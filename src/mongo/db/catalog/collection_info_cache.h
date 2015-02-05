@@ -52,7 +52,7 @@ namespace mongo {
         /*
          * Resets entire cache state. Must be called under exclusive DB lock.
          */
-        void reset();
+        void reset( OperationContext* txn );
 
         //
         // New Query Execution
@@ -73,18 +73,14 @@ namespace mongo {
         /* get set of index keys for this namespace.  handy to quickly check if a given
            field is indexed (Note it might be a secondary component of a compound index.)
         */
-        const UpdateIndexData& indexKeys() {
-            if ( !_keysComputed )
-                computeIndexKeys();
-            return _indexedPaths;
-        }
+        const UpdateIndexData& indexKeys( OperationContext* txn ) const;
 
         // ---------------------
 
         /**
          * Called when an index is added to this collection.
          */
-        void addedIndex() { reset(); }
+        void addedIndex( OperationContext* txn ) { reset( txn ); }
 
         void clearQueryCache();
 
@@ -109,7 +105,7 @@ namespace mongo {
         /**
          * Must be called under exclusive DB lock.
          */
-        void computeIndexKeys();
+        void computeIndexKeys( OperationContext* txn );
     };
 
 }  // namespace mongo

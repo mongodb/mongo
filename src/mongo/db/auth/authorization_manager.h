@@ -121,10 +121,17 @@ namespace mongo {
         static const int schemaVersion26Upgrade = 2;
 
         /**
-         * Auth schema version for MongoDB 2.6.  Users are stored in admin.system.users,
-         * roles in admin.system.roles.
+         * Auth schema version for MongoDB 2.6 and 3.0 MONGODB-CR/SCRAM mixed auth mode.
+         * Users are stored in admin.system.users, roles in admin.system.roles.
          */
         static const int schemaVersion26Final = 3;
+
+        /**
+         * Auth schema version for MongoDB 3.0 SCRAM only mode.
+         * Users are stored in admin.system.users, roles in admin.system.roles.
+         * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
+         */
+        static const int schemaVersion28SCRAM = 5;
 
         // TODO: Make the following functions no longer static.
 
@@ -176,19 +183,19 @@ namespace mongo {
         bool hasAnyPrivilegeDocuments(OperationContext* txn) const;
 
         /**
-         * Updates the auth schema version document to reflect that the system is upgraded to
-         * schemaVersion26Final.
-         *
-         * Do not call if getAuthorizationVersion() reports a value other than schemaVersion26Final.
+         * Updates the auth schema version document to reflect the current state of the system.
+         * 'foundSchemaVersion' is the authSchemaVersion to update with.
          */
-        Status writeAuthSchemaVersionIfNeeded();
+        Status writeAuthSchemaVersionIfNeeded(OperationContext* txn,
+                                              int foundSchemaVersion);
 
         /**
          * Creates the given user object in the given database.
          * 'writeConcern' contains the arguments to be passed to getLastError to block for
          * successful completion of the write.
          */
-        Status insertPrivilegeDocument(const std::string& dbname,
+        Status insertPrivilegeDocument(OperationContext* txn,
+                                       const std::string& dbname,
                                        const BSONObj& userObj,
                                        const BSONObj& writeConcern) const;
 
@@ -197,7 +204,8 @@ namespace mongo {
          * 'writeConcern' contains the arguments to be passed to getLastError to block for
          * successful completion of the write.
          */
-        Status updatePrivilegeDocument(const UserName& user,
+        Status updatePrivilegeDocument(OperationContext* txn,
+                                       const UserName& user,
                                        const BSONObj& updateObj,
                                        const BSONObj& writeConcern) const;
 
@@ -207,7 +215,8 @@ namespace mongo {
          * 'writeConcern' contains the arguments to be passed to getLastError to block for
          * successful completion of the write.
          */
-        Status removePrivilegeDocuments(const BSONObj& query,
+        Status removePrivilegeDocuments(OperationContext* txn,
+                                        const BSONObj& query,
                                         const BSONObj& writeConcern,
                                         int* numRemoved) const;
 
@@ -216,14 +225,17 @@ namespace mongo {
          * 'writeConcern' contains the arguments to be passed to getLastError to block for
          * successful completion of the write.
          */
-        Status insertRoleDocument(const BSONObj& roleObj, const BSONObj& writeConcern) const;
+        Status insertRoleDocument(OperationContext* txn,
+                                  const BSONObj& roleObj,
+                                  const BSONObj& writeConcern) const;
 
         /**
          * Updates the given role object with the given update modifier.
          * 'writeConcern' contains the arguments to be passed to getLastError to block for
          * successful completion of the write.
          */
-        Status updateRoleDocument(const RoleName& role,
+        Status updateRoleDocument(OperationContext* txn,
+                                  const RoleName& role,
                                   const BSONObj& updateObj,
                                   const BSONObj& writeConcern) const;
 
@@ -232,7 +244,8 @@ namespace mongo {
          * Should only be called on collections with authorization documents in them
          * (ie admin.system.users and admin.system.roles).
          */
-        Status updateAuthzDocuments(const NamespaceString& collectionName,
+        Status updateAuthzDocuments(OperationContext* txn,
+                                    const NamespaceString& collectionName,
                                     const BSONObj& query,
                                     const BSONObj& updatePattern,
                                     bool upsert,
@@ -246,7 +259,8 @@ namespace mongo {
          * 'writeConcern' contains the arguments to be passed to getLastError to block for
          * successful completion of the write.
          */
-        Status removeRoleDocuments(const BSONObj& query,
+        Status removeRoleDocuments(OperationContext* txn,
+                                   const BSONObj& query,
                                    const BSONObj& writeConcern,
                                    int* numRemoved) const;
 
@@ -463,7 +477,7 @@ namespace mongo {
          */
         bool _authEnabled;
 
-        scoped_ptr<AuthzManagerExternalState> _externalState;
+        boost::scoped_ptr<AuthzManagerExternalState> _externalState;
 
         /**
          * Cached value of the authorization schema version.

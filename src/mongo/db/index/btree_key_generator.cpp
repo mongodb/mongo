@@ -31,6 +31,11 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     // Used in scanandorder.cpp to inforatively error when we try to sort keys with parallel arrays.
     const int BtreeKeyGenerator::ParallelArraysCode = 10088;
 
@@ -48,9 +53,28 @@ namespace mongo {
         nullEltBuilder.appendNull("");
         _nullObj = nullEltBuilder.obj();
         _nullElt = _nullObj.firstElement();
+
+        _isIdIndex = fieldNames.size() == 1 && std::string("_id") == fieldNames[0];
     }
 
     void BtreeKeyGenerator::getKeys(const BSONObj &obj, BSONObjSet *keys) const {
+
+        if (_isIdIndex) {
+            // we special case for speed
+            BSONElement e = obj["_id"];
+            if ( e.eoo() ) {
+                keys->insert(_nullKey);
+            }
+            else {
+                int size = e.size() + 5 /* bson over head*/ - 3 /* remove _id string */;
+                BSONObjBuilder b(size);
+                b.appendAs(e, "");
+                keys->insert(b.obj());
+                invariant(keys->begin()->objsize() == size);
+            }
+            return;
+        }
+
         // These are mutated as part of the getKeys call.  :|
         vector<const char*> fieldNames(_fieldNames);
         vector<BSONElement> fixed(_fixed);

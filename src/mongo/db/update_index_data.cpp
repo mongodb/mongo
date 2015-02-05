@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     UpdateIndexData::UpdateIndexData() : _allPathsIndexed( false ) { }
 
     void UpdateIndexData::addPath( const StringData& path ) {

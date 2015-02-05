@@ -29,5 +29,6 @@ var rstConn3 = rst.getMaster();
 rstConn3.getDB("test").a.insert({a:3, str:"TESTTESTTEST"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
 
-var canConnectSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--ssl", "--eval", ";");
+var canConnectSSL = runMongoProgram("mongo", "--port", rst.ports[0],
+                                    "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
 assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");

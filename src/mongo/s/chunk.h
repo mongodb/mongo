@@ -30,14 +30,20 @@
 
 #pragma once
 
+#include <boost/next_prior.hpp>
+#include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/base/string_data.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/shardkey.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/ptr.h"
 
 namespace mongo {
 
@@ -48,13 +54,13 @@ namespace mongo {
     class ChunkObjUnitTest;
     struct WriteConcernOptions;
 
-    typedef shared_ptr<const Chunk> ChunkPtr;
+    typedef boost::shared_ptr<const Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
     typedef std::map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
-    typedef std::map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
+    typedef std::map<BSONObj,boost::shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
 
-    typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
+    typedef boost::shared_ptr<const ChunkManager> ChunkManagerPtr;
 
     /**
        config.chunks
@@ -65,6 +71,20 @@ namespace mongo {
      */
     class Chunk : boost::noncopyable {
     public:
+        enum SplitPointMode {
+            // Determines the split points that will make the current chunk smaller than
+            // the current chunk size setting. Gives empty result if chunk is not big enough.
+            normal,
+
+            // Will get a split which approximately splits the chunk into 2 halves,
+            // regardless of the size of the chunk.
+            atMedian,
+
+            // Behaves like normal, with additional special heuristics for "top chunks"
+            // (the 1 or 2 chunks in the extreme ends of the chunk key space).
+            autoSplitInternal
+        };
+
         Chunk( const ChunkManager * info , BSONObj from);
         Chunk( const ChunkManager * info ,
                const BSONObj& min,
@@ -89,12 +109,12 @@ namespace mongo {
         bool minIsInf() const;
         bool maxIsInf() const;
 
-        // Returns true if this chunk contains the given point, and false otherwise
+        // Returns true if this chunk contains the given shard key, and false otherwise
         //
         // Note: this function takes an extracted *key*, not an original document
         // (the point may be computed by, say, hashing a given field or projecting
         //  to a subset of fields).
-        bool containsPoint( const BSONObj& point ) const;
+        bool containsKey( const BSONObj& shardKey ) const;
 
         std::string genID() const;
         static std::string genID( const std::string& ns , const BSONObj& min );
@@ -112,10 +132,10 @@ namespace mongo {
         // split support
         //
 
-        long getBytesWritten() const { return _dataWritten; }
+        long long getBytesWritten() const { return _dataWritten; }
         // Const since _dataWritten is mutable and a heuristic
         // TODO: Split data tracking and chunk information
-        void setBytesWritten( long bytesWritten ) const { _dataWritten = bytesWritten; }
+        void setBytesWritten(long long bytesWritten) const { _dataWritten = bytesWritten; }
 
         /**
          * if the amount of data written nears the max size of a shard
@@ -127,17 +147,15 @@ namespace mongo {
         /**
          * Splits this chunk at a non-specificed split key to be chosen by the mongod holding this chunk.
          *
-         * @param atMedian if set to true, will split the chunk at the middle regardless if
-         *      the split is really necessary size wise. If set to false, will only split if
-         *      the chunk has reached the currently desired maximum size. Setting to false also
-         *      has the effect of splitting the chunk such that the resulting chunks will never
-         *      be greater than the current chunk size setting.
+         * @param mode
          * @param res the object containing details about the split execution
          * @param resultingSplits the number of resulting split points. Set to NULL to ignore.
          *
          * @throws UserException
          */
-        Status split( bool atMedian, size_t* resultingSplits ) const;
+        Status split(SplitPointMode mode,
+                     size_t* resultingSplits,
+                     BSONObj* res) const;
 
         /**
          * Splits this chunk at the given key (or keys)
@@ -147,7 +165,7 @@ namespace mongo {
          *
          * @throws UserException
          */
-        Status multiSplit( const std::vector<BSONObj>& splitPoints ) const;
+        Status multiSplit(const std::vector<BSONObj>& splitPoints, BSONObj* res) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
@@ -162,7 +180,10 @@ namespace mongo {
          * @param maxPoints limits the number of split points that are needed, zero is max (optional)
          * @param maxObjs limits the number of objects in each chunk, zero is as max (optional)
          */
-        void pickSplitVector( std::vector<BSONObj>& splitPoints , int chunkSize , int maxPoints = 0, int maxObjs = 0) const;
+        void pickSplitVector(std::vector<BSONObj>& splitPoints,
+                             long long chunkSize,
+                             int maxPoints = 0,
+                             int maxObjs = 0) const;
 
         //
         // migration support
@@ -216,7 +237,7 @@ namespace mongo {
         // public constants
         //
 
-        static int MaxChunkSize;
+        static long long MaxChunkSize;
         static int MaxObjectPerChunk;
         static bool ShouldAutoSplit;
 
@@ -251,20 +272,22 @@ namespace mongo {
 
         // transient stuff
 
-        mutable long _dataWritten;
+        mutable long long _dataWritten;
 
         // methods, etc..
 
-        /** Returns the highest or lowest existing value in the shard-key space.
-         *  Warning: this assumes that the shard key is not "special"- that is, the shardKeyPattern
-         *           is simply an ordered list of ascending/descending field names. Examples:
-         *           {a : 1, b : -1} is not special. {a : "hashed"} is.
+        /**
+         * Returns the split point that will result in one of the chunk having exactly one
+         * document. Also returns an empty document if the split point cannot be determined.
          *
-         * if sort 1, return lowest key
-         * if sort -1, return highest key
-         * will return empty object if have none
+         * @param doSplitAtLower determines which side of the split will have exactly one document.
+         *        True means that the split point chosen will be closer to the lower bound.
+         *
+         * Warning: this assumes that the shard key is not "special"- that is, the shardKeyPattern
+         *          is simply an ordered list of ascending/descending field names. Examples:
+         *          {a : 1, b : -1} is not special. {a : "hashed"} is.
          */
-        BSONObj _getExtremeKey( int sort ) const;
+        BSONObj _getExtremeKey(bool doSplitAtLower) const;
 
         /**
          * Determines the appropriate split points for this chunk.
@@ -276,8 +299,6 @@ namespace mongo {
 
         /** initializes _dataWritten with a random value so that a mongos restart wouldn't cause delay in splitting */
         static int mkDataWritten();
-
-        ShardKeyPattern skey() const;
     };
 
     class ChunkRange {
@@ -289,12 +310,12 @@ namespace mongo {
         const BSONObj& getMax() const { return _max; }
 
         // clones of Chunk methods
-        // Returns true if this ChunkRange contains the given point, and false otherwise
+        // Returns true if this ChunkRange contains the given shard key, and false otherwise
         //
         // Note: this function takes an extracted *key*, not an original document
         // (the point may be computed by, say, hashing a given field or projecting
         //  to a subset of fields).
-        bool containsPoint( const BSONObj& point ) const;
+        bool containsKey( const BSONObj& shardKey ) const;
 
         ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
             : _manager(begin->second->getManager())
@@ -362,7 +383,7 @@ namespace mongo {
     */
     class ChunkManager {
     public:
-        typedef std::map<Shard,ChunkVersion> ShardVersionMap;
+        typedef std::map<std::string, ChunkVersion> ShardVersionMap;
 
         // Loads a new chunk manager from a collection document
         ChunkManager( const BSONObj& collDoc );
@@ -370,16 +391,9 @@ namespace mongo {
         // Creates an empty chunk manager for the namespace
         ChunkManager( const std::string& ns, const ShardKeyPattern& pattern, bool unique );
 
-        // Updates a chunk manager based on an older manager
-        ChunkManager( ChunkManagerPtr oldManager );
-
         std::string getns() const { return _ns; }
 
-        const ShardKeyPattern& getShardKey() const {  return _key; }
-
-        bool hasShardKey(const BSONObj& doc) const;
-
-        bool hasTargetableShardKey(const BSONObj& doc) const;
+        const ShardKeyPattern& getShardKeyPattern() const { return _keyPattern; }
 
         bool isUnique() const { return _unique; }
 
@@ -400,7 +414,7 @@ namespace mongo {
                                 const std::vector<Shard>* initShards );
 
         // Loads existing ranges based on info in chunk manager
-        void loadExistingRanges( const std::string& config );
+        void loadExistingRanges(const std::string& config, const ChunkManager* oldManager);
 
 
         // Helpers for load
@@ -416,26 +430,15 @@ namespace mongo {
 
         int numChunks() const { return _chunkMap.size(); }
 
-        /** Given a document, returns the chunk which contains that document.
-         *  This works by extracting the shard key part of the given document, then
-         *  calling findIntersectingChunk() on the extracted key.
+        /**
+         * Given a key that has been extracted from a document, returns the
+         * chunk that contains that key.
          *
-         *  See also the description for findIntersectingChunk().
+         * For instance, to locate the chunk for document {a : "foo" , b : "bar"}
+         * when the shard key is {a : "hashed"}, you can call
+         *  findIntersectingChunk() on {a : hash("foo") }
          */
-        ChunkPtr findChunkForDoc( const BSONObj& doc ) const;
-
-        /** Given a key that has been extracted from a document, returns the
-         *  chunk that contains that key.
-         *
-         *  For instance, to locate the chunk for document {a : "foo" , b : "bar"}
-         *  when the shard key is {a : "hashed"}, you can call
-         *      findChunkForDoc() on {a : "foo" , b : "bar"}, or
-         *      findIntersectingChunk() on {a : hash("foo") }
-         */
-        ChunkPtr findIntersectingChunk( const BSONObj& point ) const;
-
-
-        ChunkPtr findChunkOnServer( const Shard& shard ) const;
+        ChunkPtr findIntersectingChunk( const BSONObj& shardKey ) const;
 
         void getShardsForQuery( std::set<Shard>& shards , const BSONObj& query ) const;
         void getAllShards( std::set<Shard>& all ) const;
@@ -460,21 +463,16 @@ namespace mongo {
         //   =>  { a: (0, 1), (2, 3), b: (0, 1), (2, 3) }
         static IndexBounds collapseQuerySolution( const QuerySolutionNode* node );
 
-        ChunkMap getChunkMap() const { return _chunkMap; }
+        const ChunkMap& getChunkMap() const { return _chunkMap; }
 
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
          */
-        bool compatibleWith( const ChunkManager& other, const Shard& shard ) const;
-        bool compatibleWith( ChunkManagerPtr other, const Shard& shard ) const { if( ! other ) return false; return compatibleWith( *other, shard ); }
-
-        bool compatibleWith( const Chunk& other ) const;
-        bool compatibleWith( ChunkPtr other ) const { if( ! other ) return false; return compatibleWith( *other ); }
+        bool compatibleWith(const ChunkManager& other, const std::string& shard) const;
 
         std::string toString() const;
 
-        ChunkVersion getVersion( const StringData& shardName ) const;
-        ChunkVersion getVersion( const Shard& shard ) const;
+        ChunkVersion getVersion(const std::string& shardName) const;
         ChunkVersion getVersion() const;
 
         void getInfo( BSONObjBuilder& b ) const;
@@ -498,15 +496,18 @@ namespace mongo {
         // helpers for loading
 
         // returns true if load was consistent
-        bool _load( const std::string& config, ChunkMap& chunks, std::set<Shard>& shards,
-                                    ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
+        bool _load(const std::string& config,
+                   ChunkMap& chunks,
+                   std::set<Shard>& shards,
+                   ShardVersionMap& shardVersions,
+                   const ChunkManager* oldManager);
         static bool _isValid(const ChunkMap& chunks);
 
         // end helpers
 
         // All members should be const for thread-safety
         const std::string _ns;
-        const ShardKeyPattern _key;
+        const ShardKeyPattern _keyPattern;
         const bool _unique;
 
         const ChunkMap _chunkMap;
@@ -518,10 +519,6 @@ namespace mongo {
 
         // max version of any chunk
         ChunkVersion _version;
-
-        // the previous manager this was based on
-        // cleared after loading chunks
-        ChunkManagerPtr _oldManager;
 
         mutable mutex _mutex; // only used with _nsLock
 
@@ -535,21 +532,11 @@ namespace mongo {
         class SplitHeuristics {
         public:
 
-            SplitHeuristics() :
-                _splitTickets( maxParallelSplits ),
-                _staleMinorSetMutex( "SplitHeuristics::staleMinorSet" ),
-                _staleMinorCount( 0 ) {}
-
-            void markMinorForReload( const std::string& ns, ChunkVersion majorVersion );
-            void getMarkedMinorVersions( std::set<ChunkVersion>& minorVersions );
+            SplitHeuristics()
+                : _splitTickets(maxParallelSplits) {
+            }
 
             TicketHolder _splitTickets;
-
-            mutex _staleMinorSetMutex;
-
-            // mutex protects below
-            int _staleMinorCount;
-            std::set<ChunkVersion> _staleMinorSet;
 
             // Test whether we should split once data * splitTestFactor > chunkSize (approximately)
             static const int splitTestFactor = 5;
@@ -563,7 +550,6 @@ namespace mongo {
             // (for now) for parallel or sequential oversplitting.
             // TODO: Make splitting a separate thread with notifications?
             static const int staleMinorReloadThreshold = maxParallelSplits;
-
         };
 
         mutable SplitHeuristics _splitHeuristics;
@@ -575,10 +561,8 @@ namespace mongo {
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt32 NextSequenceNumber;
-        
-        /** Just for testing */
+
         friend class TestableChunkManager;
-        ChunkManager();
     };
 
     // like BSONObjCmp. for use as an STL comparison functor
@@ -597,7 +581,7 @@ namespace mongo {
         bool operator()( const ChunkRange &l, const ChunkRange &r ) const {
             return _cmp(l.getMin(), r.getMin());
         }
-        bool operator()( const shared_ptr<ChunkRange> l, const shared_ptr<ChunkRange> r ) const {
+        bool operator()( const boost::shared_ptr<ChunkRange> l, const boost::shared_ptr<ChunkRange> r ) const {
             return operator()(*l, *r);
         }
     private:

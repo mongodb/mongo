@@ -38,6 +38,7 @@
 
 #pragma once
 
+#include "mongo/base/data_view.h"
 #include "mongo/bson/optime.h"
 #include "mongo/util/time_support.h"
 
@@ -61,22 +62,8 @@ namespace mongo {
 
     inline OpTime BSONElement::_opTime() const {
         if( type() == mongo::Date || type() == Timestamp )
-            return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
+            return OpTime(ConstDataView(value()).readLE<unsigned long long>());
         return OpTime();
-    }
-
-    inline std::string BSONElement::_asCode() const {
-        switch( type() ) {
-        case mongo::String:
-        case Code:
-            return std::string(valuestr(), valuestrsize()-1);
-        case CodeWScope:
-            return std::string(codeWScopeCode(), *(int*)(valuestr())-1);
-        default:
-            log() << "can't convert type: " << (int)(type()) << " to code" << std::endl;
-        }
-        uassert( 10062 ,  "not code" , 0 );
-        return "";
     }
 
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const DateNowLabeler& id) {

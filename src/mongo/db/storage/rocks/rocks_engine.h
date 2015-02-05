@@ -1,5 +1,3 @@
-// rocks_engine.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -32,96 +30,135 @@
 #pragma once
 
 #include <list>
+#include <map>
 #include <string>
+#include <memory>
 
+#include <boost/optional.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include <rocksdb/cache.h>
+#include <rocksdb/status.h>
+
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/storage/storage_engine.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/util/string_map.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
+    struct ColumnFamilyDescriptor;
     struct ColumnFamilyOptions;
     class DB;
+    class Comparator;
+    class Iterator;
+    struct Options;
+    struct ReadOptions;
 }
 
 namespace mongo {
 
-    class RocksCollectionCatalogEntry;
-    class RocksRecordStore;
-
     struct CollectionOptions;
 
-    /**
-     * Since we have one DB for the entire server, the RocksEngine is going to hold all state.
-     * DatabaseCatalogEntry will just be a thin slice over the engine.
-     */
-    class RocksEngine : public StorageEngine {
+    class RocksEngine : public KVEngine {
         MONGO_DISALLOW_COPYING( RocksEngine );
     public:
-        RocksEngine( const std::string& path );
+        RocksEngine(const std::string& path, bool durable);
         virtual ~RocksEngine();
 
-        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
+        virtual RecoveryUnit* newRecoveryUnit() override;
 
-        virtual void listDatabases( std::vector<std::string>* out ) const;
+        virtual Status createRecordStore(OperationContext* opCtx,
+                                         const StringData& ns,
+                                         const StringData& ident,
+                                         const CollectionOptions& options) override;
 
-        virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                               const StringData& db );
+        virtual RecordStore* getRecordStore(OperationContext* opCtx, const StringData& ns,
+                                            const StringData& ident,
+                                            const CollectionOptions& options) override;
 
-        /**
-         * @return number of files flushed
-         */
-        virtual int flushAllFiles( bool sync );
+        virtual Status createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
+                                                 const IndexDescriptor* desc) override;
 
-        virtual Status repairDatabase( OperationContext* tnx,
-                                       const std::string& dbName,
-                                       bool preserveClonedFilesOnFailure = false,
-                                       bool backupOriginalFiles = false );
+        virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
+                                                            const StringData& ident,
+                                                            const IndexDescriptor* desc) override;
+
+        virtual Status dropIdent(OperationContext* opCtx, const StringData& ident) override;
+
+        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const {
+            return _identColumnFamilyMap.find(ident) != _identColumnFamilyMap.end();;
+        }
+        virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const override;
+
+        virtual bool supportsDocLocking() const override {
+            return true;
+        }
+
+        virtual bool supportsDirectoryPerDB() const override {
+            return false;
+        }
+
+        virtual bool isDurable() const override { return _durable; }
+
+        virtual int64_t getIdentSize(OperationContext* opCtx,
+                                      const StringData& ident) {
+          // TODO: return correct size.
+          return 1;
+        }
+
+        virtual Status repairIdent(OperationContext* opCtx,
+                                    const StringData& ident) {
+            return Status::OK();
+        }
+
+        virtual void cleanShutdown() {}
 
         // rocks specific api
 
-        rocksdb::DB* getDB() { return _db; }
-        const rocksdb::DB* getDB() const { return _db; }
-
-        void getCollectionNamespaces( const StringData& dbName, std::list<std::string>* out ) const;
-
-        Status createCollection( OperationContext* txn,
-                                 const StringData& ns,
-                                 const CollectionOptions& options );
-
-        Status dropCollection( OperationContext* opCtx,
-                               const StringData& ns );
-
-        // will create if doesn't exist
-        // collection has to exist first though
-        rocksdb::ColumnFamilyHandle* getIndexColumnFamily( const StringData& ns,
-                                                           const StringData& indexName );
-
-        struct Entry {
-            boost::scoped_ptr<rocksdb::ColumnFamilyHandle> cfHandle;
-            boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;
-            boost::scoped_ptr<RocksRecordStore> recordStore;
-            StringMap< boost::shared_ptr<rocksdb::ColumnFamilyHandle> > indexNameToCF;
-        };
-
-        Entry* getEntry( const StringData& ns );
-        const Entry* getEntry( const StringData& ns ) const;
+        rocksdb::DB* getDB() { return _db.get(); }
+        const rocksdb::DB* getDB() const { return _db.get(); }
 
     private:
+        bool _existsColumnFamily(const StringData& ident);
+        Status _createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
+                                   const StringData& ident);
+        Status _dropColumnFamily(const StringData& ident);
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _getColumnFamily(const StringData& ident);
 
-        rocksdb::ColumnFamilyOptions _collectionOptions() const;
-        rocksdb::ColumnFamilyOptions _indexOptions() const;
+        std::unordered_map<std::string, Ordering> _loadOrderingMetaData(rocksdb::Iterator* itr);
+        std::set<std::string> _loadCollections(rocksdb::Iterator* itr);
+        std::vector<std::string> _loadColumnFamilies();
+
+        rocksdb::ColumnFamilyOptions _collectionOptions();
+        rocksdb::ColumnFamilyOptions _indexOptions(const Ordering& order);
+
+        rocksdb::Options _dbOptions();
+
+        rocksdb::ColumnFamilyOptions _defaultCFOptions();
 
         std::string _path;
-        rocksdb::DB* _db;
+        boost::scoped_ptr<rocksdb::DB> _db;
+        std::shared_ptr<rocksdb::Cache> _block_cache;
 
-        typedef StringMap< boost::shared_ptr<Entry> > Map;
-        mutable boost::mutex _mapLock;
-        Map _map;
+        const bool _durable;
 
+        // Default column family is owned by the rocksdb::DB instance.
+        rocksdb::ColumnFamilyHandle* _defaultHandle;
+
+        mutable boost::mutex _identColumnFamilyMapMutex;
+        typedef StringMap<boost::shared_ptr<rocksdb::ColumnFamilyHandle> > IdentColumnFamilyMap;
+        IdentColumnFamilyMap _identColumnFamilyMap;
+
+        // This is for concurrency control
+        RocksTransactionEngine _transactionEngine;
+
+        static const std::string kOrderingPrefix;
+        static const std::string kCollectionPrefix;
     };
+
+    Status toMongoStatus( rocksdb::Status s );
 }

@@ -34,10 +34,8 @@ function f() {
     assert(lim == 64, "not 64 indexes");
 
     assert(t.find({ x: 9 }).length() == 1, "b");
-    assert(t.find({ x: 9 }).explain().cursor.match(/Btree/), "not using index?");
 
     assert(t.find({ y: 99 }).length() == 2, "y idx");
-    assert(t.find({ y: 99 }).explain().cursor.match(/Btree/), "not using y index?");
 
     /* check that renamecollection remaps all the indexes right */
     assert(t.renameCollection("many2").ok, "rename failed");

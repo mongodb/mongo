@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 
@@ -38,21 +38,18 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/storage/mmap_v1/catalog/hashtab.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_index.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/startup_test.h"
 
-
 namespace mongo {
-
-
-    BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool capped ) {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
@@ -64,7 +61,7 @@ namespace mongo {
         nIndexes = 0;
         isCapped = capped;
         maxDocsInCapped = 0x7fffffff; // no limit (value is for pre-v2.3.2 compatibility)
-        paddingFactor = 1.0;
+        paddingFactorOldDoNotUse = 1.0;
         systemFlagsOldDoNotUse = 0;
         userFlags = 0;
         capFirstNewRecord = DiskLoc();
@@ -73,7 +70,7 @@ namespace mongo {
         // For capped case, signal that we are doing initial extent allocation.
         if ( capped ) {
             // WAS: cappedLastDelRecLastExtent().setInvalid();
-            deletedList[1].setInvalid();
+            deletedListSmall[1].setInvalid();
         }
         verify( sizeof(_dataFileVersion) == 2 );
         _dataFileVersion = 0;
@@ -89,7 +86,10 @@ namespace mongo {
                                                            const StringData& ns,
                                                            NamespaceIndex& ni,
                                                            int nindexessofar) {
-        txn->lockState()->assertWriteLocked(ns);
+
+        // Namespace details must always be changed under an exclusive DB lock
+        const NamespaceString nss(ns);
+        invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
         int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
         verify( i >= 0 && i <= 1 );
@@ -224,12 +224,13 @@ namespace mongo {
     /* ------------------------------------------------------------------------- */
 
 
-    int NamespaceDetails::_catalogFindIndexByName(const Collection* coll,
+    int NamespaceDetails::_catalogFindIndexByName(OperationContext* txn,
+                                                  const Collection* coll,
                                                   const StringData& name,
                                                   bool includeBackgroundInProgress) const {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
-            const BSONObj obj = coll->docFor(i.next().info);
+            const BSONObj obj = coll->docFor(txn, i.next().info.toRecordId()).value();
             if ( name == obj.getStringField("name") )
                 return i.pos()-1;
         }

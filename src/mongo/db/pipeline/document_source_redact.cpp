@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
 
@@ -38,6 +38,9 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using std::vector;
 
     const char DocumentSourceRedact::redactName[] = "$redact";
 

@@ -66,4 +66,4 @@ function allReplicated() {
 }
 
 // Wait for the correct number of (replicated) documents to be present on the secondary.
-assert.soon( allReplicated );
+assert.soon( allReplicated, "didn't replicate all docs", 5 * 60 * 1000 );

@@ -1,14 +1,14 @@
 /**
  * This checks rollback, which shouldn't happen unless we have reached minvalid.
  *  1. make 3-member set w/arb (2)
- *  2. shut down 1
- *  3. do writes to 0
- *  4. modify 0's minvalid
- *  5. shut down 0
- *  6. start up 1
- *  7. writes on 1
- *  8. start up 0
- *  9. check 0 does not rollback
+ *  2. shut down slave
+ *  3. do writes to master
+ *  4. modify master's minvalid
+ *  5. shut down master
+ *  6. start up slave
+ *  7. writes on former slave (now primary)
+ *  8. start up master
+ *  9. check master does not rollback
  */
 
 print("1. make 3-member set w/arb (2)");
@@ -22,49 +22,50 @@ replTest.initiate({_id : name, members : [
     {_id : 1, host : host+":"+replTest.ports[1]},
     {_id : 2, host : host+":"+replTest.ports[2], arbiterOnly : true}
 ]});
+var slaves = replTest.liveNodes.slaves;
 var master = replTest.getMaster();
+var masterId = replTest.getNodeId(master);
+var slave = slaves[0];
+var slaveId = replTest.getNodeId(slave);
 var mdb = master.getDB("foo");
 
 mdb.foo.save({a: 1000});
 replTest.awaitReplication();
 
-print("2: shut down 1");
-replTest.stop(1);
+print("2: shut down slave");
+replTest.stop(slaveId);
 
-print("3: do writes to 0");
-mdb.foo.save({a: 1001});
+print("3: write to master");
+assert.writeOK(mdb.foo.insert({a: 1001}, { writeConcern: { w: 1 } }));
 
-print("4: modify 0's minvalid");
+print("4: modify master's minvalid");
 var local = master.getDB("local");
 var lastOp = local.oplog.rs.find().sort({$natural:-1}).limit(1).next();
 printjson(lastOp);
 
-local.replset.minvalid.insert({ts:new Timestamp(lastOp.ts.t, lastOp.ts.i+1),
-                               h:new NumberLong("1234567890")});
+// Overwrite minvalid document to simulate an inconsistent state (as might result from a server
+// crash.
+local.replset.minvalid.update({},{ ts:new Timestamp(lastOp.ts.t, lastOp.ts.i+1) }, {upsert: true});
 printjson(local.replset.minvalid.findOne());
 
-print("5: shut down 0");
-replTest.stop(0);
+print("5: shut down master");
+replTest.stop(masterId);
 
-print("6: start up 1");
-replTest.restart(1);
+print("6: start up slave");
+replTest.restart(slaveId);
 
-print("7: writes on 1")
+print("7: writes on former slave")
 master = replTest.getMaster();
 mdb1 = master.getDB("foo");
 mdb1.foo.save({a:1002});
 
-print("8: start up 0");
-replTest.restart(0);
+print("8: start up former master");
+clearRawMongoProgramOutput();
+replTest.restart(masterId);
 
-print("9: check 0 does not rollback");
+print("9: check former master does not roll back");
 assert.soon(function(){
-    var status = master.adminCommand({replSetGetStatus:1});
-    var stateStr = status.members[0].stateStr;
-    assert(stateStr != "ROLLBACK" &&
-           stateStr != "SECONDARY" &&
-           stateStr != "PRIMARY", tojson(status));
-    return stateStr == "FATAL";
+    return rawMongoProgramOutput().match("replSet need to rollback, but in inconsistent state");
 });
 
 replTest.stopSet(15);

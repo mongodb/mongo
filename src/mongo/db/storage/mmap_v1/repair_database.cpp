@@ -28,11 +28,14 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
@@ -42,28 +45,24 @@
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using boost::scoped_ptr;
+    using std::endl;
+    using std::map;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     typedef boost::filesystem::path Path;
-
-    // TODO SERVER-4328
-    bool inDBRepair = false;
-    struct doingRepair {
-        doingRepair() {
-            verify( ! inDBRepair );
-            inDBRepair = true;
-        }
-        ~doingRepair() {
-            inDBRepair = false;
-        }
-    };
 
     // inheritable class to implement an operation that may be applied to all
     // files in a database using _applyOpToDataFiles()
@@ -251,9 +250,10 @@ namespace mongo {
                   << "db: " << _dbName << " path: " << _pathString;
 
             try {
-                _txn->recoveryUnit()->syncDataAndTruncateJournal();
+                getDur().syncDataAndTruncateJournal(_txn);
 
-                globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
+                // need both in case journaling is disabled
+                MongoFile::flushAll(true);
 
                 MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( _path ) );
             }
@@ -280,18 +280,10 @@ namespace mongo {
                                          const std::string& dbName,
                                          bool preserveClonedFilesOnFailure,
                                          bool backupOriginalFiles ) {
-        // We must hold some form of lock here
-        invariant(txn->lockState()->threadState());
-        invariant( dbName.find( '.' ) == string::npos );
-
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
-        doingRepair dr;
 
-        log() << "repairDatabase " << dbName << endl;
-
-        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
-
-        txn->recoveryUnit()->syncDataAndTruncateJournal(); // Must be done before and after repair
+        // Must be done before and after repair
+        getDur().syncDataAndTruncateJournal(txn);
 
         intmax_t totalSize = dbSize( dbName );
         intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
@@ -308,7 +300,9 @@ namespace mongo {
         Path reservedPath =
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
                                 "backup" : "_tmp" );
-        MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
+        bool created = false;
+        MONGO_ASSERT_ON_EXCEPTION( created = boost::filesystem::create_directory( reservedPath ) );
+        invariant( created );
         string reservedPathString = reservedPath.string();
 
         if ( !preserveClonedFilesOnFailure )
@@ -318,40 +312,36 @@ namespace mongo {
                                                             reservedPath ) );
 
         {
-            Database* originalDatabase =
-                            dbHolder().get(txn, dbName);
+            Database* originalDatabase = dbHolder().openDb(txn, dbName);
             if (originalDatabase == NULL) {
                 return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
             }
 
             scoped_ptr<MMAPV1DatabaseCatalogEntry> dbEntry;
             scoped_ptr<Database> tempDatabase;
-            {
-                dbEntry.reset( new MMAPV1DatabaseCatalogEntry( txn,
-                                                               dbName,
-                                                               reservedPathString,
-                                                               storageGlobalParams.directoryperdb,
-                                                               true ) );
-                invariant( !dbEntry->exists() );
-                tempDatabase.reset( new Database( txn,
-                                                  dbName,
-                                                  dbEntry.get() ) );
 
+            // Must call this before MMAPV1DatabaseCatalogEntry's destructor closes the DB files
+            ON_BLOCK_EXIT(&dur::DurableInterface::syncDataAndTruncateJournal, &getDur(), txn);
+
+            {
+                dbEntry.reset(new MMAPV1DatabaseCatalogEntry(txn,
+                                                             dbName,
+                                                             reservedPathString,
+                                                             storageGlobalParams.directoryperdb,
+                                                             true));
+                tempDatabase.reset( new Database(txn, dbName, dbEntry.get()));
             }
 
             map<string,CollectionOptions> namespacesToCopy;
             {
                 string ns = dbName + ".system.namespaces";
                 Client::Context ctx(txn,  ns );
-                Collection* coll = originalDatabase->getCollection( txn, ns );
+                Collection* coll = originalDatabase->getCollection( ns );
                 if ( coll ) {
-                    scoped_ptr<RecordIterator> it( coll->getIterator( txn,
-                                                                      DiskLoc(),
-                                                                      false,
-                                                                      CollectionScanParams::FORWARD ) );
+                    scoped_ptr<RecordIterator> it( coll->getIterator(txn) );
                     while ( !it->isEOF() ) {
-                        DiskLoc loc = it->getNext();
-                        BSONObj obj = coll->docFor( loc );
+                        RecordId loc = it->getNext();
+                        BSONObj obj = coll->docFor(txn, loc).value();
 
                         string ns = obj["name"].String();
 
@@ -385,64 +375,70 @@ namespace mongo {
 
                 Collection* tempCollection = NULL;
                 {
-                    Client::Context tempContext(txn, ns, tempDatabase );
-                    tempCollection = tempDatabase->createCollection( txn, ns, options, true, false );
+                    WriteUnitOfWork wunit(txn);
+                    tempCollection = tempDatabase->createCollection(txn, ns, options, true, false);
+                    wunit.commit();
                 }
 
                 Client::Context readContext(txn, ns, originalDatabase);
-                Collection* originalCollection = originalDatabase->getCollection( txn, ns );
+                Collection* originalCollection = originalDatabase->getCollection( ns );
                 invariant( originalCollection );
 
                 // data
 
-                MultiIndexBlock indexBlock(txn, tempCollection );
+                // TODO SERVER-14812 add a mode that drops duplicates rather than failing
+                MultiIndexBlock indexer(txn, tempCollection );
                 {
                     vector<BSONObj> indexes;
                     IndexCatalog::IndexIterator ii =
-                        originalCollection->getIndexCatalog()->getIndexIterator( false );
+                        originalCollection->getIndexCatalog()->getIndexIterator( txn, false );
                     while ( ii.more() ) {
                         IndexDescriptor* desc = ii.next();
                         indexes.push_back( desc->infoObj() );
                     }
 
-                    Client::Context tempContext(txn, ns, tempDatabase);
-                    Status status = indexBlock.init( indexes );
+                    Status status = indexer.init( indexes );
                     if ( !status.isOK() )
                         return status;
-
                 }
 
-                scoped_ptr<RecordIterator> iterator(
-                    originalCollection->getIterator( txn, DiskLoc(), false,
-                                                     CollectionScanParams::FORWARD ));
+                scoped_ptr<RecordIterator> iterator(originalCollection->getIterator(txn));
                 while ( !iterator->isEOF() ) {
-                    DiskLoc loc = iterator->getNext();
+                    RecordId loc = iterator->getNext();
                     invariant( !loc.isNull() );
 
-                    BSONObj doc = originalCollection->docFor( loc );
+                    BSONObj doc = originalCollection->docFor(txn, loc).value();
 
-                    Client::Context tempContext(txn, ns, tempDatabase);
-                    StatusWith<DiskLoc> result = tempCollection->insertDocument( txn, doc, indexBlock );
+                    WriteUnitOfWork wunit(txn);
+                    StatusWith<RecordId> result = tempCollection->insertDocument(txn,
+                                                                                 doc,
+                                                                                 &indexer,
+                                                                                 false);
                     if ( !result.isOK() )
                         return result.getStatus();
 
-                    txn->recoveryUnit()->commitIfNeeded();
-                    txn->checkForInterrupt(false);
+                    wunit.commit();
+                    txn->checkForInterrupt();
                 }
+                
+                Status status = indexer.doneInserting();
+                if (!status.isOK())
+                    return status;
 
                 {
-                    Client::Context tempContext(txn, ns, tempDatabase);
-                    Status status = indexBlock.commit();
-                    if ( !status.isOK() )
-                        return status;
+                    WriteUnitOfWork wunit(txn);
+                    indexer.commit();
+                    wunit.commit();
                 }
 
             }
 
-            txn->recoveryUnit()->syncDataAndTruncateJournal();
-            globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
+            getDur().syncDataAndTruncateJournal(txn);
 
-            txn->checkForInterrupt(false);
+            // need both in case journaling is disabled
+            MongoFile::flushAll(true);
+
+            txn->checkForInterrupt();
         }
 
         // at this point if we abort, we don't want to delete new files
@@ -451,7 +447,8 @@ namespace mongo {
         if ( repairFileDeleter.get() )
             repairFileDeleter->success();
 
-        dbHolder().close( txn, dbName );
+        // Close the database so we can rename/delete the original data files
+        dbHolder().close(txn, dbName);
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );
@@ -473,8 +470,12 @@ namespace mongo {
 
         _replaceWithRecovered( dbName, reservedPathString.c_str() );
 
-        if ( !backupOriginalFiles )
-            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
+        if (!backupOriginalFiles) {
+            MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::remove_all(reservedPath));
+        }
+
+        // Reopen the database so it's discoverable
+        dbHolder().openDb(txn, dbName);
 
         return Status::OK();
     }

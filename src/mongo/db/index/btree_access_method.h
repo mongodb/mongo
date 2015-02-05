@@ -59,7 +59,7 @@ namespace mongo {
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         // Our keys differ for V0 and V1.
-        scoped_ptr<BtreeKeyGenerator> _keyGenerator;
+        boost::scoped_ptr<BtreeKeyGenerator> _keyGenerator;
     };
 
 }  // namespace mongo

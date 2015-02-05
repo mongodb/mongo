@@ -29,6 +29,10 @@
 
 #include "mongo/util/net/hostandport.h"
 
+#include <boost/functional/hash.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
@@ -135,6 +139,12 @@ namespace mongo {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "']' present without '[' in " << s.toString());
         }
+        else if (s.find(':') != colonPos) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "More than one ':' detected. If this is an ipv6 address,"
+                                        << " it needs to be surrounded by '[' and ']'; "
+                                        << s.toString());
+        }
 
         if (hostPart.empty()) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<
@@ -168,3 +178,12 @@ namespace mongo {
     }
 
 }  // namespace mongo
+
+MONGO_HASH_NAMESPACE_START
+size_t hash<mongo::HostAndPort>::operator()(const mongo::HostAndPort& host) const {
+    hash<int> intHasher;
+    size_t hash = intHasher(host.port());
+    boost::hash_combine(hash, host.host());
+    return hash;
+}
+MONGO_HASH_NAMESPACE_END

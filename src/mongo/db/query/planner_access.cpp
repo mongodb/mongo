@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/query/planner_access.h"
 
 #include <algorithm>
@@ -38,8 +40,10 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/util/log.h"
 
 namespace {
 
@@ -56,6 +60,7 @@ namespace {
 
 namespace mongo {
 
+    using std::auto_ptr;
     using std::vector;
 
     // static
@@ -90,44 +95,6 @@ namespace mongo {
         return csn;
     }
 
-    // Helper needed for GeoNear until we remove the default 100 limit
-    static MatchExpression* cloneExcludingGeoNear(const MatchExpression* expr) {
-
-        if (MatchExpression::GEO_NEAR == expr->matchType()) {
-            return NULL;
-        }
-
-        auto_ptr<MatchExpression> clone(expr->shallowClone());
-        vector<MatchExpression*> stack;
-        stack.push_back(clone.get());
-
-        while (!stack.empty()) {
-
-            MatchExpression* next = stack.back();
-            stack.pop_back();
-
-            vector<MatchExpression*>* childVector = next->getChildVector();
-            if (!childVector)
-                continue;
-
-            for (vector<MatchExpression*>::iterator it = childVector->begin();
-                it != childVector->end();) {
-
-                MatchExpression* child = *it;
-                if (MatchExpression::GEO_NEAR == child->matchType()) {
-                    it = childVector->erase(it);
-                    delete child;
-                }
-                else {
-                    stack.push_back(child);
-                    ++it;
-                }
-            }
-        }
-
-        return clone.release();
-    }
-
     // static
     QuerySolutionNode* QueryPlannerAccess::makeLeafNode(const CanonicalQuery& query,
                                                         const IndexEntry& index,
@@ -155,24 +122,19 @@ namespace mongo {
             if (indexIs2D) {
                 GeoNear2DNode* ret = new GeoNear2DNode();
                 ret->indexKeyPattern = index.keyPattern;
-                ret->nq = nearExpr->getData();
+                ret->nq = &nearExpr->getData();
                 ret->baseBounds.fields.resize(index.keyPattern.nFields());
                 if (NULL != query.getProj()) {
                     ret->addPointMeta = query.getProj()->wantGeoNearPoint();
                     ret->addDistMeta = query.getProj()->wantGeoNearDistance();
                 }
 
-                ret->numToReturn = query.getParsed().getNumToReturn();
-                if (ret->numToReturn == 0)
-                    ret->numToReturn = 100;
-                ret->fullFilterExcludingNear.reset(cloneExcludingGeoNear(query.root()));
-
                 return ret;
             }
             else {
                 GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
                 ret->indexKeyPattern = index.keyPattern;
-                ret->nq = nearExpr->getData();
+                ret->nq = &nearExpr->getData();
                 ret->baseBounds.fields.resize(index.keyPattern.nFields());
                 if (NULL != query.getProj()) {
                     ret->addPointMeta = query.getProj()->wantGeoNearPoint();
@@ -447,11 +409,13 @@ namespace mongo {
                 MatchExpression* child = amExpr->getChild(curChild);
                 IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
                 invariant(NULL != ixtag);
-                // Only want prefixes.
-                if (ixtag->pos >= prefixEnd) {
+                // Skip this child if it's not part of a prefix, or if we've already assigned a
+                // predicate to this prefix position.
+                if (ixtag->pos >= prefixEnd || prefixExprs[ixtag->pos] != NULL) {
                     ++curChild;
                     continue;
                 }
+                // prefixExprs takes ownership of 'child'.
                 prefixExprs[ixtag->pos] = child;
                 amExpr->getChildVector()->erase(amExpr->getChildVector()->begin() + curChild);
                 // Don't increment curChild.
@@ -633,6 +597,7 @@ namespace mongo {
                                                MatchExpression* root,
                                                bool inArrayOperator,
                                                const std::vector<IndexEntry>& indices,
+                                               const QueryPlannerParams& params,
                                                std::vector<QuerySolutionNode*>* out) {
         // Initialize the ScanBuildingState.
         ScanBuildingState scanState(root, inArrayOperator, indices);
@@ -658,7 +623,7 @@ namespace mongo {
                 // If we're here, then the child is indexed by virtue of its children.
                 // In most cases this means that we recursively build indexed data
                 // access on 'child'.
-                if (!processIndexScansSubnode(query, &scanState, out)) {
+                if (!processIndexScansSubnode(query, &scanState, params, out)) {
                     return false;
                 }
                 continue;
@@ -733,6 +698,7 @@ namespace mongo {
     // static
     bool QueryPlannerAccess::processIndexScansElemMatch(const CanonicalQuery& query,
                                                         ScanBuildingState* scanState,
+                                                        const QueryPlannerParams& params,
                                                         std::vector<QuerySolutionNode*>* out) {
         MatchExpression* root = scanState->root;
         MatchExpression* child = root->getChild(scanState->curChild);
@@ -767,7 +733,8 @@ namespace mongo {
                 QuerySolutionNode* childSolution = buildIndexedDataAccess(query,
                                                                           subnode,
                                                                           true,
-                                                                          indices);
+                                                                          indices,
+                                                                          params);
 
                 // buildIndexedDataAccess(...) returns NULL in error conditions, when
                 // it is unable to construct a query solution from a tagged match
@@ -835,6 +802,7 @@ namespace mongo {
     // static
     bool QueryPlannerAccess::processIndexScansSubnode(const CanonicalQuery& query,
                                                       ScanBuildingState* scanState,
+                                                      const QueryPlannerParams& params,
                                                       std::vector<QuerySolutionNode*>* out) {
         MatchExpression* root = scanState->root;
         MatchExpression* child = root->getChild(scanState->curChild);
@@ -843,7 +811,7 @@ namespace mongo {
 
         if (MatchExpression::AND == root->matchType() &&
             MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
-            return processIndexScansElemMatch(query, scanState, out);
+            return processIndexScansElemMatch(query, scanState, params, out);
         }
         else if (!inArrayOperator) {
             // The logical sub-tree is responsible for fully evaluating itself.  Any
@@ -862,7 +830,8 @@ namespace mongo {
         QuerySolutionNode* childSolution = buildIndexedDataAccess(query,
                                                                   child,
                                                                   inArrayOperator,
-                                                                  indices);
+                                                                  indices,
+                                                                  params);
         if (NULL == childSolution) { return false; }
         out->push_back(childSolution);
         return true;
@@ -870,16 +839,28 @@ namespace mongo {
 
     // static
     QuerySolutionNode* QueryPlannerAccess::buildIndexedAnd(const CanonicalQuery& query,
-                                                     MatchExpression* root,
-                                                     bool inArrayOperator,
-                                                     const vector<IndexEntry>& indices) {
+                                                           MatchExpression* root,
+                                                           bool inArrayOperator,
+                                                           const vector<IndexEntry>& indices,
+                                                           const QueryPlannerParams& params) {
         auto_ptr<MatchExpression> autoRoot;
         if (!inArrayOperator) {
             autoRoot.reset(root);
         }
 
+        // If we are not allowed to trim for ixisect, then clone the match expression before
+        // passing it to processIndexScans(), which may do the trimming. If we end up with
+        // an index intersection solution, then we use our copy of the match expression to be
+        // sure that the FETCH stage will recheck the entire predicate.
+        //
+        // XXX: This block is a hack to accommodate the storage layer concurrency model.
+        std::auto_ptr<MatchExpression> clonedRoot;
+        if (params.options & QueryPlannerParams::CANNOT_TRIM_IXISECT) {
+            clonedRoot.reset(root->shallowClone());
+        }
+
         vector<QuerySolutionNode*> ixscanNodes;
-        if (!processIndexScans(query, root, inArrayOperator, indices, &ixscanNodes)) {
+        if (!processIndexScans(query, root, inArrayOperator, indices, params, &ixscanNodes)) {
             return NULL;
         }
 
@@ -913,7 +894,7 @@ namespace mongo {
                 asn->children.swap(ixscanNodes);
                 andResult = asn;
             }
-            else {
+            else if (internalQueryPlannerEnableHashIntersection) {
                 AndHashNode* ahn = new AndHashNode();
                 ahn->children.swap(ixscanNodes);
                 andResult = ahn;
@@ -929,11 +910,35 @@ namespace mongo {
                     }
                 }
             }
+            else {
+                // We can't use sort-based intersection, and hash-based intersection is disabled.
+                // Clean up the index scans and bail out by returning NULL.
+                QLOG() << "Can't build index intersection solution: "
+                       << "AND_SORTED is not possible and AND_HASH is disabled.";
+
+                for (size_t i = 0; i < ixscanNodes.size(); i++) {
+                    delete ixscanNodes[i];
+                }
+                return NULL;
+            }
         }
 
         // Don't bother doing any kind of fetch analysis lite if we're doing it anyway above us.
         if (inArrayOperator) {
             return andResult;
+        }
+
+        // XXX: This block is a hack to accommodate the storage layer concurrency model.
+        if ((params.options & QueryPlannerParams::CANNOT_TRIM_IXISECT) &&
+            (andResult->getType() == STAGE_AND_HASH || andResult->getType() == STAGE_AND_SORTED)) {
+            // We got an index intersection solution, and we aren't allowed to answer predicates
+            // using the index. We add a fetch with the entire filter.
+            invariant(clonedRoot.get());
+            FetchNode* fetch = new FetchNode();
+            fetch->filter.reset(clonedRoot.release());
+            // Takes ownership of 'andResult'.
+            fetch->children.push_back(andResult);
+            return fetch;
         }
 
         // If there are any nodes still attached to the AND, we can't answer them using the
@@ -966,16 +971,17 @@ namespace mongo {
 
     // static
     QuerySolutionNode* QueryPlannerAccess::buildIndexedOr(const CanonicalQuery& query,
-                                                    MatchExpression* root,
-                                                    bool inArrayOperator,
-                                                    const vector<IndexEntry>& indices) {
+                                                          MatchExpression* root,
+                                                          bool inArrayOperator,
+                                                          const vector<IndexEntry>& indices,
+                                                          const QueryPlannerParams& params) {
         auto_ptr<MatchExpression> autoRoot;
         if (!inArrayOperator) {
             autoRoot.reset(root);
         }
 
         vector<QuerySolutionNode*> ixscanNodes;
-        if (!processIndexScans(query, root, inArrayOperator, indices, &ixscanNodes)) {
+        if (!processIndexScans(query, root, inArrayOperator, indices, params, &ixscanNodes)) {
             return NULL;
         }
 
@@ -1057,15 +1063,16 @@ namespace mongo {
     QuerySolutionNode* QueryPlannerAccess::buildIndexedDataAccess(const CanonicalQuery& query,
                                                             MatchExpression* root,
                                                             bool inArrayOperator,
-                                                            const vector<IndexEntry>& indices) {
+                                                            const vector<IndexEntry>& indices,
+                                                            const QueryPlannerParams& params) {
         if (root->isLogical() && !Indexability::isBoundsGeneratingNot(root)) {
             if (MatchExpression::AND == root->matchType()) {
                 // Takes ownership of root.
-                return buildIndexedAnd(query, root, inArrayOperator, indices);
+                return buildIndexedAnd(query, root, inArrayOperator, indices, params);
             }
             else if (MatchExpression::OR == root->matchType()) {
                 // Takes ownership of root.
-                return buildIndexedOr(query, root, inArrayOperator, indices);
+                return buildIndexedOr(query, root, inArrayOperator, indices, params);
             }
             else {
                 // Can't do anything with negated logical nodes index-wise.
@@ -1128,42 +1135,12 @@ namespace mongo {
             else if (Indexability::arrayUsesIndexOnChildren(root)) {
                 QuerySolutionNode* solution = NULL;
 
-                if (MatchExpression::ALL == root->matchType()) {
-                    // Here, we formulate an AND of all the sub-clauses.
-                    auto_ptr<AndHashNode> ahn(new AndHashNode());
-
-                    for (size_t i = 0; i < root->numChildren(); ++i) {
-                        QuerySolutionNode* node = buildIndexedDataAccess(query,
-                                                                         root->getChild(i),
-                                                                         true,
-                                                                         indices);
-                        if (NULL != node) {
-                            ahn->children.push_back(node);
-                        }
-                    }
-
-                    // No children, no point in hashing nothing.
-                    if (0 == ahn->children.size()) { return NULL; }
-
-                    // AND of one child is just that child.
-                    if (1 == ahn->children.size()) {
-                        solution = ahn->children[0];
-                        ahn->children.clear();
-                        ahn.reset();
-                    }
-                    else {
-                        // More than one child.
-                        solution = ahn.release();
-                    }
-                }
-                else {
-                    verify(MatchExpression::ELEM_MATCH_OBJECT);
-                    // The child is an AND.
-                    verify(1 == root->numChildren());
-                    solution = buildIndexedDataAccess(query, root->getChild(0), true, indices);
-                    if (NULL == solution) {
-                        return NULL;
-                    }
+                invariant(MatchExpression::ELEM_MATCH_OBJECT);
+                // The child is an AND.
+                invariant(1 == root->numChildren());
+                solution = buildIndexedDataAccess(query, root->getChild(0), true, indices, params);
+                if (NULL == solution) {
+                    return NULL;
                 }
 
                 // There may be an array operator above us.

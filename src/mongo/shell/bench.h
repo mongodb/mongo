@@ -30,8 +30,10 @@
 
 #include <string>
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/condition.hpp>
+#include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/client/dbclientinterface.h"
@@ -425,6 +427,8 @@ namespace mongo {
 
         OID _oid;
         BenchRunState _brState;
+        Timer *_brTimer;
+        unsigned long long _microsElapsed;
         boost::scoped_ptr<BenchRunConfig> _config;
         std::vector<BenchRunWorker *> _workers;
 

@@ -27,7 +27,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/db/json.h"
@@ -35,6 +35,8 @@
 
 namespace mongo {
     namespace fts {
+
+        using std::string;
 
         TEST( FTSElementIterator, Test1 ) {
 

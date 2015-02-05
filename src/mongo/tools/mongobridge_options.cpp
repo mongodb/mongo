@@ -28,6 +28,8 @@
 
 #include "mongo/tools/mongobridge_options.h"
 
+#include <iostream>
+
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/startup_options.h"
 

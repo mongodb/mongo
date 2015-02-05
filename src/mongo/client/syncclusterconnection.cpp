@@ -28,6 +28,8 @@
  */
 
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/syncclusterconnection.h"
@@ -42,7 +44,13 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::map;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L, double socketTimeout) : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
         {

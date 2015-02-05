@@ -15,13 +15,8 @@ a.forEach( function( x ) { t.save( x ); } );
 // a series of _id index point intervals.
 explain = t.find( {$or:a} ).hint( {_id: 1} ).explain( true );
 printjson( explain );
-assert.eq( 'BtreeCursor _id_', explain.cursor, 'cursor' );
-assert.eq( expectBounds, explain.indexBounds['_id'], 'indexBounds' );
-assert.eq( 200, explain.n, 'n' );
-assert.eq( 200, explain.nscanned, 'nscanned' );
-assert.eq( 200, explain.nscannedObjects, 'nscannedObjects' );
-assert.eq( false, explain.isMultiKey, 'isMultiKey' );
-assert.eq( false, explain.scanAndOrder, 'scanAndOrder' );
-assert.eq( false, explain.indexOnly, 'indexOnly' );
+assert.eq( 200, explain.executionStats.nReturned, 'n' );
+assert.eq( 200, explain.executionStats.totalKeysExamined, 'keys examined' );
+assert.eq( 200, explain.executionStats.totalDocsExamined, 'docs examined' );
 
 assert.eq( 200, t.count( {$or:a} ) );

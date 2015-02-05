@@ -26,15 +26,21 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/index_rebuilder.h"
+
+#include <list>
+#include <string>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
@@ -45,48 +51,12 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using std::endl;
+    using std::string;
+    using std::vector;
 
-    IndexRebuilder indexRebuilder;
-
-    IndexRebuilder::IndexRebuilder() {}
-
-    std::string IndexRebuilder::name() const {
-        return "IndexRebuilder";
-    }
-
-    void IndexRebuilder::run() {
-        Client::initThread(name().c_str()); 
-        ON_BLOCK_EXIT_OBJ(cc(), &Client::shutdown);
-
-        OperationContextImpl txn;
-
-        cc().getAuthorizationSession()->grantInternalAuthorization();
-
-        std::vector<std::string> dbNames;
-
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        storageEngine->listDatabases( &dbNames );
-
-        try {
-            std::list<std::string> collNames;
-            for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
-                 dbName < dbNames.end();
-                 dbName++) {
-                Client::ReadContext ctx(&txn, *dbName);
-
-                Database* db = ctx.ctx().db();
-                db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
-            }
-            checkNS(&txn, collNames);
-        }
-        catch (const DBException& e) {
-            warning() << "Index rebuilding did not complete: " << e.what() << endl;
-        }
-        LOG(1) << "checking complete" << endl;
-    }
-
-    void IndexRebuilder::checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
+namespace {
+    void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
         bool firstTime = true;
         for (std::list<std::string>::const_iterator it = nsToCheck.begin();
                 it != nsToCheck.end();
@@ -98,59 +68,111 @@ namespace mongo {
 
             // This write lock is held throughout the index building process
             // for this namespace.
-            Client::WriteContext ctx(txn, ns);
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+            Client::Context ctx(txn, ns);
 
-            Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
+            Collection* collection = ctx.db()->getCollection(ns);
             if ( collection == NULL )
                 continue;
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
+            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal( txn ) > 0 ) {
                 warning() << ns << " had illegal indexes, removing";
                 indexCatalog->dropAllIndexes(txn, true);
                 continue;
             }
 
-            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
 
-            // The indexes have now been removed from system.indexes, so the only record is
-            // in-memory. If there is a journal commit between now and when insert() rewrites
-            // the entry and the db crashes before the new system.indexes entry is journalled,
-            // the index will be lost forever.  Thus, we're assuming no journaling will happen
-            // between now and the entry being re-written.
+            MultiIndexBlock indexer(txn, collection);
 
-            if ( indexesToBuild.size() == 0 ) {
-                continue;
-            }
+            {
+                WriteUnitOfWork wunit(txn);
+                vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
 
-            log() << "found " << indexesToBuild.size()
-                  << " interrupted index build(s) on " << ns;
+                // The indexes have now been removed from system.indexes, so the only record is
+                // in-memory. If there is a journal commit between now and when insert() rewrites
+                // the entry and the db crashes before the new system.indexes entry is journalled,
+                // the index will be lost forever. Thus, we must stay in the same WriteUnitOfWork
+                // to ensure that no journaling will happen between now and the entry being
+                // re-written in MultiIndexBlock::init(). The actual index building is done outside
+                // of this WUOW.
 
-            if (firstTime) {
-                log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
-                firstTime = false;
-            }
-
-            if (!serverGlobalParams.indexBuildRetry) {
-                log() << "  not rebuilding interrupted indexes";
-                continue;
-            }
-
-            // TODO: these can/should/must be done in parallel
-            for ( size_t i = 0; i < indexesToBuild.size(); i++ ) {
-                BSONObj indexObj = indexesToBuild[i];
-
-                log() << "going to rebuild: " << indexObj;
-
-                Status status = indexCatalog->createIndex(txn, indexObj, false);
-                if ( !status.isOK() ) {
-                    log() << "building index failed: " << status.toString() << " index: " << indexObj;
+                if (indexesToBuild.empty()) {
+                    continue;
                 }
 
+                log() << "found " << indexesToBuild.size()
+                      << " interrupted index build(s) on " << ns;
+
+                if (firstTime) {
+                    log() << "note: restart the server with --noIndexBuildRetry "
+                          << "to skip index rebuilds";
+                    firstTime = false;
+                }
+
+                if (!serverGlobalParams.indexBuildRetry) {
+                    log() << "  not rebuilding interrupted indexes";
+                    continue;
+                }
+
+                uassertStatusOK(indexer.init(indexesToBuild));
+
+                wunit.commit();
             }
-            ctx.commit();
+
+            try {
+                uassertStatusOK(indexer.insertAllDocumentsInCollection());
+
+                WriteUnitOfWork wunit(txn);
+                indexer.commit();
+                wunit.commit();
+            }
+            catch (const DBException& e) {
+                error() << "Index rebuilding did not complete: " << e.toString();
+                log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
+                // If anything went wrong, leave the indexes partially built so that we pick them up
+                // again on restart.
+                indexer.abortWithoutCleanup();
+                fassertFailedNoTrace(26100);
+            }
+            catch (...) {
+                // If anything went wrong, leave the indexes partially built so that we pick them up
+                // again on restart.
+                indexer.abortWithoutCleanup();
+                throw;
+            }
         }
     }
+} // namespace
 
+    void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
+        txn->getClient()->getAuthorizationSession()->grantInternalAuthorization();
+
+        std::vector<std::string> dbNames;
+
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
+
+        try {
+            std::list<std::string> collNames;
+            for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
+                 dbName < dbNames.end();
+                 ++dbName) {
+
+                ScopedTransaction scopedXact(txn, MODE_IS);
+                AutoGetDb autoDb(txn, *dbName, MODE_S);
+
+                Database* db = autoDb.getDb();
+                db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
+            }
+            checkNS(txn, collNames);
+        }
+        catch (const DBException& e) {
+            error() << "Index verification did not complete: " << e.toString();
+            fassertFailedNoTrace(18643);
+        }
+        LOG(1) << "checking complete" << endl;
+    }
 }

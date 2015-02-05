@@ -46,6 +46,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     // Testing only, enabled via command-line.
     class CmdHashElt : public Command {
     public:

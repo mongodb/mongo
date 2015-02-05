@@ -47,16 +47,14 @@ namespace mongo {
 
         }
         void testoid() {
-            OID id;
-            id.init();
+            // hardcoded so that we don't need to generate OIDs before initializers run
+            OID id("541c5fa6ababec1be47e21b5");
             //            sleepsecs(3);
-
             OID b;
             // goes with sleep above...
             // b.init();
-            // verify( memcmp(id.getData(), b.getData(), 12) < 0 );
 
-            b.init( id.str() );
+            b.init( id.toString() );
             verify( b == id );
         }
 

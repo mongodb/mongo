@@ -28,18 +28,20 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include <iostream>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_optime.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
@@ -47,60 +49,64 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-    void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip,
+    void assembleRequest( const std::string &ns, BSONObj query, int nToReturn, int nToSkip,
                          const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
 }
 
 namespace QueryTests {
 
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     class Base {
-    protected:
-        OperationContextImpl _txn;
-        Lock::GlobalWrite _lk;
-        WriteUnitOfWork _wunit;
-        Client::Context _context;
-
-        Database* _database;
-        Collection* _collection;
-
     public:
-        Base() : _lk(_txn.lockState()),
-                 _wunit(_txn.recoveryUnit()),
+        Base() : _scopedXact(&_txn, MODE_X),
+                 _lk(_txn.lockState()),
                  _context(&_txn, ns()) {
-            _database = _context.db();
-            _collection = _database->getCollection( &_txn, ns() );
-            if ( _collection ) {
-                _database->dropCollection( &_txn, ns() );
+
+            {
+                WriteUnitOfWork wunit(&_txn);
+                _database = _context.db();
+                _collection = _database->getCollection( ns() );
+                if ( _collection ) {
+                    _database->dropCollection( &_txn, ns() );
+                }
+                _collection = _database->createCollection( &_txn, ns() );
+                wunit.commit();
             }
-            _collection = _database->createCollection( &_txn, ns() );
+
             addIndex( fromjson( "{\"a\":1}" ) );
         }
+
         ~Base() {
             try {
+                WriteUnitOfWork wunit(&_txn);
                 uassertStatusOK( _database->dropCollection( &_txn, ns() ) );
-                _wunit.commit();
+                wunit.commit();
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up collection" );
             }
         }
+
     protected:
         static const char *ns() {
             return "unittests.querytests";
         }
+
         void addIndex( const BSONObj &key ) {
-            BSONObjBuilder b;
-            b.append( "name", key.firstElementFieldName() );
-            b.append( "ns", ns() );
-            b.append( "key", key );
-            BSONObj o = b.done();
-            Status s = _collection->getIndexCatalog()->createIndex(&_txn, o, false);
-            uassertStatusOK( s );
+            Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
         }
+
         void insert( const char *s ) {
             insert( fromjson( s ) );
         }
+
         void insert( const BSONObj &o ) {
+            WriteUnitOfWork wunit(&_txn);
             if ( o["_id"].eoo() ) {
                 BSONObjBuilder b;
                 OID oid;
@@ -112,7 +118,17 @@ namespace QueryTests {
             else {
                 _collection->insertDocument( &_txn, o, false );
             }
+            wunit.commit();
         }
+
+
+        OperationContextImpl _txn;
+        ScopedTransaction _scopedXact;
+        Lock::GlobalWrite _lk;
+        Client::Context _context;
+
+        Database* _database;
+        Collection* _collection;
     };
 
     class FindOneOr : public Base {
@@ -128,7 +144,8 @@ namespace QueryTests {
             ASSERT( Helpers::findOne( &_txn, _collection, query, ret, true ) );
             ASSERT_EQUALS( string( "b" ), ret.firstElement().fieldName() );
             // Cross check with findOne() returning location.
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, true)));
+            ASSERT_EQUALS(ret,
+                          _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, true)).value());
         }
     };
     
@@ -142,7 +159,8 @@ namespace QueryTests {
             // Check findOne() returning object, allowing unindexed scan.
             ASSERT( Helpers::findOne( &_txn, _collection, query, ret, false ) );
             // Check findOne() returning location, allowing unindexed scan.
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, false)));
+            ASSERT_EQUALS(ret,
+                          _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, false)).value());
             
             // Check findOne() returning object, requiring indexed scan without index.
             ASSERT_THROWS( Helpers::findOne( &_txn, _collection, query, ret, true ), MsgAssertionException );
@@ -153,7 +171,8 @@ namespace QueryTests {
             // Check findOne() returning object, requiring indexed scan with index.
             ASSERT( Helpers::findOne( &_txn, _collection, query, ret, true ) );
             // Check findOne() returning location, requiring indexed scan with index.
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, true)));
+            ASSERT_EQUALS(ret,
+                          _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, true)).value());
         }
     };
     
@@ -162,15 +181,20 @@ namespace QueryTests {
         void run() {
             // We don't normally allow empty objects in the database, but test that we can find
             // an empty object (one might be allowed inside a reserved namespace at some point).
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  "unittests.querytests" );
 
-            Database* db = ctx.db();
-            if ( db->getCollection( &_txn, ns() ) ) {
-                _collection = NULL;
-                db->dropCollection( &_txn, ns() );
+            {
+                WriteUnitOfWork wunit(&_txn);
+                Database* db = ctx.db();
+                if ( db->getCollection( ns() ) ) {
+                    _collection = NULL;
+                    db->dropCollection( &_txn, ns() );
+                }
+                _collection = db->createCollection( &_txn, ns(), CollectionOptions(), true, false );
+                wunit.commit();
             }
-            _collection = db->createCollection( &_txn, ns(), CollectionOptions(), true, false );
             ASSERT( _collection );
 
             DBDirectClient cl(&_txn);
@@ -183,17 +207,21 @@ namespace QueryTests {
             BSONObj ret;
             ASSERT( Helpers::findOne( &_txn, _collection, query, ret, false ) );
             ASSERT( ret.isEmpty() );
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, false)));
+            ASSERT_EQUALS(ret,
+                          _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, false)).value());
         }
     };
     
     class ClientBase {
     public:
         ClientBase() : _client(&_txn) {
+            _prevError = mongo::lastError._get( false );
+            mongo::lastError.release();
             mongo::lastError.reset( new LastError() );
+            _txn.getCurOp()->reset();
         }
-        ~ClientBase() {
-
+        virtual ~ClientBase() {
+            mongo::lastError.reset( _prevError );
         }
 
     protected:
@@ -209,6 +237,9 @@ namespace QueryTests {
 
         OperationContextImpl _txn;
         DBDirectClient _client;
+
+    private:
+        LastError* _prevError;
     };
 
     class BoundedKey : public ClientBase {
@@ -223,7 +254,7 @@ namespace QueryTests {
             a.appendMaxKey( "$lt" );
             BSONObj limit = a.done();
             ASSERT( !_client.findOne( ns, QUERY( "a" << limit ) ).isEmpty() );
-            _client.ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns, BSON( "a" << 1 ) ));
             ASSERT( !_client.findOne( ns, QUERY( "a" << limit ).hint( BSON( "a" << 1 ) ) ).isEmpty() );
         }
     };
@@ -245,24 +276,18 @@ namespace QueryTests {
 
             {
                 // Check internal server handoff to getmore.
-                Lock::DBWrite lk(_txn.lockState(), ns);
-                WriteUnitOfWork wunit(_txn.recoveryUnit());
-                Client::Context ctx(&_txn,  ns );
-                ClientCursorPin clientCursor( ctx.db()->getCollection(&_txn, ns), cursorId );
+                Client::WriteContext ctx(&_txn,  ns);
+                ClientCursorPin clientCursor( ctx.getCollection()->getCursorManager(), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
                 // ASSERT( clientCursor.c()->pq );
                 // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
                 ASSERT_EQUALS( 2, clientCursor.c()->pos() );
-                wunit.commit();
             }
             
             cursor = _client.getMore( ns, cursorId );
             ASSERT( cursor->more() );
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
         }
-
-    protected:
-        OperationContextImpl _txn;
     };
 
     /**
@@ -305,11 +330,11 @@ namespace QueryTests {
 
             // Check that the cursor has been removed.
             {
-                Client::ReadContext ctx(&_txn, ns);
-                ASSERT(0 == ctx.ctx().db()->getCollection(&_txn, ns)->cursorCache()->numCursors());
+                AutoGetCollectionForRead ctx(&_txn, ns);
+                ASSERT(0 == ctx.getCollection()->getCursorManager()->numCursors());
             }
 
-            ASSERT_FALSE(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId));
+            ASSERT_FALSE(CursorManager::eraseCursorGlobal(&_txn, cursorId));
 
             // Check that a subsequent get more fails with the cursor removed.
             ASSERT_THROWS( _client.getMore( ns, cursorId ), UserException );
@@ -355,9 +380,9 @@ namespace QueryTests {
 
             // Check that the cursor still exists
             {
-                Client::ReadContext ctx(&_txn, ns);
-                ASSERT( 1 == ctx.ctx().db()->getCollection( &_txn, ns )->cursorCache()->numCursors() );
-                ASSERT( ctx.ctx().db()->getCollection( &_txn, ns )->cursorCache()->find( cursorId, false ) );
+                AutoGetCollectionForRead ctx(&_txn, ns);
+                ASSERT(1 == ctx.getCollection()->getCursorManager()->numCursors());
+                ASSERT(ctx.getCollection()->getCursorManager()->find(cursorId, false));
             }
 
             // Check that the cursor can be iterated until all documents are returned.
@@ -472,10 +497,17 @@ namespace QueryTests {
             ASSERT( !c->more() );
             insert( ns, BSON( "a" << 2 ) );
             insert( ns, BSON( "a" << 3 ) );
-            ASSERT( !c->more() );
+
+            // This can either have been killed, or jumped to the right thing.
+            // Key is that it can't skip.
+            if ( c->more() ) {
+                BSONObj x = c->next();
+                ASSERT_EQUALS( 2, x["a"].numberInt() );
+            }
+
             // Inserting a document into a capped collection can force another document out.
             // In this case, the capped collection has 2 documents, so inserting two more clobbers
-            // whatever DiskLoc that the underlying cursor had as its state.
+            // whatever RecordId that the underlying cursor had as its state.
             //
             // In the Cursor world, the ClientCursor was responsible for manipulating cursors.  It
             // would detect that the cursor's "refloc" (translation: diskloc required to maintain
@@ -487,6 +519,34 @@ namespace QueryTests {
             // ASSERT_EQUALS( 0, c->getCursorId() );
         }
     };
+
+    class TailableDelete2 : public ClientBase {
+    public:
+        ~TailableDelete2() {
+            _client.dropCollection( "unittests.querytests.TailableDelete" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.TailableDelete";
+            _client.createCollection( ns, 8192, true, 2 );
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c = _client.query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
+            c->next();
+            c->next();
+            ASSERT( !c->more() );
+            insert( ns, BSON( "a" << 2 ) );
+            insert( ns, BSON( "a" << 3 ) );
+            insert( ns, BSON( "a" << 4 ) );
+
+            // This can either have been killed, or jumped to the right thing.
+            // Key is that it can't skip.
+            if ( c->more() ) {
+                BSONObj x = c->next();
+                ASSERT_EQUALS( 2, x["a"].numberInt() );
+            }
+        }
+    };
+
 
     class TailableInsertDelete : public ClientBase {
     public:
@@ -594,8 +654,8 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
-            Lock::DBWrite lk(_txn.lockState(), ns);
-            WriteUnitOfWork wunit(_txn.recoveryUnit());
+            ScopedTransaction transaction(&_txn, MODE_IX);
+            Lock::DBLock lk(_txn.lockState(), "unittests", MODE_X);
             Client::Context ctx(&_txn,  ns );
 
             BSONObj info;
@@ -617,9 +677,9 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns ), cursorId );
+            ClientCursorPin clientCursor( ctx.db()->getCollection( ns )->getCursorManager(),
+                                          cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
-            wunit.commit();
         }
     };
 
@@ -641,8 +701,9 @@ namespace QueryTests {
             // Check number of results and filterSet flag in explain.
             // filterSet is not available in oplog replay mode.
             BSONObj explainObj = c->next();
-            ASSERT_EQUALS( 1, explainObj.getIntField( "n" ) );
-            ASSERT_FALSE( explainObj.hasField( "filterSet" ) );
+            ASSERT( explainObj.hasField("executionStats") );
+            BSONObj execStats = explainObj["executionStats"].Obj();
+            ASSERT_EQUALS( 1, execStats.getIntField( "nReturned" ) );
 
             ASSERT( !c->more() );
         }
@@ -655,7 +716,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.BasicCount";
-            _client.ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex(&_txn, ns, BSON( "a" << 1 ) ));
             count( 0 );
             insert( ns, BSON( "a" << 3 ) );
             count( 0 );
@@ -679,7 +740,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.ArrayId";
-            _client.ensureIndex( ns, BSON( "_id" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns, BSON( "_id" << 1 ) ));
             ASSERT( !error() );
             _client.insert( ns, fromjson( "{'_id':[1,2]}" ) );
             ASSERT( error() );
@@ -750,7 +811,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.NumericEmbedded";
             _client.insert( ns, BSON( "a" << BSON ( "b" << 1 ) ) );
             ASSERT( ! _client.findOne( ns, BSON( "a" << BSON ( "b" << 1.0 ) ) ).isEmpty() );
-            _client.ensureIndex( ns , BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ) ));
             ASSERT( ! _client.findOne( ns, BSON( "a" << BSON ( "b" << 1.0 ) ) ).isEmpty() );
         }
     };
@@ -762,16 +823,10 @@ namespace QueryTests {
         }
         static const char *ns() { return "unittests.querytests.AutoResetIndexCache"; }
         static const char *idxNs() { return "unittests.system.indexes"; }
-        void index() { ASSERT( !_client.findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
-        void noIndex() {
-            BSONObj o = _client.findOne( idxNs(), BSON( "name" << NE << "_id_" ) );
-            if( !o.isEmpty() ) {
-                cout << o.toString() << endl;
-                ASSERT( false );
-            }
-        }
+        void index() { ASSERT_EQUALS(2u, _client.getIndexSpecs(ns()).size()); }
+        void noIndex() { ASSERT_EQUALS(0u, _client.getIndexSpecs(ns()).size()); }
         void checkIndex() {
-            _client.ensureIndex( ns(), BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns() , BSON( "a" << 1 ) ));
             index();
         }
         void run() {
@@ -794,12 +849,12 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.UniqueIndex";
-            _client.ensureIndex( ns, BSON( "a" << 1 ), true );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ), true ));
             _client.insert( ns, BSON( "a" << 4 << "b" << 2 ) );
             _client.insert( ns, BSON( "a" << 4 << "b" << 3 ) );
             ASSERT_EQUALS( 1U, _client.count( ns, BSONObj() ) );
             _client.dropCollection( ns );
-            _client.ensureIndex( ns, BSON( "b" << 1 ), true );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "b" << 1 ), true ));
             _client.insert( ns, BSON( "a" << 4 << "b" << 2 ) );
             _client.insert( ns, BSON( "a" << 4 << "b" << 3 ) );
             ASSERT_EQUALS( 2U, _client.count( ns, BSONObj() ) );
@@ -815,7 +870,8 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.UniqueIndexPreexistingData";
             _client.insert( ns, BSON( "a" << 4 << "b" << 2 ) );
             _client.insert( ns, BSON( "a" << 4 << "b" << 3 ) );
-            _client.ensureIndex( ns, BSON( "a" << 1 ), true );
+            ASSERT_EQUALS(ErrorCodes::DuplicateKey,
+                          dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ), true ));
             ASSERT_EQUALS( 0U, _client.count( "unittests.system.indexes", BSON( "ns" << ns << "name" << NE << "_id_" ) ) );
         }
     };
@@ -841,7 +897,7 @@ namespace QueryTests {
         void run() {
             const char *ns = "unittests.querytests.Size";
             _client.insert( ns, fromjson( "{a:[1,2,3]}" ) );
-            _client.ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ) ));
             ASSERT( _client.query( ns, QUERY( "a" << mongo::BSIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
         }
     };
@@ -855,7 +911,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.IndexedArray";
             _client.insert( ns, fromjson( "{a:[1,2,3]}" ) );
             ASSERT( _client.query( ns, Query( "{a:[1,2,3]}" ) )->more() );
-            _client.ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ) ));
             ASSERT( _client.query( ns, Query( "{a:{$in:[1,[1,2,3]]}}" ).hint( BSON( "a" << 1 ) ) )->more() );
             ASSERT( _client.query( ns, Query( "{a:[1,2,3]}" ).hint( BSON( "a" << 1 ) ) )->more() ); // SERVER-146
         }
@@ -870,7 +926,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.InsideArray";
             _client.insert( ns, fromjson( "{a:[[1],2]}" ) );
             check( "$natural" );
-            _client.ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ) ));
             check( "a" ); // SERVER-146
         }
     private:
@@ -892,7 +948,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.IndexInsideArrayCorrect";
             _client.insert( ns, fromjson( "{'_id':1,a:[1]}" ) );
             _client.insert( ns, fromjson( "{'_id':2,a:[[1]]}" ) );
-            _client.ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ) ));
             ASSERT_EQUALS( 1, _client.query( ns, Query( "{a:[1]}" ).hint( BSON( "a" << 1 ) ) )->next().getIntField( "_id" ) );
         }
     };
@@ -906,7 +962,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.SubobjArr";
             _client.insert( ns, fromjson( "{a:[{b:[1]}]}" ) );
             check( "$natural" );
-            _client.ensureIndex( ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "a" << 1 ) ));
             check( "a" );
         }
     private:
@@ -924,7 +980,7 @@ namespace QueryTests {
             _client.dropCollection( "unittests.querytests.MinMax" );
         }
         void run() {
-            _client.ensureIndex( ns, BSON( "a" << 1 << "b" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns, BSON( "a" << 1 << "b" << 1 ) ));
             _client.insert( ns, BSON( "a" << 1 << "b" << 1 ) );
             _client.insert( ns, BSON( "a" << 1 << "b" << 2 ) );
             _client.insert( ns, BSON( "a" << 2 << "b" << 1 ) );
@@ -980,28 +1036,8 @@ namespace QueryTests {
         }
         void run() {
             checkMatch();
-            _client.ensureIndex( _ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, _ns, BSON( "a" << 1 ) ));
             checkMatch();
-            // Use explain queries to check index bounds.
-            {
-                BSONObj explain = _client.findOne( _ns, QUERY( "a" << BSON( "$type" << (int)Code ) ).explain() );
-                BSONObjBuilder lower;
-                lower.appendCode( "", "" );
-                BSONObjBuilder upper;
-                upper.appendCodeWScope( "", "", BSONObj() );
-                ASSERT( lower.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 0 ] ) );
-                ASSERT( upper.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 1 ] ) );
-            }
-            {
-                BSONObj explain = _client.findOne( _ns, QUERY( "a" << BSON( "$type" << (int)CodeWScope ) ).explain() );
-                BSONObjBuilder lower;
-                lower.appendCodeWScope( "", "", BSONObj() );
-                // This upper bound may change if a new bson type is added.
-                BSONObjBuilder upper;
-                upper << "" << BSON( "$maxElement" << 1 );
-                ASSERT( lower.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 0 ] ) );
-                ASSERT( upper.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 1 ] ) );
-            }
         }
     private:
         void checkMatch() {
@@ -1037,7 +1073,7 @@ namespace QueryTests {
         }
         void run() {
             checkMatch();
-            _client.ensureIndex( _ns, BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, _ns, BSON( "a" << 1 ) ));
             checkMatch();
         }
     private:
@@ -1059,11 +1095,10 @@ namespace QueryTests {
     class DirectLocking : public ClientBase {
     public:
         void run() {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn, "unittests.DirectLocking");
-            WriteUnitOfWork wunit(_txn.recoveryUnit());
             _client.remove( "a.b", BSONObj() );
-            wunit.commit();
             ASSERT_EQUALS( "unittests", ctx.db()->name() );
         }
         const char *ns;
@@ -1077,7 +1112,7 @@ namespace QueryTests {
         void run() {
             const char *ns = "unittests.querytests.FastCountIn";
             _client.insert( ns, BSON( "i" << "a" ) );
-            _client.ensureIndex( ns, BSON( "i" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns, BSON( "i" << 1 ) ));
             ASSERT_EQUALS( 1U, _client.count( ns, fromjson( "{i:{$in:['a']}}" ) ) );
         }
     };
@@ -1122,7 +1157,7 @@ namespace QueryTests {
             { BSONObjBuilder b; b.append( "7" , (double)3.7 ); _client.insert( ns , b.obj() ); }
 
             t(ns);
-            _client.ensureIndex( ns , BSON( "7" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns , BSON( "7" << 1 ) ));
             t(ns);
         }
     };
@@ -1145,11 +1180,11 @@ namespace QueryTests {
         }
 
         size_t numCursorsOpen() {
-            Client::ReadContext ctx(&_txn, _ns);
-            Collection* collection = ctx.ctx().db()->getCollection( &_txn, _ns );
+            AutoGetCollectionForRead ctx(&_txn, _ns);
+            Collection* collection = ctx.getCollection();
             if ( !collection )
                 return 0;
-            return collection->cursorCache()->numCursors();
+            return collection->getCursorManager()->numCursors();
         }
 
         const char * ns() {
@@ -1173,7 +1208,7 @@ namespace QueryTests {
                 ASSERT_EQUALS( 17 , _client.findOne( ns() , b.obj() )["z"].number() );
             }
             ASSERT_EQUALS( 17 , _client.findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
-            _client.ensureIndex( ns() , BSON( "x" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn,  ns() , BSON( "x" << 1 ) ));
             ASSERT_EQUALS( 17 , _client.findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
         }
     };
@@ -1187,14 +1222,20 @@ namespace QueryTests {
         }
         void run() {
             string err;
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn, ns());
 
-            // note that extents are always at least 4KB now - so this will get rounded up a bit.
-            ASSERT( userCreateNS( &_txn, ctx.ctx().db(), ns(),
-                                  fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
-            for ( int i=0; i<200; i++ ) {
+            // note that extents are always at least 4KB now - so this will get rounded up
+            // a bit.
+            {
+                WriteUnitOfWork wunit(&_txn);
+                ASSERT( userCreateNS(&_txn, ctx.db(), ns(),
+                                     fromjson( "{ capped : true, size : 2000, max: 10000 }" ), false ).isOK() );
+                wunit.commit();
+            }
+
+            for (int i = 0; i < 200; i++) {
                 insertNext();
-                ASSERT( count() < 90 );
+                ASSERT(count() < 90);
             }
 
             int a = count();
@@ -1214,10 +1255,8 @@ namespace QueryTests {
             for ( int i=0; i<90; i++ ) {
                 insertNext();
             }
-            ctx.commit();
 
             while ( c->more() ) { c->next(); }
-            ASSERT( c->isDead() );
         }
 
         void insertNext() {
@@ -1237,18 +1276,17 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn,  ns());
 
             for ( int i=0; i<50; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
             }
-            ctx.commit();
 
             ASSERT_EQUALS( 50 , count() );
 
             BSONObj res;
-            ASSERT( Helpers::findOne( &_txn, ctx.ctx().db()->getCollection( &_txn, ns() ),
-                                      BSON( "_id" << 20 ) , res , true ) );
+            ASSERT( Helpers::findOne(&_txn, ctx.getCollection(),
+                                     BSON("_id" << 20) , res , true));
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
             ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
@@ -1264,15 +1302,15 @@ namespace QueryTests {
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findOne( &_txn, ctx.ctx().db()->getCollection(&_txn, ns()),
-                                              BSON( "_id" << 20 ), res, true ) );
+                    ASSERT( Helpers::findOne(&_txn, ctx.getCollection(),
+                                             BSON( "_id" << 20 ), res, true ) );
                 }
                 slow = t.micros();
             }
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
+                    ASSERT( Helpers::findById(&_txn, ctx.db(), ns() , BSON( "_id" << 20 ) , res ) );
                 }
                 fast = t.micros();
             }
@@ -1289,7 +1327,7 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn,  ns());
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1297,11 +1335,10 @@ namespace QueryTests {
             for ( int i=0; i<1000; i+=2 ) {
                 _client.remove( ns() , BSON( "_id" << i ) );
             }
-            ctx.commit();
 
             BSONObj res;
             for ( int i=0; i<1000; i++ ) {
-                bool found = Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << i ) , res );
+                bool found = Helpers::findById( &_txn, ctx.db(), ns() , BSON( "_id" << i ) , res );
                 ASSERT_EQUALS( i % 2 , int(found) );
             }
 
@@ -1313,12 +1350,11 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn, ns());
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
             }
-            ctx.commit();
 
         }
     };
@@ -1329,13 +1365,24 @@ namespace QueryTests {
         }
 
         void run() {
+    cout << "1 SFDSDF" << endl;
             BSONObj info;
             ASSERT( _client.runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
 
             int i = 0;
-            for( int oldCount = -1;
-                    count() != oldCount;
-                    oldCount = count(), _client.insert( ns(), BSON( "ts" << i++ ) ) );
+            int max = 1;
+
+            while ( 1 ) {
+                int oldCount = count();
+                _client.insert( ns(), BSON( "ts" << i++ ) );
+                int newCount = count();
+                if ( oldCount == newCount ||
+                     newCount < max )
+                    break;
+
+                if ( newCount > max )
+                    max = newCount;
+            }
 
             for( int k = 0; k < 5; ++k ) {
                 _client.insert( ns(), BSON( "ts" << i++ ) );
@@ -1347,7 +1394,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
-                //cout << k << endl;
+                cout << k << endl;
             }
         }
     };
@@ -1358,6 +1405,7 @@ namespace QueryTests {
         }
 
         void run() {
+    cout << "2 ;kljsdf" << endl;
             size_t startNumCursors = numCursorsOpen();
 
             BSONObj info;
@@ -1376,6 +1424,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
+                cout << k << endl;
             }
 
             ASSERT_EQUALS( startNumCursors, numCursorsOpen() );
@@ -1391,6 +1440,7 @@ namespace QueryTests {
         FindingStartStale() : CollectionBase( "findingstart" ) {}
 
         void run() {
+    cout << "3 xcxcv" << endl;
             size_t startNumCursors = numCursorsOpen();
 
             // Check OplogReplay mode with missing collection.
@@ -1427,19 +1477,17 @@ namespace QueryTests {
     
     class CollectionInternalBase : public CollectionBase {
     public:
-        CollectionInternalBase( const char *nsLeaf ) :
-          CollectionBase( nsLeaf ),
-          _lk(_txn.lockState(), ns() ),
-          _wunit( _txn.recoveryUnit() ),
-          _ctx(&_txn, ns()) {
-        }
-        ~CollectionInternalBase() {
-            _wunit.commit();
+        CollectionInternalBase( const char *nsLeaf )
+                : CollectionBase( nsLeaf ),
+                  _scopedXact(&_txn, MODE_IX),
+                  _lk(_txn.lockState(), "unittests", MODE_X),
+                  _ctx(&_txn, ns()) {
+
         }
 
     private:
-        Lock::DBWrite _lk;
-        WriteUnitOfWork _wunit;
+        ScopedTransaction _scopedXact;
+        Lock::DBLock _lk;
         Client::Context _ctx;
     };
     
@@ -1460,7 +1508,8 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            string exhaust = newRunQuery( &_txn, message, queryMessage, *cc().curop(), result );
+            string exhaust = runQuery( &_txn, message, queryMessage, NamespaceString(ns()),
+                                       *cc().curop(), result, false );
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );
         }
@@ -1479,9 +1528,9 @@ namespace QueryTests {
             
             ClientCursor *clientCursor = 0;
             {
-                Client::ReadContext ctx(&_txn, ns());
-                ClientCursorPin clientCursorPointer( ctx.ctx().db()->getCollection( &_txn, ns() ),
-                                                     cursorId );
+                AutoGetCollectionForRead ctx(&_txn, ns());
+                ClientCursorPin clientCursorPointer(ctx.getCollection()->getCursorManager(),
+                                                    cursorId);
                 clientCursor = clientCursorPointer.c();
                 // clientCursorPointer destructor unpins the cursor.
             }
@@ -1518,12 +1567,13 @@ namespace QueryTests {
             
             {
                 Client::WriteContext ctx(&_txn,  ns() );
-                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( &_txn, ns() ), cursorId );
+                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( ns() )
+                                                         ->getCursorManager(),
+                                           cursorId );
                 string expectedAssertion =
                         str::stream() << "Cannot kill active cursor " << cursorId; 
-                ASSERT_THROWS_WHAT(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId),
+                ASSERT_THROWS_WHAT(CursorManager::eraseCursorGlobal(&_txn, cursorId),
                                    MsgAssertionException, expectedAssertion);
-                ctx.commit();
             }
             
             // Verify that the remaining document is read from the cursor.
@@ -1589,6 +1639,7 @@ namespace QueryTests {
             add< TailNotAtEnd >();
             add< EmptyTail >();
             add< TailableDelete >();
+            add< TailableDelete2 >();
             add< TailableInsertDelete >();
             add< TailCappedOnly >();
             add< TailableQueryOnId >();
@@ -1633,7 +1684,9 @@ namespace QueryTests {
 
             add< OrderingTest >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace QueryTests
 

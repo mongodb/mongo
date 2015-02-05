@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/unittest/unittest.h"

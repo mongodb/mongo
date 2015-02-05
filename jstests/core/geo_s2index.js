@@ -69,7 +69,7 @@ t.save({loc: [0,0]})
 assert.throws(function() { return t.count({loc: {$foo:[0,0]}}) })
 assert.throws(function() { return t.find({ "nonGeo": "pointA",
                                            "geo" : { "$geoIntersects" : { "$geometry" : somepoly},
-                                                     "$near": {"$geometry" : somepoly }}}).count()}) 
+                                                     "$near": {"$geometry" : somepoly }}}).count()})
 
 // If we specify a datum, it has to be valid (WGS84).
 t.drop()
@@ -97,6 +97,9 @@ t.drop();
 t.save({loc: [0,0]})
 res = t.ensureIndex({ loc: "2dsphere" }, { finestIndexedLevel: 17, coarsestIndexedLevel: 5 });
 assert.commandWorked(res);
+// Ensure the index actually works at a basic level
+assert.neq(null,
+    t.findOne({ loc : { $geoNear : { $geometry : { type: 'Point', coordinates: [0, 0] } } } }));
 
 t.drop();
 t.save({loc: [0,0]})
@@ -107,6 +110,9 @@ t.drop();
 t.save({loc: [0,0]})
 res = t.ensureIndex({ loc: "2dsphere" }, { finestIndexedLevel: 30, coarsestIndexedLevel: 0 });
 assert.commandWorked(res);
+//Ensure the index actually works at a basic level
+assert.neq(null,
+    t.findOne({ loc : { $geoNear : { $geometry : { type: 'Point', coordinates: [0, 0] } } } }));
 
 t.drop();
 t.save({loc: [0,0]})

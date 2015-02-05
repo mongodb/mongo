@@ -37,7 +37,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 
@@ -63,6 +62,8 @@ namespace {
 } // namespace
 
 namespace mongo {
+
+    using std::string;
 
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
                                                                        ComparisonMatchExpression* cmp,
@@ -696,19 +697,20 @@ namespace mongo {
 
         // object case
 
-        StatusWithMatchExpression sub = _parse( obj, level );
-        if ( !sub.isOK() )
-            return sub;
+        StatusWithMatchExpression subRaw = _parse( obj, level );
+        if ( !subRaw.isOK() )
+            return subRaw;
+        std::auto_ptr<MatchExpression> sub( subRaw.getValue() );
 
         // $where is not supported under $elemMatch because $where
         // applies to top-level document, not array elements in a field.
-        if ( hasNode( sub.getValue(), MatchExpression::WHERE ) ) {
+        if ( hasNode( sub.get(), MatchExpression::WHERE ) ) {
             return StatusWithMatchExpression( ErrorCodes::BadValue,
                 "$elemMatch cannot contain $where expression" );
         }
 
         std::auto_ptr<ElemMatchObjectMatchExpression> temp( new ElemMatchObjectMatchExpression() );
-        Status status = temp->init( name, sub.getValue() );
+        Status status = temp->init( name, sub.release() );
         if ( !status.isOK() )
             return StatusWithMatchExpression( status );
 
@@ -722,17 +724,14 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$all needs an array" );
 
         BSONObj arr = e.Obj();
+        std::auto_ptr<AndMatchExpression> myAnd( new AndMatchExpression() );
+        BSONObjIterator i( arr );
+
         if ( arr.firstElement().type() == Object &&
              mongoutils::str::equals( "$elemMatch",
                                       arr.firstElement().Obj().firstElement().fieldName() ) ) {
             // $all : [ { $elemMatch : {} } ... ]
 
-            std::auto_ptr<AllElemMatchOp> temp( new AllElemMatchOp() );
-            Status s = temp->init( name );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-
-            BSONObjIterator i( arr );
             while ( i.more() ) {
                 BSONElement hopefullyElemMatchElement = i.next();
 
@@ -751,17 +750,15 @@ namespace mongo {
                 }
 
                 StatusWithMatchExpression inner =
-                    _parseElemMatch( "", hopefullyElemMatchObj.firstElement(), level );
+                    _parseElemMatch( name, hopefullyElemMatchObj.firstElement(), level );
                 if ( !inner.isOK() )
                     return inner;
-                temp->add( static_cast<ArrayMatchingMatchExpression*>( inner.getValue() ) );
+                myAnd->add( inner.getValue() );
             }
 
-            return StatusWithMatchExpression( temp.release() );
+            return StatusWithMatchExpression( myAnd.release() );
         }
 
-        std::auto_ptr<AndMatchExpression> myAnd( new AndMatchExpression() );
-        BSONObjIterator i( arr );
         while ( i.more() ) {
             BSONElement e = i.next();
 

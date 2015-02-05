@@ -20,12 +20,6 @@ function setIndexKey( key ) {
 
 setIndexKey( 'a' );
 
-function indexBounds( query ) {
-    debug( query );
-    debug( t.find( query ).hint( indexSpec ).explain() );
-    return t.find( query ).hint( indexSpec ).explain().indexBounds[ indexKey ];
-}
-
 /** Check that the query results match the documents in the 'expected' array. */
 function assertResults( expected, query, context ) {
     debug( query );

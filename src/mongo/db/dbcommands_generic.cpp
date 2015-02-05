@@ -28,7 +28,9 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
+#include "mongo/platform/basic.h"
 
 #include <time.h>
 
@@ -48,8 +50,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/db/repl/multicmd.h"
-#include "mongo/db/repl/write_concern.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/scripting/engine.h"
@@ -57,12 +57,18 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/version_reporting.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
 #if 0
     namespace cloud {
@@ -262,7 +268,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {} // No auth required
         virtual bool run(OperationContext* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
-            for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
+            for ( CommandMap::const_iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
                 Command * c = i->second;
 
                 // don't show oldnames
@@ -303,7 +309,7 @@ namespace mongo {
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool CmdShutdown::shutdownHelper() {
+    void CmdShutdown::shutdownHelper() {
         MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
             const std::string crashHow = crashBlock.getData()["how"].str();
             if (crashHow == "fault") {
@@ -318,9 +324,8 @@ namespace mongo {
 
         log() << "terminating, shutdown command received" << endl;
 
-        dbexit( EXIT_CLEAN , "shutdown called" ); // this never returns
-        verify(0);
-        return true;
+        exitCleanly(EXIT_CLEAN); // this never returns
+        invariant(false);
     }
 
     /* for testing purposes only */
@@ -342,20 +347,6 @@ namespace mongo {
             return false;
         }
     } cmdForceError;
-
-    class AvailableQueryOptions : public Command {
-    public:
-        AvailableQueryOptions() : Command( "availableQueryOptions" , false , "availablequeryoptions" ) {}
-        virtual bool slaveOk() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            result << "options" << QueryOption_AllSupported;
-            return true;
-        }
-    } availableQueryOptionsCmd;
 
     class GetLogCmd : public Command {
     public:

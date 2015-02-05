@@ -16,11 +16,3 @@ t.dropIndex( { "loc" : "2d" } )
 
 t.ensureIndex({"loc" : "2d"} , {"min" : 0, "max" : 10})
 assert.eq( 9 , t.find({loc : {$within : {$box : [[4,4],[6,6]]}}}).itcount() , "B1" );
-
-// 'indexBounds.loc' in explain output should be filled in with at least
-// one bounding box.
-// Actual values is dependent on implementation of 2d execution stage.
-var explain = t.find({loc : {$within : {$box : [[4,4],[6,6]]}}}).explain(true);
-print( 'explain = ' + tojson(explain) );
-assert.neq( undefined, explain.indexBounds.loc, "C1" );
-assert.gt( explain.indexBounds.loc.length, 0, "C2" );

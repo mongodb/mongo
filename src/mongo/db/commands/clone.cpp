@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -40,18 +40,20 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
+
+    using std::set;
+    using std::string;
+    using std::stringstream;
 
     /* Usage:
        mydb.$cmd.findOne( { clone: "fromhost" } );
@@ -116,9 +118,8 @@ namespace mongo {
 
             set<string> clonedColls;
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            //  SERVER-14085: This unit of work should go away and be put in the individual ops
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
 
             Cloner cloner;
             bool rval = cloner.go(txn, dbname, from, opts, &clonedColls, errmsg);
@@ -127,7 +128,6 @@ namespace mongo {
             barr.append( clonedColls );
 
             result.append( "clonedColls", barr.arr() );
-            wunit.commit();
 
             return rval;
 

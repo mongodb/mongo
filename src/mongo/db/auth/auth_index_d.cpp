@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
 #include "mongo/db/auth/auth_index_d.h"
 
 #include "mongo/base/init.h"
@@ -43,6 +45,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::endl;
+
 namespace authindex {
 
 namespace {
@@ -72,31 +77,33 @@ namespace {
 
 }  // namespace
 
-    void configureSystemIndexes(OperationContext* txn, const StringData& dbname) {
-        int authzVersion;
-        Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(
-                                                                txn, &authzVersion);
-        if (!status.isOK()) {
-            return;
+    Status verifySystemIndexes(OperationContext* txn) {
+        const NamespaceString systemUsers = AuthorizationManager::usersCollectionNamespace;
+
+        // Make sure the old unique index from v2.4 on system.users doesn't exist.
+        ScopedTransaction scopedXact(txn, MODE_IX);
+        AutoGetDb autoDb(txn, systemUsers.db(), MODE_X);
+        if (!autoDb.getDb()) {
+            return Status::OK();
         }
 
-        if (dbname == "admin" && authzVersion == AuthorizationManager::schemaVersion26Final) {
-            NamespaceString systemUsers(dbname, "system.users");
-
-            // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            Client::WriteContext wctx(txn, systemUsers);
-            Collection* collection = wctx.ctx().db()->getCollection(txn,
-                                                                    NamespaceString(systemUsers));
-            if (!collection) {
-                return;
-            }
-            IndexCatalog* indexCatalog = collection->getIndexCatalog();
-            IndexDescriptor* oldIndex = NULL;
-            while ((oldIndex = indexCatalog->findIndexByKeyPattern(v1SystemUsersKeyPattern))) {
-                indexCatalog->dropIndex(txn, oldIndex);
-            }
-            wctx.commit();
+        Collection* collection = autoDb.getDb()->getCollection(NamespaceString(systemUsers));
+        if (!collection) {
+            return Status::OK();
         }
+
+        IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        IndexDescriptor* oldIndex = NULL;
+
+        if (indexCatalog &&
+            (oldIndex = indexCatalog->findIndexByKeyPattern(txn, v1SystemUsersKeyPattern))) {
+            return Status(ErrorCodes::AuthSchemaIncompatible,
+                          "Old 2.4 style user index identified. "
+                          "The authentication schema needs to be updated by "
+                          "running authSchemaUpgrade on a 2.6 server.");
+        }
+
+        return Status::OK();
     }
 
     void createSystemIndexes(OperationContext* txn, Collection* collection) {

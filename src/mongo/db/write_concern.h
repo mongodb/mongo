@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -59,7 +60,7 @@ namespace mongo {
 
         bool wTimedOut;
         int wTime;
-        std::vector<BSONObj> writtenTo;
+        std::vector<HostAndPort> writtenTo;
 
         std::string err; // this is the old err field, should deprecate
     };

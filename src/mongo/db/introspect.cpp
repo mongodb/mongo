@@ -1,54 +1,54 @@
-// introspect.cpp
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2008 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/introspect.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/util/goodies.h"
-
-namespace {
-    const size_t MAX_PROFILE_DOC_SIZE_BYTES = 100*1024;
-}
+#include "mongo/util/log.h"
 
 namespace mongo {
 
+    using boost::scoped_ptr;
+    using std::endl;
+    using std::string;
+
 namespace {
+
     void _appendUserInfo(const CurOp& c,
                          BSONObjBuilder& builder,
                          AuthorizationSession* authSession) {
@@ -76,127 +76,113 @@ namespace {
         builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
 
     }
+
 } // namespace
 
-    static void _profile(OperationContext* txn,
-                         const Client& c,
-                         Database* db,
-                         CurOp& currentOp,
-                         BufBuilder& profileBufBuilder) {
-        dassert( db );
 
-        // build object
-        BSONObjBuilder b(profileBufBuilder);
-
-        const bool isQueryObjTooBig = !currentOp.debug().append(currentOp, b,
-                MAX_PROFILE_DOC_SIZE_BYTES);
-
-        b.appendDate("ts", jsTime());
-        b.append("client", c.clientAddress());
-
-        AuthorizationSession * authSession = c.getAuthorizationSession();
-        _appendUserInfo(currentOp, b, authSession);
-
-        BSONObj p = b.done();
-
-        if (static_cast<size_t>(p.objsize()) > MAX_PROFILE_DOC_SIZE_BYTES || isQueryObjTooBig) {
-            string small = p.toString(/*isArray*/false, /*full*/false);
-
-            warning() << "can't add full line to system.profile: " << small << endl;
-
-            // rebuild with limited info
-            BSONObjBuilder b(profileBufBuilder);
-            b.appendDate("ts", jsTime());
-            b.append("client", c.clientAddress() );
-            _appendUserInfo(currentOp, b, authSession);
-
-            b.append("err", "profile line too large (max is 100KB)");
-
-            // should be much smaller but if not don't break anything
-            if (small.size() < MAX_PROFILE_DOC_SIZE_BYTES){
-                b.append("abbreviated", small);
-            }
-
-            p = b.done();
-        }
-
-        // write: not replicated
-        // get or create the profiling collection
-        Collection* profileCollection = getOrCreateProfileCollection(txn, db);
-        if ( profileCollection ) {
-            profileCollection->insertDocument( txn, p, false );
-        }
-    }
-
-    void profile(OperationContext* txn, const Client& c, int op, CurOp& currentOp) {
-        // initialize with 1kb to start, to avoid realloc later
-        // doing this outside the dblock to improve performance
+    void profile(OperationContext* txn, int op) {
+        // Initialize with 1kb at start in order to avoid realloc later
         BufBuilder profileBufBuilder(1024);
 
+        BSONObjBuilder b(profileBufBuilder);
+
+        txn->getCurOp()->debug().append(*txn->getCurOp(), b);
+
+        b.appendDate("ts", jsTime());
+        b.append("client", txn->getClient()->clientAddress());
+
+        AuthorizationSession * authSession = txn->getClient()->getAuthorizationSession();
+        _appendUserInfo(*txn->getCurOp(), b, authSession);
+
+        const BSONObj p = b.done();
+
+        const bool wasLocked = txn->lockState()->isLocked();
+
+        const string dbName(nsToDatabase(txn->getCurOp()->getNS()));
+
         try {
-            // NOTE: It's kind of weird that we lock the op's namespace, but have to for now since
-            // we're sometimes inside the lock already
-            Lock::DBWrite lk(txn->lockState(), currentOp.getNS() );
-            if (dbHolder().get(txn, nsToDatabase(currentOp.getNS())) != NULL) {
-                // We are ok with the profiling happening in a different WUOW from the actual op.
-                WriteUnitOfWork wunit(txn->recoveryUnit());
-                Client::Context cx(txn, currentOp.getNS(), false);
-                _profile(txn, c, cx.db(), currentOp, profileBufBuilder);
-                wunit.commit();
-            }
-            else {
-                mongo::log() << "note: not profiling because db went away - probably a close on: "
-                             << currentOp.getNS() << endl;
+            bool acquireDbXLock = false;
+            while (true) {
+                ScopedTransaction scopedXact(txn, MODE_IX);
+
+                boost::scoped_ptr<AutoGetDb> autoGetDb;
+                if (acquireDbXLock) {
+                    autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_X));
+                    if (autoGetDb->getDb()) {
+                        createProfileCollection(txn, autoGetDb->getDb());
+                    }
+                }
+                else {
+                    autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_IX));
+                }
+
+                Database* const db = autoGetDb->getDb();
+                if (!db) {
+                    // Database disappeared
+                    log() << "note: not profiling because db went away for "
+                          << txn->getCurOp()->getNS();
+                    break;
+                }
+
+                Lock::CollectionLock collLock(txn->lockState(), db->getProfilingNS(), MODE_IX);
+
+                Collection* const coll = db->getCollection(db->getProfilingNS());
+                if (coll) {
+                    WriteUnitOfWork wuow(txn);
+                    coll->insertDocument(txn, p, false);
+                    wuow.commit();
+
+                    break;
+                }
+                else if (!acquireDbXLock &&
+                            (!wasLocked || txn->lockState()->isDbLockedForMode(dbName, MODE_X))) {
+                    // Try to create the collection only if we are not under lock, in order to
+                    // avoid deadlocks due to lock conversion. This would only be hit if someone
+                    // deletes the profiler collection after setting profile level.
+                    acquireDbXLock = true;
+                }
+                else {
+                    // Cannot write the profile information
+                    break;
+                }
             }
         }
         catch (const AssertionException& assertionEx) {
-            warning() << "Caught Assertion while trying to profile " << opToString(op)
-                      << " against " << currentOp.getNS()
+            warning() << "Caught Assertion while trying to profile "
+                      << opToString(op)
+                      << " against " << txn->getCurOp()->getNS()
                       << ": " << assertionEx.toString() << endl;
         }
     }
 
-    Collection* getOrCreateProfileCollection(OperationContext* txn,
-                                             Database *db,
-                                             bool force,
-                                             string* errmsg ) {
-        fassert(16372, db);
-        const char* profileName = db->getProfilingNS();
-        Collection* collection = db->getCollection( txn, profileName );
 
-        if ( collection ) {
-            if ( !collection->isCapped() ) {
-                string myerrmsg = str::stream() << profileName << " exists but isn't capped";
-                log() << myerrmsg << endl;
-                if ( errmsg )
-                    *errmsg = myerrmsg;
-                return NULL;
+    Status createProfileCollection(OperationContext* txn, Database *db) {
+        invariant(txn->lockState()->isDbLockedForMode(db->name(), MODE_X));
+
+        const std::string dbProfilingNS(db->getProfilingNS());
+
+        Collection* const collection = db->getCollection(dbProfilingNS);
+        if (collection) {
+            if (!collection->isCapped()) {
+                return Status(ErrorCodes::NamespaceExists,
+                              str::stream() << dbProfilingNS << " exists but isn't capped");
             }
-            return collection;
-        }
 
-        // does not exist!
-
-        if ( force == false && serverGlobalParams.defaultProfile == false ) {
-            // we don't want it, so why are we here?
-            static time_t last = time(0) - 10;  // warn the first time
-            if( time(0) > last+10 ) {
-                log() << "profile: warning ns " << profileName << " does not exist" << endl;
-                last = time(0);
-            }
-            return NULL;
+            return Status::OK();
         }
 
         // system.profile namespace doesn't exist; create it
-        log() << "creating profile collection: " << profileName << endl;
+        log() << "Creating profile collection: " << dbProfilingNS << endl;
 
         CollectionOptions collectionOptions;
         collectionOptions.capped = true;
         collectionOptions.cappedSize = 1024 * 1024;
 
-        collection = db->createCollection( txn, profileName, collectionOptions );
-        invariant( collection );
-        return collection;
+        WriteUnitOfWork wunit(txn);
+        invariant(db->createCollection(txn, dbProfilingNS, collectionOptions));
+        wunit.commit();
+
+        return Status::OK();
     }
 
 } // namespace mongo

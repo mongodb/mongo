@@ -28,19 +28,18 @@
 
 #pragma once
 
-#include "mongo/db/instance.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-    class OperationContext;
-
     class CustomDirectClient: public DBDirectClient {
     public:
-        CustomDirectClient() {
+        CustomDirectClient(OperationContext* txn) : DBDirectClient(txn) {
             setWireVersions(minWireVersion, maxWireVersion);
         }
 
@@ -52,35 +51,40 @@ namespace mongo {
             // This is tailored to act as a dummy response for write commands.
 
             BufBuilder bb;
-            bb.skip(sizeof(QueryResult));
+            bb.skip(sizeof(QueryResult::Value));
 
             BSONObj cmdResult(BSON("ok" << 1));
 
             bb.appendBuf(cmdResult.objdata(), cmdResult.objsize());
 
-            QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
+            QueryResult::View qr = bb.buf();
             bb.decouple();
-            qr->setResultFlagsToOk();
-            qr->len = bb.len();
-            qr->setOperation(opReply);
-            qr->cursorId = 0;
-            qr->startingFrom = 0;
-            qr->nReturned = 1;
-            m.setData(qr, true);
+            qr.setResultFlagsToOk();
+            qr.msgdata().setLen(bb.len());
+            qr.msgdata().setOperation(opReply);
+            qr.setCursorId(0);
+            qr.setStartingFrom(0);
+            qr.setNReturned(1);
+            m.setData(qr.view2ptr(), true);
 
             return true;
         }
     };
 
-    class CustomConnectHook: public ConnectionString::ConnectionHook {
+    class CustomConnectHook : public ConnectionString::ConnectionHook {
     public:
+        CustomConnectHook(OperationContext* txn) : _txn(txn) { }
+
         virtual DBClientBase* connect(const ConnectionString& connStr,
                                       std::string& errmsg,
                                       double socketTimeout)
         {
             // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient();
+            return new CustomDirectClient(_txn);
         }
+
+    private:
+        OperationContext* const _txn;
     };
 
     /**
@@ -92,12 +96,7 @@ namespace mongo {
     class ConfigServerFixture: public mongo::unittest::Test {
     public:
 
-        /**
-         * Returns a client connection to the virtual config server.
-         */
-        DBClientBase& client() {
-            return _client;
-        }
+        ConfigServerFixture();
 
         /**
          * Returns a connection std::string to the virtual config server.
@@ -130,10 +129,10 @@ namespace mongo {
 
         virtual void tearDown();
 
-    private:
 
-        CustomConnectHook* _connectHook;
+        OperationContextImpl _txn;
         CustomDirectClient _client;
+        CustomConnectHook* _connectHook;
     };
 
 }

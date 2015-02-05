@@ -26,16 +26,24 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/exec/projection.h"
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/record_id.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::endl;
+    using std::vector;
 
     static const char* kIdField = "_id";
 
@@ -162,7 +170,7 @@ namespace mongo {
             invariant(member->hasObj());
 
             // Apply the SIMPLE_DOC projection.
-            transformSimpleInclusion(member->obj, _includedFields, bob);
+            transformSimpleInclusion(member->obj.value(), _includedFields, bob);
         }
         else {
             invariant(ProjectionStageParams::COVERED_ONE_INDEX == _projImpl);
@@ -185,8 +193,8 @@ namespace mongo {
 
         member->state = WorkingSetMember::OWNED_OBJ;
         member->keyData.clear();
-        member->loc = DiskLoc();
-        member->obj = bob.obj();
+        member->loc = RecordId();
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), bob.obj());
         return Status::OK();
     }
 
@@ -231,6 +239,13 @@ namespace mongo {
                 *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             }
         }
+        else if (PlanStage::NEED_TIME == status) {
+            _commonStats.needTime++;
+        }
+        else if (PlanStage::NEED_FETCH == status) {
+            _commonStats.needFetch++;
+            *out = id;
+        }
 
         return status;
     }
@@ -245,9 +260,11 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void ProjectionStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void ProjectionStage::invalidate(OperationContext* txn,
+                                     const RecordId& dl,
+                                     InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> ProjectionStage::getChildren() const {

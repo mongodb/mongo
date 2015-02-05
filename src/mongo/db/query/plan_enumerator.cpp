@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/query/plan_enumerator.h"
 
 #include <set>
@@ -33,10 +35,16 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/util/log.h"
 
 namespace {
 
     using namespace mongo;
+    using std::auto_ptr;
+    using std::endl;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     std::string getPathPrefix(std::string path) {
         if (mongoutils::str::contains(path, '.')) {
@@ -943,9 +951,7 @@ namespace mongo {
                 bool mandatory = expressionRequiresIndex(child);
 
                 // Recursively prepMemo for the subnode. We fall through
-                // to this case for logical nodes other than AND (e.g. OR)
-                // and for array nodes other than ELEM_MATCH_OBJECT or
-                // ELEM_MATCH_VALUE (e.g. ALL).
+                // to this case for logical nodes other than AND (e.g. OR).
                 if (prepMemo(child, context)) {
                     size_t childID = memoIDForNode(child);
 
@@ -1226,6 +1232,17 @@ namespace mongo {
         }
         else if (NULL != assign->andAssignment) {
             AndAssignment* aa = assign->andAssignment.get();
+
+            // One of our subnodes might have to move on to its next enumeration state.
+            const AndEnumerableState& aes = aa->choices[aa->counter];
+            for (size_t i = 0; i < aes.subnodesToIndex.size(); ++i) {
+                if (!nextMemo(aes.subnodesToIndex[i])) {
+                    return false;
+                }
+            }
+
+            // None of the subnodes had another enumeration state, so we move on to the
+            // next top-level choice.
             ++aa->counter;
             if (aa->counter < aa->choices.size()) {
                 return false;

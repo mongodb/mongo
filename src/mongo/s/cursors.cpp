@@ -27,13 +27,17 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/cursors.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
+#include "mongo/base/data_cursor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -50,9 +54,37 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+    using boost::scoped_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
 
     const int ShardedClientCursor::INIT_REPLY_BUFFER_SIZE = 32768;
+
+    // Note: There is no counter for shardedEver from cursorInfo since it is deprecated
+    static Counter64 cursorStatsMultiTarget;
+    static Counter64 cursorStatsSingleTarget;
+
+    // Simple class to report the sum total open cursors = sharded + refs
+    class CursorStatsSum {
+    public:
+        operator long long() const {
+            return get();
+        }
+        long long get() const {
+            return cursorStatsMultiTarget.get() + cursorStatsSingleTarget.get();
+        }
+    };
+
+    static CursorStatsSum cursorStatsTotalOpen;
+
+    static ServerStatusMetricField<Counter64> dCursorStatsMultiTarget( "cursor.open.multiTarget",
+                                                                       &cursorStatsMultiTarget);
+    static ServerStatusMetricField<Counter64> dCursorStatsSingleTarget( "cursor.open.singleTarget",
+                                                                        &cursorStatsSingleTarget);
+    static ServerStatusMetricField<CursorStatsSum> dCursorStatsTotalOpen( "cursor.open.total",
+                                                                          &cursorStatsTotalOpen);
+
 
     // --------  ShardedCursor -----------
 
@@ -74,12 +106,15 @@ namespace mongo {
         }
         else
             _lastAccessMillis = Listener::getElapsedTimeMillis();
+
+        cursorStatsMultiTarget.increment();
     }
 
     ShardedClientCursor::~ShardedClientCursor() {
         verify( _cursor );
         delete _cursor;
         _cursor = 0;
+        cursorStatsMultiTarget.decrement();
     }
 
     long long ShardedClientCursor::getId() {
@@ -139,6 +174,11 @@ namespace mongo {
 
             buffer.appendBuf( (void*)o.objdata() , o.objsize() );
             docCount++;
+            // Ensure that the next batch will never wind up requesting more docs from the shard
+            // than are remaining to satisfy the initial ntoreturn.
+            if (ntoreturn != 0) {
+                _cursor->setBatchSize(ntoreturn - docCount);
+            }
 
             if ( buffer.len() > maxSize ) {
                 break;
@@ -205,7 +245,7 @@ namespace mongo {
 
     CursorCache::~CursorCache() {
         // TODO: delete old cursors?
-        bool print = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
+        bool print = shouldLog(logger::LogSeverity::Debug(1));
         if ( _cursors.size() || _refs.size() )
             print = true;
         verify(_refs.size() == _refsNS.size());
@@ -271,6 +311,7 @@ namespace mongo {
         scoped_lock lk( _mutex );
         _refs.erase( id );
         _refsNS.erase( id );
+        cursorStatsSingleTarget.decrement();
     }
 
     void CursorCache::storeRef(const std::string& server, long long id, const std::string& ns) {
@@ -279,6 +320,7 @@ namespace mongo {
         scoped_lock lk( _mutex );
         _refs[id] = server;
         _refsNS[id] = ns;
+        cursorStatsSingleTarget.increment();
     }
 
     string CursorCache::getRef( long long id ) const {
@@ -346,11 +388,12 @@ namespace mongo {
                     m.dataSize() == 8 + ( 8 * n ) );
 
 
-        const long long* cursors = dbmessage.getArray(n);
+        ConstDataCursor cursors(dbmessage.getArray(n));
+
         ClientBasic* client = ClientBasic::getCurrent();
         AuthorizationSession* authSession = client->getAuthorizationSession();
         for ( int i=0; i<n; i++ ) {
-            long long id = cursors[i];
+            long long id = cursors.readLEAndAdvance<int64_t>();
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
 
             if ( ! id ) {
@@ -364,14 +407,14 @@ namespace mongo {
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
-                    const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
-                            NamespaceString(i->second->getNS()), ActionType::killCursors);
+                    Status authorizationStatus = authSession->checkAuthForKillCursors(
+                            NamespaceString(i->second->getNS()), id);
                     audit::logKillCursorsAuthzCheck(
                             client,
                             NamespaceString(i->second->getNS()),
                             id,
-                            isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
-                    if (isAuthorized) {
+                            authorizationStatus.isOK() ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                    if (authorizationStatus.isOK()) {
                         _cursorsMaxTimeMS.erase( i->second->getId() );
                         _cursors.erase( i );
                     }
@@ -385,19 +428,20 @@ namespace mongo {
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());
-                const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
-                        NamespaceString(refsNSIt->second), ActionType::killCursors);
+                Status authorizationStatus = authSession->checkAuthForKillCursors(
+                        NamespaceString(refsNSIt->second), id);
                 audit::logKillCursorsAuthzCheck(
                         client,
                         NamespaceString(refsNSIt->second),
                         id,
-                        isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
-                if (!isAuthorized) {
+                        authorizationStatus.isOK() ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                if (!authorizationStatus.isOK()) {
                     continue;
                 }
                 server = refsIt->second;
                 _refs.erase(refsIt);
                 _refsNS.erase(refsNSIt);
+                cursorStatsSingleTarget.decrement();
             }
 
             LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
@@ -411,10 +455,10 @@ namespace mongo {
 
     void CursorCache::appendInfo( BSONObjBuilder& result ) const {
         scoped_lock lk( _mutex );
-        result.append( "sharded" , (int)_cursors.size() );
+        result.append( "sharded", static_cast<int>(cursorStatsMultiTarget.get()));
         result.appendNumber( "shardedEver" , _shardedTotal );
-        result.append( "refs" , (int)_refs.size() );
-        result.append( "totalOpen" , (int)(_cursors.size() + _refs.size() ) );
+        result.append( "refs", static_cast<int>(cursorStatsSingleTarget.get()));
+        result.append( "totalOpen", static_cast<int>(cursorStatsTotalOpen.get()));
     }
 
     void CursorCache::doTimeouts() {

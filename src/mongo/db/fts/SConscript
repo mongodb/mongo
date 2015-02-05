@@ -46,17 +46,14 @@ baseEnv.Library('base', [
                     ])
 
 env.Library( 'server_common', [
-             'fts_command.cpp',
              'fts_enabled.cpp'
              ] )
 
 env.Library('ftsmongod', [
-        'fts_command_mongod.cpp',
         ], LIBDEPS=["base","server_common"])
 
 
 env.Library('ftsmongos', [
-        'fts_command_mongos.cpp',
         ], LIBDEPS=["server_common"])
 
 

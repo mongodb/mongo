@@ -28,9 +28,10 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/db/repl/health.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -48,11 +49,7 @@ namespace repl {
         ThreadLocalValue<bool> _lockedByMe;
     protected:
         RSBase() : m("RSBase"), _locked(0) { }
-        ~RSBase() {
-            // this can happen if we throw in the constructor; otherwise never happens.  thus we
-            // logit as it is quite unusual.
-            log() << "replSet ~RSBase called" << rsLog;
-        }
+        ~RSBase() { }
 
     public:
         class lock {

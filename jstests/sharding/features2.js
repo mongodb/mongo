@@ -63,7 +63,7 @@ db.foo2.save( { _id : new ObjectId() } );
 
 assert.eq( 1 , s.onNumShards( "foo2" ) , "F1" );
 
-printjson( db.system.indexes.find( { ns : "test.foo2" } ).toArray() );
+printjson( db.foo2.getIndexes() );
 s.adminCommand( { shardcollection : "test.foo2" , key : { _id : 1 } } );
 
 assert.eq( 3 , db.foo2.count() , "F2" )

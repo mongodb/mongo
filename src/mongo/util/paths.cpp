@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/paths.h"
@@ -33,7 +35,35 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    /** from a full path */
+    RelativePath RelativePath::fromFullPath(boost::filesystem::path dbp,
+                                            boost::filesystem::path f) {
+        // filesystem::path normalizes / and backslash
+        std::string fullpath = f.string();
+        std::string relative = str::after(fullpath, dbp.string());
+        if( relative.empty() ) {
+            log() << "warning file is not under db path? " << fullpath << ' ' << dbp.string();
+            RelativePath rp;
+            rp._p = fullpath;
+            return rp;
+        }
+        if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) {
+            relative.erase(0, 1);
+        }
+        RelativePath rp;
+        rp._p = relative;
+        return rp;
+    }
+
+    dev_t getPartition(const std::string& path){
+        struct stat stats;
+
+        if (stat(path.c_str(), &stats) != 0){
+            uasserted(13646, str::stream() << "stat() failed for file: " << path << " " << errnoWithDescription());
+        }
+
+        return stats.st_dev;
+    }
 
     void flushMyDirectory(const boost::filesystem::path& file) {
 #ifdef __linux__ // this isn't needed elsewhere

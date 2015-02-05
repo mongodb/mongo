@@ -21,16 +21,16 @@ for (var pass = 0; pass < 100; pass++) {
     t.insert({ x: 3 });
     t.ensureIndex({ x: 1 });
     sleep(s);
-    if (pass % 37 == 0)
-        d.adminCommand("closeAllDatabases");
-    else if (pass % 13 == 0)
+    if (pass % 13 == 0)
         t.drop();
     else if (pass % 17 == 0)
         t.dropIndexes();
     else
         d.dropDatabase();
+
     if (pass % 7 == 0)
         d.runCommand({getLastError:1,j:1});
+
     d.getLastError();
     s = (s + 1) % 25;
     //print(pass);

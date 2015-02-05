@@ -29,25 +29,32 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/logger/labeled_level.h"
 
-#define LOCK_TIMEOUT (15 * 60 * 1000)
-#define LOCK_SKEW_FACTOR (30)
-#define LOCK_PING (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
-#define MAX_LOCK_NET_SKEW (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
-#define MAX_LOCK_CLOCK_SKEW (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
-#define NUM_LOCK_SKEW_CHECKS (3)
-
-// The maximum clock skew we need to handle between config servers is
-// 2 * MAX_LOCK_NET_SKEW + MAX_LOCK_CLOCK_SKEW.
-
-// Net effect of *this* clock being slow is effectively a multiplier on the max net skew
-// and a linear increase or decrease of the max clock skew.
 
 namespace mongo {
+
+    namespace {
+
+        enum TimeConstants {
+            LOCK_TIMEOUT = 15 * 60 * 1000,
+            LOCK_SKEW_FACTOR = 30,
+            LOCK_PING = LOCK_TIMEOUT / LOCK_SKEW_FACTOR,
+            MAX_LOCK_NET_SKEW = LOCK_TIMEOUT / LOCK_SKEW_FACTOR,
+            MAX_LOCK_CLOCK_SKEW = LOCK_TIMEOUT / LOCK_SKEW_FACTOR,
+            NUM_LOCK_SKEW_CHECKS = 3,
+        };
+
+        // The maximum clock skew we need to handle between config servers is
+        // 2 * MAX_LOCK_NET_SKEW + MAX_LOCK_CLOCK_SKEW.
+
+        // Net effect of *this* clock being slow is effectively a multiplier on the max net skew
+        // and a linear increase or decrease of the max clock skew.
+    }
 
     /**
      * Exception class to encapsulate exceptions while managing distributed locks
@@ -100,7 +107,7 @@ namespace mongo {
     class MONGO_CLIENT_API DistributedLock {
     public:
 
-    	static LabeledLevel logLvl;
+        static logger::LabeledLevel logLvl;
 
         struct PingData {
 
@@ -159,12 +166,11 @@ namespace mongo {
         bool lock_try( const std::string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
 
         /**
-         * Returns true if we currently believe we hold this lock and it was possible to
-         * confirm that, within 'timeout' seconds, if provided, with the config servers. If the
-         * lock is not held or if we failed to contact the config servers within the timeout,
-         * returns false.
+         * Returns OK if this lock is held (but does not guarantee that this owns it) and
+         * it was possible to confirm that, within 'timeout' seconds, if provided, with the
+         * config servers.
          */
-        bool isLockHeld( double timeout, std::string* errMsg );
+        Status checkStatus(double timeout);
 
         /**
          * Releases a previously taken lock.
@@ -236,37 +242,39 @@ namespace mongo {
     class MONGO_CLIENT_API dist_lock_try {
     public:
 
-    	dist_lock_try() : _lock(NULL), _got(false) {}
+        dist_lock_try() : _lock(NULL), _got(false) {}
 
-    	dist_lock_try( const dist_lock_try& that ) : _lock(that._lock), _got(that._got), _other(that._other) {
-    		_other.getOwned();
+        dist_lock_try( const dist_lock_try& that ) :
+                _lock(that._lock), _got(that._got), _other(that._other) {
 
-    		// Make sure the lock ownership passes to this object,
-    		// so we only unlock once.
-    		((dist_lock_try&) that)._got = false;
-    		((dist_lock_try&) that)._lock = NULL;
-    		((dist_lock_try&) that)._other = BSONObj();
-    	}
+            _other.getOwned();
 
-    	// Needed so we can handle lock exceptions in context of lock try.
-    	dist_lock_try& operator=( const dist_lock_try& that ){
+            // Make sure the lock ownership passes to this object,
+            // so we only unlock once.
+            ((dist_lock_try&) that)._got = false;
+            ((dist_lock_try&) that)._lock = NULL;
+            ((dist_lock_try&) that)._other = BSONObj();
+        }
 
-    	    if( this == &that ) return *this;
+        // Needed so we can handle lock exceptions in context of lock try.
+        dist_lock_try& operator=( const dist_lock_try& that ){
 
-    	    _lock = that._lock;
-    	    _got = that._got;
-    	    _other = that._other;
-    	    _other.getOwned();
-    	    _why = that._why;
+            if( this == &that ) return *this;
 
-    	    // Make sure the lock ownership passes to this object,
-    	    // so we only unlock once.
-    	    ((dist_lock_try&) that)._got = false;
-    	    ((dist_lock_try&) that)._lock = NULL;
-    	    ((dist_lock_try&) that)._other = BSONObj();
+            _lock = that._lock;
+            _got = that._got;
+            _other = that._other;
+            _other.getOwned();
+            _why = that._why;
 
-    	    return *this;
-    	}
+            // Make sure the lock ownership passes to this object,
+            // so we only unlock once.
+            ((dist_lock_try&) that)._got = false;
+            ((dist_lock_try&) that)._lock = NULL;
+            ((dist_lock_try&) that)._other = BSONObj();
+
+            return *this;
+        }
 
         dist_lock_try( DistributedLock * lock , const std::string& why, double timeout = 0.0 )
             : _lock(lock), _why(why) {
@@ -281,22 +289,20 @@ namespace mongo {
         }
 
         /**
-         * Returns false if the lock is known _not_ to be held, otherwise asks the underlying
-         * lock to issue a 'isLockHeld' call and returns whatever that calls does.
+         * Returns not OK  if the lock is known _not_ to be held.
          */
-        bool isLockHeld( double timeout, std::string* errMsg) {
+        Status checkStatus(double timeout) {
             if ( !_lock ) {
-                *errMsg = "Lock is not currently set up";
-                return false;
+                return Status(ErrorCodes::LockFailed, "Lock is not currently set up");
             }
 
             if ( !_got ) {
-                *errMsg = str::stream() << "Lock " << _lock->_name << " is currently held by "
-                                        << _other;
-                return false;
+                return Status(ErrorCodes::LockFailed,
+                        str::stream() << "Lock " << _lock->_name << " is currently held by "
+                                      << _other);
             }
 
-            return _lock->isLockHeld( timeout, errMsg );
+            return _lock->checkStatus(timeout);
         }
 
         bool got() const { return _got; }
@@ -317,38 +323,47 @@ namespace mongo {
     class MONGO_CLIENT_API ScopedDistributedLock {
     public:
 
+        static const long long kDefaultLockTryIntervalMillis;
+        static const long long kDefaultSocketTimeoutMillis;
+
         ScopedDistributedLock(const ConnectionString& conn, const std::string& name);
 
-        virtual ~ScopedDistributedLock();
+        ~ScopedDistributedLock();
 
         /**
-         * Tries once to obtain a lock, and can fail with an error message.
+         * Tries to obtain the lock once.
          *
-         * Subclasses of this lock can override this method (and are also required to call the base
-         * in the overridden method).
-         *
-         * @return if the lock was successfully acquired
+         * Returns OK if the lock was successfully acquired.
+         * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
+         * Returns ErrorCodes::LockBusy if the lock is being held.
          */
-        virtual bool tryAcquire(std::string* errMsg);
+        Status tryAcquire();
 
         /**
          * Tries to unlock the lock if acquired.  Cannot report an error or block indefinitely
          * (though it may log messages or continue retrying in a non-blocking way).
-         *
-         * Subclasses should define their own destructor unlockXXX() methods.
          */
         void unlock();
 
         /**
          * Tries multiple times to unlock the lock, using the specified lock try interval, until
-         * a certain amount of time has passed.  An error message is immediately returned if the
-         * lock acquisition attempt fails with an error message.
+         * a certain amount of time has passed.
+         *
          * waitForMillis = 0 indicates there should only be one attempt to acquire the lock, and
          * no waiting.
          * waitForMillis = -1 indicates we should retry indefinitely.
-         * @return true if the lock was acquired
+         *
+         * Returns OK if the lock was successfully acquired.
+         * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
+         * Returns ErrorCodes::LockBusy if the lock is being held.
          */
-        bool acquire(long long waitForMillis, std::string* errMsg);
+        Status acquire(long long waitForMillis);
+
+        /**
+         * If lock is held, remotely verifies that the lock has not been forced as a sanity check.
+         * If the lock is not held or cannot be verified, returns not OK.
+         */
+        Status checkStatus();
 
         bool isAcquired() const {
             return _acquired;
@@ -374,10 +389,19 @@ namespace mongo {
             return _why;
         }
 
+        void setSocketTimeoutMillis(long long socketTimeoutMillis) {
+            _socketTimeoutMillis = socketTimeoutMillis;
+        }
+
+        long long getSocketTimeoutMillis() const {
+            return _socketTimeoutMillis;
+        }
+
     private:
         DistributedLock _lock;
         std::string _why;
         long long _lockTryIntervalMillis;
+        long long _socketTimeoutMillis;
 
         bool _acquired;
         BSONObj _other;

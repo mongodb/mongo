@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+
     using mongoutils::str::stream;
 
     const std::string BatchedUpdateRequest::BATCHED_UPDATE_REQUEST = "update";
@@ -102,38 +105,52 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, collName, &_collName, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isCollNameSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, updates, &_updates, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUpdatesSet = fieldState == FieldParser::FIELD_SET;
+        BSONObjIterator it( source );
+        while ( it.more() ) {
+            const BSONElement& elem = it.next();
+            StringData fieldName = elem.fieldNameStringData();
 
-        fieldState = FieldParser::extract(source, writeConcern, &_writeConcern, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            if ( fieldName == collName.name() ) {
+                std::string collNameTemp;
+                fieldState = FieldParser::extract(elem, collName, &collNameTemp, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _collName = NamespaceString(collNameTemp);
+                _isCollNameSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == updates.name() ) {
+                fieldState = FieldParser::extract(elem, updates, &_updates, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isUpdatesSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == writeConcern.name() ) {
+                fieldState = FieldParser::extract(elem, writeConcern, &_writeConcern, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == ordered.name() ) {
+                fieldState = FieldParser::extract(elem, ordered, &_ordered, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == metadata.name() ) {
+                BSONObj metadataObj;
+                fieldState = FieldParser::extract(elem, metadata, &metadataObj, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
 
-        fieldState = FieldParser::extract(source, ordered, &_ordered, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isOrderedSet = fieldState == FieldParser::FIELD_SET;
-
-        BSONObj metadataObj;
-        fieldState = FieldParser::extract(source, metadata, &metadataObj, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-
-        if (!metadataObj.isEmpty()) {
-            _metadata.reset(new BatchedRequestMetadata());
-            if (!_metadata->parseBSON(metadataObj, errMsg)) {
-                return false;
+                if (!metadataObj.isEmpty()) {
+                    _metadata.reset(new BatchedRequestMetadata());
+                    if (!_metadata->parseBSON(metadataObj, errMsg)) {
+                        return false;
+                    }
+                }
             }
         }
-
         return true;
     }
 
     void BatchedUpdateRequest::clear() {
-        _collName.clear();
+        _collName = NamespaceString();
         _isCollNameSet = false;
 
         unsetUpdates();
@@ -179,21 +196,27 @@ namespace mongo {
     }
 
     void BatchedUpdateRequest::setCollName(const StringData& collName) {
-        _collName = collName.toString();
+        _collName = NamespaceString(collName);
         _isCollNameSet = true;
-    }
-
-    void BatchedUpdateRequest::unsetCollName() {
-         _isCollNameSet = false;
-     }
-
-    bool BatchedUpdateRequest::isCollNameSet() const {
-         return _isCollNameSet;
     }
 
     const std::string& BatchedUpdateRequest::getCollName() const {
         dassert(_isCollNameSet);
+        return _collName.ns();
+    }
+
+    void BatchedUpdateRequest::setCollNameNS(const NamespaceString& collName) {
+        _collName = collName;
+        _isCollNameSet = true;
+    }
+
+    const NamespaceString& BatchedUpdateRequest::getCollNameNS() const {
+        dassert(_isCollNameSet);
         return _collName;
+    }
+
+    const NamespaceString& BatchedUpdateRequest::getTargetingNSS() const {
+        return getCollNameNS();
     }
 
     void BatchedUpdateRequest::setUpdates(const std::vector<BatchedUpdateDocument*>& updates) {

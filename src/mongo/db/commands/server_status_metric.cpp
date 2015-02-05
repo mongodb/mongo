@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     ServerStatusMetric::ServerStatusMetric(const string& nameIn)
         : _name( nameIn ),
           _leafName( _parseLeafName( nameIn ) ) {

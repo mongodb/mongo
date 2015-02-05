@@ -27,9 +27,14 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/projection.h"
+
+#include <boost/make_shared.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/util/log.h"
@@ -37,7 +42,11 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+    using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::max;
+    using std::string;
 
     void Projection::init(const BSONObj& o,
                           const MatchExpressionParser::WhereCallback& whereCallback) {

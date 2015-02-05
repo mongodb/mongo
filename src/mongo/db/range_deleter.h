@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <deque>
 #include <set>
@@ -40,16 +41,18 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/range_arithmetic.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    struct RangeDeleterEnv;
     class OperationContext;
-    struct RangeDeleteEntry;
     struct DeleteJobStats;
+    struct RangeDeleteEntry;
+    struct RangeDeleterEnv;
+    struct RangeDeleterOptions;
 
     /**
      * Class for deleting documents for a given namespace and range.  It contains a queue of
@@ -135,11 +138,8 @@ namespace mongo {
          * Returns true if the task is queued and false If the given range is blacklisted,
          * is already queued, or stopWorkers() was called.
          */
-        bool queueDelete(const std::string& ns,
-                         const BSONObj& min,
-                         const BSONObj& max,
-                         const BSONObj& shardKeyPattern,
-                         const WriteConcernOptions& writeConcern,
+        bool queueDelete(OperationContext* txn,
+                         const RangeDeleterOptions& options,
                          Notification* notifyDone,
                          std::string* errMsg);
 
@@ -151,35 +151,8 @@ namespace mongo {
          * was already queued, or stopWorkers() was called.
          */
         bool deleteNow(OperationContext* txn,
-                       const std::string& ns,
-                       const BSONObj& min,
-                       const BSONObj& max,
-                       const BSONObj& shardKeyPattern,
-                       const WriteConcernOptions& writeConcern,
+                       const RangeDeleterOptions& options,
                        std::string* errMsg);
-
-        /**
-         * Blacklist the given range for the given namespace. Use the removeFromBlackList
-         * method to undo this operation.
-         *
-         * Note: min is inclusive and max is exclusive.
-         *
-         * Return false if a task in the queue intersects the given range or
-         * if the range intersects another range that is in the black list.
-         */
-        bool addToBlackList(const StringData& ns,
-                            const BSONObj& min,
-                            const BSONObj& max,
-                            std::string* errMsg);
-
-        /**
-         * Removes the exact range from the blacklist.
-         *
-         * Returns false if range cannot be found from the black list.
-         */
-        bool removeFromBlackList(const StringData& ns,
-                                 const BSONObj& min,
-                                 const BSONObj& max);
 
         //
         // Introspection methods
@@ -218,12 +191,6 @@ namespace mongo {
         /** Body of the worker thread */
         void doWork();
 
-        /** Returns true if range is blacklisted. Assumes _queueMutex is held */
-        bool isBlacklisted_inlock(const StringData& ns,
-                                  const BSONObj& min,
-                                  const BSONObj& max,
-                                  std::string* errMsg) const;
-
         /** Returns true if the range doesn't intersect with one other range */
         bool canEnqueue_inlock(const StringData& ns,
                                const BSONObj& min,
@@ -233,10 +200,10 @@ namespace mongo {
         /** Returns true if stopWorkers() was called. This call is synchronized. */
         bool stopRequested() const;
 
-        scoped_ptr<RangeDeleterEnv> _env;
+        boost::scoped_ptr<RangeDeleterEnv> _env;
 
         // Initially not active. Must be started explicitly.
-        scoped_ptr<boost::thread> _worker;
+        boost::scoped_ptr<boost::thread> _worker;
 
         // Protects _stopRequested.
         mutable mutex _stopMutex;
@@ -272,13 +239,6 @@ namespace mongo {
         // deleteNow life cycle: deleteNow stack variable
         NSMinMaxSet _deleteSet;
 
-        // Keeps track of ranges that cannot be queued to _notReady.
-        // Invariant: should not conflict with any entry in all queues.
-        //
-        // life cycle: new @ addToBlackList, delete @ removeFromBlackList
-        // deleteNow life cycle: deleteNow stack variable
-        NSMinMaxSet _blackList;
-
         // Keeps track of number of tasks that are in progress, including the inline deletes.
         size_t _deletesInProgress;
 
@@ -305,27 +265,25 @@ namespace mongo {
         }
     };
 
+    struct RangeDeleterOptions {
+        RangeDeleterOptions(const KeyRange& range);
+
+        const KeyRange range;
+
+        WriteConcernOptions writeConcern;
+        std::string removeSaverReason;
+        bool fromMigrate;
+        bool onlyRemoveOrphanedDocs;
+        bool waitForOpenCursors;
+    };
+
+    /**
+     * For internal use only.
+     */
     struct RangeDeleteEntry {
-        RangeDeleteEntry(const std::string& ns,
-                         const BSONObj& min,
-                         const BSONObj& max,
-                         const BSONObj& shardKey,
-                         const WriteConcernOptions& writeConcern);
+        RangeDeleteEntry(const RangeDeleterOptions& options);
 
-        const std::string ns;
-
-        // Inclusive lower range.
-        const BSONObj min;
-
-        // Exclusive upper range.
-        const BSONObj max;
-
-        // The key pattern of the index the range refers to.
-        // This is relevant especially with special indexes types
-        // like hash indexes.
-        const BSONObj shardKeyPattern;
-
-        const WriteConcernOptions writeConcern;
+        const RangeDeleterOptions options;
 
         // Sets of cursors to wait to close until this can be ready
         // for deletion.
@@ -336,7 +294,7 @@ namespace mongo {
         Notification* notifyDone;
 
         // Time since the last time we reported this object.
-        Date_t timeSinceLastLog;
+        Date_t lastLoggedTS;
 
         DeleteJobStats stats;
 

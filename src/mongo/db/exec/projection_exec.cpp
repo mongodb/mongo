@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    using std::max;
+    using std::string;
+
     ProjectionExec::ProjectionExec()
         : _include(true),
           _special(false),
@@ -245,9 +248,9 @@ namespace mongo {
             }
 
             member->state = WorkingSetMember::OWNED_OBJ;
-            member->obj = keyObj;
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj);
             member->keyData.clear();
-            member->loc = DiskLoc();
+            member->loc = RecordId();
             return Status::OK();
         }
 
@@ -259,10 +262,10 @@ namespace mongo {
             if (transformRequiresDetails()) {
                 matchDetails.requestElemMatchKey();
                 verify(NULL != _queryExpression);
-                verify(_queryExpression->matchesBSON(member->obj, &matchDetails));
+                verify(_queryExpression->matchesBSON(member->obj.value(), &matchDetails));
             }
 
-            Status projStatus = transform(member->obj, &bob, &matchDetails);
+            Status projStatus = transform(member->obj.value(), &bob, &matchDetails);
             if (!projStatus.isOK()) {
                 return projStatus;
             }
@@ -336,15 +339,19 @@ namespace mongo {
                 }
             }
             else if (META_DISKLOC == it->second) {
-                bob.append(it->first, member->loc.toBSONObj());
+                // For compatibility with old versions, we output as a split DiskLoc.
+                const int64_t repr = member->loc.repr();
+                BSONObjBuilder sub(bob.subobjStart(it->first));
+                sub.append("file", int(repr >> 32));
+                sub.append("offset", int(uint32_t(repr)));
             }
         }
 
         BSONObj newObj = bob.obj();
         member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = newObj;
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
         member->keyData.clear();
-        member->loc = DiskLoc();
+        member->loc = RecordId();
 
         return Status::OK();
     }

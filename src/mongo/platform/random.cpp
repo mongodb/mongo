@@ -117,7 +117,7 @@ namespace mongo {
         return new WinSecureRandom();
     }
 
-#elif defined(__linux__) || defined(__sunos__) || defined(__APPLE__)
+#elif defined(__linux__) || defined(__sunos__) || defined(__APPLE__) || defined(__freebsd__)
 
     class InputStreamSecureRandom : public SecureRandom {
     public:
@@ -150,25 +150,24 @@ namespace mongo {
         return new InputStreamSecureRandom( "/dev/urandom" );
     }
 
-#else
-    class SRandSecureRandom : public SecureRandom {
-    public:
-        SRandSecureRandom() {
-            srandomdev();
-        }
+#elif defined(__openbsd__)
 
+    class Arc4SecureRandom : public SecureRandom {
+    public:
         int64_t nextInt64() {
-            long a, b;
-            a = random();
-            b = random();
-            return ( static_cast<int64_t>(a) << 32 ) | b;
+            int64_t value;
+            arc4random_buf(&value, sizeof(value));
+            return value;
         }
     };
 
     SecureRandom* SecureRandom::create() {
-        return new SRandSecureRandom();
+        return new Arc4SecureRandom();
     }
 
+#else
+
+#error Must implement SecureRandom for platform
 
 #endif
 

@@ -27,12 +27,17 @@
 */
 
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/master_slave.h"  // replSettings
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h" // replLocalAuth()
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
 namespace repl {
 
     // operator requested resynchronization of replication (on a slave or secondary). {resync: 1}
@@ -66,20 +71,23 @@ namespace repl {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            const std::string ns = parseNs(dbname, cmdObj);
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            WriteUnitOfWork wunit(txn->recoveryUnit());
-            Client::Context ctx(txn, ns);
+
+            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
             if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
-                if (!theReplSet) {
-                    errmsg = "no replication yet active";
-                    return false;
+                const MemberState memberState = replCoord->getMemberState();
+                if (memberState.startup()) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotYetInitialized,
+                                                              "no replication yet active"));
                 }
-                if (theReplSet->isPrimary()) {
-                    errmsg = "primaries cannot resync";
-                    return false;
+                if (memberState.primary() ||
+                        !replCoord->setFollowerMode(MemberState::RS_STARTUP2)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotSecondary,
+                                                              "primaries cannot resync"));
                 }
-                return theReplSet->resync(txn, errmsg);
+                BackgroundSync::get()->setInitialSyncRequestedFlag(true);
+                return true;
             }
 
             // below this comment pertains only to master/slave replication
@@ -98,7 +106,7 @@ namespace repl {
 
             ReplSource::forceResyncDead( txn, "client" );
             result.append( "info", "triggered resync for all sources" );
-            wunit.commit();
+
             return true;
         }
 

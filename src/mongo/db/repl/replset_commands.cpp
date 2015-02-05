@@ -26,25 +26,41 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/repl/replset_commands.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/replset_commands.h"
-#include "mongo/db/repl/rs_config.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_set_seed_list.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_external_state_impl.h"
+#include "mongo/db/repl/scoped_conn.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/repl/write_concern.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
-    bool replSetBlind = false;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     unsigned replSetForceInitialSyncFailure = 0;
 
     // Testing only, enabled via command-line.
@@ -59,7 +75,7 @@ namespace repl {
                                            std::vector<Privilege>* out) {}
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
+            log() << "replSet replSetTest command received: " << cmdObj.toString();
 
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
@@ -69,16 +85,6 @@ namespace repl {
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK())
                 return appendCommandStatus(result, status);
-
-            if( cmdObj.hasElement("blind") ) {
-                replSetBlind = cmdObj.getBoolField("blind");
-                return true;
-            }
-
-            if (cmdObj.hasElement("sethbmsg")) {
-                sethbmsg(cmdObj["sethbmsg"].String());
-                return true;
-            }
 
             return false;
         }
@@ -117,13 +123,6 @@ namespace repl {
             return appendCommandStatus(result, status);
         }
     } cmdReplSetRBID;
-
-    /** helper to get rollback id from another server. */
-    int getRBID(DBClientConnection *c) {
-        bo info;
-        c->simpleCommand("admin", &info, "replSetGetRBID");
-        return info["rbid"].numberInt();
-    }
 
     class CmdReplSetGetStatus : public ReplSetCommand {
     public:
@@ -179,6 +178,108 @@ namespace repl {
         }
     } cmdReplSetGetConfig;
 
+namespace {
+    HostAndPort someHostAndPortForMe() {
+        const char* ips = serverGlobalParams.bind_ip.c_str();
+        while (*ips) {
+            std::string ip;
+            const char* comma = strchr(ips, ',');
+            if (comma) {
+                ip = std::string(ips, comma - ips);
+                ips = comma + 1;
+            }
+            else {
+                ip = std::string(ips);
+                ips = "";
+            }
+            HostAndPort h = HostAndPort(ip, serverGlobalParams.port);
+            if (!h.isLocalHost()) {
+                return h;
+            }
+        }
+
+        std::string h = getHostName();
+        verify(!h.empty());
+        verify(h != "localhost");
+        return HostAndPort(h, serverGlobalParams.port);
+    }
+} // namespace
+
+    class CmdReplSetInitiate : public ReplSetCommand {
+    public:
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+        CmdReplSetInitiate() : ReplSetCommand("replSetInitiate") { }
+        virtual void help(stringstream& h) const {
+            h << "Initiate/christen a replica set.";
+            h << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
+        }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetConfigure);
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        }
+        virtual bool run(OperationContext* txn,
+                         const string& ,
+                         BSONObj& cmdObj,
+                         int, string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            BSONObj configObj;
+            if( cmdObj["replSetInitiate"].type() == Object ) {
+                configObj = cmdObj["replSetInitiate"].Obj();
+            }
+
+            if (configObj.isEmpty()) {
+                result.append("info2", "no configuration explicitly specified -- making one");
+                log() << "replSet info initiate : no configuration specified.  "
+                    "Using a default configuration for the set";
+
+                ReplicationCoordinatorExternalStateImpl externalState;
+                std::string name;
+                std::vector<HostAndPort> seeds;
+                std::set<HostAndPort> seedSet;
+                parseReplSetSeedList(
+                        &externalState,
+                        getGlobalReplicationCoordinator()->getSettings().replSet,
+                        name,
+                        seeds,
+                        seedSet); // may throw...
+
+                BSONObjBuilder b;
+                b.append("_id", name);
+                b.append("version", 1);
+                BSONObjBuilder members;
+                HostAndPort me = someHostAndPortForMe();
+                members.append("0", BSON( "_id" << 0 << "host" << me.toString() ));
+                result.append("me", me.toString());
+                for( unsigned i = 0; i < seeds.size(); i++ ) {
+                    members.append(BSONObjBuilder::numStr(i+1),
+                                   BSON( "_id" << i+1 << "host" << seeds[i].toString()));
+                }
+                b.appendArray("members", members.obj());
+                configObj = b.obj();
+                log() << "replSet created this configuration for initiation : " <<
+                        configObj.toString();
+            }
+
+            if (configObj.getField("version").eoo()) {
+                // Missing version field defaults to version 1.
+                BSONObjBuilder builder;
+                builder.appendElements(configObj);
+                builder.append("version", 1);
+                configObj = builder.obj();
+            }
+
+            Status status = getGlobalReplicationCoordinator()->processReplSetInitiate(txn,
+                                                                                      configObj,
+                                                                                      &result);
+            return appendCommandStatus(result, status);
+        }
+    } cmdReplSetInitiate;
+
     class CmdReplSetReconfig : public ReplSetCommand {
         RWLock mutex; /* we don't need rw but we wanted try capability. :-( */
     public:
@@ -206,6 +307,11 @@ namespace repl {
         }
     private:
         bool _run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -214,9 +320,13 @@ namespace repl {
             ReplicationCoordinator::ReplSetReconfigArgs parsedArgs;
             parsedArgs.newConfigObj =  cmdObj["replSetReconfig"].Obj();
             parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-            Status status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
-                                                                                      parsedArgs,
-                                                                                      &result);
+            status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
+                                                                               parsedArgs,
+                                                                               &result);
+            if (status.isOK() && !parsedArgs.force) {
+                logOpInitiate(txn, BSON("msg" << "Reconfig set" << 
+                                        "version" << parsedArgs.newConfigObj["version"]));
+            }
             return appendCommandStatus(result, status);
         }
     } cmdReplSetReconfig;
@@ -272,16 +382,52 @@ namespace repl {
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
-            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-            int secs = (int) cmdObj.firstElement().numberInt();
-            if( secs == 0 )
-                secs = 60;
+            const bool force = cmdObj["force"].trueValue();
+
+            long long stepDownForSecs = cmdObj.firstElement().numberLong();
+            if (stepDownForSecs == 0) {
+                stepDownForSecs = 60;
+            }
+            else if (stepDownForSecs < 0) {
+                status = Status(ErrorCodes::BadValue,
+                                "stepdown period must be a positive integer");
+                return appendCommandStatus(result, status);
+            }
+
+            long long secondaryCatchUpPeriodSecs;
+            status = bsonExtractIntegerField(cmdObj,
+                                             "secondaryCatchUpPeriodSecs",
+                                             &secondaryCatchUpPeriodSecs);
+            if (status.code() == ErrorCodes::NoSuchKey) {
+                // if field is absent, default values
+                if (force) {
+                    secondaryCatchUpPeriodSecs = 0;
+                }
+                else {
+                    secondaryCatchUpPeriodSecs = 10;
+                }
+            }
+            else if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            if (secondaryCatchUpPeriodSecs < 0) {
+                status = Status(ErrorCodes::BadValue,
+                                "secondaryCatchUpPeriodSecs period must be a positive or absent");
+                return appendCommandStatus(result, status);
+            }
+
+            if (stepDownForSecs < secondaryCatchUpPeriodSecs) {
+                status = Status(ErrorCodes::BadValue,
+                                "stepdown period must be longer than secondaryCatchUpPeriodSecs");
+                return appendCommandStatus(result, status);
+            }
 
             status = getGlobalReplicationCoordinator()->stepDown(
                     txn,
                     force,
-                    ReplicationCoordinator::Milliseconds(0),
-                    ReplicationCoordinator::Milliseconds(secs * 1000));
+                    ReplicationCoordinator::Milliseconds(secondaryCatchUpPeriodSecs * 1000),
+                    ReplicationCoordinator::Milliseconds(stepDownForSecs * 1000));
             return appendCommandStatus(result, status);
         }
     } cmdReplSetStepDown;
@@ -307,10 +453,8 @@ namespace repl {
 
             return appendCommandStatus(
                     result,
-                    getGlobalReplicationCoordinator()->processReplSetMaintenance(
-                            txn,
-                            cmdObj["replSetMaintenance"].trueValue(),
-                            &result));
+                    getGlobalReplicationCoordinator()->setMaintenanceMode(
+                            cmdObj["replSetMaintenance"].trueValue()));
         }
     } cmdReplSetMaintenance;
 
@@ -338,10 +482,14 @@ namespace repl {
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
-            string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
+            HostAndPort targetHostAndPort;
+            status = targetHostAndPort.initialize(cmdObj["replSetSyncFrom"].valuestrsafe());
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
             return appendCommandStatus(
                     result,
-                    getGlobalReplicationCoordinator()->processReplSetSyncFrom(newTarget,
+                    getGlobalReplicationCoordinator()->processReplSetSyncFrom(targetHostAndPort,
                                                                               &result));
         }
     } cmdReplSetSyncFrom;
@@ -393,10 +541,178 @@ namespace repl {
             
             return appendCommandStatus(
                     result,
-                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(txn, args));
+                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(args));
                     
         }
     } cmdReplSetUpdatePosition;
+
+namespace {
+    /**
+     * Returns true if there is no data on this server. Useful when starting replication.
+     * The "local" database does NOT count except for "rs.oplog" collection.
+     * Used to set the hasData field on replset heartbeat command response.
+     */
+    bool replHasDatabases(OperationContext* txn) {
+        vector<string> names;
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&names);
+
+        if( names.size() >= 2 ) return true;
+        if( names.size() == 1 ) {
+            if( names[0] != "local" )
+                return true;
+
+            // we have a local database.  return true if oplog isn't empty
+            BSONObj o;
+            if (Helpers::getSingleton(txn, repl::rsoplog, o)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+} // namespace
+
+    MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
+
+    /* { replSetHeartbeat : <setname> } */
+    class CmdReplSetHeartbeat : public ReplSetCommand {
+    public:
+        void help(stringstream& h) const { h << "internal"; }
+        CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::internal);
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        }
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+
+            MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
+                const BSONObj& data = delay.getData();
+                sleepsecs(data["delay"].numberInt());
+            }
+
+            Status status = Status(ErrorCodes::InternalError, "status not set in heartbeat code");
+            /* we don't call ReplSetCommand::check() here because heartbeat
+               checks many things that are pre-initialization. */
+            if (!getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+                status = Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
+                return appendCommandStatus(result, status);
+            }
+
+            /* we want to keep heartbeat connections open when relinquishing primary.
+               tag them here. */
+            {
+                AbstractMessagingPort *mp = txn->getClient()->port();
+                if( mp )
+                    mp->tag |= ScopedConn::keepOpen;
+            }
+
+            ReplSetHeartbeatArgs args;
+            status = args.initialize(cmdObj);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            // ugh.
+            if (args.getCheckEmpty()) {
+                result.append("hasData", replHasDatabases(txn));
+            }
+
+            ReplSetHeartbeatResponse response;
+            status = getGlobalReplicationCoordinator()->processHeartbeat(args, &response);
+            if (status.isOK())
+                response.addToBSON(&result);
+            return appendCommandStatus(result, status);
+        }
+    } cmdReplSetHeartbeat;
+
+    /** the first cmd called by a node seeking election and it's a basic sanity
+        test: do any of the nodes it can reach know that it can't be the primary?
+        */
+    class CmdReplSetFresh : public ReplSetCommand {
+    public:
+        void help(stringstream& h) const { h << "internal"; }
+        CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::internal);
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        }
+
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
+            ReplicationCoordinator::ReplSetFreshArgs parsedArgs;
+            parsedArgs.id = cmdObj["id"].Int();
+            parsedArgs.setName = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.who = HostAndPort(cmdObj["who"].String());
+            BSONElement cfgverElement = cmdObj["cfgver"];
+            uassert(28525,
+                    str::stream() << "Expected cfgver argument to replSetFresh command to have "
+                    "numeric type, but found " << typeName(cfgverElement.type()),
+                    cfgverElement.isNumber());
+            parsedArgs.cfgver = cfgverElement.safeNumberLong();
+            parsedArgs.opTime = OpTime(cmdObj["opTime"].Date());
+
+            status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs, &result);
+            return appendCommandStatus(result, status);
+        }
+    } cmdReplSetFresh;
+
+    class CmdReplSetElect : public ReplSetCommand {
+    public:
+        void help(stringstream& h) const { h << "internal"; }
+        CmdReplSetElect() : ReplSetCommand("replSetElect") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::internal);
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        }
+    private:
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            DEV log() << "replSet received elect msg " << cmdObj.toString();
+            else LOG(2) << "replSet received elect msg " << cmdObj.toString();
+
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK())
+                return appendCommandStatus(result, status);
+
+            ReplicationCoordinator::ReplSetElectArgs parsedArgs;
+            parsedArgs.set = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.whoid = cmdObj["whoid"].Int();
+            BSONElement cfgverElement = cmdObj["cfgver"];
+            uassert(28526,
+                    str::stream() << "Expected cfgver argument to replSetElect command to have "
+                    "numeric type, but found " << typeName(cfgverElement.type()),
+                    cfgverElement.isNumber());
+            parsedArgs.cfgver = cfgverElement.safeNumberLong();
+            parsedArgs.round = cmdObj["round"].OID();
+
+            status = getGlobalReplicationCoordinator()->processReplSetElect(parsedArgs, &result);
+            return appendCommandStatus(result, status);
+        }
+    } cmdReplSetElect;
 
 } // namespace repl
 } // namespace mongo

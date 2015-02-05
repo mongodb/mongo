@@ -31,10 +31,18 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/parsed_delete.h"
+#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/update_driver.h"
+#include "mongo/db/ops/update_request.h"
 
 namespace mongo {
 
     class Collection;
+    struct CountRequest;
+
+    struct GroupRequest;
 
     /**
      * Filter indexes retrieved from index catalog by
@@ -49,7 +57,8 @@ namespace mongo {
      * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
      * 'collection'.  Exposed for testing.
      */
-    void fillOutPlannerParams(Collection* collection,
+    void fillOutPlannerParams(OperationContext* txn,
+                              Collection* collection,
                               CanonicalQuery* canonicalQuery,
                               QueryPlannerParams* plannerParams);
 
@@ -64,6 +73,7 @@ namespace mongo {
     Status getExecutor(OperationContext* txn,
                        Collection* collection,
                        CanonicalQuery* rawCanonicalQuery,
+                       PlanExecutor::YieldPolicy yieldPolicy,
                        PlanExecutor** out,
                        size_t plannerOptions = 0);
 
@@ -83,6 +93,7 @@ namespace mongo {
                        Collection* collection,
                        const std::string& ns,
                        const BSONObj& unparsedQuery,
+                       PlanExecutor::YieldPolicy yieldPolicy,
                        PlanExecutor** out,
                        size_t plannerOptions = 0);
 
@@ -93,7 +104,7 @@ namespace mongo {
      * If the provided solution could be mutated successfully, returns true, otherwise returns
      * false.
      */
-    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field);
+    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const std::string& field);
 
     /*
      * Get an executor for a query executing as part of a distinct command.
@@ -106,6 +117,7 @@ namespace mongo {
                                Collection* collection,
                                const BSONObj& query,
                                const std::string& field,
+                               PlanExecutor::YieldPolicy yieldPolicy,
                                PlanExecutor** out);
 
     /*
@@ -117,43 +129,65 @@ namespace mongo {
      */
     Status getExecutorCount(OperationContext* txn,
                             Collection* collection,
-                            const BSONObj& query,
-                            const BSONObj& hintObj,
+                            const CountRequest& request,
+                            PlanExecutor::YieldPolicy yieldPolicy,
                             PlanExecutor** execOut);
 
     /**
-     * Get a PlanExecutor for a delete operation.  'rawCanonicalQuery' describes the predicate for
-     * the documents to be deleted.  A write lock is required to execute the returned plan.
+     * Get a PlanExecutor for a delete operation. 'parsedDelete' describes the query predicate
+     * and delete flags like 'isMulti'. The caller must hold the appropriate MODE_X or MODE_IX
+     * locks, and must not release these locks until after the returned PlanExecutor is deleted.
      *
-     * Takes ownership of 'rawCanonicalQuery'.
+     * The returned PlanExecutor will yield if and only if parsedDelete->canYield().
+     *
+     * Does not take ownership of its arguments.
      *
      * If the query is valid and an executor could be created, returns Status::OK() and populates
-     * *out with the PlanExecutor.
+     * *execOut with the PlanExecutor. The caller takes ownership of *execOut.
      *
      * If the query cannot be executed, returns a Status indicating why.
      */
     Status getExecutorDelete(OperationContext* txn,
                              Collection* collection,
-                             CanonicalQuery* rawCanonicalQuery,
-                             bool isMulti,
-                             bool shouldCallLogOp,
+                             ParsedDelete* parsedDelete,
                              PlanExecutor** execOut);
 
     /**
-     * Overload of getExecutorDelete() above, for when a canonicalQuery is not available.  Used to
-     * support idhack-powered deletes.
+     * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
+     * and update modifiers. The caller must hold the appropriate MODE_X or MODE_IX locks prior
+     * to calling this function, and must not release these locks until after the returned
+     * PlanExecutor is deleted.
+     *
+     * The returned PlanExecutor will yield if and only if parsedUpdate->canYield().
+     *
+     * Does not take ownership of its arguments.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK() and populates
+     * *out with the PlanExecutor. The caller takes ownership of *execOut.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
+     */
+    Status getExecutorUpdate(OperationContext* txn,
+                             Collection* collection,
+                             ParsedUpdate* parsedUpdate,
+                             OpDebug* opDebug,
+                             PlanExecutor** execOut);
+
+    /**
+     * Get a PlanExecutor for a group operation.  'rawCanonicalQuery' describes the predicate for
+     * the documents to be grouped.
+     *
+     * Takes ownership of 'rawCanonicalQuery'. Does not take ownership of other args.
      *
      * If the query is valid and an executor could be created, returns Status::OK() and populates
      * *out with the PlanExecutor.
      *
-     * If the query cannot be executed, returns a Status indicating why.
+     * If an executor could not be created, returns a Status indicating why.
      */
-    Status getExecutorDelete(OperationContext* txn,
-                             Collection* collection,
-                             const std::string& ns,
-                             const BSONObj& unparsedQuery,
-                             bool isMulti,
-                             bool shouldCallLogOp,
-                             PlanExecutor** execOut);
+    Status getExecutorGroup(OperationContext* txn,
+                            Collection* collection,
+                            const GroupRequest& request,
+                            PlanExecutor::YieldPolicy yieldPolicy,
+                            PlanExecutor** execOut);
 
 }  // namespace mongo

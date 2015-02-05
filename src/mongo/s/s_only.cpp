@@ -27,7 +27,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -40,6 +42,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
+#include "mongo/util/log.h"
 #include "mongo/util/concurrency/thread_name.h"
 
 /*
@@ -47,6 +50,10 @@
 
  */
 namespace mongo {
+
+    using std::endl;
+    using std::string;
+    using std::stringstream;
 
     void* remapPrivateView(void *oldPrivateAddr) {
         log() << "remapPrivateView called in mongos, aborting" << endl;
@@ -62,14 +69,13 @@ namespace mongo {
 
     TSP_DEFINE(Client,currentClient)
 
-    LockState::LockState(){} // ugh
-
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
-        _shutdown(false),
         _desc(desc),
+        _connectionId(),
         _god(0),
-        _lastOp(0) {
+        _lastOp(0),
+        _shutdown(false) {
     }
     Client::~Client() {}
     bool Client::shutdown() { return true; }
@@ -104,13 +110,12 @@ namespace mongo {
     // execCommand and not need to worry if it's in a mongod or mongos.
     void Command::execCommand(OperationContext* txn,
                               Command * c,
-                              Client& client,
                               int queryOptions,
                               const char *ns,
                               BSONObj& cmdObj,
                               BSONObjBuilder& result,
                               bool fromRepl ) {
-        execCommandClientBasic(txn, c, client, queryOptions, ns, cmdObj, result, fromRepl);
+        execCommandClientBasic(txn, c, *txn->getClient(), queryOptions, ns, cmdObj, result, fromRepl);
     }
 
     void Command::execCommandClientBasic(OperationContext* txn,
@@ -139,6 +144,8 @@ namespace mongo {
             return;
         }
 
+        c->_commandsExecuted.increment();
+
         std::string errmsg;
         bool ok;
         try {
@@ -155,6 +162,10 @@ namespace mongo {
             ss << "exception: " << e.what();
             errmsg = ss.str();
             result.append( "code" , code );
+        }
+
+        if ( !ok ) {
+            c->_commandsFailed.increment();
         }
 
         appendCommandStatus(result, ok, errmsg);

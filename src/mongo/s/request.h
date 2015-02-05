@@ -30,7 +30,10 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include <boost/noncopyable.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/s/config.h"

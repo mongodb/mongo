@@ -31,6 +31,7 @@
 
 #include <list>
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/condition.hpp>
 
 #include "mongo/stdx/functional.h"
@@ -46,11 +47,20 @@ namespace mongo {
         // exported to the mongo namespace
         class ThreadPool : boost::noncopyable {
         public:
-            explicit ThreadPool(int nThreads=8);
+            struct DoNotStartThreadsTag {};
+
+            explicit ThreadPool(int nThreads=8, const std::string& threadNamePrefix="");
+            explicit ThreadPool(const DoNotStartThreadsTag&,
+                                int nThreads=8,
+                                const std::string& threadNamePrefix="");
 
             // blocks until all tasks are complete (tasks_remaining() == 0)
             // You should not call schedule while in the destructor
             ~ThreadPool();
+
+            // Launches the worker threads; call exactly once, if and only if
+            // you used the DoNotStartThreadsTag form of the constructor.
+            void startThreads();
 
             // blocks until all tasks are complete (tasks_remaining() == 0)
             // does not prevent new tasks from being scheduled so could wait forever.
@@ -83,6 +93,7 @@ namespace mongo {
             std::list<Task> _tasks; //used as FIFO queue (push_back, pop_front)
             int _tasksRemaining; // in queue + currently processing
             int _nThreads; // only used for sanity checking. could be removed in the future.
+            const std::string _threadNamePrefix; // used for logging/diagnostics
 
             // should only be called by a worker from the worker's thread
             void task_done(Worker* worker);

@@ -33,8 +33,12 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
 
     /* Approved formats for versionString:
      *      1.2.3
@@ -43,7 +47,7 @@ namespace mongo {
      *      1.2.3-rc4-pre-
      * If you really need to do something else you'll need to fix _versionArray()
      */
-    const char versionString[] = "2.7.5-pre-";
+    const char versionString[] = "3.1.0-pre-";
 
     // See unit test for example outputs
     BSONArray toVersionArray(const char* version){
@@ -66,7 +70,7 @@ namespace mongo {
                 verify(*c == '\0');
                 break;
             }
-            else if (startsWith(curPart, "rc")){
+            else if (str::startsWith(curPart, "rc")){
                 num = 0;
                 verify( parseNumberFromString( curPart.substr(2), &num ).isOK() );
                 finalPart = -10 + num;

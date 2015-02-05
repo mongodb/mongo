@@ -145,6 +145,10 @@ jsTestOptions = function(){
         return Object.merge(_jsTestOptions,
                             { setParameters : TestData.setParameters,
                               setParametersMongos : TestData.setParametersMongos,
+                              storageEngine: TestData.storageEngine,
+                              wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
+                              wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
+                              wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,
                               noJournal : TestData.noJournal,
                               noJournalPrealloc : TestData.noJournalPrealloc,
                               auth : TestData.auth,
@@ -886,7 +890,7 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
             var stateReached = true;
             for(var prop in desiredState) {
                 if (isObject(desiredState[prop])) {
-                    if (!friendlyEqual(desiredState[prop], node[prop])) {
+                    if (!friendlyEqual(sortDoc(desiredState[prop]), sortDoc(node[prop]))) {
                         stateReached = false;
                         break;
                     }
@@ -1002,7 +1006,7 @@ rs.conf = function () {
     var resp = db._adminCommand({replSetGetConfig:1});
     if (resp.ok && !(resp.errmsg) && resp.config)
         return resp.config;
-    else if(res.errmsg && res.errmsg.startsWith( "no such cmd" ))
+    else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
         return db.getSisterDB("local").system.replset.findOne(); 
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
 }

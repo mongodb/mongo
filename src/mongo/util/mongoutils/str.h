@@ -91,6 +91,12 @@ namespace mongoutils {
             size_t len = strlen(s);
             return len && s[len-1] == p;
         }
+        inline bool endsWith(const char *p, const char *suffix) {
+            size_t a = strlen(p);
+            size_t b = strlen(suffix);
+            if ( b > a ) return false;
+            return strcmp(p + a - b, suffix) == 0;
+        }
 
         inline bool equals( const char * a , const char * b ) { return strcmp( a , b ) == 0; }
 
@@ -213,13 +219,18 @@ namespace mongoutils {
 
         /** remove trailing chars in place */
         inline void stripTrailing(std::string& s, const char *chars) {
-            std::string::iterator i = s.end();
-            while( s.begin() != i ) {
-                i--;
-                if( contains(chars, *i) ) {
-                    s.erase(i);
+            std::string::iterator to = s.begin();
+            for ( std::string::iterator i = s.begin(); i != s.end(); i++ ) {
+                // During each iteration if i finds a non-"chars" character it writes it to the
+                // position of t. So the part of the string left from the "to" iterator is already
+                // "cleared" string.
+                if ( !contains(chars, *i) ) {
+                    if ( i != to )
+                        s.replace(to, to + 1, 1, *i);
+                    to++;
                 }
             }
+            s.erase(to, s.end());
         }
 
     }  // namespace str
@@ -228,4 +239,9 @@ namespace mongoutils {
 
 namespace mongo {
     using namespace mongoutils;
+
+#if defined(_WIN32)
+    inline int strcasecmp(const char* s1, const char* s2) {return _stricmp(s1, s2);}
+#endif
+
 }  // namespace mongo

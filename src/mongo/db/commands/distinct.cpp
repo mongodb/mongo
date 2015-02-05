@@ -46,6 +46,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::stringstream;
+
     class DistinctCommand : public Command {
     public:
         DistinctCommand() : Command("distinct") {}
@@ -70,7 +74,6 @@ namespace mongo {
                  bool fromRepl ) {
 
             Timer t;
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             // ensure that the key is a string
             uassert(18510,
@@ -98,10 +101,10 @@ namespace mongo {
             BSONArrayBuilder arr( bb );
             BSONElementSet values;
 
-            Client::ReadContext ctx(txn, ns);
+            const string ns = parseNs(dbname, cmdObj);
+            AutoGetCollectionForRead ctx(txn, ns);
 
-            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
-
+            Collection* collection = ctx.getCollection();
             if (!collection) {
                 result.appendArray( "values" , BSONObj() );
                 result.append("stats", BSON("n" << 0 <<
@@ -111,15 +114,19 @@ namespace mongo {
             }
 
             PlanExecutor* rawExec;
-            Status status = getExecutorDistinct(txn, collection, query, key, &rawExec);
+            Status status = getExecutorDistinct(txn,
+                                                collection,
+                                                query,
+                                                key,
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawExec);
             if (!status.isOK()) {
-                uasserted(17216, mongoutils::str::stream() << "Can't get runner for query "
+                uasserted(17216, mongoutils::str::stream() << "Can't get executor for query "
                               << query << ": " << status.toString());
                 return 0;
             }
 
             auto_ptr<PlanExecutor> exec(rawExec);
-            const ScopedExecutorRegistration safety(exec.get());
 
             BSONObj obj;
             PlanExecutor::ExecState state;
@@ -160,7 +167,7 @@ namespace mongo {
                 b.appendNumber( "nscanned" , stats.totalKeysExamined );
                 b.appendNumber( "nscannedObjects" , stats.totalDocsExamined );
                 b.appendNumber( "timems" , t.millis() );
-                b.append( "planSummary" , stats.summaryStr );
+                b.append( "planSummary" , Explain::getPlanSummary(exec.get()) );
                 result.append( "stats" , b.obj() );
             }
 

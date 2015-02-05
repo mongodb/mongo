@@ -26,14 +26,19 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/mmap_v1/record_store_v1_repair_iterator.h"
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::endl;
 
     RecordStoreV1RepairIterator::RecordStoreV1RepairIterator(OperationContext* txn,
                                                              const RecordStoreV1Base* recordStore)
@@ -48,10 +53,10 @@ namespace mongo {
         return _currRecord.isNull();
     }
 
-    DiskLoc RecordStoreV1RepairIterator::curr() { return _currRecord; }
+    RecordId RecordStoreV1RepairIterator::curr() { return _currRecord.toRecordId(); }
 
-    DiskLoc RecordStoreV1RepairIterator::getNext() {
-        DiskLoc retVal = _currRecord;
+    RecordId RecordStoreV1RepairIterator::getNext() {
+        const DiskLoc retVal = _currRecord;
 
         const ExtentManager* em = _recordStore->_extentManager;
 
@@ -59,7 +64,7 @@ namespace mongo {
             if (_currRecord.isNull()) {
 
                 if (!_advanceToNextValidExtent()) {
-                    return retVal;
+                    return retVal.toRecordId();
                 }
 
                 _seenInCurrentExtent.clear();
@@ -103,7 +108,7 @@ namespace mongo {
                 continue;
             }
 
-            return retVal;
+            return retVal.toRecordId();
         }
     }
 
@@ -136,7 +141,7 @@ namespace mongo {
 
             // Sanity checks for the extent's disk location
             //
-            if (hasNextExtent && (!_currExtent.isValid() || (_currExtent.getOfs() <= 0))) {
+            if (hasNextExtent && (!_currExtent.isValid() || (_currExtent.getOfs() < 0))) {
                 error() << "Invalid extent location: " << _currExtent << endl;
 
                 // Switch the direction of scan
@@ -181,12 +186,32 @@ namespace mongo {
         return true;
     }
 
-    void RecordStoreV1RepairIterator::invalidate(const DiskLoc& dl) {
-        verify(!"Invalidate is not supported for RecordStoreV1RepairIterator.");
+    void RecordStoreV1RepairIterator::invalidate(const RecordId& id) {
+        // If we see this record again it probably means it was reinserted rather than an infinite
+        // loop. If we do loop, we should quickly hit another seen record that hasn't been
+        // invalidated.
+        DiskLoc dl = DiskLoc::fromRecordId(id);
+        _seenInCurrentExtent.erase(dl);
+
+        if (_currRecord == dl) {
+            // The DiskLoc being invalidated is also the one pointed at by this iterator. We
+            // advance the iterator so it's not pointing at invalid data.
+            getNext();
+
+            if (_currRecord == dl) {
+                // Even after advancing the iterator, we're still pointing at the DiskLoc being
+                // invalidated. This is expected when 'dl' is the last DiskLoc in the FORWARD scan,
+                // and the initial call to getNext() moves the iterator to the first loc in the
+                // BACKWARDS scan.
+                getNext();
+            }
+
+            invariant(_currRecord != dl);
+        }
     }
 
-    RecordData RecordStoreV1RepairIterator::dataFor(const DiskLoc& loc) const {
-        return _recordStore->dataFor( loc );
+    RecordData RecordStoreV1RepairIterator::dataFor(const RecordId& loc) const {
+        return _recordStore->dataFor( _txn, loc );
     }
 
 }  // namespace mongo

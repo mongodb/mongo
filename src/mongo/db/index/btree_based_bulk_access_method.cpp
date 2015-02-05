@@ -26,13 +26,16 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/index/btree_based_bulk_access_method.h"
 
+#include <boost/scoped_ptr.hpp>
+
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/pdfile_private.h"  // This is for inDBRepair.
-#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
@@ -40,7 +43,8 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
+    using boost::scoped_ptr;
+    using std::set;
 
     //
     // Comparison for external sorter interface
@@ -58,7 +62,7 @@ namespace mongo {
             invariant(version == 1 || version == 0);
         }
 
-        typedef std::pair<BSONObj, DiskLoc> Data;
+        typedef std::pair<BSONObj, RecordId> Data;
 
         int operator() (const Data& l, const Data& r) const {
             int x = (_version == 1
@@ -93,7 +97,7 @@ namespace mongo {
 
     Status BtreeBasedBulkAccessMethod::insert(OperationContext* txn,
                                               const BSONObj& obj,
-                                              const DiskLoc& loc,
+                                              const RecordId& loc,
                                               const InsertDeleteOptions& options,
                                               int64_t* numInserted) {
         BSONObjSet keys;
@@ -116,62 +120,70 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeBasedBulkAccessMethod::commit(set<DiskLoc>* dupsToDrop,
-                                              bool mayInterrupt) {
-        if (_isMultiKey) {
-            _real->_btreeState->setMultikey( _txn );
-        }
-
+    Status BtreeBasedBulkAccessMethod::commit(set<RecordId>* dupsToDrop,
+                                              bool mayInterrupt,
+                                              bool dupsAllowed) {
         Timer timer;
-        IndexCatalogEntry* entry = _real->_btreeState;
-
-        bool dupsAllowed = !entry->descriptor()->unique() ||
-            repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(entry->descriptor());
-
-        bool dropDups = entry->descriptor()->dropDups() || inDBRepair;
 
         scoped_ptr<BSONObjExternalSorter::Iterator> i(_sorter->done());
 
-        // verifies that pm and op refer to the same ProgressMeter
-        ProgressMeter& pm = _txn->getCurOp()->setMessage("Index Bulk Build: (2/3) btree bottom up",
-                                                         "Index: (2/3) BTree Bottom Up Progress",
-                                                         _keysInserted,
-                                                         10);
+        ProgressMeterHolder pm(*_txn->setMessage("Index Bulk Build: (2/3) btree bottom up",
+                                                 "Index: (2/3) BTree Bottom Up Progress",
+                                                 _keysInserted,
+                                                 10));
 
         scoped_ptr<SortedDataBuilderInterface> builder;
 
-        builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(_txn);
+
+            if (_isMultiKey) {
+                _real->_btreeState->setMultikey( _txn );
+            }
+
+            builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
+            wunit.commit();
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "setting index multikey flag", "");
 
         while (i->more()) {
-            if (mayInterrupt)
-                _txn->checkForInterrupt(/*heedMutex*/ false);
+            if (mayInterrupt) {
+                _txn->checkForInterrupt();
+            }
+
+            WriteUnitOfWork wunit(_txn);
+            // Improve performance in the btree-building phase by disabling rollback tracking.
+            // This avoids copying all the written bytes to a buffer that is only used to roll back.
+            // Note that this is safe to do, as this entire index-build-in-progress will be cleaned
+            // up by the index system.
+            _txn->recoveryUnit()->setRollbackWritesDisabled();
 
             // Get the next datum and add it to the builder.
             BSONObjExternalSorter::Data d = i->next();
             Status status = builder->addKey(d.first, d.second);
 
             if (!status.isOK()) {
-                if (ErrorCodes::DuplicateKey != status.code()) {
-                    return status;
+                // Overlong key that's OK to skip?
+                if (status.code() == ErrorCodes::KeyTooLong && _real->ignoreKeyTooLong(_txn)) {
+                    continue;
                 }
 
-                // If we're here it's a duplicate key.
-                if (dropDups) {
-                    static const size_t kMaxDupsToStore = 1000000;
-                    dupsToDrop->insert(d.second);
-                    if (dupsToDrop->size() > kMaxDupsToStore) {
-                        return Status(ErrorCodes::InternalError,
-                                      "Too many dups on index build with dropDups = true");
+                // Check if this is a duplicate that's OK to skip
+                if (status.code() == ErrorCodes::DuplicateKey) {
+                    invariant(!dupsAllowed); // shouldn't be getting DupKey errors if dupsAllowed.
+
+                    if (dupsToDrop) {
+                        dupsToDrop->insert(d.second);
+                        continue;
                     }
                 }
-                else if (!dupsAllowed) {
-                    return status;
-                }
+
+                return status;
             }
 
             // If we're here either it's a dup and we're cool with it or the addKey went just
             // fine.
             pm.hit();
+            wunit.commit();
         }
 
         pm.finished();
@@ -181,16 +193,11 @@ namespace mongo {
 
         LOG(timer.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit";
 
-        unsigned long long keysCommit = builder->commit(mayInterrupt);
-
-        if (!dropDups && (keysCommit != _keysInserted)) {
-            warning() << "not all entries were added to the index, probably some "
-                      << "keys were too large" << endl;
-        }
+        builder->commit(mayInterrupt);
         return Status::OK();
     }
 
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
-MONGO_CREATE_SORTER(mongo::BSONObj, mongo::DiskLoc, mongo::BtreeExternalSortComparison);
+MONGO_CREATE_SORTER(mongo::BSONObj, mongo::RecordId, mongo::BtreeExternalSortComparison);

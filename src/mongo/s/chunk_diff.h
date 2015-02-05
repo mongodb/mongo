@@ -124,7 +124,6 @@ namespace mongo {
 
         virtual std::pair<BSONObj,ValType> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const = 0;
         virtual ShardType shardFor( const std::string& name ) const = 0;
-        virtual std::string nameFrom( const ShardType& shard ) const = 0;
 
         ///
         /// End adapter functions
@@ -146,8 +145,7 @@ namespace mongo {
         // specified.
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
         // Throws a DBException on connection errors
-        int calculateConfigDiff( std::string config,
-                                 const std::set<ChunkVersion>& extraMinorVersions = std::set<ChunkVersion>() );
+        int calculateConfigDiff(const std::string& config);
 
         // Applies changes to the config data from a cursor passed in
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
@@ -156,7 +154,7 @@ namespace mongo {
 
         // Returns the query needed to find new changes to a collection from the config server
         // Needed only if a custom connection is required to the config server
-        Query configDiffQuery( const std::set<ChunkVersion>& extraMinorVersions = std::set<ChunkVersion>() ) const;
+        Query configDiffQuery() const;
 
     private:
 
@@ -173,5 +171,5 @@ namespace mongo {
 } // namespace mongo
 
 // Include template definition
-#include "chunk_diff-inl.cpp"
+#include "chunk_diff-inl.h"
 

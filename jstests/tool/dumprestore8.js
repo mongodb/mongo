@@ -1,5 +1,6 @@
 // dumprestore8.js
 
+
 // This file tests that indexes and capped collection options get properly dumped and restored.
 // It checks that this works both when doing a full database dump/restore and when doing it just for a single db or collection
 
@@ -21,7 +22,7 @@ assert.eq( 1 , db.foo.count() , "setup2" );
 
 
 assert.eq( 0 , db.bar.count() , "setup3" );
-db.createCollection("bar", {capped:true, size:1000});
+db.createCollection("bar", {capped:true, size:1000, max:10});
 
 for (var i = 0; i < 1000; i++) {
     db.bar.save( { x : i } );
@@ -31,7 +32,7 @@ db.bar.ensureIndex({x:1});
 barDocCount = db.bar.count();
 assert.gt( barDocCount, 0 , "No documents inserted" );
 assert.lt( db.bar.count(), 1000 , "Capped collection didn't evict documents" );
-assert.eq( 5 , db.system.indexes.count() , "Indexes weren't created right" );
+assert.eq( 5 , db.foo.getIndexes().length + db.bar.getIndexes().length, "Indexes weren't created right" );
 
 
 // Full dump/restore
@@ -41,7 +42,8 @@ t.runTool( "dump" , "--out" , t.ext );
 db.dropDatabase();
 assert.eq( 0 , db.foo.count() , "foo not dropped" );
 assert.eq( 0 , db.bar.count() , "bar not dropped" );
-assert.eq( 0 , db.system.indexes.count() , "indexes not dropped" );
+assert.eq( 0 , db.bar.getIndexes().length , "indexes on bar not dropped" );
+assert.eq( 0 , db.foo.getIndexes().length , "indexes on foo not dropped" );
 
 t.runTool( "restore" , "--dir" , t.ext );
 
@@ -52,8 +54,7 @@ for (var i = 0; i < 10; i++) {
     db.bar.save({x:i});
 }
 assert.eq( barDocCount, db.bar.count(), "Capped collection didn't evict documents after restore." );
-assert.eq( 5 , db.system.indexes.count() , "Indexes weren't created correctly by restore" );
-
+assert.eq( 5 , db.foo.getIndexes().length + db.bar.getIndexes().length, "Indexes weren't created correctly by restore");
 
 // Dump/restore single DB
 
@@ -64,7 +65,8 @@ t.runTool( "dump" , "-d", dbname, "--out" , dumppath );
 db.dropDatabase();
 assert.eq( 0 , db.foo.count() , "foo not dropped2" );
 assert.eq( 0 , db.bar.count() , "bar not dropped2" );
-assert.eq( 0 , db.system.indexes.count() , "indexes not dropped2" );
+assert.eq( 0 , db.foo.getIndexes().length , "indexes on foo not dropped2" );
+assert.eq( 0 , db.bar.getIndexes().length , "indexes on bar not dropped2" );
 
 t.runTool( "restore" , "-d", dbname2, "--dir" , dumppath + dbname );
 
@@ -77,7 +79,7 @@ for (var i = 0; i < 10; i++) {
     db.bar.save({x:i});
 }
 assert.eq( barDocCount, db.bar.count(), "Capped collection didn't evict documents after restore 2." );
-assert.eq( 5 , db.system.indexes.count() , "Indexes weren't created correctly by restore 2" );
+assert.eq( 5 , db.foo.getIndexes().length + db.bar.getIndexes().length, "Indexes weren't created correctly by restore 2");
 
 
 // Dump/restore single collection
@@ -88,7 +90,7 @@ t.runTool( "dump" , "-d", dbname2, "-c", "bar", "--out" , dumppath );
 
 db.dropDatabase();
 assert.eq( 0 , db.bar.count() , "bar not dropped3" );
-assert.eq( 0 , db.system.indexes.count() , "indexes not dropped3" );
+assert.eq( 0 , db.bar.getIndexes().length , "indexes not dropped3" );
 
 t.runTool( "restore" , "-d", dbname, "-c", "baz", "--dir" , dumppath + dbname2 + "/bar.bson" );
 
@@ -100,6 +102,6 @@ for (var i = 0; i < 10; i++) {
     db.baz.save({x:i});
 }
 assert.eq( barDocCount, db.baz.count(), "Capped collection didn't evict documents after restore 3." );
-assert.eq( 2 , db.system.indexes.count() , "Indexes weren't created correctly by restore 3" );
+assert.eq( 2 , db.baz.getIndexes().length , "Indexes weren't created correctly by restore 3" );
 
 t.stop();

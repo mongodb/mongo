@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/cluster_write.h"
@@ -42,13 +44,18 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/config_coordinator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
+    using std::auto_ptr;
     using std::vector;
+    using std::endl;
+    using std::map;
     using std::string;
+    using std::stringstream;
 
     const int ConfigOpTimeoutMillis = 30 * 1000;
 
@@ -322,7 +329,7 @@ namespace mongo {
         auto_ptr<BatchedCommandRequest> idRequest(BatchedCommandRequest::cloneWithIds(origRequest));
         const BatchedCommandRequest& request = NULL != idRequest.get() ? *idRequest : origRequest;
 
-        const NamespaceString nss = NamespaceString( request.getNS() );
+        const NamespaceString& nss = request.getNSS();
         if ( !nss.isValid() ) {
             toBatchError( Status( ErrorCodes::InvalidNamespace,
                                   nss.ns() + " is not a valid namespace" ),
@@ -405,7 +412,7 @@ namespace mongo {
                                     BatchedCommandResponse* response ) {
 
         ChunkManagerTargeter targeter;
-        Status targetInitStatus = targeter.init( NamespaceString( request.getTargetingNS() ) );
+        Status targetInitStatus = targeter.init( request.getTargetingNSS() );
 
         if ( !targetInitStatus.isOK() ) {
 

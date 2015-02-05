@@ -1,5 +1,3 @@
-// rocks_record_store.h
-
 /**
 *    Copyright (C) 2014 MongoDB Inc.
 *
@@ -29,9 +27,21 @@
 *    it in the license file.
 */
 
-#include <string>
+#pragma once
 
-#include "mongo/db/structure/record_store.h"
+#include <atomic>
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <string>
+#include <memory>
+#include <vector>
+#include <functional>
+
+#include <rocksdb/options.h>
+
+#include "mongo/db/storage/capped_callback.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
@@ -42,68 +52,99 @@ namespace rocksdb {
 
 namespace mongo {
 
+    class CappedVisibilityManager {
+    public:
+        CappedVisibilityManager() : _oplog_highestSeen(RecordId::min()) {}
+        void dealtWithCappedRecord(const RecordId& record);
+        void updateHighestSeen(const RecordId& record);
+        void addUncommittedRecord(OperationContext* txn, const RecordId& record);
+
+        // a bit hacky function, but does the job
+        RecordId getNextAndAddUncommittedRecord(OperationContext* txn,
+                                                std::function<RecordId()> nextId);
+
+        bool isCappedHidden(const RecordId& record) const;
+        RecordId oplogStartHack() const;
+
+    private:
+        void _addUncommittedRecord_inlock(OperationContext* txn, const RecordId& record);
+
+        // protects the state
+        mutable boost::mutex _lock;
+        std::vector<RecordId> _uncommittedRecords;
+        RecordId _oplog_highestSeen;
+    };
+
     class RocksRecoveryUnit;
 
     class RocksRecordStore : public RecordStore {
     public:
-        RocksRecordStore( const StringData& ns,
-                          rocksdb::DB* db,
-                          rocksdb::ColumnFamilyHandle* columnFamily );
+        RocksRecordStore(const StringData& ns, const StringData& id, rocksdb::DB* db,
+                         boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+                         bool isCapped = false, int64_t cappedMaxSize = -1,
+                         int64_t cappedMaxDocs = -1,
+                         CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
 
-        virtual ~RocksRecordStore();
+        virtual ~RocksRecordStore() { }
 
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
 
-        virtual long long dataSize() const;
+        virtual long long dataSize(OperationContext* txn) const { return _dataSize.load(); }
 
-        virtual long long numRecords() const;
+        virtual long long numRecords( OperationContext* txn ) const;
 
-        virtual bool isCapped() const;
+        virtual bool isCapped() const { return _isCapped; }
 
-        virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int infoLevel = 0 ) const;
+        virtual int64_t storageSize( OperationContext* txn,
+                                     BSONObjBuilder* extraInfo = NULL,
+                                     int infoLevel = 0 ) const;
 
         // CRUD related
 
-        virtual RecordData dataFor( const DiskLoc& loc) const;
+        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc ) const;
 
-        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
+        virtual bool findRecord( OperationContext* txn,
+                                 const RecordId& loc,
+                                 RecordData* out ) const;
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual void deleteRecord( OperationContext* txn, const RecordId& dl );
+
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
-                                                  const DiskLoc& oldLocation,
+        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
+                                                  const RecordId& oldLocation,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier );
+                                                  UpdateNotifier* notifier );
+
+        virtual bool updateWithDamagesSupported() const;
 
         virtual Status updateWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
-                                          const char* damangeSource,
+                                          const RecordId& loc,
+                                          const RecordData& oldRec,
+                                          const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start = DiskLoc(),
-                                             bool tailable = false,
+                                             const RecordId& start = RecordId(),
                                              const CollectionScanParams::Direction& dir =
-                                             CollectionScanParams::FORWARD
-                                             ) const;
-
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
+                                             CollectionScanParams::FORWARD ) const;
 
         virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
 
         virtual Status truncate( OperationContext* txn );
 
-        virtual bool compactSupported() const { return false; }
+        virtual bool compactSupported() const { return true; }
+        virtual bool compactsInPlace() const { return true; }
 
         virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
@@ -113,52 +154,120 @@ namespace mongo {
         virtual Status validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
-                                 ValidateResults* results, BSONObjBuilder* output ) const;
+                                 ValidateResults* results, BSONObjBuilder* output );
 
         virtual void appendCustomStats( OperationContext* txn,
                                         BSONObjBuilder* result,
                                         double scale ) const;
-
-        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
         virtual Status setCustomOption( OperationContext* txn,
                                         const BSONElement& option,
                                         BSONObjBuilder* info = NULL );
 
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
-                                              DiskLoc end,
+                                              RecordId end,
                                               bool inclusive);
-    private:
 
+        virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+                                                         const RecordId& startingPosition) const;
+
+        virtual Status oplogDiskLocRegister(OperationContext* txn, const OpTime& opTime);
+
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) {
+            // TODO
+        }
+
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
+          _cappedDeleteCallback = cb;
+        }
+        bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
+        bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
+        bool isOplog() const { return _isOplog; }
+
+        static rocksdb::Comparator* newRocksCollectionComparator();
+
+    private:
+        // NOTE: RecordIterator might outlive the RecordStore. That's why we use all those
+        // shared_ptrs
         class Iterator : public RecordIterator {
         public:
-            Iterator( const RocksRecordStore* rs, const CollectionScanParams::Direction& dir );
+            Iterator(OperationContext* txn, rocksdb::DB* db,
+                     boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+                     boost::shared_ptr<CappedVisibilityManager> cappedVisibilityManager,
+                     const CollectionScanParams::Direction& dir, const RecordId& start);
 
             virtual bool isEOF();
-            virtual DiskLoc curr();
-            virtual DiskLoc getNext();
-            virtual void invalidate(const DiskLoc& dl);
+            virtual RecordId curr();
+            virtual RecordId getNext();
+            virtual void invalidate(const RecordId& dl);
             virtual void saveState();
-            virtual bool restoreState();
-            virtual RecordData dataFor( const DiskLoc& loc ) const;
+            virtual bool restoreState(OperationContext* txn);
+            virtual RecordData dataFor( const RecordId& loc ) const;
 
         private:
+            void _locate(const RecordId& loc);
+            RecordId _decodeCurr() const;
             bool _forward() const;
             void _checkStatus();
 
-            const RocksRecordStore* _rs;
+            OperationContext* _txn;
+            rocksdb::DB* _db; // not owned
+            boost::shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
+            boost::shared_ptr<CappedVisibilityManager> _cappedVisibilityManager;
             CollectionScanParams::Direction _dir;
+            bool _eof;
+            const RecordId _readUntilForOplog;
+            RecordId _curr;
+            RecordId _lastLoc;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 
-        RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
+        /**
+         * Returns a new ReadOptions struct, containing the snapshot held in opCtx, if opCtx is not
+         * null
+         */
+        static rocksdb::ReadOptions _readOptions(OperationContext* opCtx = NULL);
 
-        DiskLoc _nextId();
-        rocksdb::Slice _makeKey( const DiskLoc& loc ) const;
+        static RecordId _makeRecordId( const rocksdb::Slice& slice );
+
+        static RecordData _getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
+                                      OperationContext* txn, const RecordId& loc);
+
+        RecordId _nextId();
+        bool cappedAndNeedDelete(long long dataSizeDelta, long long numRecordsDelta) const;
+        void cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted);
+
+        // The use of this function requires that the passed in storage outlives the returned Slice
+        static rocksdb::Slice _makeKey(const RecordId& loc, int64_t* storage);
+
+        void _changeNumRecords(OperationContext* txn, bool insert);
+        void _increaseDataSize(OperationContext* txn, int amount);
+
+        std::string _getTransactionID(const RecordId& rid) const;
 
         rocksdb::DB* _db; // not owned
-        rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
 
-        int _tempIncrement;
+        const bool _isCapped;
+        const int64_t _cappedMaxSize;
+        const int64_t _cappedMaxDocs;
+        CappedDocumentDeleteCallback* _cappedDeleteCallback;
+        boost::mutex _cappedDeleterMutex; // see commend in ::cappedDeleteAsNeeded
+        int _cappedDeleteCheckCount;      // see comment in ::cappedDeleteAsNeeded
+
+        const bool _isOplog;
+        int _oplogCounter;
+
+        boost::shared_ptr<CappedVisibilityManager> _cappedVisibilityManager;
+
+        std::string _ident;
+        AtomicUInt64 _nextIdNum;
+        std::atomic<long long> _dataSize;
+        std::atomic<long long> _numRecords;
+
+        const std::string _dataSizeKey;
+        const std::string _numRecordsKey;
     };
 }

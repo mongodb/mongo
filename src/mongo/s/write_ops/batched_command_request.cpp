@@ -33,6 +33,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     const size_t BatchedCommandRequest::kMaxWriteBatchSize = 1000;
 
     BatchedCommandRequest::BatchedCommandRequest( BatchType batchType ) :
@@ -83,7 +87,7 @@ namespace mongo {
 
     bool BatchedCommandRequest::isInsertIndexRequest() const {
         if ( _batchType != BatchedCommandRequest::BatchType_Insert ) return false;
-        return NamespaceString( getNS() ).isSystemDotIndexes();
+        return getNSS().isSystemDotIndexes();
     }
 
     static bool extractUniqueIndex( const BSONObj& indexDesc ) {
@@ -107,13 +111,13 @@ namespace mongo {
             return false;
         }
 
-        NamespaceString targetNSS( getTargetingNS() );
+        const NamespaceString& targetNSS = getTargetingNSS();
         if ( !targetNSS.isValid() ) {
             *errMsg = targetNSS.ns() + " is not a valid namespace to index";
             return false;
         }
 
-        NamespaceString reqNSS( getNS() );
+        const NamespaceString& reqNSS = getNSS();
         if ( reqNSS.db().compare( targetNSS.db() ) != 0 ) {
             *errMsg = targetNSS.ns() + " namespace is not in the request database "
                       + reqNSS.db().toString();
@@ -123,15 +127,13 @@ namespace mongo {
         return true;
     }
 
-    static void extractIndexNSS( const BSONObj& indexDesc, NamespaceString* indexNSS ) {
-        *indexNSS = NamespaceString( indexDesc["ns"].str() );
+    string BatchedCommandRequest::getTargetingNS() const {
+        return getTargetingNSS().toString();
     }
 
-    string BatchedCommandRequest::getTargetingNS() const {
-        if ( !isInsertIndexRequest() ) return getNS();
-        NamespaceString nss;
-        extractIndexNSS( getInsertRequest()->getDocumentsAt( 0 ), &nss );
-        return nss.toString();
+    const NamespaceString& BatchedCommandRequest::getTargetingNSS() const {
+        if ( !isInsertIndexRequest() ) return getNSS();
+        INVOKE(getTargetingNSS);
     }
 
     static BSONObj extractIndexKeyPattern( const BSONObj& indexDesc ) {
@@ -200,20 +202,20 @@ namespace mongo {
         INVOKE( toString );
     }
 
+    void BatchedCommandRequest::setNSS( const NamespaceString& nss ) {
+        INVOKE( setCollNameNS, nss );
+    }
+
     void BatchedCommandRequest::setNS( const StringData& collName ) {
         INVOKE( setCollName, collName );
     }
 
-    void BatchedCommandRequest::unsetNS() {
-        INVOKE( unsetCollName );
-    }
-
-    bool BatchedCommandRequest::isNSSet() const {
-        INVOKE( isCollNameSet );
-    }
-
     const std::string& BatchedCommandRequest::getNS() const {
         INVOKE( getCollName );
+    }
+
+    const NamespaceString& BatchedCommandRequest::getNSS() const {
+        INVOKE(getCollNameNS);
     }
 
     std::size_t BatchedCommandRequest::sizeWriteOps() const {

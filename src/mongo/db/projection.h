@@ -29,7 +29,10 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/util/string_map.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"

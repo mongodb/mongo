@@ -34,6 +34,9 @@
 
 namespace mongo {
 
+    using std::stringstream;
+    using std::vector;
+
     static void clear( vector<ChildWriteOp*>* childOps ) {
         for ( vector<ChildWriteOp*>::const_iterator it = childOps->begin(); it != childOps->end();
             ++it ) {

@@ -29,6 +29,7 @@
 #pragma once
 
 #include <cstddef>
+#include <deque>
 #include <string>
 
 namespace mongo {
@@ -39,22 +40,22 @@ namespace mongo {
 
 namespace repl {
 
-    // These functions redefine the function for logOp(),
-    // for either master/slave or replica sets.
+    // Redefines the function for logOp() to master/slave.
     void oldRepl();  // master-slave
-    void newRepl();  // replica set starting up 
-    void newReplUp();// replica set after startup
 
     // Create a new capped collection for the oplog if it doesn't yet exist.
     // This will be either local.oplog.rs (replica sets) or local.oplog.$main (master/slave)
     // If the collection already exists, set the 'last' OpTime if master/slave (side effect!)
     void createOplog(OperationContext* txn);
 
-    // This poorly-named function writes an op into the replica-set oplog;
-    // used internally by replication secondaries after they have applied an op
-    void _logOpObjRS(OperationContext* txn, const BSONObj& op);
+    // This function writes ops into the replica-set oplog;
+    // used internally by replication secondaries after they have applied ops.  Updates the global
+    // optime.
+    // Returns the optime for the last op inserted.
+    OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops);
 
     const char rsoplog[] = "local.oplog.rs";
+    static const int OPLOG_VERSION = 2;
 
     /** Log an operation to the local oplog 
 
@@ -118,5 +119,10 @@ namespace repl {
      * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
      */
     void initOpTimeFromOplog(OperationContext* txn, const std::string& oplogNS);
+
+    /**
+     * Sets the global OpTime to be 'newTime'.
+     */
+    void setNewOptime(const OpTime& newTime);
 } // namespace repl
 } // namespace mongo

@@ -32,6 +32,12 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::make_pair;
+    using std::set;
+    using std::stringstream;
+    using std::vector;
+
     /**
      * Returns a new write concern that has the copy of every field from the original
      * document but with a w set to 1. This is intended for upgrading { w: 0 } write

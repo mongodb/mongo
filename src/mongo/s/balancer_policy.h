@@ -31,11 +31,17 @@
 #ifndef S_BALANCER_POLICY_HEADER
 #define S_BALANCER_POLICY_HEADER
 
+#include <boost/noncopyable.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
 
 namespace mongo {
 
+    class ChunkManager;
 
     struct ChunkInfo {
         const BSONObj min;
@@ -67,10 +73,11 @@ namespace mongo {
     class ShardInfo {
     public:
         ShardInfo();
-        ShardInfo( long long maxSize, long long currSize, 
-                   bool draining, bool opsQueued, 
-                   const std::set<std::string>& tags = std::set<std::string>(),
-                   const std::string& _mongoVersion = std::string("") );
+        ShardInfo(long long maxSizeMB,
+                  long long currSizeMB,
+                  bool draining,
+                  const std::set<std::string>& tags = std::set<std::string>(),
+                  const std::string& _mongoVersion = std::string(""));
 
         void addTag( const std::string& tag );
 
@@ -89,25 +96,19 @@ namespace mongo {
          * "isDraining" on 'shrdLimits'.
          */
         bool isDraining() const { return _draining; }
-        
-        /**
-         * @return true if a shard currently has operations in any of its writeback queues
-         */
-        bool hasOpsQueued() const { return _hasOpsQueued; }
-        
-        long long getMaxSize() const { return _maxSize; }
 
-        long long getCurrSize() const { return _currSize; }
+        long long getMaxSizeMB() const { return _maxSizeMB; }
+
+        long long getCurrSizeMB() const { return _currSizeMB; }
 
         std::string getMongoVersion() const { return _mongoVersion; }
 
         std::string toString() const;
         
     private:
-        long long _maxSize;
-        long long _currSize;
+        long long _maxSizeMB;
+        long long _currSizeMB;
         bool _draining;
-        bool _hasOpsQueued;
         std::set<std::string> _tags;
         std::string _mongoVersion;
     };
@@ -125,7 +126,7 @@ namespace mongo {
     };
 
     typedef std::map< std::string,ShardInfo > ShardInfoMap;
-    typedef std::map< std::string,std::vector<BSONObj> > ShardToChunksMap;
+    typedef std::map<std::string, OwnedPointerVector<ChunkType>* > ShardToChunksMap;
 
     class DistributionStatus : boost::noncopyable {
     public:
@@ -166,13 +167,13 @@ namespace mongo {
         unsigned numberOfChunksInShardWithTag( const std::string& shard, const std::string& tag ) const;
 
         /** @return chunks for the shard */
-        const std::vector<BSONObj>& getChunks( const std::string& shard ) const;
+        const std::vector<ChunkType*>& getChunks(const std::string& shard) const;
 
         /** @return all tags we know about, not include "" */
         const std::set<std::string>& tags() const { return _allTags; }
 
         /** @return the right tag for chunk, possibly "" */
-        std::string getTagForChunk( const BSONObj& chunk ) const;
+        std::string getTagForChunk(const ChunkType& chunk) const;
         
         /** @return all shards we know about */
         const std::set<std::string>& shards() const { return _shards; }
@@ -183,6 +184,28 @@ namespace mongo {
         /** writes all state to log() */
         void dump() const;
         
+        /**
+         * Retrieves shard metadata information from the config server as well as some stats
+         * from the shards.
+         */
+        static Status populateShardInfoMap(ShardInfoMap* shardInfo);
+
+        /**
+         * Note: jumbo and versions are not set.
+         */
+        static void populateShardToChunksMap(const ShardInfoMap& allShards,
+                                             const ChunkManager& chunkMgr,
+                                             ShardToChunksMap* shardToChunksMap);
+
+        /**
+         * Returns the tag of the given chunk by querying the config server.
+         *
+         * TODO: add a way to incrementally update chunk tags metadata so this is not needed.
+         */
+        static StatusWith<std::string> getTagForSingleChunk(const std::string& configServer,
+                                                            const std::string& ns,
+                                                            const ChunkType& chunk);
+
     private:
         const ShardInfoMap& _shardInfo;
         const ShardToChunksMap& _shardChunks;
@@ -208,9 +231,6 @@ namespace mongo {
         static MigrateInfo* balance( const std::string& ns,
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
-
-    private:
-        static bool _isJumbo( const BSONObj& chunk );
     };
 
 

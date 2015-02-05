@@ -267,6 +267,22 @@ namespace mongo {
                             std::string* errMsg = NULL);
 
         /**
+         * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
+         * field 'elem'. Write the extracted contents to '*out' if successful or fills
+         * '*errMsg', if exising, otherwise.  This variant relies on T having a parseBSON,
+         * which all BSONSerializable's have.
+         *
+         * The vector owns the instances of T.
+         *
+         * TODO: Tighten for BSONSerializable's only
+         */
+        template<typename T>
+        static FieldState extract(BSONElement elem,
+                            const BSONField<std::vector<T*> >& field,
+                            std::vector<T*>* out,
+                            std::string* errMsg = NULL);
+
+        /**
          * Similar to the mandatory repetition' extract but on an optional field. '*out' would
          * only be allocated if the field is present. The ownership of '*out' would be
          * transferred to the caller, in that case.

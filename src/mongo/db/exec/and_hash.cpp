@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/and_common-inl.h"
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/util/mongoutils/str.h"
@@ -45,6 +46,7 @@ namespace {
 namespace mongo {
 
     using std::auto_ptr;
+    using std::vector;
 
     const size_t AndHashStage::kLookAheadWorks = 10;
 
@@ -163,7 +165,7 @@ namespace mongo {
                         _dataMap.clear();
                         return PlanStage::FAILURE;
                     }
-                    // We ignore NEED_TIME.
+                    // We ignore NEED_TIME. TODO: what do we want to do if we get NEED_FETCH here?
                 }
             }
 
@@ -219,7 +221,7 @@ namespace mongo {
         // We know that we've ADVANCED.  See if the WSM is in our table.
         WorkingSetMember* member = _ws->get(*out);
 
-        // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+        // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
         // with this WSM.
         if (!member->hasLoc()) {
             _ws->flagForReview(*out);
@@ -278,7 +280,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -328,6 +330,10 @@ namespace mongo {
             if (PlanStage::NEED_TIME == childStatus) {
                 ++_commonStats.needTime;
             }
+            else if (PlanStage::NEED_FETCH == childStatus) {
+                ++_commonStats.needFetch;
+                *out = id;
+            }
 
             return childStatus;
         }
@@ -342,7 +348,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -427,6 +433,10 @@ namespace mongo {
             if (PlanStage::NEED_TIME == childStatus) {
                 ++_commonStats.needTime;
             }
+            else if (PlanStage::NEED_FETCH == childStatus) {
+                ++_commonStats.needFetch;
+                *out = id;
+            }
 
             return childStatus;
         }
@@ -448,13 +458,13 @@ namespace mongo {
         }
     }
 
-    void AndHashStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl, type);
+            _children[i]->invalidate(txn, dl, type);
         }
 
         // Invalidation can happen to our warmup results.  If that occurs just
@@ -463,15 +473,15 @@ namespace mongo {
             if (WorkingSet::INVALID_ID != _lookAheadResults[i]) {
                 WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
                 if (member->hasLoc() && member->loc == dl) {
-                    WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
+                    WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
                     _ws->flagForReview(_lookAheadResults[i]);
                     _lookAheadResults[i] = WorkingSet::INVALID_ID;
                 }
             }
         }
 
-        // If it's a deletion, we have to forget about the DiskLoc, and since the AND-ing is by
-        // DiskLoc we can't continue processing it even with the object.
+        // If it's a deletion, we have to forget about the RecordId, and since the AND-ing is by
+        // RecordId we can't continue processing it even with the object.
         //
         // If it's a mutation the predicates implied by the AND-ing may no longer be true.
         //
@@ -493,7 +503,7 @@ namespace mongo {
             _memUsage -= member->getMemUsage();
 
             // The loc is about to be invalidated.  Fetch it and clear the loc.
-            WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
 
             // Add the WSID to the to-be-reviewed list in the WS.
             _ws->flagForReview(id);

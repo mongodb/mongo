@@ -50,4 +50,13 @@ namespace mongo {
      */
     void startSignalProcessingThread();
 
+    /*
+     * Uninstall the Control-C handler
+     *
+     * Windows Only
+     * Used by nt services to remove the Control-C handler after the system knows it is running
+     * as a service, and not as a console program.
+     */
+    void removeControlCHandler();
+
 } // namespace mongo

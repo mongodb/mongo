@@ -36,12 +36,16 @@
 
 namespace mongo {
 
+    using std::string;
+
     void BsonTemplateEvaluator::initializeEvaluator() {
         addOperator("RAND_INT", &BsonTemplateEvaluator::evalRandInt);
+        addOperator("RAND_INT_PLUS_THREAD", &BsonTemplateEvaluator::evalRandPlusThread);
         addOperator("SEQ_INT", &BsonTemplateEvaluator::evalSeqInt);
         addOperator("RAND_STRING", &BsonTemplateEvaluator::evalRandString);
         addOperator("CONCAT", &BsonTemplateEvaluator::evalConcat);
         addOperator("OID", &BsonTemplateEvaluator::evalObjId);
+        addOperator("VARIABLE", &BsonTemplateEvaluator::evalVariable);
     }
 
     BsonTemplateEvaluator::BsonTemplateEvaluator() : _id(0) {
@@ -81,27 +85,77 @@ namespace mongo {
         return StatusSuccess;
     }
 
-    BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(BSONElement in,
-                                                                   BSONObjBuilder& out) {
-       if (in.type() != Object) {
-           out.append(in);
-           return StatusSuccess;
-       }
-       BSONObj subObj = in.embeddedObject();
-       const char* opOrNot = subObj.firstElementFieldName();
-       if (opOrNot[0] != '#') {
-           out.append(in);
-           return StatusSuccess;
-       }
-       const char* op = opOrNot+1;
-       OperatorFn fn = operatorEvaluator(op);
-       if (!fn)
-           return StatusBadOperator;
-       Status st = fn(this, in.fieldName(), subObj, out);
-       if (st != StatusSuccess)
-           return st;
-       return StatusSuccess;
+    /* Sets the variable
+     */
+    void BsonTemplateEvaluator::setVariable(const std::string& name, const BSONElement& elem) {
+        this->_varMap[name] = elem.wrap();
     }
+
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(const BSONElement in,
+                                                                   BSONObjBuilder& out) {
+       if (in.type() == Array) {
+            BSONArrayBuilder arrayBuilder(out.subarrayStart(in.fieldName()));
+            std::vector<BSONElement> arrElems = in.Array();
+            for (unsigned int i = 0; i < arrElems.size(); i++) {
+                BSONElement element = arrElems[i];
+                if (element.isABSONObj()) {
+
+                    BSONObjBuilder newBuilder( element.objsize() );
+                    Status st = _evalElem(element, newBuilder);
+                    if (st != StatusSuccess)
+                        return st;
+                    // Only want to append the field value, not the whole object
+                    arrayBuilder.append(newBuilder.done().getField(element.fieldName()));
+                }
+                else {
+                    arrayBuilder.append(element);
+                }
+            }
+            arrayBuilder.done();
+            return StatusSuccess;
+       }
+
+        if (in.type() != Object) {
+            out.append(in);
+            return StatusSuccess;
+        }
+
+       //continue evaluation on subObject
+       BSONObj subObj = in.embeddedObject();
+
+       BSONObjBuilder newBuilder( subObj.objsize() + 128 );
+       Status st = _evalObj(subObj, newBuilder);
+       if (st != StatusSuccess)
+          return st;
+
+       BSONObj updatedObj = newBuilder.obj();
+
+       //check if updated object needs template evaluation
+       const char* opOrNot = updatedObj.firstElementFieldName();
+       if (opOrNot[0] == '#') {
+           const char* op = opOrNot+1;
+           OperatorFn fn = operatorEvaluator(op);
+           if (!fn)
+               return StatusBadOperator;
+           Status st = fn(this, in.fieldName(), updatedObj, out);
+           if (st != StatusSuccess)
+               return st;
+       }
+       else {
+           out.append(in.fieldName(), updatedObj);
+       }
+       return StatusSuccess;
+     }
+
+     BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalObj(const BSONObj& in,
+                                                                  BSONObjBuilder& out) {
+         BSONForEach(e, in) {
+            Status st = _evalElem(e, out);
+             if (st != StatusSuccess)
+                 return st;
+         }
+         return StatusSuccess;
+     }
 
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandInt(BsonTemplateEvaluator* btl,
                                                                      const char* fieldName,
@@ -109,7 +163,7 @@ namespace mongo {
                                                                      BSONObjBuilder& out) {
         // in = { #RAND_INT: [10, 20] }
         BSONObj range = in.firstElement().embeddedObject();
-        if (!range[0].isNumber() || !range[1].isNumber())
+        if (!range["0"].isNumber() || !range["1"].isNumber())
             return StatusOpEvaluationError;
         const int min = range["0"].numberInt();
         const int max  = range["1"].numberInt();
@@ -121,6 +175,25 @@ namespace mongo {
                 return StatusOpEvaluationError;
             randomNum *= range[2].numberInt();
         }
+        out.append(fieldName, randomNum);
+        return StatusSuccess;
+    }
+
+    BsonTemplateEvaluator::Status
+       BsonTemplateEvaluator::evalRandPlusThread(BsonTemplateEvaluator* btl,
+                                                   const char* fieldName,
+                                                   const BSONObj& in,
+                                                   BSONObjBuilder& out) {
+        // in = { #RAND_INT_PLUS_THREAD: [10, 20] }
+        BSONObj range = in.firstElement().embeddedObject();
+        if (!range["0"].isNumber() || !range["1"].isNumber())
+            return StatusOpEvaluationError;
+        const int min = range["0"].numberInt();
+        const int max  = range["1"].numberInt();
+        if (max <= min)
+            return StatusOpEvaluationError;
+        int randomNum = min + (rand() % (max - min));
+        randomNum += ((max - min) * btl->_id);
         out.append(fieldName, randomNum);
         return StatusSuccess;
     }
@@ -240,6 +313,21 @@ namespace mongo {
             return StatusOpEvaluationError;
         out.genOID();
         return StatusSuccess;
+    }
+
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalVariable(BsonTemplateEvaluator* btl,
+                                                                      const char* fieldName,
+                                                                      const BSONObj& in,
+                                                                      BSONObjBuilder& out) {
+        // in = { #VARIABLE: "x" }
+        BSONElement varEle = btl->_varMap[in["#VARIABLE"].String()].firstElement();
+        if ( !varEle.eoo() ) {
+           out.appendAs(varEle, fieldName);
+           return StatusSuccess;
+        }
+        else {
+            return StatusOpEvaluationError;
+        }
     }
 
 } // end namespace mongo

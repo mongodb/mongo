@@ -28,97 +28,46 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
-#if defined(_WIN32)
-#include <io.h>
-#else
-#include <sys/file.h>
-#endif
-
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/storage/mmap_v1/data_file_sync.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/platform/process_id.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
+
 
 namespace mongo {
 
-namespace {
-#ifdef _WIN32
-    HANDLE lockFileHandle;
-#endif
+    using std::endl;
+    using std::ifstream;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
-    // This is used by everyone, including windows.
-    int lockFile = 0;
+namespace {
 
 #if !defined(__sunos__)
-    void writePid(int fd) {
-        stringstream ss;
-        ss << ProcessId::getCurrent() << endl;
-        string s = ss.str();
-        const char * data = s.c_str();
-#ifdef _WIN32
-        verify( _write( fd, data, strlen( data ) ) );
-#else
-        verify( write( fd, data, strlen( data ) ) );
-#endif
-    }
-
     // if doingRepair is true don't consider unclean shutdown an error
-    void acquirePathLock(MMAPV1Engine* storageEngine, bool doingRepair) {
-        string name = (boost::filesystem::path(storageGlobalParams.dbpath) / "mongod.lock").string();
-
-        bool oldFile = false;
-
-        if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ) {
-            oldFile = true;
-        }
-
-#ifdef _WIN32
-        lockFileHandle = CreateFileA( name.c_str(), GENERIC_READ | GENERIC_WRITE,
-            0 /* do not allow anyone else access */, NULL, 
-            OPEN_ALWAYS /* success if fh can open */, 0, NULL );
-
-        if (lockFileHandle == INVALID_HANDLE_VALUE) {
-            DWORD code = GetLastError();
-            char *msg;
-            FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-                NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                (LPSTR)&msg, 0, NULL);
-            string m = msg;
-            str::stripTrailing(m, "\r\n");
-            uasserted(ErrorCodes::DBPathInUse,
-                      str::stream() << "Unable to create/open lock file: "
-                                    << name << ' ' << m
-                                    << ". Is a mongod instance already running?");
-        }
-        lockFile = _open_osfhandle((intptr_t)lockFileHandle, 0);
-#else
-        lockFile = open( name.c_str(), O_RDWR | O_CREAT , S_IRWXU | S_IRWXG | S_IRWXO );
-        if( lockFile <= 0 ) {
-            uasserted( ErrorCodes::DBPathInUse,
-                       str::stream() << "Unable to create/open lock file: "
-                                     << name << ' ' << errnoWithDescription()
-                                     << " Is a mongod instance already running?" );
-        }
-        if (flock( lockFile, LOCK_EX | LOCK_NB ) != 0) {
-            close ( lockFile );
-            lockFile = 0;
-            uasserted(ErrorCodes::DBPathInUse,
-                      "Unable to lock file: " + name + ". Is a mongod instance already running?");
-        }
-#endif
+    void acquirePathLock(MMAPV1Engine* storageEngine,
+                         bool doingRepair,
+                         const StorageEngineLockFile& lockFile) {
+        string name = lockFile.getFilespec();
+        bool oldFile = lockFile.createdByUncleanShutdown();
 
         if ( oldFile ) {
             // we check this here because we want to see if we can get the lock
@@ -175,12 +124,6 @@ namespace {
 
             if (!errmsg.empty()) {
                 log() << errmsg << endl;
-#ifdef _WIN32
-                CloseHandle( lockFileHandle );
-#else
-                close ( lockFile );
-#endif
-                lockFile = 0;
                 uassert( 12596 , "old lock file" , 0 );
             }
         }
@@ -193,20 +136,11 @@ namespace {
             log() << "**************" << endl;
             uasserted(13597, "can't start without --journal enabled when journal/ files are present");
         }
-
-#ifdef _WIN32
-        uassert( 13625, "Unable to truncate lock file", _chsize(lockFile, 0) == 0);
-        writePid( lockFile );
-        _commit( lockFile );
-#else
-        uassert( 13342, "Unable to truncate lock file", ftruncate(lockFile, 0) == 0);
-        writePid( lockFile );
-        fsync( lockFile );
-        flushMyDirectory(name);
-#endif
     }
 #else
-    void acquirePathLock(MMAPV1Engine* storageEngine, bool) {
+    void acquirePathLock(MMAPV1Engine* storageEngine,
+                         bool doingRepair,
+                         const StorageEngineLockFile& lockFile) {
         // TODO - this is very bad that the code above not running here.
 
         // Not related to lock file, but this is where we handle unclean shutdown
@@ -219,7 +153,7 @@ namespace {
             uasserted(13618, "can't start without --journal enabled when journal/ files are present");
         }
     }
-#endif
+#endif  //  !defined(__sunos__)
 
 
     /// warn if readahead > 256KB (gridfs chunk size)
@@ -282,21 +216,22 @@ namespace {
     }
 } // namespace
 
-    MMAPV1Engine::MMAPV1Engine() {
+    MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile& lockFile) {
         // TODO check non-journal subdirs if using directory-per-db
         checkReadAhead(storageGlobalParams.dbpath);
 
-        acquirePathLock(this, storageGlobalParams.repair);
+        acquirePathLock(this, storageGlobalParams.repair, lockFile);
 
         FileAllocator::get()->start();
 
         MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
+    }
 
-        // dur::startup() depends on globalStorageEngine being set before calling.
-        // TODO clean up dur::startup() so this isn't needed.
-        invariant(!globalStorageEngine);
-        globalStorageEngine = this;
+    void MMAPV1Engine::finishInit() {
+        dataFileSync.go();
 
+        // Replays the journal (if needed) and starts the background thread. This requires the
+        // ability to create OperationContexts.
         dur::startup();
     }
 
@@ -307,8 +242,8 @@ namespace {
         _entryMap.clear();
     }
 
-    RecoveryUnit* MMAPV1Engine::newRecoveryUnit( OperationContext* opCtx ) {
-        return new DurRecoveryUnit( opCtx );
+    RecoveryUnit* MMAPV1Engine::newRecoveryUnit() {
+        return new DurRecoveryUnit();
     }
 
     void MMAPV1Engine::listDatabases( std::vector<std::string>* out ) const {
@@ -317,19 +252,39 @@ namespace {
 
     DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                  const StringData& db ) {
-        boost::mutex::scoped_lock lk( _entryMapMutex );
-        MMAPV1DatabaseCatalogEntry*& entry = _entryMap[db.toString()];
-        if ( !entry ) {
-            entry =  new MMAPV1DatabaseCatalogEntry( opCtx,
-                                                     db,
-                                                     storageGlobalParams.dbpath,
-                                                     storageGlobalParams.directoryperdb,
-                                                     false );
+        {
+            boost::mutex::scoped_lock lk(_entryMapMutex);
+            EntryMap::const_iterator iter = _entryMap.find(db.toString());
+            if (iter != _entryMap.end()) {
+                return iter->second;
+            }
         }
+
+        // This is an on-demand database create/open. At this point, we are locked under X lock for
+        // the database (MMAPV1DatabaseCatalogEntry's constructor checks that) so no two threads
+        // can be creating the same database concurrenty. We need to create the database outside of
+        // the _entryMapMutex so we do not deadlock (see SERVER-15880).
+        MMAPV1DatabaseCatalogEntry* entry =
+            new MMAPV1DatabaseCatalogEntry(opCtx,
+                                           db,
+                                           storageGlobalParams.dbpath,
+                                           storageGlobalParams.directoryperdb,
+                                           false);
+
+        boost::mutex::scoped_lock lk(_entryMapMutex);
+
+        // Sanity check that we are not overwriting something
+        invariant(_entryMap.insert(EntryMap::value_type(db.toString(), entry)).second);
+
         return entry;
     }
 
     Status MMAPV1Engine::closeDatabase( OperationContext* txn, const StringData& db ) {
+        // Before the files are closed, flush any potentially outstanding changes, which might
+        // reference this database. Otherwise we will assert when subsequent applications of the
+        // global journal entries occur, which happen to have write intents for the removed files.
+        getDur().syncDataAndTruncateJournal(txn);
+
         boost::mutex::scoped_lock lk( _entryMapMutex );
         MMAPV1DatabaseCatalogEntry* entry = _entryMap[db.toString()];
         delete entry;
@@ -372,7 +327,15 @@ namespace {
         return MongoFile::flushAll( sync );
     }
 
-    void MMAPV1Engine::cleanShutdown(OperationContext* txn) {
+    bool MMAPV1Engine::isDurable() const {
+        return getDur().isDurable();
+    }
+
+    RecordAccessTracker& MMAPV1Engine::getRecordAccessTracker() {
+        return _recordAccessTracker;
+    }
+
+    void MMAPV1Engine::cleanShutdown() {
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
@@ -381,36 +344,13 @@ namespace {
 
         if (storageGlobalParams.dur) {
             log() << "shutdown: final commit..." << endl;
-            getDur().commitNow(txn);
 
-            flushAllFiles(true);
+            getDur().commitAndStopDurThread();
         }
 
         log() << "shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         log() << ss3.str() << endl;
-
-        if (storageGlobalParams.dur) {
-            dur::journalCleanup(true);
-        }
-
-#if !defined(__sunos__)
-        if ( lockFile ) {
-            log() << "shutdown: removing fs lock..." << endl;
-            /* This ought to be an unlink(), but Eliot says the last
-               time that was attempted, there was a race condition
-               with acquirePathLock().  */
-#ifdef _WIN32
-            if( _chsize( lockFile , 0 ) )
-                log() << "couldn't remove fs lock " << errnoWithDescription(_doserrno) << endl;
-            CloseHandle(lockFileHandle);
-#else
-            if( ftruncate( lockFile , 0 ) )
-                log() << "couldn't remove fs lock " << errnoWithDescription() << endl;
-            flock( lockFile, LOCK_UN );
-#endif
-        }
-#endif
     }
 }

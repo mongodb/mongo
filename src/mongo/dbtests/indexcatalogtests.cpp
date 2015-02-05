@@ -16,10 +16,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -32,43 +34,40 @@ namespace IndexCatalogTests {
     public:
         IndexIteratorTests() {
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
+            ScopedTransaction transaction(&txn, MODE_IX);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
 
-            _db = ctx.ctx().db();
+            _db = ctx.db();
             _coll = _db->createCollection(&txn, _ns);
             _catalog = _coll->getIndexCatalog();
-            ctx.commit();
+            wuow.commit();
         }
 
         ~IndexIteratorTests() {
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
+            ScopedTransaction transaction(&txn, MODE_IX);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
 
             _db->dropCollection(&txn, _ns);
-            ctx.commit();
+            wuow.commit();
         }
 
         void run() {
             OperationContextImpl txn;
             Client::WriteContext ctx(&txn, _ns);
 
-            int numFinishedIndexesStart = _catalog->numIndexesReady();
+            int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
 
-            BSONObjBuilder b1;
-            b1.append("key", BSON("x" << 1));
-            b1.append("ns", _ns);
-            b1.append("name", "_x_0");
-            _catalog->createIndex(&txn, b1.obj(), true);
+            dbtests::createIndex(&txn, _ns, BSON("x" << 1));
+            dbtests::createIndex(&txn, _ns, BSON("y" << 1));
 
-            BSONObjBuilder b2;
-            b2.append("key", BSON("y" << 1));
-            b2.append("ns", _ns);
-            b2.append("name", "_y_0");
-            _catalog->createIndex(&txn, b2.obj(), true);
+            ASSERT_TRUE(_catalog->numIndexesReady(&txn) == numFinishedIndexesStart+2);
 
-            ASSERT_TRUE(_catalog->numIndexesReady() == numFinishedIndexesStart+2);
-
-            IndexCatalog::IndexIterator ii = _catalog->getIndexIterator(false);
+            IndexCatalog::IndexIterator ii = _catalog->getIndexIterator(&txn,false);
             int indexesIterated = 0;
             bool foundIndex = false;
             while (ii.more()) {
@@ -78,16 +77,80 @@ namespace IndexCatalogTests {
                 while (boit.more() && !foundIndex) {
                     BSONElement e = boit.next();
                     if (str::equals(e.fieldName(), "name") &&
-                            str::equals(e.valuestrsafe(), "_y_0")) {
+                            str::equals(e.valuestrsafe(), "y_1")) {
                         foundIndex = true;
                         break;
                     }
                 }
             }
 
-            ctx.commit();
-            ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady());
+            ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady(&txn));
             ASSERT_TRUE(foundIndex);
+        }
+
+    private:
+        IndexCatalog* _catalog;
+        Collection* _coll;
+        Database* _db;
+    };
+
+    /**
+     * Test for IndexCatalog::refreshEntry().
+     */
+    class RefreshEntry {
+    public:
+        RefreshEntry() {
+            OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_IX);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
+
+            _db = ctx.db();
+            _coll = _db->createCollection(&txn, _ns);
+            _catalog = _coll->getIndexCatalog();
+            wuow.commit();
+        }
+
+        ~RefreshEntry () {
+            OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_IX);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
+
+            _db->dropCollection(&txn, _ns);
+            wuow.commit();
+        }
+
+        void run() {
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, _ns);
+            const std::string indexName = "x_1";
+
+            ASSERT_OK(dbtests::createIndexFromSpec(&txn, _ns, BSON("name" << indexName <<
+                                                                   "ns" << _ns <<
+                                                                   "key" << BSON("x" << 1) <<
+                                                                   "expireAfterSeconds" << 5)));
+
+            const IndexDescriptor* desc = _catalog->findIndexByName(&txn, indexName);
+            ASSERT(desc);
+            ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+
+            // Change value of "expireAfterSeconds" on disk.
+            WriteUnitOfWork wuow(&txn);
+            _coll->getCatalogEntry()->updateTTLSetting(&txn, "x_1", 10);
+            wuow.commit();
+
+            // Verify that the catalog does not yet know of the change.
+            desc = _catalog->findIndexByName(&txn, indexName);
+            ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+
+            // Notify the catalog of the change.
+            desc = _catalog->refreshEntry(&txn, desc);
+
+            // Test that the catalog reflects the change.
+            ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());
         }
 
     private:
@@ -102,6 +165,9 @@ namespace IndexCatalogTests {
         }
         void setupTests() {
             add<IndexIteratorTests>();
+            add<RefreshEntry>();
         }
-    } indexCatalogTests;
+    };
+
+    SuiteInstance<IndexCatalogTests> indexCatalogTests;
 }

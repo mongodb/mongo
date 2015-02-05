@@ -32,8 +32,13 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
+
+    class BSONObjBuilder;
+    class OperationContext;
 
     /**
      * A RecoveryUnit is responsible for ensuring that data is persisted.
@@ -43,6 +48,11 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(RecoveryUnit);
     public:
         virtual ~RecoveryUnit() { }
+
+        virtual void reportState( BSONObjBuilder* b ) const { }
+
+        virtual void beingReleasedFromOperationContext() {}
+        virtual void beingSetOnOperationContext() {}
 
         /**
          * These should be called through WriteUnitOfWork rather than directly.
@@ -64,7 +74,7 @@ namespace mongo {
          *
          * TODO see if we can get rid of nested UnitsOfWork.
          */
-        virtual void beginUnitOfWork() = 0;
+        virtual void beginUnitOfWork(OperationContext* opCtx) = 0;
         virtual void commitUnitOfWork() = 0;
         virtual void endUnitOfWork() = 0;
 
@@ -79,17 +89,18 @@ namespace mongo {
          */
         virtual bool awaitCommit() = 0;
 
-        /**
-         * Commit if required.  May take a long time.  Returns true if committed.
-         *
-         * WARNING: Data *must* be in a crash-recoverable state when this is called.
-         */
-        virtual bool commitIfNeeded(bool force = false) = 0;
+        // This is a hint to the engine that this transaction is going to call awaitCommit at the
+        // end.  This should be called before any work is done so that transactions can be
+        // configured correctly.
+        virtual void goingToAwaitCommit() { }
 
         /**
-         * Returns true if a global commit of the journal is needed but does not commit.
+         * When this is called, if there is an open transaction, it is commited and a new one is
+         * started.  This cannot be called inside of a WriteUnitOfWork, and should fail if it is.
          */
-        virtual bool isCommitNeeded() const = 0;
+        virtual void commitAndRestart() = 0;
+
+        virtual SnapshotId getSnapshotId() const = 0;
 
         /**
          * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
@@ -130,18 +141,6 @@ namespace mongo {
          */
         virtual void* writingPtr(void* data, size_t len) = 0;
 
-        /**
-         * Commits pending changes, flushes all changes to main data files, then removes the
-         * journal.
-         *
-         * WARNING: Data *must* be in a crash-recoverable state when this is called.
-         *
-         * This is useful as a "barrier" to ensure that writes before this call will never go
-         * through recovery and be applied to files that have had changes made after this call
-         * applied.
-         */
-        virtual void syncDataAndTruncateJournal() = 0;
-
         //
         // Syntactic sugar
         //
@@ -162,19 +161,23 @@ namespace mongo {
             return x;
         }
 
+        /**
+         * Sets a flag that declares this RecoveryUnit will skip rolling back writes, for the
+         * duration of the current outermost WriteUnitOfWork.  This function can only be called
+         * between a pair of unnested beginUnitOfWork() / endUnitOfWork() calls.
+         * The flag is cleared when endUnitOfWork() is called.
+         * While the flag is set, rollback will skip rolling back writes, but custom rollback
+         * change functions are still called.  Clearly, this functionality should only be used when
+         * writing to temporary collections that can be cleaned up externally.  For example,
+         * foreground index builds write to a temporary collection; if something goes wrong that
+         * normally requires a rollback, we can instead clean up the index by dropping the entire
+         * index.
+         * Setting the flag may permit increased performance.
+         */
+        virtual void setRollbackWritesDisabled() = 0;
+
     protected:
         RecoveryUnit() { }
-    };
-
-    class WriteUnitOfWork {
-        MONGO_DISALLOW_COPYING(WriteUnitOfWork);
-    public:
-        WriteUnitOfWork(RecoveryUnit* ru) : _ru(ru) { _ru->beginUnitOfWork(); }
-        ~WriteUnitOfWork(){ _ru->endUnitOfWork(); }
-
-        void commit() { _ru->commitUnitOfWork(); }
-
-        RecoveryUnit* const _ru;
     };
 
 }  // namespace mongo

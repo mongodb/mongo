@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
@@ -38,7 +40,9 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
+    using std::endl;
+    using std::string;
+    using std::stringstream;
 
     class ValidateCmd : public Command {
     public:
@@ -77,17 +81,11 @@ namespace mongo {
                 LOG(0) << "CMD: validate " << ns << endl;
             }
 
-            Client::ReadContext ctx(txn, ns_string.ns());
+            AutoGetCollectionForRead ctx(txn, ns_string.ns());
 
-            Database* db = ctx.ctx().db();
-            if ( !db ) {
-                errmsg = "database not found";
-                return false;
-            }
-
-            Collection* collection = db->getCollection( txn, ns );
+            Collection* collection = ctx.getCollection();
             if ( !collection ) {
-                errmsg = "collection not found";
+                errmsg = "ns not found";
                 return false;
             }
 

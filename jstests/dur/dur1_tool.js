@@ -111,13 +111,14 @@ stopMongod(30001, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
-// mongorestore with --dbpath and --journal options should do a recovery pass
+// mongod with --dbpath and --journal options should do a recovery pass
 // empty.bson is an empty file so it won't actually insert anything
-log("use mongorestore to recover");
-runMongoProgram("mongorestore", "--dbpath", path2, "--journal", "-d", "test", "-c", "empty", "jstests/dur/data/empty.bson");
-
-// stopMongod seems to be asynchronous (hmmm) so we sleep here.
-// sleep(5000);
+log("use mongod to recover");
+conn = startMongoProgram('mongod', '--port', 30001, '--dbpath', path2,
+                         '--journal', '--smallfiles',
+                         '--nohttpinterface', '--noprealloc', '--bind_ip', '127.0.0.1');
+verify();
+stopMongod(30001);
 
 // at this point, after clean shutdown, there should be no journal files
 log("check no journal files (after presumably clean shutdown)");

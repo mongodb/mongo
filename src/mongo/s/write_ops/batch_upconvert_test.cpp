@@ -40,6 +40,9 @@
 
 namespace {
 
+    using std::string;
+    using std::vector;
+
     using namespace mongo;
 
     TEST(WriteBatchUpconvert, BasicInsert) {

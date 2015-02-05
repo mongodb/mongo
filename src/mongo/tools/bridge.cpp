@@ -26,17 +26,23 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include <boost/thread.hpp>
+#include <iostream>
+#include <signal.h>
 
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/tools/mongobridge_options.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 #include "mongo/util/timer.h"
 
@@ -80,7 +86,7 @@ public:
                 }
                 sleepmillis(mongoBridgeGlobalParams.delay);
 
-                int oldId = m.header()->id;
+                int oldId = m.header().getId();
                 if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
                     bool exhaust = false;
                     if ( m.operation() == dbQuery ) {
@@ -96,9 +102,9 @@ public:
 
                     mp_.reply( m, response, oldId );
                     while ( exhaust ) {
-                        MsgData *header = response.header();
-                        QueryResult *qr = (QueryResult *) header;
-                        if ( qr->cursorId ) {
+                        MsgData::View header = response.header();
+                        QueryResult::View qr = header.view2ptr();
+                        if ( qr.getCursorId() ) {
                             response.reset();
                             dest.port().recv( response );
                             mp_.reply( m, response ); // m argument is ignored anyway
@@ -140,7 +146,7 @@ void cleanup( int sig ) {
     ListeningSockets::get()->closeAll();
     for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
         (*i)->shutdown();
-    ::_exit( 0 );
+    quickExit( 0 );
 }
 #if !defined(_WIN32)
 void myterminate() {
@@ -185,11 +191,11 @@ int toolMain( int argc, char **argv, char** envp ) {
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     WindowsCommandLine wcl(argc, argvW, envpW);
     int exitCode = toolMain(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = toolMain(argc, argv, envp);
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #endif

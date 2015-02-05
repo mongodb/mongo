@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
@@ -34,6 +34,8 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
 
 namespace {
     const char subTotalName[] = "subTotal";

@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournal
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -38,17 +40,18 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
+#include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/db/storage/mmap_v1/dur_journalimpl.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/random.h"
-#include "mongo/server.h"
-#include "mongo/util/alignedbuilder.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
-#include "mongo/util/concurrency/race.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/mmap.h"
@@ -61,10 +64,11 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using std::endl;
+    using std::hex;
+    using std::string;
 
     class AlignedBuilder;
-
 
     namespace dur {
         // Rotate after reaching this data size in a journal (j._<n>) file
@@ -83,7 +87,7 @@ namespace mongo {
 #endif
 
         MONGO_INITIALIZER(InitializeJournalingParams)(InitializerContext* context) {
-            if (storageGlobalParams.smallfiles == true) {
+            if (mmapv1GlobalOptions.smallfiles == true) {
                 verify(dur::DataLimitPerJournalFile >= 128 * 1024 * 1024);
                 dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
             }
@@ -418,12 +422,12 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            if (!(storageGlobalParams.durOptions & StorageGlobalParams::DurNoCheckSpace))
+            if (!(mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalNoCheckSpace))
                 checkFreeSpace();
 
             if( exists(preallocPath(0)) || // if enabled previously, keep using
                 exists(preallocPath(1)) ||
-                (storageGlobalParams.preallocj && preallocateIsFaster()) ) {
+                (mmapv1GlobalOptions.preallocj && preallocateIsFaster()) ) {
                     usingPreallocate = true;
                     try {
                         _preallocateFiles();
@@ -614,7 +618,6 @@ namespace mongo {
             concurrency: called by durThread only.
         */
         void Journal::updateLSNFile() {
-            RACECHECK
             if( !_writeToLSNNeeded )
                 return;
             _writeToLSNNeeded = false;
@@ -688,8 +691,6 @@ namespace mongo {
 
         void Journal::_rotate() {
 
-            RACECHECK;
-
             _curLogFileMutex.dassertLocked();
 
             if ( inShutdown() || !_curLogFile )
@@ -725,13 +726,13 @@ namespace mongo {
             @param uncompressed - a buffer that will be written to the journal after compression
             will not return until on disk
         */
-        void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed) {
+        void WRITETOJOURNAL(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             Timer t;
             j.journal(h, uncompressed);
-            stats.curr->_writeToJournalMicros += t.micros();
+            stats.curr()->_writeToJournalMicros += t.micros();
         }
+
         void Journal::journal(const JSectHeader& h, const AlignedBuilder& uncompressed) {
-            RACECHECK
             static AlignedBuilder b(32*1024*1024);
             /* buffer to journal will be
                JSectHeader
@@ -778,11 +779,11 @@ namespace mongo {
                 // must already be open -- so that _curFileId is correct for previous buffer building
                 verify( _curLogFile );
 
-                stats.curr->_uncompressedBytes += uncompressed.len();
+                stats.curr()->_uncompressedBytes += uncompressed.len();
                 unsigned w = b.len();
                 _written += w;
                 verify( w <= L );
-                stats.curr->_journaledBytes += L;
+                stats.curr()->_journaledBytes += L;
                 _curLogFile->synchronousAppend((const void *) b.buf(), L);
                 _rotate();
             }
@@ -794,8 +795,3 @@ namespace mongo {
 
     }
 }
-
-/* todo
-   test (and handle) disk full on journal append.  best quick thing to do is to terminate.
-   if we roll back operations, there are nuances such as is ReplSetImpl::lastOpTimeWritten too new in ram then?
-*/

@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
@@ -36,6 +36,9 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+
     const char DocumentSourceLimit::limitName[] = "$limit";
 
     DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pExpCtx,
@@ -54,7 +57,7 @@ namespace mongo {
         DocumentSourceLimit *pLimit =
             dynamic_cast<DocumentSourceLimit *>(pNextSource.get());
 
-        /* if it's not another $skip, we can't coalesce */
+        /* if it's not another $limit, we can't coalesce */
         if (!pLimit)
             return false;
 

@@ -72,7 +72,7 @@ var executeTests = function() {
     var result = assert.throws( function() { bulk.execute({ w : 3, wtimeout : 1 }); } );
     assert.eq(result.nInserted, 2);
     assert.eq(result.getWriteErrors()[0].index, 2);
-    assert(result.getWriteConcernError().errInfo.wtimeout);
+    assert.eq(100, result.getWriteConcernError().code);
     assert.eq(coll.count(), 2);
 
     //

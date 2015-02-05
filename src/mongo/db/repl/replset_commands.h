@@ -32,12 +32,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/repl/rs.h"
 
 namespace mongo {
 namespace repl {
 
-    extern bool replSetBlind;
     extern unsigned replSetForceInitialSyncFailure;
 
     /**
@@ -50,7 +48,7 @@ namespace repl {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream &help ) const { help << "internal"; }
+        virtual void help( std::stringstream &help ) const { help << "internal"; }
     };
 
 } // namespace repl

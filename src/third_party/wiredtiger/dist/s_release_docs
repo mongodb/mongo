@@ -1,0 +1,79 @@
+#!/bin/sh
+# Build a WiredTiger release package.
+
+set -e
+
+. ../RELEASE_INFO || exit 1
+
+TOPDIR=`pwd`/..
+RELEASE_DIR=$TOPDIR/releases
+DOC_DIR=$TOPDIR/../wiredtiger.github.com
+DOCFILE=$TOPDIR/src/docs/top/main.dox
+tmp=$0.tmp
+
+RELEASE_PACKAGE=`ls $RELEASE_DIR | tail -n 1`
+
+# Parse command line options.
+while getopts d:r: OPT; do
+    case "$OPT" in
+        d)
+            DOC_DIR=$OPTARG
+            ;;
+        r)
+            RELEASE_PACKAGE=$OPTARG
+            ;;
+        \?)
+            # getopts issues an error message
+            echo $USAGE >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Remove the switches we parsed above.
+shift `expr $OPTIND - 1`
+
+if [ ! -d "$DOC_DIR" ]; then
+	echo "Invalid Git doc repository $DOC_DIR"
+fi
+if [ ! -f "$RELEASE_DIR/$RELEASE_PACKAGE" ]; then
+	echo "Invalid release package: $RELEASE_DIR/$RELEASE_PACKAGE"
+fi
+
+pkgver="$WIREDTIGER_VERSION"
+
+# Find the old versions in the documentation.
+oldrel=`grep current $DOCFILE | cut -d ' ' -f 2 | cut -d '<' -f 1`
+prevrel=`grep previous $DOCFILE | cut -d ' ' -f 2 | cut -d '<' -f 1`
+
+OLD_VERSION_MAJOR=`echo $oldrel | cut -d '.' -f 1`
+OLD_VERSION_MINOR=`echo $oldrel | cut -d '.' -f 2`
+OLD_VERSION_PATCH=`echo $oldrel | cut -d '.' -f 3`
+PREV_VERSION_MAJOR=`echo $prevrel | cut -d '.' -f 1`
+PREV_VERSION_MINOR=`echo $prevrel | cut -d '.' -f 2`
+PREV_VERSION_PATCH=`echo $prevrel | cut -d '.' -f 3`
+
+# Update the release versions on the landing page.
+sed -e "s/$oldrel/$pkgver/" $DOCFILE > $tmp && mv $tmp $DOCFILE
+if [ $OLD_VERSION_MINOR != $WIREDTIGER_VERSION_MINOR ]; then
+	sed -e "s/$prevrel/$oldrel/" $DOCFILE > $tmp && mv $tmp $DOCFILE
+fi
+
+echo "Rebuild documentation root"
+(cd "$TOPDIR/dist" && sh s_docs -l > /dev/null)
+
+# Copy the new files into the documentation repository
+(cd $TOPDIR && cp docs/top/* $DOC_DIR/)
+
+# Unpack the documentation into the right location
+(mkdir -p $DOC_DIR/$pkgver && cd $RELEASE_DIR && \
+    cp $RELEASE_PACKAGE $DOC_DIR/releases/ &&
+    tar xjf $RELEASE_PACKAGE -C $DOC_DIR/$pkgver --strip-components 2 wiredtiger-$pkgver/docs)
+
+(cd $DOC_DIR && git add . $pkgver releases/wiredtiger-$pkgver.tar.bz2 && \
+    git commit -m "Release $pkgver")
+
+echo "Finished packaging documentation, you should now push the results. Run:"
+echo "cd $DOC_DIR && git push origin"
+echo "To backout changes run 'git reset HEAD~1'"
+

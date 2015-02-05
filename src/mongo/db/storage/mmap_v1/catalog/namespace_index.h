@@ -30,17 +30,19 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <list>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/diskloc.h"
-#include "mongo/db/storage/mmap_v1/catalog/hashtab.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
 namespace mongo {
 
     class NamespaceDetails;
+    class NamespaceHashTable;
     class OperationContext;
 
     /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"
@@ -49,16 +51,13 @@ namespace mongo {
     class NamespaceIndex {
         MONGO_DISALLOW_COPYING(NamespaceIndex);
     public:
-        NamespaceIndex(const std::string &dir, const std::string &database) :
-            _ht( 0 ), _dir( dir ), _database( database ) {}
+        NamespaceIndex(const std::string& dir, const std::string& database);
+        ~NamespaceIndex();
 
         /* returns true if the file represented by this file exists on disk */
         bool pathExists() const;
 
-        void init( OperationContext* txn ) {
-            if ( !_ht.get() )
-                _init( txn );
-        }
+        void init(OperationContext* txn);
 
         void add_ns( OperationContext* txn,
                      const StringData& ns, const DiskLoc& loc, bool capped);
@@ -67,8 +66,8 @@ namespace mongo {
         void add_ns( OperationContext* txn,
                      const Namespace& ns, const NamespaceDetails* details );
 
-        NamespaceDetails* details(const StringData& ns);
-        NamespaceDetails* details(const Namespace& ns);
+        NamespaceDetails* details(const StringData& ns) const;
+        NamespaceDetails* details(const Namespace& ns) const;
 
         void kill_ns( OperationContext* txn,
                       const StringData& ns);
@@ -82,13 +81,13 @@ namespace mongo {
         unsigned long long fileLength() const { return _f.length(); }
 
     private:
-        void _init( OperationContext* txn );
         void maybeMkdir() const;
 
+        const std::string _dir;
+        const std::string _database;
+
         DurableMappedFile _f;
-        scoped_ptr<HashTable<Namespace,NamespaceDetails> > _ht;
-        std::string _dir;
-        std::string _database;
+        boost::scoped_ptr<NamespaceHashTable> _ht;
     };
 
 }

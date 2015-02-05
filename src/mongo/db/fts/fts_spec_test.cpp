@@ -28,13 +28,17 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using std::set;
+    using std::string;
+
     namespace fts {
 
         /**

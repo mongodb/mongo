@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/util/bson_extract.h"
@@ -36,6 +38,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -48,7 +51,13 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::map;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     AtomicInt64 DBClientBase::ConnectionIdSequence;
 
@@ -578,6 +587,7 @@ namespace mongo {
             DBClientWithCommands::RunCommandHookFunc const _oldHookFunc;
         };
     }  // namespace
+
     void DBClientWithCommands::_auth(const BSONObj& params) {
         RunCommandHookOverrideGuard hookGuard(this, RunCommandHookFunc());
         std::string mechanism;
@@ -646,8 +656,8 @@ namespace mongo {
             uassert(ErrorCodes::AuthenticationFailed,
                     "Username \"" + user + 
                     "\" does not match the provided client certificate user \"" +
-                    getSSLManager()->getClientSubjectName() + "\"",
-                    user ==  getSSLManager()->getClientSubjectName());
+                    getSSLManager()->getSSLConfiguration().clientSubjectName + "\"",
+                    user ==  getSSLManager()->getSSLConfiguration().clientSubjectName);
 
             BSONObj result;
             uassert(result["code"].Int(),
@@ -665,7 +675,20 @@ namespace mongo {
     };
 
     void DBClientWithCommands::auth(const BSONObj& params) {
-        _auth(params);
+        try {
+            _auth(params);
+            return;
+        } catch(const UserException& ex) {
+            if (getFallbackAuthParams(params).isEmpty() ||
+                (ex.getCode() != ErrorCodes::BadValue &&
+                ex.getCode() != ErrorCodes::CommandNotFound)) {
+                throw ex;
+            }
+        }
+
+        // BadValue or CommandNotFound indicates unsupported auth mechanism so fall back to
+        // MONGODB-CR for 2.6 compatibility.
+        _auth(getFallbackAuthParams(params));
     }
 
     bool DBClientWithCommands::auth(const string &dbname,
@@ -674,7 +697,7 @@ namespace mongo {
                                     string& errmsg,
                                     bool digestPassword) {
         try {
-            _auth(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
+            auth(BSON(saslCommandMechanismFieldName << "SCRAM-SHA-1" <<
                        saslCommandUserDBFieldName << dbname <<
                        saslCommandUserFieldName << username <<
                        saslCommandPasswordFieldName << password_text <<
@@ -850,7 +873,10 @@ namespace mongo {
 
     list<string> DBClientWithCommands::getDatabaseNames() {
         BSONObj info;
-        uassert( 10005 ,  "listdatabases failed" , runCommand( "admin" , BSON( "listDatabases" << 1 ) , info ) );
+        uassert(10005, "listdatabases failed", runCommand("admin",
+                                                          BSON("listDatabases" << 1),
+                                                          info,
+                                                          QueryOption_SlaveOk));
         uassert( 10006 ,  "listDatabases.databases not array" , info["databases"].type() == Array );
 
         list<string> names;
@@ -877,18 +903,35 @@ namespace mongo {
         list<BSONObj> infos;
 
         // first we're going to try the command
-        // it was only added in 2.8, so if we're talking to an older server
+        // it was only added in 3.0, so if we're talking to an older server
         // we'll fail back to querying system.namespaces
+        // TODO(spencer): remove fallback behavior after 3.0 
 
         {
             BSONObj res;
-            if ( runCommand( db, BSON( "listCollections" << 1 << "filter" << filter ), res ) ) {
-                BSONObj collections = res["collections"].Obj();
+            if (runCommand(db,
+                           BSON("listCollections" << 1 << "filter" << filter
+                                                       << "cursor" << BSONObj()),
+                           res,
+                           QueryOption_SlaveOk)) {
+                BSONObj cursorObj = res["cursor"].Obj();
+                BSONObj collections = cursorObj["firstBatch"].Obj();
                 BSONObjIterator it( collections );
                 while ( it.more() ) {
                     BSONElement e = it.next();
                     infos.push_back( e.Obj().getOwned() );
                 }
+
+                const long long id = cursorObj["id"].Long();
+
+                if ( id != 0 ) {
+                    const std::string ns = cursorObj["ns"].String();
+                    auto_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+                    while ( cursor->more() ) {
+                        infos.push_back(cursor->nextSafe().getOwned());
+                    }
+                }
+
                 return infos;
             }
 
@@ -906,8 +949,16 @@ namespace mongo {
 
         }
 
+        // SERVER-14951 filter for old version fallback needs to db qualify the 'name' element
+        BSONObjBuilder fallbackFilter;
+        if ( filter.hasField( "name" ) && filter["name"].type() == String ) {
+            fallbackFilter.append( "name", db + "." + filter["name"].str() );
+        }
+        fallbackFilter.appendElementsUnique( filter );
+
         string ns = db + ".system.namespaces";
-        auto_ptr<DBClientCursor> c = query( ns.c_str(), filter );
+        auto_ptr<DBClientCursor> c = query(
+                ns.c_str(), fallbackFilter.obj(), 0, 0, 0, QueryOption_SlaveOk);
         while ( c->more() ) {
             BSONObj obj = c->nextSafe();
             string ns = obj["name"].valuestr();
@@ -984,7 +1035,15 @@ namespace mongo {
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
-        server.reset(new SockAddr(_server.host().c_str(), _server.port()));
+        std::auto_ptr<SockAddr> serverSockAddr(new SockAddr(_server.host().c_str(),
+                                                            _server.port()));
+        if (!serverSockAddr->isValid()) {
+            errmsg = str::stream() << "couldn't initialize connection to host "
+                                   << _server.host().c_str() << ", address is invalid";
+            return false;
+        }
+
+        server.reset(serverSockAddr.release());
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
         if (_server.host().empty() ) {
@@ -1304,21 +1363,33 @@ namespace mongo {
         say( toSend );
     }
 
-    auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
-        return query( NamespaceString( ns ).getSystemIndexesCollection() , BSON( "ns" << ns ) );
-    }
-
     list<BSONObj> DBClientWithCommands::getIndexSpecs( const string &ns, int options ) {
         list<BSONObj> specs;
 
         {
-            BSONObj cmd = BSON( "listIndexes" << nsToCollectionSubstring( ns ) );
+            BSONObj cmd = BSON(
+                "listIndexes" << nsToCollectionSubstring( ns ) <<
+                "cursor" << BSONObj()
+            );
+
             BSONObj res;
             if ( runCommand( nsToDatabase( ns ), cmd, res, options ) ) {
-                BSONObjIterator i( res["indexes"].Obj() );
+                BSONObj cursorObj = res["cursor"].Obj();
+                BSONObjIterator i( cursorObj["firstBatch"].Obj() );
                 while ( i.more() ) {
                     specs.push_back( i.next().Obj().getOwned() );
                 }
+
+                const long long id = cursorObj["id"].Long();
+
+                if ( id != 0 ) {
+                    const std::string ns = cursorObj["ns"].String();
+                    auto_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+                    while ( cursor->more() ) {
+                        specs.push_back(cursor->nextSafe().getOwned());
+                    }
+                }
+
                 return specs;
             }
             int code = res["code"].numberInt();
@@ -1335,7 +1406,10 @@ namespace mongo {
             }
         }
 
-        auto_ptr<DBClientCursor> cursor = getIndexes( ns );
+        // fallback to querying system.indexes
+        // TODO(spencer): Remove fallback behavior after 3.0
+        auto_ptr<DBClientCursor> cursor = query(NamespaceString(ns).getSystemIndexesCollection(),
+                                                BSON("ns" << ns), 0, 0, 0, options);
         while ( cursor->more() ) {
             BSONObj spec = cursor->nextSafe();
             specs.push_back( spec.getOwned() );
@@ -1372,19 +1446,14 @@ namespace mongo {
     }
 
     void DBClientWithCommands::reIndex( const string& ns ) {
-        list<BSONObj> all;
-        auto_ptr<DBClientCursor> i = getIndexes( ns );
-        while ( i->more() ) {
-            all.push_back( i->next().getOwned() );
-        }
-
-        dropIndexes( ns );
-
-        for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
-            BSONObj o = *i;
-            insert( NamespaceString( ns ).getSystemIndexesCollection() , o );
-        }
-
+        resetIndexCache();
+        BSONObj info;
+        uassert(18908,
+                str::stream() << "reIndex failed: " << info,
+                runCommand(nsToDatabase(ns),
+                           BSON("reIndex" << nsToCollectionSubstring(ns)),
+                           info)
+                );
     }
 
 

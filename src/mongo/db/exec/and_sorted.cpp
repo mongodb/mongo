@@ -30,10 +30,15 @@
 
 #include "mongo/db/exec/and_common-inl.h"
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::numeric_limits;
+    using std::vector;
 
     // static
     const char* AndSortedStage::kStageType = "AND_SORTED";
@@ -70,14 +75,14 @@ namespace mongo {
             _specificStats.failedAnd.resize(_children.size());
         }
 
-        // If we don't have any nodes that we're work()-ing until they hit a certain DiskLoc...
+        // If we don't have any nodes that we're work()-ing until they hit a certain RecordId...
         if (0 == _workingTowardRep.size()) {
-            // Get a target DiskLoc.
+            // Get a target RecordId.
             return getTargetLoc(out);
         }
 
-        // Move nodes toward the target DiskLoc.
-        // If all nodes reach the target DiskLoc, return it.  The next call to work() will set a new
+        // Move nodes toward the target RecordId.
+        // If all nodes reach the target RecordId, return it.  The next call to work() will set a new
         // target.
         return moveTowardTargetLoc(out);
     }
@@ -85,7 +90,7 @@ namespace mongo {
     PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
         verify(numeric_limits<size_t>::max() == _targetNode);
         verify(WorkingSet::INVALID_ID == _targetId);
-        verify(DiskLoc() == _targetLoc);
+        verify(RecordId() == _targetLoc);
 
         // Pick one, and get a loc to work toward.
         WorkingSetID id = WorkingSet::INVALID_ID;
@@ -94,7 +99,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -138,6 +143,10 @@ namespace mongo {
             if (PlanStage::NEED_TIME == state) {
                 ++_commonStats.needTime;
             }
+            else if (PlanStage::NEED_FETCH == state) {
+                ++_commonStats.needFetch;
+                *out = id;
+            }
 
             // NEED_TIME, NEED_YIELD.
             return state;
@@ -157,7 +166,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -179,7 +188,7 @@ namespace mongo {
 
                     _targetNode = numeric_limits<size_t>::max();
                     _targetId = WorkingSet::INVALID_ID;
-                    _targetLoc = DiskLoc();
+                    _targetLoc = RecordId();
 
                     // Everyone hit it, hooray.  Return it, if it matches.
                     if (Filter::passes(toMatchTest, _filter)) {
@@ -218,7 +227,7 @@ namespace mongo {
                 _targetNode = workingChildNumber;
                 _targetLoc = member->loc;
                 _targetId = id;
-                _workingTowardRep = queue<size_t>();
+                _workingTowardRep = std::queue<size_t>();
                 for (size_t i = 0; i < _children.size(); ++i) {
                     if (workingChildNumber != i) {
                         _workingTowardRep.push(i);
@@ -253,6 +262,11 @@ namespace mongo {
             if (PlanStage::NEED_TIME == state) {
                 ++_commonStats.needTime;
             }
+            else if (PlanStage::NEED_FETCH == state) {
+                ++_commonStats.needFetch;
+                *out = id;
+            }
+
             return state;
         }
     }
@@ -273,13 +287,15 @@ namespace mongo {
         }
     }
 
-    void AndSortedStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void AndSortedStage::invalidate(OperationContext* txn,
+                                    const RecordId& dl,
+                                    InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl, type);
+            _children[i]->invalidate(txn, dl, type);
         }
 
         if (dl == _targetLoc) {
@@ -289,14 +305,14 @@ namespace mongo {
             // fetch it, flag for review, and find another _targetLoc.
             ++_specificStats.flagged;
 
-            // The DiskLoc could still be a valid result so flag it and save it for later.
-            WorkingSetCommon::fetchAndInvalidateLoc(_ws->get(_targetId), _collection);
+            // The RecordId could still be a valid result so flag it and save it for later.
+            WorkingSetCommon::fetchAndInvalidateLoc(txn, _ws->get(_targetId), _collection);
             _ws->flagForReview(_targetId);
 
             _targetId = WorkingSet::INVALID_ID;
             _targetNode = numeric_limits<size_t>::max();
-            _targetLoc = DiskLoc();
-            _workingTowardRep = queue<size_t>();
+            _targetLoc = RecordId();
+            _workingTowardRep = std::queue<size_t>();
         }
     }
 

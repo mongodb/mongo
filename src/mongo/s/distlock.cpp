@@ -1,5 +1,3 @@
-// @file distlock.h
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -27,10 +25,13 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/distlock.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/server_options.h"
@@ -38,12 +39,20 @@
 #include "mongo/s/type_locks.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     LabeledLevel DistributedLock::logLvl( 1 );
     DistributedLock::LastPings DistributedLock::lastPings;
@@ -295,13 +304,11 @@ namespace mongo {
             if ( _seen.count( s ) > 0 ) return s;
 
             // Check our clock skew
-            try {
-                if( lock.isRemoteTimeSkewed() ) {
-                    throw LockException( str::stream() << "clock skew of the cluster " << conn.toString() << " is too far out of bounds to allow distributed locking." , 13650 );
-                }
-            }
-            catch( LockException& e) {
-                throw LockException( str::stream() << "error checking clock skew of cluster " << conn.toString() << causedBy( e ) , 13651);
+            if (lock.isRemoteTimeSkewed()) {
+                throw LockException(
+                        str::stream() << "clock skew of the cluster " << conn.toString()
+                                      << " is too far out of bounds to allow distributed locking.",
+                        ErrorCodes::DistributedClockSkewed);
             }
 
             boost::thread t( stdx::bind( &DistributedLockPinger::distLockPingThread, this, conn, getJSTimeVirtualThreadSkew(), processId, sleepTime) );
@@ -541,47 +548,45 @@ namespace mongo {
     }
 
 
-    bool DistributedLock::isLockHeld( double timeout, string* errMsg ) {
-        ScopedDbConnection conn(_conn.toString(), timeout );
+    Status DistributedLock::checkStatus(double timeout) {
 
         BSONObj lockObj;
         try {
+            ScopedDbConnection conn(_conn.toString(), timeout );
             lockObj = conn->findOne( LocksType::ConfigNS,
                                      BSON( LocksType::name(_name) ) ).getOwned();
+            conn.done();
         }
         catch ( DBException& e ) {
-            *errMsg = str::stream() << "error checking whether lock " << _name << " is held "
-                                    << causedBy( e );
-            return false;
+            return e.toStatus();
         }
-        conn.done();
 
         if ( lockObj.isEmpty() ) {
-            *errMsg = str::stream() << "no lock for " << _name << " exists in the locks collection";
-            return false;
+            return Status(ErrorCodes::LockFailed,
+                    str::stream() << "no lock for " << _name << " exists in the locks collection");
         }
 
         if ( lockObj[LocksType::state()].numberInt() < 2 ) {
-            *errMsg = str::stream() << "lock " << _name << " current state is not held ("
-                                    << lockObj[LocksType::state()].numberInt() << ")";
-            return false;
+            return Status(ErrorCodes::LockFailed,
+                          str::stream() << "lock " << _name << " current state is not held ("
+                                        << lockObj[LocksType::state()].numberInt() << ")");
         }
 
         if ( lockObj[LocksType::process()].String() != _processId ) {
-            *errMsg = str::stream() << "lock " << _name << " is currently being held by "
-                                    << "another process ("
-                                    << lockObj[LocksType::process()].String() << ")";
-            return false;
+            return Status(ErrorCodes::LockFailed,
+                          str::stream() << "lock " << _name << " is currently being held by "
+                                        << "another process ("
+                                        << lockObj[LocksType::process()].String() << ")");
         }
 
         if ( distLockPinger.willUnlockOID( lockObj[LocksType::lockID()].OID() ) ) {
-            *errMsg = str::stream() << "lock " << _name << " is not held and is currently being "
-                                    << "scheduled for lazy unlock by "
-                                    << lockObj[LocksType::lockID()].OID();
-            return false;
+            return Status(ErrorCodes::LockFailed,
+                    str::stream() << "lock " << _name << " is not held and is currently being "
+                                  << "scheduled for lazy unlock by "
+                                  << lockObj[LocksType::lockID()].OID());
         }
 
-        return true;
+        return Status::OK();
     }
 
     static void logErrMsgOrWarn(const StringData& messagePrefix,
@@ -759,7 +764,12 @@ namespace mongo {
                         // and after the lock times out, we can be pretty sure the time is
                         // increasing at the same rate on all servers and therefore our
                         // timeout is accurate
-                        uassert( 14023, str::stream() << "remote time in cluster " << _conn.toString() << " is now skewed, cannot force lock.", !isRemoteTimeSkewed() );
+                        if (isRemoteTimeSkewed()) {
+                            throw LockException(
+                                    str::stream() << "remote time in cluster " << _conn.toString()
+                                                  << " is now skewed, cannot force lock.",
+                                    ErrorCodes::DistributedClockSkewed);
+                        }
 
                         // Make sure we break the lock with the correct "ts" (OID) value, otherwise
                         // we can overwrite a new lock inserted in the meantime.
@@ -784,6 +794,10 @@ namespace mongo {
                         // Ok to continue since we know we forced at least one lock document, and all lock docs
                         // are required for a lock to be held.
                         warning() << "lock forcing " << lockName << " inconsistent" << endl;
+                    }
+                    catch (const LockException& ) {
+                        // Let the exception go up and don't repackage the exception.
+                        throw;
                     }
                     catch( std::exception& e ) {
                         conn.done();
@@ -1149,9 +1163,15 @@ namespace mongo {
                   << " minutes timeout." << endl;
     }
 
-    ScopedDistributedLock::ScopedDistributedLock(const ConnectionString& conn, const string& name) :
-            _lock(conn, name), _why(""), _lockTryIntervalMillis(1000), _acquired(false)
-    {
+    const long long ScopedDistributedLock::kDefaultLockTryIntervalMillis = 1000;
+    const long long ScopedDistributedLock::kDefaultSocketTimeoutMillis = 30 * 1000;
+
+    ScopedDistributedLock::ScopedDistributedLock(const ConnectionString& conn, const string& name)
+        : _lock(conn, name),
+          _why(""),
+          _lockTryIntervalMillis(kDefaultLockTryIntervalMillis),
+          _socketTimeoutMillis(kDefaultSocketTimeoutMillis),
+          _acquired(false) {
     }
 
     ScopedDistributedLock::~ScopedDistributedLock() {
@@ -1160,50 +1180,53 @@ namespace mongo {
         }
     }
 
-    bool ScopedDistributedLock::tryAcquire(string* errMsg) {
+    Status ScopedDistributedLock::tryAcquire() {
         try {
-            _acquired = _lock.lock_try(_why, false, &_other);
+            _acquired = _lock.lock_try(_why,
+                                       false,
+                                       &_other,
+                                       static_cast<double>(_socketTimeoutMillis / 1000));
         }
         catch (const DBException& e) {
-
-            *errMsg = str::stream() << "error acquiring distributed lock " << _lock._name << " for "
-                                    << _why << causedBy(e);
-
-            return false;
+            return e.toStatus();
         }
 
-        return _acquired;
+        if (_acquired) {
+            return Status::OK();
+        }
+
+        return Status(ErrorCodes::LockBusy, str::stream() << "Lock for " << _why << " is taken.");
     }
 
     void ScopedDistributedLock::unlock() {
         _lock.unlock(&_other);
     }
 
-    bool ScopedDistributedLock::acquire(long long waitForMillis, string* errMsg) {
-
-        string dummy;
-        if (!errMsg) errMsg = &dummy;
-
+    Status ScopedDistributedLock::acquire(long long waitForMillis) {
         Timer timer;
         Timer msgTimer;
 
-        while (!_acquired && (waitForMillis <= 0 || timer.millis() < waitForMillis)) {
+        Status lastStatus = Status::OK();
+        while (waitForMillis <= 0 || timer.millis() < waitForMillis) {
+            lastStatus = tryAcquire();
+            _acquired = lastStatus.isOK();
 
-            string acquireErrMsg;
-            _acquired = tryAcquire(&acquireErrMsg);
-
-            if (_acquired) break;
-
-            // Set our error message to the last error, in case we break with !_acquired
-            *errMsg = acquireErrMsg;
+            if (_acquired) {
+                verify(!_other.isEmpty());
+                return Status::OK();
+            }
 
             if (waitForMillis == 0) break;
+
+            if (lastStatus.code() == ErrorCodes::DistributedClockSkewed) {
+                return lastStatus;
+            }
 
             // Periodically message for debugging reasons
             if (msgTimer.seconds() > 10) {
 
                 log() << "waited " << timer.seconds() << "s for distributed lock " << _lock._name
-                      << " for " << _why << endl;
+                      << " for " << _why << ": " << lastStatus.toString() << endl;
 
                 msgTimer.reset();
             }
@@ -1212,16 +1235,15 @@ namespace mongo {
             sleepmillis(std::min(_lockTryIntervalMillis, timeRemainingMillis));
         }
 
-        if (_acquired) {
-            verify(!_other.isEmpty());
-            return true;
+        return lastStatus;
+    }
+
+    Status ScopedDistributedLock::checkStatus() {
+        if (!_acquired) {
+            return Status(ErrorCodes::LockFailed, "lock was never acquired");
         }
 
-        *errMsg = str::stream() << "could not acquire distributed lock " << _lock._name << " for "
-                                << _why << " after " << timer.seconds()
-                                << "s, other lock may be held: " << _other << causedBy(errMsg);
-
-        return false;
+        return _lock.checkStatus(static_cast<double>(_socketTimeoutMillis / 1000));
     }
 
 }

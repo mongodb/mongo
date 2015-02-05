@@ -26,6 +26,10 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/security_key.h"
 
 #include <sys/stat.h>
@@ -33,53 +37,22 @@
 #include <vector>
 
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
-    // not guarded by the authParams mutex never changed in
-    // multi-threaded operation
-    static bool authParamsSet = false;
-    // guarded by the authParams mutex
-    static BSONObj authParams;
-    static boost::mutex authParamMutex; 
 
-    bool isInternalAuthSet() {
-       return authParamsSet; 
-    }
-
-    void setInternalUserAuthParams(const BSONObj& authParamsIn) {
-        if (!isInternalAuthSet()) {
-            authParamsSet = true;
-        }
-        boost::mutex::scoped_lock lk(authParamMutex);
-        authParams = authParamsIn.copy();
-    }
- 
-    bool authenticateInternalUser(DBClientWithCommands* conn){
-        if (!isInternalAuthSet()) {
-            log() << "ERROR: No authentication parameters set for internal user" << endl;
-            return false;
-        }
-        try { 
-            BSONObj outgoingAuthParams;
-            {
-                boost::mutex::scoped_lock lk(authParamMutex);
-                outgoingAuthParams = authParams.copy();
-            }                
-            conn->auth(outgoingAuthParams);
-            return true;
-        } catch(const UserException& ex) {
-            log() << "can't authenticate to " << conn->toString() << " as internal user, error: "
-                  << ex.what() << endl;
-            return false;
-        }
-    }
+    using std::endl;
+    using std::string;
 
     bool setUpSecurityKey(const string& filename) {
         struct stat stats;
@@ -143,16 +116,25 @@ namespace mongo {
             return false;
         }
 
+        // Generate MONGODB-CR and SCRAM credentials for the internal user based on the keyfile.
         User::CredentialData credentials;
         credentials.password = mongo::createPasswordDigest(
                 internalSecurity.user->getName().getUser().toString(), str);
+
+        BSONObj creds = scram::generateCredentials(credentials.password,
+                                                   saslGlobalParams.scramIterationCount);
+        credentials.scram.iterationCount = creds[scram::iterationCountFieldName].Int();
+        credentials.scram.salt = creds[scram::saltFieldName].String();
+        credentials.scram.storedKey = creds[scram::storedKeyFieldName].String();
+        credentials.scram.serverKey = creds[scram::serverKeyFieldName].String();
+
         internalSecurity.user->setCredentials(credentials);
 
         int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
             setInternalUserAuthParams(
-                    BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
+                    BSON(saslCommandMechanismFieldName << "SCRAM-SHA-1" <<
                          saslCommandUserDBFieldName <<
                          internalSecurity.user->getName().getDB() <<
                          saslCommandUserFieldName << internalSecurity.user->getName().getUser() <<

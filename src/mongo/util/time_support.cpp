@@ -36,6 +36,7 @@
 #include <boost/thread/tss.hpp>
 #include <boost/thread/xtime.hpp>
 
+#include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/cstdint.h"
@@ -882,6 +883,21 @@ namespace {
     static SimpleMutex _curTimeMicros64ReadMutex("curTimeMicros64Read");
     static SimpleMutex _curTimeMicros64ResyncMutex("curTimeMicros64Resync");
 
+    typedef WINBASEAPI VOID (WINAPI *pGetSystemTimePreciseAsFileTime)
+        (_Out_ LPFILETIME lpSystemTimeAsFileTime);
+
+    static pGetSystemTimePreciseAsFileTime GetSystemTimePreciseAsFileTimeFunc;
+
+    MONGO_INITIALIZER(Init32TimeSupport)(InitializerContext*) {
+        HINSTANCE kernelLib = LoadLibraryA("kernel32.dll");
+        if (kernelLib) {
+            GetSystemTimePreciseAsFileTimeFunc = reinterpret_cast<pGetSystemTimePreciseAsFileTime>
+                (GetProcAddress(kernelLib, "GetSystemTimePreciseAsFileTime"));
+        }
+
+        return Status::OK();
+    }
+
     static unsigned long long resyncTime() {
         SimpleMutex::scoped_lock lkResync(_curTimeMicros64ResyncMutex);
         unsigned long long ftOld;
@@ -898,11 +914,18 @@ namespace {
         SimpleMutex::scoped_lock lkRead(_curTimeMicros64ReadMutex);
         baseFiletime = ftNew;
         basePerfCounter = newPerfCounter;
-        resyncInterval = 60 * Timer::_countsPerSecond;
+        resyncInterval = 60 * Timer::getCountsPerSecond();
         return newPerfCounter;
     }
 
     unsigned long long curTimeMicros64() {
+
+        // Windows 8/2012 & later support a <1us time function
+        if (GetSystemTimePreciseAsFileTimeFunc != NULL) {
+            FILETIME time;
+            GetSystemTimePreciseAsFileTimeFunc(&time);
+            return boost::date_time::winapi::file_time_to_microseconds(time);
+        }
 
         // Get a current value for QueryPerformanceCounter; if it is not time to resync we will
         // use this value.
@@ -929,7 +952,7 @@ namespace {
         // truncation while using only integer instructions.
         //
         unsigned long long computedTime = baseFiletime +
-                ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) / Timer::_countsPerSecond;
+                ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) / Timer::getCountsPerSecond();
 
         // Convert the computed FILETIME into microseconds since the Unix epoch (1/1/1970).
         //

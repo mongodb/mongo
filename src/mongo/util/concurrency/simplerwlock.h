@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 

@@ -32,6 +32,9 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/client/export_macros.h"
@@ -96,8 +99,20 @@ namespace mongo {
          */
         QueryOption_PartialResults = 1 << 7 ,
 
-        QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay | QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust | QueryOption_PartialResults
+        QueryOption_AllSupported = QueryOption_CursorTailable |
+            QueryOption_SlaveOk |
+            QueryOption_OplogReplay |
+            QueryOption_NoCursorTimeout |
+            QueryOption_AwaitData |
+            QueryOption_Exhaust |
+            QueryOption_PartialResults,
 
+        QueryOption_AllSupportedForSharding = QueryOption_CursorTailable |
+            QueryOption_SlaveOk |
+            QueryOption_OplogReplay |
+            QueryOption_NoCursorTimeout |
+            QueryOption_AwaitData |
+            QueryOption_PartialResults,
     };
 
     enum MONGO_CLIENT_API UpdateOptions {
@@ -265,7 +280,7 @@ namespace mongo {
 
         std::string getSetName() const { return _setName; }
 
-        std::vector<HostAndPort> getServers() const { return _servers; }
+        const std::vector<HostAndPort>& getServers() const { return _servers; }
 
         ConnectionType type() const { return _type; }
 
@@ -974,11 +989,6 @@ namespace mongo {
          */
         virtual void resetIndexCache();
 
-        /**
-         * @deprecated use getIndexSpecs
-         */
-        virtual std::auto_ptr<DBClientCursor> getIndexes( const std::string &ns );
-
         virtual std::list<BSONObj> getIndexSpecs( const std::string &ns, int options = 0 );
 
         virtual void dropIndex( const std::string& ns , BSONObj keys );
@@ -991,7 +1001,7 @@ namespace mongo {
 
         virtual void reIndex( const std::string& ns );
 
-        std::string genIndexName( const BSONObj& keys );
+        static std::string genIndexName( const BSONObj& keys );
 
         /** Erase / drop an entire database */
         virtual bool dropDatabase(const std::string &dbname, BSONObj *info = 0) {
@@ -1242,23 +1252,6 @@ namespace mongo {
            If autoReconnect is true, you can try to use the DBClientConnection even when
            false was returned -- it will try to connect again.
 
-           @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
-                                 If you use IPv6 you must add a port number ( ::1:27017 )
-           @param errmsg any relevant error message will appended to the string
-           @deprecated please use HostAndPort
-           @return false if fails to connect.
-        */
-        virtual bool connect(const char * hostname, std::string& errmsg) {
-            // TODO: remove this method
-            HostAndPort t( hostname );
-            return connect( t , errmsg );
-        }
-
-        /** Connect to a Mongo database server.
-
-           If autoReconnect is true, you can try to use the DBClientConnection even when
-           false was returned -- it will try to connect again.
-
            @param server server to connect to.
            @param errmsg any relevant error message will appended to the string
            @return false if fails to connect.
@@ -1324,6 +1317,7 @@ namespace mongo {
         }
 
         std::string getServerAddress() const { return _serverString; }
+        const HostAndPort& getServerHostAndPort() const { return _server; }
 
         virtual void killCursor( long long cursorID );
         virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }

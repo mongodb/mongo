@@ -27,6 +27,8 @@ var b_conn = conns[1];
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
 
+replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
+
 // get master and do an initial write
 var master = replTest.getMaster();
 assert(master === conns[0], "conns[0] assumed to be master");
@@ -42,8 +44,11 @@ master = replTest.getMaster();
 assert(b_conn.host === master.host, "b_conn assumed to be master");
 options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
 var oplog_entry = b_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
+oplog_entry["ts"].t++;
 oplog_entry["h"] = NumberLong(1);
-b_conn.getDB("local").oplog.rs.insert(oplog_entry);
+res = b_conn.getDB("local").oplog.rs.insert(oplog_entry);
+assert( res.nInserted > 0, tojson( res ) );
+
 // another insert to set minvalid ahead
 assert.writeOK(b_conn.getDB(name).foo.insert({x: 123}));
 

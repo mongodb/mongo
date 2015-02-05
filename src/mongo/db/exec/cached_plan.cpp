@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -39,6 +40,9 @@
 #include "mongo/db/query/qlog.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::vector;
 
     // static
     const char* CachedPlanStage::kStageType = "CACHED_PLAN";
@@ -58,23 +62,32 @@ namespace mongo {
           _usingBackupChild(false),
           _alreadyProduced(false),
           _updatedCache(false),
+          _killed(false),
           _commonStats(kStageType) {}
 
     CachedPlanStage::~CachedPlanStage() {
-        // We may have produced all necessary results without hitting EOF.
-        // In this case, we still want to update the cache with feedback.
-        if (!_updatedCache) {
+        // We may have produced all necessary results without hitting EOF. In this case, we still
+        // want to update the cache with feedback.
+        //
+        // We can't touch the plan cache if we've been killed.
+        if (!_updatedCache && !_killed) {
             updateCache();
         }
     }
 
-    bool CachedPlanStage::isEOF() { return getActiveChild()->isEOF(); }
+    bool CachedPlanStage::isEOF() {
+        invariant(!_killed);
+        return getActiveChild()->isEOF();
+    }
 
     PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
+
+        // We shouldn't be trying to work a dead plan.
+        invariant(!_killed);
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
@@ -83,6 +96,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == childStatus) {
             // we'll skip backupPlan processing now
             _alreadyProduced = true;
+            _commonStats.advanced++;
         }
         else if (PlanStage::IS_EOF == childStatus) {
             updateCache();
@@ -91,16 +105,24 @@ namespace mongo {
              && !_alreadyProduced
              && !_usingBackupChild
              && NULL != _backupChildPlan.get()) {
+            // Switch the active child to the backup. Subsequent calls to work() will exercise
+            // the backup plan.
             _usingBackupChild = true;
-            childStatus = _backupChildPlan->work(out);
+            _commonStats.needTime++;
+            return PlanStage::NEED_TIME;
         }
+        else if (PlanStage::NEED_FETCH == childStatus) {
+            _commonStats.needFetch++;
+        }
+        else if (PlanStage::NEED_TIME == childStatus) {
+            _commonStats.needTime++;
+        }
+
         return childStatus;
     }
 
     void CachedPlanStage::saveState() {
-        if (! _usingBackupChild) {
-            _mainChildPlan->saveState();
-        }
+        _mainChildPlan->saveState();
 
         if (NULL != _backupChildPlan.get()) {
             _backupChildPlan->saveState();
@@ -109,22 +131,22 @@ namespace mongo {
     }
 
     void CachedPlanStage::restoreState(OperationContext* opCtx) {
+        _mainChildPlan->restoreState(opCtx);
+
         if (NULL != _backupChildPlan.get()) {
             _backupChildPlan->restoreState(opCtx);
-        }
-
-        if (! _usingBackupChild) {
-            _mainChildPlan->restoreState(opCtx);
         }
         ++_commonStats.unyields;
     }
 
-    void CachedPlanStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void CachedPlanStage::invalidate(OperationContext* txn,
+                                     const RecordId& dl,
+                                     InvalidationType type) {
         if (! _usingBackupChild) {
-            _mainChildPlan->invalidate(dl, type);
+            _mainChildPlan->invalidate(txn, dl, type);
         }
         if (NULL != _backupChildPlan.get()) {
-            _backupChildPlan->invalidate(dl, type);
+            _backupChildPlan->invalidate(txn, dl, type);
         }
         ++_commonStats.invalidates;
     }
@@ -186,6 +208,10 @@ namespace mongo {
 
     PlanStage* CachedPlanStage::getActiveChild() const {
         return _usingBackupChild ? _backupChildPlan.get() : _mainChildPlan.get();
+    }
+
+    void CachedPlanStage::kill() {
+        _killed = true;
     }
 
 }  // namespace mongo

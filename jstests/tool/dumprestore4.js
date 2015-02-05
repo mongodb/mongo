@@ -1,5 +1,6 @@
 // dumprestore4.js -- see SERVER-2186
 
+
 // The point of this test is to ensure that mongorestore successfully
 // constructs indexes when the database being restored into has a
 // different name than the database dumped from.  There are 2
@@ -22,9 +23,9 @@ db2=db.getSisterDB( dbname2 );
 db.dropDatabase(); // make sure it's empty
 db2.dropDatabase(); // make sure everybody's empty
 
-assert.eq( 0 , db.system.indexes.count() , "setup1" );
+assert.eq( 0 , c.getIndexes().length , "setup1" );
 c.ensureIndex({ x : 1} );
-assert.eq( 2 , db.system.indexes.count() , "setup2" ); // _id and x_1
+assert.eq( 2 , c.getIndexes().length , "setup2" ); // _id and x_1
 
 assert.eq( 0, t.runTool( "dump" , "-d" , dbname, "--out", t.ext ), "dump")
 
@@ -35,8 +36,8 @@ c.drop();
 assert.eq( 0, t.runTool( "restore" , "--dir" , t.ext + "/" + dbname, "-d", dbname2 ), "restore" );
 
 // issue (1)
-assert.eq( 2 , db2.system.indexes.count() , "after restore 1" );
+assert.eq( 2 , db2.dumprestore4.getIndexes().length , "after restore 1" );
 // issue (2)
-assert.eq( 0 , db.system.indexes.count() , "after restore 2" );
+assert.eq( 0 , db.dumprestore4.getIndexes().length , "after restore 2" );
 
 t.stop();

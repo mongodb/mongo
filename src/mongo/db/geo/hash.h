@@ -28,9 +28,8 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 #include "mongo/db/jsobj.h"
-#include <iostream>
 
 namespace mongo {
 
@@ -128,6 +127,15 @@ namespace mongo {
         GeoHash parent(unsigned int level) const;
         GeoHash parent() const;
 
+        // Return the neighbors of closest vertex to this cell at the given level,
+        // by appending them to "output".  Normally there are four neighbors, but
+        // the closest vertex may only have two or one neighbor if it is next to the
+        // boundary.
+        //
+        // Requires: level < this->_bits, so that we can determine which vertex is
+        // closest (in particular, level == kMaxBits is not allowed).
+        void appendVertexNeighbors(unsigned level, std::vector<GeoHash>* output) const;
+
     private:
 
         // Create a hash from the provided string.  Used by the std::string and char* cons.
@@ -155,6 +163,8 @@ namespace mongo {
      */
     class GeoHashConverter {
     public:
+        static double const kMachinePrecision; // = 1.1e-16
+
         struct Parameters {
             // How many bits to use for the hash?
             int bits;
@@ -171,6 +181,8 @@ namespace mongo {
          * Returns hashing parameters parsed from a BSONObj
          */
         static Status parseParameters(const BSONObj& paramDoc, Parameters* params);
+
+        static double calcUnhashToBoxError(const GeoHashConverter::Parameters& params);
 
         /**
          * Return converter parameterss which can be used to
@@ -215,17 +227,18 @@ namespace mongo {
         void unhash(const GeoHash &h, double *x, double *y) const;
 
         /**
-         * Generates bounding box from geo hash using converter.
-         * Used in GeoBrowse::fillStack and db/query/explain_plan.cpp
-         * to generate index bounds from
-         * geo hashes in plan stats.
+         * Generates bounding box from geohash, expanded by the error bound
          */
-        Box unhashToBox(const GeoHash &h) const;
-        Box unhashToBox(const BSONElement &e) const;
+        Box unhashToBoxCovering(const GeoHash &h) const;
 
         double sizeOfDiag(const GeoHash& a) const;
-        // XXX: understand/clean this.
-        double sizeEdge(const GeoHash& a) const;
+
+        // Return the sizeEdge of a cell at a given level.
+        double sizeEdge(unsigned level) const;
+
+        // Used by test.
+        double convertDoubleFromHashScale(double in) const;
+        double convertToDoubleHashScale(double in) const;
     private:
 
         void init();
@@ -240,5 +253,9 @@ namespace mongo {
         // We compute these based on the _params:
         double _error;
         double _errorSphere;
+
+        // Error bound of unhashToBox, see hash_test.cpp for its proof.
+        // 8 * max(|max|, |min|) * u
+        double _errorUnhashToBox;
     };
 }  // namespace mongo

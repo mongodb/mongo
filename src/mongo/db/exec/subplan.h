@@ -30,13 +30,16 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <string>
-#include <queue>
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -48,23 +51,26 @@ namespace mongo {
      * each clause.
      *
      * Uses the MultiPlanStage in order to rank plans for the individual clauses.
+     *
+     * Notes on caching strategy:
+     *
+     *   --Interaction with the plan cache is done on a per-clause basis. For a given clause C,
+     *   if there is a plan in the cache for shape C, then C is planned using the index tags
+     *   obtained from the plan cache entry. If no cached plan is found for C, then a MultiPlanStage
+     *   is used to determine the best plan for the clause; unless there is a tie between multiple
+     *   candidate plans, the winner is inserted into the plan cache and used to plan subsequent
+     *   executions of C. These subsequent executions of shape C could be either as a clause in
+     *   another rooted $or query, or shape C as its own query.
+     *
+     *   --Plans for entire rooted $or queries are neither written to nor read from the plan cache.
      */
     class SubplanStage : public PlanStage {
     public:
-        /**
-         * Used to create SubplanStage instances. The caller owns the instance
-         * returned through 'out'.
-         *
-         * 'out' is valid only if an OK status is returned.
-         */
-        static Status make(OperationContext* txn,
-                           Collection* collection,
-                           WorkingSet* ws,
-                           const QueryPlannerParams& params,
-                           CanonicalQuery* cq,
-                           SubplanStage** out);
-
-        virtual ~SubplanStage();
+        SubplanStage(OperationContext* txn,
+                     Collection* collection,
+                     WorkingSet* ws,
+                     const QueryPlannerParams& params,
+                     CanonicalQuery* cq);
 
         static bool canUseSubplanning(const CanonicalQuery& query);
 
@@ -73,7 +79,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -87,12 +93,53 @@ namespace mongo {
 
         static const char* kStageType;
 
+        /**
+         * Selects a plan using subplanning. First uses the query planning results from
+         * planSubqueries() and the multi plan stage to select the best plan for each branch.
+         *
+         * If this effort fails, then falls back on planning the whole query normally rather
+         * then planning $or branches independently.
+         *
+         * If 'yieldPolicy' is non-NULL, then all locks may be yielded in between round-robin
+         * works of the candidate plans. By default, 'yieldPolicy' is NULL and no yielding will
+         * take place.
+         *
+         * Returns a non-OK status if the plan was killed during yield or if planning fails.
+         */
+        Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+
+        //
+        // For testing.
+        //
+
+        /**
+         * Returns true if the i-th branch was planned by retrieving a cached solution,
+         * otherwise returns false.
+         */
+        bool branchPlannedFromCache(size_t i) const;
+
     private:
-        SubplanStage(OperationContext* txn,
-                     Collection* collection,
-                     WorkingSet* ws,
-                     const QueryPlannerParams& params,
-                     CanonicalQuery* cq);
+        /**
+         * A class used internally in order to keep track of the results of planning
+         * a particular $or branch.
+         */
+        struct BranchPlanningResult {
+            MONGO_DISALLOW_COPYING(BranchPlanningResult);
+        public:
+            BranchPlanningResult() { }
+
+            // A parsed version of one branch of the $or.
+            boost::scoped_ptr<CanonicalQuery> canonicalQuery;
+
+            // If there is cache data available, then we store it here rather than generating
+            // a set of alternate plans for the branch. The index tags from the cache data
+            // can be applied directly to the parent $or MatchExpression when generating the
+            // composite solution.
+            boost::scoped_ptr<CachedSolution> cachedSolution;
+
+            // Query solutions resulting from planning the $or branch.
+            OwnedPointerVector<QuerySolution> solutions;
+        };
 
         /**
          * Plan each branch of the $or independently, and store the resulting
@@ -107,8 +154,15 @@ namespace mongo {
         /**
          * Uses the query planning results from planSubqueries() and the multi plan stage
          * to select the best plan for each branch.
+         *
+         * Helper for pickBestPlan().
          */
-        Status pickBestPlan();
+        Status choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy);
+
+        /**
+         * Used as a fallback if subplanning fails. Helper for pickBestPlan().
+         */
+        Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy);
 
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
@@ -123,22 +177,17 @@ namespace mongo {
         // Not owned here.
         CanonicalQuery* _query;
 
-        bool _killed;
+        // If we successfully create a "composite solution" by planning each $or branch
+        // independently, that solution is owned here.
+        boost::scoped_ptr<QuerySolution> _compositeSolution;
 
         boost::scoped_ptr<PlanStage> _child;
 
-        // We do the subquery planning up front, and keep the resulting
-        // query solutions here. Lists of query solutions are dequeued
-        // and ownership is transferred to the underlying runners one
-        // at a time.
-        std::queue< std::vector<QuerySolution*> > _solutions;
-
-        // Holds the canonicalized subqueries. Ownership is transferred
-        // to the underlying runners one at a time.
-        std::queue<CanonicalQuery*> _cqs;
+        // Holds a list of the results from planning each branch.
+        OwnedPointerVector<BranchPlanningResult> _branchResults;
 
         // We need this to extract cache-friendly index data from the index assignments.
-        map<BSONObj, size_t> _indexMap;
+        std::map<BSONObj, size_t> _indexMap;
 
         CommonStats _commonStats;
     };

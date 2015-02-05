@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
@@ -40,6 +40,9 @@
 namespace mongo {
 
     namespace fts {
+
+        using std::string;
+        using std::vector;
 
         namespace {
             BSONObj nullObj;

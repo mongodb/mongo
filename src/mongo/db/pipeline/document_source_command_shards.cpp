@@ -26,12 +26,15 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/s/shard.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using std::vector;
 
     void DocumentSourceCommandShards::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */

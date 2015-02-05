@@ -27,22 +27,41 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/engine.h"
 
 #include <cctype>
 #include <boost/filesystem/operations.hpp>
+#include <boost/scoped_array.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+    using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::set;
+    using std::string;
+
     long long Scope::_lastVersion = 1;
-    static const unsigned kMaxJsFileLength = std::numeric_limits<unsigned>::max() - 1;
+
+namespace {
+    // 2 GB is the largest support Javascript file size.
+    const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
+}  // namespace
 
     ScriptEngine::ScriptEngine() : _scopeInitCallback() {
     }
@@ -114,7 +133,7 @@ namespace mongo {
         boost::filesystem::path p(filename);
 #endif
         if (!exists(p)) {
-            log() << "file [" << filename << "] doesn't exist" << endl;
+            error() << "file [" << filename << "] doesn't exist" << endl;
             return false;
         }
 
@@ -126,14 +145,14 @@ namespace mongo {
             for (boost::filesystem::directory_iterator it (p); it != end; it++) {
                 empty = false;
                 boost::filesystem::path sub(*it);
-                if (!endsWith(sub.string().c_str(), ".js"))
+                if (!str::endsWith(sub.string().c_str(), ".js"))
                     continue;
                 if (!execFile(sub.string(), printResult, reportError, timeoutMs))
                     return false;
             }
 
             if (empty) {
-                log() << "directory [" << filename << "] doesn't have any *.js files" << endl;
+                error() << "directory [" << filename << "] doesn't have any *.js files" << endl;
                 return false;
             }
 
@@ -211,7 +230,7 @@ namespace mongo {
                 _storedNames.insert(n.valuestr());
             }
             catch (const DBException& setElemEx) {
-                log() << "unable to load stored JavaScript function " << n.valuestr()
+                error() << "unable to load stored JavaScript function " << n.valuestr()
                       << "(): " << setElemEx.what() << endl;
             }
         }
@@ -256,6 +275,8 @@ namespace mongo {
     namespace JSFiles {
         extern const JSFile collection;
         extern const JSFile db;
+        extern const JSFile explain_query;
+        extern const JSFile explainable;
         extern const JSFile mongo;
         extern const JSFile mr;
         extern const JSFile query;
@@ -276,6 +297,8 @@ namespace mongo {
         execSetup(JSFiles::query);
         execSetup(JSFiles::bulk_api);
         execSetup(JSFiles::collection);
+        execSetup(JSFiles::explain_query);
+        execSetup(JSFiles::explainable);
         execSetup(JSFiles::upgrade_check);
     }
 
@@ -305,11 +328,12 @@ namespace {
                 _pools.pop_back();
             }
 
+            scope->reset();
             ScopeAndPool toStore = {scope, poolName};
             _pools.push_front(toStore);
         }
 
-        boost::shared_ptr<Scope> tryAcquire(const string& poolName) {
+        boost::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
             scoped_lock lk(_mutex);
 
             for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
@@ -318,6 +342,7 @@ namespace {
                     _pools.erase(it);
                     scope->incTimesUsed();
                     scope->reset();
+                    scope->registerOperation(txn);
                     return scope;
                 }
             }
@@ -335,7 +360,7 @@ namespace {
         static const unsigned kMaxPoolSize = 10;
         static const int kMaxScopeReuse = 10;
 
-        typedef deque<ScopeAndPool> Pools; // More-recently used Scopes are kept at the front.
+        typedef std::deque<ScopeAndPool> Pools; // More-recently used Scopes are kept at the front.
         Pools _pools;    // protected by _mutex
         mongo::mutex _mutex;
     };
@@ -357,6 +382,8 @@ namespace {
 
         // wrappers for the derived (_real) scope
         void reset() { _real->reset(); }
+        void registerOperation(OperationContext* txn) { _real->registerOperation(txn); }
+        void unregisterOperation() { _real->unregisterOperation(); }
         void init(const BSONObj* data) { _real->init(data); }
         void localConnectForDbEval(OperationContext* txn, const char* dbName) {
             invariant(!"localConnectForDbEval should only be called from dbEval");
@@ -426,9 +453,10 @@ namespace {
                                                  const string& db,
                                                  const string& scopeType) {
         const string fullPoolName = db + scopeType;
-        boost::shared_ptr<Scope> s = scopeCache.tryAcquire(fullPoolName);
+        boost::shared_ptr<Scope> s = scopeCache.tryAcquire(txn, fullPoolName);
         if (!s) {
             s.reset(newScope());
+            s->registerOperation(txn);
         }
 
         auto_ptr<Scope> p;
@@ -439,8 +467,6 @@ namespace {
     }
 
     void (*ScriptEngine::_connectCallback)(DBClientWithCommands&) = 0;
-    const char* (*ScriptEngine::_checkInterruptCallback)() = 0;
-    unsigned (*ScriptEngine::_getCurrentOpIdCallback)() = 0;
     ScriptEngine* globalScriptEngine = 0;
 
     bool hasJSReturn(const string& code) {

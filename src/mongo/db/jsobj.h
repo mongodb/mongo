@@ -40,7 +40,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/optime.h"

@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
 
@@ -56,10 +55,7 @@ namespace mongo {
     */
     class Database {
     public:
-        // you probably need to be in dbHolderMutex when constructing this
-        Database(OperationContext* txn,
-                 const StringData& name,
-                 DatabaseCatalogEntry* dbEntry ); // not owner here
+        Database(OperationContext* txn, const StringData& name, DatabaseCatalogEntry* dbEntry);
 
         // must call close first
         ~Database();
@@ -72,29 +68,17 @@ namespace mongo {
         void clearTmpCollections(OperationContext* txn);
 
         /**
-         * @return true if success.  false if bad level or error creating profile ns
+         * Sets a new profiling level for the database and returns the outcome.
+         *
+         * @param txn Operation context which to use for creating the profiling collection.
+         * @param newLevel New profiling level to use.
          */
-        bool setProfilingLevel( OperationContext* txn, int newLevel , std::string& errmsg );
-
-        /**
-         * @return true if ns is part of the database
-         *         ns=foo.bar, db=foo returns true
-         */
-        bool ownsNS( const std::string& ns ) const {
-            if ( ! mongoutils::str::startsWith( ns , _name ) )
-                return false;
-            return ns[_name.size()] == '.';
-        }
+        Status setProfilingLevel(OperationContext* txn, int newLevel);
 
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }
 
         void getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale = 1 );
-
-        long long getIndexSizeForCollection( OperationContext* opCtx,
-                                             Collection* collections,
-                                             BSONObjBuilder* details = NULL,
-                                             int scale = 1 );
 
         const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
 
@@ -109,10 +93,10 @@ namespace mongo {
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
          */
-        Collection* getCollection( OperationContext* txn, const StringData& ns );
+        Collection* getCollection( const StringData& ns ) const ;
 
-        Collection* getCollection( OperationContext* txn, const NamespaceString& ns ) {
-            return getCollection( txn, ns.ns() );
+        Collection* getCollection( const NamespaceString& ns ) const {
+            return getCollection( ns.ns() );
         }
 
         Collection* getOrCreateCollection( OperationContext* txn, const StringData& ns );
@@ -128,19 +112,27 @@ namespace mongo {
          * 'duplicates' is specified, it is filled with all duplicate names.
          // TODO move???
          */
-        static string duplicateUncasedName( const std::string &name,
-                                            std::set< std::string > *duplicates = 0 );
+        static std::string duplicateUncasedName( const std::string &name,
+                                                 std::set< std::string > *duplicates = 0 );
 
         static Status validateDBName( const StringData& dbname );
 
         const std::string& getSystemIndexesName() const { return _indexesName; }
     private:
 
-        void _clearCollectionCache( const StringData& fullns );
+        /**
+         * Gets or creates collection instance from existing metadata,
+         * Returns NULL if invalid
+         *
+         * Note: This does not add the collection to _collections map, that must be done
+         * by the caller, who takes onership of the Collection*
+         */
+        Collection* _getOrCreateCollectionInstance(OperationContext* txn, const StringData& fullns);
 
-        void _clearCollectionCache_inlock( const StringData& fullns );
+        void _clearCollectionCache(OperationContext* txn, const StringData& fullns );
 
-        class CollectionCacheChange; // to allow rollback actions for invalidating above cache
+        class AddCollectionChange;
+        class RemoveCollectionChange;
 
         const std::string _name; // "alleyinsider"
 
@@ -156,7 +148,6 @@ namespace mongo {
         // but it points to a much more useful data structure
         typedef StringMap< Collection* > CollectionMap;
         CollectionMap _collections;
-        mongo::mutex _collectionLock;
 
         friend class Collection;
         friend class NamespaceDetails;

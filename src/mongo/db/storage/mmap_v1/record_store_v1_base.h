@@ -30,7 +30,11 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
+#include <boost/scoped_ptr.hpp>
+#include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/platform/unordered_set.h"
+
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -63,13 +67,17 @@ namespace mongo {
                                      long long numRecordsIncrement ) = 0;
 
         virtual void setStats( OperationContext* txn,
-                               long long dataSizeIncrement,
-                               long long numRecordsIncrement ) = 0;
+                               long long dataSize,
+                               long long numRecords ) = 0;
 
-        virtual const DiskLoc& deletedListEntry( int bucket ) const = 0;
+        virtual DiskLoc deletedListEntry( int bucket ) const = 0;
         virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc ) = 0;
+
+        virtual DiskLoc deletedListLegacyGrabBag() const = 0;
+        virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc) = 0;
+
         virtual void orphanDeletedList(OperationContext* txn) = 0;
 
         virtual const DiskLoc& firstExtent( OperationContext* txn ) const = 0;
@@ -91,22 +99,70 @@ namespace mongo {
 
         virtual long long maxCappedDocs() const = 0;
 
-        virtual double paddingFactor() const = 0;
+    };
 
-        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor ) = 0;
+    /**
+     * Class that stores active cursors that have been saved (as part of yielding) to
+     * allow them to be invalidated if the thing they pointed at goes away. The registry is
+     * thread-safe, as readers may concurrently register and remove their cursors. Contention is
+     * expected to be very low, as yielding is infrequent. This logically belongs to the
+     * RecordStore, but is not contained in it to facilitate unit testing.
+     */
+    class SavedCursorRegistry {
+    public:
+        /**
+         * The destructor ensures the cursor is unregistered when an exception is thrown.
+         * Note that the SavedCursor may outlive the registry it was saved in.
+         */
+        struct SavedCursor {
+            SavedCursor() : _registry(NULL) { }
+            virtual ~SavedCursor() { if (_registry) _registry->unregisterCursor(this); }
+            DiskLoc bucket;
+            BSONObj key;
+            DiskLoc loc;
 
+        private:
+            friend class SavedCursorRegistry;
+            // Non-null iff registered. Accessed by owner or writer with MODE_X collection lock
+            SavedCursorRegistry* _registry;
+        };
+
+        ~SavedCursorRegistry();
+
+        /**
+         * Adds given saved cursor to SavedCursorRegistry. Doesn't take ownership.
+         */
+        void registerCursor(SavedCursor* cursor);
+
+        /**
+         * Removes given saved cursor. Returns true if the cursor was still present, and false
+         * if it had already been removed due to invalidation. Doesn't take ownership.
+         */
+        bool unregisterCursor(SavedCursor* cursor);
+
+        /**
+         * When a btree-bucket disappears due to merge/split or similar, this invalidates all
+         * cursors that point at the same bucket by removing them from the registry.
+         */
+        void invalidateCursorsForBucket(DiskLoc bucket);
+
+    private:
+        SpinLock _mutex;
+        typedef unordered_set<SavedCursor *> SavedCursorSet; // SavedCursor pointers not owned here
+        SavedCursorSet _cursors;
     };
 
     class RecordStoreV1Base : public RecordStore {
     public:
 
-        static const int Buckets;
-        static const int MaxBucket;
+        static const int Buckets = 26;
+        static const int MaxAllowedAllocation = 16*1024*1024 + 512*1024;
 
         static const int bucketSizes[];
 
         enum UserFlags {
-            Flag_UsePowerOf2Sizes = 1 << 0
+            Flag_UsePowerOf2Sizes = 1 << 0,
+            Flag_NoPadding = 1 << 1,
         };
 
         // ------------
@@ -117,44 +173,52 @@ namespace mongo {
          * @param details - takes ownership
          * @param em - does NOT take ownership
          */
-        RecordStoreV1Base( const StringData& ns,
-                           RecordStoreV1MetaData* details,
-                           ExtentManager* em,
-                           bool isSystemIndexes );
+        RecordStoreV1Base(const StringData& ns,
+                          RecordStoreV1MetaData* details,
+                          ExtentManager* em,
+                          bool isSystemIndexes);
 
         virtual ~RecordStoreV1Base();
 
-        virtual long long dataSize() const { return _details->dataSize(); }
-        virtual long long numRecords() const { return _details->numRecords(); }
+        virtual long long dataSize( OperationContext* txn ) const { return _details->dataSize(); }
+        virtual long long numRecords( OperationContext* txn ) const { return _details->numRecords(); }
 
         virtual int64_t storageSize( OperationContext* txn,
                                      BSONObjBuilder* extraInfo = NULL,
                                      int level = 0 ) const;
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc ) const;
+
+        virtual bool findRecord( OperationContext* txn, const RecordId& loc, RecordData* rd ) const;
 
         void deleteRecord( OperationContext* txn,
-                           const DiskLoc& dl );
+                           const RecordId& dl );
 
-        StatusWith<DiskLoc> insertRecord( OperationContext* txn,
-                                          const char* data,
-                                          int len,
-                                          bool enforceQuota );
+        virtual RecordFetcher* recordNeedsFetch( OperationContext* txn,
+                                                 const RecordId& loc ) const;
 
-        StatusWith<DiskLoc> insertRecord( OperationContext* txn,
-                                          const DocWriter* doc,
-                                          bool enforceQuota );
+        StatusWith<RecordId> insertRecord( OperationContext* txn,
+                                           const char* data,
+                                           int len,
+                                           bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
-                                                  const DiskLoc& oldLocation,
-                                                  const char* data,
-                                                  int len,
-                                                  bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier );
+        StatusWith<RecordId> insertRecord( OperationContext* txn,
+                                           const DocWriter* doc,
+                                           bool enforceQuota );
+
+        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
+                                                   const RecordId& oldLocation,
+                                                   const char* data,
+                                                   int len,
+                                                   bool enforceQuota,
+                                                   UpdateNotifier* notifier );
+
+        virtual bool updateWithDamagesSupported() const;
 
         virtual Status updateWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
-                                          const char* damangeSource,
+                                          const RecordId& loc,
+                                          const RecordData& oldRec,
+                                          const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
@@ -164,7 +228,7 @@ namespace mongo {
         virtual Status validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
-                                 ValidateResults* results, BSONObjBuilder* output ) const;
+                                 ValidateResults* results, BSONObjBuilder* output );
 
         virtual void appendCustomStats( OperationContext* txn,
                                         BSONObjBuilder* result,
@@ -174,12 +238,8 @@ namespace mongo {
 
         const RecordStoreV1MetaData* details() const { return _details.get(); }
 
-        /**
-         * @return the actual size to create
-         *         will be >= oldRecordSize
-         *         based on padding and any other flags
-         */
-        int getRecordAllocationSize( int minRecordSize ) const;
+        // This keeps track of cursors saved during yielding, for invalidation purposes.
+        SavedCursorRegistry savedCursors;
 
         DiskLoc getExtentLocForRecord( OperationContext* txn, const DiskLoc& loc ) const;
 
@@ -189,16 +249,12 @@ namespace mongo {
         DiskLoc getNextRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
         DiskLoc getPrevRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
 
-        /* @return the size for an allocated record quantized to 1/16th of the BucketSize.
-           @param allocSize    requested size to allocate
-           The returned size will be greater than or equal to 'allocSize'.
-        */
-        static int quantizeAllocationSpace(int allocSize);
-
         /**
-         * Quantize 'allocSize' to the nearest bucketSize (or nearest 1mb boundary for large sizes).
+         * Quantize 'minSize' to the nearest allocation size.
          */
-        static int quantizePowerOf2AllocationSpace(int allocSize);
+        static int quantizeAllocationSpace(int minSize);
+
+        static bool isQuantized(int recordSize);
 
         /* return which "deleted bucket" for this size object */
         static int bucket(int size);
@@ -206,6 +262,12 @@ namespace mongo {
         virtual Status setCustomOption( OperationContext* txn,
                                         const BSONElement& option,
                                         BSONObjBuilder* info = NULL );
+
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) {
+            invariant(false); // MMAPv1 has its own repair which doesn't call this.
+        }
     protected:
 
         virtual Record* recordFor( const DiskLoc& loc ) const;
@@ -213,6 +275,8 @@ namespace mongo {
         const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
         virtual bool isCapped() const = 0;
+
+        virtual bool shouldPadInserts() const = 0;
 
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
@@ -246,19 +310,16 @@ namespace mongo {
         */
         void _addRecordToRecListInExtent(OperationContext* txn, Record* r, DiskLoc loc);
 
-        void _paddingTooSmall( OperationContext* txn );
-        void _paddingFits( OperationContext* txn );
-
         /**
          * internal
          * doesn't check inputs or change padding
          */
-        StatusWith<DiskLoc> _insertRecord( OperationContext* txn,
-                                           const char* data,
-                                           int len,
-                                           bool enforceQuota );
+        StatusWith<RecordId> _insertRecord( OperationContext* txn,
+                                            const char* data,
+                                            int len,
+                                            bool enforceQuota );
 
-        scoped_ptr<RecordStoreV1MetaData> _details;
+        boost::scoped_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
 
@@ -280,17 +341,17 @@ namespace mongo {
 
         virtual bool isEOF() { return _curr.isNull(); }
 
-        virtual DiskLoc curr() { return _curr; }
+        virtual RecordId curr() { return _curr.toRecordId(); }
 
-        virtual DiskLoc getNext( );
+        virtual RecordId getNext( );
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const RecordId& dl);
 
         virtual void saveState() {}
 
-        virtual bool restoreState() { return true; }
+        virtual bool restoreState(OperationContext* txn) { return true; }
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const { return _rs->dataFor(loc); }
+        virtual RecordData dataFor( const RecordId& loc ) const { return _rs->dataFor(_txn, loc); }
 
     private:
         virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }

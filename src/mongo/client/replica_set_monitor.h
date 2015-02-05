@@ -33,6 +33,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/client/export_macros.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 

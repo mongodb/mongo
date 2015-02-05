@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
 
     const std::string LocksType::ConfigNS = "config.locks";

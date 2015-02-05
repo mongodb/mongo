@@ -27,6 +27,9 @@
 
 #include "mongo/util/options_parser/option_section.h"
 
+#include <algorithm>
+#include <boost/shared_ptr.hpp>
+#include <iostream>
 #include <sstream>
 
 #include "mongo/bson/util/builder.h"
@@ -35,6 +38,8 @@
 
 namespace mongo {
 namespace optionenvironment {
+
+    using boost::shared_ptr;
 
     // Registration interface
 
@@ -58,10 +63,29 @@ namespace optionenvironment {
                                                         const std::string& singleName,
                                                         const OptionType type,
                                                         const std::string& description) {
-        OptionDescription option(dottedName, singleName, type, description);
+        std::vector<std::string> v;
+        return addOptionChaining(dottedName, singleName, type, description, v);
+    }
 
-        // Verify that neither the single name nor the dotted name for this option conflicts with
-        // the names for any options we have already registered
+    OptionDescription& OptionSection::addOptionChaining(const std::string& dottedName,
+                                                        const std::string& singleName,
+                                                        const OptionType type,
+                                                        const std::string& description,
+                                                        const std::string& deprecatedDottedName) {
+        std::vector<std::string> v;
+        v.push_back(deprecatedDottedName);
+        return addOptionChaining(dottedName, singleName, type, description, v);
+    }
+
+    OptionDescription& OptionSection::addOptionChaining(const std::string& dottedName,
+        const std::string& singleName,
+        const OptionType type,
+        const std::string& description,
+        const std::vector<std::string>& deprecatedDottedNames) {
+        OptionDescription option(dottedName, singleName, type, description, deprecatedDottedNames);
+
+        // Verify that single name, the dotted name and deprecated dotted names for this option
+        // conflicts with the names for any options we have already registered.
         std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             if (option._dottedName == oditerator->_dottedName) {
@@ -77,6 +101,27 @@ namespace optionenvironment {
                 sb << "Attempted to register option with duplicate singleName: "
                    << option._singleName;
                 throw DBException(sb.str(), ErrorCodes::InternalError);
+            }
+            // Deprecated dotted names should not conflict with dotted names or deprecated dotted
+            // names of any other options.
+            if (std::count(option._deprecatedDottedNames.begin(),
+                           option._deprecatedDottedNames.end(), oditerator->_dottedName)) {
+                StringBuilder sb;
+                sb << "Attempted to register option with duplicate deprecated dotted name "
+                   << "(with another option's dotted name): "
+                   << option._dottedName;
+                throw DBException(sb.str(), ErrorCodes::BadValue);
+            }
+            for (std::vector<std::string>::const_iterator i =
+                     oditerator->_deprecatedDottedNames.begin();
+                 i != oditerator->_deprecatedDottedNames.end(); ++i) {
+                if (std::count(option._deprecatedDottedNames.begin(),
+                               option._deprecatedDottedNames.end(), *i)) {
+                    StringBuilder sb;
+                    sb << "Attempted to register option with duplicate deprecated dotted name "
+                       << *i << " (other option " << oditerator->_dottedName << ")";
+                    throw DBException(sb.str(), ErrorCodes::BadValue);
+                }
             }
         }
 
@@ -286,7 +331,7 @@ namespace optionenvironment {
                        << oditerator->_dottedName << "\", but trying to use it on the command line "
                        << "or INI config file.  Only options that are exclusive to the YAML config "
                        << "file can have an empty single name";
-                    return Status(ErrorCodes::InternalError, oditerator->_dottedName);
+                    return Status(ErrorCodes::InternalError, sb.str());
                 }
 
                 boostOptions->add_options()(oditerator->_singleName.c_str(),

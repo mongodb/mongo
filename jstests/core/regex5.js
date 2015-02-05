@@ -36,18 +36,6 @@ t.ensureIndex( {x:1} );
 print( "now indexed" );
 doit();
 
-// check bound unions SERVER-322
-assert.eq( {
-            x:[[1,1],
-               [2.5,2.5],
-               ["a","a"],
-               ["b","e"],
-               [/^b/,/^b/],
-               [/^c/,/^c/],            
-               [/^d/,/^d/]]
-          },
-            t.find( { x : { $in: [ 1, 2.5, "a", "b", /^b/, /^c/, /^d/ ] } } ).explain().indexBounds );
-
 // SERVER-505
 assert.eq( 0, t.find( { x : { $all: [ "a", /^a/ ] } } ).itcount());
 assert.eq( 2, t.find( { x : { $all: [ /^a/ ] } } ).itcount());

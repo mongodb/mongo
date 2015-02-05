@@ -18,7 +18,7 @@ var md = startMongod("--port", port1, "--dbpath",
                      "--sslCRLFile", "jstests/libs/crl.pem");
 
 
-var mongo = runMongoProgram("mongo", "--port", port1, "--ssl", 
+var mongo = runMongoProgram("mongo", "--port", port1, "--ssl", "--sslAllowInvalidCertificates",
                             "--sslPEMKeyFile", "jstests/libs/client.pem",
                             "--eval", ";");
 
@@ -34,7 +34,7 @@ md = startMongod("--port", port2, "--dbpath", MongoRunner.dataPath + baseName + 
                  "--sslCRLFile", "jstests/libs/crl_expired.pem");
 
 
-mongo = runMongoProgram("mongo", "--port", port2, "--ssl", 
+mongo = runMongoProgram("mongo", "--port", port2, "--ssl", "--sslAllowInvalidCertificates",
                         "--sslPEMKeyFile", "jstests/libs/client.pem",
                         "--eval", ";");
 

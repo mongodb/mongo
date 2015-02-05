@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/oid.h"
 #include "mongo/s/type_collection.h"

@@ -28,6 +28,8 @@
 *    then also delete it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/grid.h"
@@ -55,7 +57,15 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using std::endl;
+    using std::istringstream;
+    using std::map;
+    using std::ostringstream;
+    using std::set;
+    using std::setfill;
+    using std::setw;
+    using std::stringstream;
+    using std::vector;
 
     MONGO_FP_DECLARE(neverBalance);
 

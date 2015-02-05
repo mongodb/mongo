@@ -26,11 +26,20 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/exec/shard_filter.h"
 
-#include "mongo/db/keypattern.h"
+#include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/working_set_common.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::vector;
 
     // static
     const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
@@ -56,15 +65,45 @@ namespace mongo {
         StageState status = _child->work(out);
 
         if (PlanStage::ADVANCED == status) {
-            // If we're sharded make sure that we don't return any data that hasn't been migrated
-            // off of our shared yet.
+
+            // If we're sharded make sure that we don't return data that is not owned by us,
+            // including pending documents from in-progress migrations and orphaned documents from
+            // aborted migrations
             if (_metadata) {
-                KeyPattern kp(_metadata->getKeyPattern());
 
+                ShardKeyPattern shardKeyPattern(_metadata->getKeyPattern());
                 WorkingSetMember* member = _ws->get(*out);
+                WorkingSetMatchableDocument matchable(member);
+                BSONObj shardKey = shardKeyPattern.extractShardKeyFromMatchable(matchable);
 
-                // This performs excessive BSONObj creation but that's OK for now.
-                if (!_metadata->keyBelongsToMe(kp.extractSingleKey(member->obj))) {
+                if (shardKey.isEmpty()) {
+
+                    // We can't find a shard key for this document - this should never happen with
+                    // a non-fetched result unless our query planning is screwed up
+                    if (!member->hasObj()) {
+
+                        Status status(ErrorCodes::InternalError,
+                                     "shard key not found after a covered stage, "
+                                     "query planning has failed");
+
+                        // Fail loudly and cleanly in production, fatally in debug
+                        error() << status.toString();
+                        dassert(false);
+
+                        _ws->free(*out);
+                        *out = WorkingSetCommon::allocateStatusMember(_ws, status);
+                        return PlanStage::FAILURE;
+                    }
+
+                    // Skip this document with a warning - no shard key should not be possible
+                    // unless manually inserting data into a shard
+                    warning() << "no shard key found in document "
+                              << member->obj.value().toString() << " "
+                              << "for shard key pattern " << _metadata->getKeyPattern() << ", "
+                              << "document may have been inserted manually into shard";
+                }
+
+                if (!_metadata->keyBelongsToMe(shardKey)) {
                     _ws->free(*out);
                     ++_specificStats.chunkSkips;
                     return PlanStage::NEED_TIME;
@@ -76,12 +115,14 @@ namespace mongo {
             ++_commonStats.advanced;
             return status;
         }
-        else {
-            if (PlanStage::NEED_TIME == status) {
-                ++_commonStats.needTime;
-            }
-            return status;
+        else if (PlanStage::NEED_TIME == status) {
+            ++_commonStats.needTime;
         }
+        else if (PlanStage::NEED_FETCH == status) {
+            ++_commonStats.needFetch;
+        }
+
+        return status;
     }
 
     void ShardFilterStage::saveState() {
@@ -94,9 +135,11 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void ShardFilterStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void ShardFilterStage::invalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> ShardFilterStage::getChildren() const {

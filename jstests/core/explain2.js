@@ -1,27 +1,24 @@
+// Test calculation of the 'millis' field in explain output.
 
-t = db.explain2
+t = db.jstests_explain2;
 t.drop();
 
-t.ensureIndex( { a : 1 , b : 1 } );
-
-for ( i=1; i<10; i++ ){
-    t.insert( { _id : i , a : i , b : i , c : i } );
+t.ensureIndex( { a:1 } );
+for( i = 1000; i < 4000; i += 1000 ) {
+    t.save( { a:i } );
 }
 
-function go( q , c , b , o ){
-    var e = t.find( q ).hint( {a:1,b:1} ).explain();
-    assert.eq( c , e.n , "count " + tojson( q ) )
-    assert.eq( b , e.nscanned , "nscanned " + tojson( q ) )
-    assert.eq( o , e.nscannedObjects , "nscannedObjects " + tojson( q ) )
+// Run a query with one $or clause per a-value, each of which sleeps for 'a' milliseconds.
+function slow() {
+    sleep( this.a );
+    return true;
 }
+clauses = [];
+for( i = 1000; i < 4000; i += 1000 ) {
+    clauses.push( { a:i, $where:slow } );
+}
+explain = t.find( { $or:clauses } ).explain( true );
+printjson( explain );
 
-q = { a : { $gt : 3 } }
-go( q , 6 , 6 , 6 );
-
-q.b = 5
-go( q , 1 , 6 , 1 );
-
-delete q.b
-q.c = 5
-go( q , 1 , 6 , 6 );
-
+// Verify the duration of the whole query, and of each clause.
+assert.gt( explain.executionStats.executionTimeMillis, 1000 - 500 + 2000 - 500 + 3000 - 500 );

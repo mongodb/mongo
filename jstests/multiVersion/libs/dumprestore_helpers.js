@@ -13,7 +13,7 @@ load( './jstests/multiVersion/libs/verify_collection_data.js' )
 //     'mongoRestoreVersion' : "latest",
 //     'dumpDir' : dumpDir,
 //     'testDbpath' : testDbpath,
-//     'dumpType' : "direct",
+//     'dumpType' : "mongos",
 //     'restoreType' : "mongod" // "mongos" also supported
 // }
 //
@@ -21,12 +21,10 @@ load( './jstests/multiVersion/libs/verify_collection_data.js' )
 //
 // The "dumpDir" field is the external directory to use as scratch space for database dumps.
 //
-// The "testDbpath" is the external directory to use as the server dbpath directory.  This is also
-// used for the "direct" dump and restore.
+// The "testDbpath" is the external directory to use as the server dbpath directory.
 //
 // For the "dumpType" and "restoreType" fields, the following values are supported:
 //     - "mongod" - Do the dump or restore by connecting to a single mongod node
-//     - "direct" - Do the dump or restore directly from the data files
 //     - "mongos" - Do the dump or restore by connecting to a sharded cluster
 //
 function multiVersionDumpRestoreTest(configObj) {
@@ -85,16 +83,8 @@ function multiVersionDumpRestoreTest(configObj) {
     var collValid = new CollectionDataValidator();
     collValid.recordCollectionData(sourceColl);
 
-    // Dump using the specified version of mongodump, either using the data files directly or from
-    // the running mongod instance
-    if (configObj.dumpType === "direct") {
-        MongoRunner.stopMongod(serverSource.port);
-        MongoRunner.runMongoTool("mongodump", { out : configObj.dumpDir,
-                                                binVersion : configObj.mongoDumpVersion,
-                                                dbpath : configObj.testDbpath,
-                                                db : testBaseName });
-    }
-    else if (configObj.dumpType === "mongod") {
+    // Dump using the specified version of mongodump from the running mongod or mongos instance.
+    if (configObj.dumpType === "mongod") {
         MongoRunner.runMongoTool("mongodump", { out : configObj.dumpDir,
                                                 binVersion : configObj.mongoDumpVersion,
                                                 host : serverSource.host,
@@ -110,25 +100,7 @@ function multiVersionDumpRestoreTest(configObj) {
     }
 
     // Restore using the specified version of mongorestore
-    if (configObj.restoreType === "direct") {
-
-        // Clear out the dbpath we are restoring to
-        resetDbpath(configObj.testDbpath);
-
-        // Restore directly to the destination dbpath
-        MongoRunner.runMongoTool("mongorestore", { dir : configObj.dumpDir + "/" + testBaseName,
-                                                   binVersion : configObj.mongoRestoreVersion,
-                                                   dbpath : configObj.testDbpath,
-                                                   db : testBaseName });
-
-        // Start a mongod on the dbpath we just restored to
-        // Need to pass the "restart" option otherwise the data files get cleared automatically
-        serverDest = MongoRunner.runMongod({ binVersion : configObj.serverDestVersion,
-                                             setParameter : "textSearchEnabled=true",
-                                             dbpath : configObj.testDbpath,
-                                             restart : true });
-    }
-    else if (configObj.restoreType === "mongod") {
+    if (configObj.restoreType === "mongod") {
         var serverDest = MongoRunner.runMongod({ binVersion : configObj.serverDestVersion,
                                                  setParameter : "textSearchEnabled=true" });
 
@@ -259,8 +231,8 @@ function getPermutationIterator(permsObj) {
 //     'mongoRestoreVersion' :[ "latest", "2.4" ],
 //     'dumpDir' : [ dumpDir ],
 //     'testDbpath' : [ testDbpath ],
-//     'dumpType' : [ "direct", "mongod", "mongos" ],
-//     'restoreType' : [ "direct", "mongod", "mongos" ]
+//     'dumpType' : [ "mongod", "mongos" ],
+//     'restoreType' : [ "mongod", "mongos" ]
 // }
 //
 // This function will run a test for each possible combination of the parameters.  See comments on

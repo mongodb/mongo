@@ -26,6 +26,10 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
+#include "mongo/platform/basic.h"
+
 #include <sstream>
 #include <string>
 #include <vector>
@@ -35,15 +39,23 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
     class ApplyOpsCmd : public Command {
     public:
         virtual bool slaveOk() const { return false; }
@@ -73,20 +85,22 @@ namespace mongo {
                 BSONObjIterator i( ops );
                 while ( i.more() ) {
                     BSONElement e = i.next();
-                    if ( e.type() == Object )
-                        continue;
-                    errmsg = "op not an object: ";
-                    errmsg += e.fieldName();
-                    return false;
+                    if (!_checkOperation(e, errmsg)) {
+                        return false;
+                    }
                 }
             }
 
             // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
             // ns used so locking individually requires more analysis
+            ScopedTransaction scopedXact(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            WriteUnitOfWork wunit(txn->recoveryUnit());
 
-            DBDirectClient db(txn);
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while applying ops to database " << dbname));
+            }
 
             // Preconditions check reads the database state, so needs to be done locked
             if ( cmdObj["preCondition"].type() == Array ) {
@@ -122,24 +136,52 @@ namespace mongo {
                 BSONElement e = i.next();
                 const BSONObj& temp = e.Obj();
 
-                string ns = temp["ns"].String();
+                // Ignore 'n' operations.
+                const char *opType = temp["op"].valuestrsafe();
+                if (*opType == 'n') continue;
 
-                // Run operations under a nested lock as a hack to prevent them from yielding.
+                const string ns = temp["ns"].String();
+
+                // Run operations under a nested lock as a hack to prevent yielding.
                 //
-                // The list of operations is supposed to be applied atomically; yielding would break
-                // atomicity by allowing an interruption or a shutdown to occur after only some
-                // operations are applied.  We are already locked globally at this point, so taking
-                // a DBWrite on the namespace creates a nested lock, and yields are disallowed for
-                // operations that hold a nested lock.
-                Lock::DBWrite lk(txn->lockState(), ns);
-                invariant(txn->lockState()->isRecursive());
+                // The list of operations is supposed to be applied atomically; yielding
+                // would break atomicity by allowing an interruption or a shutdown to occur
+                // after only some operations are applied.  We are already locked globally
+                // at this point, so taking a DBLock on the namespace creates a nested lock,
+                // and yields are disallowed for operations that hold a nested lock.
+                //
+                // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
+                // commit to happen with a subset of ops applied.
+                // TODO figure out what to do about this.
+                Lock::GlobalWrite globalWriteLockDisallowTempRelease(txn->lockState());
+
+                // Ensures that yielding will not happen (see the comment above).
+                DEV {
+                    Locker::LockSnapshot lockSnapshot;
+                    invariant(!txn->lockState()->saveLockStateAndUnlock(&lockSnapshot));
+                };
 
                 Client::Context ctx(txn, ns);
-                bool failed = repl::applyOperation_inlock(txn,
+
+                bool failed;
+                while (true) {
+                    try {
+                        // We assume that in the WriteConflict retry case, either the op rolls back
+                        // any changes it makes or is otherwise safe to rerun.
+                        failed = repl::applyOperation_inlock(txn,
                                                              ctx.db(),
                                                              temp,
                                                              false,
                                                              alwaysUpsert);
+                        break;
+                    }
+                    catch (const WriteConflictException& wce) {
+                        LOG(2) << "WriteConflictException in applyOps command, retrying.";
+                        txn->recoveryUnit()->commitAndRestart();
+                        continue;
+                    }
+                }
+
                 ab.append(!failed);
                 if ( failed )
                     errors++;
@@ -170,14 +212,81 @@ namespace mongo {
                     }
                 }
 
-                repl::logOp(txn, "c", tempNS.c_str(), cmdBuilder.done());
+                const BSONObj cmdRewritten = cmdBuilder.done();
+
+                // We currently always logOp the command regardless of whether the individial ops
+                // succeeded and rely on any failures to also happen on secondaries. This isn't
+                // perfect, but it's what the command has always done and is part of its "correct"
+                // behavior.
+                while (true) {
+                    try {
+                        WriteUnitOfWork wunit(txn);
+                        repl::logOp(txn, "c", tempNS.c_str(), cmdRewritten);
+                        wunit.commit();
+                        break;
+                    }
+                    catch (const WriteConflictException& wce) {
+                        LOG(2) <<
+                            "WriteConflictException while logging applyOps command, retrying.";
+                        txn->recoveryUnit()->commitAndRestart();
+                        continue;
+                    }
+                }
             }
 
             if (errors != 0) {
                 return false;
             }
 
-            wunit.commit();
+            return true;
+        }
+
+    private:
+        /**
+         * Returns true if 'e' contains a valid operation.
+         */
+        bool _checkOperation(const BSONElement& e, string& errmsg) {
+            if (e.type() != Object) {
+                errmsg = str::stream() << "op not an object: " << e.fieldName();
+                return false;
+            }
+            BSONObj obj = e.Obj();
+            // op - operation type
+            BSONElement opElement = obj.getField("op");
+            if (opElement.eoo()) {
+                errmsg = str::stream() << "op does not contain required \"op\" field: "
+                                       << e.fieldName();
+                return false;
+            }
+            if (opElement.type() != mongo::String) {
+                errmsg = str::stream() << "\"op\" field is not a string: " << e.fieldName();
+                return false;
+            }
+            // operation type -- see logOp() comments for types
+            const char *opType = opElement.valuestrsafe();
+            if (*opType == '\0') {
+                errmsg = str::stream() << "\"op\" field value cannot be empty: " << e.fieldName();
+                return false;
+            }
+
+            // ns - namespace
+            // Only operations of type 'n' are allowed to have an empty namespace.
+            BSONElement nsElement = obj.getField("ns");
+            if (nsElement.eoo()) {
+                errmsg = str::stream() << "op does not contain required \"ns\" field: "
+                                       << e.fieldName();
+                return false;
+            }
+            if (nsElement.type() != mongo::String) {
+                errmsg = str::stream() << "\"ns\" field is not a string: " << e.fieldName();
+                return false;
+            }
+            if (*opType != 'n' && nsElement.String().empty()) {
+                errmsg = str::stream()
+                    << "\"ns\" field value cannot be empty when op type is not 'n': "
+                    << e.fieldName();
+                return false;
+            }
             return true;
         }
     } applyOpsCmd;

@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/query/planner_ixselect.h"
 
 #include <vector>
@@ -39,6 +41,7 @@
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -238,14 +241,14 @@ namespace mongo {
             if (exprtype == MatchExpression::GEO) {
                 // within or intersect.
                 GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(node);
-                const GeoQuery& gq = gme->getGeoQuery();
+                const GeoExpression& gq = gme->getGeoExpression();
                 const GeometryContainer& gc = gq.getGeometry();
                 return gc.hasS2Region();
             }
             else if (exprtype == MatchExpression::GEO_NEAR) {
                 GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
                 // Make sure the near query is compatible with 2dsphere.
-                return gnme->getData().centroid.crs == SPHERE;
+                return gnme->getData().centroid->crs == SPHERE;
             }
             return false;
         }
@@ -253,13 +256,13 @@ namespace mongo {
             if (exprtype == MatchExpression::GEO_NEAR) {
                 GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
                 // Make sure the near query is compatible with 2d index
-                return gnme->getData().centroid.crs == FLAT || !gnme->getData().isWrappingQuery;
+                return gnme->getData().centroid->crs == FLAT || !gnme->getData().isWrappingQuery;
             }
             else if (exprtype == MatchExpression::GEO) {
                 // 2d only supports within.
                 GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(node);
-                const GeoQuery& gq = gme->getGeoQuery();
-                if (GeoQuery::WITHIN != gq.getPred()) {
+                const GeoExpression& gq = gme->getGeoExpression();
+                if (GeoExpression::WITHIN != gq.getPred()) {
                     return false;
                 }
 
@@ -373,6 +376,73 @@ namespace mongo {
             MatchExpression::GEO_NEAR != node->matchType()) {
 
             stripInvalidAssignmentsTo2dsphereIndices(node, indices);
+        }
+    }
+
+    namespace {
+
+        /**
+         * For every node in the subtree rooted at 'node' that has a RelevantTag, removes index
+         * assignments from that tag.
+         *
+         * Used as a helper for stripUnneededAssignments().
+         */
+        void clearAssignments(MatchExpression* node) {
+            if (node->getTag()) {
+                RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+                rt->first.clear();
+                rt->notFirst.clear();
+            }
+
+            for (size_t i = 0; i < node->numChildren(); i++) {
+                clearAssignments(node->getChild(i));
+            }
+        }
+
+    } // namespace
+
+    // static
+    void QueryPlannerIXSelect::stripUnneededAssignments(MatchExpression* node,
+                                                        const std::vector<IndexEntry>& indices) {
+        if (MatchExpression::AND == node->matchType()) {
+            for (size_t i = 0; i < node->numChildren(); i++) {
+                MatchExpression* child = node->getChild(i);
+
+                if (MatchExpression::EQ != child->matchType()) {
+                    continue;
+                }
+
+                if (!child->getTag()) {
+                    continue;
+                }
+
+                // We found a EQ child of an AND which is tagged.
+                RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
+
+                // Look through all of the indices for which this predicate can be answered with
+                // the leading field of the index.
+                for (std::vector<size_t>::const_iterator i = rt->first.begin();
+                        i != rt->first.end(); ++i) {
+                    size_t index = *i;
+
+                    if (indices[index].unique && 1 == indices[index].keyPattern.nFields()) {
+                        // Found an EQ predicate which can use a single-field unique index.
+                        // Clear assignments from the entire tree, and add back a single assignment
+                        // for 'child' to the unique index.
+                        clearAssignments(node);
+                        RelevantTag* newRt = static_cast<RelevantTag*>(child->getTag());
+                        newRt->first.push_back(index);
+
+                        // Tag state has been reset in the entire subtree at 'root'; nothing
+                        // else for us to do.
+                        return;
+                    }
+                }
+            }
+        }
+
+        for (size_t i = 0; i < node->numChildren(); i++) {
+            stripUnneededAssignments(node->getChild(i), indices);
         }
     }
 
@@ -537,7 +607,11 @@ namespace mongo {
 
     static void stripInvalidAssignmentsTo2dsphereIndex(MatchExpression* node, size_t idx) {
 
-        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
+        if (Indexability::nodeCanUseIndexOnOwnField(node)
+            && MatchExpression::GEO != node->matchType()
+            && MatchExpression::GEO_NEAR != node->matchType()) {
+            // We found a non-geo predicate tagged to use a V2 2dsphere index which is not
+            // and-related to a geo predicate that can use the index.
             removeIndexRelevantTag(node, idx);
             return;
         }

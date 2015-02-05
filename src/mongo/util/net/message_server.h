@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 

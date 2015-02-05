@@ -51,6 +51,7 @@ namespace mongo {
         TextMatchExpression* textExp = static_cast<TextMatchExpression*>( exp );
         ASSERT_EQUALS( textExp->getQuery(), "awesome" );
         ASSERT_EQUALS( textExp->getLanguage(), "english" );
+        delete exp;
     }
 
     TEST( MatchExpressionParserText, Parse2 ) {

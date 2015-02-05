@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/platform/atomic_word.h"
 

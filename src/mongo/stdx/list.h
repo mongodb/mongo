@@ -28,23 +28,6 @@
 
 #pragma once
 
-#ifdef _MSC_VER
-
-// The MSVS STL implementation of std::list is not standards compliant, at least because it
-// invalidates iterators during std::list::splice operations.
-
-#include <boost/container/list.hpp>
-
-namespace mongo {
-namespace stdx {
-
-    using boost::container::list;
-
-}  // namespace stdx
-}  // namespace mongo
-
-#else
-
 #include <list>
 
 namespace mongo {
@@ -54,4 +37,4 @@ namespace stdx {
 
 }  // namespace stdx
 }  // namespace mongo
-#endif
+

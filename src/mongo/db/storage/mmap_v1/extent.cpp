@@ -31,9 +31,14 @@
 #include "mongo/db/storage/mmap_v1/extent.h"
 
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::iostream;
+    using std::string;
+    using std::vector;
 
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
 

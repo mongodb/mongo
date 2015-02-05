@@ -120,7 +120,7 @@
  * that depends on them being separate.
  *
  * Usage:
- *     MONGO_STARTUP_OPTIONS_PARSE(MongodOptions)(InitializerContext* context) {
+ *     MONGO_STARTUP_OPTIONS_STORE(MongodOptions)(InitializerContext* context) {
  *         return Status::OK();
  *     }
  */

@@ -6,6 +6,7 @@ Import("env")
 Import("windows")
 Import("mongoCodeVersion")
 Import("s3push")
+Import("has_option")
 
 env = env.Clone()
 env['WIX'] = os.environ.get('WIX')
@@ -19,17 +20,18 @@ if env['MERGEMODULESBASEPATH'] == None and os.environ.get('ProgramFiles(x86)') !
     env['MERGEMODULESBASEPATH'] = (os.environ.get('ProgramFiles(x86)') +
             r"\Common Files\Merge Modules")
 
-sources = [ "wxs/BinaryFragment.wxs",
-            "wxs/FeatureFragment.wxs",
-            "wxs/LicensingFragment.wxs"
+sourcesList = [ "BinaryFragment.wxs",
+            "FeatureFragment.wxs",
+            "LicensingFragment.wxs",
+            "UIFragment.wxs",
             ]
-objects = [ "$BUILD_DIR/msi/BinaryFragment.wixobj",
-            "$BUILD_DIR/msi/FeatureFragment.wixobj",
-            "$BUILD_DIR/msi/LicensingFragment.wixobj",
-           ]
 
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = Dir(env["BUILD_DIR"]).path
+if has_option("use-new-tools"):
+	toolBuildDir = "src\mongo-tools"
+else:
+	toolBuildDir = buildDir + r'\mongo'
 
 enterprisebase = 'src\mongo\db\modules\enterprise'
 
@@ -40,36 +42,46 @@ enterprisebase = 'src\mongo\db\modules\enterprise'
 # msi_flavor - "2008R2Plus" or ""
 #
 
-
-
 # Enterprise
 if 'enterprise' in env['MONGO_MODULES']:
   msi_edition = 'Enterprise'
   msi_flavor = '2008R2Plus'
   msi_platform = 'x64'
-  upgrade_code = 'F395569E-9DD4-49E6-AE8B-16B22BBFE915'
+  upgrade_code = 'E7FE8DF3-00F1-4434-97DF-2721E7F712FA'
 # Community
 else:
-  msi_edition = 'Standard'
+  if 'MONGO_SSL' in env['CPPDEFINES']:
+    msi_edition = 'SSL'
+  else:
+    msi_edition = 'Standard'
   if env['PROCESSOR_ARCHITECTURE'] == 'i386':
     msi_platform = 'x86'
     msi_flavor = ''
-    upgrade_code = '20623330-B71C-4FEB-8B6F-F19FAB27C457'
+    upgrade_code = 'B2E70C13-483E-4E16-B6AA-FCCA7983B767'
   else:
     msi_platform = 'x64'
     if env.get('WIN_VERSION_MIN') == 'ws08r2' or env.get('WIN_VERSION_MIN') == 'win7':
       msi_flavor = '2008R2Plus'
-      upgrade_code = 'B5D765D3-7A55-4BD3-9990-A0F85F5DBE2F'
+      if msi_edition == 'SSL':
+        upgrade_code = '86CB92A1-E631-4C63-89D2-40A7159B938B'
+      else:
+        upgrade_code = '448C9172-C5E7-42E0-81CB-00DAA191DD98'
     else:
       msi_flavor = 'Legacy'
-      upgrade_code = '6A44D061-6FA9-438B-8D25-4AF1BBAC61D7'
+      upgrade_code = '54BEB8CC-C8F7-4292-A411-BDE0A9F21CA3'
+
+if 'msi' in BUILD_TARGETS and msi_edition == 'SSL' and msi_flavor != '2008R2Plus':
+  print "Building the MongoDB SSL MSI is only supported on Windows 2008 R2+ or Windows 7+ platforms."
+  print "You must add --win-version-min=ws08r2 to your scons flags"
+  exit(1)
 
 if msi_platform == 'x64':
-  sources.append("wxs/Installer_64.wxs")
-  objects.append("$BUILD_DIR/msi/Installer_64.wixobj")
+  sourcesList.append("Installer_64.wxs")
 else:
-  sources.append("wxs/Installer.wxs")
-  objects.append("$BUILD_DIR/msi/Installer.wixobj")
+  sourcesList.append("Installer.wxs")
+
+sources = ["wxs/" + file for file in sourcesList]
+objects = ["$BUILD_DIR/msi/" + file.replace(".wxs", ".wixobj") for file in sourcesList]
 
 full_version = mongoCodeVersion.partition('-')[0]
 
@@ -82,7 +94,7 @@ major_version = "%s.%s" % (mv[0], mv[1])
 # (msi_edition, msi_platform, msi_flavor) combination
 # and change MSI ProductId on minor updates, 2.6.0 -> 2.6.1, we let Wix do automatic
 # GUID generation for us rather then build a database of GUIDs in our build system
-# For major updates, we are going to create a new directory/productid/upgrade_code ie, 2.6 -> 2.8
+# For major updates, we are going to create a new directory/productid/upgrade_code ie, 2.6 -> 3.0
 
 
 # candle: compile .wxs files into .wixobjs
@@ -96,6 +108,7 @@ env.Command(objects,
             ' -dLicenseSource=distsrc'
             r' -dEnterpriseBase=' + enterprisebase + '\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
+            ' -dToolBinarySource=' + toolBuildDir +
             ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
             ' -dEdition=' + msi_edition +
             ' -d"ProductId=*\"'
@@ -120,13 +133,17 @@ env.Command(objects,
             ' $SOURCES')
 
 #light: link .objs into an msi
-msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
-env.Command(msi,
+pre_msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi"
+env.Command(pre_msi,
             objects,
             '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82 '
             ' -ext "$WIXUIEXT"'
             ' ${SOURCES}')
 
+msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
+env.Command(msi,
+            pre_msi,
+            r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}')
 env.AlwaysBuild(msi)
 
 env.Alias( "msi" , msi )

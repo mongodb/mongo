@@ -21,14 +21,14 @@ db.foo.ensureIndex({a:1});
 
 replTest.awaitReplication();
 
-assert.eq(2, db.system.indexes.count(), "Master didn't have proper indexes before reindex");
-assert.eq(2, slaveDb.system.indexes.count(), "Slave didn't have proper indexes before reindex");
+assert.eq(2, db.foo.getIndexes().length, "Master didn't have proper indexes before reindex");
+assert.eq(2, slaveDb.foo.getIndexes().length, "Slave didn't have proper indexes before reindex");
 
 
 // Try to reindex secondary
 slaveDb.foo.reIndex();
 
-assert.eq(2, db.system.indexes.count(), "Master didn't have proper indexes after reindex");
-assert.eq(2, slaveDb.system.indexes.count(), "Slave didn't have proper indexes after reindex");
+assert.eq(2, db.foo.getIndexes().length, "Master didn't have proper indexes after reindex");
+assert.eq(2, slaveDb.foo.getIndexes().length, "Slave didn't have proper indexes after reindex");
 
 replTest.stopSet(15);

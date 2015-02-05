@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
@@ -43,17 +45,20 @@
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple_iterator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using std::endl;
+    using std::vector;
 
     static Counter64 freelistAllocs;
     static Counter64 freelistBucketExhausted;
     static Counter64 freelistIterations;
 
+    // TODO figure out what to do about these.
     static ServerStatusMetricField<Counter64> dFreelist1( "storage.freelist.search.requests",
                                                           &freelistAllocs );
 
@@ -72,161 +77,86 @@ namespace mongo {
 
         invariant( !details->isCapped() );
         _normalCollection = NamespaceString::normal( ns );
-        if ( _details->paddingFactor() == 0 ) {
-            warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
-            _details->setPaddingFactor(txn, 1.0);
-        }
-
     }
 
     SimpleRecordStoreV1::~SimpleRecordStoreV1() {
     }
 
     DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents( OperationContext* txn,
-                                                            int lenToAlloc ) {
+                                                            int lenToAllocRaw ) {
+
+        // Slowly drain the deletedListLegacyGrabBag by popping one record off and putting it in the
+        // correct deleted list each time we try to allocate a new record. This ensures we won't
+        // orphan any data when upgrading from old versions, without needing a long upgrade phase.
+        // This is done before we try to allocate the new record so we can take advantage of the new
+        // space immediately.
+        {
+            const DiskLoc head = _details->deletedListLegacyGrabBag();
+            if (!head.isNull()) {
+                _details->setDeletedListLegacyGrabBag(txn, drec(head)->nextDeleted());
+                addDeletedRec(txn, head);
+            }
+        }
+
         // align size up to a multiple of 4
-        lenToAlloc = (lenToAlloc + (4-1)) & ~(4-1);
+        const int lenToAlloc = (lenToAllocRaw + (4-1)) & ~(4-1);
 
         freelistAllocs.increment();
         DiskLoc loc;
+        DeletedRecord* dr = NULL;
         {
-            DiskLoc *prev = 0;
-            DiskLoc *bestprev = 0;
-            DiskLoc bestmatch;
-            int bestmatchlen = INT_MAX; // sentinel meaning we haven't found a record big enough
-            int b = bucket(lenToAlloc);
-            DiskLoc cur = _details->deletedListEntry(b);
-            
-            int extra = 5; // look for a better fit, a little.
-            int chain = 0;
-            while ( 1 ) {
-                { // defensive check
-                    int fileNumber = cur.a();
-                    int fileOffset = cur.getOfs();
-                    if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
-                        StringBuilder sb;
-                        sb << "Deleted record list corrupted in collection " << _ns
-                           << ", bucket " << b
-                           << ", link number " << chain
-                           << ", invalid link is " << cur.toString()
-                           << ", throwing Fatal Assertion";
-                        log() << sb.str() << endl;
-                        fassertFailed(16469);
-                    }
-                }
-                if ( cur.isNull() ) {
-                    // move to next bucket.  if we were doing "extra", just break
-                    if ( bestmatchlen < INT_MAX )
-                        break;
 
-                    if ( chain > 0 ) {
-                        // if we looked at things in the right bucket, but they were not suitable
-                        freelistBucketExhausted.increment();
-                    }
-
-                    b++;
-                    if ( b > MaxBucket ) {
-                        // out of space. alloc a new extent.
-                        freelistIterations.increment( 1 + chain );
-                        return DiskLoc();
-                    }
-                    cur = _details->deletedListEntry(b);
-                    prev = 0;
-                    continue;
-                }
-                DeletedRecord *r = drec(cur);
-                if ( r->lengthWithHeaders() >= lenToAlloc &&
-                     r->lengthWithHeaders() < bestmatchlen ) {
-                    bestmatchlen = r->lengthWithHeaders();
-                    bestmatch = cur;
-                    bestprev = prev;
-                    if (r->lengthWithHeaders() == lenToAlloc)
-                        // exact match, stop searching
-                        break;
-                }
-                if ( bestmatchlen < INT_MAX && --extra <= 0 )
+            int myBucket;
+            for (myBucket = bucket(lenToAlloc); myBucket < Buckets; myBucket++) {
+                // Only look at the first entry in each bucket. This works because we are either
+                // quantizing or allocating fixed-size blocks.
+                const DiskLoc head = _details->deletedListEntry(myBucket);
+                if (head.isNull()) continue;
+                DeletedRecord* const candidate = drec(head);
+                if (candidate->lengthWithHeaders() >= lenToAlloc) {
+                    loc = head;
+                    dr = candidate;
                     break;
-                if ( ++chain > 30 && b <= MaxBucket ) {
-                    // too slow, force move to next bucket to grab a big chunk
-                    //b++;
-                    freelistIterations.increment( chain );
-                    chain = 0;
-                    cur.Null();
-                }
-                else {
-                    cur = r->nextDeleted();
-                    prev = &r->nextDeleted();
                 }
             }
 
-            // unlink ourself from the deleted list
-            DeletedRecord *bmr = drec(bestmatch);
-            if ( bestprev ) {
-                *txn->recoveryUnit()->writing(bestprev) = bmr->nextDeleted();
-            }
-            else {
-                // should be the front of a free-list
-                int myBucket = bucket(bmr->lengthWithHeaders());
-                invariant( _details->deletedListEntry(myBucket) == bestmatch );
-                _details->setDeletedListEntry(txn, myBucket, bmr->nextDeleted());
-            }
-            *txn->recoveryUnit()->writing(&bmr->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
-            invariant(bmr->extentOfs() < bestmatch.getOfs());
+            if (!dr)
+                return DiskLoc(); // no space
 
-            freelistIterations.increment( 1 + chain );
-            loc = bestmatch;
+            // Unlink ourself from the deleted list
+            _details->setDeletedListEntry(txn, myBucket, dr->nextDeleted());
+            *txn->recoveryUnit()->writing(&dr->nextDeleted()) = DiskLoc().setInvalid(); // defensive
         }
 
-        if ( loc.isNull() )
-            return loc;
+        invariant( dr->extentOfs() < loc.getOfs() );
 
-        // determine if we should chop up
+        // Split the deleted record if it has at least as much left over space as our smallest
+        // allocation size. Otherwise, just take the whole DeletedRecord.
+        const int remainingLength = dr->lengthWithHeaders() - lenToAlloc;
+        if (remainingLength >= bucketSizes[0]) {
+            txn->recoveryUnit()->writingInt(dr->lengthWithHeaders()) = lenToAlloc;
+            const DiskLoc newDelLoc = DiskLoc(loc.a(), loc.getOfs() + lenToAlloc);
+            DeletedRecord* newDel = txn->recoveryUnit()->writing(drec(newDelLoc));
+            newDel->extentOfs() = dr->extentOfs();
+            newDel->lengthWithHeaders() = remainingLength;
+            newDel->nextDeleted().Null();
 
-        DeletedRecord *r = drec(loc);
-
-        /* note we want to grab from the front so our next pointers on disk tend
-        to go in a forward direction which is important for performance. */
-        int regionlen = r->lengthWithHeaders();
-        invariant( r->extentOfs() < loc.getOfs() );
-
-        int left = regionlen - lenToAlloc;
-        if ( left < 24 || left < (lenToAlloc / 8) ) {
-            // you get the whole thing.
-            return loc;
+            addDeletedRec(txn, newDelLoc);
         }
 
-        // don't quantize:
-        //   - $ collections (indexes) as we already have those aligned the way we want SERVER-8425
-        if ( _normalCollection ) {
-            // we quantize here so that it only impacts newly sized records
-            // this prevents oddities with older records and space re-use SERVER-8435
-            lenToAlloc = std::min( r->lengthWithHeaders(),
-                                   quantizeAllocationSpace( lenToAlloc ) );
-            left = regionlen - lenToAlloc;
-
-            if ( left < 24 ) {
-                // you get the whole thing.
-                return loc;
-            }
-        }
-
-        /* split off some for further use. */
-        txn->recoveryUnit()->writingInt(r->lengthWithHeaders()) = lenToAlloc;
-        DiskLoc newDelLoc = loc;
-        newDelLoc.inc(lenToAlloc);
-        DeletedRecord* newDel = drec(newDelLoc);
-        DeletedRecord* newDelW = txn->recoveryUnit()->writing(newDel);
-        newDelW->extentOfs() = r->extentOfs();
-        newDelW->lengthWithHeaders() = left;
-        newDelW->nextDeleted().Null();
-
-        addDeletedRec( txn, newDelLoc );
         return loc;
     }
 
     StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord( OperationContext* txn,
                                                           int lengthWithHeaders,
                                                           bool enforceQuota ) {
+        if (lengthWithHeaders > MaxAllowedAllocation) {
+            return StatusWith<DiskLoc>(
+                ErrorCodes::InvalidLength,
+                str::stream() << "Attempting to allocate a record larger than maximum size: "
+                              << lengthWithHeaders << " > 16.5MB");
+        }
+
         DiskLoc loc = _allocFromExistingExtents( txn, lengthWithHeaders );
         if ( !loc.isNull() )
             return StatusWith<DiskLoc>( loc );
@@ -265,14 +195,44 @@ namespace mongo {
     }
 
     Status SimpleRecordStoreV1::truncate(OperationContext* txn) {
-        return Status( ErrorCodes::InternalError,
-                       "SimpleRecordStoreV1::truncate not implemented" );
+        const DiskLoc firstExtLoc = _details->firstExtent(txn);
+        if (firstExtLoc.isNull() || !firstExtLoc.isValid()) {
+            // Already empty
+            return Status::OK();
+        }
+
+        // Free all extents except the first.
+        Extent* firstExt = _extentManager->getExtent(firstExtLoc);
+        if (!firstExt->xnext.isNull()) {
+            const DiskLoc extNextLoc = firstExt->xnext;
+            const DiskLoc oldLastExtLoc = _details->lastExtent(txn);
+            Extent* const nextExt = _extentManager->getExtent(extNextLoc);
+
+            // Unlink other extents;
+            *txn->recoveryUnit()->writing(&nextExt->xprev) = DiskLoc();
+            *txn->recoveryUnit()->writing(&firstExt->xnext) = DiskLoc();
+            _details->setLastExtent(txn, firstExtLoc);
+            _details->setLastExtentSize(txn, firstExt->length);
+
+            _extentManager->freeExtents(txn, extNextLoc, oldLastExtLoc);
+        }
+
+        // Make the first (now only) extent a single large deleted record.
+        *txn->recoveryUnit()->writing(&firstExt->firstRecord) = DiskLoc();
+        *txn->recoveryUnit()->writing(&firstExt->lastRecord) = DiskLoc();
+        _details->orphanDeletedList(txn);
+        addDeletedRec(txn, _findFirstSpot(txn, firstExtLoc, firstExt));
+
+        // Make stats reflect that there are now no documents in this record store.
+        _details->setStats(txn, 0, 0);
+
+        return Status::OK();
     }
 
     void SimpleRecordStoreV1::addDeletedRec( OperationContext* txn, const DiskLoc& dloc ) {
         DeletedRecord* d = drec( dloc );
 
-        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
+        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << std::hex << d->extentOfs() << endl;
 
         int b = bucket(d->lengthWithHeaders());
         *txn->recoveryUnit()->writing(&d->nextDeleted()) = _details->deletedListEntry(b);
@@ -280,8 +240,7 @@ namespace mongo {
     }
 
     RecordIterator* SimpleRecordStoreV1::getIterator( OperationContext* txn,
-                                                      const DiskLoc& start,
-                                                      bool tailable,
+                                                      const RecordId& start,
                                                       const CollectionScanParams::Direction& dir) const {
         return new SimpleRecordStoreV1Iterator( txn, this, start, dir );
     }
@@ -332,123 +291,147 @@ namespace mongo {
     };
 
     void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
-                                             const DiskLoc diskloc,
+                                             const DiskLoc extentLoc,
                                              int extentNumber,
                                              RecordStoreCompactAdaptor* adaptor,
                                              const CompactOptions* compactOptions,
                                              CompactStats* stats ) {
 
         log() << "compact begin extent #" << extentNumber
-              << " for namespace " << _ns << " " << diskloc;
+              << " for namespace " << _ns << " " << extentLoc;
 
         unsigned oldObjSize = 0; // we'll report what the old padding was
         unsigned oldObjSizeWithPadding = 0;
 
-        Extent *e = _extentManager->getExtent( diskloc );
-        e->assertOk();
-        fassert( 17437, e->validates(diskloc) );
+        Extent* const sourceExtent = _extentManager->getExtent( extentLoc );
+        sourceExtent->assertOk();
+        fassert( 17437, sourceExtent->validates(extentLoc) );
 
         {
-            // the next/prev pointers within the extent might not be in order so we first
-            // page the whole thing in sequentially
-            log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
+            // The next/prev Record pointers within the Extent might not be in order so we first
+            // page in the whole Extent sequentially.
+            // TODO benchmark on slow storage to verify this is measurably faster.
+            log() << "compact paging in len=" << sourceExtent->length/1000000.0 << "MB" << endl;
             Timer t;
-            size_t length = e->length;
+            size_t length = sourceExtent->length;
 
-            touch_pages( reinterpret_cast<const char*>(e), length );
+            touch_pages( reinterpret_cast<const char*>(sourceExtent), length );
             int ms = t.millis();
             if( ms > 1000 )
                 log() << "compact end paging in " << ms << "ms "
-                      << e->length/1000000.0/t.seconds() << "MB/sec" << endl;
+                      << sourceExtent->length/1000000.0/t.seconds() << "MB/sec" << endl;
         }
 
         {
+            // Move each Record out of this extent and insert it in to the "new" extents.
             log() << "compact copying records" << endl;
-            long long datasize = 0;
+            long long totalNetSize = 0;
             long long nrecords = 0;
-            DiskLoc L = e->firstRecord;
-            if( !L.isNull() ) {
-                while( 1 ) {
-                    Record *recOld = recordFor(L);
-                    RecordData oldData = recOld->toRecordData();
-                    L = getNextRecordInExtent(txn, L);
+            DiskLoc nextSourceLoc = sourceExtent->firstRecord;
+            while (!nextSourceLoc.isNull()) {
+                txn->checkForInterrupt();
 
-                    if ( compactOptions->validateDocuments && !adaptor->isDataValid( oldData ) ) {
-                        // object is corrupt!
-                        log() << "compact skipping corrupt document!";
-                        stats->corruptDocuments++;
-                    }
-                    else {
-                        unsigned dataSize = adaptor->dataSize( oldData );
-                        unsigned docSize = dataSize;
+                WriteUnitOfWork wunit(txn);
+                Record* recOld = recordFor(nextSourceLoc);
+                RecordData oldData = recOld->toRecordData();
+                nextSourceLoc = getNextRecordInExtent(txn, nextSourceLoc);
 
-                        nrecords++;
-                        oldObjSize += docSize;
-                        oldObjSizeWithPadding += recOld->netLength();
+                if ( compactOptions->validateDocuments && !adaptor->isDataValid( oldData ) ) {
+                    // object is corrupt!
+                    log() << "compact removing corrupt document!";
+                    stats->corruptDocuments++;
+                }
+                else {
+                    // How much data is in the record. Excludes padding and Record headers.
+                    const unsigned rawDataSize = adaptor->dataSize( oldData );
 
-                        unsigned lenWHdr = docSize + Record::HeaderSize;
-                        unsigned lenWPadding = lenWHdr;
+                    nrecords++;
+                    oldObjSize += rawDataSize;
+                    oldObjSizeWithPadding += recOld->netLength();
 
-                        switch( compactOptions->paddingMode ) {
-                        case CompactOptions::NONE:
-                            if ( _details->isUserFlagSet(Flag_UsePowerOf2Sizes) )
-                                lenWPadding = quantizePowerOf2AllocationSpace(lenWPadding);
-                            break;
-                        case CompactOptions::PRESERVE:
-                            // if we are preserving the padding, the record should not change size
-                            lenWPadding = recOld->lengthWithHeaders();
-                            break;
-                        case CompactOptions::MANUAL:
-                            lenWPadding = compactOptions->computeRecordSize(lenWPadding);
-                            if (lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) {
-                                lenWPadding = lenWHdr;
-                            }
-                            break;
+                    // Allocation sizes include the headers and possibly some padding.
+                    const unsigned minAllocationSize = rawDataSize + Record::HeaderSize;
+                    unsigned allocationSize = minAllocationSize;
+                    switch( compactOptions->paddingMode ) {
+                    case CompactOptions::NONE: // default padding
+                        if (shouldPadInserts()) {
+                            allocationSize = quantizeAllocationSpace(minAllocationSize);
                         }
+                        break;
 
-                        CompactDocWriter writer( recOld, dataSize, lenWPadding );
-                        StatusWith<DiskLoc> status = insertRecord( txn, &writer, false );
-                        uassertStatusOK( status.getStatus() );
-                        datasize += recordFor( status.getValue() )->netLength();
+                    case CompactOptions::PRESERVE: // keep original padding
+                        allocationSize = recOld->lengthWithHeaders();
+                        break;
 
-                        adaptor->inserted( dataFor( status.getValue() ), status.getValue() );
-                    }
-
-                    if( L.isNull() ) {
-                        // we just did the very last record from the old extent.  it's still pointed to
-                        // by the old extent ext, but that will be fixed below after this loop
+                    case CompactOptions::MANUAL: // user specified how much padding to use
+                        allocationSize = compactOptions->computeRecordSize(minAllocationSize);
+                        if (allocationSize < minAllocationSize
+                                || allocationSize > BSONObjMaxUserSize / 2 ) {
+                            allocationSize = minAllocationSize;
+                        }
                         break;
                     }
+                    invariant(allocationSize >= minAllocationSize);
 
-                    // remove the old records (orphan them) periodically so our commit block doesn't get too large
-                    bool stopping = false;
-                    RARELY stopping = !txn->checkForInterruptNoAssert().isOK();
-                    if( stopping || txn->recoveryUnit()->isCommitNeeded() ) {
-                        *txn->recoveryUnit()->writing(&e->firstRecord) = L;
-                        Record *r = recordFor(L);
-                        txn->recoveryUnit()->writingInt(r->prevOfs()) = DiskLoc::NullOfs;
-                        txn->recoveryUnit()->commitIfNeeded();
-                        txn->checkForInterrupt();
-                    }
+                    // Copy the data to a new record. Because we orphaned the record freelist at the
+                    // start of the compact, this insert will allocate a record in a new extent.
+                    // See the comment in compact() for more details.
+                    CompactDocWriter writer( recOld, rawDataSize, allocationSize );
+                    StatusWith<RecordId> status = insertRecord( txn, &writer, false );
+                    uassertStatusOK( status.getStatus() );
+                    const Record* newRec = recordFor(DiskLoc::fromRecordId(status.getValue()));
+                    invariant(unsigned(newRec->netLength()) >= rawDataSize);
+                    totalNetSize += newRec->netLength();
+
+                    // Tells the caller that the record has been moved, so it can do things such as
+                    // add it to indexes.
+                    adaptor->inserted(newRec->toRecordData(), status.getValue());
                 }
-            } // if !L.isNull()
 
-            invariant( _details->firstExtent(txn) == diskloc );
-            invariant( _details->lastExtent(txn) != diskloc );
-            DiskLoc newFirst = e->xnext;
+                // Remove the old record from the linked list of records withing the sourceExtent.
+                // The old record is not added to the freelist as we will be freeing the whole
+                // extent at the end.
+                *txn->recoveryUnit()->writing(&sourceExtent->firstRecord) = nextSourceLoc;
+                if (nextSourceLoc.isNull()) {
+                    // Just moved the last record out of the extent. Mark extent as empty.
+                    *txn->recoveryUnit()->writing(&sourceExtent->lastRecord) = DiskLoc();
+                }
+                else {
+                    Record* newFirstRecord = recordFor(nextSourceLoc);
+                    txn->recoveryUnit()->writingInt(newFirstRecord->prevOfs()) = DiskLoc::NullOfs;
+                }
+
+                // Adjust the stats to reflect the removal of the old record. The insert above
+                // handled adjusting the stats for the new record.
+                _details->incrementStats(txn, -(recOld->netLength()), -1);
+
+                wunit.commit();
+            }
+
+            // The extent must now be empty.
+            invariant(sourceExtent->firstRecord.isNull());
+            invariant(sourceExtent->lastRecord.isNull());
+
+            // We are still the first extent, but we must not be the only extent.
+            invariant( _details->firstExtent(txn) == extentLoc );
+            invariant( _details->lastExtent(txn) != extentLoc );
+
+            // Remove the newly emptied sourceExtent from the extent linked list and return it to
+            // the extent manager.
+            WriteUnitOfWork wunit(txn);
+            const DiskLoc newFirst = sourceExtent->xnext;
             _details->setFirstExtent( txn, newFirst );
             *txn->recoveryUnit()->writing(&_extentManager->getExtent( newFirst )->xprev) = DiskLoc();
-            _extentManager->freeExtent( txn, diskloc );
-
-            txn->recoveryUnit()->commitIfNeeded();
+            _extentManager->freeExtent( txn, extentLoc );
+            wunit.commit();
 
             {
-                double op = 1.0;
-                if( oldObjSize )
-                    op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
+                const double oldPadding = oldObjSize ? double(oldObjSizeWithPadding) / oldObjSize
+                                                     : 1.0; // defining 0/0 as 1 for this.
+
                 log() << "compact finished extent #" << extentNumber << " containing " << nrecords
-                      << " documents (" << datasize/1000000.0 << "MB)"
-                      << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100;
+                      << " documents (" << totalNetSize / (1024*1024.0) << "MB)"
+                      << " oldPadding: " << oldPadding;
             }
         }
 
@@ -459,10 +442,7 @@ namespace mongo {
                                          const CompactOptions* options,
                                          CompactStats* stats ) {
 
-        // this is a big job, so might as well make things tidy before we start just to be nice.
-        txn->recoveryUnit()->commitIfNeeded();
-
-        list<DiskLoc> extents;
+        std::vector<DiskLoc> extents;
         for( DiskLoc extLocation = _details->firstExtent(txn);
              !extLocation.isNull();
              extLocation = _extentManager->getExtent( extLocation )->xnext ) {
@@ -470,26 +450,36 @@ namespace mongo {
         }
         log() << "compact " << extents.size() << " extents";
 
-        log() << "compact orphan deleted lists" << endl;
-        _details->orphanDeletedList(txn);
+        {
+            WriteUnitOfWork wunit(txn);
+            // Orphaning the deleted lists ensures that all inserts go to new extents rather than
+            // the ones that existed before starting the compact. If we abort the operation before
+            // completion, any free space in the old extents will be leaked and never reused unless
+            // the collection is compacted again or dropped. This is considered an acceptable
+            // failure mode as no data will be lost.
+            log() << "compact orphan deleted lists" << endl;
+            _details->orphanDeletedList(txn);
 
-        // Start over from scratch with our extent sizing and growth
-        _details->setLastExtentSize( txn, 0 );
+            // Start over from scratch with our extent sizing and growth
+            _details->setLastExtentSize( txn, 0 );
 
-        // create a new extent so new records go there
-        increaseStorageSize( txn, _details->lastExtentSize(txn), true );
-
-        // reset data size and record counts to 0 for this namespace
-        // as we're about to tally them up again for each new extent
-        _details->setStats( txn, 0, 0 );
+            // create a new extent so new records go there
+            increaseStorageSize( txn, _details->lastExtentSize(txn), true );
+            wunit.commit();
+        }
 
         ProgressMeterHolder pm(*txn->setMessage("compact extent",
                                                 "Extent Compacting Progress",
                                                 extents.size()));
 
+        // Go through all old extents and move each record to a new set of extents.
         int extentNumber = 0;
-        for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) {
-            _compactExtent(txn, *i, extentNumber++, adaptor, options, stats );
+        for( std::vector<DiskLoc>::iterator it = extents.begin(); it != extents.end(); it++ ) {
+            txn->checkForInterrupt();
+            invariant(_details->firstExtent(txn) == *it);
+            // empties and removes the first extent
+            _compactExtent(txn, *it, extentNumber++, adaptor, options, stats );
+            invariant(_details->firstExtent(txn) != *it);
             pm.hit();
         }
 

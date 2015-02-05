@@ -40,6 +40,7 @@
 namespace mongo {
 
     using std::string;
+    using std::stringstream;
     using std::vector;
 
     /**
@@ -56,6 +57,10 @@ namespace mongo {
 
         bool slaveOk() const {
             return false;
+        }
+
+        bool slaveOverrideOk() const {
+            return true;
         }
 
         virtual bool isWriteCommandForConfigServer() const { return false; }

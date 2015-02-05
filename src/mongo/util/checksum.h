@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
     /** a simple, rather dumb, but very fast checksum.  see perftests.cpp for unit tests. */

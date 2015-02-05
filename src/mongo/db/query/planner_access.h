@@ -211,8 +211,8 @@ namespace mongo {
         //
         // Indexed Data Access methods.
         //
-        // The inArrayOperator flag deserves some attention.  It is set when we're processing a child of
-        // a MatchExpression::ALL or MatchExpression::ELEM_MATCH_OBJECT.
+        // The inArrayOperator flag deserves some attention.  It is set when we're processing a
+        // child of an MatchExpression::ELEM_MATCH_OBJECT.
         //
         // When true, the following behavior changes for all methods below that take it as an argument:
         // 0. No deletion of MatchExpression(s).  In fact,
@@ -230,7 +230,8 @@ namespace mongo {
         static QuerySolutionNode* buildIndexedDataAccess(const CanonicalQuery& query,
                                                          MatchExpression* root,
                                                          bool inArrayOperator,
-                                                         const std::vector<IndexEntry>& indices);
+                                                         const std::vector<IndexEntry>& indices,
+                                                         const QueryPlannerParams& params);
 
         /**
          * Takes ownership of 'root'.
@@ -238,7 +239,8 @@ namespace mongo {
         static QuerySolutionNode* buildIndexedAnd(const CanonicalQuery& query,
                                                   MatchExpression* root,
                                                   bool inArrayOperator,
-                                                  const std::vector<IndexEntry>& indices);
+                                                  const std::vector<IndexEntry>& indices,
+                                                  const QueryPlannerParams& params);
 
         /**
          * Takes ownership of 'root'.
@@ -246,17 +248,18 @@ namespace mongo {
         static QuerySolutionNode* buildIndexedOr(const CanonicalQuery& query,
                                                  MatchExpression* root,
                                                  bool inArrayOperator,
-                                                 const std::vector<IndexEntry>& indices);
+                                                 const std::vector<IndexEntry>& indices,
+                                                 const QueryPlannerParams& params);
 
         /**
          * Traverses the tree rooted at the $elemMatch expression 'node',
          * finding all predicates that can use an index directly and returning
          * them in the out-parameter vector 'out'.
          *
-         * Traverses only through $and and array nodes like $all.
+         * Traverses only through AND and ELEM_MATCH_OBJECT nodes.
          *
          * Other nodes (i.e. nodes which cannot use an index directly, and which are
-         * neither $and nor array nodes) are returned in 'subnodesOut' if they are
+         * neither AND nor ELEM_MATCH_OBJECT) are returned in 'subnodesOut' if they are
          * tagged to use an index.
          */
         static void findElemMatchChildren(const MatchExpression* node,
@@ -280,6 +283,7 @@ namespace mongo {
                                       MatchExpression* root,
                                       bool inArrayOperator,
                                       const std::vector<IndexEntry>& indices,
+                                      const QueryPlannerParams& params,
                                       std::vector<QuerySolutionNode*>* out);
 
         /**
@@ -291,6 +295,7 @@ namespace mongo {
          */
         static bool processIndexScansSubnode(const CanonicalQuery& query,
                                              ScanBuildingState* scanState,
+                                             const QueryPlannerParams& params,
                                              std::vector<QuerySolutionNode*>* out);
 
         /**
@@ -301,6 +306,7 @@ namespace mongo {
          */
         static bool processIndexScansElemMatch(const CanonicalQuery& query,
                                                ScanBuildingState* scanState,
+                                               const QueryPlannerParams& params,
                                                std::vector<QuerySolutionNode*>* out);
 
         //

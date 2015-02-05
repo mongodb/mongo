@@ -56,13 +56,17 @@ namespace mongo {
                                      long long numRecordsIncrement );
 
         virtual void setStats( OperationContext* txn,
-                               long long dataSizeIncrement,
-                               long long numRecordsIncrement );
+                               long long dataSize,
+                               long long numRecords );
 
-        virtual const DiskLoc& deletedListEntry( int bucket ) const;
+        virtual DiskLoc deletedListEntry( int bucket ) const;
         virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc );
+
+        virtual DiskLoc deletedListLegacyGrabBag() const;
+        virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
+
         virtual void orphanDeletedList(OperationContext* txn);
 
         virtual const DiskLoc& firstExtent( OperationContext* txn ) const;
@@ -85,10 +89,6 @@ namespace mongo {
 
         virtual long long maxCappedDocs() const;
 
-        virtual double paddingFactor() const;
-
-        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor );
-
     protected:
 
         DiskLoc _capExtent;
@@ -108,6 +108,7 @@ namespace mongo {
         double _paddingFactor;
 
         std::vector<DiskLoc> _deletedLists;
+        DiskLoc _deletedListLegacyGrabBag;
     };
 
     class DummyExtentManager : public ExtentManager {
@@ -129,9 +130,13 @@ namespace mongo {
 
         virtual void freeExtent( OperationContext* txn, DiskLoc extent );
 
-        virtual void freeListStats( int* numExtents, int64_t* totalFreeSize ) const;
+        virtual void freeListStats(OperationContext* txn,
+                                   int* numExtents,
+                                   int64_t* totalFreeSizeBytes) const;
 
         virtual Record* recordForV1( const DiskLoc& loc ) const;
+
+        virtual RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const;
 
         virtual Extent* extentForV1( const DiskLoc& loc ) const;
 
@@ -179,6 +184,7 @@ namespace mongo {
     void initializeV1RS(OperationContext* txn,
                         const LocAndSize* records,
                         const LocAndSize* drecs,
+                        const LocAndSize* legacyGrabBag,
                         DummyExtentManager* em,
                         DummyRecordStoreV1MetaData* md);
 
@@ -192,6 +198,7 @@ namespace mongo {
     void assertStateV1RS(OperationContext* txn,
                          const LocAndSize* records,
                          const LocAndSize* drecs,
+                         const LocAndSize* legacyGrabBag,
                          const ExtentManager* em,
                          const DummyRecordStoreV1MetaData* md);
 

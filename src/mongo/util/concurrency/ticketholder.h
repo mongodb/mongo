@@ -1,4 +1,4 @@
-/*    Copyright 2009 10gen Inc.
+/*    Copyright 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,86 +26,52 @@
  */
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
-#include <iostream>
+#if defined(__linux__)
+#include <semaphore.h>
+#endif
 
+#include <boost/thread/condition_variable.hpp>
+
+#include "mongo/base/disallow_copying.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
     class TicketHolder {
+        MONGO_DISALLOW_COPYING(TicketHolder);
     public:
-        TicketHolder( int num ) : _mutex("TicketHolder") {
-            _outof = num;
-            _num = num;
-        }
+        explicit TicketHolder(int num);
+        ~TicketHolder();
 
-        bool tryAcquire() {
-            scoped_lock lk( _mutex );
-            return _tryAcquire();
-        }
+        bool tryAcquire();
 
-        void waitForTicket() {
-            scoped_lock lk( _mutex );
+        void waitForTicket();
 
-            while( ! _tryAcquire() ) {
-                _newTicket.wait( lk.boost() );
-            }
-        }
+        void release();
 
-        void release() {
-            {
-                scoped_lock lk( _mutex );
-                _num++;
-            }
-            _newTicket.notify_one();
-        }
+        Status resize(int newSize);
 
-        void resize( int newSize ) {
-            {
-                scoped_lock lk( _mutex );
+        int available() const;
 
-                int used = _outof - _num;
-                if ( used > newSize ) {
-                    std::cout << "can't resize since we're using (" << used << ") more than newSize(" << newSize << ")" << std::endl;
-                    return;
-                }
+        int used() const;
 
-                _outof = newSize;
-                _num = _outof - used;
-            }
-
-            // Potentially wasteful, but easier to see is correct
-            _newTicket.notify_all();
-        }
-
-        int available() const {
-            return _num;
-        }
-
-        int used() const {
-            return _outof - _num;
-        }
-
-        int outof() const { return _outof; }
+        int outof() const;
 
     private:
+#if defined(__linux__)
+        mutable sem_t _sem;
 
-        bool _tryAcquire(){
-            if ( _num <= 0 ) {
-                if ( _num < 0 ) {
-                    std::cerr << "DISASTER! in TicketHolder" << std::endl;
-                }
-                return false;
-            }
-            _num--;
-            return true;
-        }
+        // You can read _outof without a lock, but have to hold _resizeMutex to change.
+        AtomicInt32 _outof;
+        boost::mutex _resizeMutex;
+#else
+        bool _tryAcquire();
 
-        int _outof;
+        AtomicInt32 _outof;
         int _num;
         mongo::mutex _mutex;
         boost::condition_variable_any _newTicket;
+#endif
     };
 
     class ScopedTicket {
@@ -124,14 +90,31 @@ namespace mongo {
     };
 
     class TicketHolderReleaser {
+        MONGO_DISALLOW_COPYING(TicketHolderReleaser);
     public:
-        TicketHolderReleaser( TicketHolder * holder ) {
+        TicketHolderReleaser() {
+            _holder = NULL;
+        }
+
+        explicit TicketHolderReleaser(TicketHolder* holder) {
             _holder = holder;
         }
 
         ~TicketHolderReleaser() {
-            _holder->release();
+            if (_holder) {
+                _holder->release();
+            }
         }
+
+        bool hasTicket() const { return _holder != NULL; }
+
+        void reset(TicketHolder* holder = NULL) {
+            if (_holder) {
+                _holder->release();
+            }
+            _holder = holder;
+        }
+
     private:
         TicketHolder * _holder;
     };

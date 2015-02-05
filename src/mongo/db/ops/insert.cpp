@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using namespace mongoutils;
 
     StatusWith<BSONObj> fixDocumentForInsert( const BSONObj& doc ) {

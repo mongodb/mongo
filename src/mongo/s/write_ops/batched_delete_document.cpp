@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
         const BSONField<BSONObj> BatchedDeleteDocument::query("q");
         const BSONField<int> BatchedDeleteDocument::limit("limit");
@@ -58,6 +60,12 @@ namespace mongo {
 
         if (!_isLimitSet) {
             *errMsg = stream() << "missing " << limit.name() << " field";
+            return false;
+        }
+
+        if (_limit != 0 && _limit != 1) {
+            *errMsg = stream() << "specify either a 0 to delete all"
+                               << "matching documents or 1 to delete a single document";
             return false;
         }
 

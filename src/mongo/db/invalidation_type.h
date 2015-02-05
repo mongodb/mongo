@@ -31,11 +31,11 @@
 namespace mongo {
 
     enum InvalidationType {
-        // The DiskLoc is about to be deleted.  The receiver of this invalidate call cannot use
-        // the DiskLoc after it returns from the invalidate.
+        // The RecordId is about to be deleted.  The receiver of this invalidate call cannot use
+        // the RecordId after it returns from the invalidate.
         INVALIDATION_DELETION,
 
-        // The DiskLoc's contents are about to change.
+        // The RecordId's contents are about to change.
         INVALIDATION_MUTATION,
     };
 

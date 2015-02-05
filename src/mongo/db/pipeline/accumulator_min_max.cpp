@@ -26,12 +26,14 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
 
     void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
         // nullish values should have no impact on result

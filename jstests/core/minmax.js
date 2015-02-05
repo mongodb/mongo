@@ -52,3 +52,36 @@ if ( 0 ) { // SERVER-3766
 reverseResult = t.find().min( { a:6 } ).max( { a:3 } ).sort( { a:-1 } ).hint( { a:1 } ).toArray();
 assert.eq( [ { _id:6, a:6 }, { _id:5, a:5 }, { _id:4, a:4 } ], reverseResult );
 }
+
+//
+// SERVER-15015.
+//
+
+// Test ascending index.
+t.drop();
+t.ensureIndex({a: 1});
+t.insert({a: 3});
+t.insert({a: 4});
+t.insert({a: 5});
+
+var cursor = t.find().min({a: 4});
+assert.eq(4, cursor.next()["a"]);
+assert.eq(5, cursor.next()["a"]);
+assert(!cursor.hasNext());
+
+cursor = t.find().max({a: 4});
+assert.eq(3, cursor.next()["a"]);
+assert(!cursor.hasNext());
+
+// Test descending index.
+t.dropIndexes();
+t.ensureIndex({a: -1});
+
+cursor = t.find().min({a: 4});
+assert.eq(4, cursor.next()["a"]);
+assert.eq(3, cursor.next()["a"]);
+assert(!cursor.hasNext());
+
+cursor = t.find().max({a: 4});
+assert.eq(5, cursor.next()["a"]);
+assert(!cursor.hasNext());

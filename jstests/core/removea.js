@@ -8,12 +8,20 @@ Random.setRandomSeed();
 for( v = 0; v < 2; ++v ) { // Try each index version.
     t.drop();
     t.ensureIndex( { a:1 }, { v:v } );
-    for( i = 0; i < 10000; ++i ) {
-        t.save( { a:i } );
+    S = 100;
+    B = 100;
+    for ( var x = 0; x < S; x++ ) {
+        var batch = [];
+        for ( var y = 0; y < B; y++ ) {
+            var i = y + ( B * x );
+            batch.push( { a : i } );
+        }
+        t.insert( batch );
     }
-    
+    assert.eq( t.count(), S * B );
+
     toDrop = [];
-    for( i = 0; i < 10000; ++i ) {
+    for( i = 0; i < S * B ; ++i ) {
         toDrop.push( Random.randInt( 10000 ) ); // Dups in the query will be ignored.
     }
     // Remove many of the documents; $atomic prevents use of a ClientCursor, which would invoke a

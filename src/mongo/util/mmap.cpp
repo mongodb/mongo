@@ -27,7 +27,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/mmap.h"
 
@@ -35,6 +37,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
@@ -42,6 +45,13 @@
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     void minOSPageSizeBytesTest(size_t minOSPageSizeBytes) {
         fassert( 16325, minOSPageSizeBytes > 0 );

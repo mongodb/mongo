@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include <malloc.h>
 #include <iostream>
 #include <stdio.h>
@@ -38,6 +40,7 @@
 #include "processinfo.h"
 #include "boost/filesystem.hpp"
 #include <mongo/util/file.h>
+#include "mongo/util/log.h"
 
 using namespace std;
 
@@ -57,7 +60,6 @@ namespace mongo {
                 stringstream ss;
                 ss << "couldn't open [" << name << "] " << errnoWithDescription();
                 string s = ss.str();
-                // help the assert# control uasserted( 13538 , s.c_str() );
                 msgassertedNoTrace( 13538 , s.c_str() );
             }
             int found = fscanf(f,

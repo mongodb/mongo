@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
@@ -35,6 +35,10 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using std::string;
+    using std::vector;
 
     /** Helper class to unwind array from a single document. */
     class DocumentSourceUnwind::Unwinder {

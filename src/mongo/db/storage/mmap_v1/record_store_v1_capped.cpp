@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 
 #include "mongo/db/operation_context_impl.h"
@@ -35,6 +37,7 @@
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped_iterator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -57,6 +60,11 @@
 #define DDD(x)
 
 namespace mongo {
+
+    using std::dec;
+    using std::endl;
+    using std::hex;
+    using std::vector;
 
     CappedRecordStoreV1::CappedRecordStoreV1( OperationContext* txn,
                                               CappedDocumentDeleteCallback* collection,
@@ -95,7 +103,7 @@ namespace mongo {
             // since we have to iterate all the extents (for now) to get
             // storage size
             if ( lenToAlloc > storageSize(txn) ) {
-                return StatusWith<DiskLoc>( ErrorCodes::BadValue,
+                return StatusWith<DiskLoc>( ErrorCodes::DocTooLargeForCapped,
                                             mongoutils::str::stream()
                                             << "document is larger than capped size "
                                             << lenToAlloc << " > " << storageSize(txn),
@@ -112,11 +120,6 @@ namespace mongo {
 
             invariant( lenToAlloc < 400000000 );
             int passes = 0;
-            int maxPasses = ( lenToAlloc / 30 ) + 2; // 30 is about the smallest entry that could go in the oplog
-            if ( maxPasses < 5000 ) {
-                // this is for bacwards safety since 5000 was the old value
-                maxPasses = 5000;
-            }
 
             // delete records until we have room and the max # objects limit achieved.
 
@@ -124,7 +127,7 @@ namespace mongo {
             //invariant( theCapExtent()->ns == ns );
 
             theCapExtent()->assertOk();
-            DiskLoc firstEmptyExtent;
+            DiskLoc firstEmptyExtent; // This prevents us from infinite looping.
             while ( 1 ) {
                 if ( _details->numRecords() < _details->maxCappedDocs() ) {
                     loc = __capAlloc( txn, lenToAlloc );
@@ -155,30 +158,35 @@ namespace mongo {
                         firstEmptyExtent = _details->capExtent();
                     advanceCapExtent( txn, _ns );
                     if ( firstEmptyExtent == _details->capExtent() ) {
+                        // All records have been deleted but there is still no room for this record.
+                        // Nothing we can do but fail.
                         _maybeComplain( txn, lenToAlloc );
-                        return StatusWith<DiskLoc>( ErrorCodes::InternalError,
-                                                    "no space in capped collection" );
+                        return StatusWith<DiskLoc>(
+                            ErrorCodes::DocTooLargeForCapped,
+                            str::stream() << "document doesn't fit in capped collection."
+                                          << " size: " << lenToAlloc
+                                          << " storageSize:" << storageSize(txn),
+                            28575);
                     }
                     continue;
                 }
 
-                DiskLoc fr = theCapExtent()->firstRecord;
-                Status status = _deleteCallback->aboutToDeleteCapped( txn, fr );
+                const RecordId fr = theCapExtent()->firstRecord.toRecordId();
+                Status status = _deleteCallback->aboutToDeleteCapped( txn, fr, dataFor(txn, fr) );
                 if ( !status.isOK() )
                     return StatusWith<DiskLoc>( status );
                 deleteRecord( txn, fr );
 
-                compact(txn);
-                if( ++passes > maxPasses ) {
+                _compact(txn);
+                if ((++passes % 5000) == 0) {
                     StringBuilder sb;
-                    sb << "passes >= maxPasses in CappedRecordStoreV1::cappedAlloc: ns: " << _ns
-                       << ", lenToAlloc: " << lenToAlloc
-                       << ", maxPasses: " << maxPasses
-                       << ", _maxDocsInCapped: " << _details->maxCappedDocs()
-                       << ", nrecords: " << _details->numRecords()
-                       << ", datasize: " << _details->dataSize();
-
-                    return StatusWith<DiskLoc>( ErrorCodes::InternalError, sb.str() );
+                    log() << "passes = " << passes << " in CappedRecordStoreV1::allocRecord:"
+                          << " ns: " << _ns
+                          << ", lenToAlloc: " << lenToAlloc
+                          << ", maxCappedDocs: " << _details->maxCappedDocs()
+                          << ", nrecords: " << _details->numRecords()
+                          << ", datasize: " << _details->dataSize()
+                          << ". Continuing to delete old records to make room.";
                 }
             }
 
@@ -226,7 +234,7 @@ namespace mongo {
         // nIndexes preserve 0
         // capped preserve true
         // max preserve
-        _details->setPaddingFactor( txn, 1.0 );
+        // paddingFactor is unused
         _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
         setLastDelRecLastExtent( txn, DiskLoc().setInvalid() );
         // dataFileVersion preserve
@@ -249,9 +257,9 @@ namespace mongo {
     }
 
     void CappedRecordStoreV1::temp_cappedTruncateAfter( OperationContext* txn,
-                                                        DiskLoc end,
+                                                        RecordId end,
                                                         bool inclusive ) {
-        cappedTruncateAfter( txn, _ns.c_str(), end, inclusive );
+        cappedTruncateAfter( txn, _ns.c_str(), DiskLoc::fromRecordId(end), inclusive );
     }
 
     /* combine adjacent deleted records *for the current extent* of the capped collection
@@ -259,7 +267,7 @@ namespace mongo {
        this is O(n^2) but we call it for capped tables where typically n==1 or 2!
        (or 3...there will be a little unused sliver at the end of the extent.)
     */
-    void CappedRecordStoreV1::compact(OperationContext* txn) {
+    void CappedRecordStoreV1::_compact(OperationContext* txn) {
         DDD( "CappedRecordStoreV1::compact enter" );
 
         vector<DiskLoc> drecs;
@@ -307,7 +315,7 @@ namespace mongo {
 
     }
 
-    const DiskLoc &CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
+    DiskLoc CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
         if ( cappedLastDelRecLastExtent().isNull() )
             return cappedListOfAllDeletedRecords();
         else
@@ -325,6 +333,7 @@ namespace mongo {
     void CappedRecordStoreV1::cappedCheckMigrate(OperationContext* txn) {
         // migrate old RecordStoreV1MetaData format
         if ( _details->capExtent().a() == 0 && _details->capExtent().getOfs() == 0 ) {
+            WriteUnitOfWork wunit(txn);
             _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
             // put all the DeletedRecords in cappedListOfAllDeletedRecords()
             for ( int i = 1; i < Buckets; ++i ) {
@@ -341,6 +350,7 @@ namespace mongo {
 
             // Last, in case we're killed before getting here
             _details->setCapExtent( txn, _details->firstExtent(txn) );
+            wunit.commit();
         }
     }
 
@@ -454,9 +464,9 @@ namespace mongo {
                 // 'end' has been found and removed, so break.
                 break;
             }
-            txn->recoveryUnit()->commitIfNeeded();
             // 'curr' will point to the newest document in the collection.
-            DiskLoc curr = theCapExtent()->lastRecord;
+            const DiskLoc curr = theCapExtent()->lastRecord;
+            const RecordId currId = curr.toRecordId();
             invariant( !curr.isNull() );
             if ( curr == end ) {
                 if ( inclusive ) {
@@ -474,12 +484,13 @@ namespace mongo {
             // this case instead of asserting.
             uassert( 13415, "emptying the collection is not allowed", _details->numRecords() > 1 );
 
+            WriteUnitOfWork wunit(txn);
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
-            Status status = _deleteCallback->aboutToDeleteCapped( txn, curr );
+            Status status = _deleteCallback->aboutToDeleteCapped(txn, currId, dataFor(txn, currId));
             uassertStatusOK( status );
-            deleteRecord( txn, curr );
-            compact(txn);
+            deleteRecord( txn, currId );
+            _compact(txn);
 
             // This is the case where we have not yet had to remove any
             // documents to make room for other documents, and we are allocating
@@ -501,6 +512,7 @@ namespace mongo {
                     // update cappedLastDelRecLastExtent()
                     cappedTruncateLastDelUpdate(txn);
                 }
+                wunit.commit();
                 continue;
             }
 
@@ -538,10 +550,12 @@ namespace mongo {
                 // update cappedLastDelRecLastExtent()
                 cappedTruncateLastDelUpdate(txn);
             }
+
+            wunit.commit();
         }
     }
 
-    const DiskLoc& CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
+    DiskLoc CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
         return _details->deletedListEntry(0);
     }
 
@@ -550,7 +564,7 @@ namespace mongo {
         return _details->setDeletedListEntry(txn, 0, loc);
     }
 
-    const DiskLoc& CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
+    DiskLoc CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
         return _details->deletedListEntry(1);
     }
 
@@ -582,15 +596,14 @@ namespace mongo {
         else {
             d->nextDeleted() = cappedFirstDeletedInCurExtent();
             setFirstDeletedInCurExtent( txn, dloc );
-            // always compact() after this so order doesn't matter
+            // always _compact() after this so order doesn't matter
         }
     }
 
     RecordIterator* CappedRecordStoreV1::getIterator( OperationContext* txn,
-                                                      const DiskLoc& start,
-                                                      bool tailable,
+                                                      const RecordId& start,
                                                       const CollectionScanParams::Direction& dir) const {
-        return new CappedRecordStoreV1Iterator( txn, this, start, tailable, dir );
+        return new CappedRecordStoreV1Iterator( txn, this, start, false, dir );
     }
 
     vector<RecordIterator*> CappedRecordStoreV1::getManyIterators( OperationContext* txn ) const {
@@ -650,18 +663,11 @@ namespace mongo {
         return iterators.release();
     }
 
-    Status CappedRecordStoreV1::compact( OperationContext* txn,
-                                         RecordStoreCompactAdaptor* adaptor,
-                                         const CompactOptions* options,
-                                         CompactStats* stats ) {
-        invariant(false);
-    }
-
     void CappedRecordStoreV1::_maybeComplain( OperationContext* txn, int len ) const {
         RARELY {
             std::stringstream buf;
             buf << "couldn't make room for record len: " << len << " in capped ns " << _ns << '\n';
-            buf << "numRecords: " << numRecords() << '\n';
+            buf << "numRecords: " << numRecords(txn) << '\n';
             int i = 0;
             for ( DiskLoc e = _details->firstExtent(txn);
                   !e.isNull();

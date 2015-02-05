@@ -183,7 +183,7 @@ namespace mongo {
         std::vector<ChildWriteOp*> _childOps;
 
         // filled when state == _Error
-        scoped_ptr<WriteErrorDetail> _error;
+        boost::scoped_ptr<WriteErrorDetail> _error;
 
         // Finished child operations, for debugging
         std::vector<ChildWriteOp*> _history;
@@ -210,10 +210,10 @@ namespace mongo {
         TargetedWrite* pendingWrite;
 
         // filled when state > _Pending
-        scoped_ptr<ShardEndpoint> endpoint;
+        boost::scoped_ptr<ShardEndpoint> endpoint;
 
         // filled when state == _Error or (optionally) when state == _Cancelled
-        scoped_ptr<WriteErrorDetail> error;
+        boost::scoped_ptr<WriteErrorDetail> error;
     };
 
     // First value is write item index in the batch, second value is child write op index

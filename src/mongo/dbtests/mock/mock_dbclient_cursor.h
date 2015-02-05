@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientmockcursor.h"
 

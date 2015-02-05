@@ -29,7 +29,7 @@
 #include "mongo/db/geo/geometry_container.h"
 
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -45,6 +45,7 @@ namespace mongo {
 
     bool GeometryContainer::supportsContains() const {
         return NULL != _polygon
+               || NULL != _box
                || NULL != _cap
                || NULL != _multiPolygon
                || (NULL != _geometryCollection
@@ -55,7 +56,7 @@ namespace mongo {
     bool GeometryContainer::hasS2Region() const {
         return (NULL != _point && _point->crs == SPHERE)
                || NULL != _line
-               || (NULL != _polygon && _polygon->crs == SPHERE)
+               || (NULL != _polygon && (_polygon->crs == SPHERE || _polygon->crs == STRICT_SPHERE))
                || (NULL != _cap && _cap->crs == SPHERE)
                || NULL != _multiPoint
                || NULL != _multiLine
@@ -68,8 +69,10 @@ namespace mongo {
             return _point->cell;
         } else if (NULL != _line) {
             return _line->line;
-        } else if (NULL != _polygon && SPHERE == _polygon->crs) {
-            return _polygon->polygon;
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return *_polygon->s2Polygon;
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return *_polygon->bigPolygon;
         } else if (NULL != _cap && SPHERE == _cap->crs) {
             return _cap->cap;
         } else if (NULL != _multiPoint) {
@@ -286,7 +289,8 @@ namespace mongo {
         }
 
         if (NULL != otherContainer._polygon) {
-            return contains(otherContainer._polygon->polygon);
+            invariant(NULL != otherContainer._polygon->s2Polygon);
+            return contains(*otherContainer._polygon->s2Polygon);
         }
 
         if (NULL != otherContainer._multiPoint) {
@@ -331,7 +335,7 @@ namespace mongo {
 
             const vector<PolygonWithCRS*>& polys = c.polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (!contains(polys[i]->polygon)) { return false; }
+                if (!contains(*polys[i]->s2Polygon)) { return false; }
             }
 
             const vector<MultiPointWithCRS*>& multipoints = c.multiPoints.vector();
@@ -372,8 +376,14 @@ namespace mongo {
     }
 
     bool GeometryContainer::contains(const S2Cell& otherCell, const S2Point& otherPoint) const {
-        if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return containsPoint(_polygon->polygon, otherCell, otherPoint);
+        if (NULL != _polygon && (NULL != _polygon->s2Polygon)) {
+            return containsPoint(*_polygon->s2Polygon, otherCell, otherPoint);
+        }
+
+        if (NULL != _polygon && (NULL != _polygon->bigPolygon)) {
+            if (_polygon->bigPolygon->Contains(otherPoint))
+                return true;
+            return _polygon->bigPolygon->MayIntersect(otherCell);
         }
 
         if (NULL != _cap && (_cap->crs == SPHERE)) {
@@ -390,9 +400,9 @@ namespace mongo {
         if (NULL != _geometryCollection) {
             const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (containsPoint(polys[i]->polygon, otherCell, otherPoint)) { return true; }
+                if (containsPoint(*polys[i]->s2Polygon, otherCell, otherPoint)) { return true; }
             }
-            
+
             const vector<MultiPolygonWithCRS*>& multipolys =_geometryCollection->multiPolygons.vector();
             for (size_t i = 0; i < multipolys.size(); ++i) {
                 const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
@@ -424,8 +434,12 @@ namespace mongo {
     }
 
     bool GeometryContainer::contains(const S2Polyline& otherLine) const {
-        if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return containsLine(_polygon->polygon, otherLine);
+        if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return containsLine(*_polygon->s2Polygon, otherLine);
+        }
+
+        if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Contains(otherLine);
         }
 
         if (NULL != _multiPolygon) {
@@ -438,9 +452,9 @@ namespace mongo {
         if (NULL != _geometryCollection) {
             const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (containsLine(polys[i]->polygon, otherLine)) { return true; }
+                if (containsLine(*polys[i]->s2Polygon, otherLine)) { return true; }
             }
-            
+
             const vector<MultiPolygonWithCRS*>& multipolys =_geometryCollection->multiPolygons.vector();
             for (size_t i = 0; i < multipolys.size(); ++i) {
                 const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
@@ -458,8 +472,12 @@ namespace mongo {
     }
 
     bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
-        if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return containsPolygon(_polygon->polygon, otherPolygon);
+        if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return containsPolygon(*_polygon->s2Polygon, otherPolygon);
+        }
+
+        if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Contains(otherPolygon);
         }
 
         if (NULL != _multiPolygon) {
@@ -472,9 +490,9 @@ namespace mongo {
         if (NULL != _geometryCollection) {
             const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
             for (size_t i = 0; i < polys.size(); ++i) {
-                if (containsPolygon(polys[i]->polygon, otherPolygon)) { return true; }
+                if (containsPolygon(*polys[i]->s2Polygon, otherPolygon)) { return true; }
             }
-            
+
             const vector<MultiPolygonWithCRS*>& multipolys =_geometryCollection->multiPolygons.vector();
             for (size_t i = 0; i < multipolys.size(); ++i) {
                 const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
@@ -493,8 +511,8 @@ namespace mongo {
         } else if (NULL != otherContainer._line) {
             return intersects(otherContainer._line->line);
         } else if (NULL != otherContainer._polygon) {
-            if (SPHERE != otherContainer._polygon->crs) { return false; }
-            return intersects(otherContainer._polygon->polygon);
+            if (NULL == otherContainer._polygon->s2Polygon) { return false; }
+            return intersects(*otherContainer._polygon->s2Polygon);
         } else if (NULL != otherContainer._multiPoint) {
             return intersects(*otherContainer._multiPoint);
         } else if (NULL != otherContainer._multiLine) {
@@ -509,7 +527,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (intersects(c.polygons.vector()[i]->polygon)) { return true; }
+                if (intersects(*c.polygons.vector()[i]->s2Polygon)) { return true; }
             }
 
             for (size_t i = 0; i < c.lines.vector().size(); ++i) {
@@ -559,8 +577,10 @@ namespace mongo {
             return _point->cell.MayIntersect(otherPoint);
         } else if (NULL != _line) {
             return _line->line.MayIntersect(otherPoint);
-        } else if (NULL != _polygon) {
-            return _polygon->polygon.MayIntersect(otherPoint);
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return _polygon->s2Polygon->MayIntersect(otherPoint);
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->MayIntersect(otherPoint);
         } else if (NULL != _multiPoint) {
             const vector<S2Cell>& cells = _multiPoint->cells;
             for (size_t i = 0; i < cells.size(); ++i) {
@@ -584,7 +604,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (c.polygons.vector()[i]->polygon.MayIntersect(otherPoint)) { return true; }
+                if (c.polygons.vector()[i]->s2Polygon->MayIntersect(otherPoint)) { return true; }
             }
 
             for (size_t i = 0; i < c.lines.vector().size(); ++i) {
@@ -633,8 +653,10 @@ namespace mongo {
             return otherLine.MayIntersect(_point->cell);
         } else if (NULL != _line) {
             return otherLine.Intersects(&_line->line);
-        } else if (NULL != _polygon && (_polygon->crs == SPHERE)) {
-            return polygonLineIntersection(otherLine, _polygon->polygon);
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return polygonLineIntersection(otherLine, *_polygon->s2Polygon);
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Intersects(otherLine);
         } else if (NULL != _multiPoint) {
             for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
                 if (otherLine.MayIntersect(_multiPoint->cells[i])) { return true; }
@@ -659,7 +681,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (polygonLineIntersection(otherLine, c.polygons.vector()[i]->polygon)) {
+                if (polygonLineIntersection(otherLine, *c.polygons.vector()[i]->s2Polygon)) {
                     return true;
                 }
             }
@@ -703,8 +725,10 @@ namespace mongo {
             return otherPolygon.MayIntersect(_point->cell);
         } else if (NULL != _line) {
             return polygonLineIntersection(_line->line, otherPolygon);
-        } else if (NULL != _polygon) {
-            return otherPolygon.Intersects(&_polygon->polygon);
+        } else if (NULL != _polygon && NULL != _polygon->s2Polygon) {
+            return otherPolygon.Intersects(_polygon->s2Polygon.get());
+        } else if (NULL != _polygon && NULL != _polygon->bigPolygon) {
+            return _polygon->bigPolygon->Intersects(otherPolygon);
         } else if (NULL != _multiPoint) {
             for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
                 if (otherPolygon.MayIntersect(_multiPoint->cells[i])) { return true; }
@@ -729,7 +753,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-                if (otherPolygon.Intersects(&c.polygons.vector()[i]->polygon)) {
+                if (otherPolygon.Intersects(c.polygons.vector()[i]->s2Polygon.get())) {
                     return true;
                 }
             }
@@ -773,88 +797,182 @@ namespace mongo {
         return false;
     }
 
-    bool GeometryContainer::parseFrom(const BSONObj& obj) {
+    Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj) {
+        GeoParser::GeoJSONType type = GeoParser::parseGeoJSONType(obj);
 
-        if (GeoParser::isPolygon(obj)) {
-            // We can't really pass these things around willy-nilly except by ptr.
-            _polygon.reset(new PolygonWithCRS());
-            if (!GeoParser::parsePolygon(obj, _polygon.get())) { return false; }
-        } else if (GeoParser::isIndexablePoint(obj)) {
+        if (GeoParser::GEOJSON_UNKNOWN == type) {
+            return Status(ErrorCodes::BadValue, str::stream() << "unknown GeoJSON type: " << obj);
+        }
+
+        Status status = Status::OK();
+        vector<S2Region*> regions;
+
+        if (GeoParser::GEOJSON_POINT == type) {
             _point.reset(new PointWithCRS());
-            if (!GeoParser::parsePoint(obj, _point.get())) { return false; }
-        } else if (GeoParser::isLine(obj)) {
+            status = GeoParser::parseGeoJSONPoint(obj, _point.get());
+        } else if (GeoParser::GEOJSON_LINESTRING == type) {
             _line.reset(new LineWithCRS());
-            if (!GeoParser::parseLine(obj, _line.get())) { return false; }
-        } else if (GeoParser::isBox(obj)) {
-            _box.reset(new BoxWithCRS());
-            if (!GeoParser::parseBox(obj, _box.get())) { return false; }
-        } else if (GeoParser::isCap(obj)) {
-            _cap.reset(new CapWithCRS());
-            if (!GeoParser::parseCap(obj, _cap.get())) { return false; }
-        } else if (GeoParser::isMultiPoint(obj)) {
+            status = GeoParser::parseGeoJSONLine(obj, _line.get());
+        } else if (GeoParser::GEOJSON_POLYGON == type) {
+            _polygon.reset(new PolygonWithCRS());
+            status = GeoParser::parseGeoJSONPolygon(obj, _polygon.get());
+        } else if (GeoParser::GEOJSON_MULTI_POINT == type) {
             _multiPoint.reset(new MultiPointWithCRS());
-            if (!GeoParser::parseMultiPoint(obj, _multiPoint.get())) { return false; }
-            _s2Region.reset(new S2RegionUnion());
+            status = GeoParser::parseMultiPoint(obj, _multiPoint.get());
             for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
-                _s2Region->Add(&_multiPoint->cells[i]);
+                regions.push_back(&_multiPoint->cells[i]);
             }
-        } else if (GeoParser::isMultiLine(obj)) {
+        } else if (GeoParser::GEOJSON_MULTI_LINESTRING == type) {
             _multiLine.reset(new MultiLineWithCRS());
-            if (!GeoParser::parseMultiLine(obj, _multiLine.get())) { return false; }
-            _s2Region.reset(new S2RegionUnion());
-            for (size_t i = 0; i < _multiLine->lines.vector().size(); ++i) {
-                _s2Region->Add(_multiLine->lines.vector()[i]);
+            status = GeoParser::parseMultiLine(obj, _multiLine.get());
+            for (size_t i = 0; i < _multiLine->lines.size(); ++i) {
+                regions.push_back(_multiLine->lines[i]);
             }
-        } else if (GeoParser::isMultiPolygon(obj)) {
+        } else if (GeoParser::GEOJSON_MULTI_POLYGON == type) {
             _multiPolygon.reset(new MultiPolygonWithCRS());
-            if (!GeoParser::parseMultiPolygon(obj, _multiPolygon.get())) { return false; }
-            _s2Region.reset(new S2RegionUnion());
-            for (size_t i = 0; i < _multiPolygon->polygons.vector().size(); ++i) {
-                _s2Region->Add(_multiPolygon->polygons.vector()[i]);
+            status = GeoParser::parseMultiPolygon(obj, _multiPolygon.get());
+            for (size_t i = 0; i < _multiPolygon->polygons.size(); ++i) {
+                regions.push_back(_multiPolygon->polygons[i]);
             }
-        } else if (GeoParser::isGeometryCollection(obj)) {
+        } else if (GeoParser::GEOJSON_GEOMETRY_COLLECTION == type) {
             _geometryCollection.reset(new GeometryCollection());
-            if (!GeoParser::parseGeometryCollection(obj, _geometryCollection.get())) {
-                return false;
-            }
-            _s2Region.reset(new S2RegionUnion());
+            status = GeoParser::parseGeometryCollection(obj, _geometryCollection.get());
+
+            // Add regions
             for (size_t i = 0; i < _geometryCollection->points.size(); ++i) {
-                _s2Region->Add(&_geometryCollection->points[i].cell);
+                regions.push_back(&_geometryCollection->points[i].cell);
             }
-            for (size_t i = 0; i < _geometryCollection->lines.vector().size(); ++i) {
-                _s2Region->Add(&_geometryCollection->lines.vector()[i]->line);
+            for (size_t i = 0; i < _geometryCollection->lines.size(); ++i) {
+                regions.push_back(&_geometryCollection->lines[i]->line);
             }
-            for (size_t i = 0; i < _geometryCollection->polygons.vector().size(); ++i) {
-                _s2Region->Add(&_geometryCollection->polygons.vector()[i]->polygon);
+            for (size_t i = 0; i < _geometryCollection->polygons.size(); ++i) {
+                regions.push_back(_geometryCollection->polygons[i]->s2Polygon.get());
             }
-            for (size_t i = 0; i < _geometryCollection->multiPoints.vector().size(); ++i) {
-                MultiPointWithCRS* multiPoint = _geometryCollection->multiPoints.vector()[i];
+            for (size_t i = 0; i < _geometryCollection->multiPoints.size(); ++i) {
+                MultiPointWithCRS* multiPoint = _geometryCollection->multiPoints[i];
                 for (size_t j = 0; j < multiPoint->cells.size(); ++j) {
-                    _s2Region->Add(&multiPoint->cells[j]);
+                    regions.push_back(&multiPoint->cells[j]);
                 }
             }
-            for (size_t i = 0; i < _geometryCollection->multiLines.vector().size(); ++i) {
-                const MultiLineWithCRS* multiLine = _geometryCollection->multiLines.vector()[i];
-                for (size_t j = 0; j < multiLine->lines.vector().size(); ++j) {
-                    _s2Region->Add(multiLine->lines.vector()[j]);
+            for (size_t i = 0; i < _geometryCollection->multiLines.size(); ++i) {
+                const MultiLineWithCRS* multiLine = _geometryCollection->multiLines[i];
+                for (size_t j = 0; j < multiLine->lines.size(); ++j) {
+                    regions.push_back(multiLine->lines[j]);
                 }
             }
-            for (size_t i = 0; i < _geometryCollection->multiPolygons.vector().size(); ++i) {
-                const MultiPolygonWithCRS* multiPolygon =
-                    _geometryCollection->multiPolygons.vector()[i];
-                for (size_t j = 0; j < multiPolygon->polygons.vector().size(); ++j) {
-                    _s2Region->Add(multiPolygon->polygons.vector()[j]);
+            for (size_t i = 0; i < _geometryCollection->multiPolygons.size(); ++i) {
+                const MultiPolygonWithCRS* multiPolygon = _geometryCollection->multiPolygons[i];
+                for (size_t j = 0; j < multiPolygon->polygons.size(); ++j) {
+                    regions.push_back(multiPolygon->polygons[j]);
                 }
             }
         } else {
-            return false;
+            // Should not reach here.
+            invariant(false);
         }
 
-        // If we support R2 regions, build the region immediately
-        if (hasR2Region())
-            _r2Region.reset(new R2BoxRegion(this));
+        // Check parsing result.
+        if (!status.isOK()) return status;
 
-        return true;
+        if (regions.size() > 0) {
+            // S2RegionUnion doesn't take ownership of pointers.
+            _s2Region.reset(new S2RegionUnion(&regions));
+        }
+
+        return Status::OK();
+    }
+
+    // Examples:
+    // { $geoWithin : { $geometry : <GeoJSON> } }
+    // { $geoIntersects : { $geometry : <GeoJSON> } }
+    // { $geoWithin : { $box : [[x1, y1], [x2, y2]] } }
+    // { $geoWithin : { $polygon : [[x1, y1], [x1, y2], [x2, y2], [x2, y1]] } }
+    // { $geoWithin : { $center : [[x1, y1], r], } }
+    // { $geoWithin : { $centerSphere : [[x, y], radius] } }
+    // { $geoIntersects : { $geometry : [1, 2] } }
+    //
+    // "elem" is the first element of the object after $geoWithin / $geoIntersects predicates.
+    // i.e. { $box: ... }, { $geometry: ... }
+    Status GeometryContainer::parseFromQuery(const BSONElement& elem) {
+        // Check elem is an object and has geo specifier.
+        GeoParser::GeoSpecifier specifier = GeoParser::parseGeoSpecifier(elem);
+
+        if (GeoParser::UNKNOWN == specifier) {
+            // Cannot parse geo specifier.
+            return Status(ErrorCodes::BadValue, str::stream() << "unknown geo specifier: " << elem);
+        }
+
+        Status status = Status::OK();
+        BSONObj obj = elem.Obj();
+        if (GeoParser::BOX == specifier) {
+            _box.reset(new BoxWithCRS());
+            status = GeoParser::parseLegacyBox(obj, _box.get());
+        } else if (GeoParser::CENTER == specifier) {
+            _cap.reset(new CapWithCRS());
+            status = GeoParser::parseLegacyCenter(obj, _cap.get());
+        } else if (GeoParser::POLYGON == specifier) {
+            _polygon.reset(new PolygonWithCRS());
+            status = GeoParser::parseLegacyPolygon(obj, _polygon.get());
+        } else if (GeoParser::CENTER_SPHERE == specifier) {
+            _cap.reset(new CapWithCRS());
+            status = GeoParser::parseCenterSphere(obj, _cap.get());
+        } else if (GeoParser::GEOMETRY == specifier) {
+            // GeoJSON geometry or legacy point
+            if (Array == elem.type() || obj.firstElement().isNumber()) {
+                // legacy point
+                _point.reset(new PointWithCRS());
+                status = GeoParser::parseQueryPoint(elem, _point.get());
+            } else {
+                // GeoJSON geometry
+                status = parseFromGeoJSON(obj);
+            }
+        }
+        if (!status.isOK()) return status;
+
+        // If we support R2 regions, build the region immediately
+        if (hasR2Region()) {
+            _r2Region.reset(new R2BoxRegion(this));
+        }
+
+        return status;
+    }
+
+    // Examples:
+    // { location: <GeoJSON> }
+    // { location: [1, 2] }
+    // { location: [1, 2, 3] }
+    // { location: {x: 1, y: 2} }
+    //
+    // "elem" is the element that contains geo data. e.g. "location": [1, 2]
+    // We need the type information to determine whether it's legacy point.
+    Status GeometryContainer::parseFromStorage(const BSONElement& elem) {
+        if (!elem.isABSONObj()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "geo element must be an array or object: " << elem);
+        }
+
+        BSONObj geoObj = elem.Obj();
+        Status status = Status::OK();
+        if (Array == elem.type() || geoObj.firstElement().isNumber()) {
+            // Legacy point
+            // { location: [1, 2] }
+            // { location: [1, 2, 3] }
+            // { location: {x: 1, y: 2} }
+            // { location: {x: 1, y: 2, type: "Point" } }
+            _point.reset(new PointWithCRS());
+            // Allow more than two dimensions or extra fields, like [1, 2, 3]
+            status = GeoParser::parseLegacyPoint(elem, _point.get(), true);
+        } else {
+            // GeoJSON
+            // { location: { type: "Point", coordinates: [...] } }
+            status = parseFromGeoJSON(elem.Obj());
+        }
+        if (!status.isOK()) return status;
+
+        // If we support R2 regions, build the region immediately
+        if (hasR2Region()) _r2Region.reset(new R2BoxRegion(this));
+
+        return Status::OK();
     }
 
     string GeometryContainer::getDebugType() const {
@@ -901,7 +1019,9 @@ namespace mongo {
         }
         else if (NULL != _line) { return _line->crs == otherCRS; }
         else if (NULL != _box) { return _box->crs == otherCRS; }
-        else if (NULL != _polygon) { return _polygon->crs == otherCRS; }
+        else if (NULL != _polygon) {
+            return ShapeProjection::supportsProject(*_polygon, otherCRS);
+        }
         else if (NULL != _cap ) { return _cap->crs == otherCRS; }
         else if (NULL != _multiPoint) { return _multiPoint->crs == otherCRS; }
         else if (NULL != _multiLine) { return _multiLine->crs == otherCRS; }
@@ -914,11 +1034,14 @@ namespace mongo {
 
     void GeometryContainer::projectInto(CRS otherCRS) {
 
-        if (otherCRS == getNativeCRS())
+        if (getNativeCRS() == otherCRS) return;
+
+        if (NULL != _polygon) {
+            ShapeProjection::projectInto(_polygon.get(), otherCRS);
             return;
+        }
 
         invariant(NULL != _point);
-
         ShapeProjection::projectInto(_point.get(), otherCRS);
     }
 
@@ -995,7 +1118,9 @@ namespace mongo {
             it != geometryCollection.polygons.vector().end(); ++it) {
 
             invariant(SPHERE == (*it)->crs);
-            double nextDistance = S2Distance::minDistanceRad(s2Point, (*it)->polygon);
+            // We don't support distances for big polygons yet.
+            invariant(NULL != (*it)->s2Polygon);
+            double nextDistance = S2Distance::minDistanceRad(s2Point, *((*it)->s2Polygon));
             if (minDistance < 0 || nextDistance < minDistance) {
                 minDistance = nextDistance;
             }
@@ -1060,7 +1185,9 @@ namespace mongo {
                 minDistance = S2Distance::minDistanceRad(otherPoint.point, _line->line);
             }
             else if (NULL != _polygon) {
-                minDistance = S2Distance::minDistanceRad(otherPoint.point, _polygon->polygon);
+                // We don't support distances for big polygons yet.
+                invariant(NULL != _polygon->s2Polygon);
+                minDistance = S2Distance::minDistanceRad(otherPoint.point, *_polygon->s2Polygon);
             }
             else if (NULL != _cap) {
                 minDistance = S2Distance::minDistanceRad(otherPoint.point, _cap->cap);

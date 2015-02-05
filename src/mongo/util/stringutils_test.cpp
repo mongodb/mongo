@@ -29,11 +29,12 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/bson/util/misc.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/hex.h"
 
 namespace mongo {
+
+    using std::string;
 
     TEST(Comparison, Basic) {
 

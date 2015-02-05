@@ -26,13 +26,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/query/stage_builder.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/count.h"
+#include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/geo_near.h"
@@ -49,8 +51,11 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
 
     PlanStage* buildStages(OperationContext* txn,
                            Collection* collection,
@@ -78,7 +83,7 @@ namespace mongo {
             IndexScanParams params;
 
             params.descriptor =
-                collection->getIndexCatalog()->findIndexByKeyPattern( ixn->indexKeyPattern );
+                collection->getIndexCatalog()->findIndexByKeyPattern( txn, ixn->indexKeyPattern );
             if ( params.descriptor == NULL ) {
                 warning() << "Can't find index " << ixn->indexKeyPattern.toString()
                           << "in namespace " << collection->ns() << endl;
@@ -95,7 +100,7 @@ namespace mongo {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
             PlanStage* childStage = buildStages(txn, collection, qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            return new FetchStage(ws, childStage, fn->filter.get(), collection);
+            return new FetchStage(txn, ws, childStage, fn->filter.get(), collection);
         }
         else if (STAGE_SORT == root->getType()) {
             const SortNode* sn = static_cast<const SortNode*>(root);
@@ -198,8 +203,8 @@ namespace mongo {
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByKeyPattern(node
-                ->indexKeyPattern);
+            IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByKeyPattern(txn,
+                                                                                              node->indexKeyPattern);
 
             if (twoDIndex == NULL) {
                 warning() << "Can't find 2D index " << node->indexKeyPattern.toString()
@@ -207,11 +212,7 @@ namespace mongo {
                 return NULL;
             }
 
-            int numToReturn = node->numToReturn;
-            params.fullFilter = node->fullFilterExcludingNear.get();
-
             GeoNear2DStage* nearStage = new GeoNear2DStage(params, txn, ws, collection, twoDIndex);
-            nearStage->setLimit(numToReturn);
 
             return nearStage;
         }
@@ -225,8 +226,8 @@ namespace mongo {
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByKeyPattern(node
-                ->indexKeyPattern);
+            IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByKeyPattern(txn,
+                                                                                            node->indexKeyPattern);
 
             if (s2Index == NULL) {
                 warning() << "Can't find 2DSphere index " << node->indexKeyPattern.toString()
@@ -244,7 +245,7 @@ namespace mongo {
                 return NULL;
             }
             vector<IndexDescriptor*> idxMatches;
-            collection->getIndexCatalog()->findIndexByType("text", idxMatches);
+            collection->getIndexCatalog()->findIndexByType(txn, "text", idxMatches);
             if (1 != idxMatches.size()) {
                 warning() << "No text index, or more than one text index";
                 return NULL;
@@ -263,7 +264,8 @@ namespace mongo {
                                            ? fam->getSpec().defaultLanguage().str()
                                            : node->language);
 
-            Status parseStatus = params.query.parse(node->query, language);
+            Status parseStatus = params.query.parse(node->query, language,
+                                                    fam->getSpec().getTextIndexVersion());
             if (!parseStatus.isOK()) {
                 warning() << "Can't parse text search query";
                 return NULL;
@@ -295,13 +297,13 @@ namespace mongo {
             DistinctParams params;
 
             params.descriptor =
-                collection->getIndexCatalog()->findIndexByKeyPattern(dn->indexKeyPattern);
+                collection->getIndexCatalog()->findIndexByKeyPattern(txn, dn->indexKeyPattern);
             params.direction = dn->direction;
             params.bounds = dn->bounds;
             params.fieldNo = dn->fieldNo;
             return new DistinctScan(txn, params, ws);
         }
-        else if (STAGE_COUNT == root->getType()) {
+        else if (STAGE_COUNT_SCAN == root->getType()) {
             const CountNode* cn = static_cast<const CountNode*>(root);
 
             if (NULL == collection) {
@@ -309,16 +311,16 @@ namespace mongo {
                 return NULL;
             }
 
-            CountParams params;
+            CountScanParams params;
 
             params.descriptor =
-                collection->getIndexCatalog()->findIndexByKeyPattern(cn->indexKeyPattern);
+                collection->getIndexCatalog()->findIndexByKeyPattern(txn, cn->indexKeyPattern);
             params.startKey = cn->startKey;
             params.startKeyInclusive = cn->startKeyInclusive;
             params.endKey = cn->endKey;
             params.endKeyInclusive = cn->endKeyInclusive;
 
-            return new Count(txn, params, ws);
+            return new CountScan(txn, params, ws);
         }
         else {
             mongoutils::str::stream ss;

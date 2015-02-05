@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/repl/oplogreader.h"
 
 /* replication data overview
@@ -50,7 +52,7 @@ namespace mongo {
 namespace repl {
 
     // Main entry point for master/slave at startup time.
-    void startMasterSlave();
+    void startMasterSlave(OperationContext* txn);
 
     // externed for use with resync.cpp
     extern volatile int relinquishSyncingSome;
@@ -75,7 +77,7 @@ namespace repl {
        not done (always use main for now).
     */
     class ReplSource {
-        shared_ptr<threadpool::ThreadPool> tp;
+        boost::shared_ptr<threadpool::ThreadPool> tp;
 
         void resync(OperationContext* txn, const std::string& dbName);
 
@@ -122,12 +124,9 @@ namespace repl {
 
         void forceResync(OperationContext* txn, const char *requester);
 
+        bool _connect(OplogReader* reader, const HostAndPort& host, const OID& myRID);
     public:
         OplogReader oplogReader;
-
-        // Returns the RID for this process.  ensureMe() must have been called before this can be.
-        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
-        OID getMyRID() const { return _me["_id"].OID(); }
 
         void applyOperation(OperationContext* txn, Database* db, const BSONObj& op);
         std::string hostName;    // ip addr or hostname plus optionally, ":<port>"
@@ -140,7 +139,7 @@ namespace repl {
 
         int nClonedThisPass;
 
-        typedef std::vector< shared_ptr< ReplSource > > SourceVector;
+        typedef std::vector< boost::shared_ptr< ReplSource > > SourceVector;
         static void loadAll(OperationContext* txn, SourceVector&);
 
         explicit ReplSource(OperationContext* txn, BSONObj);

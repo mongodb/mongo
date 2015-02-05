@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -55,7 +55,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         /**
          * ID Hack has a very strict criteria for the queries it supports.
@@ -75,6 +75,13 @@ namespace mongo {
         static const char* kStageType;
 
     private:
+        /**
+         * Marks this stage as done, optionally adds key metadata, and returns PlanStage::ADVANCED.
+         *
+         * Called whenever we have a WSM containing the matching obj.
+         */
+        StageState advance(WorkingSetID id, WorkingSetMember* member, WorkingSetID* out);
+
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
 
@@ -87,14 +94,17 @@ namespace mongo {
         // The value to match against the _id field.
         BSONObj _key;
 
-        // Did someone call kill() on us?
-        bool _killed;
-
         // Have we returned our one document?
         bool _done;
 
         // Do we need to add index key metadata for $returnKey?
         bool _addKeyMetadata;
+
+        // If we want to return a RecordId and it points to something that's not in memory,
+        // we return a "please page this in" result. We add a RecordFetcher given back to us by the
+        // storage engine to the WSM. The RecordFetcher is used by the PlanExecutor when it handles
+        // the fetch request.
+        WorkingSetID _idBeingPagedIn;
 
         CommonStats _commonStats;
         IDHackStats _specificStats;

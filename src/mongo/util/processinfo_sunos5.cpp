@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <iostream>
@@ -32,6 +34,7 @@
 #include <procfs.h>
 #include <stdio.h>
 #include <string>
+#include <sys/lgrp_user.h>
 #include <sys/mman.h>
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
@@ -39,8 +42,13 @@
 #include <vector>
 
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/stringutils.h"
+
+using namespace std;
 
 namespace mongo {
 
@@ -142,6 +150,36 @@ namespace mongo {
         cpuArch = unameData.machine;
         hasNuma = checkNumaEnabled();
 
+        // We prefer FSync over msync, when:
+        // 1. Pre-Oracle Solaris 11.2 releases
+        // 2. Illumos kernel releases (which is all non Oracle Solaris releases)
+        preferMsyncOverFSync = false;
+
+        if (mongoutils::str::startsWith(osName, "Oracle Solaris")) {
+
+            std::vector<std::string> versionComponents;
+            splitStringDelim(osVersion, &versionComponents, '.');
+
+            if (versionComponents.size() > 1) {
+                unsigned majorInt, minorInt;
+                Status majorStatus =
+                    parseNumberFromString<unsigned>(versionComponents[0], &majorInt);
+
+                Status minorStatus =
+                    parseNumberFromString<unsigned>(versionComponents[1], &minorInt);
+
+                if (!majorStatus.isOK() || !minorStatus.isOK()) {
+                    warning() << "Could not parse OS version numbers from uname: " << osVersion;
+                }
+                else if ((majorInt == 11 && minorInt >= 2) || majorInt > 11) {
+                    preferMsyncOverFSync = true;
+                }
+            }
+            else {
+                warning() << "Could not parse OS version string from uname: " << osVersion;
+            }
+        }
+
         BSONObjBuilder bExtra;
         bExtra.append("kernelVersion", unameData.release);
         bExtra.append("pageSize", static_cast<long long>(pageSize));
@@ -151,7 +189,24 @@ namespace mongo {
     }
 
     bool ProcessInfo::checkNumaEnabled() {
-        return false;
+        lgrp_cookie_t cookie = lgrp_init(LGRP_VIEW_OS);
+
+        if (cookie == LGRP_COOKIE_NONE) {
+            warning() << "lgrp_init failed: " << errnoWithDescription();
+            return false;
+        }
+
+        ON_BLOCK_EXIT(lgrp_fini, cookie);
+
+        int groups = lgrp_nlgrps(cookie);
+
+        if (groups == -1) {
+            warning() << "lgrp_nlgrps failed: " << errnoWithDescription();
+            return false;
+        }
+
+        // NUMA machines have more then 1 locality group
+        return groups > 1;
     }
 
     bool ProcessInfo::blockCheckSupported() {

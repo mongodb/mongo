@@ -94,7 +94,7 @@ namespace mongo {
         OpEntries _ops;
 
         struct PreparedState;
-        scoped_ptr<PreparedState> _preparedState;
+        boost::scoped_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

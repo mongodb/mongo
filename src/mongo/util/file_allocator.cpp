@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/file_allocator.h"
@@ -52,6 +54,8 @@
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
@@ -67,11 +71,16 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using std::endl;
+    using std::list;
+    using std::string;
+    using std::stringstream;
 
     // unique number for temporary file names
     unsigned long long FileAllocator::_uniqueNumber = 0;
     static SimpleMutex _uniqueNumberMutex( "uniqueNumberMutex" );
+
+    MONGO_FP_DECLARE(allocateDiskFull);
 
     /**
      * Aliases for Win32 CRT functions
@@ -80,6 +89,18 @@ namespace mongo {
     static inline long lseek(int fd, long offset, int origin) { return _lseek(fd, offset, origin); }
     static inline int write(int fd, const void *data, int count) { return _write(fd, data, count); }
     static inline int close(int fd) { return _close(fd); }
+
+    typedef BOOL (CALLBACK *GetVolumeInformationByHandleWPtr)(HANDLE, LPWSTR, DWORD, LPDWORD, LPDWORD, LPDWORD, LPWSTR, DWORD);
+    GetVolumeInformationByHandleWPtr GetVolumeInformationByHandleWFunc;
+
+    MONGO_INITIALIZER(InitGetVolumeInformationByHandleW)(InitializerContext *context) {
+        HMODULE kernelLib = LoadLibraryA("kernel32.dll");
+        if (kernelLib) {
+            GetVolumeInformationByHandleWFunc = reinterpret_cast<GetVolumeInformationByHandleWPtr>
+                (GetProcAddress(kernelLib, "GetVolumeInformationByHandleW"));
+        }
+        return Status::OK();
+    }
 #endif
 
     boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p){
@@ -121,6 +142,11 @@ namespace mongo {
 
     void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
         scoped_lock lk( _pendingMutex );
+
+        // In case the allocator is in failed state, check once before starting so that subsequent
+        // requests for the same database would fail fast after the first one has failed.
+        checkFailure();
+
         long oldSize = prevSize( name );
         if ( oldSize != -1 ) {
             size = oldSize;
@@ -165,8 +191,11 @@ namespace mongo {
 #if defined(__linux__)
 // these are from <linux/magic.h> but that isn't available on all systems
 # define NFS_SUPER_MAGIC 0x6969
+# define TMPFS_MAGIC 0x01021994
 
-        return (fs_stats.f_type == NFS_SUPER_MAGIC);
+        return (fs_stats.f_type == NFS_SUPER_MAGIC)
+            || (fs_stats.f_type == TMPFS_MAGIC)
+            ;
 
 #elif defined(__freebsd__)
 
@@ -183,7 +212,36 @@ namespace mongo {
 #endif
     }
 
+#if defined(_WIN32)
+    static bool isFileOnNTFSVolume(int fd) {
+        if (!GetVolumeInformationByHandleWFunc) {
+            warning() << "Could not retrieve pointer to GetVolumeInformationByHandleW function";
+            return false;
+        }
+
+        HANDLE fileHandle = (HANDLE)_get_osfhandle(fd);
+        if (fileHandle == INVALID_HANDLE_VALUE) {
+            warning() << "_get_osfhandle() failed with " << _strerror(NULL);
+            return false;
+        }
+
+        WCHAR fileSystemName[MAX_PATH + 1];
+        if (!GetVolumeInformationByHandleWFunc(fileHandle, NULL, 0, NULL, 0, NULL, fileSystemName, sizeof(fileSystemName))) {
+            DWORD gle = GetLastError();
+            warning() << "GetVolumeInformationByHandleW failed with " << errnoWithDescription(gle);
+            return false;
+        }
+
+        return lstrcmpW(fileSystemName, L"NTFS") == 0;
+    }
+#endif
+
     void FileAllocator::ensureLength(int fd , long size) {
+        // Test running out of disk scenarios
+        if (MONGO_FAIL_POINT(allocateDiskFull)) {
+            uasserted( 10444 , "File allocation failed due to failpoint.");
+        }
+
 #if !defined(_WIN32)
         if (useSparseFiles(fd)) {
             LOG(1) << "using ftruncate to create a sparse file" << endl;
@@ -223,6 +281,13 @@ namespace mongo {
                 return;
             }
 
+#if defined(_WIN32)
+            if (!isFileOnNTFSVolume(fd)) {
+                log() << "No need to zero out datafile on non-NTFS volume" << endl;
+                return;
+            }
+#endif
+
             lseek(fd, 0, SEEK_SET);
 
             const long z = 256 * 1024;
@@ -240,10 +305,6 @@ namespace mongo {
                 left -= written;
             }
         }
-    }
-
-    bool FileAllocator::hasFailed() const {
-        return _failed;
     }
 
     void FileAllocator::checkFailure() {
@@ -288,7 +349,7 @@ namespace mongo {
               return fn;
         }
         return "";
-	}
+    }
 
     void FileAllocator::run( FileAllocator * fa ) {
         setThreadName( "FileAllocator" );
@@ -378,10 +439,14 @@ namespace mongo {
                     } catch ( const std::exception& e ) {
                         log() << "error removing files: " << e.what() << endl;
                     }
-                    scoped_lock lk( fa->_pendingMutex );
-                    fa->_failed = true;
-                    // not erasing from pending
-                    fa->_pendingUpdated.notify_all();
+
+                    {
+                        scoped_lock lk(fa->_pendingMutex);
+                        fa->_failed = true;
+
+                        // TODO: Should we remove the file from pending?
+                        fa->_pendingUpdated.notify_all();
+                    }
                     
                     
                     sleepsecs(10);

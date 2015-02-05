@@ -29,6 +29,8 @@
  * Unit tests of the UserDocumentParser type.
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -42,6 +44,8 @@
 
 namespace mongo {
 namespace {
+
+    using boost::scoped_ptr;
 
     class V1UserDocumentParsing : public ::mongo::unittest::Test {
     public:

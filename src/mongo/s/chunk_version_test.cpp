@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"

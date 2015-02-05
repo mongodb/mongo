@@ -25,14 +25,22 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include <boost/scoped_array.hpp>
+
+#include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/platform/random.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/util/log.h"
 
 namespace {
 
     using namespace mongo;
+    using boost::scoped_array;
+    using std::endl;
 
     void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
         // like a BSONObj string, but without a NUL terminator.
@@ -61,8 +69,7 @@ namespace {
             int size = 1234;
 
             char* x = new char[size];
-            int* xx = reinterpret_cast<int*>(x);
-            xx[0] = size;
+            DataView(x).writeLE(size);
 
             for ( int i=4; i<size; i++ ) {
                 x[i] = r.nextInt32( 255 );

@@ -112,12 +112,14 @@ MongoRunner.VersionSub = function(regex, version) {
 // version string to support the dev/stable MongoDB release cycle.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
                                new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
-                               // To-be-updated when 2.8 becomes available
+                               // To-be-updated when 3.0 becomes available
                                new MongoRunner.VersionSub(/^last-stable$/, "2.6"),
                                // Latest unstable and next stable are effectively the
                                // same release
                                new MongoRunner.VersionSub(/^2\.7(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, "") ];
+                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.0(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
  
@@ -284,8 +286,9 @@ MongoRunner.arrOptions = function( binaryName , args ){
         var o = isObject( args ) ? args : args[0]
                 
         // If we've specified a particular binary version, use that
-        if( o.binVersion && o.binVersion != "latest" && o.binVersion != "" ) 
-            binaryName += "-" + o.binVersion
+        if (o.binVersion && o.binVersion != "") {
+            binaryName += "-" + o.binVersion;
+        }
         
         // Manage legacy options
         var isValidOptionForBinary = function( option, value ){
@@ -713,6 +716,8 @@ MongoRunner.isStopped = function( port ){
 MongoRunner.runMongoTool = function( binaryName, opts ){
 
     var opts = opts || {}
+    // Normalize and get the binary version to use
+    opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
     var argsArray = MongoRunner.arrOptions(binaryName, opts)
 
@@ -762,7 +767,7 @@ function appendSetParameterArgs(argArray) {
         if (jsTest.options().enableTestCommands) {
             argArray.push.apply(argArray, ['--setParameter', "enableTestCommands=1"]);
         }
-        if (jsTest.options().authMechanism && jsTest.options().authMechanism != "MONGODB-CR") {
+        if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
             var hasAuthMechs = false;
             for (i in argArray) {
                 if (typeof argArray[i] === 'string' &&
@@ -795,6 +800,21 @@ function appendSetParameterArgs(argArray) {
         }
         // mongod only options
         else if (programName.endsWith('mongod')) {
+            // set storageEngine for mongod
+            if (jsTest.options().storageEngine) {
+                if ( argArray.indexOf( "--storageEngine" ) < 0 ) {
+                    argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
+                }
+            }
+            if (jsTest.options().wiredTigerEngineConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerEngineConfigString', jsTest.options().wiredTigerEngineConfigString]);
+            }
+            if (jsTest.options().wiredTigerCollectionConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerCollectionConfigString', jsTest.options().wiredTigerCollectionConfigString]);
+            }
+            if (jsTest.options().wiredTigerIndexConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerIndexConfigString', jsTest.options().wiredTigerIndexConfigString]);
+            }
             // apply setParameters for mongod
             if (jsTest.options().setParameters) {
                 var params = jsTest.options().setParameters.split(",");
@@ -891,7 +911,6 @@ runMongoProgram = function() {
         args.unshift( progName,
                       '-u', jsTestOptions().authUser,
                       '-p', jsTestOptions().authPassword,
-                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                       '--authenticationDatabase=admin'
                     );
     }
@@ -917,7 +936,6 @@ startMongoProgramNoConnect = function() {
         args.unshift(progName,
                      '-u', jsTestOptions().authUser,
                      '-p', jsTestOptions().authPassword,
-                     '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                      '--authenticationDatabase=admin');
     }
 

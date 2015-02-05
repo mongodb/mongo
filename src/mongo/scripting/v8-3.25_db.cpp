@@ -32,19 +32,23 @@
 #include <iostream>
 #include <iomanip>
 #include <boost/scoped_array.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/init.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/scripting/engine_v8-3.25.h"
 #include "mongo/scripting/v8-3.25_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/text.h"
 
 using namespace std;
+using boost::scoped_array;
+using boost::shared_ptr;
 
 namespace mongo {
 
@@ -125,13 +129,10 @@ namespace mongo {
 
     v8::Local<v8::Value> mongoConsExternal(V8Scope* scope,
                                            const v8::FunctionCallbackInfo<v8::Value>& args) {
-        char host[255];
+        string host = "127.0.0.1";
         if (args.Length() > 0 && args[0]->IsString()) {
-            uassert(16666, "string argument too long", args[0]->ToString()->Utf8Length() < 250);
-            args[0]->ToString()->WriteUtf8(host);
-        }
-        else {
-            strcpy(host, "127.0.0.1");
+            v8::String::Utf8Value utf(args[0]);
+            host = string(*utf);
         }
 
         // only allow function template to be used by a constructor
@@ -734,7 +735,7 @@ namespace mongo {
         }
 
         it->ForceSet(scope->v8StringData("str"),
-                     v8::String::NewFromUtf8(scope->getIsolate(), oid.str().c_str()));
+                     v8::String::NewFromUtf8(scope->getIsolate(), oid.toString().c_str()));
         return it;
     }
 

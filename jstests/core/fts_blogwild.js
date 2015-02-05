@@ -9,11 +9,11 @@ t.save( { _id: 3 , title: "knives are Fun for writing eliot" , text: "this is a 
 // specify weights if you want a field to be more meaningull
 t.ensureIndex( { dummy: "text" } , { weights: "$**" } );
 
-res = t.runCommand( "text" , { search: "blog" } );
-assert.eq( 3 , res.stats.n , "A1" );
+res = t.find( { "$text" : { "$search": "blog" } } );
+assert.eq( 3 , res.length() , "A1" );
 
-res = t.runCommand( "text" , { search: "write" } );
-assert.eq( 3 , res.stats.n , "B1" );
+res = t.find( { "$text" : { "$search": "write" } } );
+assert.eq( 3 , res.length() , "B1" );
 
 // mixing
 t.dropIndex( "dummy_text" );
@@ -21,17 +21,17 @@ assert.eq( 1 , t.getIndexKeys().length , "C1" );
 t.ensureIndex( { dummy: "text" } , { weights: { "$**": 1 , title: 2 } } );
 
 
-res = t.runCommand( "text" , { search: "write" } );
-assert.eq( 3 , res.stats.n , "C2" );
-assert.eq( 3 , res.results[0].obj._id , "C3" );
+res = t.find( { "$text" : { "$search": "write" } },  { score: { "$meta" : "textScore" } }  ).sort( { score: { "$meta" : "textScore" } });
+assert.eq( 3 , res.length() , "C2" );
+assert.eq( 3 , res[0]._id , "C3" );
 
-res = t.runCommand( "text" , { search: "blog" } );
-assert.eq( 3 , res.stats.n , "D1" );
-assert.eq( 1 , res.results[0].obj._id , "D2" );
+res = t.find( { "$text" : { "$search": "blog" } },  { score: { "$meta" : "textScore" } }  ).sort( { score: { "$meta" : "textScore" } });
+assert.eq( 3 , res.length() , "D1" );
+assert.eq( 1 , res[0]._id , "D2" );
 
-res = t.runCommand( "text" , { search: "eliot" } );
-assert.eq( 2 , res.stats.n , "E1" );
-assert.eq( 3 , res.results[0].obj._id , "E2" );
+res = t.find( { "$text" : { "$search": "eliot" } },  { score: { "$meta" : "textScore" } }  ).sort( { score: { "$meta" : "textScore" } });
+assert.eq( 2 , res.length() , "E1" );
+assert.eq( 3 , res[0]._id , "E2" );
 
 
 

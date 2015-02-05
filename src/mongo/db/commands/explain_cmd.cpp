@@ -30,13 +30,17 @@
 
 #include "mongo/db/commands/explain_cmd.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::string;
 
     static CmdExplain cmdExplain;
 
@@ -65,42 +69,46 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
-        // Get the verbosity.
-        Explain::Verbosity verbosity = Explain::QUERY_PLANNER;
-        if (!cmdObj["verbosity"].eoo()) {
-            const char* verbStr = cmdObj["verbosity"].valuestrsafe();
-            if (mongoutils::str::equals(verbStr, "executionStats")) {
-                verbosity = Explain::EXEC_STATS;
-            }
-            else if (mongoutils::str::equals(verbStr, "allPlansExecution")) {
-                verbosity = Explain::EXEC_ALL_PLANS;
-            }
-            else if (mongoutils::str::equals(verbStr, "full")) {
-                verbosity = Explain::FULL;
-            }
-            else if (!mongoutils::str::equals(verbStr, "queryPlanner")) {
-               errmsg = "verbosity string must be one of "
-                        "{'queryPlanner', 'executionStats', 'allPlansExecution'}";
-               return false;
-            }
+        // Should never get explain commands issued from replication.
+        if (fromRepl) {
+            Status commandStat(ErrorCodes::IllegalOperation,
+                               "explain command should not be from repl");
+            appendCommandStatus(result, commandStat);
+            return false;
         }
 
-        if (Object != cmdObj.firstElement().type()) {
-            errmsg = "explain command requires a nested object";
-            return false;
+        ExplainCommon::Verbosity verbosity;
+        Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
+        if (!parseStatus.isOK()) {
+            return appendCommandStatus(result, parseStatus);
         }
 
         // This is the nested command which we are explaining.
         BSONObj explainObj = cmdObj.firstElement().Obj();
 
-        const string ns = parseNs(dbname, explainObj);
-
         Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
         if (NULL == commToExplain) {
             mongoutils::str::stream ss;
-            ss << "unknown command: " << explainObj.firstElementFieldName();
+            ss << "Explain failed due to unknown command: " << explainObj.firstElementFieldName();
             Status explainStatus(ErrorCodes::CommandNotFound, ss);
             return appendCommandStatus(result, explainStatus);
+        }
+
+        // Check whether the child command is allowed to run here. TODO: this logic is
+        // copied from Command::execCommand and should be abstracted. Until then, make
+        // sure to keep it up to date.
+        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+        const bool canRunHere =
+            replCoord->canAcceptWritesForDatabase(dbname) ||
+            commToExplain->slaveOk() ||
+            (commToExplain->slaveOverrideOk() && (options & QueryOption_SlaveOk));
+
+        if (!canRunHere) {
+            mongoutils::str::stream ss;
+            ss << "Explain's child command cannot run on this node. "
+               << "Are you explaining a write command on a secondary?";
+            appendCommandStatus(result, false, ss);
+            return false;
         }
 
         // Actually call the nested command's explain(...) method.

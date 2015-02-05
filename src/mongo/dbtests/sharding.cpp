@@ -1,5 +1,3 @@
-// sharding.cpp : some unit tests for sharding internals
-
 /**
  *    Copyright (C) 2009 10gen Inc.
  *
@@ -28,10 +26,15 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
+
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientmockcursor.h"
 #include "mongo/client/parallel.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/dbtests/dbtests.h"
@@ -40,8 +43,18 @@
 #include "mongo/s/config.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/util/log.h"
 
 namespace ShardingTests {
+
+    using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::make_pair;
+    using std::map;
+    using std::pair;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     namespace serverandquerytests {
         class test1 {
@@ -82,11 +95,8 @@ namespace ShardingTests {
     class ChunkManagerTest : public ConnectionString::ConnectionHook {
     public:
 
-        OperationContextImpl _txn;
-        CustomDirectClient _client;
-        Shard _shard;
-
-        ChunkManagerTest() {
+        ChunkManagerTest() : _client(&_txn) {
+            shardConnectionPool.clear();
 
             DBException::traceExceptions = true;
 
@@ -104,14 +114,19 @@ namespace ShardingTests {
 
             // Since we've redirected the conns, the host doesn't matter here so long as it's
             // prefixed with a "$"
-            _shard = Shard( "shard0000", "$hostFooBar:27017" );
+            _shard = Shard("shard0000",
+                           "$hostFooBar:27017",
+                           0 /* maxSize */,
+                           false /* draining */);
             // Need to run this to ensure the shard is in the global lookup table
-            _shard.setAddress( _shard.getAddress() );
+            Shard::installShard(_shard.getName(), _shard);
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
-            _client.ensureIndex( ChunkType::ConfigNS, // br
-                                  BSON( ChunkType::ns() << 1 << // br
-                                          ChunkType::DEPRECATED_lastmod() << 1 ) );
+            ASSERT_OK(dbtests::createIndex(
+                              &_txn,
+                              ChunkType::ConfigNS,
+                              BSON( ChunkType::ns() << 1 << // br
+                                    ChunkType::DEPRECATED_lastmod() << 1 ) ));
             configServer.init("$dummy:1000");
         }
 
@@ -129,8 +144,14 @@ namespace ShardingTests {
                                        double socketTimeout )
         {
             // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient();
+            return new CustomDirectClient(&_txn);
         }
+
+
+    protected:
+        OperationContextImpl _txn;
+        CustomDirectClient _client;
+        Shard _shard;
     };
 
     //
@@ -141,7 +162,8 @@ namespace ShardingTests {
 
         void run(){
 
-            ChunkManager manager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false );
+            ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+            ChunkManager manager(collName(), shardKeyPattern, false);
             manager.createFirstChunks( shard().getConnString(), shard(), NULL, NULL );
 
             BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
@@ -191,7 +213,8 @@ namespace ShardingTests {
             vector<BSONObj> splitKeys;
             genRandomSplitKeys( keyName, &splitKeys );
 
-            ChunkManager manager( collName(), ShardKeyPattern( BSON( keyName << 1 ) ), false );
+            ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
+            ChunkManager manager(collName(), shardKeyPattern, false);
 
             manager.createFirstChunks( shard().getConnString(), shard(), &splitKeys, NULL );
         }
@@ -260,12 +283,12 @@ namespace ShardingTests {
 
             BSONObj collDoc(collDocBuilder.done());
 
-            ChunkManagerPtr manager( new ChunkManager(collDoc) );
-            const_cast<ChunkManager *>(manager.get())->loadExistingRanges(shard().getConnString());
+            ChunkManager manager(collDoc);
+            manager.loadExistingRanges(shard().getConnString(), NULL);
 
-            ASSERT( manager->getVersion().epoch() == version.epoch() );
-            ASSERT( manager->getVersion().minorVersion() == ( numChunks - 1 ) );
-            ASSERT( static_cast<int>( manager->getChunkMap().size() ) == numChunks );
+            ASSERT(manager.getVersion().epoch() == version.epoch());
+            ASSERT(manager.getVersion().minorVersion() == (numChunks - 1));
+            ASSERT(static_cast<int>(manager.getChunkMap().size()) == numChunks);
 
             // Modify chunks collection
             BSONObjBuilder b;
@@ -275,8 +298,10 @@ namespace ShardingTests {
             _client.update(ChunkType::ConfigNS, BSONObj(), BSON( "$set" << b.obj()));
 
             // Make new manager load chunk diff
-            ChunkManager newManager( manager );
-            newManager.loadExistingRanges( shard().getConnString() );
+            ChunkManager newManager(manager.getns(),
+                                    manager.getShardKeyPattern(),
+                                    manager.isUnique());
+            newManager.loadExistingRanges(shard().getConnString(), &manager);
 
             ASSERT( newManager.getVersion().toLong() == laterVersion.toLong() );
             ASSERT( newManager.getVersion().epoch() == laterVersion.epoch() );
@@ -310,7 +335,6 @@ namespace ShardingTests {
             }
 
             virtual string shardFor( const string& name ) const { return name; }
-            virtual string nameFrom( const string& shard ) const { return shard; }
         };
 
         // Inverts the storage order for chunks from min to max
@@ -660,6 +684,8 @@ namespace ShardingTests {
             add< ChunkDiffUnitTestNormal >();
             add< ChunkDiffUnitTestInverse >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 }

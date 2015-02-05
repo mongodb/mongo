@@ -35,10 +35,10 @@
 
 #include <boost/assert.hpp>
 #include <boost/detail/interlocked.hpp>
+#include <boost/noncopyable.hpp>
 #include <boost/thread/win32/thread_primitives.hpp>
 #include <boost/static_assert.hpp>
 #include <limits.h>
-#include <boost/utility.hpp>
 #include <boost/thread/thread_time.hpp>
 
 #include <boost/config/abi_prefix.hpp>

@@ -952,6 +952,12 @@ class CodeRange {
   // manage it.
   void TearDown();
 
+// Disable error about "this" never being NULL in well
+// defined C++ code (Clang 3.5)
+// See SERVER-15306
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-undefined-compare"
+
   bool exists() { return this != NULL && code_range_ != NULL; }
   Address start() {
     if (this == NULL || code_range_ == NULL) return NULL;
@@ -962,6 +968,8 @@ class CodeRange {
     Address start = static_cast<Address>(code_range_->address());
     return start <= address && address < start + code_range_->size();
   }
+
+#pragma clang diagnostic pop
 
   // Allocates a chunk of memory from the large-object portion of
   // the code range.  On platforms with no separate code range, should

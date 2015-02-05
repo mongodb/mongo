@@ -119,7 +119,7 @@ namespace mongo {
          * exist, it is not considered as an error, but the "key" property of the settings
          * output parameter will not be set.
          */
-        bool getBalancerSettings(SettingsType* settings, string* errMsg) const;
+        bool getBalancerSettings(SettingsType* settings, std::string* errMsg) const;
 
         /**
          * Returns true if the config server settings indicate that the balancer should be active.

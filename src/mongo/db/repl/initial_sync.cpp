@@ -26,40 +26,36 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/initial_sync.h"
 
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replset_commands.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/util/log.h"
 
 
 namespace mongo {
 namespace repl {
+
     InitialSync::InitialSync(BackgroundSyncInterface *q) : 
-        SyncTail(q) {}
+        SyncTail(q, multiInitialSyncApply) {}
 
     InitialSync::~InitialSync() {}
 
     /* initial oplog application, during initial sync, after cloning.
     */
-    BSONObj InitialSync::oplogApplication(OperationContext* txn,
-                                          const BSONObj& applyGTEObj,
-                                          const BSONObj& minValidObj) {
+    void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
         if (replSetForceInitialSyncFailure > 0) {
             log() << "replSet test code invoked, forced InitialSync failure: "
-                  << replSetForceInitialSyncFailure << rsLog;
+                  << replSetForceInitialSyncFailure;
             replSetForceInitialSyncFailure--;
             throw DBException("forced error",0);
         }
-
-        // create the initial oplog entry
-        syncApply(txn, applyGTEObj);
-        _logOpObjRS(txn, applyGTEObj);
-
-        return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
+        _applyOplogUntil(txn, endOpTime);
     }
 
 } // namespace repl

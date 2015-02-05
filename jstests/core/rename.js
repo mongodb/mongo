@@ -24,7 +24,6 @@ assert( db.getCollectionNames().indexOf( "jstests_rename_b" ) >= 0 );
 assert( db.getCollectionNames().indexOf( "jstests_rename_a" ) < 0 );
 assert.eq( 3, db.jstests_rename_b.getIndexes().length );
 assert.eq( 0, db.jstests_rename_a.getIndexes().length );
-assert( b.find( {a:1} ).explain().cursor.match( /^BtreeCursor/ ) );
 
 // now try renaming a capped collection
 

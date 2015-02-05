@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_options.h"
@@ -33,9 +35,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
+
+    using std::string;
 
     Status addSSLServerOptions(moe::OptionSection* options) {
         options->addOptionChaining("net.ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
@@ -69,6 +74,11 @@ namespace mongo {
         options->addOptionChaining("net.ssl.weakCertificateValidation",
                 "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
                 "presenting a certificate");
+
+        // Alias for --sslWeakCertificateValidation.
+        options->addOptionChaining("net.ssl.allowConnectionsWithoutCertificates",
+                "sslAllowConnectionsWithoutCertificates", moe::Switch,
+                "allow client to connect without presenting a certificate");
 
         options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
                 moe::Switch, "Allow server certificates to provide non-matching hostnames");
@@ -223,6 +233,10 @@ namespace mongo {
             sslGlobalParams.sslWeakCertificateValidation =
                 params["net.ssl.weakCertificateValidation"].as<bool>();
         }
+        else if (params.count("net.ssl.allowConnectionsWithoutCertificates")) {
+            sslGlobalParams.sslWeakCertificateValidation =
+                params["net.ssl.allowConnectionsWithoutCertificates"].as<bool>();
+        }
         if (params.count("net.ssl.allowInvalidHostnames")) {
             sslGlobalParams.sslAllowInvalidHostnames =
                 params["net.ssl.allowInvalidHostnames"].as<bool>();
@@ -235,6 +249,7 @@ namespace mongo {
             sslGlobalParams.sslFIPSMode = params["net.ssl.FIPSMode"].as<bool>();
         }
 
+        int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
         if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_disabled) {
             if (sslGlobalParams.sslPEMKeyFile.size() == 0) {
                 return Status(ErrorCodes::BadValue,
@@ -249,9 +264,15 @@ namespace mongo {
                 sslGlobalParams.sslCAFile.empty()) {
                 return Status(ErrorCodes::BadValue, "need sslCAFile with sslCRLFile");
             }
+            std::string sslCANotFoundError("No SSL certificate validation can be performed since"
+                                          " no CA file has been provided; please specify an"
+                                          " sslCAFile parameter");
+
             if (sslGlobalParams.sslCAFile.empty()) {
-                warning() << "No SSL certificate validation can be performed since no CA file "
-                             "has been provided; please specify an sslCAFile parameter";
+                if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
+                    return Status(ErrorCodes::BadValue, sslCANotFoundError);
+                }
+                warning() << sslCANotFoundError;
             }
         }
         else if (sslGlobalParams.sslPEMKeyFile.size() ||
@@ -266,7 +287,6 @@ namespace mongo {
                           "need to enable SSL via the sslMode flag when "
                           "using SSL configuration parameters");
         }
-        int clusterAuthMode = serverGlobalParams.clusterAuthMode.load(); 
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509 ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
@@ -309,6 +329,18 @@ namespace mongo {
         }
         if (params.count("ssl.FIPSMode")) {
             sslGlobalParams.sslFIPSMode = true;
+        }
+        return Status::OK();
+    }
+
+    Status validateSSLMongoShellOptions(const moe::Environment& params) {
+        // Users must specify either a CAFile or allowInvalidCertificates if ssl=true.
+        if (params.count("ssl") &&
+                params["ssl"].as<bool>() == true &&
+                !params.count("ssl.CAFile") &&
+                !params.count("ssl.allowInvalidCertificates")) {
+            return Status(ErrorCodes::BadValue,
+                    "need to either provide sslCAFile or specify sslAllowInvalidCertificates");
         }
         return Status::OK();
     }

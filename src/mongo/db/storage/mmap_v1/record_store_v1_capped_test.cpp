@@ -42,14 +42,17 @@ using namespace mongo;
 
 namespace {
 
+    using std::string;
+    using std::vector;
+
     // Provides data to be inserted. Must be large enough for largest possible record.
     // Should be in BSS so unused portions should be free.
     char zeros[20*1024*1024] = {};
 
     class DummyCappedDocumentDeleteCallback : public CappedDocumentDeleteCallback {
     public:
-        Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) {
-            deleted.push_back( loc );
+        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc, RecordData data) {
+            deleted.push_back( DiskLoc::fromRecordId(loc) );
             return Status::OK();
         }
         vector<DiskLoc> deleted;
@@ -65,7 +68,7 @@ namespace {
         string myns = "test.simple1";
         CappedRecordStoreV1 rs( &txn, &cb, myns, md, &em, false );
 
-        rs.increaseStorageSize( &txn, 1024, -1 );
+        rs.increaseStorageSize( &txn, 1024, false );
 
         ASSERT_NOT_OK( rs.insertRecord( &txn, buf, 3, 1000 ).getStatus() );
 
@@ -116,7 +119,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -130,7 +133,7 @@ namespace {
                 {DiskLoc(0, 1100), 900},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid()); // unlooped
         }
@@ -158,7 +161,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -176,7 +179,7 @@ namespace {
                 {DiskLoc(0, 1500), 50}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -204,7 +207,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -222,7 +225,7 @@ namespace {
                 {DiskLoc(0, 1500), 50}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -253,7 +256,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -271,7 +274,7 @@ namespace {
                 {DiskLoc(0, 1500), 123}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -299,7 +302,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -318,7 +321,7 @@ namespace {
                 {DiskLoc(0, 1600), 24}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -346,7 +349,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -365,7 +368,7 @@ namespace {
                 {DiskLoc(1, 1100), 900},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid()); // unlooped
         }
@@ -396,7 +399,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
@@ -416,10 +419,62 @@ namespace {
                 {DiskLoc(1, 1900), 100},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(1, 1000));
         }
+    }
+
+    // Larger than storageSize (fails early)
+    TEST(CappedRecordStoreV1, OversizedRecordHuge) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
+        DummyCappedDocumentDeleteCallback cb;
+        CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+
+        {
+            LocAndSize records[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 1000},
+                {}
+            };
+            md->setCapExtent(&txn, DiskLoc(0, 0));
+            md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        }
+
+        StatusWith<RecordId> status = rs.insertRecord(&txn, zeros, 16000, false);
+        ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
+        ASSERT_EQUALS(status.getStatus().location(), 16328);
+    }
+
+    // Smaller than storageSize, but larger than usable space (fails late)
+    TEST(CappedRecordStoreV1, OversizedRecordMedium) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
+        DummyCappedDocumentDeleteCallback cb;
+        CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+
+        {
+            LocAndSize records[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 1000},
+                {}
+            };
+            md->setCapExtent(&txn, DiskLoc(0, 0));
+            md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        }
+
+        StatusWith<RecordId> status = rs.insertRecord(&txn, zeros, 1004 - Record::HeaderSize, false);
+        ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
+        ASSERT_EQUALS(status.getStatus().location(), 28575);
     }
 
     //
@@ -449,7 +504,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, false);
@@ -471,7 +526,7 @@ namespace {
                 {DiskLoc(0, 1920), 80},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -499,7 +554,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         // This list of sizes was empirically generated to achieve this outcome. Don't think too
@@ -553,7 +608,7 @@ namespace {
                 {DiskLoc(0, 1628), 84},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -584,7 +639,7 @@ namespace {
 
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, recs, drecs, &em, md);
+            initializeV1RS(&txn, recs, drecs, NULL, &em, md);
         }
 
         // Insert bypasses standard alloc/insert routines to use the extent we want.
@@ -625,7 +680,7 @@ namespace {
         void walkAndCount (int expectedCount) {
             // Walk the collection going forward.
             {
-                CappedRecordStoreV1Iterator it(&txn, &rs, DiskLoc(), false,
+                CappedRecordStoreV1Iterator it(&txn, &rs, RecordId(), false,
                                                CollectionScanParams::FORWARD);
 
                 int resultCount = 0;
@@ -639,7 +694,7 @@ namespace {
 
             // Walk the collection going backwards.
             {
-                CappedRecordStoreV1Iterator it(&txn, &rs, DiskLoc(), false,
+                CappedRecordStoreV1Iterator it(&txn, &rs, RecordId(), false,
                                                CollectionScanParams::BACKWARD);
 
                 int resultCount = expectedCount;

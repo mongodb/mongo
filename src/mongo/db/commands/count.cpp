@@ -26,20 +26,209 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/count.h"
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/count.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/type_explain.h"
+#include "mongo/db/range_preserver.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    static CmdCount cmdCount;
+    using boost::scoped_ptr;
+    using std::string;
+    using std::stringstream;
+
+    /* select count(*) */
+    class CmdCount : public Command {
+    public:
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+        CmdCount() : Command("count") { }
+        virtual bool slaveOk() const {
+            // ok on --slave setups
+            return repl::getGlobalReplicationCoordinator()->getSettings().slave == repl::SimpleSlave;
+        }
+        virtual bool slaveOverrideOk() const { return true; }
+        virtual bool maintenanceOk() const { return false; }
+        virtual bool adminOnly() const { return false; }
+        virtual void help( stringstream& help ) const { help << "count objects in collection"; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::find);
+            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+        }
+
+        virtual Status explain(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               ExplainCommon::Verbosity verbosity,
+                               BSONObjBuilder* out) const {
+
+            CountRequest request;
+            Status parseStatus = parseRequest(dbname, cmdObj, &request);
+            if (!parseStatus.isOK()) {
+                return parseStatus;
+            }
+
+            request.explain = true;
+
+            // Acquire the db read lock.
+            AutoGetCollectionForRead ctx(txn, request.ns);
+            Collection* collection = ctx.getCollection();
+
+            // Prevent chunks from being cleaned up during yields - this allows us to only check the
+            // version on initial entry into count.
+            RangePreserver preserver(collection);
+
+            PlanExecutor* rawExec;
+            Status getExecStatus = getExecutorCount(txn,
+                                                    collection,
+                                                    request,
+                                                    PlanExecutor::YIELD_AUTO,
+                                                    &rawExec);
+            if (!getExecStatus.isOK()) {
+                return getExecStatus;
+            }
+
+            scoped_ptr<PlanExecutor> exec(rawExec);
+
+            Explain::explainStages(exec.get(), verbosity, out);
+            return Status::OK();
+        }
+
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int, string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            CountRequest request;
+            Status parseStatus = parseRequest(dbname, cmdObj, &request);
+            if (!parseStatus.isOK()) {
+                return appendCommandStatus(result, parseStatus);
+            }
+
+            AutoGetCollectionForRead ctx(txn, request.ns);
+            Collection* collection = ctx.getCollection();
+
+            // Prevent chunks from being cleaned up during yields - this allows us to only check the
+            // version on initial entry into count.
+            RangePreserver preserver(collection);
+
+            PlanExecutor* rawExec;
+            Status getExecStatus = getExecutorCount(txn,
+                                                    collection,
+                                                    request,
+                                                    PlanExecutor::YIELD_AUTO,
+                                                    &rawExec);
+            if (!getExecStatus.isOK()) {
+                return appendCommandStatus(result, getExecStatus);
+            }
+
+            scoped_ptr<PlanExecutor> exec(rawExec);
+
+            // Store the plan summary string in CurOp.
+            if (NULL != txn->getCurOp()) {
+                txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
+            }
+
+            Status execPlanStatus = exec->executePlan();
+            if (!execPlanStatus.isOK()) {
+                return appendCommandStatus(result, execPlanStatus);
+            }
+
+            // Plan is done executing. We just need to pull the count out of the root stage.
+            invariant(STAGE_COUNT == exec->getRootStage()->stageType());
+            CountStage* countStage = static_cast<CountStage*>(exec->getRootStage());
+            const CountStats* countStats =
+                static_cast<const CountStats*>(countStage->getSpecificStats());
+
+            result.appendNumber("n", countStats->nCounted);
+            return true;
+        }
+
+        /**
+         * Parses a count command object, 'cmdObj'.
+         *
+         * On success, fills in the out-parameter 'request' and returns an OK status.
+         *
+         * Returns a failure status if 'cmdObj' is not well formed.
+         */
+        Status parseRequest(const std::string& dbname,
+                            const BSONObj& cmdObj,
+                            CountRequest* request) const {
+
+            long long skip = 0;
+            if (cmdObj["skip"].isNumber()) {
+                skip = cmdObj["skip"].numberLong();
+                if (skip < 0) {
+                    return Status(ErrorCodes::BadValue, "skip value is negative in count query");
+                }
+            }
+            else if (cmdObj["skip"].ok()) {
+                return Status(ErrorCodes::BadValue, "skip value is not a valid number");
+            }
+
+            long long limit = 0;
+            if (cmdObj["limit"].isNumber()) {
+                limit = cmdObj["limit"].numberLong();
+            }
+            else if (cmdObj["limit"].ok()) {
+                return Status(ErrorCodes::BadValue, "limit value is not a valid number");
+            }
+
+            // For counts, limit and -limit mean the same thing.
+            if (limit < 0) {
+                limit = -limit;
+            }
+
+            // We don't validate that "query" is a nested object due to SERVER-15456.
+            BSONObj query = cmdObj.getObjectField("query");
+
+            BSONObj hintObj;
+            if (Object == cmdObj["hint"].type()) {
+                hintObj = cmdObj["hint"].Obj();
+            }
+            else if (String == cmdObj["hint"].type()) {
+                const std::string hint = cmdObj.getStringField("hint");
+                hintObj = BSON("$hint" << hint);
+            }
+
+            std::string ns = parseNs(dbname, cmdObj);
+
+            if (!nsIsFull(ns)) {
+                return Status(ErrorCodes::BadValue, "collection name missing");
+            }
+
+            // Parsed correctly. Fill out 'request' with the results.
+            request->ns = ns;
+            request->query = query;
+            request->hint = hintObj;
+            request->limit = limit;
+            request->skip = skip;
+
+            // By default, count requests are regular count not explain of count.
+            request->explain = false;
+
+            return Status::OK();
+        }
+
+    } cmdCount;
+
 
     static long long applySkipLimit(long long num, const BSONObj& cmd) {
         BSONElement s = cmd["skip"];
@@ -72,209 +261,63 @@ namespace mongo {
                        const BSONObj &cmd,
                        string &err,
                        int &errCode) {
-        // Lock 'ns'.
-        Client::Context cx(txn, ns);
-        Collection* collection = cx.db()->getCollection(txn, ns);
-        const string& dbname = cx.db()->name();
 
+        AutoGetCollectionForRead ctx(txn, ns);
+
+        Collection* collection = ctx.getCollection();
         if (NULL == collection) {
             err = "ns missing";
             return -1;
         }
 
-        BSONObj query = cmd.getObjectField("query");
-        const std::string hint = cmd.getStringField("hint");
-        const BSONObj hintObj = hint.empty() ? BSONObj() : BSON("$hint" << hint);
+        const NamespaceString nss(ns);
 
-        // count of all objects
-        if (query.isEmpty()) {
-            return applySkipLimit(collection->numRecords(), cmd);
+        CountRequest request;
+        CmdCount* countComm = static_cast<CmdCount*>(Command::findCommand("count"));
+        Status parseStatus = countComm->parseRequest(nss.db().toString(), cmd, &request);
+        if (!parseStatus.isOK()) {
+            err = parseStatus.reason();
+            errCode = parseStatus.code();
+            return -1;
         }
 
-        long long skip = cmd["skip"].numberLong();
-        long long limit = cmd["limit"].numberLong();
-
-        if (limit < 0) {
-            limit = -limit;
+        if (request.query.isEmpty()) {
+            return applySkipLimit(collection->numRecords(txn), cmd);
         }
 
-        // Get an executor for the command.
         PlanExecutor* rawExec;
-        uassertStatusOK(CmdCount::parseCountToExecutor(txn, cmd, dbname, ns, collection, &rawExec));
-        scoped_ptr<PlanExecutor> exec(rawExec);
-
-        // Store the plan summary string in CurOp.
-        Client& client = cc();
-        CurOp* currentOp = client.curop();
-        if (NULL != currentOp) {
-            PlanSummaryStats stats;
-            Explain::getSummaryStats(exec.get(), &stats);
-            currentOp->debug().planSummary = stats.summaryStr.c_str();
-        }
-
-        try {
-            ScopedExecutorRegistration safety(exec.get());
-
-            long long count = 0;
-            PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, NULL))) {
-                if (skip > 0) {
-                    --skip;
-                }
-                else {
-                    ++count;
-                    // Fast-path. There's no point in iterating all over the runner if limit
-                    // is set.
-                    if (count >= limit && limit != 0) {
-                        break;
-                    }
-                }
-            }
-
-            // Emulate old behavior and return the count even if the runner was killed.  This
-            // happens when the underlying collection is dropped.
-            return count;
-        }
-        catch (const DBException &e) {
-            err = e.toString();
-            errCode = e.getCode();
-        }
-        catch (const std::exception &e) {
-            err = e.what();
-            errCode = 0;
-        }
-
-        // Historically we have returned zero in many count assertion cases - see SERVER-2291.
-        log() << "Count with ns: " << ns << " and query: " << query
-              << " failed with exception: " << err << " code: " << errCode
-              << endl;
-
-        return -2;
-    }
-
-    Status CmdCount::explain(OperationContext* txn,
-                             const std::string& dbname,
-                             const BSONObj& cmdObj,
-                             Explain::Verbosity verbosity,
-                             BSONObjBuilder* out) const {
-
-        // Acquire the DB read lock and get the collection.
-        const string ns = parseNs(dbname, cmdObj);
-        Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
-
-        // Handle special case of an empty query. When there is no query, we don't construct
-        // an actual execution tree. Since each collection tracks the number of documents it
-        // contains, count ops with no query just ask the collection for the total number of
-        // documents (and then apply the skip/limit to this number if necessary).
-        BSONObj query = cmdObj.getObjectField("query");
-        if (query.isEmpty()) {
-            Explain::explainCountEmptyQuery(out);
-            return Status::OK();
-        }
-
-        // Get an executor for the command and use it to generate the explain output.
-        PlanExecutor* rawExec;
-        Status execStatus = parseCountToExecutor(txn, cmdObj, dbname, ns, collection, &rawExec);
-        if (!execStatus.isOK()) {
-            return execStatus;
+        Status getExecStatus = getExecutorCount(txn,
+                                                collection,
+                                                request,
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawExec);
+        if (!getExecStatus.isOK()) {
+            err = getExecStatus.reason();
+            errCode = getExecStatus.code();
+            return -1;
         }
 
         scoped_ptr<PlanExecutor> exec(rawExec);
 
-        return Explain::explainStages(exec.get(), verbosity, out);
-    }
-
-    // static
-    Status CmdCount::parseCountToExecutor(OperationContext* txn,
-                                          const BSONObj& cmdObj,
-                                          const std::string& dbname,
-                                          const std::string& ns,
-                                          Collection* collection,
-                                          PlanExecutor** execOut) {
-
-        long long skip = 0;
-        if (cmdObj["skip"].isNumber()) {
-            skip = cmdObj["skip"].numberLong();
-            if (skip < 0) {
-                return Status(ErrorCodes::BadValue, "skip value is negative in count query");
-            }
-        }
-        else if (cmdObj["skip"].ok()) {
-            return Status(ErrorCodes::BadValue, "skip value is not a valid number");
+        // Store the plan summary string in CurOp.
+        if (NULL != txn->getCurOp()) {
+            txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
         }
 
-        BSONObj query = cmdObj.getObjectField("query");
-        invariant(!query.isEmpty());
-
-        const std::string hint = cmdObj.getStringField("hint");
-        const BSONObj hintObj = hint.empty() ? BSONObj() : BSON("$hint" << hint);
-
-        StringData dbnameData(dbname);
-        const WhereCallbackReal whereCallback(txn, dbnameData);
-
-        CanonicalQuery* cq;
-        uassertStatusOK(CanonicalQuery::canonicalize(ns,
-                                                     query,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     0,
-                                                     0,
-                                                     hintObj,
-                                                     &cq,
-                                                     whereCallback));
-
-        // Takes ownership of 'cq'.
-        return getExecutor(txn, collection, cq, execOut, QueryPlannerParams::PRIVATE_IS_COUNT);
-    }
-
-    bool CmdCount::run(OperationContext* txn,
-                       const string& dbname,
-                       BSONObj& cmdObj,
-                       int, string& errmsg,
-                       BSONObjBuilder& result, bool) {
-
-        long long skip = 0;
-        if ( cmdObj["skip"].isNumber() ) {
-            skip = cmdObj["skip"].numberLong();
-            if ( skip < 0 ) {
-                errmsg = "skip value is negative in count query";
-                return false;
-            }
-        }
-        else if ( cmdObj["skip"].ok() ) {
-            errmsg = "skip value is not a valid number";
-            return false;
+        Status execPlanStatus = exec->executePlan();
+        if (!execPlanStatus.isOK()) {
+            err = execPlanStatus.reason();
+            errCode = execPlanStatus.code();
+            return -2;
         }
 
-        const string ns = parseNs(dbname, cmdObj);
+        // Plan is done executing. We just need to pull the count out of the root stage.
+        invariant(STAGE_COUNT == exec->getRootStage()->stageType());
+        CountStage* countStage = static_cast<CountStage*>(exec->getRootStage());
+        const CountStats* countStats =
+            static_cast<const CountStats*>(countStage->getSpecificStats());
 
-        // This acquires the DB read lock
-        //
-        Client::ReadContext ctx(txn, ns);
-
-        string err;
-        int errCode;
-        long long n = runCount(txn, ns, cmdObj, err, errCode);
-
-        long long retVal = n;
-        bool ok = true;
-        if ( n == -1 ) {
-            retVal = 0;
-            result.appendBool( "missing" , true );
-        }
-        else if ( n < 0 ) {
-            retVal = 0;
-            ok = false;
-            if ( !err.empty() ) {
-                errmsg = err;
-                result.append("code", errCode);
-                return false;
-            }
-        }
-
-        result.append("n", static_cast<double>(retVal));
-        return ok;
+        return countStats->nCounted;
     }
 
 } // namespace mongo

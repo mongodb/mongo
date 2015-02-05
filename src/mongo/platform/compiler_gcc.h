@@ -61,3 +61,6 @@
 #define MONGO_COMPILER_API_EXPORT __attribute__(( __visibility__("default") ))
 #define MONGO_COMPILER_API_IMPORT
 #define MONGO_COMPILER_API_CALLING_CONVENTION
+
+#define MONGO_likely(x) static_cast<bool>(__builtin_expect(static_cast<bool>(x), 1))
+#define MONGO_unlikely(x) static_cast<bool>(__builtin_expect(static_cast<bool>(x), 0))

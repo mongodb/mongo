@@ -81,7 +81,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
     LogComponent LogComponent::parent() const {
         switch (_value) {
         case kDefault: return kNumLogComponents;
-        DECLARE_LOG_COMPONENT_PARENT(kJournaling, kStorage);
+        DECLARE_LOG_COMPONENT_PARENT(kJournal, kStorage);
         case kNumLogComponents: return kNumLogComponents;
         default: return kDefault;
         }
@@ -92,15 +92,17 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         switch (_value) {
         case kDefault: return createStringData("default");
         case kAccessControl: return createStringData("accessControl");
-        case kCommands: return createStringData("commands");
-        case kIndexing: return createStringData("indexing");
-        case kNetworking: return createStringData("networking");
+        case kCommand: return createStringData("command");
+        case kControl: return createStringData("control");
+        case kGeo: return createStringData("geo");
+        case kIndex: return createStringData("index");
+        case kNetwork: return createStringData("network");
         case kQuery: return createStringData("query");
         case kReplication: return createStringData("replication");
         case kSharding: return createStringData("sharding");
         case kStorage: return createStringData("storage");
-        case kJournaling: return createStringData("journaling");
-        case kWrites: return createStringData("writes");
+        case kJournal: return createStringData("journal");
+        case kWrite: return createStringData("write");
         case kNumLogComponents: return createStringData("total");
         // No default. Compiler should complain if there's a log component that's not handled.
         }
@@ -133,17 +135,19 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
 
     StringData LogComponent::getNameForLog() const {
         switch (_value) {
-        case kDefault:              return createStringData("        ");
+        case kDefault:              return createStringData("-       ");
         case kAccessControl:        return createStringData("ACCESS  ");
-        case kCommands:             return createStringData("COMMANDS");
-        case kIndexing:             return createStringData("INDEXING");
-        case kNetworking:           return createStringData("NETWORK ");
+        case kCommand:              return createStringData("COMMAND ");
+        case kControl:              return createStringData("CONTROL ");
+        case kGeo:                  return createStringData("GEO     ");
+        case kIndex:                return createStringData("INDEX   ");
+        case kNetwork:              return createStringData("NETWORK ");
         case kQuery:                return createStringData("QUERY   ");
-        case kReplication:          return createStringData("REPLSETS");
+        case kReplication:          return createStringData("REPL    ");
         case kSharding:             return createStringData("SHARDING");
         case kStorage:              return createStringData("STORAGE ");
-        case kJournaling:           return createStringData("JOURNAL ");
-        case kWrites:               return createStringData("WRITES  ");
+        case kJournal:              return createStringData("JOURNAL ");
+        case kWrite:                return createStringData("WRITE   ");
         case kNumLogComponents:     return createStringData("TOTAL   ");
         // No default. Compiler should complain if there's a log component that's not handled.
         }

@@ -32,8 +32,8 @@
 
 #include <iterator>
 
-#include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -63,7 +63,7 @@ namespace {
             return StatusWith<int>(ErrorCodes::NodeNotFound, str::stream() <<
                                    "No host described in new configuration " <<
                                    newConfig.getConfigVersion() << " for replica set " <<
-                                   newConfig.getReplSetName() << " maps to this node.");
+                                   newConfig.getReplSetName() << " maps to this node");
         }
         if (meConfigs.size() > 1) {
             str::stream message;
@@ -155,15 +155,11 @@ namespace {
         }
 
         //
-        // For every member config mNew in newConfig, if there exists member config mOld in
-        // oldConfig such that mNew.getId() == mOld.getId(), it is required that
-        // mNew.getHostAndPort() == mOld.getHostAndPort().
-        //
-        // Similarly, for every member config mNew in newConfig, if there exists member confg mOld
+        // For every member config mNew in newConfig, if there exists member config mOld
         // in oldConfig such that mNew.getHostAndPort() == mOld.getHostAndPort(), it is required
         // that mNew.getId() == mOld.getId().
         //
-        // Finally, one may not use reconfig to change the value of the buildIndexes or
+        // Also, one may not use reconfig to change the value of the buildIndexes or
         // arbiterOnly flags.
         //
         for (ReplicaSetConfig::MemberIterator mNew = newConfig.membersBegin();
@@ -177,18 +173,6 @@ namespace {
                 const bool hostsEqual = mOld->getHostAndPort() == mNew->getHostAndPort();
                 if (!idsEqual && !hostsEqual) {
                     continue;
-                }
-                if (idsEqual && !hostsEqual) {
-                    return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                                  str::stream() <<
-                                  "New and old configurations both have members with " <<
-                                  MemberConfig::kIdFieldName << " of " << mOld->getId() <<
-                                  " but in the new configuration the " <<
-                                  MemberConfig::kHostFieldName << " field is " <<
-                                  mNew->getHostAndPort().toString() <<
-                                  " and in the old configuration it is " <<
-                                  mOld->getHostAndPort().toString() <<
-                                  " for replica set " << newConfig.getReplSetName());
                 }
                 if (hostsEqual && !idsEqual) {
                     return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
@@ -212,7 +196,7 @@ namespace {
                                   "New and old configurations differ in the setting of the "
                                   "buildIndexes field for member " <<
                                   mOld->getHostAndPort().toString() <<
-                                  "; to make this change, remove then re-add the member.");
+                                  "; to make this change, remove then re-add the member");
                 }
                 const bool arbiterFlagsEqual = mOld->isArbiter() == mNew->isArbiter();
                 if (!arbiterFlagsEqual) {
@@ -221,7 +205,7 @@ namespace {
                                   "New and old configurations differ in the setting of the "
                                   "arbiterOnly field for member " <<
                                   mOld->getHostAndPort().toString() <<
-                                  "; to make this change, remove then re-add the member.");
+                                  "; to make this change, remove then re-add the member");
 
                 }
             }
@@ -229,6 +213,23 @@ namespace {
         return Status::OK();
     }
 }  // namespace
+
+    StatusWith<int> validateConfigForStartUp(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& oldConfig,
+            const ReplicaSetConfig& newConfig) {
+        Status status = newConfig.validate();
+        if (!status.isOK()) {
+            return StatusWith<int>(status);
+        }
+        if (oldConfig.isInitialized()) {
+            status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
+            if (!status.isOK()) {
+                return StatusWith<int>(status);
+            }
+        }
+        return findSelfInConfig(externalState, newConfig);
+    }
 
     StatusWith<int> validateConfigForInitiate(
             ReplicationCoordinatorExternalState* externalState,
@@ -249,7 +250,8 @@ namespace {
     StatusWith<int> validateConfigForReconfig(
             ReplicationCoordinatorExternalState* externalState,
             const ReplicaSetConfig& oldConfig,
-            const ReplicaSetConfig& newConfig) {
+            const ReplicaSetConfig& newConfig,
+            bool force) {
 
         Status status = newConfig.validate();
         if (!status.isOK()) {
@@ -261,7 +263,23 @@ namespace {
             return StatusWith<int>(status);
         }
 
+        if (force) {
+            return findSelfInConfig(externalState, newConfig);
+        }
+
         return findSelfInConfigIfElectable(externalState, newConfig);
+    }
+
+    StatusWith<int> validateConfigForHeartbeatReconfig(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& newConfig) {
+
+        Status status = newConfig.validate();
+        if (!status.isOK()) {
+            return StatusWith<int>(status);
+        }
+
+        return findSelfInConfig(externalState, newConfig);
     }
 
 }  // namespace repl

@@ -26,13 +26,15 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
 
     boost::optional<Document> DocumentSourceBsonArray::getNext() {
         pExpCtx->checkForInterrupt();

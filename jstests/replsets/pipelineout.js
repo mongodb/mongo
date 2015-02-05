@@ -6,7 +6,7 @@ var nodes = replTest.nodeList();
 replTest.startSet();
 replTest.initiate({"_id" : name,
                    "members" : [
-                         {"_id" : 0, "host" : nodes[0], "priority" : 5},
+                         {"_id" : 0, "host" : nodes[0]},
                          {"_id" : 1, "host" : nodes[1]}
      ]});
 
@@ -32,4 +32,5 @@ assert.throws(function() {
 // run one and check for proper replication
 primary.in.aggregate({$out: "out"}).itcount;
 replTest.awaitReplication();
-assert.eq(primary.out.find().toArray(), secondary.out.find().toArray());
+assert.eq(primary.out.find().sort( { x : 1 } ).toArray(),
+          secondary.out.find().sort( { x : 1 } ).toArray());

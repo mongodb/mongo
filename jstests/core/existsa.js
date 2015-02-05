@@ -13,18 +13,11 @@ function setIndex( _indexKeyField ) {
     indexKeySpec = {};
     indexKeySpec[ indexKeyField ] = 1;
     t.ensureIndex( indexKeySpec, { sparse:true } );
-    indexCursorName = 'BtreeCursor ' + indexKeyField + '_1';
 }
 setIndex( 'a' );
 
-/** Validate the prefix of 'str'. */
-function assertPrefix( prefix, str ) {
-    assert.eq( prefix, str.substring( 0, prefix.length ) );
-}
-
 /** @return count when hinting the index to use. */
 function hintedCount( query ) {
-    assertPrefix( indexCursorName, t.find( query ).hint( indexKeySpec ).explain().cursor );
     return t.find( query ).hint( indexKeySpec ).itcount();
 }
 
@@ -33,7 +26,6 @@ function assertMissing( query, expectedMissing, expectedIndexedMissing ) {
     expectedMissing = expectedMissing || 1;
     expectedIndexedMissing = expectedIndexedMissing || 0;
     assert.eq( expectedMissing, t.count( query ) );
-    assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
     // We also shouldn't get a different count depending on whether
     // an index is used or not.
     assert.eq( expectedIndexedMissing, hintedCount( query ) );
@@ -43,14 +35,12 @@ function assertMissing( query, expectedMissing, expectedIndexedMissing ) {
 function assertExists( query, expectedExists ) {
     expectedExists = expectedExists || 2;
     assert.eq( expectedExists, t.count( query ) );
-    assert.eq( 0, t.find( query ).explain().cursor.indexOf('BtreeCursor') );
     // An $exists:true predicate generates no index filters.  Add another predicate on the index key
     // to trigger use of the index.
     andClause = {}
     andClause[ indexKeyField ] = { $ne:null };
     Object.extend( query, { $and:[ andClause ] } );
     assert.eq( expectedExists, t.count( query ) );
-    assertPrefix( indexCursorName, t.find( query ).explain().cursor );
     assert.eq( expectedExists, hintedCount( query ) );
 }
 
@@ -58,13 +48,11 @@ function assertExists( query, expectedExists ) {
 function assertExistsUnindexed( query, expectedExists ) {
     expectedExists = expectedExists || 2;
     assert.eq( expectedExists, t.count( query ) );
-    assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
     // Even with another predicate on the index key, the sparse index is disallowed.
     andClause = {}
     andClause[ indexKeyField ] = { $ne:null };
     Object.extend( query, { $and:[ andClause ] } );
     assert.eq( expectedExists, t.count( query ) );
-    assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
     assert.eq( expectedExists, hintedCount( query ) );
 }
 
@@ -111,4 +99,3 @@ t.drop();
 t.save( {} );
 t.ensureIndex( { a:1 } );
 assert.eq( 1, t.find( { a:{ $exists:false } } ).itcount() );
-assert.eq( 'BtreeCursor a_1', t.find( { a:{ $exists:false } } ).explain().cursor );

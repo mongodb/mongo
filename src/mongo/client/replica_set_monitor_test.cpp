@@ -26,15 +26,17 @@
  *    then also delete it in the license file.
  */
 
+#include <boost/make_shared.hpp>
+
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
+using std::set;
 using namespace mongo;
 
 // Pull nested types to top-level scope
@@ -444,10 +446,12 @@ TEST(ReplicaSetMonitorTests, MasterNotInSeeds_PrimaryInIsMaster) {
     for (size_t i = 0; i < basicSeeds.size() + 1; i++) {
         NextStep ns = refresher.getNextStep();
         ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
-        if (i == 1) // d should be the second host we contact since we are told it is primary
+        if (i == 1) { // d should be the second host we contact since we are told it is primary
             ASSERT_EQUALS(ns.host.host(), "d");
-        else
+        }
+        else {
             ASSERT(basicSeedsSet.count(ns.host));
+        }
 
         ASSERT(!seen.count(ns.host));
         seen.insert(ns.host);

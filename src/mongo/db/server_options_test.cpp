@@ -368,7 +368,7 @@ namespace {
                          "            verbosity: 0\n"
                          "        storage:\n"
                          "            verbosity: -1\n"
-                         "            journaling:\n"
+                         "            journal:\n"
                          "                verbosity: 2\n");
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
@@ -410,9 +410,9 @@ namespace {
 
         // Journaling - explicitly set to 2 in configuration.
         ASSERT_TRUE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
-                          ::mongo::logger::LogComponent::kJournaling));
+                          ::mongo::logger::LogComponent::kJournal));
         ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
-                          ::mongo::logger::LogComponent::kJournaling),
+                          ::mongo::logger::LogComponent::kJournal),
                       ::mongo::logger::LogSeverity::Debug(2));
     }
 

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 
@@ -40,7 +42,13 @@ namespace mongo {
 
         void reset();
 
+        /**
+         * Updates fields based on BSON document from client.
+         * If document contains a 'storageEngine' field, ensures that 'storageEngine'
+         * contains a single field of Object type.
+         */
         Status parse( const BSONObj& obj );
+
         BSONObj toBSON() const;
 
         /**
@@ -72,6 +80,9 @@ namespace mongo {
         bool flagsSet;
 
         bool temp;
+
+        // Storage engine collection options. Always owned or empty.
+        BSONObj storageEngine;
     };
 
 }

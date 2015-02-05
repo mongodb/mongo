@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 
 #include "mongo/db/jsobj.h"
@@ -38,6 +38,12 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using boost::shared_ptr;
+    using std::pair;
+    using std::vector;
+
     const char DocumentSourceGroup::groupName[] = "$group";
 
     const char *DocumentSourceGroup::getSourceName() const {

@@ -24,20 +24,16 @@ r = function( k , vs ){
 }
 
 ex = function(){
-    return out.find().sort( { value : 1 } ).explain()
+    return out.find().sort( { value : 1 } ).explain("executionStats")
 }
 
 res = t.mapReduce(  m , r , { out : outName } )
-    
-assert.eq( "BasicCursor" , ex().cursor , "A1" )
+
+assert.eq( 3 , ex().executionStats.nReturned , "A1" )
 out.ensureIndex( { value : 1 } )
-assert.eq( "BtreeCursor value_1" , ex().cursor , "A2" )
-assert.eq( 3 , ex().n , "A3" )
+assert.eq( 3 , ex().executionStats.nReturned , "A2" )
 
 res = t.mapReduce(  m , r , { out : outName } )
-    
-assert.eq( "BtreeCursor value_1" , ex().cursor , "B1" )
-assert.eq( 3 , ex().n , "B2" )
+
+assert.eq( 3 , ex().executionStats.nReturned , "B1" )
 res.drop()
-
-

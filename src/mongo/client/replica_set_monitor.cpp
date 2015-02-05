@@ -25,19 +25,24 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/replica_set_monitor.h"
 
 #include <algorithm>
+#include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
 #include <limits>
 
 #include "mongo/db/server_options.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor_internal.h"
-#include "mongo/util/concurrency/mutex.h" // for StaticObserver
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/mutex.h" // for StaticObserver
+#include "mongo/util/debug_util.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
@@ -52,7 +57,9 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+    using std::numeric_limits;
+    using std::set;
+    using std::string;
 
 namespace {
     // Pull nested types to top-level scope
@@ -442,7 +449,16 @@ namespace {
             builder.append("ismaster", node.isMaster); // intentionally not camelCase
             builder.append("hidden", false); // we don't keep hidden nodes in the set
             builder.append("secondary", node.isUp && !node.isMaster);
-            builder.append("pingTimeMillis", int(node.latencyMicros / 1000));
+
+            int32_t pingTimeMillis = 0;
+            if (node.latencyMicros / 1000 > numeric_limits<int32_t>::max()) {
+                // In particular, Node::unknownLatency does not fit in an int32.
+                pingTimeMillis = numeric_limits<int32_t>::max();
+            }
+            else {
+                pingTimeMillis = node.latencyMicros / 1000;
+            }
+            builder.append("pingTimeMillis", pingTimeMillis);
 
             if (!node.tags.isEmpty()) {
                 builder.append("tags", node.tags);

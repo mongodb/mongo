@@ -20,7 +20,7 @@ assert.soon( base.length + " == c.count()" , "after import 1 " );
 a = c.find().sort( { a : 1 } ).toArray();
 for (i = 0; i < base.length; i++ ) {
     delete a[i]._id
-    assert.eq( tojson(base[i]), tojson(a[i]), "csv parse " + i)
+    assert.docEq( base[i], a[i], "csv parse " + i)
 }
 
 c.drop()
@@ -33,7 +33,7 @@ assert.eq( base.length - 1 , c.count() , "after import 2" );
 x = c.find().sort( { a : 1 } ).toArray();
 for (i = 0; i < base.length - 1; i++ ) {
     delete x[i]._id
-    assert.eq( tojson(base[i]), tojson(x[i]), "csv parse with headerline " + i)
+    assert.docEq( base[i], x[i], "csv parse with headerline " + i)
 }
 
 

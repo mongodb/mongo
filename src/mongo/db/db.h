@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
@@ -42,7 +42,5 @@ namespace repl {
 } // namespace repl
 
     extern void (*snmpInit)();
-
-    void setGlobalReplSettings(const repl::ReplSettings& settings);
 
 } // namespace mongo

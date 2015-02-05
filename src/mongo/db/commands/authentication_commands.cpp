@@ -26,6 +26,10 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/commands/authentication_commands.h"
 
 #include <boost/algorithm/string.hpp>
@@ -49,13 +53,19 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
+
+    using std::hex;
+    using std::string;
+    using std::stringstream;
 
     static bool _isCRAuthDisabled;
     static bool _isX509AuthDisabled;
@@ -142,9 +152,11 @@ namespace mongo {
                               BSONObjBuilder& result,
                               bool fromRepl) {
 
-        mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
-        redactForLogging(&cmdToLog);
-        log() << " authenticate db: " << dbname << " " << cmdToLog << endl;
+        if (!serverGlobalParams.quiet) {
+            mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
+            redactForLogging(&cmdToLog);
+            log() << " authenticate db: " << dbname << " " << cmdToLog;
+        }
 
         UserName user(cmdObj.getStringField("user"), dbname);
         if (Command::testCommandsEnabled &&
@@ -166,8 +178,10 @@ namespace mongo {
                                  user,
                                  status.code());
         if (!status.isOK()) {
-            log() << "Failed to authenticate " << user << " with mechanism " << mechanism << ": " <<
-                status;
+            if (!serverGlobalParams.quiet) {
+                log() << "Failed to authenticate " << user << " with mechanism " << mechanism
+                      << ": " << status;
+            }
             if (status.code() == ErrorCodes::AuthenticationFailed) {
                 // Statuses with code AuthenticationFailed may contain messages we do not wish to
                 // reveal to the user, so we return a status with the message "auth failed".
@@ -258,6 +272,11 @@ namespace mongo {
         string pwd = userObj->getCredentials().password;
         getGlobalAuthorizationManager()->releaseUser(userObj);
 
+        if (pwd.empty()) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "MONGODB-CR credentials missing in the user document");
+        }
+
         md5digest d;
         {
             digestBuilder << user.getUser() << pwd;
@@ -336,12 +355,16 @@ namespace mongo {
         AuthorizationSession* authorizationSession = client->getAuthorizationSession();
         std::string subjectName = client->port()->getX509SubjectName();
 
-        if (user.getUser() != subjectName) {
+        if (!getSSLManager()->getSSLConfiguration().hasCA) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "Unable to verify x.509 certificate, as no CA has been provided.");
+        }
+        else if (user.getUser() != subjectName) {
             return Status(ErrorCodes::AuthenticationFailed,
                           "There is no x.509 client certificate matching the user.");
         }
         else {
-            std::string srvSubjectName = getSSLManager()->getServerSubjectName();
+            std::string srvSubjectName = getSSLManager()->getSSLConfiguration().serverSubjectName;
  
             // Handle internal cluster member auth, only applies to server-server connections
             if (_clusterIdMatch(subjectName, srvSubjectName)) {

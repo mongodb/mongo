@@ -80,9 +80,9 @@ assert.eq( 1, result3.ok , "moveChunk didn't succeed");
 db.user.ensureIndex({ num: 1, x: 1 });
 db.adminCommand({ shardCollection: 'test.user', key: { num: 1 }});
 
-var indexCount = db.system.indexes.find({ ns: 'test.user' }).count();
+var indexCount = db.user.getIndexes().length;
 assert.eq(2, indexCount, // indexes for _id_ and num_1_x_1
-          'index count not expected: ' + tojson(db.system.indexes.find().toArray()));
+          'index count not expected: ' + tojson(db.user.getIndexes()));
 
 var array = [];
 for (var item = 0; item < 50; item++) {
@@ -136,8 +136,10 @@ for( i=0; i < 3; i++ ){
     // setup new collection on shard0
     var coll2 = db.foo2;
     coll2.drop();
-    var moveRes = admin.runCommand( { movePrimary : coll2.getDB() + "", to : shards[0]._id } );
-    assert.eq( moveRes.ok , 1 , "primary not moved correctly" );
+    if ( s.getServerName( coll2.getDB() ) != shards[0]._id ) {
+        var moveRes = admin.runCommand( { movePrimary : coll2.getDB() + "", to : shards[0]._id } );
+        assert.eq( moveRes.ok , 1 , "primary not moved correctly" );
+    }
 
     // declare a longer index
     if ( i == 0 ) {

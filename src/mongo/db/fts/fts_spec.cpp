@@ -27,7 +27,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/fts/fts_spec.h"
 
@@ -41,6 +41,8 @@ namespace mongo {
 
     namespace fts {
 
+        using std::map;
+        using std::string;
         using namespace mongoutils;
 
         const double DEFAULT_WEIGHT = 1;

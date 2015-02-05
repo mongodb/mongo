@@ -26,13 +26,16 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using std::vector;
 
     DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext> &pCtx)
         : pSource(NULL)

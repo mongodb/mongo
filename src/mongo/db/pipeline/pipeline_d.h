@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include <boost/smart_ptr.hpp>
+#include <boost/intrusive_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace mongo {
     class Collection;
@@ -63,7 +64,7 @@ namespace mongo {
          *
          * The cursor is added to the front of the pipeline's sources.
          *
-         * Must have a ReadContext before entering.
+         * Must have a AutoGetCollectionForRead before entering.
          *
          * If the returned PlanExecutor is non-null, you are responsible for ensuring
          * it receives appropriate invalidate and kill messages.
@@ -74,8 +75,8 @@ namespace mongo {
         static boost::shared_ptr<PlanExecutor> prepareCursorSource(
             OperationContext* txn,
             Collection* collection,
-            const intrusive_ptr<Pipeline> &pPipeline,
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
+            const boost::intrusive_ptr<Pipeline> &pPipeline,
+            const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
 
     private:
         PipelineD(); // does not exist:  prevent instantiation

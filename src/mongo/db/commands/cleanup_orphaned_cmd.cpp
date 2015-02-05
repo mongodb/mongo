@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -41,9 +43,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_deleter_service.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/collection_metadata.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/range_arithmetic.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/util/log.h"
@@ -59,7 +61,8 @@ namespace {
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
+    using std::endl;
+    using std::string;
 
     using mongoutils::str::stream;
 
@@ -120,6 +123,7 @@ namespace mongo {
 
             return CleanupResult_Done;
         }
+        orphanRange.ns = ns;
         *stoppedAtKey = orphanRange.maxKey;
 
         // We're done with this metadata now, no matter what happens
@@ -133,14 +137,16 @@ namespace mongo {
 
         // Metadata snapshot may be stale now, but deleter checks metadata again in write lock
         // before delete.
-        if ( !getDeleter()->deleteNow( txn,
-                                       ns.toString(),
-                                       orphanRange.minKey,
-                                       orphanRange.maxKey,
-                                       keyPattern,
-                                       secondaryThrottle,
-                                       errMsg ) ) {
+        RangeDeleterOptions deleterOptions(orphanRange);
+        deleterOptions.writeConcern = secondaryThrottle;
+        deleterOptions.onlyRemoveOrphanedDocs = true;
+        deleterOptions.fromMigrate = true;
+        // Must wait for cursors since there can be existing cursors with an older
+        // CollectionMetadata.
+        deleterOptions.waitForOpenCursors = true;
+        deleterOptions.removeSaverReason = "cleanup-cmd";
 
+        if (!getDeleter()->deleteNow(txn, deleterOptions, errMsg)) {
             warning() << *errMsg << endl;
             return CleanupResult_Error;
         }
@@ -245,7 +251,16 @@ namespace mongo {
                 repl::ReplicationCoordinator* replCoordinator =
                         repl::getGlobalReplicationCoordinator();
                 Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
-                if (!status.isOK()) {
+
+                if (replCoordinator->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeMasterSlave &&
+                    writeConcern.shouldWaitForOtherNodes()) {
+                    warning() << "cleanupOrphaned cannot check if write concern setting "
+                              << writeConcern.toBSON()
+                              << " can be enforced in a master slave configuration";
+                }
+
+                if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
                     return appendCommandStatus(result, status);
                 }
             }

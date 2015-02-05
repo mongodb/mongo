@@ -26,8 +26,13 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/mongos_options.h"
 
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -37,12 +42,15 @@
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/version_mongos.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+    using std::endl;
 
     MongosGlobalParams mongosGlobalParams;
 

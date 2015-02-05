@@ -37,8 +37,8 @@
 #include <vector>
 
 #include "mongo/bson/inline_decls.h"
-
 #include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 namespace mutablebson {

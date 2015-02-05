@@ -26,6 +26,7 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/assert_util.h"
@@ -36,6 +37,9 @@ using mongo::MsgAssertionException;
  * Test getLastError client handling
  */
 namespace {
+
+    using std::string;
+
     static const char* const _ns = "unittests.gle";
 
     /**
@@ -105,5 +109,7 @@ namespace {
             add< GetLastErrorCommandFailure >();
             add< GetLastErrorFromDup >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 }

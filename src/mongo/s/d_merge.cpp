@@ -26,18 +26,23 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/chunk.h"  // needed for genID
 #include "mongo/s/config.h" // needed for changelog write
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
     using std::string;
     using mongoutils::str::stream;
 
@@ -77,11 +82,11 @@ namespace mongo {
         collLock.setLockMessage( stream() << "merging chunks in " << nss.ns() << " from "
                                           << minKey << " to " << maxKey );
 
-        if ( !collLock.tryAcquire( errMsg ) ) {
-
+        Status acquisitionStatus = collLock.tryAcquire();
+        if (!acquisitionStatus.isOK()) {
             *errMsg = stream() << "could not acquire collection lock for " << nss.ns()
                                << " to merge chunks in [" << minKey << "," << maxKey << ")"
-                               << causedBy( *errMsg );
+                               << causedBy(acquisitionStatus);
 
             warning() << *errMsg << endl;
             return false;
@@ -292,7 +297,9 @@ namespace mongo {
         //
 
         {
-            Lock::DBWrite writeLk(txn->lockState(), nss.ns());
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock writeLk(txn->lockState(), nss.db(), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_X);
             shardingState.mergeChunks(txn, nss.ns(), minKey, maxKey, mergeVersion);
         }
 

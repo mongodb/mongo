@@ -29,7 +29,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include <iostream>
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/matcher.h"
@@ -39,21 +39,15 @@
 
 namespace MatcherTests {
 
+    using std::cout;
+    using std::endl;
+    using std::string;
+
     class CollectionBase {
     public:
-        CollectionBase() : _ns( "unittests.matchertests" ) {
+        CollectionBase() { }
 
-        }
-
-        virtual ~CollectionBase() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
-            client.dropCollection(_ns);
-        }
-
-    protected:
-        const char * const _ns;
+        virtual ~CollectionBase() { }
     };
 
     template <typename M>
@@ -219,7 +213,7 @@ namespace MatcherTests {
     public:
         void run() {
             OperationContextImpl txn;
-            Client::ReadContext ctx(&txn, "unittests.matchertests");
+            AutoGetCollectionForRead ctx(&txn, "unittests.matchertests");
 
             M m(BSON("$where" << "function(){ return this.a == 1; }"),
                 WhereCallbackReal(&txn, StringData("unittests")));
@@ -282,7 +276,9 @@ namespace MatcherTests {
             ADD_BOTH(WithinCenter);
             ADD_BOTH(WithinPolygon);
         }
-    } dball;
+    };
+
+    SuiteInstance<All> dball;
 
 } // namespace MatcherTests
 

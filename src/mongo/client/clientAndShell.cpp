@@ -27,16 +27,24 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/clientOnly-private.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/shard.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::string;
+    using std::vector;
 
     class OperationContext;
 
@@ -59,7 +67,7 @@ namespace mongo {
         if ( whyMsg )
             log() << " b/c " << whyMsg << endl;
         log() << "exiting" << endl;
-        ::_exit( returnCode );
+        quickExit( returnCode );
     }
 
     bool inShutdown() {

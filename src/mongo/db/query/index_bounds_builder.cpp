@@ -26,17 +26,22 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/query/index_bounds_builder.h"
 
+#include <cmath>
 #include <limits>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/s2common.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2cell.h"
@@ -62,6 +67,11 @@ namespace mongo {
             return r;
         }
 
+        // A regex with the "|" character is never considered a simple regular expression.
+        if (StringData(regex).find('|') != std::string::npos) {
+            return "";
+        }
+
         bool extended = false;
         while (*flags) {
             switch (*(flags++)) {
@@ -82,15 +92,15 @@ namespace mongo {
 
         while(*regex) {
             char c = *(regex++);
+
+            // We should have bailed out early above if '|' is in the regex.
+            invariant(c != '|');
+
             if ( c == '*' || c == '?' ) {
                 // These are the only two symbols that make the last char optional
                 r = ss;
                 r = r.substr( 0 , r.size() - 1 );
                 return r; //breaking here fails with /^a?/
-            }
-            else if (c == '|') {
-                // whole match so far is optional. Nothing we can do here.
-                return string();
             }
             else if (c == '\\') {
                 c = *(regex++);
@@ -266,6 +276,9 @@ namespace mongo {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else if (MatchExpression::NOT == expr->matchType()) {
+            // A NOT is indexed by virtue of its child. If we're here then the NOT's child
+            // must be a kind of node for which we can index negations. It can't be things like
+            // $mod, $regex, or $type.
             MatchExpression* child = expr->getChild(0);
 
             // If we have a NOT -> EXISTS, we must handle separately.
@@ -277,32 +290,20 @@ namespace mongo {
                 bob.appendNull("");
                 BSONObj dataObj = bob.obj();
                 oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
-                
+
                 *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
                 return;
             }
-            else if (Indexability::nodeCanUseIndexOnOwnField(child)) {
-                // We have a NOT of a bounds-generating expression. Get the
-                // bounds of the NOT's child and then complement them.
-                translate(expr->getChild(0), elt, index, oilOut, tightnessOut);
-                oilOut->complement();
 
-                // If the index is multikey, it doesn't matter what the tightness
-                // of the child is, we must return INEXACT_FETCH. Consider a multikey
-                // index on 'a' with document {a: [1, 2, 3]} and query {a: {$ne: 3}}.
-                // If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then
-                // we would erroneously return the document!
-                if (index.multikey) {
-                    *tightnessOut = INEXACT_FETCH;
-                }
-            }
-            else {
-                // TODO: In the future we shouldn't need this. We handle this case for the time
-                // being because we have some deficiencies in tree normalization (see SERVER-12735).
-                //
-                // For example, we will get here if there is an index {a: 1}
-                // and the query is {a: {$elemMatch: {$not: {$gte: 6}}}}.
-                oilOut->intervals.push_back(allValues());
+            translate(child, elt, index, oilOut, tightnessOut);
+            oilOut->complement();
+
+            // If the index is multikey, it doesn't matter what the tightness
+            // of the child is, we must return INEXACT_FETCH. Consider a multikey
+            // index on 'a' with document {a: [1, 2, 3]} and query {a: {$ne: 3}}.
+            // If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then
+            // we would erroneously return the document!
+            if (index.multikey) {
                 *tightnessOut = INEXACT_FETCH;
             }
         }
@@ -359,7 +360,7 @@ namespace mongo {
             }
 
             // Only NaN is <= NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 double nan = dataElt.numberDouble();
                 oilOut->intervals.push_back(makePointInterval(nan));
                 *tightnessOut = IndexBoundsBuilder::EXACT;
@@ -398,7 +399,7 @@ namespace mongo {
             }
 
             // Nothing is < NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -441,7 +442,7 @@ namespace mongo {
             }
 
             // Nothing is > NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -483,7 +484,7 @@ namespace mongo {
             }
 
             // Only NaN is >= NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 double nan = dataElt.numberDouble();
                 oilOut->intervals.push_back(makePointInterval(nan));
                 *tightnessOut = IndexBoundsBuilder::EXACT;
@@ -578,14 +579,14 @@ namespace mongo {
             const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
 
             if (mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
-                verify(gme->getGeoQuery().getGeometry().hasS2Region());
-                const S2Region& region = gme->getGeoQuery().getGeometry().getS2Region();
+                verify(gme->getGeoExpression().getGeometry().hasS2Region());
+                const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
                 ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
                 *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             }
             else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
-                verify(gme->getGeoQuery().getGeometry().hasR2Region());
-                const R2Region& region = gme->getGeoQuery().getGeometry().getR2Region();
+                verify(gme->getGeoExpression().getGeometry().hasR2Region());
+                const R2Region& region = gme->getGeoExpression().getGeometry().getR2Region();
 
                 ExpressionMapping::cover2d(region,
                                            index.infoObj,

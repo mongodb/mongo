@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/stacktrace.h"
@@ -158,7 +160,7 @@ namespace mongo {
         std::string symbolAndOffset;
     };
 
-    static const int maxBackTraceFrames = 20;
+    static const int maxBackTraceFrames = 100;
 
     /**
      * Print a stack backtrace for the current thread to the specified ostream.

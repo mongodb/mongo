@@ -35,15 +35,12 @@
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/util/log.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
     class OperationContext;
 
 namespace repl {
-
-    class Member;
 
     class SyncSourceFeedback {
     public:
@@ -62,10 +59,6 @@ namespace repl {
         /// replication progress.
         void forwardSlaveProgress();
 
-        /// Returns the RID for this process.  ensureMe() must have been called before this can be.
-        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
-        OID getMyRID() const { return _me["_id"].OID(); }
-
         /// Loops continuously until shutdown() is called, passing updates when they are present.
         /// TODO(spencer): Currently also can terminate when the global inShutdown() function
         /// returns true.  Remove that once the legacy repl coordinator is gone.
@@ -75,12 +68,7 @@ namespace repl {
         void shutdown();
 
     private:
-        void _resetConnection() {
-            MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kReplication);
-
-            LOG(1) << "resetting connection in sync source feedback";
-            _connection.reset();
-        }
+        void _resetConnection();
 
         /**
          * Authenticates _connection using the server's cluster-membership credentials.
@@ -96,21 +84,23 @@ namespace repl {
 
         /* Inform the sync target of our current position in the oplog, as well as the positions
          * of all secondaries chained through us.
+         * ErrorCodes::NodeNotFound indicates that the caller should re-run replHandshake before
+         * calling this again.
          */
-        bool updateUpstream(OperationContext* txn);
+        Status updateUpstream(OperationContext* txn);
 
         bool hasConnection() {
             return _connection.get();
         }
 
         /// Connect to sync target.
-        bool _connect(OperationContext* txn, const std::string& hostName);
+        bool _connect(OperationContext* txn, const HostAndPort& host);
 
         // stores our OID to be passed along in commands
         /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.
         BSONObj _me;
         // the member we are currently syncing from
-        const Member* _syncTarget;
+        HostAndPort _syncTarget;
         // our connection to our sync target
         boost::scoped_ptr<DBClientConnection> _connection;
         // protects cond, _shutdownSignaled, and the indicator bools.

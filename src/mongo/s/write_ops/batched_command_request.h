@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
@@ -35,6 +37,8 @@
 #include "mongo/s/write_ops/batched_delete_request.h"
 
 namespace mongo {
+
+    class NamespaceString;
 
     /**
      * This class wraps the different kinds of command requests into a generically usable write
@@ -109,6 +113,7 @@ namespace mongo {
         bool isUniqueIndexRequest() const;
         bool isValidIndexRequest( std::string* errMsg ) const;
         std::string getTargetingNS() const;
+        const NamespaceString& getTargetingNSS() const;
         BSONObj getIndexKeyPattern() const;
 
         //
@@ -117,10 +122,10 @@ namespace mongo {
 
         bool isVerboseWC() const;
 
+        void setNSS( const NamespaceString& nss );
         void setNS( const StringData& collName );
-        void unsetNS();
-        bool isNSSet() const;
         const std::string& getNS() const;
+        const NamespaceString& getNSS() const;
 
         std::size_t sizeWriteOps() const;
 
@@ -177,10 +182,9 @@ namespace mongo {
     private:
 
         BatchType _batchType;
-        scoped_ptr<BatchedInsertRequest> _insertReq;
-        scoped_ptr<BatchedUpdateRequest> _updateReq;
-        scoped_ptr<BatchedDeleteRequest> _deleteReq;
-
+        boost::scoped_ptr<BatchedInsertRequest> _insertReq;
+        boost::scoped_ptr<BatchedUpdateRequest> _updateReq;
+        boost::scoped_ptr<BatchedDeleteRequest> _deleteReq;
     };
 
     /**

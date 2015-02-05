@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include <cstdlib>
 #include <string>
 
@@ -40,7 +42,10 @@
 #include <vm/vm_param.h>
 
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/log.h"
 #include "processinfo.h"
+
+using namespace std;
 
 namespace mongo {
 

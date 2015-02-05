@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "mongo/platform/compiler.h"
+#include "mongo/util/exit_code.h"
 
 namespace mongo {
 
@@ -57,7 +58,7 @@ namespace ntservice {
         const wchar_t* serviceDescription;
     };
 
-    typedef void (*ServiceCallback)(void);
+    typedef ExitCode (*ServiceCallback)(void);
 
     /**
      * Configure the service.
@@ -95,7 +96,7 @@ namespace ntservice {
      */
     MONGO_COMPILER_NORETURN void startService();
 
-    bool reportStatus(DWORD reportState, DWORD waitHint = 0);
+    bool reportStatus(DWORD reportState, DWORD waitHint = 0, DWORD exitCode = 0);
 
 }  // namespace ntservice
 }  // namespace mongo

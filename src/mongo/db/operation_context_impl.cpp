@@ -26,37 +26,60 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/operation_context_impl.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/log.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
-    OperationContextImpl::OperationContextImpl() {
+    using std::string;
+
+    OperationContextImpl::OperationContextImpl()
+        : _client(currentClient.get()),
+          _locker(_client->getLocker()) {
+        invariant(_locker);
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         invariant(storageEngine);
-        _recovery.reset(storageEngine->newRecoveryUnit(this));
-
-        getGlobalEnvironment()->registerOperationContext(this);
+        _recovery.reset(storageEngine->newRecoveryUnit());
+        _client->setOperationContext(this);
     }
 
     OperationContextImpl::~OperationContextImpl() {
-        getGlobalEnvironment()->unregisterOperationContext(this);
+        _locker->assertEmpty();
+        _client->resetOperationContext();
     }
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {
         return _recovery.get();
     }
 
-    LockState* OperationContextImpl::lockState() const {
-        return const_cast<LockState*>(&_lockState);
+    RecoveryUnit* OperationContextImpl::releaseRecoveryUnit() {
+        if ( _recovery.get() )
+            _recovery->beingReleasedFromOperationContext();
+        return _recovery.release();
+    }
+
+    void OperationContextImpl::setRecoveryUnit(RecoveryUnit* unit) {
+        _recovery.reset(unit);
+        if ( unit )
+            unit->beingSetOnOperationContext();
+    }
+
+    Locker* OperationContextImpl::lockState() const {
+        return _locker;
     }
 
     ProgressMeter* OperationContextImpl::setMessage(const char * msg,
@@ -71,15 +94,19 @@ namespace mongo {
     }
 
     bool OperationContextImpl::isGod() const {
-        return cc().isGod();
+        return getClient()->isGod();
     }
 
     Client* OperationContextImpl::getClient() const {
-        return &cc();
+        return _client;
     }
 
     CurOp* OperationContextImpl::getCurOp() const {
-        return cc().curop();
+        return getClient()->curop();
+    }
+
+    unsigned int OperationContextImpl::getOpID() const {
+        return getCurOp()->opNum();
     }
 
     // Enabling the checkForInterruptFail fail point will start a game of random chance on the
@@ -127,57 +154,35 @@ namespace mongo {
 
     } // namespace
 
-    void OperationContextImpl::checkForInterrupt(bool heedMutex) const {
-        Client& c = cc();
+    void OperationContextImpl::checkForInterrupt() const {
+        // We cannot interrupt operation, while it's inside of a write unit of work, because logOp
+        // cannot handle being iterrupted.
+        if (lockState()->inAWriteUnitOfWork()) return;
 
-        if (heedMutex && lockState()->isWriteLocked() && c.hasWrittenSinceCheckpoint()) {
-            return;
-        }
-
-        uassert(ErrorCodes::InterruptedAtShutdown,
-                "interrupted at shutdown",
-                !getGlobalEnvironment()->getKillAllOperations());
-
-        if (c.curop()->maxTimeHasExpired()) {
-            c.curop()->kill();
-            uasserted(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
-        }
-
-        MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
-            if (opShouldFail(c, scopedFailPoint.getData())) {
-                log() << "set pending kill on " << (c.curop()->parent() ? "nested" : "top-level")
-                      << " op " << c.curop()->opNum() << ", for checkForInterruptFail";
-                c.curop()->kill();
-            }
-        }
-
-        if (c.curop()->killPending()) {
-            uasserted(11601, "operation was interrupted");
-        }
+        uassertStatusOK(checkForInterruptNoAssert());
     }
 
     Status OperationContextImpl::checkForInterruptNoAssert() const {
-        Client& c = cc();
-
         if (getGlobalEnvironment()->getKillAllOperations()) {
-            return Status(ErrorCodes::Interrupted, "interrupted at shutdown");
+            return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
         }
 
-        if (c.curop()->maxTimeHasExpired()) {
-            c.curop()->kill();
-            return Status(ErrorCodes::Interrupted, "exceeded time limit");
+        Client* c = getClient();
+        if (c->curop()->maxTimeHasExpired()) {
+            c->curop()->kill();
+            return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
         }
 
         MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
-            if (opShouldFail(c, scopedFailPoint.getData())) {
-                log() << "set pending kill on " << (c.curop()->parent() ? "nested" : "top-level")
-                      << " op " << c.curop()->opNum() << ", for checkForInterruptFail";
-                c.curop()->kill();
+            if (opShouldFail(*c, scopedFailPoint.getData())) {
+                log() << "set pending kill on " << (c->curop()->parent() ? "nested" : "top-level")
+                      << " op " << c->curop()->opNum() << ", for checkForInterruptFail";
+                c->curop()->kill();
             }
         }
 
-        if (c.curop()->killPending()) {
-            return Status(ErrorCodes::Interrupted, "interrupted");
+        if (c->curop()->killPending()) {
+            return Status(ErrorCodes::Interrupted, "operation was interrupted");
         }
 
         return Status::OK();
@@ -186,10 +191,6 @@ namespace mongo {
     bool OperationContextImpl::isPrimaryFor( const StringData& ns ) {
         return repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
                 NamespaceString(ns).db());
-    }
-
-    Transaction* OperationContextImpl::getTransaction() {
-        return _tx.setTxIdOnce((unsigned)getCurOp()->opNum());
     }
 
 }  // namespace mongo

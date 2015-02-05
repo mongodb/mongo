@@ -39,10 +39,14 @@ namespace mongo {
         STAGE_CACHED_PLAN,
         STAGE_COLLSCAN,
 
+        // This stage sits at the root of the query tree and counts up the number of results
+        // returned by its child.
+        STAGE_COUNT,
+
         // If we're running a .count(), the query is fully covered by one ixscan, and the ixscan is
         // from one key to another, we can just skip through the keys without bothering to examine
         // them.
-        STAGE_COUNT,
+        STAGE_COUNT_SCAN,
 
         STAGE_DELETE,
 
@@ -65,10 +69,11 @@ namespace mongo {
         STAGE_GEO_NEAR_2D,
         STAGE_GEO_NEAR_2DSPHERE,
 
+        STAGE_GROUP,
+
         STAGE_IDHACK,
         STAGE_IXSCAN,
         STAGE_LIMIT,
-        STAGE_MOCK,
 
         // Implements parallelCollectionScan.
         STAGE_MULTI_ITERATOR,
@@ -81,6 +86,7 @@ namespace mongo {
         // Stage for running aggregation pipelines.
         STAGE_PIPELINE_PROXY,
 
+        STAGE_QUEUED_DATA,
         STAGE_SHARDING_FILTER,
         STAGE_SKIP,
         STAGE_SORT,
@@ -88,6 +94,8 @@ namespace mongo {
         STAGE_SUBPLAN,
         STAGE_TEXT,
         STAGE_UNKNOWN,
+
+        STAGE_UPDATE,
     };
 
 }  // namespace mongo

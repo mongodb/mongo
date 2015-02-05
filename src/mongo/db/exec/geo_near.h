@@ -28,12 +28,15 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/geo/geo_query.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/index_bounds.h"
 
 namespace mongo {
@@ -44,20 +47,19 @@ namespace mongo {
     struct GeoNearParams {
 
         GeoNearParams() :
-            filter(NULL), addPointMeta(false), addDistMeta(false), fullFilter(NULL) {
+            filter(NULL), nearQuery(NULL), addPointMeta(false), addDistMeta(false) {
         }
 
         // MatchExpression to apply to the index keys and fetched documents
+        // Not owned here, owned by solution nodes
         MatchExpression* filter;
         // Index scan bounds, not including the geo bounds
         IndexBounds baseBounds;
 
-        NearQuery nearQuery;
+        // Not owned here
+        const GeoNearExpression* nearQuery;
         bool addPointMeta;
         bool addDistMeta;
-
-        // More exclusive MatchExpression to apply to the fetched documents, if set
-        MatchExpression* fullFilter;
     };
 
     /**
@@ -82,8 +84,10 @@ namespace mongo {
 
         virtual StatusWith<double> computeDistance(WorkingSetMember* member);
 
+        virtual PlanStage::StageState initialize(OperationContext* txn,
+                                                 WorkingSet* workingSet,
+                                                 Collection* collection);
     private:
-
         const GeoNearParams _nearParams;
 
         // The 2D index we're searching over
@@ -98,6 +102,9 @@ namespace mongo {
 
         // Amount to increment the next bounds by
         double _boundsIncrement;
+
+        class DensityEstimator;
+        boost::scoped_ptr<DensityEstimator> _densityEstimator;
     };
 
     /**
@@ -122,8 +129,10 @@ namespace mongo {
 
         virtual StatusWith<double> computeDistance(WorkingSetMember* member);
 
+        virtual PlanStage::StageState initialize(OperationContext* txn,
+                                                 WorkingSet* workingSet,
+                                                 Collection* collection);
     private:
-
         const GeoNearParams _nearParams;
 
         // The 2D index we're searching over
@@ -138,6 +147,9 @@ namespace mongo {
 
         // Amount to increment the next bounds by
         double _boundsIncrement;
+
+        class DensityEstimator;
+        boost::scoped_ptr<DensityEstimator> _densityEstimator;
     };
 
 } // namespace mongo

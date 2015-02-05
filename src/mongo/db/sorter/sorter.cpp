@@ -48,6 +48,8 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/make_shared.hpp>
+#include <boost/shared_ptr.hpp>
 #include <snappy.h>
 
 #include "mongo/base/string_data.h"
@@ -56,12 +58,14 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/goodies.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/print.h"
+#include "mongo/util/ptr.h"
 
 namespace mongo {
     namespace sorter {
+
+        using boost::shared_ptr;
         using namespace mongoutils;
 
         // We need to use the "real" errno everywhere, not GetLastError() on Windows
@@ -110,7 +114,7 @@ namespace mongo {
         /** Ensures a named file is deleted when this object goes out of scope */
         class FileDeleter {
         public:
-            FileDeleter(const string& fileName) :_fileName(fileName) {}
+            FileDeleter(const std::string& fileName) :_fileName(fileName) {}
             ~FileDeleter() {
                 DESTRUCTOR_GUARD(
                     boost::filesystem::remove(_fileName);
@@ -156,7 +160,7 @@ namespace mongo {
                              > Settings;
             typedef std::pair<Key, Value> Data;
 
-            FileIterator(const string& fileName,
+            FileIterator(const std::string& fileName,
                          const Settings& settings,
                          boost::shared_ptr<FileDeleter> fileDeleter)
                 : _settings(settings)
@@ -253,7 +257,7 @@ namespace mongo {
             bool _done;
             boost::scoped_array<char> _buffer;
             boost::scoped_ptr<BufReader> _reader;
-            string _fileName;
+            std::string _fileName;
             boost::shared_ptr<FileDeleter> _fileDeleter; // Must outlive _file
             std::ifstream _file;
         };
@@ -270,7 +274,7 @@ namespace mongo {
                           const SortOptions& opts,
                           const Comparator& comp)
                 : _opts(opts)
-                , _remaining(opts.limit ? opts.limit : numeric_limits<unsigned long long>::max())
+                , _remaining(opts.limit ? opts.limit : std::numeric_limits<unsigned long long>::max())
                 , _first(true)
                 , _greater(comp)
             {

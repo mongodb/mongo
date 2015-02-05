@@ -29,7 +29,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/isself.h"
 #include "mongo/dbtests/dbtests.h"
@@ -56,7 +56,9 @@ namespace SockTests {
         void setupTests() {
             add< HostByName >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace SockTests
 

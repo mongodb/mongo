@@ -29,13 +29,16 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
@@ -82,6 +85,8 @@ namespace mongo {
             _timeTracker = this;
         }
 
+        // TODO(spencer): Remove this and get the global Listener via the
+        // globalEnvironmentExperiment
         static const Listener* getTimeTracker() {
             return _timeTracker;
         }
@@ -94,6 +99,12 @@ namespace mongo {
             return 0;
         }
 
+        /**
+         * Blocks until initAndListen has been called on this instance and gotten far enough that
+         * it is ready to receive incoming network requests.
+         */
+        void waitUntilListening() const;
+
     private:
         std::vector<SockAddr> _mine;
         std::vector<SOCKET> _socks;
@@ -102,6 +113,10 @@ namespace mongo {
         bool _setupSocketsSuccessful;
         bool _logConnect;
         long long _elapsedTime;
+        mutable boost::mutex _readyMutex; // Protects _ready
+        mutable boost::condition_variable _readyCondition; // Used to wait for changes to _ready
+        // Boolean that indicates whether this Listener is ready to accept incoming network requests
+        bool _ready;
         
 #ifdef MONGO_SSL
         SSLManagerInterface* _ssl;
@@ -143,30 +158,7 @@ namespace mongo {
             scoped_lock lk( _mutex );
             _sockets->erase( sock );
         }
-        void closeAll() {
-            std::set<int>* sockets;
-            std::set<std::string>* paths;
-
-            {
-                scoped_lock lk( _mutex );
-                sockets = _sockets;
-                _sockets = new std::set<int>();
-                paths = _socketPaths;
-                _socketPaths = new std::set<std::string>();
-            }
-
-            for ( std::set<int>::iterator i=sockets->begin(); i!=sockets->end(); i++ ) {
-                int sock = *i;
-                log() << "closing listening socket: " << sock << std::endl;
-                closesocket( sock );
-            }
-
-            for ( std::set<std::string>::iterator i=paths->begin(); i!=paths->end(); i++ ) {
-                std::string path = *i;
-                log() << "removing socket file: " << path << std::endl;
-                ::remove( path.c_str() );
-            }
-        }
+        void closeAll();
         static ListeningSockets* get();
     private:
         mongo::mutex _mutex;

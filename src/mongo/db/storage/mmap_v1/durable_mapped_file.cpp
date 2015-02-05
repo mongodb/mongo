@@ -32,22 +32,33 @@
    if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, not this.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
+#include <utility>
 
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 
 using namespace mongoutils;
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
+    using std::dec;
+    using std::endl;
+    using std::hex;
+    using std::map;
+    using std::pair;
+    using std::string;
 
     void DurableMappedFile::remapThePrivateView() {
         verify(storageGlobalParams.dur);
@@ -64,20 +75,112 @@ namespace mongo {
     }
 
     /** register view. threadsafe */
-    void PointerToDurableMappedFile::add(void *view, DurableMappedFile *f) {
+    void PointerToDurableMappedFile::add_inlock(void *view, DurableMappedFile *f) {
         verify(view);
         verify(f);
-        mutex::scoped_lock lk(_m);
-        _views.insert( pair<void*,DurableMappedFile*>(view,f) );
+        clearWritableBits_inlock(view, f->length());
+        _views.insert(pair<void*, DurableMappedFile*>(view, f));
     }
 
     /** de-register view. threadsafe */
-    void PointerToDurableMappedFile::remove(void *view) {
+    void PointerToDurableMappedFile::remove(void *view, size_t len) {
         if( view ) {
             mutex::scoped_lock lk(_m);
+            clearWritableBits_inlock(view, len);
             _views.erase(view);
         }
     }
+
+#ifdef _WIN32
+    void PointerToDurableMappedFile::clearWritableBits(void *privateView, size_t len) {
+        mutex::scoped_lock lk(_m);
+        clearWritableBits_inlock(privateView, len);
+    }
+
+    /** notification on unmapping so we can clear writable bits */
+    void PointerToDurableMappedFile::clearWritableBits_inlock(void *privateView, size_t len) {
+        for (unsigned i = reinterpret_cast<size_t>(privateView) / MemoryMappedCOWBitset::ChunkSize;
+            i <= (reinterpret_cast<size_t>(privateView) + len) / MemoryMappedCOWBitset::ChunkSize;
+            ++i) {
+            writable.clear(i);
+            dassert(!writable.get(i));
+        }
+    }
+
+    extern mutex mapViewMutex;
+
+    __declspec(noinline) void PointerToDurableMappedFile::makeChunkWritable(size_t chunkno) {
+        mutex::scoped_lock lkPrivateViews(_m);
+
+        if (writable.get(chunkno)) // double check lock
+            return;
+
+        // remap all maps in this chunk.
+        // common case is a single map, but could have more than one with smallfiles or .ns files
+        size_t chunkStart = chunkno * MemoryMappedCOWBitset::ChunkSize;
+        size_t chunkNext = chunkStart + MemoryMappedCOWBitset::ChunkSize;
+
+        scoped_lock lkMapView(mapViewMutex);
+
+        map<void*, DurableMappedFile*>::iterator i = _views.upper_bound((void*)(chunkNext - 1));
+        while (1) {
+            const pair<void*, DurableMappedFile*> x = *(--i);
+            DurableMappedFile *mmf = x.second;
+            if (mmf == 0)
+                break;
+
+            size_t viewStart = reinterpret_cast<size_t>(x.first);
+            size_t viewEnd = viewStart + mmf->length();
+            if (viewEnd <= chunkStart)
+                break;
+
+            size_t protectStart = std::max(viewStart, chunkStart);
+            dassert(protectStart < chunkNext);
+
+            size_t protectEnd = std::min(viewEnd, chunkNext);
+            size_t protectSize = protectEnd - protectStart;
+            dassert(protectSize > 0 && protectSize <= MemoryMappedCOWBitset::ChunkSize);
+
+            DWORD oldProtection;
+            bool ok = VirtualProtect(reinterpret_cast<void*>(protectStart),
+                protectSize,
+                PAGE_WRITECOPY,
+                &oldProtection);
+            if (!ok) {
+                DWORD dosError = GetLastError();
+
+                if (dosError == ERROR_COMMITMENT_LIMIT) {
+                    // System has run out of memory between physical RAM & page file, tell the user
+                    BSONObjBuilder bb;
+
+                    ProcessInfo p;
+                    p.getExtraInfo(bb);
+
+                    severe() << "MongoDB has exhausted the system memory capacity.";
+                    severe() << "Current Memory Status: " << bb.obj().toString();
+                }
+
+                severe() << "VirtualProtect for " << mmf->filename()
+                    << " chunk " << chunkno
+                    << " failed with " << errnoWithDescription(dosError)
+                    << " (chunk size is " << protectSize
+                    << ", address is " << hex << protectStart << dec << ")"
+                    << " in mongo::makeChunkWritable, terminating"
+                    << endl;
+
+                fassertFailed(16362);
+            }
+        }
+
+        writable.set(chunkno);
+    }
+#else
+    void PointerToDurableMappedFile::clearWritableBits(void *privateView, size_t len) {
+    }
+
+    void PointerToDurableMappedFile::clearWritableBits_inlock(void *privateView, size_t len) {
+    }
+#endif
 
     PointerToDurableMappedFile::PointerToDurableMappedFile() : _m("PointerToDurableMappedFile") {
 #if defined(SIZE_MAX)
@@ -139,32 +242,34 @@ namespace mongo {
         else
             _fileSuffixNo = (int) str::toUnsigned(suffix);
 
-        _p = RelativePath::fromFullPath(prefix);
+        _p = RelativePath::fromFullPath(storageGlobalParams.dbpath, prefix);
     }
 
     bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {
-        LOG(3) << "mmf open " << fname << endl;
+        LOG(3) << "mmf open " << fname;
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool DurableMappedFile::create(const std::string& fname, unsigned long long& len, bool sequentialHint) {
-        LOG(3) << "mmf create " << fname << endl;
+        LOG(3) << "mmf create " << fname;
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool DurableMappedFile::finishOpening() {
-        LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length() << endl;
+        LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length();
         if( _view_write ) {
             if (storageGlobalParams.dur) {
+                scoped_lock lk2(privateViews._mutex());
+
                 _view_private = createPrivateMap();
                 if( _view_private == 0 ) {
                     msgasserted(13636, str::stream() << "file " << filename() << " open/create failed in createPrivateMap (look in log for more information)");
                 }
-                privateViews.add(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
+                privateViews.add_inlock(_view_private, this); // note that testIntent builds use this, even though it points to view_write then...
             }
             else {
                 _view_private = _view_write;
@@ -178,24 +283,20 @@ namespace mongo {
         _view_write = _view_private = 0;
     }
 
-    namespace dur {
-        void closingFileNotification();
-    }
-
     DurableMappedFile::~DurableMappedFile() {
         try { 
-            LOG(3) << "mmf close " << filename() << endl;
+            LOG(3) << "mmf close " << filename();
 
-            // Only notifiy the durability system if the file was actually opened
-            if (view_write()) {
-                dur::closingFileNotification();
-            }
+            // Notify the durability system that we are closing a file.
+            getDur().closingFileNotification();
 
             LockMongoFilesExclusive lk;
-            privateViews.remove(_view_private);
+            privateViews.remove(_view_private, length());
             _view_write = _view_private = 0;
             MemoryMappedFile::close();
         }
-        catch(...) { error() << "exception in ~DurableMappedFile" << endl; }
+        catch (...) {
+            error() << "exception in ~DurableMappedFile";
+        }
     }
 }

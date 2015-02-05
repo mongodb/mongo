@@ -30,7 +30,7 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <string>
 #include <vector>
@@ -41,15 +41,18 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
 
     class TouchCmd : public Command {
     public:
@@ -79,13 +82,9 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
-            string coll = cmdObj.firstElement().valuestr();
-            if( coll.empty() || dbname.empty() ) {
-                errmsg = "no collection name specified";
-                return false;
-            }
+            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
-            NamespaceString nss( dbname, coll );
+            const NamespaceString nss(ns);
             if ( ! nss.isNormal() ) {
                 errmsg = "bad namespace name";
                 return false;
@@ -99,10 +98,9 @@ namespace mongo {
                 return false;
             }
 
-            Client::ReadContext context(txn, nss.ns());
+            AutoGetCollectionForRead context(txn, nss);
 
-            Database* db = context.ctx().db();
-            Collection* collection = db->getCollection( txn, nss.ns() );
+            Collection* collection = context.getCollection();
             if ( !collection ) {
                 errmsg = "collection not found";
                 return false;

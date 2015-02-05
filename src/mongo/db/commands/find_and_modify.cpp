@@ -1,52 +1,57 @@
-// find_and_modify.cpp
-
 /**
-*    Copyright (C) 2012-2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2012-2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/find_and_modify.h"
 
-#include "mongo/db/clientcursor.h"
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
+    using boost::scoped_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
 
     /* Find and Modify an object returning either the old (default) or new value*/
     class CmdFindAndModify : public Command {
@@ -67,15 +72,21 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
         }
-        /* this will eventually replace run,  once sort is handled */
-        bool runNoDirectClient( OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            verify( cmdObj["sort"].eoo() );
 
-            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
 
-            BSONObj query = cmdObj.getObjectField("query");
-            BSONObj fields = cmdObj.getObjectField("fields");
-            BSONObj update = cmdObj.getObjectField("update");
+            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
+
+            const BSONObj query = cmdObj.getObjectField("query");
+            const BSONObj fields = cmdObj.getObjectField("fields");
+            const BSONObj update = cmdObj.getObjectField("update");
+            const BSONObj sort = cmdObj.getObjectField("sort");
             
             bool upsert = cmdObj["upsert"].trueValue();
             bool returnNew = cmdObj["new"].trueValue();
@@ -84,6 +95,10 @@ namespace mongo {
             if ( remove ) {
                 if ( upsert ) {
                     errmsg = "remove and upsert can't co-exist";
+                    return false;
+                }
+                if ( !update.isEmpty() ) {
+                    errmsg = "remove and update can't co-exist";
                     return false;
                 }
                 if ( returnNew ) {
@@ -96,13 +111,77 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, ns);
-            
-            return runNoDirectClient( txn, ns , 
-                                      query , fields , update , 
-                                      upsert , returnNew , remove , 
-                                      result , errmsg );
+            bool ok = false;
+            int attempt = 0;
+            while ( 1 ) {
+                try {
+                    errmsg = "";
+
+                    // We can always retry because we only ever modify one document
+                    ok = runImpl(txn,
+                                 dbname,
+                                 ns,
+                                 query,
+                                 fields,
+                                 update,
+                                 sort,
+                                 upsert,
+                                 returnNew,
+                                 remove,
+                                 result,
+                                 errmsg);
+                    break;
+                }
+                catch (const WriteConflictException&) {
+                    txn->getCurOp()->debug().writeConflicts++;
+                    if ( attempt++ > 1 ) {
+                        log() << "got WriteConflictException on findAndModify for " << ns
+                              <<  " retrying attempt: " << attempt;
+                    }
+                }
+            }
+
+            if ( !ok && errmsg == "no-collection" ) {
+                // Take X lock so we can create collection, then re-run operation.
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
+                Client::Context ctx(txn, ns, false /* don't check version */);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while creating collection " << ns
+                        << " during findAndModify"));
+                }
+                Database* db = ctx.db();
+                if ( db->getCollection( ns ) ) {
+                    // someone else beat us to it, that's ok
+                    // we might race while we unlock if someone drops
+                    // but that's ok, we'll just do nothing and error out
+                }
+                else {
+                    WriteUnitOfWork wuow(txn);
+                    uassertStatusOK( userCreateNS( txn, db,
+                                                   ns, BSONObj(),
+                                                   !fromRepl ) );
+                    wuow.commit();
+                }
+
+                errmsg = "";
+                ok = runImpl(txn,
+                             dbname,
+                             ns,
+                             query,
+                             fields,
+                             update,
+                             sort,
+                             upsert,
+                             returnNew,
+                             remove,
+                             result,
+                             errmsg);
+            }
+
+            return ok;
         }
 
         static void _appendHelper(BSONObjBuilder& result,
@@ -125,50 +204,119 @@ namespace mongo {
             result.append( "value" , p.transform( doc ) );
         }
 
-        static bool runNoDirectClient(OperationContext* txn,
-                                      const string& ns, 
-                                      const BSONObj& queryOriginal,
-                                      const BSONObj& fields,
-                                      const BSONObj& update,
-                                      bool upsert,
-                                      bool returnNew,
-                                      bool remove ,
-                                      BSONObjBuilder& result,
-                                      string& errmsg) {
+        static bool runImpl(OperationContext* txn,
+                            const string& dbname,
+                            const string& ns,
+                            const BSONObj& query,
+                            const BSONObj& fields,
+                            const BSONObj& update,
+                            const BSONObj& sort,
+                            bool upsert,
+                            bool returnNew,
+                            bool remove ,
+                            BSONObjBuilder& result,
+                            string& errmsg) {
 
-            Lock::DBWrite lk(txn->lockState(), ns);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
-            Client::Context cx(txn, ns);
-            
-            Collection* collection = cx.db()->getCollection( txn, ns );
+            AutoGetOrCreateDb autoDb(txn, dbname, MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), ns, MODE_IX);
+            Client::Context ctx(txn, ns, autoDb.getDb(), autoDb.justCreated());
 
-            const WhereCallbackReal whereCallback = WhereCallbackReal(txn, StringData(ns));
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while running findAndModify in " << ns));
+            }
 
-            BSONObj doc;
+            Collection* collection = ctx.db()->getCollection(ns);
+
+            const WhereCallbackReal whereCallback(txn, StringData(ns));
+
+            if ( !collection ) {
+                if ( !upsert ) {
+                    // no collectio and no upsert, so can't possible do anything
+                    _appendHelper( result, BSONObj(), false, fields, whereCallback );
+                    return true;
+                }
+                // no collection, but upsert, so we want to create it
+                // problem is we only have IX on db and collection :(
+                // so we tell our caller who can do it
+                errmsg = "no-collection";
+                return false;
+            }
+
+            Snapshotted<BSONObj> snapshotDoc;
+            RecordId loc;
             bool found = false;
             {
                 CanonicalQuery* cq;
-                massert(17383, "Could not canonicalize " + queryOriginal.toString(),
-                    CanonicalQuery::canonicalize(ns, queryOriginal, &cq, whereCallback).isOK());
+                const BSONObj projection;
+                const long long skip = 0;
+                const long long limit = -1; // 1 document requested; negative indicates hard limit.
+                uassertStatusOK(CanonicalQuery::canonicalize(ns,
+                                                             query,
+                                                             sort,
+                                                             projection,
+                                                             skip,
+                                                             limit,
+                                                             &cq,
+                                                             whereCallback));
 
                 PlanExecutor* rawExec;
-                massert(17384, "Could not get plan executor for query " + queryOriginal.toString(),
-                        getExecutor(txn, collection, cq, &rawExec, QueryPlannerParams::DEFAULT).isOK());
+                uassertStatusOK(getExecutor(txn,
+                                            collection,
+                                            cq,
+                                            PlanExecutor::YIELD_AUTO,
+                                            &rawExec,
+                                            QueryPlannerParams::DEFAULT));
 
-                auto_ptr<PlanExecutor> exec(rawExec);
+                scoped_ptr<PlanExecutor> exec(rawExec);
 
-                // We need to keep this PlanExecutor registration: we are concurrently modifying
-                // state and may continue doing that with document-level locking (approach is TBD).
-                const ScopedExecutorRegistration safety(exec.get());
-
-                PlanExecutor::ExecState state;
-                if (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, NULL))) {
+                PlanExecutor::ExecState state = exec->getNextSnapshotted(&snapshotDoc, &loc);
+                if (PlanExecutor::ADVANCED == state) {
                     found = true;
+                }
+                else if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+                    if (PlanExecutor::FAILURE == state &&
+                        WorkingSetCommon::isValidStatusMemberObject(snapshotDoc.value())) {
+                        const Status errorStatus =
+                            WorkingSetCommon::getMemberObjectStatus(snapshotDoc.value());
+                        invariant(!errorStatus.isOK());
+                        uasserted(errorStatus.code(), errorStatus.reason());
+                    }
+                    uasserted(ErrorCodes::OperationFailed,
+                              str::stream() << "executor returned " << PlanExecutor::statestr(state)
+                                            << " while finding document to update");
+                }
+                else {
+                    invariant(PlanExecutor::IS_EOF == state);
                 }
             }
 
-            BSONObj queryModified = queryOriginal;
-            if ( found && doc["_id"].type() && ! CanonicalQuery::isSimpleIdQuery( queryOriginal ) ) {
+            WriteUnitOfWork wuow(txn);
+            if (found) {
+                // We found a doc, but it might not be associated with the active snapshot.
+                // If the doc has changed or is no longer in the collection, we will throw a
+                // write conflict exception and start again from the beginning.
+                if (txn->recoveryUnit()->getSnapshotId() != snapshotDoc.snapshotId()) {
+                    BSONObj oldObj = snapshotDoc.value();
+                    if (!collection->findDoc(txn, loc, &snapshotDoc)) {
+                        // Got deleted in the new snapshot.
+                        throw WriteConflictException();
+                    }
+
+                    if (!oldObj.binaryEqual(snapshotDoc.value())) {
+                        // Got updated in the new snapshot.
+                        throw WriteConflictException();
+                    }
+                }
+
+                // If we get here without throwing, then we should have the copy of the doc from
+                // the latest snapshot.
+                invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
+            }
+
+            BSONObj doc = snapshotDoc.value();
+            BSONObj queryModified = query;
+            if (found && !doc["_id"].eoo() && !CanonicalQuery::isSimpleIdQuery(query)) {
                 // we're going to re-write the query to be more efficient
                 // we have to be a little careful because of positional operators
                 // maybe we can pass this all through eventually, but right now isn't an easy way
@@ -196,12 +344,12 @@ namespace mongo {
                     }
                 }
 
-                BSONObjBuilder b( queryOriginal.objsize() + 10 );
+                BSONObjBuilder b(query.objsize() + 10);
                 b.append( doc["_id"] );
                 
                 bool addedAtomic = false;
 
-                BSONObjIterator i( queryOriginal );
+                BSONObjIterator i(query);
                 while ( i.more() ) {
                     const BSONElement& elem = i.next();
 
@@ -222,13 +370,15 @@ namespace mongo {
 
                     b.append( elem );
                 }
+
                 queryModified = b.obj();
             }
 
             if ( remove ) {
                 _appendHelper(result, doc, found, fields, whereCallback);
                 if ( found ) {
-                    deleteObjects(txn, cx.db(), ns, queryModified, true, true);
+                    deleteObjects(txn, ctx.db(), ns, queryModified, PlanExecutor::YIELD_MANUAL,
+                                  true, true);
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
@@ -248,23 +398,36 @@ namespace mongo {
                     }
                     
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(txn, requestNs);
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(queryModified);
                     request.setUpdates(update);
                     request.setUpsert(upsert);
                     request.setUpdateOpLog();
+
+                    request.setYieldPolicy(PlanExecutor::YIELD_MANUAL);
+
                     // TODO(greg) We need to send if we are ignoring
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = mongo::update(cx.db(),
+                    UpdateResult res = mongo::update(txn,
+                                                     ctx.db(),
                                                      request,
                                                      &txn->getCurOp()->debug());
 
+                    if (!found && res.existing) {
+                        // No match was found during the read part of this find and modify, which
+                        // means that we're here doing an upsert. But the update also told us that
+                        // we modified an *already existing* document. This probably means that
+                        // the query reported EOF based on an out-of-date snapshot. This should be
+                        // a rare event, so we handle it by throwing a write conflict.
+                        throw WriteConflictException();
+                    }
+
                     if ( !collection ) {
                         // collection created by an upsert
-                        collection = cx.db()->getCollection( txn, ns );
+                        collection = ctx.db()->getCollection(ns);
                     }
 
                     LOG(3) << "update result: "  << res ;
@@ -285,7 +448,7 @@ namespace mongo {
                             errmsg = str::stream() << "can't find object after modification  " 
                                                    << " ns: " << ns 
                                                    << " queryModified: " << queryModified 
-                                                   << " queryOriginal: " << queryOriginal;
+                                                   << " queryOriginal: " << query;
                             log() << errmsg << endl;
                             return false;
                         }
@@ -302,136 +465,17 @@ namespace mongo {
                     
                 }
             }
-            wunit.commit();
+
+            // Committing the WUOW can close the current snapshot. Until this happens, the
+            // snapshot id should not have changed.
+            if (found) {
+                invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
+            }
+            wuow.commit();
+
             return true;
         }
-        
-        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
-            DBDirectClient db(txn);
 
-            if (cmdObj["sort"].eoo()) {
-                return runNoDirectClient(txn, dbname, cmdObj, x, errmsg, result, y);
-            }
-
-            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
-
-            BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
-            Query q (origQuery);
-            BSONElement sort = cmdObj["sort"];
-            if (!sort.eoo())
-                q.sort(sort.embeddedObjectUserCheck());
-
-            bool upsert = cmdObj["upsert"].trueValue();
-
-            BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
-            const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
-
-            Projection projection;
-            if (fields) {
-                projection.init(fieldsHolder, WhereCallbackReal(txn, StringData(dbname)));
-                if (!projection.includeID()) {
-                    fields = NULL; // do projection in post-processing
-                }
-            }
-
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
-            Client::Context ctx(txn, ns);
-
-            BSONObj out = db.findOne(ns, q, fields);
-            if (out.isEmpty()) {
-                if (!upsert) {
-                    result.appendNull("value");
-                    return true;
-                }
-
-                BSONElement update = cmdObj["update"];
-                uassert(13329, "upsert mode requires update field", !update.eoo());
-                uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
-                db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
-
-                BSONObj gle = db.getLastErrorDetailed(dbname);
-                result.append("lastErrorObject", gle);
-                if (gle["err"].type() == String) {
-                    errmsg = gle["err"].String();
-                    return false;
-                }
-
-                if (!cmdObj["new"].trueValue()) {
-                    result.appendNull("value");
-                    return true;
-                }
-
-                BSONObjBuilder bob;
-                BSONElement _id = gle[kUpsertedFieldName];
-                if (!_id.eoo())
-                    bob.appendAs(_id, "_id");
-                else
-                    bob.appendAs(origQuery["_id"], "_id");
-
-                out = db.findOne(ns, bob.done(), fields);
-
-            }
-            else {
-
-                if (cmdObj["remove"].trueValue()) {
-                    uassert(12515, "can't remove and update", cmdObj["update"].eoo());
-                    db.remove(ns, QUERY("_id" << out["_id"]), 1);
-
-                    BSONObj gle = db.getLastErrorDetailed(dbname);
-                    result.append("lastErrorObject", gle);
-                    if (gle["err"].type() == String) {
-                        errmsg = gle["err"].String();
-                        return false;
-                    }
-
-                }
-                else {   // update
-
-                    BSONElement queryId = origQuery["_id"];
-                    if (queryId.eoo() || getGtLtOp(queryId) != BSONObj::Equality) {
-                        // need to include original query for $ positional operator
-
-                        BSONObjBuilder b;
-                        b.append(out["_id"]);
-                        BSONObjIterator it(origQuery);
-                        while (it.more()) {
-                            BSONElement e = it.next();
-                            if (strcmp(e.fieldName(), "_id"))
-                                b.append(e);
-                        }
-                        q = Query(b.obj());
-                    }
-
-                    if (q.isComplex()) // update doesn't work with complex queries
-                        q = Query(q.getFilter().getOwned());
-
-                    BSONElement update = cmdObj["update"];
-                    uassert(12516, "must specify remove or update", !update.eoo());
-                    db.update(ns, q, update.embeddedObjectUserCheck());
-
-                    BSONObj gle = db.getLastErrorDetailed(dbname);
-                    result.append("lastErrorObject", gle);
-                    if (gle["err"].type() == String) {
-                        errmsg = gle["err"].String();
-                        return false;
-                    }
-
-                    if (cmdObj["new"].trueValue())
-                        out = db.findOne(ns, QUERY("_id" << out["_id"]), fields);
-                }
-            }
-
-            if (!fieldsHolder.isEmpty() && !fields){
-                // we need to run projection but haven't yet
-                out = projection.transform(out);
-            }
-
-            result.append("value", out);
-
-            wunit.commit();
-            return true;
-        }
     } cmdFindAndModify;
 
 }

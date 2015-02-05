@@ -54,7 +54,6 @@ namespace mongo {
 
             static const StopWords* getStopWords( const FTSLanguage& language );
         private:
-            ~StopWords(){}
             unordered_set<std::string> _words;
         };
 

@@ -28,16 +28,17 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <queue>
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -80,20 +81,14 @@ namespace mongo {
 
         virtual ~NearStage();
 
-        /**
-         * Sets a limit on the total number of results this stage will return.
-         * Not required.
-         */
-        void setLimit(int limit);
-
         virtual bool isEOF();
         virtual StageState work(WorkingSetID* out);
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual vector<PlanStage*> getChildren() const;
+        virtual std::vector<PlanStage*> getChildren() const;
 
         virtual StageType stageType() const;
         virtual PlanStageStats* getStats();
@@ -140,13 +135,25 @@ namespace mongo {
          */
         virtual StatusWith<double> computeDistance(WorkingSetMember* member) = 0;
 
+        /*
+         * Initialize near stage before buffering the data.
+         * Return IS_EOF if subclass finishes the initialization.
+         * Return NEED_TIME if we need more time.
+         * Return errors if an error occurs.
+         * Can't return ADVANCED.
+         */
+        virtual StageState initialize(OperationContext* txn,
+                                      WorkingSet* workingSet,
+                                      Collection* collection);
+
     private:
 
         //
         // Generic methods for progressive search functionality
         //
 
-        StageState bufferNext(Status* error);
+        StageState initNext();
+        StageState bufferNext(WorkingSetID* toReturn, Status* error);
         StageState advanceNext(WorkingSetID* toReturn);
 
         //
@@ -162,31 +169,35 @@ namespace mongo {
 
         // A progressive search works in stages of buffering and then advancing
         enum SearchState {
+            SearchState_Initializing,
             SearchState_Buffering,
             SearchState_Advancing,
             SearchState_Finished
         } _searchState;
 
-        // The current stage from which this stage should buffer results
-        scoped_ptr<CoveredInterval> _nextInterval;
-
         // May need to track disklocs from the child stage to do our own deduping, also to do
         // invalidation of buffered results.
-        unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> _nextIntervalSeen;
+        unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _nextIntervalSeen;
 
         // Stats for the stage covering this interval
-        scoped_ptr<IntervalStats> _nextIntervalStats;
+        boost::scoped_ptr<IntervalStats> _nextIntervalStats;
 
         // Sorted buffered results to be returned - the current interval
         struct SearchResult;
         std::priority_queue<SearchResult> _resultBuffer;
 
-        // Tracking for the number of results we should return
-        int _limit;
-        int _totalReturned;
-
         // Stats
-        scoped_ptr<PlanStageStats> _stats;
+        boost::scoped_ptr<PlanStageStats> _stats;
+
+        // The current stage from which this stage should buffer results
+        // Pointer to the last interval in _childrenIntervals. Owned by _childrenIntervals.
+        CoveredInterval* _nextInterval;
+
+        // All children CoveredIntervals and the sub-stages owned by them.
+        //
+        // All children intervals except the last active one are only used by getStats(),
+        // because they are all EOF.
+        OwnedPointerVector<CoveredInterval> _childrenIntervals;
     };
 
     /**
@@ -200,7 +211,8 @@ namespace mongo {
                         double maxDistance,
                         bool inclusiveMax);
 
-        const scoped_ptr<PlanStage> covering;
+        // Owned by NearStage
+        boost::scoped_ptr<PlanStage> const covering;
         const bool dedupCovering;
 
         const double minDistance;

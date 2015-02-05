@@ -65,4 +65,50 @@ namespace mongo {
         virtual std::string toString() const = 0;
     };
 
+    /**
+     * Generic implementation which accepts and stores any BSON object
+     *
+     * Generally this should only be used for compatibility reasons - newer requests should be
+     * fully typed.
+     */
+    class RawBSONSerializable : public BSONSerializable {
+    public:
+
+        RawBSONSerializable() {
+        }
+
+        explicit RawBSONSerializable(const BSONObj& raw)
+            : _raw(raw) {
+        }
+
+        virtual ~RawBSONSerializable() {
+        }
+
+        virtual bool isValid(std::string* errMsg) const {
+            return true;
+        }
+
+        virtual BSONObj toBSON() const {
+            return _raw;
+        }
+
+        virtual bool parseBSON(const BSONObj& source, std::string* errMsg) {
+            _raw = source.getOwned();
+            return true;
+        }
+
+        virtual void clear() {
+            _raw = BSONObj();
+        }
+
+        virtual std::string toString() const {
+            return toBSON().toString();
+        }
+
+    private:
+
+        BSONObj _raw;
+    };
+
+
 } // namespace mongo

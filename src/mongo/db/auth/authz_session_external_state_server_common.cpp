@@ -26,6 +26,10 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authz_session_external_state_server_common.h"
 
 #include "mongo/base/status.h"
@@ -33,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

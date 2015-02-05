@@ -32,7 +32,6 @@
 #pragma once
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
@@ -71,76 +70,9 @@ namespace mongo {
     void assembleResponse( OperationContext* txn,
                            Message& m,
                            DbResponse& dbresponse,
-                           const HostAndPort &client );
-
-    /**
-     * Embedded calls to the local server using the DBClientBase API without going over the network.
-     *
-     * Caller does not need to lock, that is handled within.
-     *
-     * All operations are performed within the scope of a passed-in OperationContext (except when
-     * using the deprecated constructor). You must ensure that the OperationContext is valid when
-     * calling into any function. If you ever need to change the OperationContext, that can be done
-     * without the overhead of creating a new DBDirectClient by calling setOpCtx(), after which all
-     * operations will use the new OperationContext.
-     */
-    class DBDirectClient : public DBClientBase {
-    public:
-        DBDirectClient(); // DEPRECATED
-        DBDirectClient(OperationContext* txn);
-
-        void setOpCtx(OperationContext* txn) { _txn = txn; };
-
-        using DBClientBase::query;
-
-        virtual std::auto_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
-                                               const BSONObj *fieldsToReturn = 0, int queryOptions = 0, int batchSize = 0);
-
-        virtual bool isFailed() const {
-            return false;
-        }
-
-        virtual bool isStillConnected() {
-            return true;
-        }
-
-        virtual std::string toString() const {
-            return "DBDirectClient";
-        }
-        virtual std::string getServerAddress() const {
-            return "localhost"; // TODO: should this have the port?
-        }
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true , std::string * actualServer = 0 );
-        virtual void say( Message &toSend, bool isRetry = false , std::string * actualServer = 0 );
-        virtual void sayPiggyBack( Message &toSend ) {
-            // don't need to piggy back when connected locally
-            return say( toSend );
-        }
-
-        virtual void killCursor( long long cursorID );
-
-        virtual bool callRead( Message& toSend , Message& response ) {
-            return call( toSend , response );
-        }
-        
-        virtual unsigned long long count(const std::string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
-        
-        virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
-
-        double getSoTimeout() const { return 0; }
-
-        virtual bool lazySupported() const { return true; }
-
-        virtual QueryOptions _lookupAvailableOptions();
-
-    private:
-        static HostAndPort _clientHost;
-        boost::scoped_ptr<OperationContext> _txnOwned;
-        OperationContext* _txn; // Points either to _txnOwned or a passed-in transaction.
-    };
+                           const HostAndPort &client,
+                           bool fromDBDirectClient = false );
 
     void maybeCreatePidFile();
-
-    void exitCleanly( ExitCode code );
 
 } // namespace mongo

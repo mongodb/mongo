@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <v8.h>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -41,7 +44,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/v8_deadline_monitor.h"
 #include "mongo/scripting/v8-3.25_profiler.h"
-#include "mongo/util/log.h"
 
 /**
  * V8_SIMPLE_HEADER must be placed in any function called from a public API
@@ -61,6 +63,7 @@ namespace mongo {
     class V8ScriptEngine;
     class V8Scope;
     class BSONHolder;
+    class JSThreadConfig;
 
     typedef v8::Local<v8::Value> (*v8Function)(V8Scope* scope,
                                   const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -93,13 +96,7 @@ namespace mongo {
          * V8Scope is destructed.
          */
         ~ObjTracker() {
-            MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kQuery);
-
-            if (!_container.empty()) {
-                LOG(1) << "freeing " << _container.size() << " uncollected "
-                       << typeid(_ObjType).name() << " objects" << endl;
-            }
-            typename set<TrackedPtr*>::iterator it = _container.begin();
+            typename std::set<TrackedPtr*>::iterator it = _container.begin();
             while (it != _container.end()) {
                 delete *it;
                 _container.erase(it++);
@@ -137,7 +134,7 @@ namespace mongo {
         }
 
         // container for all TrackedPtrs created by this ObjTracker instance
-        set<TrackedPtr*> _container;
+        std::set<TrackedPtr*> _container;
     };
 
     /**
@@ -180,6 +177,18 @@ namespace mongo {
         OperationContext* getOpContext() const;
 
         /**
+         * Register this scope with the mongo op id.  If executing outside the
+         * context of a mongo operation (e.g. from the shell), killOp will not
+         * be supported.
+         */
+        virtual void registerOperation(OperationContext* txn);
+
+        /**
+         * Unregister this scope with the mongo op id.
+         */
+        virtual void unregisterOperation();
+
+        /**
          * Connect to a local database, create a Mongo object instance, and load any
          * server-side js into the global object
          */
@@ -191,7 +200,7 @@ namespace mongo {
 
         virtual void installBSONTypes();
 
-        virtual string getError() { return _error; }
+        virtual std::string getError() { return _error; }
 
         virtual bool hasOutOfMemoryException();
 
@@ -209,7 +218,7 @@ namespace mongo {
         virtual double getNumber(const char* field);
         virtual int getNumberInt(const char* field);
         virtual long long getNumberLongLong(const char* field);
-        virtual string getString(const char* field);
+        virtual std::string getString(const char* field);
         virtual bool getBoolean(const char* field);
         virtual BSONObj getObject(const char* field);
 
@@ -228,7 +237,7 @@ namespace mongo {
                            int timeoutMs = 0, bool ignoreReturn = false,
                            bool readOnlyArgs = false, bool readOnlyRecv = false);
 
-        virtual bool exec(const StringData& code, const string& name, bool printResult,
+        virtual bool exec(const StringData& code, const std::string& name, bool printResult,
                           bool reportError, bool assertOnError, int timeoutMs);
 
         // functions to create v8 object and function templates
@@ -337,6 +346,7 @@ namespace mongo {
                 : conn(conn), cursor(cursor) { }
         };
         ObjTracker<DBConnectionAndCursor> dbConnectionAndCursor;
+        ObjTracker<JSThreadConfig> jsThreadConfigTracker;
 
         // These are all named after the JS constructor name + FT
         v8::Local<v8::FunctionTemplate> ObjectIdFT()       { return _ObjectIdFT.Get(_isolate); }
@@ -435,18 +445,6 @@ namespace mongo {
         bool nativeEpilogue();
 
         /**
-         * Register this scope with the mongo op id.  If executing outside the
-         * context of a mongo operation (e.g. from the shell), killOp will not
-         * be supported.
-         */
-        void registerOpId();
-
-        /**
-         * Unregister this scope with the mongo op id.
-         */
-        void unregisterOpId();
-
-        /**
          * Create a new function; primarily used for BSON/V8 conversion.
          */
         v8::Local<v8::Value> newFunction(const StringData& code);
@@ -461,7 +459,7 @@ namespace mongo {
 
         v8::Eternal<v8::Context> _context;
         v8::Eternal<v8::Object> _global;
-        string _error;
+        std::string _error;
         std::vector<v8::Eternal<v8::Value> > _funcs;
 
         enum ConnectState { NOT, LOCAL, EXTERNAL };
@@ -521,7 +519,7 @@ namespace mongo {
         mongo::mutex _interruptLock; // protects interruption-related flags
         bool _inNativeExecution;     // protected by _interruptLock
         bool _pendingKill;           // protected by _interruptLock
-        int _opId;                   // op id for this scope
+        unsigned int _opId;          // op id for this scope
         OperationContext* _opCtx;    // Op context for DbEval
     };
 
@@ -566,7 +564,7 @@ namespace mongo {
          */
         DeadlineMonitor<V8Scope>* getDeadlineMonitor() { return &_deadlineMonitor; }
 
-        typedef map<unsigned, V8Scope*> OpIdToScopeMap;
+        typedef std::map<unsigned, V8Scope*> OpIdToScopeMap;
         mongo::mutex _globalInterruptLock;  // protects map of all operation ids -> scope
         OpIdToScopeMap _opToScopeMap;       // map of mongo op ids to scopes (protected by
                                             // _globalInterruptLock).
@@ -597,53 +595,8 @@ namespace mongo {
         const BSONObj _obj;
         bool _modified;
         const bool _readOnly;
-        set<string> _removed;
+        std::set<std::string> _removed;
     };
-
-    /**
-     * Check for an error condition (e.g. empty handle, JS exception, OOM) after executing
-     * a v8 operation.
-     * @resultHandle         handle storing the result of the preceding v8 operation
-     * @try_catch            the active v8::TryCatch exception handler
-     * @param reportError    if true, log an error message
-     * @param assertOnError  if true, throw an exception if an error is detected
-     *                       if false, return value indicates error state
-     * @return true if an error was detected and assertOnError is set to false
-     *         false if no error was detected
-     */
-    template <typename _HandleType>
-    bool V8Scope::checkV8ErrorState(const _HandleType& resultHandle,
-                                    const v8::TryCatch& try_catch,
-                                    bool reportError,
-                                    bool assertOnError) {
-        bool haveError = false;
-
-        if (try_catch.HasCaught() && try_catch.CanContinue()) {
-            // normal JS exception
-            _error = v8ExceptionToSTLString(&try_catch);
-            haveError = true;
-        }
-        else if (hasOutOfMemoryException()) {
-            // out of memory exception (treated as terminal)
-            _error = "JavaScript execution failed -- v8 is out of memory";
-            haveError = true;
-        }
-        else if (resultHandle.IsEmpty() || try_catch.HasCaught()) {
-            // terminal exception (due to empty handle, termination, etc.)
-            _error = "JavaScript execution failed";
-            haveError = true;
-        }
-
-        if (haveError) {
-            if (reportError)
-                log() << _error << endl;
-            if (assertOnError)
-                uasserted(16722, _error);
-            return true;
-        }
-
-        return false;
-    }
 
     extern ScriptEngine* globalScriptEngine;
 

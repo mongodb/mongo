@@ -25,21 +25,73 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <third_party/gperftools-2.2/src/gperftools/malloc_extension.h>
 
+#include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/log.h"
+#include "mongo/util/net/listen.h"
 
 namespace mongo {
+
 namespace {
+    // If many clients are used, the per-thread caches become smaller and chances of
+    // rebalancing of free space during critical sections increases. In such situations,
+    // it is better to release memory when it is likely the thread will be blocked for
+    // a long time.
+    const int kManyClients = 40;
+
+    boost::mutex tcmallocCleanupLock;
+
+    /**
+     *  Callback to allow TCMalloc to release freed memory to the central list at
+     *  favorable times. Ideally would do some milder cleanup or scavenge...
+     */
+    void threadStateChange() {
+        if (Listener::globalTicketHolder.used() <= kManyClients) {
+            return;
+        }
+
+        size_t threadCacheSizeBytes = MallocExtension::instance()->GetThreadCacheSize();
+
+        static const size_t kMaxThreadCacheSizeBytes = 0x10000;
+        if (threadCacheSizeBytes < kMaxThreadCacheSizeBytes) {
+            // This number was chosen a bit magically.
+            // At 1000 threads and the current (64mb) thread local cache size, we're "full".
+            // So we may want this number to scale with the number of current clients.
+            return;
+        }
+
+        LOG(1) << "thread over memory limit, cleaning up, current: "
+               << (threadCacheSizeBytes/1024) << "k";
+
+        // We synchronize as the tcmalloc central list uses a spinlock, and we can cause a really
+        // terrible runaway if we're not careful.
+        boost::mutex::scoped_lock lk(tcmallocCleanupLock);
+        MallocExtension::instance()->MarkThreadIdle();
+        MallocExtension::instance()->MarkThreadBusy();
+    }
+
+    // Register threadStateChange callback
+    MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
+        registerThreadIdleCallback(&threadStateChange);
+        return Status::OK();
+    }
+
     class TCMallocServerStatusSection : public ServerStatusSection {
     public:
 
         TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
         virtual bool includeByDefault() const { return false; }
-        
-        virtual BSONObj generateSection(const BSONElement& configElement) const {
+
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const {
+
             BSONObjBuilder builder;
 
             // For a list of properties see the "Generic Tcmalloc Status" section of
@@ -64,13 +116,14 @@ namespace {
                                                  "tcmalloc.current_total_thread_cache_bytes");
                 // Not including tcmalloc.slack_bytes since it is deprecated.
 
-                // These are not available in our version but are available with use-system-tcmalloc
                 appendNumericPropertyIfAvailable(sub,     "central_cache_free_bytes",
                                                  "tcmalloc.central_cache_free_bytes");
                 appendNumericPropertyIfAvailable(sub,     "transfer_cache_free_bytes",
                                                  "tcmalloc.transfer_cache_free_bytes");
                 appendNumericPropertyIfAvailable(sub,     "thread_cache_free_bytes",
                                                  "tcmalloc.thread_cache_free_bytes");
+                appendNumericPropertyIfAvailable(sub,     "aggressive_memory_decommit",
+                                                 "tcmalloc.aggressive_memory_decommit");
             }
 
             char buffer[4096];

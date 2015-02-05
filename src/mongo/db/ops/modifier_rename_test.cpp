@@ -121,6 +121,21 @@ namespace {
         ASSERT_EQUALS(logDoc, logObj);
     }
 
+    TEST(MissingFromDotted, InitPrepLog) {
+        Document doc(fromjson("{a: {r:2}}"));
+        Mod setMod(fromjson("{$rename: {'a.b':'a.c'}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+        ASSERT_TRUE(execInfo.noOp);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        BSONObj logObj = fromjson("{}");
+        ASSERT_OK(setMod.log(&logBuilder));
+        ASSERT_EQUALS(logDoc, logObj);
+    }
+
     TEST(BasicInit, DifferentRoots) {
         Document doc(fromjson("{a: 2}"));
         Mod setMod(fromjson("{$rename: {'a':'f.g'}}"));

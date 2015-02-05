@@ -107,7 +107,11 @@ namespace {
         _hasSetName = true;
 
         std::string hostAndPortString;
-        status = bsonExtractStringField(argsObj, kSenderHostFieldName, &hostAndPortString);
+        status = bsonExtractStringFieldWithDefault(
+                argsObj,
+                kSenderHostFieldName,
+                "",
+                &hostAndPortString);
         if (!status.isOK())
             return status;
 
@@ -122,18 +126,19 @@ namespace {
     }
 
     bool ReplSetHeartbeatArgs::isInitialized() const {
-        return _hasProtocolVersion && _hasConfigVersion && _hasSetName && _hasSenderHost;
+        return _hasProtocolVersion && _hasConfigVersion && _hasSetName;
     }
 
     BSONObj ReplSetHeartbeatArgs::toBSON() const {
         invariant(isInitialized());
         BSONObjBuilder builder;
         builder.append("replSetHeartbeat", _setName);
-        builder.append("pv", _protocolVersion);
-        builder.append("v", _configVersion);
-        builder.append("from", _senderHost.toString());
+        builder.appendIntOrLL("pv", _protocolVersion);
+        builder.appendIntOrLL("v", _configVersion);
+        builder.append("from", _hasSenderHost ? _senderHost.toString() : "");
+
         if (_hasSenderId) {
-            builder.append("fromId", _senderId);
+            builder.appendIntOrLL("fromId", _senderId);
         }
         if (_hasCheckEmpty) {
             builder.append("checkEmpty", _checkEmpty);

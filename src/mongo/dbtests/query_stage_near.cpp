@@ -40,6 +40,7 @@
 namespace {
 
     using namespace mongo;
+    using boost::shared_ptr;
     using std::vector;
 
     /**
@@ -73,7 +74,7 @@ namespace {
             *out = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(*out);
             member->state = WorkingSetMember::OWNED_OBJ;
-            member->obj = next;
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), next);
 
             return PlanStage::ADVANCED;
         }
@@ -88,7 +89,7 @@ namespace {
         virtual void restoreState(OperationContext* opCtx) {
         }
 
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type) {
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         }
         virtual vector<PlanStage*> getChildren() const {
             return vector<PlanStage*>();
@@ -172,7 +173,7 @@ namespace {
 
         virtual StatusWith<double> computeDistance(WorkingSetMember* member) {
             ASSERT(member->hasObj());
-            return StatusWith<double>(member->obj["distance"].numberDouble());
+            return StatusWith<double>(member->obj.value()["distance"].numberDouble());
         }
 
     private:
@@ -190,7 +191,7 @@ namespace {
 
         while (PlanStage::NEED_TIME == state) {
             while (PlanStage::ADVANCED == (state = stage->work(&nextMemberID))) {
-                results.push_back(workingSet->get(nextMemberID)->obj);
+                results.push_back(workingSet->get(nextMemberID)->obj.value());
             }
         }
 

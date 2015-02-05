@@ -28,9 +28,10 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/geo/geo_query.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_cache.h"
@@ -39,6 +40,8 @@
 namespace mongo {
 
     using mongo::fts::FTSQuery;
+
+    class GeoNearExpression;
 
     /**
      * This is an abstract representation of a query plan.  It can be transcribed into a tree of
@@ -147,7 +150,7 @@ namespace mongo {
 
         // If a stage has a non-NULL filter all values outputted from that stage must pass that
         // filter.
-        scoped_ptr<MatchExpression> filter;
+        boost::scoped_ptr<MatchExpression> filter;
 
     protected:
         /**
@@ -175,7 +178,7 @@ namespace mongo {
         QuerySolution() : hasBlockingStage(false), indexFilterApplied(false) { }
 
         // Owned here.
-        scoped_ptr<QuerySolutionNode> root;
+        boost::scoped_ptr<QuerySolutionNode> root;
 
         // Any filters in root or below point into this object.  Must be owned.
         BSONObj filterData;
@@ -222,7 +225,8 @@ namespace mongo {
 
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
-        // text's return is LOC_AND_UNOWNED_OBJ so it's fetched and has all fields.
+        // Text's return is LOC_AND_UNOWNED_OBJ or LOC_AND_OWNED_OBJ so it's fetched and has all
+        // fields.
         bool fetched() const { return true; }
         bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
@@ -444,9 +448,9 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         /**
-         * This node changes the type to OWNED_OBJ.  There's no fetching possible after this.
+         * Data from the projection node is considered fetch iff the child provides fetched data.
          */
-        bool fetched() const { return true; }
+        bool fetched() const { return children[0]->fetched(); }
 
         bool hasField(const std::string& field) const {
             // TODO: Returning false isn't always the right answer -- we may either be including
@@ -458,10 +462,10 @@ namespace mongo {
         }
 
         bool sortedByDiskLoc() const {
-            // Projections destroy the DiskLoc.  By returning true here, this kind of implies that a
+            // Projections destroy the RecordId.  By returning true here, this kind of implies that a
             // fetch could still be done upstream.
             //
-            // Perhaps this should be false to not imply that there *is* a DiskLoc?  Kind of a
+            // Perhaps this should be false to not imply that there *is* a RecordId?  Kind of a
             // corner case.
             return children[0]->sortedByDiskLoc();
         }
@@ -564,7 +568,7 @@ namespace mongo {
 
     // This is a standalone stage.
     struct GeoNear2DNode : public QuerySolutionNode {
-        GeoNear2DNode() : numToReturn(0), addPointMeta(false), addDistMeta(false) { }
+        GeoNear2DNode() : addPointMeta(false), addDistMeta(false) { }
         virtual ~GeoNear2DNode() { }
 
         virtual StageType getType() const { return STAGE_GEO_NEAR_2D; }
@@ -579,15 +583,9 @@ namespace mongo {
 
         BSONObjSet _sorts;
 
-        NearQuery nq;
+        // Not owned here
+        const GeoNearExpression* nq;
         IndexBounds baseBounds;
-
-        // TODO: Remove both of these
-        int numToReturn;
-        // A full match expression for the query with geoNear removed is currently needed -
-        // since 2D geoNear has a default limit not set in the query, we must limit ourselves and
-        // so generate only valid results.
-        scoped_ptr<MatchExpression> fullFilterExcludingNear;
 
         BSONObj indexKeyPattern;
         bool addPointMeta;
@@ -611,7 +609,8 @@ namespace mongo {
 
         BSONObjSet _sorts;
 
-        NearQuery nq;
+        // Not owned here
+        const GeoNearExpression* nq;
         IndexBounds baseBounds;
 
         BSONObj indexKeyPattern;
@@ -708,10 +707,10 @@ namespace mongo {
         CountNode() { }
         virtual ~CountNode() { }
 
-        virtual StageType getType() const { return STAGE_COUNT; }
+        virtual StageType getType() const { return STAGE_COUNT_SCAN; }
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
-        bool fetched() const { return true; }
+        bool fetched() const { return false; }
         bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }

@@ -28,34 +28,52 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/data_file.h"
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/lockstate.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
+    using std::endl;
 
-    static void data_file_check(void *_mb) {
-        if( sizeof(char *) == 4 )
-            uassert( 10084, "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
-        else
-            uassert( 10085, "can't map file memory", _mb != 0);
+namespace {
+
+    void data_file_check(void *_mb) {
+        if (sizeof(char *) == 4) {
+            uassert(10084,
+                    "can't map file memory - mongo requires 64 bit build for larger datasets",
+                    _mb != NULL);
+        }
+        else {
+            uassert(10085, "can't map file memory", _mb != NULL);
+        }
     }
+
+} // namespace
+
+
+    BOOST_STATIC_ASSERT(DataFileHeader::HeaderSize == 8192);
+    BOOST_STATIC_ASSERT(sizeof(reinterpret_cast<DataFileHeader*>(NULL)->data) == 4);
+    BOOST_STATIC_ASSERT(
+        sizeof(DataFileHeader) - sizeof(reinterpret_cast<DataFileHeader*>(NULL)->data)
+                == DataFileHeader::HeaderSize);
+
 
     int DataFile::maxSize() {
         if ( sizeof( int* ) == 4 ) {
             return 512 * 1024 * 1024;
         }
-        else if (storageGlobalParams.smallfiles) {
+        else if (mmapv1GlobalOptions.smallfiles) {
             return 0x7ff00000 >> 2;
         }
         else {
@@ -63,47 +81,53 @@ namespace mongo {
         }
     }
 
-    NOINLINE_DECL void DataFile::badOfs2(int ofs) const {
-        uasserted(13441, str::stream() << "bad offset:" << ofs
-                  << " accessing file: " << mmf.filename()
-                  << ". See http://dochub.mongodb.org/core/data-recovery");
-    }
-
     NOINLINE_DECL void DataFile::badOfs(int ofs) const {
-        uasserted(13440, str::stream()  << "bad offset:" << ofs
-                  << " accessing file: " << mmf.filename()
-                  << ". See http://dochub.mongodb.org/core/data-recovery");
+        msgasserted(13440, str::stream()  << "bad offset:" << ofs
+                    << " accessing file: " << mmf.filename()
+                    << ". See http://dochub.mongodb.org/core/data-recovery");
     }
 
-    int DataFile::defaultSize( const char *filename ) const {
+    int DataFile::_defaultSize() const {
         int size;
-        if ( fileNo <= 4 )
-            size = (64*1024*1024) << fileNo;
-        else
+
+        if (_fileNo <= 4) {
+            size = (64 * 1024 * 1024) << _fileNo;
+        }
+        else {
             size = 0x7ff00000;
-        if (storageGlobalParams.smallfiles) {
+        }
+
+        if (mmapv1GlobalOptions.smallfiles) {
             size = size >> 2;
         }
+
         return size;
     }
 
     /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-    Status DataFile::openExisting( OperationContext* txn, const char *filename ) {
-        verify( _mb == 0 );
-        if( !boost::filesystem::exists(filename) )
-            return Status( ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist" );
+    Status DataFile::openExisting(const char *filename) {
+        invariant(_mb == 0);
 
-        if( !mmf.open(filename,false) ) {
-            return Status( ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed" );
+        if (!boost::filesystem::exists(filename)) {
+            return Status(ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist");
         }
-        _mb = mmf.getView(); verify(_mb);
-        unsigned long long sz = mmf.length();
-        verify( sz <= 0x7fffffff );
-        verify( sz % 4096 == 0 );
-        if (sz < 64*1024*1024 && !storageGlobalParams.smallfiles) {
+
+        if (!mmf.open(filename, false)) {
+            return Status(ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed");
+        }
+
+        // The mapped view of the file should never be NULL if the open call above succeeded.
+        _mb = mmf.getView();
+        invariant(_mb);
+
+        const uint64_t sz = mmf.length();
+        invariant(sz <= 0x7fffffff);
+        invariant(sz % 4096 == 0);
+
+        if (sz < 64*1024*1024 && !mmapv1GlobalOptions.smallfiles) {
             if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) {
                 log() << "info openExisting file size " << sz
-                      << " but storageGlobalParams.smallfiles=false: "
+                      << " but mmapv1GlobalOptions.smallfiles=false: "
                       << filename << endl;
             }
             else {
@@ -112,8 +136,8 @@ namespace mongo {
                 verify(false);
             }
         }
+
         data_file_check(_mb);
-        header()->checkUpgrade(txn);
         return Status::OK();
     }
 
@@ -121,23 +145,28 @@ namespace mongo {
                          const char *filename,
                          int minSize,
                          bool preallocateOnly ) {
-        long size = defaultSize( filename );
-        while ( size < minSize ) {
-            if ( size < maxSize() / 2 )
+
+        long size = _defaultSize();
+
+        while (size < minSize) {
+            if (size < maxSize() / 2) {
                 size *= 2;
+            }
             else {
                 size = maxSize();
                 break;
             }
         }
-        if ( size > maxSize() )
-            size = maxSize();
 
-        verify(size >= 64*1024*1024 || storageGlobalParams.smallfiles);
-        verify( size % 4096 == 0 );
+        if (size > maxSize()) {
+            size = maxSize();
+        }
+
+        invariant(size >= 64 * 1024 * 1024 || mmapv1GlobalOptions.smallfiles);
+        invariant( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
-            if (storageGlobalParams.prealloc) {
+            if (mmapv1GlobalOptions.prealloc) {
                 FileAllocator::get()->requestAllocation( filename, size );
             }
             return;
@@ -151,8 +180,9 @@ namespace mongo {
             verify( sz <= 0x7fffffff );
             size = (int) sz;
         }
+
         data_file_check(_mb);
-        header()->init(txn, fileNo, size, filename);
+        header()->init(txn, _fileNo, size, filename);
     }
 
     void DataFile::flush( bool sync ) {
@@ -160,57 +190,45 @@ namespace mongo {
     }
 
     DiskLoc DataFile::allocExtentArea( OperationContext* txn, int size ) {
-
-        massert( 10357, "shutdown in progress", !inShutdown() );
-        massert( 10359, "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
-
-        verify( size <= header()->unusedLength );
+        // The header would be NULL if file open failed. However, if file open failed we should
+        // never be entering here.
+        invariant(header());
+        invariant(size <= header()->unusedLength);
 
         int offset = header()->unused.getOfs();
 
         DataFileHeader *h = header();
-        *txn->recoveryUnit()->writing(&h->unused) = DiskLoc( fileNo, offset + size );
+        *txn->recoveryUnit()->writing(&h->unused) = DiskLoc(_fileNo, offset + size);
         txn->recoveryUnit()->writingInt(h->unusedLength) = h->unusedLength - size;
 
-        return DiskLoc( fileNo, offset );
+        return DiskLoc(_fileNo, offset);
     }
 
     // -------------------------------------------------------------------------------
 
-    void DataFileHeader::init(OperationContext* txn, int fileno, int filelength, const char* filename) {
-        if ( uninitialized() ) {
-            DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
-            if( !(filelength > 32768 ) ) {
-                massert(13640, str::stream() << "DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:" << fileno, false);
-            }
+    void DataFileHeader::init(OperationContext* txn,
+                              int fileno,
+                              int filelength,
+                              const char* filename) {
 
-            {
-                // "something" is too vague, but we checked for the right db to be locked higher up the call stack
-                if (!txn->lockState()->isWriteLocked()) {
-                    txn->lockState()->dump();
-                    log() << "*** TEMP NOT INITIALIZING FILE " << filename << ", not in a write lock." << endl;
-                    log() << "temp bypass until more elaborate change - case that is manifesting is benign anyway" << endl;
-                    return;
-                    /**
-                       log() << "ERROR can't create outside a write lock" << endl;
-                       printStackTrace();
-                       ::abort();
-                    **/
-                }
-            }
+        if (uninitialized()) {
+            DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
+
+            massert(13640,
+                    str::stream() << "DataFileHeader looks corrupt at file open filelength:"
+                                  << filelength << " fileno:" << fileno,
+                    filelength > 32768);
 
             // The writes done in this function must not be rolled back. If the containing
             // UnitOfWork rolls back it should roll back to the state *after* these writes. This
             // will leave the file empty, but available for future use. That is why we go directly
             // to the global dur dirty list rather than going through the OperationContext.
             getDur().createdFile(filename, filelength);
-            verify( HeaderSize == 8192 );
-            DataFileHeader *h = getDur().writing(this);
+
+            DataFileHeader* const h = getDur().writing(this);
             h->fileLength = filelength;
-            h->version = PDFILE_VERSION;
-            h->versionMinor = PDFILE_VERSION_MINOR_22_AND_OLDER; // All dbs start like this
-            h->unused.set( fileno, HeaderSize );
-            verify( (data-(char*)this) == HeaderSize );
+            h->version = DataFileVersion::defaultForNewFiles();
+            h->unused.set(fileno, HeaderSize);
             h->unusedLength = fileLength - HeaderSize - 16;
             h->freeListStart.Null();
             h->freeListEnd.Null();
@@ -221,11 +239,13 @@ namespace mongo {
     }
 
     void DataFileHeader::checkUpgrade(OperationContext* txn) {
-        if ( freeListStart == minDiskLoc ) {
+        if ( freeListStart == DiskLoc(0, 0) ) {
             // we are upgrading from 2.4 to 2.6
-            invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real
+            invariant(freeListEnd == DiskLoc(0, 0)); // both start and end should be (0,0) or real
+            WriteUnitOfWork wunit(txn);
             *txn->recoveryUnit()->writing( &freeListStart ) = DiskLoc();
             *txn->recoveryUnit()->writing( &freeListEnd ) = DiskLoc();
+            wunit.commit();
         }
     }
 

@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     // Does not take ownership.
     OplogStart::OplogStart(OperationContext* txn,
                            const Collection* collection,
@@ -83,15 +85,16 @@ namespace mongo {
         }
 
         // we work from the back to the front since the back has the newest data.
-        const DiskLoc loc = _subIterators.back()->getNext();
+        const RecordId loc = _subIterators.back()->getNext();
         _subIterators.popAndDeleteBack();
 
-        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(loc))) {
+        // TODO: should we ever try and return NEED_FETCH here?
+        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc).value())) {
             _done = true;
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
-            member->obj = _collection->docFor(member->loc);
+            member->obj = _collection->docFor(_txn, member->loc);
             member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             *out = id;
             return PlanStage::ADVANCED;
@@ -127,9 +130,9 @@ namespace mongo {
         verify(member->hasObj());
         verify(member->hasLoc());
 
-        if (!_filter->matchesBSON(member->obj)) {
+        if (!_filter->matchesBSON(member->obj.value())) {
             _done = true;
-            // DiskLoc is returned in *out.
+            // RecordId is returned in *out.
             return PlanStage::ADVANCED;
         }
         else {
@@ -140,13 +143,13 @@ namespace mongo {
 
     bool OplogStart::isEOF() { return _done; }
 
-    void OplogStart::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void OplogStart::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         if (_needInit) { return; }
 
         if (INVALIDATION_DELETION != type) { return; }
 
         if (_cs) {
-            _cs->invalidate(dl, type);
+            _cs->invalidate(txn, dl, type);
         }
 
         for (size_t i = 0; i < _subIterators.size(); i++) {
@@ -155,6 +158,7 @@ namespace mongo {
     }
 
     void OplogStart::saveState() {
+        _txn = NULL;
         if (_cs) {
             _cs->saveState();
         }
@@ -165,12 +169,14 @@ namespace mongo {
     }
 
     void OplogStart::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
+        _txn = opCtx;
         if (_cs) {
             _cs->restoreState(opCtx);
         }
 
         for (size_t i = 0; i < _subIterators.size(); i++) {
-            if (!_subIterators[i]->restoreState()) {
+            if (!_subIterators[i]->restoreState(opCtx)) {
                 _subIterators.erase(_subIterators.begin() + i);
                 // need to hit same i on next pass through loop
                 i--;

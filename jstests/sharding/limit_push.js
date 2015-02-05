@@ -19,7 +19,7 @@ s.adminCommand( { shardcollection : "test.limit_push" , key : { x : 1 } } );
 
 // Now split the and move the data between the shards
 s.adminCommand( { split : "test.limit_push", middle : { x : 50 }} ); 
-s.adminCommand( { moveChunk: "test.limit_push", find : { x : 51}, to : "shard0000", _waitForDelete : true }) 
+s.adminCommand( { moveChunk: "test.limit_push", find : { x : 51}, to : s.getOther( s.getServer( "test" ) ).name, _waitForDelete : true }) 
 
 // Check that the chunck have split correctly
 assert.eq( 2 , s.config.chunks.count() , "wrong number of chunks");
@@ -35,16 +35,17 @@ assert.eq( 60 , db.limit_push.find( q ).count() , "Did not find 60 documents" );
 
 // Now make sure that the explain shos that each shard is returning a single document as indicated
 // by the "n" element for each shard
-exp = db.limit_push.find( q ).sort( { x:-1} ).limit(1).explain();
+exp = db.limit_push.find( q ).sort( { x:-1} ).limit(1).explain("executionStats");
 printjson( exp )
 
-assert.eq("ParallelSort", exp.clusteredType, "Not a ParallelSort");
+var execStages = exp.executionStats.executionStages;
+assert.eq("SHARD_MERGE_SORT", execStages.stage, "Expected SHARD_MERGE_SORT as root stage");
 
 var k = 0;
-for (var j in exp.shards) {
-    assert.eq( 1 , exp.shards[j][0].n, "'n' is not 1 from shard000" + k.toString());
+for (var j in execStages.shards) {
+    assert.eq( 1 , execStages.shards[j].executionStages.nReturned,
+               "'n' is not 1 from shard000" + k.toString());
     k++
 }
 
 s.stop();
-

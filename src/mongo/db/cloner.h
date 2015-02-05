@@ -31,18 +31,18 @@
 #pragma once
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
     struct CloneOptions;
     class DBClientBase;
-    class DBClientCursor;
+    class NamespaceString;
     class OperationContext;
-    class Query;
 
-    class Cloner: boost::noncopyable {
+
+    class Cloner {
+        MONGO_DISALLOW_COPYING(Cloner);
     public:
         Cloner();
 
@@ -81,7 +81,7 @@ namespace mongo {
                   Query q);
 
         void copyIndexes(OperationContext* txn,
-                         const string& toDBName,
+                         const std::string& toDBName,
                          const NamespaceString& from_ns,
                          const NamespaceString& to_ns,
                          bool logForRepl,

@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/stats/top.h"
 
@@ -36,31 +37,37 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {
 
-    Top::UsageData::UsageData( const UsageData& older , const UsageData& newer ) {
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
+    Top::UsageData::UsageData( const UsageData& older, const UsageData& newer ) {
         // this won't be 100% accurate on rollovers and drop(), but at least it won't be negative
         time  = (newer.time  >= older.time)  ? (newer.time  - older.time)  : newer.time;
         count = (newer.count >= older.count) ? (newer.count - older.count) : newer.count;
     }
 
-    Top::CollectionData::CollectionData( const CollectionData& older , const CollectionData& newer )
-        : total( older.total , newer.total ) ,
-          readLock( older.readLock , newer.readLock ) ,
-          writeLock( older.writeLock , newer.writeLock ) ,
-          queries( older.queries , newer.queries ) ,
-          getmore( older.getmore , newer.getmore ) ,
-          insert( older.insert , newer.insert ) ,
-          update( older.update , newer.update ) ,
-          remove( older.remove , newer.remove ),
-          commands( older.commands , newer.commands ) {
+    Top::CollectionData::CollectionData( const CollectionData& older, const CollectionData& newer )
+        : total( older.total, newer.total ),
+          readLock( older.readLock, newer.readLock ),
+          writeLock( older.writeLock, newer.writeLock ),
+          queries( older.queries, newer.queries ),
+          getmore( older.getmore, newer.getmore ),
+          insert( older.insert, newer.insert ),
+          update( older.update, newer.update ),
+          remove( older.remove, newer.remove ),
+          commands( older.commands, newer.commands ) {
 
     }
 
-    void Top::record( const StringData& ns , int op , int lockType , long long micros , bool command ) {
+    void Top::record( const StringData& ns, int op, int lockType, long long micros, bool command ) {
         if ( ns[0] == '?' )
             return;
 
@@ -73,11 +80,10 @@ namespace mongo {
         }
 
         CollectionData& coll = _usage[ns];
-        _record( coll , op , lockType , micros , command );
-        _record( _global , op , lockType , micros , command );
+        _record( coll, op, lockType, micros, command );
     }
 
-    void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ) {
+    void Top::_record( CollectionData& c, int op, int lockType, long long micros, bool command ) {
         c.total.inc( micros );
 
         if ( lockType > 0 )
@@ -132,17 +138,17 @@ namespace mongo {
 
     void Top::append( BSONObjBuilder& b ) {
         SimpleMutex::scoped_lock lk( _lock );
-        _appendToUsageMap( b , _usage );
+        _appendToUsageMap( b, _usage );
     }
 
-    void Top::_appendToUsageMap( BSONObjBuilder& b , const UsageMap& map ) const {
+    void Top::_appendToUsageMap( BSONObjBuilder& b, const UsageMap& map ) const {
         // pull all the names into a vector so we can sort them for the user
-        
+
         vector<string> names;
         for ( UsageMap::const_iterator i = map.begin(); i != map.end(); ++i ) {
             names.push_back( i->first );
         }
-        
+
         std::sort( names.begin(), names.end() );
 
         for ( size_t i=0; i<names.size(); i++ ) {
@@ -150,26 +156,26 @@ namespace mongo {
 
             const CollectionData& coll = map.find(names[i])->second;
 
-            _appendStatsEntry( b , "total" , coll.total );
+            _appendStatsEntry( b, "total", coll.total );
 
-            _appendStatsEntry( b , "readLock" , coll.readLock );
-            _appendStatsEntry( b , "writeLock" , coll.writeLock );
+            _appendStatsEntry( b, "readLock", coll.readLock );
+            _appendStatsEntry( b, "writeLock", coll.writeLock );
 
-            _appendStatsEntry( b , "queries" , coll.queries );
-            _appendStatsEntry( b , "getmore" , coll.getmore );
-            _appendStatsEntry( b , "insert" , coll.insert );
-            _appendStatsEntry( b , "update" , coll.update );
-            _appendStatsEntry( b , "remove" , coll.remove );
-            _appendStatsEntry( b , "commands" , coll.commands );
+            _appendStatsEntry( b, "queries", coll.queries );
+            _appendStatsEntry( b, "getmore", coll.getmore );
+            _appendStatsEntry( b, "insert", coll.insert );
+            _appendStatsEntry( b, "update", coll.update );
+            _appendStatsEntry( b, "remove", coll.remove );
+            _appendStatsEntry( b, "commands", coll.commands );
 
             bb.done();
         }
     }
 
-    void Top::_appendStatsEntry( BSONObjBuilder& b , const char * statsName , const UsageData& map ) const {
+    void Top::_appendStatsEntry( BSONObjBuilder& b, const char * statsName, const UsageData& map ) const {
         BSONObjBuilder bb( b.subobjStart( statsName ) );
-        bb.appendNumber( "time" , map.time );
-        bb.appendNumber( "count" , map.count );
+        bb.appendNumber( "time", map.time );
+        bb.appendNumber( "count", map.count );
         bb.done();
     }
 
@@ -188,10 +194,10 @@ namespace mongo {
             actions.addAction(ActionType::top);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );
-                b.append( "note" , "all times in microseconds" );
+                b.append( "note", "all times in microseconds" );
                 Top::global.append( b );
                 b.done();
             }

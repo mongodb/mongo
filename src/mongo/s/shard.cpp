@@ -28,10 +28,13 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/shard.h"
 
+#include <boost/make_shared.hpp>
 #include <set>
 #include <string>
 #include <vector>
@@ -41,9 +44,9 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/security_key.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/client_info.h"
@@ -53,10 +56,18 @@
 #include "mongo/s/type_shard.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::map;
+    using std::ostream;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     static bool initWireVersion( DBClientBase* conn, std::string* errMsg ) {
         BSONObj response;
@@ -116,34 +127,25 @@ namespace mongo {
             }
             _rsLookup.clear();
             
-            for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ) {
-                BSONObj o = *i;
-                string name = o[ ShardType::name() ].String();
-                string host = o[ ShardType::host() ].String();
+            for (list<BSONObj>::const_iterator iter = all.begin(); iter != all.end(); ++iter) {
+                ShardType shardData;
 
-                long long maxSize = 0;
-                BSONElement maxSizeElem = o[ ShardType::maxSize.name() ];
-                if ( ! maxSizeElem.eoo() ) {
-                    maxSize = maxSizeElem.numberLong();
+                string errmsg;
+                if (!shardData.parseBSON(*iter, &errmsg) || !shardData.isValid(&errmsg)) {
+                    uasserted(28530, errmsg);
                 }
 
-                bool isDraining = false;
-                BSONElement isDrainingElem = o[ ShardType::draining.name() ];
-                if ( ! isDrainingElem.eoo() ) {
-                    isDraining = isDrainingElem.Bool();
-                }
+                const long long maxSize = shardData.isMaxSizeSet() ? shardData.getMaxSize() : 0;
+                const bool isDraining = shardData.isDrainingSet() ?
+                        shardData.getDraining() : false;
+                const BSONArray tags = shardData.isTagsSet() ? shardData.getTags() : BSONArray();
+                ShardPtr shard = boost::make_shared<Shard>(shardData.getName(),
+                                                           shardData.getHost(),
+                                                           maxSize,
+                                                           isDraining);
 
-                ShardPtr s( new Shard( name , host , maxSize , isDraining ) );
-
-                if ( o[ ShardType::tags() ].type() == Array ) {
-                    vector<BSONElement> v = o[ ShardType::tags() ].Array();
-                    for ( unsigned j=0; j<v.size(); j++ ) {
-                        s->addTag( v[j].String() );
-                    }
-                }
-
-                _lookup[name] = s;
-                _installHost( host , s );
+                _lookup[shardData.getName()] = shard;
+                _installHost(shardData.getHost(), shard);
             }
 
         }
@@ -155,24 +157,48 @@ namespace mongo {
             return ShardPtr();
         }
 
-        ShardPtr find( const string& ident ) {
-            string mykey = ident;
+        ShardPtr find(const string& ident) {
+            string errmsg;
+            ConnectionString connStr = ConnectionString::parse(ident, errmsg);
 
-            {
-                scoped_lock lk( _mutex );
-                ShardMap::iterator i = _lookup.find( mykey );
+            uassert(18642, str::stream() << "Error parsing connection string: " << ident,
+                    errmsg.empty());
 
-                if ( i != _lookup.end() )
-                    return i->second;
+            if (connStr.type() == ConnectionString::SET) {
+                scoped_lock lk(_rsMutex);
+                ShardMap::iterator iter = _rsLookup.find(connStr.getSetName());
+
+                if (iter == _rsLookup.end()) {
+                    return ShardPtr();
+                }
+
+                return iter->second;
+            }
+            else {
+                scoped_lock lk(_mutex);
+                ShardMap::iterator iter = _lookup.find(ident);
+
+                if (iter == _lookup.end()) {
+                    return ShardPtr();
+                }
+
+                return iter->second;
+            }
+        }
+
+        ShardPtr findWithRetry(const string& ident) {
+            ShardPtr shard(find(ident));
+
+            if (shard != NULL) {
+                return shard;
             }
 
             // not in our maps, re-load all
             reload();
 
-            scoped_lock lk( _mutex );
-            ShardMap::iterator i = _lookup.find( mykey );
-            massert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
-            return i->second;
+            shard = find(ident);
+            massert(13129 , str::stream() << "can't find shard for: " << ident, shard != NULL);
+            return shard;
         }
 
         // Lookup shard by replica set name. Returns Shard::EMTPY if the name can't be found.
@@ -182,12 +208,12 @@ namespace mongo {
             scoped_lock lk( _rsMutex );
             ShardMap::iterator i = _rsLookup.find( name );
 
-            return (i == _rsLookup.end()) ? Shard::EMPTY : i->second.get();
+            return (i == _rsLookup.end()) ? Shard::EMPTY : *(i->second.get());
         }
 
         // Useful for ensuring our shard data will not be modified while we use it
         Shard findCopy( const string& ident ){
-            ShardPtr found = find( ident );
+            ShardPtr found = findWithRetry(ident);
             scoped_lock lk( _mutex );
             massert( 13128 , (string)"can't find shard for: " + ident , found.get() );
             return *found.get();
@@ -305,7 +331,7 @@ namespace mongo {
 
     private:
         typedef map<string,ShardPtr> ShardMap;
-        ShardMap _lookup;
+        ShardMap _lookup; // Map of both shardName -> Shard and hostName -> Shard
         ShardMap _rsLookup; // Map from ReplSet name to shard
         mutable mongo::mutex _mutex;
         mutable mongo::mutex _rsMutex;
@@ -331,6 +357,27 @@ namespace mongo {
         }
     } cmdGetShardMap;
 
+    Shard::Shard(const std::string& name,
+            const std::string& addr,
+            long long maxSizeMB,
+            bool isDraining):
+                _name(name),
+                _addr(addr),
+                _maxSizeMB(maxSizeMB),
+                _isDraining(isDraining) {
+        _setAddr(addr);
+    }
+
+    Shard::Shard(const std::string& name,
+            const ConnectionString& connStr,
+            long long maxSizeMB,
+            bool isDraining):
+                _name(name),
+                _addr(connStr.toString()),
+                _cs(connStr),
+                _maxSizeMB(maxSizeMB),
+                _isDraining(isDraining) {
+    }
 
     Shard Shard::findIfExists( const string& shardName ) {
         ShardPtr shard = staticShardInfo.findIfExists( shardName );
@@ -342,13 +389,6 @@ namespace mongo {
         if ( !_addr.empty() ) {
             _cs = ConnectionString( addr , ConnectionString::SET );
         }
-    }
-
-    void Shard::setAddress( const ConnectionString& cs) {
-        verify( _name.size() );
-        _addr = cs.toString();
-        _cs = cs;
-        staticShardInfo.set( _name , *this , true , false );
     }
 
     void Shard::reset( const string& ident ) {
@@ -409,8 +449,46 @@ namespace mongo {
         return res;
     }
 
+    string Shard::getShardMongoVersion(const string& shardHost) {
+        ScopedDbConnection conn(shardHost);
+        BSONObj serverStatus;
+        bool ok = conn->runCommand("admin", BSON("serverStatus" << 1), serverStatus);
+        conn.done();
+
+        uassert(28598,
+                str::stream() << "call to serverStatus on " << shardHost
+                              << " failed: " << serverStatus,
+                ok);
+
+        BSONElement versionElement = serverStatus["version"];
+
+        uassert(28589, "version field not found in serverStatus",
+                versionElement.type() == String);
+        return serverStatus["version"].String();
+    }
+
+    long long Shard::getShardDataSizeBytes(const string& shardHost) {
+        ScopedDbConnection conn(shardHost);
+        BSONObj listDatabases;
+        bool ok = conn->runCommand("admin", BSON("listDatabases" << 1), listDatabases);
+        conn.done();
+
+        uassert(28599,
+                str::stream() << "call to listDatabases on " << shardHost
+                              << " failed: " << listDatabases,
+                ok);
+
+        BSONElement totalSizeElem = listDatabases["totalSize"];
+
+        uassert(28590, "totalSize field not found in listDatabases",
+                totalSizeElem.isNumber());
+        return listDatabases["totalSize"].numberLong();
+    }
+
     ShardStatus Shard::getStatus() const {
-        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
+        return ShardStatus(*this,
+                           getShardDataSizeBytes(getConnString()),
+                           getShardMongoVersion(getConnString()));
     }
 
     void Shard::reloadShardInfo() {
@@ -448,15 +526,18 @@ namespace mongo {
         return best.shard();
     }
 
-    ShardStatus::ShardStatus( const Shard& shard , const BSONObj& obj )
-        : _shard( shard ) {
-        _mapped = obj.getFieldDotted( "mem.mapped" ).numberLong();
-        _hasOpsQueued = obj["writeBacksQueued"].Bool();
-        _writeLock = 0; // TODO
-        _mongoVersion = obj["version"].String();
+    void Shard::installShard(const std::string& name, const Shard& shard) {
+        staticShardInfo.set(name, shard, true, false);
+    }
+
+    ShardStatus::ShardStatus(const Shard& shard, long long dataSizeBytes, const string& version):
+            _shard(shard), _dataSizeBytes(dataSizeBytes), _mongoVersion(version) {
     }
 
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
+
+        // Authenticate as the first thing we do
+        // NOTE: Replica set authentication allows authentication against *any* online host
         if(getGlobalAuthorizationManager()->isAuthEnabled()) {
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
 
@@ -467,33 +548,23 @@ namespace mongo {
                      result );
         }
 
+        // Initialize the wire version of single connections
+        if (conn->type() == ConnectionString::MASTER) {
+
+            LOG(2) << "checking wire version of new connection " << conn->toString();
+
+            // Initialize the wire protocol version of the connection to find out if we
+            // can send write commands to this connection.
+            string errMsg;
+            if (!initWireVersion(conn, &errMsg)) {
+                uasserted(17363, errMsg);
+            }
+        }
+
         if ( _shardedConnections ) {
-            if ( versionManager.isVersionableCB( conn )) {
-                // We must initialize sharding on all connections, so that we get exceptions
-                // if sharding is enabled on the collection.
-                BSONObj result;
-                bool ok = versionManager.initShardVersionCB( conn, result );
-
-                // assert that we actually successfully setup sharding
-                uassert( 15907,
-                         str::stream() << "could not initialize sharding on connection "
-                             << conn->toString() << ( result["errmsg"].type() == String ?
-                                  causedBy( result["errmsg"].String() ) :
-                                  causedBy( (string)"unknown failure : " + result.toString() ) ),
-                         ok );
-            }
-            else {
-                // Initialize the wire protocol version of the connection to find out if we
-                // can send write commands to this connection.
-                string errMsg;
-                if ( !initWireVersion( conn, &errMsg )) {
-                    uasserted( 17363, errMsg );
-                }
-            }
-
             // For every DBClient created by mongos, add a hook that will capture the response from
-            // commands, so that we can target the correct node when subsequent getLastError calls
-            // are made by mongos.
+            // commands we pass along from the client, so that we can target the correct node when
+            // subsequent getLastError calls are made by mongos.
             conn->setPostRunCommandHook(stdx::bind(&saveGLEStats, stdx::placeholders::_1, stdx::placeholders::_2));
         }
 

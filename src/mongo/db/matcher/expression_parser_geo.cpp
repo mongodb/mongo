@@ -33,19 +33,20 @@
 #include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
 
     StatusWithMatchExpression expressionParserGeoCallbackReal( const char* name,
                                                                int type,
                                                                const BSONObj& section ) {
         if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
-            auto_ptr<GeoQuery> gq(new GeoQuery(name));
-            if ( !gq->parseFrom( section ) )
-                return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                  string("bad geo query: ") + section.toString() );
+            auto_ptr<GeoExpression> gq(new GeoExpression(name));
+            Status parseStatus = gq->parseFrom(section);
+
+            if (!parseStatus.isOK()) return StatusWithMatchExpression(parseStatus);
 
             auto_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
 
@@ -61,7 +62,7 @@ namespace mongo {
         }
         else {
             verify(BSONObj::opNEAR == type);
-            auto_ptr<NearQuery> nq(new NearQuery(name));
+            auto_ptr<GeoNearExpression> nq(new GeoNearExpression(name));
             Status s = nq->parseFrom( section );
             if ( !s.isOK() ) {
                 return StatusWithMatchExpression( s );

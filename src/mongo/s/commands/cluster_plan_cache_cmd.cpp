@@ -40,6 +40,7 @@
 namespace mongo {
 
     using std::string;
+    using std::stringstream;
     using std::vector;
 
     /**
@@ -58,6 +59,10 @@ namespace mongo {
             return false;
         }
 
+        bool slaveOverrideOk() const {
+            return true;
+        }
+
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
         void help(stringstream& ss) const {
@@ -69,11 +74,11 @@ namespace mongo {
                                     const BSONObj& cmdObj ) {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
             ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
-    
+
             if (authzSession->isAuthorizedForActionsOnResource(pattern, _actionType)) {
                 return Status::OK();
             }
-    
+
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
 

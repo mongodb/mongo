@@ -31,6 +31,7 @@
 
 namespace mongo {
 
+    using std::string;
     using mongoutils::str::stream;
 
     FieldParser::FieldState FieldParser::extract( BSONObj doc,

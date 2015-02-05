@@ -26,13 +26,17 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using std::vector;
+
     void AccumulatorPush::processInternal(const Value& input, bool merging) {
         if (!merging) {
             if (!input.missing()) {

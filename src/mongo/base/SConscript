@@ -19,6 +19,7 @@ env.Library('base', ['error_codes.cpp',
                      'string_data.cpp',
                      ],
                      LIBDEPS=[
+                     '$BUILD_DIR/mongo/quick_exit',
                      '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                      ])
 
@@ -45,6 +46,15 @@ env.CppUnitTest('parse_number_test',
 env.CppUnitTest('status_test',
                 'status_test.cpp',
                 LIBDEPS=['base'])
+
+env.CppUnitTest('encoded_value_storage_test',
+                'encoded_value_storage_test.cpp')
+
+env.CppUnitTest('data_view_test',
+                'data_view_test.cpp')
+
+env.CppUnitTest('data_cursor_test',
+                'data_cursor_test.cpp')
 
 env.CppUnitTest('counter_test',
                 'counter_test.cpp',

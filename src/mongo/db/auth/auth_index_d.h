@@ -44,13 +44,10 @@ namespace authindex {
     void createSystemIndexes(OperationContext* txn, Collection* collection);
 
     /**
-     * Ensures that exactly the appropriate indexes to support authentication and authorization
-     * are present for the given database.
-     *
-     * It is appropriate to call this function on new or existing databases, though it is
-     * primarily intended for use on existing databases.
+     * Verifies that only the appropriate indexes to support authentication and authorization
+     * are present in the admin database
      */
-    void configureSystemIndexes(OperationContext* txn, const StringData& dbname);
+    Status verifySystemIndexes(OperationContext* txn);
 
 }  // namespace authindex
 }  // namespace mongo

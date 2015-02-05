@@ -28,22 +28,27 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/stats/snapshots.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 
 /**
    handles snapshotting performance metrics and other such things
  */
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+
     void SnapshotData::takeSnapshot() {
         _created = curTimeMicros64();
-        _globalUsage = Top::global.getGlobalData();
-//        _totalWriteLockedTime = d.dbMutex.info().getTimeLocked();
         Top::global.cloneMap(_usage);
     }
 
@@ -53,9 +58,6 @@ namespace mongo {
         _elapsed = _newer._created - _older._created;
     }
 
-    Top::CollectionData SnapshotDelta::globalUsageDiff() {
-        return Top::CollectionData( _older._globalUsage , _newer._globalUsage );
-    }
     Top::UsageMap SnapshotDelta::collectionUsageDiff() {
         verify( _newer._created > _older._created );
         Top::UsageMap u;
@@ -101,22 +103,8 @@ namespace mongo {
         return _snapshots[x];
     }
 
-    void Snapshots::outputLockInfoHTML( stringstream& ss ) {
-        scoped_lock lk(_lock);
-        ss << "\n<div>";
-        for ( int i=0; i<numDeltas(); i++ ) {
-            SnapshotDelta d( getPrev(i+1) , getPrev(i) );
-            unsigned e = (unsigned) d.elapsed() / 1000;
-            ss << (unsigned)(100*d.percentWriteLocked());
-            if( e < 3900 || e > 4100 )
-                ss << '(' << e / 1000.0 << "s)";
-            ss << ' ';
-        }
-        ss << "</div>\n";
-    }
-
     void SnapshotThread::run() {
-        Client::initThread("snapshotthread");
+        Client::initThread("snapshot");
         Client& client = cc();
 
         long long numLoops = 0;
@@ -126,13 +114,6 @@ namespace mongo {
         while ( ! inShutdown() ) {
             try {
                 const SnapshotData* s = statsSnapshots.takeSnapshot();
-
-                if (prev && serverGlobalParams.cpu) {
-                    unsigned long long elapsed = s->_created - prev->_created;
-                    SnapshotDelta d( *prev , *s );
-                    log() << "cpu: elapsed:" << (elapsed/1000) <<"  writelock: " << (int)(100*d.percentWriteLocked()) << "%" << endl;
-                }
-
                 prev = s;
             }
             catch ( std::exception& e ) {

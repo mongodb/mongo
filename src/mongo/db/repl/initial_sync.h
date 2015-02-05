@@ -44,12 +44,9 @@ namespace repl {
         InitialSync(BackgroundSyncInterface *q);
 
         /**
-         * Creates the initial oplog entry: applies applyGTEObj and writes it to the oplog.  Then
-         * this runs oplogApplySegment allowing recloning documents.
+         * applies up to endOpTime, fetching missing documents as needed.
          */
-        BSONObj oplogApplication(OperationContext* txn,
-                                 const BSONObj& applyGTEObj,
-                                 const BSONObj& minValidObj);
+        void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
     };
 
 } // namespace repl

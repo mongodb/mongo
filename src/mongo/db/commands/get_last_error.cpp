@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
@@ -35,14 +37,14 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
+    using std::string;
+    using std::stringstream;
 
     /* reset any errors so that getlasterror comes back clean.
 
@@ -124,7 +126,7 @@ namespace mongo {
             LastError *le = lastError.disableForCommand();
 
             // Always append lastOp and connectionId
-            Client& c = cc();
+            Client& c = *txn->getClient();
             c.appendLastOp( result );
 
             // for sharding; also useful in general for debugging
@@ -142,7 +144,7 @@ namespace mongo {
             bool lastOpTimePresent = extracted != FieldParser::FIELD_NONE;
             if (!lastOpTimePresent) {
                 // Use the client opTime if no wOpTime is specified
-                lastOpTime = cc().getLastOp();
+                lastOpTime = c.getLastOp();
             }
             
             OID electionId;
@@ -176,20 +178,18 @@ namespace mongo {
                 (nFields == 2 && lastOpTimePresent) ||
                 (nFields == 3 && lastOpTimePresent && electionIdPresent);
 
+            WriteConcernOptions writeConcern;
+
             if (useDefaultGLEOptions) {
-                BSONObj getLastErrorDefault =
-                        repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
-                if (!getLastErrorDefault.isEmpty()) {
-                    writeConcernDoc = getLastErrorDefault;
-                }
+                writeConcern = repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
             }
+
+            Status status = writeConcern.parse( writeConcernDoc );
 
             //
             // Validate write concern no matter what, this matches 2.4 behavior
             //
 
-            WriteConcernOptions writeConcern;
-            Status status = writeConcern.parse( writeConcernDoc );
 
             if ( status.isOK() ) {
                 // Ensure options are valid for this host

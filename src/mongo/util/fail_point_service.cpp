@@ -28,7 +28,12 @@
 
 #include "mongo/util/fail_point_service.h"
 
+#include <boost/scoped_ptr.hpp>
+
 namespace mongo {
+
+    using boost::scoped_ptr;
+
     MONGO_FP_DECLARE(dummy); // used by jstests/libs/fail_point.js
 
     scoped_ptr<FailPointRegistry> _fpRegistry(NULL);

@@ -28,9 +28,11 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -51,7 +53,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -67,7 +69,7 @@ namespace mongo {
 
     private:
         WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
+        boost::scoped_ptr<PlanStage> _child;
 
         // We only return this many results.
         int _numToReturn;

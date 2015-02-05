@@ -27,7 +27,10 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h" // needed for log.h
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
+#undef MONGO_PCH_WHITELISTED // needed for log.h
 
 #include "mongo/util/progress_meter.h"
 
@@ -68,14 +71,14 @@ namespace mongo {
         if ( _total > 0 ) {
             int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
             LogstreamBuilder out = log();
-            out << "\t\t" << _name << ": " << _done;
+            out << "  " << _name << ": " << _done;
 
             if (_showTotal) {
-                out << '/' << _total << '\t' << per << '%';
+                out << '/' << _total << ' ' << per << '%';
             }
 
             if ( ! _units.empty() ) {
-                out << "\t(" << _units << ")";
+                out << " (" << _units << ")";
             }
             out << endl;
         }
@@ -90,7 +93,7 @@ namespace mongo {
         buf << _name << ": " << _done << '/' << _total << ' ' << (_done*100)/_total << '%';
         
         if ( ! _units.empty() ) {
-            buf << "\t(" << _units << ")" << endl;
+            buf << " (" << _units << ")" << endl;
         }
         
         return buf.str();

@@ -30,8 +30,8 @@
 
 #include <vector>
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -43,14 +43,16 @@ namespace mongo {
          * @param n  The centroid that we're searching
          * @param maxDistance  The maximum distance to consider from that point
          * @param limit  The maximum number of results to return
-         * @param geoField  Which field in the provided DiskLoc has the point to test.
+         * @param geoField  Which field in the provided RecordId has the point to test.
          */
-        GeoHaystackSearchHopper(const BSONObj& nearObj, 
+        GeoHaystackSearchHopper(OperationContext* txn,
+                                const BSONObj& nearObj, 
                                 double maxDistance,
                                 unsigned limit,
                                 const std::string& geoField,
                                 const Collection* collection)
-            : _collection(collection),
+            : _txn(txn),
+              _collection(collection),
               _near(nearObj), 
               _maxDistance(maxDistance),
               _limit(limit),
@@ -58,9 +60,9 @@ namespace mongo {
 
         // Consider the point in loc, and keep it if it's within _maxDistance (and we have space for
         // it)
-        void consider(const DiskLoc& loc) {
+        void consider(const RecordId& loc) {
             if (limitReached()) return;
-            Point p(_collection->docFor(loc).getFieldDotted(_geoField));
+            Point p(_collection->docFor(_txn, loc).value().getFieldDotted(_geoField));
             if (distance(_near, p) > _maxDistance)
                 return;
             _locs.push_back(loc);
@@ -68,7 +70,7 @@ namespace mongo {
 
         int appendResultsTo(BSONArrayBuilder* b) {
             for (unsigned i = 0; i <_locs.size(); i++)
-                b->append(_collection->docFor(_locs[i]));
+                b->append(_collection->docFor(_txn, _locs[i]).value());
             return _locs.size();
         }
 
@@ -77,13 +79,14 @@ namespace mongo {
             return _locs.size() >= _limit;
         }
     private:
+        OperationContext* _txn;
         const Collection* _collection;
 
         Point _near;
         double _maxDistance;
         unsigned _limit;
         const std::string _geoField;
-        std::vector<DiskLoc> _locs;
+        std::vector<RecordId> _locs;
     };
 
 }  // namespace mongo

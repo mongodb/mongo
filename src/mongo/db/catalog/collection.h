@@ -34,14 +34,15 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
-#include "mongo/db/catalog/collection_cursor_cache.h"
 #include "mongo/db/catalog/collection_info_cache.h"
+#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/platform/atomic_word.h"
@@ -49,13 +50,14 @@
 namespace mongo {
 
     class CollectionCatalogEntry;
-    class Database;
+    class DatabaseCatalogEntry;
     class ExtentManager;
     class IndexCatalog;
     class MultiIndexBlock;
     class OperationContext;
 
     class RecordIterator;
+    class RecordFetcher;
 
     class OpDebug;
 
@@ -100,13 +102,13 @@ namespace mongo {
      * this is NOT safe through a yield right now
      * not sure if it will be, or what yet
      */
-    class Collection : CappedDocumentDeleteCallback, UpdateMoveNotifier {
+    class Collection : CappedDocumentDeleteCallback, UpdateNotifier {
     public:
         Collection( OperationContext* txn,
                     const StringData& fullNS,
                     CollectionCatalogEntry* details, // does not own
                     RecordStore* recordStore, // does not own
-                    Database* database ); // does not own
+                    DatabaseCatalogEntry* dbce ); // does not own
 
         ~Collection();
 
@@ -126,20 +128,24 @@ namespace mongo {
         const RecordStore* getRecordStore() const { return _recordStore; }
         RecordStore* getRecordStore() { return _recordStore; }
 
-        CollectionCursorCache* cursorCache() const { return &_cursorCache; }
+        CursorManager* getCursorManager() const { return &_cursorManager; }
 
         bool requiresIdIndex() const;
 
-        BSONObj docFor(const DiskLoc& loc) const;
+        Snapshotted<BSONObj> docFor(OperationContext* txn, const RecordId& loc) const;
+
+        /**
+         * @param out - contents set to the right docs if exists, or nothing.
+         * @return true iff loc exists
+         */
+        bool findDoc(OperationContext* txn, const RecordId& loc, Snapshotted<BSONObj>* out) const;
 
         // ---- things that should move to a CollectionAccessMethod like thing
         /**
-         * canonical to get all would be
-         * getIterator( DiskLoc(), false, CollectionScanParams::FORWARD )
+         * Default arguments will return all items in the collection.
          */
         RecordIterator* getIterator( OperationContext* txn,
-                                     const DiskLoc& start = DiskLoc(),
-                                     bool tailable = false,
+                                     const RecordId& start = RecordId(),
                                      const CollectionScanParams::Direction& dir = CollectionScanParams::FORWARD ) const;
 
         /**
@@ -149,16 +155,8 @@ namespace mongo {
          */
         std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
 
-
-        /**
-         * does a table scan to do a count
-         * this should only be used at a very low level
-         * does no yielding, indexes, etc...
-         */
-        int64_t countTableScan( OperationContext* txn, const MatchExpression* expression );
-
         void deleteDocument( OperationContext* txn,
-                             const DiskLoc& loc,
+                             const RecordId& loc,
                              bool cappedOK = false,
                              bool noWarn = false,
                              BSONObj* deletedId = 0 );
@@ -166,18 +164,33 @@ namespace mongo {
         /**
          * this does NOT modify the doc before inserting
          * i.e. will not add an _id field for documents that are missing it
+         *
+         * If enforceQuota is false, quotas will be ignored.
          */
-        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
+        StatusWith<RecordId> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
                                             bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
+        StatusWith<RecordId> insertDocument( OperationContext* txn,
                                             const DocWriter* doc,
                                             bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
+        StatusWith<RecordId> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
-                                            MultiIndexBlock& indexBlock );
+                                            MultiIndexBlock* indexBlock,
+                                            bool enforceQuota );
+
+        /**
+         * If the document at 'loc' is unlikely to be in physical memory, the storage
+         * engine gives us back a RecordFetcher functor which we can invoke in order
+         * to page fault on that record.
+         *
+         * Returns NULL if the document does not need to be fetched.
+         *
+         * Caller takes ownership of the returned RecordFetcher*.
+         */
+        RecordFetcher* documentNeedsFetch( OperationContext* txn,
+                                           const RecordId& loc ) const;
 
         /**
          * updates the document @ oldLocation with newDoc
@@ -185,18 +198,21 @@ namespace mongo {
          * if not, it is moved
          * @return the post update location of the doc (may or may not be the same as oldLocation)
          */
-        StatusWith<DiskLoc> updateDocument( OperationContext* txn,
-                                            const DiskLoc& oldLocation,
-                                            const BSONObj& newDoc,
-                                            bool enforceQuota,
-                                            OpDebug* debug );
+        StatusWith<RecordId> updateDocument( OperationContext* txn,
+                                             const RecordId& oldLocation,
+                                             const Snapshotted<BSONObj>& oldDoc,
+                                             const BSONObj& newDoc,
+                                             bool enforceQuota,
+                                             bool indexesAffected,
+                                             OpDebug* debug );
 
         /**
          * right now not allowed to modify indexes
          */
         Status updateDocumentWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
-                                          const char* damangeSource,
+                                          const RecordId& loc,
+                                          const Snapshotted<RecordData>& oldRec,
+                                          const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         // -----------
@@ -235,7 +251,7 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
+        void temp_cappedTruncateAfter( OperationContext* txn, RecordId end, bool inclusive );
 
         // -----------
 
@@ -245,15 +261,15 @@ namespace mongo {
 
         bool isCapped() const;
 
-        uint64_t numRecords() const;
+        uint64_t numRecords( OperationContext* txn ) const;
 
-        uint64_t dataSize() const;
+        uint64_t dataSize( OperationContext* txn ) const;
 
-        int averageObjectSize() const {
-            uint64_t n = numRecords();
+        int averageObjectSize( OperationContext* txn ) const {
+            uint64_t n = numRecords( txn );
             if ( n == 0 )
                 return 5;
-            return static_cast<int>( dataSize() / n );
+            return static_cast<int>( dataSize( txn ) / n );
         }
         
         /* For now triggerChangeSubscribersNotification() used only to awake waiters on capped collection
@@ -268,23 +284,30 @@ namespace mongo {
            is actively waiting for data while outside of the readlock */
         void subscribeToInsertedEvent();
 
+        uint64_t getIndexSize(OperationContext* opCtx,
+                              BSONObjBuilder* details = NULL,
+                              int scale = 1);
+
         // --- end suspect things
 
     private:
 
         Status recordStoreGoingToMove( OperationContext* txn,
-                                       const DiskLoc& oldLocation,
+                                       const RecordId& oldLocation,
                                        const char* oldBuffer,
                                        size_t oldSize );
 
-        Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc );
+        Status recordStoreGoingToUpdateInPlace( OperationContext* txn,
+                                                const RecordId& loc );
+
+        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc, RecordData data );
 
         /**
          * same semantics as insertDocument, but doesn't do:
          *  - some user error checks
          *  - adjust padding
          */
-        StatusWith<DiskLoc> _insertDocument( OperationContext* txn,
+        StatusWith<RecordId> _insertDocument( OperationContext* txn,
                                              const BSONObj& doc,
                                              bool enforceQuota );
 
@@ -295,7 +318,7 @@ namespace mongo {
         NamespaceString _ns;
         CollectionCatalogEntry* _details;
         RecordStore* _recordStore;
-        Database* _database;
+        DatabaseCatalogEntry* _dbce;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
         NotifyAll _changeSubscribers;
@@ -304,7 +327,7 @@ namespace mongo {
         // this is mutable because read only users of the Collection class
         // use it keep state.  This seems valid as const correctness of Collection
         // should be about the data.
-        mutable CollectionCursorCache _cursorCache;
+        mutable CursorManager _cursorManager;
 
         friend class Database;
         friend class IndexCatalog;

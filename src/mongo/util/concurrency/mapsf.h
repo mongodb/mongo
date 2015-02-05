@@ -28,6 +28,8 @@
 *    then also delete it in the license file.
 */
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {

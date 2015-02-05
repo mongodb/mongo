@@ -28,18 +28,30 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
+#include <string>
+#include <vector>
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
+
+    using std::string;
 
     /**
      * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
@@ -126,57 +138,58 @@ namespace mongo {
                 }
             }
 
-
-            {
-                // We first take a read lock to see if we need to do anything
-                // as many calls are ensureIndex (and hence no-ops), this is good so its a shared
-                // lock for common calls. We only take write lock if needed.
-                // Note: createIndexes command does not currently respect shard versioning.
-                Client::ReadContext readContext(txn, ns, false /* doVersion */);
-                const Collection* collection = readContext.ctx().db()->getCollection(txn, ns.ns());
-                if ( collection ) {
-                    for ( size_t i = 0; i < specs.size(); i++ ) {
-                        BSONObj spec = specs[i];
-                        StatusWith<BSONObj> statusWithSpec =
-                            collection->getIndexCatalog()->prepareSpecForCreate( txn, spec );
-                        status = statusWithSpec.getStatus();
-                        if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
-                            specs.erase( specs.begin() + i );
-                            i--;
-                            continue;
-                        }
-                        if ( !status.isOK() )
-                            return appendCommandStatus( result, status );
-                    }
-
-                    if ( specs.size() == 0 ) {
-                        result.append( "numIndexesBefore",
-                                       collection->getIndexCatalog()->numIndexesTotal() );
-                        result.append( "note", "all indexes already exist" );
-                        return true;
-                    }
-
-                    // need to create index
-                }
-            }
-
             // now we know we have to create index(es)
             // Note: createIndexes command does not currently respect shard versioning.
-            Client::WriteContext writeContext(txn, ns.ns(), false /* doVersion */ );
-            Database* db = writeContext.ctx().db();
-
-            Collection* collection = db->getCollection( txn, ns.ns() );
-            result.appendBool( "createdCollectionAutomatically", collection == NULL );
-            if ( !collection ) {
-                collection = db->createCollection( txn, ns.ns() );
-                invariant( collection );
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while creating indexes in " << ns.ns()));
             }
 
-            result.append( "numIndexesBefore", collection->getIndexCatalog()->numIndexesTotal() );
+            Database* db = dbHolder().get(txn, ns.db());
+            if (!db) {
+                db = dbHolder().openDb(txn, ns.db());
+            }
+
+            Collection* collection = db->getCollection( ns.ns() );
+            result.appendBool( "createdCollectionAutomatically", collection == NULL );
+            if ( !collection ) {
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    WriteUnitOfWork wunit(txn);
+                    collection = db->createCollection( txn, ns.ns() );
+                    invariant( collection );
+                    if (!fromRepl) {
+                        repl::logOp(txn, "c", (dbname + ".$cmd").c_str(),
+                                    BSON("create" << ns.coll()));
+                    }
+                    wunit.commit();
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
+            }
+
+            const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);
+            result.append("numIndexesBefore", numIndexesBefore);
+
+            MultiIndexBlock indexer(txn, collection);
+            indexer.allowBackgroundBuilding();
+            indexer.allowInterruption();
+
+            const size_t origSpecsSize = specs.size();
+            indexer.removeExistingIndexes(&specs);
+
+            if (specs.size() == 0) {
+                result.append("numIndexesAfter", numIndexesBefore);
+                result.append( "note", "all indexes already exist" );
+                return true;
+            }
+
+            if (specs.size() != origSpecsSize) {
+                result.append( "note", "index already exists" );
+            }
 
             for ( size_t i = 0; i < specs.size(); i++ ) {
-                BSONObj spec = specs[i];
-
+                const BSONObj& spec = specs[i];
                 if ( spec["unique"].trueValue() ) {
                     status = checkUniqueIndexConstraints(txn, ns.ns(), spec["key"].Obj());
 
@@ -185,28 +198,71 @@ namespace mongo {
                         return false;
                     }
                 }
-
-                status = collection->getIndexCatalog()->createIndex(txn, spec, true);
-                if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
-                    if ( !result.hasField( "note" ) )
-                        result.append( "note", "index already exists" );
-                    continue;
-                }
-
-                if ( !status.isOK() ) {
-                    appendCommandStatus( result, status );
-                    return false;
-                }
-
-                if ( !fromRepl ) {
-                    std::string systemIndexes = ns.getSystemIndexesCollection();
-                    repl::logOp(txn, "i", systemIndexes.c_str(), spec);
-                }
             }
 
-            result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal() );
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                uassertStatusOK(indexer.init(specs));
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
 
-            writeContext.commit();
+            // If we're a background index, replace exclusive db lock with an intent lock, so that
+            // other readers and writers can proceed during this phase.  
+            if (indexer.getBuildInBackground()) {
+                txn->recoveryUnit()->commitAndRestart();
+                dbLock.relockWithMode(MODE_IX);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while creating background indexes in " << ns.ns()));
+                }
+            }
+            try {
+                Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                uassertStatusOK(indexer.insertAllDocumentsInCollection());
+            }
+            catch (const DBException& e) {
+                invariant(e.getCode() != ErrorCodes::WriteConflict);
+                // Must have exclusive DB lock before we clean up the index build via the
+                // destructor of 'indexer'.
+                if (indexer.getBuildInBackground()) {
+                    try {
+                        // This function cannot throw today, but we will preemptively prepare for
+                        // that day, to avoid data corruption due to lack of index cleanup.
+                        txn->recoveryUnit()->commitAndRestart();
+                        dbLock.relockWithMode(MODE_X);
+                    }
+                    catch (...) {
+                        std::terminate();
+                    }
+                }
+                throw;
+            }
+            // Need to return db lock back to exclusive, to complete the index build.
+            if (indexer.getBuildInBackground()) {
+                txn->recoveryUnit()->commitAndRestart();
+                dbLock.relockWithMode(MODE_X);
+                Database* db = dbHolder().get(txn, ns.db());
+                uassert(28551, "database dropped during index build", db);
+                uassert(28552, "collection dropped during index build",
+                        db->getCollection(ns.ns()));
+            }
+
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wunit(txn);
+
+                indexer.commit();
+
+                if ( !fromRepl ) {
+                    for ( size_t i = 0; i < specs.size(); i++ ) {
+                        std::string systemIndexes = ns.getSystemIndexesCollection();
+                        repl::logOp(txn, "i", systemIndexes.c_str(), specs[i]);
+                    }
+                }
+
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
+
+            result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn) );
+
             return true;
         }
 
@@ -214,18 +270,20 @@ namespace mongo {
         static Status checkUniqueIndexConstraints(OperationContext* txn,
                                                   const StringData& ns,
                                                   const BSONObj& newIdxKey) {
-            txn->lockState()->assertWriteLocked( ns );
+
+            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
 
             if ( shardingState.enabled() ) {
                 CollectionMetadataPtr metadata(
                         shardingState.getCollectionMetadata( ns.toString() ));
 
                 if ( metadata ) {
-                    BSONObj shardKey(metadata->getKeyPattern());
-                    if ( !isUniqueIndexCompatible( shardKey, newIdxKey )) {
+                    ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+                    if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {
                         return Status(ErrorCodes::CannotCreateIndex,
-                                str::stream() << "cannot create unique index over " << newIdxKey
-                                              << " with shard key pattern " << shardKey);
+                            str::stream() << "cannot create unique index over " << newIdxKey
+                                          << " with shard key pattern "
+                                          << shardKeyPattern.toBSON());
                     }
                 }
             }

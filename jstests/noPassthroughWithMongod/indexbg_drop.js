@@ -56,14 +56,14 @@ jsTest.log("Starting background indexing for test of: " + tojson(dc));
 masterDB.getCollection(collection).ensureIndex({b:1});
 
 masterDB.getCollection(collection).ensureIndex( {i:1}, {background:true} );
-assert.eq(3, masterDB.system.indexes.count( {ns:dbname + "." + collection}, {background:true} ) );
+assert.eq(3, masterDB.getCollection(collection).getIndexes().length );
 
 // Wait for the secondary to get the index entry
-assert.soon( 
-    function() { return 3 == secondDB.system.indexes.count( {ns:dbname + "." + collection} ); }, 
+assert.soon(
+    function() { return 3 == secondDB.getCollection(collection).getIndexes().length; },
     "index not created on secondary (prior to drop)", 240000 );
 
-jsTest.log("Index created and system.indexes entry exists on secondary");
+jsTest.log("Index created and index entry exists on secondary");
 
 
 // make sure the index build has started on secondary
@@ -90,17 +90,17 @@ jsTest.log("Waiting on replication");
 replTest.awaitReplication();
 
 print("index list on master:");
-masterDB.system.indexes.find().forEach(printjson);
+masterDB.getCollection(collection).getIndexes().forEach(printjson);
 
 // we need to assert.soon because the drop only marks the index for removal
 // the removal itself is asynchronous and may take another moment before it happens
 var i = 0;
 assert.soon( function() {
     print("index list on secondary (run " + i + "):");
-    secondDB.system.indexes.find().forEach(printjson);
-    
+    secondDB.getCollection(collection).getIndexes().forEach(printjson);
+
     i++;
-    return 1 === secondDB.system.indexes.count();
+    return 1 === secondDB.getCollection(collection).getIndexes().length;
     }, "secondary did not drop index"
 );
 

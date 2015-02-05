@@ -3,7 +3,9 @@
    we use lock+fsync to force secondary to be stale
 */
 
-var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
+load("jstests/replsets/rslib.js")
+
+var replTest = new ReplSetTest({ name: 'testSet', nodes: 2, nodeOptions: {verbose: 1} });
 var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getMaster();
@@ -65,12 +67,7 @@ config.members[0].priority = 2;
 config.members[1].priority = 1;
 // make sure 1 can stay master once 0 is down
 config.members[0].votes = 0;
-try {
-    master.getDB("admin").runCommand({replSetReconfig : config});
-}
-catch (e) {
-    print(e);
-}
+reconfig(replTest, config);
 
 print("\nawait");
 replTest.awaitSecondaryNodes(90000);
@@ -92,10 +89,12 @@ var firstMaster = master;
 print("\nmaster is now "+firstMaster);
 
 try {
-    printjson(master.getDB("admin").runCommand({replSetStepDown : 100, force : true}));
+    assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown : 100, force : true}));
 }
 catch (e) {
-    print(e);
+    if (tojson( e ).indexOf( "error doing query: failed" ) < 0) {
+        throw e;
+    }
 }
 
 print("\nget a master");
@@ -106,6 +105,23 @@ assert.soon(function() {
         return firstMaster+"" != secondMaster+"";
     }, 'making sure '+firstMaster+' isn\'t still master', 60000);
 
+// Add arbiter for shutdown tests
+replTest.add();
+
+config.version++;
+config.members.push({_id: 2,
+                     host: getHostName()+":"+replTest.ports[replTest.ports.length-1],
+                     arbiterOnly:true});
+try {
+    reconfig(replTest, config);
+} catch (x) {
+    // SERVER-16878 Print the last few oplog entries of the secondary to aid debugging
+    var oplog1 = replTest.nodes[1].getDB('local').oplog.rs.find().sort({'$natural':-1}).limit(3);
+    print("Node 1 oplog: " + tojson(oplog1.toArray()));
+
+    throw x;
+}
+
 
 print("\ncheck shutdown command");
 
@@ -114,7 +130,7 @@ var slave = replTest.liveNodes.slaves[0];
 var slaveId = replTest.getNodeId(slave);
 
 try {
-    slave.adminCommand({shutdown :1})
+    slave.adminCommand({shutdown :1});
 }
 catch (e) {
     print(e);
@@ -123,15 +139,21 @@ catch (e) {
 
 master = replTest.getMaster();
 assert.soon(function() {
-    var result = master.getDB("admin").runCommand({replSetGetStatus:1});
-    for (var i in result.members) {
-        if (result.members[i].self) {
-            continue;
+    try {
+        var result = master.getDB("admin").runCommand({replSetGetStatus:1});
+        for (var i in result.members) {
+            if (result.members[i].self) {
+                continue;
+            }
+
+            return result.members[i].health == 0;
         }
-
-        return result.members[i].health == 0;
     }
-
+    catch (e) {
+        print("error getting status from master: " + e);
+        master = replTest.getMaster();
+        return false;
+    }
 }, 'make sure master knows that slave is down before proceeding');
 
 
@@ -139,8 +161,9 @@ print("\nrunning shutdown without force on master: "+master);
 
 // this should fail because the master can't reach an up-to-date secondary (because the only 
 // secondary is down)
-result = master.getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3});
-assert.eq(result.ok, 0);
+var now = new Date();
+assert.commandFailed(master.getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3}));
+assert.gte((new Date()) - now, 3000);
 
 print("\nsend shutdown command");
 
@@ -149,7 +172,9 @@ try {
     printjson(currentMaster.getDB("admin").runCommand({shutdown : 1, force : true}));
 }
 catch (e) {
-    print(e);
+    if (tojson(e).indexOf( "error doing query: failed" ) < 0) {
+        throw e;
+    }
 }
 
 print("checking "+currentMaster+" is actually shutting down");

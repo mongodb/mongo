@@ -32,7 +32,10 @@
 
 #pragma once
 
+#include <cstring>
+
 namespace mongo {
+    class OperationContext;
 
     enum ExitCode {
         EXIT_CLEAN = 0 ,
@@ -54,5 +57,12 @@ namespace mongo {
         EXIT_UNCAUGHT = 100 , // top level exception that wasn't caught
         EXIT_TEST = 101
     };
+
+    /**
+     * Exit the current executable doing whatever cleanup is necessary.
+     * Defined differently in different executables.
+     * No database locks must be held by the thread when this function is called.
+     */
+    void exitCleanly(ExitCode code);
 
 }  // namespace mongo

@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/record_id.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -54,7 +56,7 @@ namespace mongo {
      * inserted before documents in a subsequent extent.  As such we can skip through entire extents
      * looking only at the first document.
      *
-     * Why is this a stage?  Because we want to yield, and we want to be notified of DiskLoc
+     * Why is this a stage?  Because we want to yield, and we want to be notified of RecordId
      * invalidations.  :(
      */
     class OplogStart : public PlanStage {
@@ -69,7 +71,7 @@ namespace mongo {
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
 
@@ -102,7 +104,7 @@ namespace mongo {
         OperationContext* _txn;
 
         // If we're backwards scanning we just punt to a collscan.
-        scoped_ptr<CollectionScan> _cs;
+        boost::scoped_ptr<CollectionScan> _cs;
 
         // This is only used for the extent hopping scan.
         typedef OwnedPointerVector<RecordIterator> SubIterators;

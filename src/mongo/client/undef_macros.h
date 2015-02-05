@@ -33,14 +33,6 @@
 
 #ifdef MONGO_MACROS_PUSHED
 
-// util/allocator.h
-#ifdef MONGO_MALLOC
-#undef malloc
-#pragma pop_macro("malloc")
-#undef realloc
-#pragma pop_macro("realloc")
-#endif
-
 // util/assert_util.h
 #undef dassert
 #pragma pop_macro("dassert")
@@ -54,10 +46,12 @@
 #pragma pop_macro("verify")
 #undef invariant
 #pragma pop_macro("invariant")
+#undef invariantOK
+#pragma pop_macro("invariantOK")
 #undef DESTRUCTOR_GUARD
 #pragma pop_macro("DESTRUCTOR_GUARD")
 
-// util/goodies.h
+// util/print.h
 #undef PRINT
 #pragma pop_macro("PRINT")
 #undef PRINTFL

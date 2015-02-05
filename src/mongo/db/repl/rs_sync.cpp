@@ -26,7 +26,9 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/rs_sync.h"
 
@@ -35,253 +37,114 @@
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/member.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/rs.h"
-#include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/rs_initialsync.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
-    /* should be in RECOVERING state on arrival here.
-       readlocks
-       @return true if transitioned to SECONDARY
-    */
-    bool ReplSetImpl::tryToGoLiveAsASecondary(OperationContext* txn, OpTime& /*out*/ minvalid) {
-        bool golive = false;
+    void runSyncThread() {
+        Client::initThread("rsSync");
+        cc().getAuthorizationSession()->grantInternalAuthorization();
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
-        lock rsLock( this );
-
-        if (_maintenanceMode > 0) {
-            // we're not actually going live
-            return true;
-        }
-
-        // if we're blocking sync, don't change state
-        if (_blockSync) {
-            return false;
-        }
-
-        Lock::GlobalWrite writeLock(txn->lockState());
-
-        // make sure we're not primary, secondary, rollback, or fatal already
-        if (box.getState().primary() || box.getState().secondary() ||
-            box.getState().fatal()) {
-            return false;
-        }
-
-        minvalid = getMinValid(txn);
-        if( minvalid <= lastOpTimeWritten ) {
-            golive=true;
-        }
-        else {
-            sethbmsg(str::stream() << "still syncing, not yet to minValid optime " <<
-                     minvalid.toString());
-        }
-
-        if( golive ) {
-            sethbmsg("");
-            changeState(MemberState::RS_SECONDARY);
-        }
-        return golive;
-    }
-
-
-    Status ReplSetImpl::forceSyncFrom(const string& host, BSONObjBuilder* result) {
-        lock lk(this);
-
-        // initial sanity check
-        if (iAmArbiterOnly()) {
-            return Status(ErrorCodes::NotSecondary, "arbiters don't sync");
-        }
-        if (box.getState().primary()) {
-            return Status(ErrorCodes::NotSecondary, "primaries don't sync");
-        }
-        if (_self != NULL && host == _self->fullName()) {
-            return Status(ErrorCodes::InvalidOptions, "I cannot sync from myself");
-        }
-
-        // find the member we want to sync from
-        Member *newTarget = 0;
-        for (Member *m = _members.head(); m; m = m->next()) {
-            if (m->fullName() == host) {
-                newTarget = m;
-                break;
+        // Set initial indexPrefetch setting
+        const std::string& prefetch = replCoord->getSettings().rsIndexPrefetch;
+        if (!prefetch.empty()) {
+            BackgroundSync::IndexPrefetchConfig prefetchConfig = BackgroundSync::PREFETCH_ALL;
+            if (prefetch == "none")
+                prefetchConfig = BackgroundSync::PREFETCH_NONE;
+            else if (prefetch == "_id_only")
+                prefetchConfig = BackgroundSync::PREFETCH_ID_ONLY;
+            else if (prefetch == "all")
+                prefetchConfig = BackgroundSync::PREFETCH_ALL;
+            else {
+                warning() << "unrecognized indexPrefetch setting " << prefetch << ", defaulting "
+                          << "to \"all\"";
             }
+            BackgroundSync::get()->setIndexPrefetchConfig(prefetchConfig);
         }
 
-        // do some more sanity checks
-        if (!newTarget) {
-            // this will also catch if someone tries to sync a member from itself, as _self is not
-            // included in the _members list.
-            return Status(ErrorCodes::NodeNotFound, "could not find member in replica set");
-        }
-        if (newTarget->config().arbiterOnly) {
-            return Status(ErrorCodes::InvalidOptions, "I cannot sync from an arbiter");
-        }
-        if (!newTarget->config().buildIndexes && myConfig().buildIndexes) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "I cannot sync from a member who does not build indexes");
-        }
-        if (newTarget->hbinfo().authIssue) {
-            return Status(ErrorCodes::Unauthorized,
-                          "not authorized to communicate with " + newTarget->fullName());
-        }
-        if (newTarget->hbinfo().health == 0) {
-            return Status(ErrorCodes::HostUnreachable, "I cannot reach the requested member");
-        }
-        if (newTarget->hbinfo().opTime.getSecs()+10 < lastOpTimeWritten.getSecs()) {
-            log() << "attempting to sync from " << newTarget->fullName()
-                  << ", but its latest opTime is " << newTarget->hbinfo().opTime.getSecs()
-                  << " and ours is " << lastOpTimeWritten.getSecs() << " so this may not work"
-                  << rsLog;
-            result->append("warning", "requested member is more than 10 seconds behind us");
-            // not returning false, just warning
-        }
-
-        // record the previous member we were syncing from
-        const Member *prev = BackgroundSync::get()->getSyncTarget();
-        if (prev) {
-            result->append("prevSyncTarget", prev->fullName());
-        }
-
-        // finally, set the new target
-        _forceSyncTarget = newTarget;
-        return Status::OK();
-    }
-
-    bool ReplSetImpl::gotForceSync() {
-        lock lk(this);
-        return _forceSyncTarget != 0;
-    }
-
-    bool ReplSetImpl::shouldChangeSyncTarget(const OpTime& targetOpTime) const {
-        for (Member *m = _members.head(); m; m = m->next()) {
-            if (m->syncable() &&
-                targetOpTime.getSecs()+maxSyncSourceLagSecs < m->hbinfo().opTime.getSecs()) {
-                log() << "changing sync target because current sync target's most recent OpTime is "
-                      << targetOpTime.toStringPretty() << " which is more than "
-                      << maxSyncSourceLagSecs << " seconds behind member " << m->fullName()
-                      << " whose most recent OpTime is " << m->hbinfo().opTime.getSecs();
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    void ReplSetImpl::_syncThread() {
-        StateBox::SP sp = box.get();
-        if( sp.state.primary() ) {
-            sleepsecs(1);
-            return;
-        }
-        if( _blockSync || sp.state.fatal() || sp.state.startup() ) {
-            sleepsecs(5);
-            return;
-        }
-
-        bool initialSyncRequested = false;
-        {
-            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
-            initialSyncRequested = theReplSet->initialSyncRequested;
-        }
-        // Check criteria for doing an initial sync:
-        // 1. If the oplog is empty, do an initial sync
-        // 2. If minValid has _initialSyncFlag set, do an initial sync
-        // 3. If initialSyncRequested is true
-        if (lastOpTimeWritten.isNull() || getInitialSyncFlag() || initialSyncRequested) {
-            syncDoInitialSync();
-            return; // _syncThread will be recalled, starts from top again in case sync failed.
-        }
-
-        /* we have some data.  continue tailing. */
-        SyncTail tail(BackgroundSync::get());
-        tail.oplogApplication();
-    }
-
-    bool ReplSetImpl::resync(OperationContext* txn, string& errmsg) {
-        changeState(MemberState::RS_RECOVERING);
-
-        Client::Context ctx(txn, "local");
-
-        ctx.db()->dropCollection(txn, "local.oplog.rs");
-        {
-            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
-            theReplSet->initialSyncRequested = true;
-        }
-        lastOpTimeWritten = OpTime();
-        _veto.clear();
-        return true;
-    }
-
-    void ReplSetImpl::syncThread() {
-        while( 1 ) {
+        while (!inShutdown()) {
             // After a reconfig, we may not be in the replica set anymore, so
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
-            if( ! _self ) {
-                log() << "replSet warning did not receive a valid config yet, sleeping 20 seconds " << rsLog;
-                sleepsecs(20);
+            // TODO(spencer): Use a condition variable to await loading a config
+            if (replCoord->getMemberState().startup()) {
+                log() << "replSet warning did not receive a valid config yet, sleeping 5 seconds ";
+                sleepsecs(5);
                 continue;
             }
-            if( myConfig().arbiterOnly ) {
-                return;
+
+            const MemberState memberState = replCoord->getMemberState();
+
+            // An arbiter can never transition to any other state, and doesn't replicate, ever
+            if (memberState.arbiter()) {
+                break;
+            }
+
+            // If we are removed then we don't belong to the set anymore
+            if (memberState.removed()) {
+                sleepsecs(5);
+                continue;
             }
 
             try {
-                _syncThread();
+
+                if (memberState.primary() && !replCoord->isWaitingForApplierToDrain()) {
+                    sleepsecs(1);
+                    continue;
+                }
+
+                bool initialSyncRequested = BackgroundSync::get()->getInitialSyncRequestedFlag();
+                // Check criteria for doing an initial sync:
+                // 1. If the oplog is empty, do an initial sync
+                // 2. If minValid has _initialSyncFlag set, do an initial sync
+                // 3. If initialSyncRequested is true
+                if (getGlobalReplicationCoordinator()->getMyLastOptime().isNull() ||
+                        getInitialSyncFlag() ||
+                        initialSyncRequested) {
+                    syncDoInitialSync();
+                    continue; // start from top again in case sync failed.
+                }
+                if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+                    continue;
+                }
+
+                /* we have some data.  continue tailing. */
+                SyncTail tail(BackgroundSync::get(), multiSyncApply);
+                tail.oplogApplication();
             }
             catch(const DBException& e) {
-                sethbmsg(str::stream() << "syncThread: " << e.toString());
+                log() << "Received exception while syncing: " << e.toString();
                 sleepsecs(10);
             }
-            catch(...) {
-                sethbmsg("unexpected exception in syncThread()");
-                // TODO : SET NOT SECONDARY here?
-                sleepsecs(60);
+            catch(const std::exception& e) {
+                log() << "Received exception while syncing: " << e.what();
+                sleepsecs(10);
             }
-            sleepsecs(1);
         }
-    }
-
-    void startSyncThread() {
-        static int n;
-        if( n != 0 ) {
-            log() << "replSet ERROR : more than one sync thread?" << rsLog;
-            verify( n == 0 );
-        }
-        n++;
-
-        Client::initThread("rsSync");
-        replLocalAuth();
-        theReplSet->syncThread();
         cc().shutdown();
     }
 
-    void ReplSetImpl::blockSync(bool block) {
-        // RS lock is already taken in Manager::checkAuth
-        _blockSync = block;
-        if (_blockSync) {
-            // syncing is how we get into SECONDARY state, so we'll be stuck in
-            // RECOVERING until we unblock
-            changeState(MemberState::RS_RECOVERING);
-        }
-    }
 } // namespace repl
 } // namespace mongo

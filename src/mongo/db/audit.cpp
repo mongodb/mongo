@@ -43,8 +43,9 @@ namespace audit {
                            ErrorCodes::Error result) MONGO_AUDIT_STUB
 
     void logCommandAuthzCheck(ClientBasic* client,
-                              const NamespaceString& ns,
-                              const mutablebson::Document& cmdObj,
+                              const std::string& dbname,
+                              const BSONObj& cmdObj,
+                              Command* command,
                               ErrorCodes::Error result) MONGO_AUDIT_STUB
 
     void logDeleteAuthzCheck(

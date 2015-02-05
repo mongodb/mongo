@@ -80,7 +80,7 @@ expectedResult = {
                 },
                 "storage" : {
                     "verbosity" : 3,
-                    "journaling" : {
+                    "journal" : {
                         "verbosity" : 5
                     }
                 }

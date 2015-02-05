@@ -46,6 +46,7 @@ namespace mongo {
     // Define Timer::_countsPerSecond before static initializer "atstartuputil" to ensure correct
     // relative sequencing regardless of how _countsPerSecond is initialized (static or dynamic).
     long long Timer::_countsPerSecond = Timer::microsPerSecond;
+    double Timer::_microsPerCount = 1.0f;
 
     namespace {
 
@@ -81,7 +82,7 @@ namespace mongo {
             LARGE_INTEGER x;
             bool ok = QueryPerformanceFrequency(&x);
             verify(ok);
-            Timer::_countsPerSecond = x.QuadPart;
+            Timer::setCountsPerSecond(x.QuadPart);
             _timerNow = &timerNowWindows;
         }
 
@@ -112,7 +113,7 @@ namespace mongo {
                 return;
             }
 
-            Timer::_countsPerSecond = Timer::nanosPerSecond;
+            Timer::setCountsPerSecond(Timer::nanosPerSecond);
             _timerNow = &timerNowPosixMonotonicClock;
 
             // Make sure that the current time relative to the (unspecified) epoch isn't already too

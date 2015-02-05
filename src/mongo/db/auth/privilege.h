@@ -71,6 +71,8 @@ namespace mongo {
         // Checks if the given actions are present in the Privilege.
         bool includesActions(const ActionSet& actions) const;
 
+        BSONObj toBSON() const;
+
     private:
 
         ResourcePattern _resource;

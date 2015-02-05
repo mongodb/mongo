@@ -26,26 +26,35 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geo_query.h"
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/range_preserver.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+    using std::stringstream;
 
     class Geo2dFindNearCmd : public Command {
     public:
@@ -68,22 +77,15 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const string ns = dbname + "." + cmdObj.firstElement().valuestr();
-
             if (!cmdObj["start"].eoo()) {
                 errmsg = "using deprecated 'start' argument to geoNear";
                 return false;
             }
 
-            Client::ReadContext ctx(txn, ns);
+            const NamespaceString nss(parseNs(dbname, cmdObj));
+            AutoGetCollectionForRead ctx(txn, nss);
 
-            Database* db = ctx.ctx().db();
-            if ( !db ) {
-                errmsg = "can't find ns";
-                return false;
-            }
-
-            Collection* collection = db->getCollection( txn, ns );
+            Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;
@@ -96,13 +98,13 @@ namespace mongo {
             // We seek to populate this.
             string nearFieldName;
             bool using2DIndex = false;
-            if (!getFieldName(collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
+            if (!getFieldName(txn, collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
                 return false;
             }
 
+            PointWithCRS point;
             uassert(17304, "'near' field must be point",
-                    !cmdObj["near"].eoo() && cmdObj["near"].isABSONObj()
-                    && GeoParser::isPoint(cmdObj["near"].Obj()));
+                    GeoParser::parseQueryPoint(cmdObj["near"], &point).isOK());
 
             bool isSpherical = cmdObj["spherical"].trueValue();
             if (!using2DIndex) {
@@ -130,7 +132,7 @@ namespace mongo {
             }
 
             if (!cmdObj["uniqueDocs"].eoo()) {
-                warning() << ns << ": ignoring deprecated uniqueDocs option in geoNear command";
+                warning() << nss << ": ignoring deprecated uniqueDocs option in geoNear command";
             }
 
             // And, build the full query expression.
@@ -143,12 +145,12 @@ namespace mongo {
 
             // cout << "rewritten query: " << rewritten.toString() << endl;
 
-            int numWanted = 100;
+            long long numWanted = 100;
             const char* limitName = !cmdObj["num"].eoo() ? "num" : "limit";
             BSONElement eNumWanted = cmdObj[limitName];
             if (!eNumWanted.eoo()) {
                 uassert(17303, "limit must be number", eNumWanted.isNumber());
-                numWanted = eNumWanted.numberInt();
+                numWanted = eNumWanted.safeNumberLong();
                 uassert(17302, "limit must be >=0", numWanted >= 0);
             }
 
@@ -169,11 +171,9 @@ namespace mongo {
                                    "$dis" << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
             CanonicalQuery* cq;
-
-            const NamespaceString nss(dbname);
             const WhereCallbackReal whereCallback(txn, nss.db());
 
-            if (!CanonicalQuery::canonicalize(ns,
+            if (!CanonicalQuery::canonicalize(nss,
                                               rewritten,
                                               BSONObj(),
                                               projObj,
@@ -186,21 +186,24 @@ namespace mongo {
                 return false;
             }
 
+            // Prevent chunks from being cleaned up during yields - this allows us to only check the
+            // version on initial entry into geoNear.
+            RangePreserver preserver(collection);
+
             PlanExecutor* rawExec;
-            if (!getExecutor(txn, collection, cq, &rawExec, 0).isOK()) {
-                errmsg = "can't get query runner";
+            if (!getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, 0).isOK()) {
+                errmsg = "can't get query executor";
                 return false;
             }
 
-            auto_ptr<PlanExecutor> exec(rawExec);
-            const ScopedExecutorRegistration safety(exec.get());
+            scoped_ptr<PlanExecutor> exec(rawExec);
 
             double totalDistance = 0;
             BSONObjBuilder resultBuilder(result.subarrayStart("results"));
             double farthestDist = 0;
 
             BSONObj currObj;
-            int results = 0;
+            long long results = 0;
             while ((results < numWanted) && PlanExecutor::ADVANCED == exec->getNext(&currObj, NULL)) {
 
                 // Come up with the correct distance.
@@ -260,12 +263,12 @@ namespace mongo {
         }
 
     private:
-        bool getFieldName(Collection* collection, IndexCatalog* indexCatalog, string* fieldOut,
-                          string* errOut, bool *isFrom2D) {
+        bool getFieldName(OperationContext* txn, Collection* collection, IndexCatalog* indexCatalog,
+                          string* fieldOut, string* errOut, bool *isFrom2D) {
             vector<IndexDescriptor*> idxs;
 
             // First, try 2d.
-            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_2D, idxs);
+            collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2D, idxs);
             if (idxs.size() > 1) {
                 *errOut = "more than one 2d index, not sure which to run geoNear on";
                 return false;
@@ -286,7 +289,7 @@ namespace mongo {
 
             // Next, 2dsphere.
             idxs.clear();
-            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_2DSPHERE, idxs);
+            collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2DSPHERE, idxs);
             if (0 == idxs.size()) {
                 *errOut = "no geo indices for geoNear";
                 return false;

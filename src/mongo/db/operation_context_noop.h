@@ -27,22 +27,28 @@
  */
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-
 
 namespace mongo {
 
     class OperationContextNoop : public OperationContext {
     public:
-        OperationContextNoop(RecoveryUnit* ru) {
-            _recoveryUnit.reset(ru);
+        OperationContextNoop(RecoveryUnit* ru)
+            : _recoveryUnit(ru),
+              _locker(new LockerNoop()) {
+
         }
 
-        OperationContextNoop() {
-            _recoveryUnit.reset(new RecoveryUnitNoop());
+        OperationContextNoop()
+            : _recoveryUnit(new RecoveryUnitNoop()),
+              _locker(new LockerNoop()) {
+
         }
 
         virtual ~OperationContextNoop() { }
@@ -61,22 +67,26 @@ namespace mongo {
             return _recoveryUnit.get();
         }
 
-        virtual LockState* lockState() const {
-            // TODO: Eventually, this should return an actual LockState object. For now,
-            //       LockState depends on the whole world and is not necessary for testing.
-            return NULL;
+        virtual RecoveryUnit* releaseRecoveryUnit() {
+            return _recoveryUnit.release();
+        }
+
+        virtual void setRecoveryUnit(RecoveryUnit* unit) {
+            _recoveryUnit.reset(unit);
+        }
+
+        virtual Locker* lockState() const {
+            return _locker.get();
         }
 
         virtual ProgressMeter* setMessage(const char * msg,
                                           const std::string &name,
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween) {
-            invariant(false);
-            return NULL;
+            return &_pm;
         }
 
-        virtual void checkForInterrupt(bool heedMutex = true) const { }
-
+        virtual void checkForInterrupt() const { }
         virtual Status checkForInterruptNoAssert() const {
             return Status::OK();
         }
@@ -89,16 +99,18 @@ namespace mongo {
             return false;
         }
 
-        virtual string getNS() const {
-            return string();
+        virtual std::string getNS() const {
+            return std::string();
         };
 
-        virtual Transaction* getTransaction() {
-            return NULL;
+        virtual unsigned int getOpID() const {
+            return 0;
         }
 
     private:
-        boost::scoped_ptr<RecoveryUnit> _recoveryUnit;
+        std::auto_ptr<RecoveryUnit> _recoveryUnit;
+        boost::scoped_ptr<Locker> _locker;
+        ProgressMeter _pm;
     };
 
 }  // namespace mongo

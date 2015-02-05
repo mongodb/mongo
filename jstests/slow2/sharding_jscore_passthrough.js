@@ -24,8 +24,6 @@ files.forEach(function(x) {
     //                  the ShardingTest setup.  SERVER-1440.
 
     // cursor8: cursorInfo different/meaningless(?) in mongos.
-    //          closeAllDatabases may not work through mongos
-    //          SERVER-1441.
     //          deal with cursorInfo in mongos SERVER-1442.
 
     // dbcase: Database names are case-insensitive under ShardingTest?
@@ -62,7 +60,6 @@ files.forEach(function(x) {
      * copydbgetnonce
      * dbhash
      * medianKey
-     * clean (apitest_dbcollection)
      * logout and getnonce
      */
 
@@ -76,7 +73,6 @@ files.forEach(function(x) {
         'dbhash|' +
         'dbhash2|' +
         'median|' +
-        'apitest_dbcollection|' +
         'evalb|' +
         'evald|' +
         'eval_nolock|' +
@@ -109,11 +105,13 @@ files.forEach(function(x) {
         'fsync2|' +
         'geo.*|' +
         'indexh|' +
+        'index_bigkeys_nofail|' +
         'remove5|' +
         'update4|' +
         'loglong|' +
         'logpath|' +
         'notablescan|' +
+        'collection_truncate|' + // relies on emptycapped test command which isn't in mongos
         'compact.*|' +
         'check_shard_index|' +
         'bench_test.*|' +
@@ -126,8 +124,11 @@ files.forEach(function(x) {
         'block_check_supported|' +
         'stages.*|' +
         'top|' +
+        'repair_cursor1|' +
         'touch1|' +
+        'query_oplogreplay|' + // no local db on mongos
         'dbcase|' + // undo after fixing SERVER-11735
+        'dbcase2|' + // undo after fixing SERVER-11735
         'stats' + // tests db.stats().dataFileVersion, which doesn't appear in sharded db.stats()
         ')\.js$');
 
@@ -146,7 +147,7 @@ files.forEach(function(x) {
         print(" !!!!!!!!!!!!!!! skipping test that should not run under sharding: " + x.name);
         return;
     }
-    
+
     print(" *******************************************");
     print("         Test : " + x.name + " ...");
     print("                " +

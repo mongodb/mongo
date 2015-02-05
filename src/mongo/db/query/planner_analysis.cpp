@@ -37,6 +37,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     //
     // Helpers for bounds explosion AKA quick-and-dirty SERVER-1205.
     //
@@ -203,6 +208,11 @@ namespace mongo {
                 child->addKeyMetadata = isn->addKeyMetadata;
                 child->indexIsMultiKey = isn->indexIsMultiKey;
 
+                // Copy the filter, if there is one.
+                if (isn->filter.get()) {
+                    child->filter.reset(isn->filter->shallowClone());
+                }
+
                 // Create child bounds.
                 child->bounds.fields.resize(isn->bounds.fields.size());
                 for (size_t j = 0; j < fieldsToExplode; ++j) {
@@ -248,6 +258,23 @@ namespace mongo {
 
     }  // namespace
 
+    // static
+    BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
+        BSONObjBuilder sortBob;
+        BSONObjIterator kpIt(indexKeyPattern);
+        while (kpIt.more()) {
+            BSONElement elt = kpIt.next();
+            if (elt.type() == mongo::String) {
+                break;
+            }
+            long long val = elt.safeNumberLong();
+            int sortOrder = val >= 0 ? 1 : -1;
+            sortBob.append(elt.fieldName(), sortOrder);
+        }
+        return sortBob.obj();
+    }
+
+    // static
     bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
                                               const QueryPlannerParams& params,
                                               QuerySolutionNode** solnRoot) {
@@ -303,6 +330,11 @@ namespace mongo {
             // There's no sort order left to gain by exploding.  Just go home.  TODO: verify nothing
             // clever we can do here.
             if (!kpIt.more()) {
+                return false;
+            }
+
+            // Only explode if there's at least one field to explode for this scan.
+            if (0 == boundsIdx) {
                 return false;
             }
 
@@ -448,6 +480,11 @@ namespace mongo {
             // We have no idea what the client intended. One way to handle the ambiguity
             // of a limited OR stage is to use the SPLIT_LIMITED_SORT hack.
             //
+            // If wantMore is false (meaning that 'ntoreturn' was initially passed to
+            // the server as a negative value), then we treat numToReturn as a limit.
+            // Since there is no limit-batchSize ambiguity in this case, we do not use the
+            // SPLIT_LIMITED_SORT hack.
+            //
             // If numToReturn is really a limit, then we want to add a limit to this
             // SORT stage, and hence perform a topK.
             //
@@ -458,7 +495,8 @@ namespace mongo {
             // with the topK first. If the client wants a limit, they'll get the efficiency
             // of topK. If they want a batchSize, the other OR branch will deliver the missing
             // results. The OR stage handles deduping.
-            if (params.options & QueryPlannerParams::SPLIT_LIMITED_SORT
+            if (query.getParsed().wantMore()
+                && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO)
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
@@ -490,7 +528,6 @@ namespace mongo {
                                                            QuerySolutionNode* solnRoot) {
         auto_ptr<QuerySolution> soln(new QuerySolution());
         soln->filterData = query.getQueryObj();
-        verify(soln->filterData.isOwned());
         soln->indexFilterApplied = params.indexFiltersApplied;
 
         solnRoot->computeProperties();
@@ -501,12 +538,29 @@ namespace mongo {
         // If we're answering a query on a sharded system, we need to drop documents that aren't
         // logically part of our shard.
         if (params.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            // TODO: We could use params.shardKey to do fetch analysis instead of always fetching.
+
             if (!solnRoot->fetched()) {
-                FetchNode* fetch = new FetchNode();
-                fetch->children.push_back(solnRoot);
-                solnRoot = fetch;
+
+                // See if we need to fetch information for our shard key.
+                // NOTE: Solution nodes only list ordinary, non-transformed index keys for now
+
+                bool fetch = false;
+                BSONObjIterator it(params.shardKey);
+                while (it.more()) {
+                    BSONElement nextEl = it.next();
+                    if (!solnRoot->hasField(nextEl.fieldName())) {
+                        fetch = true;
+                        break;
+                    }
+                }
+
+                if (fetch) {
+                    FetchNode* fetch = new FetchNode();
+                    fetch->children.push_back(solnRoot);
+                    solnRoot = fetch;
+                }
             }
+
             ShardingFilterNode* sfn = new ShardingFilterNode();
             sfn->children.push_back(solnRoot);
             solnRoot = sfn;

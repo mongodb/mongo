@@ -41,10 +41,15 @@
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version_reporting.h"
 
 namespace mongo {
+
+    using std::set;
+    using std::map;
+    using std::string;
 
     namespace JSFiles {
         extern const JSFile servers;
@@ -92,7 +97,7 @@ namespace mongo {
             // converts to the integer value 0.
             goingAwaySoon();
             int exit_code = int( args.firstElement().number() );
-            ::_exit(exit_code);
+            quickExit(exit_code);
             return undefinedReturn;
         }
 

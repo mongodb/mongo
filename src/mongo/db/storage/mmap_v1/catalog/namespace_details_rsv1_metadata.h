@@ -71,10 +71,14 @@ namespace mongo {
                                long long dataSize,
                                long long numRecords );
 
-        virtual const DiskLoc& deletedListEntry( int bucket ) const;
+        virtual DiskLoc deletedListEntry( int bucket ) const;
         virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc );
+
+        virtual DiskLoc deletedListLegacyGrabBag() const;
+        virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
+
         virtual void orphanDeletedList(OperationContext* txn);
 
         virtual const DiskLoc& firstExtent( OperationContext* txn ) const;
@@ -95,9 +99,6 @@ namespace mongo {
         virtual void setLastExtentSize( OperationContext* txn, int newMax );
 
         virtual long long maxCappedDocs() const;
-
-        virtual double paddingFactor() const;
-        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor );
 
     private:
 

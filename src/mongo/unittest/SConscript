@@ -2,14 +2,22 @@
 
 Import("env")
 
-env.Library("unittest", ['unittest.cpp', 'temp_dir.cpp'],
+env.Library(target="unittest",
+            source=[
+                'unittest.cpp',
+                'temp_dir.cpp',
+                'unittest_helpers.cpp',
+            ],
             LIBDEPS=['$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ])
 
 env.Library("unittest_main", ['unittest_main.cpp'],
-            LIBDEPS=['unittest',
-                     '$BUILD_DIR/mongo/base/base'])
+            LIBDEPS=[
+                'unittest',
+                '$BUILD_DIR/mongo/base/base',
+                '$BUILD_DIR/mongo/signal_handlers_synchronous',
+                 ])
 
 env.Library("unittest_crutch", ['crutch.cpp'])
 

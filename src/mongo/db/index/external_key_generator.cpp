@@ -28,8 +28,10 @@
 
 #include "mongo/db/index/external_key_generator.h"
 
+#include <cmath>
+
 #include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/btree_key_generator.h"
@@ -117,7 +119,7 @@ namespace {
                 break;
             case jstOID:
                 size += 1;
-                size += sizeof(OID);
+                size += OID::kOIDSize;
                 break;
             case BinData:
                 {
@@ -170,7 +172,7 @@ namespace {
             case NumberDouble:
                 {
                     double d = e._numberDouble();
-                    if (isNaN(d)) {
+                    if (std::isnan(d)) {
                         return traditionalSize;
                     }
                     size += 1;

@@ -26,16 +26,20 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/unittest/unittest.h"
 
+#include <boost/shared_ptr.hpp>
 #include <iostream>
 #include <map>
 
 #include "mongo/base/init.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/log_manager.h"
+#include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/util/assert_util.h"
@@ -44,12 +48,16 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+    using std::string;
+
     namespace unittest {
 
         namespace {
             logger::MessageLogDomain* unittestOutput =
                 logger::globalLogManager()->getNamedDomain("unittest");
-            typedef std::map<std::string, Suite*> SuiteMap;
+
+            typedef std::map<std::string, boost::shared_ptr<Suite> > SuiteMap;
 
             inline SuiteMap& _allSuites() {
                 static SuiteMap allSuites;
@@ -111,8 +119,13 @@ namespace mongo {
 
         Result* Result::cur = 0;
 
-        Test::Test() {}
-        Test::~Test() {}
+        Test::Test() : _isCapturingLogMessages(false) {}
+
+        Test::~Test() {
+            if (_isCapturingLogMessages) {
+                stopCapturingLogMessages();
+            }
+        }
 
         void Test::run() {
             setUp();
@@ -139,6 +152,40 @@ namespace mongo {
         void Test::setUp() {}
         void Test::tearDown() {}
 
+namespace {
+    class StringVectorAppender : public logger::MessageLogDomain::EventAppender {
+    public:
+        explicit StringVectorAppender(std::vector<std::string>* lines) : _lines(lines) {}
+        virtual ~StringVectorAppender() {}
+        virtual Status append(const logger::MessageLogDomain::Event& event) {
+            std::ostringstream _os;
+            if (!_encoder.encode(event, _os)) {
+                return Status(ErrorCodes::LogWriteFailed, "Failed to append to LogTestAppender.");
+            }
+            _lines->push_back(_os.str());
+            return Status::OK();
+        }
+    private:
+        logger::MessageEventDetailsEncoder _encoder;
+        std::vector<std::string>* _lines;
+    };
+}  // namespace
+
+        void Test::startCapturingLogMessages() {
+            invariant(!_isCapturingLogMessages);
+            _capturedLogMessages.clear();
+            _captureAppenderHandle = logger::globalLogDomain()->attachAppender(
+                    logger::MessageLogDomain::AppenderAutoPtr(new StringVectorAppender(
+                                                                      &_capturedLogMessages)));
+            _isCapturingLogMessages = true;
+        }
+
+        void Test::stopCapturingLogMessages() {
+            invariant(_isCapturingLogMessages);
+            logger::globalLogDomain()->detachAppender(_captureAppenderHandle);
+            _isCapturingLogMessages = false;
+        }
+
         Suite::Suite( const std::string& name ) : _name( name ) {
             registerSuite( name , this );
         }
@@ -146,7 +193,7 @@ namespace mongo {
         Suite::~Suite() {}
 
         void Suite::add(const std::string& name, const TestFunction& testFn) {
-            _tests.push_back(new TestHolder(name, testFn));
+            _tests.push_back(boost::shared_ptr<TestHolder>(new TestHolder(name, testFn)));
         }
 
         Result * Suite::run( const std::string& filter, int runsPerTest ) {
@@ -159,8 +206,9 @@ namespace mongo {
             Result * r = new Result( _name );
             Result::cur = r;
 
-            for ( std::vector<TestHolder*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ) {
-                TestHolder* tc = *i;
+            for ( std::vector< boost::shared_ptr<TestHolder> >::iterator i=_tests.begin();
+                  i!=_tests.end(); i++ ) {
+                boost::shared_ptr<TestHolder>& tc = *i;
                 if ( filter.size() && tc->getName().find( filter ) == std::string::npos ) {
                     LOG(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << std::endl;
                     continue;
@@ -240,8 +288,8 @@ namespace mongo {
 
             for ( std::vector<std::string>::iterator i=torun.begin(); i!=torun.end(); i++ ) {
                 std::string name = *i;
-                Suite* s = _allSuites()[name];
-                fassert( 16145,  s );
+                boost::shared_ptr<Suite>& s = _allSuites()[name];
+                fassert( 16145, s != NULL );
 
                 log() << "going to run suite: " << name << std::endl;
                 results.push_back( s->run( filter, runsPerTest ) );
@@ -258,6 +306,7 @@ namespace mongo {
             Result totals ("TOTALS");
             std::vector<std::string> failedSuites;
 
+            Result::cur = NULL;
             for ( std::vector<Result*>::iterator i=results.begin(); i!=results.end(); i++ ) {
                 Result* r = *i;
                 log() << r->toString();
@@ -275,6 +324,8 @@ namespace mongo {
                 }
                 asserts += r->_asserts;
                 millis += r->_millis;
+
+                delete r;
             }
 
             totals._tests = tests;
@@ -302,16 +353,19 @@ namespace mongo {
         }
 
         void Suite::registerSuite( const std::string& name , Suite* s ) {
-            Suite*& m = _allSuites()[name];
-            fassert( 10162, ! m );
-            m = s;
+            boost::shared_ptr<Suite>& m = _allSuites()[name];
+            fassert( 10162, !m );
+            m.reset(s);
         }
 
         Suite* Suite::getSuite(const std::string& name) {
-            Suite* result = _allSuites()[name];
-            if (!result)
-                result = new Suite(name);  // Suites are self-registering.
-            return result;
+            boost::shared_ptr<Suite>& result = _allSuites()[name];
+            if (!result) {
+                // Suites are self-registering.
+                new Suite(name);
+            }
+            invariant(result);
+            return result.get();
         }
 
         void Suite::setupTests() {}
@@ -331,37 +385,41 @@ namespace mongo {
         TestAssertionFailure::TestAssertionFailure(const std::string& file,
                                                    unsigned line,
                                                    const std::string& message)
-            : _exception(file, line, message) {}
+            : _exception(file, line, message), _enabled(false) {}
+
+        TestAssertionFailure::TestAssertionFailure(const TestAssertionFailure& other) :
+            _exception(other._exception), _enabled(false) {
+
+            invariant(!other._enabled);
+        }
+
+        TestAssertionFailure& TestAssertionFailure::operator=(const TestAssertionFailure& other) {
+            invariant(!_enabled);
+            invariant(!other._enabled);
+            _exception = other._exception;
+            return *this;
+        }
 
         TestAssertionFailure::~TestAssertionFailure()
 #if __cplusplus >= 201103
         noexcept(false)
 #endif
         {
-            if (!_stream.str().empty())
+            if (!_enabled) {
+                invariant(_stream.str().empty());
+                return;
+            }
+            if (!_stream.str().empty()) {
                 _exception.setMessage(_exception.getMessage() + " " + _stream.str());
+            }
             throw _exception;
         }
 
         std::ostream& TestAssertionFailure::stream() {
+            invariant(!_enabled);
+            _enabled = true;
             return _stream;
         }
-
-        TestAssertion::TestAssertion( const char* file, unsigned line )
-            : _file( file ), _line( line ) {
-
-            ++Result::cur->_asserts;
-        }
-
-        TestAssertion::~TestAssertion() {}
-
-        void TestAssertion::fail( const std::string& message ) const {
-            throw TestAssertionFailureException( _file, _line, message );
-        }
-
-        ComparisonAssertion::ComparisonAssertion( const char* aexp, const char* bexp,
-                                                  const char* file, unsigned line )
-            : TestAssertion( file, line ), _aexp( aexp ), _bexp( bexp ) {}
 
         std::vector<std::string> getAllSuiteNames() {
             std::vector<std::string> result;

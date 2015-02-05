@@ -28,12 +28,18 @@
  */
 
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/parallel.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/s/chunk.h"
@@ -41,12 +47,20 @@
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+    using boost::shared_ptr;
+    using std::endl;
+    using std::list;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     LabeledLevel pc( "pcursor", 2 );
 
@@ -70,30 +84,40 @@ namespace mongo {
         return _ns;
     }
 
-    static void _checkCursor( DBClientCursor * cursor ) {
-        verify( cursor );
-        
-        if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
+    /**
+     * Throws a RecvStaleConfigException wrapping the stale error document in this cursor when the
+     * ShardConfigStale flag is set or a command returns a SendStaleConfigCode error code.
+     */
+    static void throwCursorStale(DBClientCursor* cursor) {
+        verify(cursor);
+
+        if (cursor->hasResultFlag(ResultFlag_ShardConfigStale)) {
             BSONObj error;
-            cursor->peekError( &error );
-            throw RecvStaleConfigException( "_checkCursor", error );
-        }
-        
-        if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
-            BSONObj o = cursor->next();
-            throw UserException( o["code"].numberInt() , o["$err"].String() );
+            cursor->peekError(&error);
+            throw RecvStaleConfigException("query returned a stale config error", error);
         }
 
-        if ( NamespaceString( cursor->getns() ).isCommand() ) {
-            // For backwards compatibility with v2.0 mongods because in 2.0 commands that care about
-            // versioning (like the count command) will return with the stale config error code, but
-            // don't set the ShardConfigStale result flag on the cursor.
-            // TODO: This should probably be removed for 2.3, as we'll no longer need to support
-            // running with a 2.0 mongod.
+        if (NamespaceString(cursor->getns()).isCommand()) {
+            // Commands that care about versioning (like the count or geoNear command) sometimes
+            // return with the stale config error code, but don't set the ShardConfigStale result
+            // flag on the cursor.
+            // TODO: Standardize stale config reporting.
             BSONObj res = cursor->peekFirst();
-            if ( res.hasField( "code" ) && res["code"].Number() == SendStaleConfigCode ) {
-                throw RecvStaleConfigException( "_checkCursor", res );
+            if (res.hasField("code") && res["code"].Number() == SendStaleConfigCode) {
+                throw RecvStaleConfigException("command returned a stale config error", res);
             }
+        }
+    }
+
+    /**
+     * Throws an exception wrapping the error document in this cursor when the error flag is set.
+     */
+    static void throwCursorError(DBClientCursor* cursor) {
+        verify(cursor);
+
+        if (cursor->hasResultFlag(ResultFlag_ErrSet)) {
+            BSONObj o = cursor->next();
+            throw UserException(o["code"].numberInt(), o["$err"].str());
         }
     }
 
@@ -121,11 +145,13 @@ namespace mongo {
         string cursorType;
         BSONObj indexBounds;
         BSONObj oldPlan;
-        
+
         long long millis = 0;
         double numExplains = 0;
 
-        map<string,long long> counters;
+        long long nReturned = 0;
+        long long keysExamined = 0;
+        long long docsExamined = 0;
 
         map<string,list<BSONObj> > out;
         {
@@ -151,40 +177,66 @@ namespace mongo {
 
                     y.append( temp );
 
-                    BSONObjIterator k( temp );
-                    while ( k.more() ) {
-                        BSONElement z = k.next();
-                        if ( z.fieldName()[0] != 'n' )
-                            continue;
-                        long long& c = counters[z.fieldName()];
-                        c += z.numberLong();
+                    if (temp.hasField("executionStats")) {
+                        // Here we assume that the shard gave us back explain 2.0 style output.
+                        BSONObj execStats = temp["executionStats"].Obj();
+                        if (execStats.hasField("nReturned")) {
+                            nReturned += execStats["nReturned"].numberLong();
+                        }
+                        if (execStats.hasField("totalKeysExamined")) {
+                            keysExamined += execStats["totalKeysExamined"].numberLong();
+                        }
+                        if (execStats.hasField("totalDocsExamined")) {
+                            docsExamined += execStats["totalDocsExamined"].numberLong();
+                        }
+                        if (execStats.hasField("executionTimeMillis")) {
+                            millis += execStats["executionTimeMillis"].numberLong();
+                        }
+                    }
+                    else {
+                        // Here we assume that the shard gave us back explain 1.0 style output.
+                        if (temp.hasField("n")) {
+                            nReturned += temp["n"].numberLong();
+                        }
+                        if (temp.hasField("nscanned")) {
+                            keysExamined += temp["nscanned"].numberLong();
+                        }
+                        if (temp.hasField("nscannedObjects")) {
+                            docsExamined += temp["nscannedObjects"].numberLong();
+                        }
+                        if (temp.hasField("millis")) {
+                            millis += temp["millis"].numberLong();
+                        }
+                        if (String == temp["cursor"].type()) {
+                            if (cursorType.empty()) {
+                                cursorType = temp["cursor"].String();
+                            }
+                            else if (cursorType != temp["cursor"].String()) {
+                                cursorType = "multiple";
+                            }
+                        }
+                        if (Object == temp["indexBounds"].type()) {
+                            indexBounds = temp["indexBounds"].Obj();
+                        }
+                        if (Object == temp["oldPlan"].type()) {
+                            oldPlan = temp["oldPlan"].Obj();
+                        }
                     }
 
-                    millis += temp["millis"].numberLong();
                     numExplains++;
-
-                    if ( temp["cursor"].type() == String ) { 
-                        if ( cursorType.size() == 0 )
-                            cursorType = temp["cursor"].String();
-                        else if ( cursorType != temp["cursor"].String() )
-                            cursorType = "multiple";
-                    }
-
-                    if ( temp["indexBounds"].type() == Object )
-                        indexBounds = temp["indexBounds"].Obj();
-
-                    if ( temp["oldPlan"].type() == Object )
-                        oldPlan = temp["oldPlan"].Obj();
-
                 }
                 y.done();
             }
             x.done();
         }
 
-        b.append( "cursor" , cursorType );
-        for ( map<string,long long>::iterator i=counters.begin(); i!=counters.end(); ++i )
-            b.appendNumber( i->first , i->second );
+        if ( !cursorType.empty() ) {
+            b.append( "cursor" , cursorType );
+        }
+
+        b.appendNumber( "n" , nReturned );
+        b.appendNumber( "nscanned" , keysExamined );
+        b.appendNumber( "nscannedObjects" , docsExamined );
 
         b.appendNumber( "millisShardTotal" , millis );
         b.append( "millisShardAvg" , 
@@ -205,72 +257,6 @@ namespace mongo {
             // TODO: this is lame...
         }
 
-    }
-
-    // --------  FilteringClientCursor -----------
-    FilteringClientCursor::FilteringClientCursor()
-        : _pcmData( NULL ), _done( true ) {
-    }
-
-    FilteringClientCursor::~FilteringClientCursor() {
-        // Don't use _pcmData
-        _pcmData = NULL;
-    }
-
-    void FilteringClientCursor::reset( auto_ptr<DBClientCursor> cursor ) {
-        _cursor = cursor;
-        _next = BSONObj();
-        _done = _cursor.get() == 0;
-        _pcmData = NULL;
-    }
-
-    void FilteringClientCursor::reset( DBClientCursor* cursor, ParallelConnectionMetadata* pcmData ) {
-        _cursor.reset( cursor );
-        _pcmData = pcmData;
-        _next = BSONObj();
-        _done = cursor == 0;
-    }
-
-
-    bool FilteringClientCursor::more() {
-        if ( ! _next.isEmpty() )
-            return true;
-
-        if ( _done )
-            return false;
-
-        _advance();
-        return ! _next.isEmpty();
-    }
-
-    BSONObj FilteringClientCursor::next() {
-        verify( ! _next.isEmpty() );
-        verify( ! _done );
-
-        BSONObj ret = _next;
-        _next = BSONObj();
-        return ret;
-    }
-
-    BSONObj FilteringClientCursor::peek() {
-        if ( _next.isEmpty() )
-            _advance();
-        return _next;
-    }
-
-    void FilteringClientCursor::_advance() {
-        verify( _next.isEmpty() );
-        if ( ! _cursor.get() || _done )
-            return;
-
-        while ( _cursor->more() ) {
-            _next = _cursor->next();
-            if (!_cursor->moreInCurrentBatch()) {
-                _next = _next.getOwned();
-            }
-            return;
-        }
-        _done = true;
     }
 
     // --------  ParallelSortClusteredCursor -----------
@@ -407,14 +393,7 @@ namespace mongo {
         if( full || errored ) retryNext = false;
 
         if( ! retryNext && pcState ){
-
-            if( errored && pcState->conn ){
-                // Don't return this conn to the pool if it's bad
-                pcState->conn->kill();
-                pcState->conn.reset();
-            }
-            else if( initialized ){
-
+            if (initialized && !errored) {
                 verify( pcState->cursor );
                 verify( pcState->conn );
 
@@ -585,8 +564,21 @@ namespace mongo {
         bool allowShardVersionFailure =
             rawConn->type() == ConnectionString::SET &&
             DBClientReplicaSet::isSecondaryQuery( _qSpec.ns(), _qSpec.query(), _qSpec.options() );
+        bool connIsDown = rawConn->isFailed();
+        if (allowShardVersionFailure && !connIsDown) {
+            // If the replica set connection believes that it has a valid primary that is up,
+            // confirm that the replica set monitor agrees that the suspected primary is indeed up.
+            const DBClientReplicaSet* replConn = dynamic_cast<const DBClientReplicaSet*>(rawConn);
+            invariant(replConn);
+            ReplicaSetMonitorPtr rsMonitor = ReplicaSetMonitor::get(replConn->getSetName());
+            if (!rsMonitor->isHostUp(replConn->getSuspectedPrimaryHostAndPort())) {
+                connIsDown = true;
+            }
+        }
 
-        if ( allowShardVersionFailure && rawConn->isFailed() ) {
+        if (allowShardVersionFailure && connIsDown) {
+            // If we're doing a secondary-allowed query and the primary is down, don't attempt to
+            // set the shard version.
 
             state->conn->donotCheckVersion();
 
@@ -644,7 +636,7 @@ namespace mongo {
         ShardPtr primary;
 
         string prefix;
-        if (MONGO_unlikely(logger::globalLogDomain()->shouldLog(pc))) {
+        if (MONGO_unlikely(shouldLog(pc))) {
             if( _totalTries > 0 ) {
                 prefix = str::stream() << "retrying (" << _totalTries << " tries)";
             }
@@ -664,7 +656,7 @@ namespace mongo {
         // Try to get either the chunk manager or the primary shard
         config->getChunkManagerOrPrimary( ns, manager, primary );
 
-        if (MONGO_unlikely(logger::globalLogDomain()->shouldLog(pc))) {
+        if (MONGO_unlikely(shouldLog(pc))) {
             if (manager) {
                 vinfo = str::stream() << "[" << manager->getns() << " @ "
                     << manager->getVersion().toString() << "]";
@@ -679,13 +671,15 @@ namespace mongo {
         else if( primary ) todo.insert( *primary );
 
         // Close all cursors on extra shards first, as these will be invalid
-        for( map< Shard, PCMData >::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end; ++i ){
+        for (map<Shard, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
+            ++i) {
+            if (todo.find(i->first) == todo.end()) {
 
-            LOG( pc ) << "closing cursor on shard " << i->first
-                << " as the connection is no longer required by " << vinfo << endl;
+                LOG( pc ) << "closing cursor on shard " << i->first
+                          << " as the connection is no longer required by " << vinfo << endl;
 
-            // Force total cleanup of these connections
-            if( todo.find( i->first ) == todo.end() ) i->second.cleanup();
+                i->second.cleanup(true);
+            }
         }
 
         verify( todo.size() );
@@ -725,7 +719,9 @@ namespace mongo {
                         warning() << "Weird shift of primary detected" << endl;
 
                     compatiblePrimary = primary && state->primary && primary == state->primary;
-                    compatibleManager = manager && state->manager && manager->compatibleWith( state->manager, shard );
+                    compatibleManager = manager &&
+                                        state->manager &&
+                                        manager->compatibleWith(*state->manager, shard.getName());
 
                     if( compatiblePrimary || compatibleManager ){
                         // If we're compatible, don't need to retry unless forced
@@ -735,7 +731,7 @@ namespace mongo {
                     }
                     else {
                         // Force total cleanup of connection if no longer compatible
-                        mdata.cleanup();
+                        mdata.cleanup( true );
                     }
                 }
                 else {
@@ -868,7 +864,7 @@ namespace mongo {
                 e._shard = shard.getName();
                 mdata.errored = true;
                 if( returnPartial ){
-                    mdata.cleanup();
+                    mdata.cleanup( true );
                     continue;
                 }
                 throw;
@@ -878,7 +874,7 @@ namespace mongo {
                 e._shard = shard.getName();
                 mdata.errored = true;
                 if( returnPartial && e.getCode() == 15925 /* From above! */ ){
-                    mdata.cleanup();
+                    mdata.cleanup( true );
                     continue;
                 }
                 throw;
@@ -977,8 +973,9 @@ namespace mongo {
                     mdata.completed = true;
 
                     // Make sure we didn't get an error we should rethrow
-                    // TODO : Rename/refactor this to something better
-                    _checkCursor( state->cursor.get() );
+                    // TODO : Refactor this to something better
+                    throwCursorStale( state->cursor.get() );
+                    throwCursorError( state->cursor.get() );
 
                     // Finalize state
                     state->cursor->attach( state->conn.get() ); // Closes connection for us
@@ -998,14 +995,14 @@ namespace mongo {
                 staleNSExceptions[ staleNS ] = e;
 
                 // Fully clear this cursor, as it needs to be re-established
-                mdata.cleanup();
+                mdata.cleanup( true );
                 continue;
             }
             catch( SocketException& e ){
                 warning() << "socket exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
                 mdata.errored = true;
                 if( returnPartial ){
-                    mdata.cleanup();
+                    mdata.cleanup( true );
                     continue;
                 }
                 throw;
@@ -1021,7 +1018,7 @@ namespace mongo {
 
                     mdata.errored = true;
                     if (returnPartial) {
-                        mdata.cleanup();
+                        mdata.cleanup( true );
                         continue;
                     }
                     throw;
@@ -1105,7 +1102,7 @@ namespace mongo {
 
         // LEGACY STUFF NOW
 
-        _cursors = new FilteringClientCursor[ _cursorMap.size() ];
+        _cursors = new DBClientCursorHolder[ _cursorMap.size() ];
 
         // Put the cursors in the legacy format
         int index = 0;
@@ -1204,7 +1201,7 @@ namespace mongo {
 
         // make sure we're not already initialized
         verify( ! _cursors );
-        _cursors = new FilteringClientCursor[_numServers];
+        _cursors = new DBClientCursorHolder[_numServers];
 
         bool returnPartial = ( _options & QueryOption_PartialResults );
 
@@ -1292,27 +1289,27 @@ namespace mongo {
                 LOG(5) << "ParallelSortClusteredCursor::init server:" << sq._server << " ns:" << _ns
                        << " query:" << q << " _fields:" << _fields << " options: " << _options  << endl;
 
-                if( ! _cursors[i].raw() )
+                if( ! _cursors[i].get() )
                     _cursors[i].reset( new DBClientCursor( conns[i]->get() , _ns , q ,
                                                             0 , // nToReturn
                                                             0 , // nToSkip
                                                             _fields.isEmpty() ? 0 : &_fields , // fieldsToReturn
                                                             _options ,
                                                             _batchSize == 0 ? 0 : _batchSize + _needToSkip // batchSize
-                                                            ) );
+                                                            ), NULL );
 
                 try{
-                    _cursors[i].raw()->initLazy( ! firstPass );
+                    _cursors[i].get()->initLazy( ! firstPass );
                 }
                 catch( SocketException& e ){
                     socketExs.push_back( e.what() + errLoc );
-                    _cursors[i].reset( NULL );
+                    _cursors[i].reset( NULL, NULL );
                     conns[i]->done();
                     if( ! returnPartial ) break;
                 }
                 catch( std::exception& e){
                     otherExs.push_back( e.what() + errLoc );
-                    _cursors[i].reset( NULL );
+                    _cursors[i].reset( NULL, NULL );
                     conns[i]->done();
                     break;
                 }
@@ -1328,7 +1325,7 @@ namespace mongo {
                 // log() << "Finishing query for " << cons[i].get()->getHost() << endl;
                 string errLoc = " @ " + queries[i]._server;
 
-                if( ! _cursors[i].raw() || ( ! firstPass && retryQueries.find( i ) == retryQueries.end() ) ){
+                if( ! _cursors[i].get() || ( ! firstPass && retryQueries.find( i ) == retryQueries.end() ) ){
                     if( conns[i] ) conns[i].get()->done();
                     continue;
                 }
@@ -1340,10 +1337,10 @@ namespace mongo {
 
                 try {
 
-                    if( ! _cursors[i].raw()->initLazyFinish( retry ) ) {
+                    if( ! _cursors[i].get()->initLazyFinish( retry ) ) {
 
                         warning() << "invalid result from " << conns[i]->getHost() << ( retry ? ", retrying" : "" ) << endl;
-                        _cursors[i].reset( NULL );
+                        _cursors[i].reset( NULL, NULL );
 
                         if( ! retry ){
                             socketExs.push_back( str::stream() << "error querying server: " << servers[i] );
@@ -1362,26 +1359,28 @@ namespace mongo {
                     allConfigStale = true;
 
                     staleConfigExs.push_back( (string)"stale config detected when receiving response for " + e.what() + errLoc );
-                    _cursors[i].reset( NULL );
+                    _cursors[i].reset( NULL, NULL );
                     conns[i]->done();
                     continue;
                 }
                 catch ( SocketException& e ) {
                     socketExs.push_back( e.what() + errLoc );
-                    _cursors[i].reset( NULL );
+                    _cursors[i].reset( NULL, NULL );
                     conns[i]->done();
                     continue;
                 }
                 catch( std::exception& e ){
                     otherExs.push_back( e.what() + errLoc );
-                    _cursors[i].reset( NULL );
+                    _cursors[i].reset( NULL, NULL );
                     conns[i]->done();
                     continue;
                 }
 
                 try {
-                    _cursors[i].raw()->attach( conns[i].get() ); // this calls done on conn
-                    _checkCursor( _cursors[i].raw() );
+                    _cursors[i].get()->attach( conns[i].get() ); // this calls done on conn
+                    // Rethrow stale config or other errors
+                    throwCursorStale( _cursors[i].get() );
+                    throwCursorError( _cursors[i].get() );
 
                     finishedQueries++;
                 }
@@ -1392,13 +1391,13 @@ namespace mongo {
                     allConfigStale = true;
 
                     staleConfigExs.push_back( (string)"stale config detected for " + e.what() + errLoc );
-                    _cursors[i].reset( NULL );
+                    _cursors[i].reset( NULL, NULL );
                     conns[i]->done();
                     continue;
                 }
                 catch( std::exception& e ){
                     otherExs.push_back( e.what() + errLoc );
-                    _cursors[i].reset( NULL );
+                    _cursors[i].reset( NULL, NULL );
                     conns[i]->done();
                     continue;
                 }
@@ -1477,6 +1476,13 @@ namespace mongo {
         _done = true;
     }
 
+    void ParallelSortClusteredCursor::setBatchSize(int newBatchSize) {
+        for ( int i=0; i<_numServers; i++ ) {
+            if (_cursors[i].get())
+                _cursors[i].get()->setBatchSize(newBatchSize);
+        }
+    }
+
     bool ParallelSortClusteredCursor::more() {
 
         if ( _needToSkip > 0 ) {
@@ -1484,7 +1490,7 @@ namespace mongo {
             _needToSkip = 0;
 
             while ( n > 0 && more() ) {
-                BSONObj x = next();
+                next();
                 n--;
             }
 
@@ -1492,7 +1498,7 @@ namespace mongo {
         }
 
         for ( int i=0; i<_numServers; i++ ) {
-            if ( _cursors[i].more() )
+            if (_cursors[i].get() && _cursors[i].get()->more())
                 return true;
         }
         return false;
@@ -1509,21 +1515,25 @@ namespace mongo {
 
             int i = ( j + _lastFrom + 1 ) % _numServers;
 
-            if ( ! _cursors[i].more() ){
-                if( _cursors[i].rawMData() )
-                    _cursors[i].rawMData()->pcState->done = true;
+            // Check to see if the cursor is finished
+            if (!_cursors[i].get() || !_cursors[i].get()->more()) {
+                if (_cursors[i].getMData())
+                    _cursors[i].getMData()->pcState->done = true;
                 continue;
             }
 
-            BSONObj me = _cursors[i].peek();
+            // We know we have at least one result in this cursor
+            BSONObj me = _cursors[i].get()->peekFirst();
 
-            if ( best.isEmpty() ) {
+            // If this is the first non-empty cursor, save the result as best
+            if (bestFrom < 0) {
                 best = me;
                 bestFrom = i;
                 if( _sortKey.isEmpty() ) break;
                 continue;
             }
 
+            // Otherwise compare the result to the current best result
             int comp = best.woSortOrder( me , _sortKey , true );
             if ( comp < 0 )
                 continue;
@@ -1534,11 +1544,16 @@ namespace mongo {
 
         _lastFrom = bestFrom;
 
-        uassert( 10019 ,  "no more elements" , ! best.isEmpty() );
-        _cursors[bestFrom].next();
+        uassert(10019, "no more elements", bestFrom >= 0);
+        _cursors[bestFrom].get()->next();
 
-        if( _cursors[bestFrom].rawMData() )
-            _cursors[bestFrom].rawMData()->pcState->count++;
+        // Make sure the result data won't go away after the next call to more()
+        if (!_cursors[bestFrom].get()->moreInCurrentBatch()) {
+            best = best.getOwned();
+        }
+
+        if (_cursors[bestFrom].getMData())
+            _cursors[bestFrom].getMData()->pcState->count++;
 
         return best;
     }
@@ -1624,6 +1639,9 @@ namespace mongo {
 
                 uassert(14812,  str::stream() << "Error running command on server: " << _server, finished);
                 massert(14813, "Command returned nothing", _cursor->more());
+
+                // Rethrow stale config errors stored in this cursor for correct handling
+                throwCursorStale(_cursor.get());
 
                 _res = _cursor->nextSafe();
                 _ok = _res["ok"].trueValue();

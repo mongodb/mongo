@@ -28,11 +28,13 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/version_manager.h"
 
 namespace mongo {
+
+    using std::string;
 
     // Global version manager
     VersionManager versionManager;
@@ -42,10 +44,6 @@ namespace mongo {
     }
 
     bool VersionManager::isVersionableCB( DBClientBase* conn ){
-        return false;
-    }
-
-    bool VersionManager::initShardVersionCB( DBClientBase * conn_in, BSONObj& result ){
         return false;
     }
 

@@ -5,9 +5,7 @@
 var coll = db.getCollection( "batch_write_wc" );
 coll.drop();
 
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands")
-
-jsTest.log("Starting Tests");
+assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
 
 // Basic validation of WriteConcern
 // -- {}, versus {w:0}/{w:1} +opt wTimeout

@@ -59,6 +59,24 @@ assert.commandWorked(
     st.shard0.getDB("admin").runCommand({
         configureFailPoint : 'failMigrationConfigWritePrepare', mode : 'off' }));
 
+assert.commandWorked(
+    st.shard0.getDB("admin").runCommand({
+        configureFailPoint : 'failMigrationApplyOps', mode : 'alwaysOn' }));
+
+version = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
+
+assert.commandWorked( admin.runCommand({ moveChunk : coll + "",
+                                         find : { _id : 0 },
+                                         to : shards[1]._id }) );
+
+failVersion = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
+
+assert.neq(version.global, failVersion.global);
+
+assert.commandWorked(
+    st.shard0.getDB("admin").runCommand({
+        configureFailPoint : 'failMigrationApplyOps', mode : 'off' }));
+
 jsTest.log( "DONE!" );
 
 st.stop();

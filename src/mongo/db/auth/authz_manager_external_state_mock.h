@@ -58,9 +58,6 @@ namespace mongo {
         void setAuthorizationManager(AuthorizationManager* authzManager);
         void setAuthzVersion(int version);
 
-        virtual Status getAllDatabaseNames(
-                            OperationContext* txn, std::vector<std::string>* dbnames);
-
         virtual Status findOne(OperationContext* txn,
                                const NamespaceString& collectionName,
                                const BSONObj& query,
@@ -73,34 +70,32 @@ namespace mongo {
                              const stdx::function<void(const BSONObj&)>& resultProcessor);
 
         // This implementation does not understand uniqueness constraints.
-        virtual Status insert(const NamespaceString& collectionName,
+        virtual Status insert(OperationContext* txn,
+                              const NamespaceString& collectionName,
                               const BSONObj& document,
                               const BSONObj& writeConcern);
 
         // This implementation does not understand uniqueness constraints, ignores writeConcern,
         // and only correctly handles some upsert behaviors.
-        virtual Status updateOne(const NamespaceString& collectionName,
+        virtual Status updateOne(OperationContext* txn,
+                                 const NamespaceString& collectionName,
                                  const BSONObj& query,
                                  const BSONObj& updatePattern,
                                  bool upsert,
                                  const BSONObj& writeConcern);
-        virtual Status update(const NamespaceString& collectionName,
+        virtual Status update(OperationContext* txn,
+                              const NamespaceString& collectionName,
                               const BSONObj& query,
                               const BSONObj& updatePattern,
                               bool upsert,
                               bool multi,
                               const BSONObj& writeConcern,
                               int* nMatched);
-        virtual Status remove(const NamespaceString& collectionName,
+        virtual Status remove(OperationContext* txn,
+                              const NamespaceString& collectionName,
                               const BSONObj& query,
                               const BSONObj& writeConcern,
                               int* numRemoved);
-        virtual Status createIndex(const NamespaceString& collectionName,
-                                   const BSONObj& pattern,
-                                   bool unique,
-                                   const BSONObj& writeConcern);
-        virtual Status dropIndexes(const NamespaceString& collectionName,
-                                   const BSONObj& writeConcern);
         virtual bool tryAcquireAuthzUpdateLock(const StringData& why);
         virtual void releaseAuthzUpdateLock();
 
@@ -109,9 +104,6 @@ namespace mongo {
     private:
         typedef std::vector<BSONObj> BSONObjCollection;
         typedef std::map<NamespaceString, BSONObjCollection> NamespaceDocumentMap;
-
-        virtual Status _getUserDocument(
-                            OperationContext* txn, const UserName& userName, BSONObj* userDoc);
 
         Status _findOneIter(const NamespaceString& collectionName,
                             const BSONObj& query,

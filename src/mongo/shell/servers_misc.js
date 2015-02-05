@@ -198,7 +198,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
         var v = extra[k];
         if( k in MongoRunner.logicalOptions ) continue
         a.push( "--" + k );
-        if ( v != null )
+        if ( v != null && v !== "")
             a.push( v );                    
     }
 
@@ -211,11 +211,18 @@ ReplTest.prototype.start = function( master , options , restart, norepl ){
     var o = this.getOptions( master , options , restart, norepl );
 
     if (restart) {
-        return startMongoProgram.apply(null, o);
+        var conn = startMongoProgram.apply(null, o);
+        if (!master) {
+            conn.setSlaveOk();
+        }
+        return conn;
     } else {
         var conn = startMongod.apply(null, o);
         if (jsTestOptions().keyFile || jsTestOptions().auth || jsTestOptions().useX509) {
             jsTest.authenticate(conn);
+        }
+        if (!master) {
+            conn.setSlaveOk();
         }
         return conn;
     }
@@ -289,6 +296,17 @@ function startParallelShell( jsCode, port, noConnect ){
 
     var args = ["mongo"];
 
+    // Convert function into call-string
+    if (typeof(jsCode) == "function") {
+        var id = Math.floor(Math.random() * 100000);
+        jsCode = "var f" + id + " = " + jsCode.toString() + ";f" + id + "();"; 
+    }
+    else if(typeof(jsCode) == "string") {}
+        // do nothing
+    else {
+        throw Error("bad first argument to startParallelShell");
+    }
+    
     if (noConnect) {
         args.push("--nodb");
     } else if (typeof(db) == "object") {
@@ -323,15 +341,8 @@ function startParallelShell( jsCode, port, noConnect ){
 
     x = startMongoProgramNoConnect.apply(null, args);
     return function(){
-        waitProgram( x );
+        return waitProgram( x );
     };
 }
 
 var testingReplication = false;
-
-function skipIfTestingReplication(){
-    if (testingReplication) {
-        print("skipIfTestingReplication skipping");
-        quit(0);
-    }
-}

@@ -38,6 +38,8 @@ namespace mongo {
 
     namespace fts {
 
+        using std::string;
+
         Stemmer::Stemmer( const FTSLanguage& language ) {
             _stemmer = NULL;
             if ( language.str() != "none" )

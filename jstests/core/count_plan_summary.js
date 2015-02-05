@@ -1,7 +1,6 @@
 // Test that the plan summary string appears in db.currentOp() for
 // count operations. SERVER-14064.
 
-if (0) {// SERVER-14143
 var t = db.jstests_count_plan_summary;
 t.drop();
 
@@ -46,4 +45,3 @@ assert.soon(function() {
 });
 
 s();
-}

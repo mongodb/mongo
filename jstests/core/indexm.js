@@ -20,13 +20,6 @@ test();
 // Now create an index.
 t.ensureIndex({"a":1});
 test();
-// SERVER-3105
-//assert( !t.find( 
-//                { 
-//                a : { x : 1 } , 
-//                "$or" : [ { a : { x : 2 } } , { a : { x : 3 } } ] 
-//                } 
-//               ).explain().clauses );
 
 // Now create a different index.
 t.dropIndexes();

@@ -34,6 +34,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::string;
+
     Status validateKeyPattern(const BSONObj& key) {
         const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
 

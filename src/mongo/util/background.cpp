@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/background.h"
@@ -48,8 +50,6 @@
 
 using namespace std;
 namespace mongo {
-
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
 
     namespace {
 
@@ -153,31 +153,22 @@ namespace mongo {
     void BackgroundJob::jobBody() {
 
         const string threadName = name();
-        if( ! threadName.empty() )
-            setThreadName( threadName.c_str() );
+        if (!threadName.empty()) {
+            setThreadName(threadName.c_str());
+        }
 
         LOG(1) << "BackgroundJob starting: " << threadName << endl;
 
         try {
             run();
         }
-        catch ( std::exception& e ) {
-            error() << "backgroundjob " << threadName << " exception: " << e.what() << endl;
-        }
-        catch(...) {
-            error() << "uncaught exception in BackgroundJob " << threadName << endl;
+        catch (const std::exception& e) {
+            error() << "backgroundjob " << threadName << " exception: " << e.what();
+            throw;
         }
 
         // We must cache this value so that we can use it after we leave the following scope.
         const bool selfDelete = _selfDelete;
-
-        {
-            // It is illegal to access any state owned by this BackgroundJob after leaving this
-            // scope, with the exception of the call to 'delete this' below.
-            scoped_lock l( _status->mutex );
-            _status->state = Done;
-            _status->done.notify_all();
-        }
 
 #ifdef MONGO_SSL
         // TODO(sverch): Allow people who use the BackgroundJob to also specify cleanup tasks.
@@ -187,6 +178,14 @@ namespace mongo {
         if (manager)
             manager->cleanupThreadLocals();
 #endif
+
+        {
+            // It is illegal to access any state owned by this BackgroundJob after leaving this
+            // scope, with the exception of the call to 'delete this' below.
+            scoped_lock l( _status->mutex );
+            _status->state = Done;
+            _status->done.notify_all();
+        }
 
         if( selfDelete )
             delete this;

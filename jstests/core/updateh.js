@@ -40,6 +40,9 @@ assert.writeError(res);
 res = t.update({ n: 0 }, { $set: { "secret.agent$.$x": 1 }});
 assert.writeError(res);
 
+res = t.update({ n: 0 }, { $set: { "$secret.agent.x": 1 }});
+assert.writeError(res);
+
 res = t.update({ n: 0 }, { $set: { "secret.agent$": 1 }});
 assert.writeOK(res);
 t.save( {_id:0, n: 0} )

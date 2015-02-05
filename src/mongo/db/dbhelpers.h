@@ -28,9 +28,11 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/s/range_arithmetic.h"
 
@@ -86,7 +88,7 @@ namespace mongo {
                             BSONObj& result, 
                             bool requireIndex = false);
 
-        static DiskLoc findOne(OperationContext* txn,
+        static RecordId findOne(OperationContext* txn,
                                Collection* collection,
                                const BSONObj &query,
                                bool requireIndex);
@@ -102,7 +104,7 @@ namespace mongo {
         /* TODO: should this move into Collection?
          * uasserts if no _id index.
          * @return null loc if not found */
-        static DiskLoc findById(OperationContext* txn,
+        static RecordId findById(OperationContext* txn,
                                 Collection* collection, const BSONObj& query);
 
         /** Get/put the first (or last) object from a collection.  Generally only useful if the collection
@@ -115,9 +117,6 @@ namespace mongo {
         static bool getSingleton(OperationContext* txn, const char *ns, BSONObj& result);
         static void putSingleton(OperationContext* txn, const char *ns, BSONObj obj);
         static void putSingletonGod(OperationContext* txn, const char *ns, BSONObj obj, bool logTheOp);
-        static bool getFirst(OperationContext* txn, const char *ns, BSONObj& result) {
-            return getSingleton(txn, ns, result);
-        }
 
         /**
          * get last object int he collection; e.g. {$natural : -1}
@@ -194,7 +193,7 @@ namespace mongo {
         static Status getLocsInRange( OperationContext* txn,
                                       const KeyRange& range,
                                       long long maxChunkSizeBytes,
-                                      std::set<DiskLoc>* locs,
+                                      std::set<RecordId>* locs,
                                       long long* numDocs,
                                       long long* estChunkSizeBytes );
 

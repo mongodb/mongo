@@ -9,10 +9,10 @@ var options = { separateConfig : true,
                 rs : true,
                 rsOptions : { nojournal : "" },
                 // Options for each replica set shard
-                rs0 : { nodes : 2 },
-                rs1 : { nodes : 1 } };
+                rs0 : { nodes : 3 },
+                rs1 : { nodes : 3 } };
 
-var st = new ShardingTest({ shards : 2, mongos : 1, other : options });
+var st = new ShardingTest({ shards : 2, mongos : 1, other : options, verbose: 4});
 st.stopBalancer();
 
 var mongos = st.s0;
@@ -65,10 +65,12 @@ assert(!gle.errmsg);
 assert.eq(coll.count(), 1);
 
 //
-// Successful remove on two hosts, write concern timeout on one
+// Successful remove on one shard, write concern timeout on the other
+var s0Id = st.rs0.getNodeId(st.rs0.liveNodes.slaves[0]);
+st.rs0.stop(s0Id);
 coll.remove({});
-st.rs0.awaitReplication(); // To ensure the first shard won't timeout
-printjson(gle = coll.getDB().runCommand({ getLastError : 1, w : 2, wtimeout : 5 * 1000 }));
+st.rs1.awaitReplication(); // To ensure the first shard won't timeout
+printjson(gle = coll.getDB().runCommand({ getLastError : 1, w : 3, wtimeout : 5 * 1000 }));
 assert(gle.ok);
 assert.eq(gle.err, 'timeout');
 assert(gle.wtimeout);
@@ -78,9 +80,15 @@ assert.eq(coll.count(), 0);
 //
 // Successful remove on two hosts, write concern timeout on both
 // We don't aggregate two timeouts together
+var s1Id = st.rs1.getNodeId(st.rs1.liveNodes.slaves[0]);
+st.rs1.stop(s1Id);
+// new writes to both shards to ensure that remove will do something on both of them
+coll.insert({ _id : -1 });
+coll.insert({ _id : 1 });
+
 coll.remove({});
-st.rs0.awaitReplication();
 printjson(gle = coll.getDB().runCommand({ getLastError : 1, w : 3, wtimeout : 5 * 1000 }));
+
 assert(!gle.ok);
 assert(gle.errmsg);
 assert.eq(gle.code, 64); // WriteConcernFailed - needed for backwards compatibility

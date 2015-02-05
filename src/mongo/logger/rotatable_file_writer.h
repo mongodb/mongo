@@ -29,7 +29,6 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
-#include <iostream>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"

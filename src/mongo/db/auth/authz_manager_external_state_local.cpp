@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 
 #include "mongo/base/status.h"
@@ -34,9 +36,12 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_document_parser.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::vector;
 
     AuthzManagerExternalStateLocal::AuthzManagerExternalStateLocal() :
         _roleGraphState(roleGraphStateInitial) {}
@@ -87,12 +92,7 @@ namespace mongo {
             }
         }
         else if (status == ErrorCodes::NoMatchingDocument) {
-            if (hasAnyPrivilegeDocuments(txn)) {
-                *outVersion = AuthorizationManager::schemaVersion24;
-            }
-            else {
-                *outVersion = AuthorizationManager::schemaVersion26Final;
-            }
+            *outVersion = AuthorizationManager::schemaVersion28SCRAM;
             return Status::OK();
         }
         else {
@@ -207,6 +207,22 @@ namespace {
         }
         *result = resultDoc.getObject();
         return Status::OK();
+    }
+
+    Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* txn,
+                                                            const UserName& userName,
+                                                            BSONObj* userDoc) {
+        Status status = findOne(
+                txn,
+                AuthorizationManager::usersCollectionNamespace,
+                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
+                     AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
+                userDoc);
+        if (status == ErrorCodes::NoMatchingDocument) {
+            status = Status(ErrorCodes::UserNotFound, mongoutils::str::stream() <<
+                            "Could not find user " << userName.getFullName());
+        }
+        return status;
     }
 
     Status AuthzManagerExternalStateLocal::getRoleDescription(const RoleName& roleName,

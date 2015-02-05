@@ -27,10 +27,11 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <list>
 #include <boost/filesystem/path.hpp>
+#include <boost/noncopyable.hpp>
 #include <boost/thread/condition.hpp>
 
 #include "mongo/util/concurrency/mutex.h"
@@ -65,8 +66,6 @@ namespace mongo {
         void allocateAsap( const std::string &name, unsigned long long &size );
 
         void waitUntilFinished() const;
-        
-        bool hasFailed() const;
 
         static void ensureLength(int fd, long size);
 

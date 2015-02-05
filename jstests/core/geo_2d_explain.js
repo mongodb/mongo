@@ -20,9 +20,11 @@ for (var i = 0; i < n; i++) {
     t.save({_id: i, a: a, loc: loc}); 
 }
 
-var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain();
+var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain("executionStats");
 
 print('explain = ' + tojson(explain));
 
-assert.eq(explain.n, explain.nscannedObjects);
-assert.lte(explain.n, explain.nscanned);
+var stats = explain.executionStats;
+assert.eq(stats.nReturned, 50);
+assert.lte(stats.nReturned, stats.totalDocsExamined);
+assert.eq(stats.executionSuccess, true);

@@ -28,23 +28,29 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/shell/bench.h"
 
 #include <pcrecpp.h>
 
+#include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
+#include <iostream>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/log.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
-
 
 // ---------------------------------
 // ---- benchmarking system --------
@@ -69,6 +75,11 @@ namespace {
 }
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::map;
 
     BenchRunEventCounter::BenchRunEventCounter() {
         reset();
@@ -185,25 +196,25 @@ namespace mongo {
         if ( ! args["trapPattern"].eoo() ){
             const char* regex = args["trapPattern"].regex();
             const char* flags = args["trapPattern"].regexFlags();
-            this->trapPattern = shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->trapPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         if ( ! args["noTrapPattern"].eoo() ){
             const char* regex = args["noTrapPattern"].regex();
             const char* flags = args["noTrapPattern"].regexFlags();
-            this->noTrapPattern = shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->noTrapPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         if ( ! args["watchPattern"].eoo() ){
             const char* regex = args["watchPattern"].regex();
             const char* flags = args["watchPattern"].regexFlags();
-            this->watchPattern = shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->watchPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         if ( ! args["noWatchPattern"].eoo() ){
             const char* regex = args["noWatchPattern"].regex();
             const char* flags = args["noWatchPattern"].regexFlags();
-            this->noWatchPattern = shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->noWatchPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         this->ops = args["ops"].Obj().getOwned();
@@ -333,6 +344,13 @@ namespace mongo {
         BsonTemplateEvaluator bsonTemplateEvaluator;
         invariant(bsonTemplateEvaluator.setId(_id) == BsonTemplateEvaluator::StatusSuccess);
 
+        if (_config->username != "") {
+            string errmsg;
+            if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
+                uasserted(15931, "Authenticating to connection for _benchThread failed: " + errmsg);
+            }
+        }
+
         while ( !shouldStop() ) {
             BSONObjIterator i( _config->ops );
             while ( i.more() ) {
@@ -355,13 +373,6 @@ namespace mongo {
                 auto_ptr<Scope> scope;
                 ScriptingFunction scopeFunc = 0;
                 BSONObj scopeObj;
-
-                if (_config->username != "") {
-                    string errmsg;
-                    if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                        uasserted(15931, "Authenticating to connection for _benchThread failed: " + errmsg);
-                    }
-                }
 
                 bool check = ! e["check"].eoo();
                 if( check ){
@@ -388,7 +399,10 @@ namespace mongo {
                 }
 
                 try {
-                    if ( op == "findOne" ) {
+                    if ( op == "nop") {
+                        // do nothing
+                    }
+                    else if ( op == "findOne" ) {
 
                         BSONObj result;
                         {
@@ -482,13 +496,15 @@ namespace mongo {
 
                         bool multi = e["multi"].trueValue();
                         bool upsert = e["upsert"].trueValue();
-                        BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
-                        BSONObj update = e["update"].Obj();
+                        BSONObj queryOrginal = e["query"].eoo() ? BSONObj() : e["query"].Obj();
+                        BSONObj updateOriginal = e["update"].Obj();
                         BSONObj result;
                         bool safe = e["safe"].trueValue();
 
                         {
                             BenchRunEventTrace _bret(&_stats.updateCounter);
+                            BSONObj query = fixQuery(queryOrginal, bsonTemplateEvaluator);
+                            BSONObj update = fixQuery(updateOriginal, bsonTemplateEvaluator);
 
                             if (useWriteCmd) {
                                 // TODO: Replace after SERVER-11774.
@@ -497,7 +513,7 @@ namespace mongo {
                                     nsToCollectionSubstring(ns));
                                 BSONArrayBuilder docBuilder(
                                     builder.subarrayStart("updates"));
-                                docBuilder.append(BSON("q" << fixQuery(query, bsonTemplateEvaluator) <<
+                                docBuilder.append(BSON("q" << query <<
                                                        "u" << update <<
                                                        "multi" << multi <<
                                                        "upsert" << upsert));
@@ -507,8 +523,7 @@ namespace mongo {
                                     builder.done(), result);
                             }
                             else {
-                                conn->update(ns, fixQuery(query,
-                                            bsonTemplateEvaluator), update,
+                                conn->update(ns, query, update,
                                             upsert , multi);
                                 if (safe)
                                     result = conn->getLastErrorDetailed();
@@ -541,16 +556,15 @@ namespace mongo {
                         {
                             BenchRunEventTrace _bret(&_stats.insertCounter);
 
-                            BSONObjBuilder builder;
                             BSONObj insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
-                            builder.append("insert",
-                                nsToCollectionSubstring(ns));
-                            BSONArrayBuilder docBuilder(
-                                builder.subarrayStart("documents"));
-                            docBuilder.append(insertDoc);
-                            docBuilder.done();
 
                             if (useWriteCmd) {
+                                BSONObjBuilder builder;
+                                builder.append("insert", nsToCollectionSubstring(ns));
+                                BSONArrayBuilder docBuilder(
+                                    builder.subarrayStart("documents"));
+                                docBuilder.append(insertDoc);
+                                docBuilder.done();
                                 // TODO: Replace after SERVER-11774.
                                 conn->runCommand(
                                     nsToDatabaseSubstring(ns).toString(),
@@ -588,11 +602,11 @@ namespace mongo {
                         BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
                         bool safe = e["safe"].trueValue();
                         BSONObj result;
-
                         {
                             BenchRunEventTrace _bret(&_stats.deleteCounter);
-
+                            BSONObj predicate = fixQuery(query, bsonTemplateEvaluator);
                             if (useWriteCmd) {
+
                                 // TODO: Replace after SERVER-11774.
                                 BSONObjBuilder builder;
                                 builder.append("delete",
@@ -601,7 +615,7 @@ namespace mongo {
                                     builder.subarrayStart("deletes"));
                                 int limit = (multi == true) ? 0 : 1;
                                 docBuilder.append(
-                                        BSON("q" << fixQuery(query, bsonTemplateEvaluator) <<
+                                        BSON("q" << predicate <<
                                              "limit" << limit));
                                 docBuilder.done();
                                 conn->runCommand(
@@ -609,8 +623,7 @@ namespace mongo {
                                     builder.done(), result);
                             }
                             else {
-                                conn->remove(ns, fixQuery(query,
-                                    bsonTemplateEvaluator), !multi);
+                                conn->remove(ns, predicate, !multi);
                                 if (safe)
                                     result = conn->getLastErrorDetailed();
                             }
@@ -640,6 +653,15 @@ namespace mongo {
                     }
                     else if ( op == "dropIndex" ) {
                         conn->dropIndex( ns , e["key"].Obj()  );
+                    }
+                    else if( op == "let" ) {
+                        string target = e["target"].eoo() ? string() : e["target"].String();
+                        BSONElement value = e["value"].eoo() ? BSONElement() : e["value"];
+                        BSONObjBuilder valBuilder;
+                        BSONObjBuilder templateBuilder;
+                        valBuilder.append(value);
+                        bsonTemplateEvaluator.evaluate(valBuilder.done(), templateBuilder);
+                        bsonTemplateEvaluator.setVariable(target, templateBuilder.done().firstElement());
                     }
                     else {
                         log() << "don't understand op: " << op << endl;
@@ -685,7 +707,9 @@ namespace mongo {
                     conn->getLastError();
                 }
 
-                sleepmillis( delay );
+                if (delay > 0)
+                    sleepmillis( delay );
+
             }
         }
 
@@ -709,15 +733,14 @@ namespace mongo {
     }  // namespace
 
     void BenchRunWorker::run() {
-        BenchRunWorkerStateGuard _workerStateGuard( _brState );
-
-        boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
-
         try {
+            BenchRunWorkerStateGuard _workerStateGuard( _brState );
+            boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
             if ( !_config->username.empty() ) {
                 string errmsg;
                 if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                    uasserted(15932, "Authenticating to connection for benchThread failed: " + errmsg);
+                    uasserted(15932,
+                              "Authenticating to connection for benchThread failed: " + errmsg);
                 }
             }
             generateLoadOnConnection( conn.get() );
@@ -749,7 +772,6 @@ namespace mongo {
 
      void BenchRunner::start( ) {
 
-
          {
              boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
              // Must authenticate to admin db in order to run serverStatus command
@@ -762,24 +784,28 @@ namespace mongo {
                                "required to use benchRun with auth enabled");
                  }
              }
-             // Get initial stats
+
+             // Start threads
+             for ( unsigned i = 0; i < _config->parallel; i++ ) {
+                 BenchRunWorker *worker = new BenchRunWorker(i, _config.get(), &_brState);
+                 worker->start();
+                 _workers.push_back(worker);
+             }
+
+             _brState.waitForState(BenchRunState::BRS_RUNNING);
+
+             // initial stats
              conn->simpleCommand( "admin" , &before , "serverStatus" );
              before = before.getOwned();
+             _brTimer = new mongo::Timer();
          }
-
-         // Start threads
-         for ( unsigned i = 0; i < _config->parallel; i++ ) {
-             BenchRunWorker *worker = new BenchRunWorker(i, _config.get(), &_brState);
-             worker->start();
-             _workers.push_back(worker);
-         }
-
-         _brState.waitForState(BenchRunState::BRS_RUNNING);
      }
 
      void BenchRunner::stop() {
          _brState.tellWorkersToFinish();
          _brState.waitForState(BenchRunState::BRS_FINISHED);
+         _microsElapsed = _brTimer->micros();
+         delete _brTimer;
 
          {
              boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
@@ -873,7 +899,8 @@ namespace mongo {
                  BSONElement e = i.next();
                  double x = e.number();
                  x -= before[e.fieldName()].number();
-                 buf.append( e.fieldName() , x / runner->_config->seconds );
+                 std::string s = e.fieldName();
+                 buf.append( s, x / (runner->_microsElapsed / 1000000.0) );
              }
          }
 
@@ -895,6 +922,7 @@ namespace mongo {
 
          OID oid = OID( start.firstElement().String() );
          BenchRunner* runner = BenchRunner::get( oid );
+
          sleepmillis( (int)(1000.0 * runner->config().seconds) );
 
          return benchFinish( start, data );
@@ -922,7 +950,7 @@ namespace mongo {
 
         OID oid = OID( argsFake.firstElement().String() );
 
-        // Get new BenchRunner object
+        // Get old BenchRunner object
         BenchRunner* runner = BenchRunner::get( oid );
 
         BSONObj finalObj = BenchRunner::finish( runner );

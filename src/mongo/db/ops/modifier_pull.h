@@ -78,11 +78,11 @@ namespace mongo {
         BSONObj _exprObj;
 
         // If we are using the matcher, this is the match expression we built around _exprObj.
-        scoped_ptr<MatchExpression> _matchExpr;
+        boost::scoped_ptr<MatchExpression> _matchExpr;
         bool _matcherOnPrimitive;
 
         struct PreparedState;
-        scoped_ptr<PreparedState> _preparedState;
+        boost::scoped_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

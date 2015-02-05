@@ -1,6 +1,9 @@
 var t = db.hashindex1;
 t.drop()
 
+// Include helpers for analyzing explain output.
+load("jstests/libs/analyze_plan.js");
+
 //test non-single field hashed indexes don't get created (maybe change later)
 var badspec = {a : "hashed" , b : 1};
 t.ensureIndex( badspec );
@@ -34,36 +37,30 @@ assert.eq( t.find({a : 3}).hint(goodspec).toArray().length , 1);
 //test right obj is found
 assert.eq( t.find({a : 3.1}).hint(goodspec).toArray()[0].a , 3.1);
 
-//test that hashed cursor is used when it should be
-var cursorname = "BtreeCursor a_hashed";
-assert.eq( t.find({a : 1}).explain().cursor ,
-		cursorname ,
-		"not using hashed cursor");
+// Make sure we're using the hashed index.
+var explain = t.find({a : 1}).explain();
+assert( isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
 
 // SERVER-12222
 //printjson( t.find({a : {$gte : 3 , $lte : 3}}).explain() )
 //assert.eq( t.find({a : {$gte : 3 , $lte : 3}}).explain().cursor ,
 //		cursorname ,
 //		"not using hashed cursor");
-assert.neq( t.find({c : 1}).explain().cursor ,
-		cursorname ,
-		"using irrelevant hashed cursor");
+var explain = t.find({c : 1}).explain();
+assert( !isIxscan(explain.queryPlanner.winningPlan), "using irrelevant hashed index");
 
-printjson( t.find({a : {$in : [1,2]}}).explain() )
 // Hash index used with a $in set membership predicate.
-assert.eq( t.find({a : {$in : [1,2]}}).explain()["cursor"],
-           "BtreeCursor a_hashed",
-           "not using hashed cursor");
+var explain = t.find({a : {$in : [1,2]}}).explain();
+printjson(explain);
+assert( isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
 
 // Hash index used with a singleton $and predicate conjunction.
-assert.eq( t.find({$and : [{a : 1}]}).explain()["cursor"],
-           "BtreeCursor a_hashed",
-           "not using hashed cursor");
+var explain = t.find({$and : [{a : 1}]}).explain();
+assert( isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
 
 // Hash index used with a non singleton $and predicate conjunction.
-assert.eq( t.find({$and : [{a : {$in : [1,2]}},{a : {$gt : 1}}]}).explain()["cursor"],
-           "BtreeCursor a_hashed",
-           "not using hashed cursor");
+var explain = t.find({$and : [{a : {$in : [1,2]}},{a : {$gt : 1}}]}).explain();
+assert( isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
 
 //test creation of index based on hash of _id index
 var goodspec2 = {'_id' : "hashed"};

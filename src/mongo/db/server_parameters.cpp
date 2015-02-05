@@ -28,13 +28,16 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/parse_number.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::vector;
 
     namespace {
         ServerParameterSet* GLOBAL = NULL;

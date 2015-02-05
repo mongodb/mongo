@@ -32,8 +32,8 @@
 
 #include "mongo/db/exec/sort.h"
 
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
-#include "mongo/db/exec/mock_stage.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -44,8 +44,8 @@ namespace {
     TEST(SortStageTest, SortEmptyWorkingSet) {
         WorkingSet ws;
 
-        // MockStage will be owned by SortStage.
-        MockStage* ms = new MockStage(&ws);
+        // QueuedDataStage will be owned by SortStage.
+        QueuedDataStage* ms = new QueuedDataStage(&ws);
         SortStageParams params;
         SortStage sort(params, &ws, ms);
 
@@ -84,8 +84,8 @@ namespace {
         // so it's fine to declare
         WorkingSet ws;
 
-        // MockStage will be owned by SortStage.
-        MockStage* ms = new MockStage(&ws);
+        // QueuedDataStage will be owned by SortStage.
+        QueuedDataStage* ms = new QueuedDataStage(&ws);
         BSONObj inputObj = fromjson(inputStr);
         BSONElement inputElt = inputObj.getField("input");
         ASSERT(inputElt.isABSONObj());
@@ -98,7 +98,7 @@ namespace {
             // Insert obj from input array into working set.
             WorkingSetMember wsm;
             wsm.state = WorkingSetMember::OWNED_OBJ;
-            wsm.obj = obj;
+            wsm.obj = Snapshotted<BSONObj>(SnapshotId(), obj);
             ms->pushBack(wsm);
         }
 
@@ -129,7 +129,7 @@ namespace {
         BSONArrayBuilder arr(bob.subarrayStart("output"));
         while (state == PlanStage::ADVANCED) {
             WorkingSetMember* member = ws.get(id);
-            const BSONObj& obj = member->obj;
+            const BSONObj& obj = member->obj.value();
             arr.append(obj);
             state = sort.work(&id);
         }

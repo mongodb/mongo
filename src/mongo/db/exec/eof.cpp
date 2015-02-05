@@ -30,7 +30,11 @@
 
 #include "mongo/db/exec/eof.h"
 
+#include "mongo/db/exec/scoped_timer.h"
+
 namespace mongo {
+
+    using std::vector;
 
     // static
     const char* EOFStage::kStageType = "EOF";
@@ -58,7 +62,7 @@ namespace mongo {
         ++_commonStats.unyields;
     }
 
-    void EOFStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void EOFStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
     }
 

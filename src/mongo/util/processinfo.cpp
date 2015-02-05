@@ -27,13 +27,17 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
 #include "mongo/util/processinfo.h"
 
 #include <iostream>
 #include <fstream>
+
+#include "mongo/util/log.h"
 
 using namespace std;
 

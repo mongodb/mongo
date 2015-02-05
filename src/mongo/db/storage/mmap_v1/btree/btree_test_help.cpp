@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     string bigNumString(long long n, int len) {
         char sub[17];
         sprintf(sub, "%.16llx", n);
@@ -58,29 +60,26 @@ namespace mongo {
     // BtreeLogicTestHelper
     //
 
-    static BucketDeletionNotification dummyBucketDeletionNotification;
-
     template <class OnDiskFormat>
     BtreeLogicTestHelper<OnDiskFormat>::BtreeLogicTestHelper(const BSONObj& order)
             : recordStore("TestRecordStore"),
               btree(&headManager,
                     &recordStore,
+                    &cursorRegistry,
                     Ordering::make(order),
-                    "TestIndex",
-                    &dummyBucketDeletionNotification) {
-
+                    "TestIndex") {
         static const string randomData("RandomStuff");
 
         // Generate a valid record location for a "fake" record, which we will repeatedly use
         // thoughout the tests.
         OperationContextNoop txn;
-        StatusWith<DiskLoc> s =
+        StatusWith<RecordId> s =
             recordStore.insertRecord(&txn, randomData.c_str(), randomData.length(), false);
 
         ASSERT_TRUE(s.isOK());
-        ASSERT_EQUALS(1, recordStore.numRecords());
+        ASSERT_EQUALS(1, recordStore.numRecords(NULL));
 
-        dummyDiskLoc = s.getValue();
+        dummyDiskLoc = DiskLoc::fromRecordId(s.getValue());
     }
 
 
@@ -90,13 +89,13 @@ namespace mongo {
 
     template <class OnDiskFormat>
     void ArtificialTreeBuilder<OnDiskFormat>::makeTree(const string &spec) {
-        _helper->headManager.setHead(_txn, makeTree(fromjson(spec)));
+        _helper->headManager.setHead(_txn, makeTree(fromjson(spec)).toRecordId());
     }
 
     template <class OnDiskFormat>
     DiskLoc ArtificialTreeBuilder<OnDiskFormat>::makeTree(const BSONObj &spec) {
         DiskLoc bucketLoc = _helper->btree._addBucket(_txn);
-        BucketType* bucket = _helper->btree.getBucket(bucketLoc);
+        BucketType* bucket = _helper->btree.getBucket(_txn, bucketLoc);
 
         BSONObjIterator i(spec);
         while (i.more()) {
@@ -121,14 +120,14 @@ namespace mongo {
 
     template <class OnDiskFormat>
     void ArtificialTreeBuilder<OnDiskFormat>::checkStructure(const string &spec) const {
-        checkStructure(fromjson(spec), _helper->headManager.getHead());
+        checkStructure(fromjson(spec), DiskLoc::fromRecordId(_helper->headManager.getHead(_txn)));
     }
 
     template <class OnDiskFormat>
     void ArtificialTreeBuilder<OnDiskFormat>::push(
                         const DiskLoc bucketLoc, const BSONObj& key, const DiskLoc child) {
         KeyDataOwnedType k(key);
-        BucketType* bucket = _helper->btree.getBucket(bucketLoc);
+        BucketType* bucket = _helper->btree.getBucket(_txn, bucketLoc);
 
         invariant(_helper->btree.pushBack(bucket, _helper->dummyDiskLoc, k, child));
         _helper->btree.fixParentPtrs(_txn, bucket, bucketLoc);
@@ -137,7 +136,7 @@ namespace mongo {
     template <class OnDiskFormat>
     void ArtificialTreeBuilder<OnDiskFormat>::checkStructure(
                         const BSONObj &spec, const DiskLoc node) const {
-        BucketType* bucket = _helper->btree.getBucket(node);
+        BucketType* bucket = _helper->btree.getBucket(_txn, node);
 
         BSONObjIterator j(spec);
         for (int i = 0; i < bucket->n; ++i) {
@@ -201,7 +200,7 @@ namespace mongo {
                             const DiskLoc bucketLoc, int targetSize, char startKey) {
         ASSERT_FALSE(bucketLoc.isNull());
 
-        BucketType* bucket = _helper->btree.getBucket(bucketLoc);
+        BucketType* bucket = _helper->btree.getBucket(_txn, bucketLoc);
         ASSERT_EQUALS(0, bucket->n);
 
         static const int bigSize = KeyDataOwnedType(simpleKey('a', 801)).dataSize();

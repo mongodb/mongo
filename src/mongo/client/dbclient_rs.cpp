@@ -25,11 +25,14 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclient_rs.h"
 
 #include <memory>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
@@ -42,7 +45,13 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+    using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::vector;
 
 namespace {
 
@@ -59,6 +68,8 @@ namespace {
             _secOkCmdList.insert("count");
             _secOkCmdList.insert("distinct");
             _secOkCmdList.insert("dbStats");
+            _secOkCmdList.insert("explain");
+            _secOkCmdList.insert("find");
             _secOkCmdList.insert("geoNear");
             _secOkCmdList.insert("geoSearch");
             _secOkCmdList.insert("geoWalk");
@@ -190,6 +201,13 @@ namespace {
             return str::stream() << _setName << "/" ;
         }
         return rsm->getServerAddress();
+    }
+
+    HostAndPort DBClientReplicaSet::getSuspectedPrimaryHostAndPort() const {
+        if (!_master) {
+            return HostAndPort();
+        }
+        return _master->getServerHostAndPort();
     }
 
     void DBClientReplicaSet::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
@@ -987,9 +1005,9 @@ namespace {
             return false;
 
         if ( ns ) {
-            QueryResult * res = (QueryResult*)response.singleData();
-            if ( res->nReturned == 1 ) {
-                BSONObj x(res->data() );
+            QueryResult::View res = response.singleData().view2ptr();
+            if ( res.getNReturned() == 1 ) {
+                BSONObj x(res.data() );
                 if ( str::contains( ns , "$cmd" ) ) {
                     if ( isNotMasterErrorString( x["errmsg"] ) )
                         isntMaster();

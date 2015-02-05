@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::vector;
+    using std::string;
     namespace str = mongoutils::str;
 
     namespace {
@@ -57,6 +59,10 @@ namespace mongo {
     }
 
     FieldRefSet::FieldRefSet() {
+    }
+
+    FieldRefSet::FieldRefSet(const vector<FieldRef*>& paths) {
+        fillFrom(paths);
     }
 
     bool FieldRefSet::findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const {

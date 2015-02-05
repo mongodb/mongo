@@ -27,9 +27,15 @@
  */
 
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/lite_parsed_query.h"
+
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/query_planner_common.h"
 
 namespace mongo {
+
+    using std::set;
 
     string QuerySolutionNode::toString() const {
         mongoutils::str::stream ss;
@@ -411,6 +417,10 @@ namespace mongo {
         // in the key was extracted from an array in the original document.
         if (indexIsMultiKey) { return false; }
 
+        // Custom index access methods may return non-exact key data - this function is currently
+        // used for covering exact key data only.
+        if (IndexNames::BTREE != IndexNames::findPluginName(indexKeyPattern)) { return false; }
+
         BSONObjIterator it(indexKeyPattern);
         while (it.more()) {
             if (field == it.next().fieldName()) {
@@ -421,9 +431,9 @@ namespace mongo {
     }
 
     bool IndexScanNode::sortedByDiskLoc() const {
-        // Indices use DiskLoc as an additional key after the actual index key.
+        // Indices use RecordId as an additional key after the actual index key.
         // Therefore, if we're only examining one index key, the output is sorted
-        // by DiskLoc.
+        // by RecordId.
 
         // If it's a simple range query, it's easy to determine if the range is a point.
         if (bounds.isSimpleRange) {
@@ -448,23 +458,11 @@ namespace mongo {
     void IndexScanNode::computeProperties() {
         _sorts.clear();
 
-        BSONObj sortPattern;
-        {
-            BSONObjBuilder sortBob;
-            BSONObj normalizedIndexKeyPattern(LiteParsedQuery::normalizeSortOrder(indexKeyPattern));
-            BSONObjIterator it(normalizedIndexKeyPattern);
-            while (it.more()) {
-                BSONElement elt = it.next();
-                // Zero is returned if elt is not a number.  This happens when elt is hashed or
-                // 2dsphere, our two projection indices.  We want to drop those from the sort
-                // pattern.
-                int val = elt.numberInt() * direction;
-                if (0 != val) {
-                    sortBob.append(elt.fieldName(), val);
-                }
-            }
-            sortPattern = sortBob.obj();
+        BSONObj sortPattern = QueryPlannerAnalysis::getSortPattern(indexKeyPattern);
+        if (direction == -1) {
+            sortPattern = QueryPlannerCommon::reverseSortObj(sortPattern);
         }
+
         _sorts.insert(sortPattern);
 
         const int nFields = sortPattern.nFields();
@@ -511,9 +509,13 @@ namespace mongo {
         // For each sort in _sorts:
         //    For each drop in powerset(equalityFields):
         //        Remove fields in 'drop' from 'sort' and add resulting sort to output.
-
-        // Since this involves a powerset, we only remove point intervals that the prior sort
-        // planning code removed, namely the contiguous prefix of the key pattern.
+        //
+        // Since this involves a powerset, we don't generate the full set of possibilities.
+        // Instead, we generate sort orders by removing possible contiguous prefixes of equality
+        // predicates. For example, if the key pattern is {a: 1, b: 1, c: 1, d: 1, e: 1}
+        // and and there are equality predicates on 'a', 'b', and 'c', then here we add the sort
+        // orders {b: 1, c: 1, d: 1, e: 1} and {c: 1, d: 1, e: 1}. (We also end up adding
+        // {d: 1, e: 1} and {d: 1}, but this is done later on.)
         BSONObjIterator it(sortPattern);
         BSONObjBuilder suffixBob;
         while (it.more()) {
@@ -524,6 +526,15 @@ namespace mongo {
                 // This field isn't a point interval, can't drop.
                 break;
             }
+
+            // We add the sort obtained by dropping 'elt' and all preceding elements from the index
+            // key pattern.
+            BSONObjIterator droppedPrefixIt = it;
+            BSONObjBuilder droppedPrefixBob;
+            while (droppedPrefixIt.more()) {
+                droppedPrefixBob.append(droppedPrefixIt.next());
+            }
+            _sorts.insert(droppedPrefixBob.obj());
         }
 
         while (it.more()) {
@@ -638,7 +649,7 @@ namespace mongo {
     //
     // LimitNode
     //
-    
+
 
     void LimitNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
@@ -695,7 +706,7 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "keyPattern = " << indexKeyPattern.toString() << '\n';
         addCommon(ss, indent);
-        *ss << "nearQuery = " << nq.toString() << '\n';
+        *ss << "nearQuery = " << nq->toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();
@@ -709,7 +720,6 @@ namespace mongo {
         copy->_sorts = this->_sorts;
         copy->nq = this->nq;
         copy->baseBounds = this->baseBounds;
-        copy->numToReturn = this->numToReturn;
         copy->indexKeyPattern = this->indexKeyPattern;
         copy->addPointMeta = this->addPointMeta;
         copy->addDistMeta = this->addDistMeta;
@@ -729,7 +739,7 @@ namespace mongo {
         addCommon(ss, indent);
         *ss << "baseBounds = " << baseBounds.toString() << '\n';
         addIndent(ss, indent + 1);
-        *ss << "nearQuery = " << nq.toString() << '\n';
+        *ss << "nearQuery = " << nq->toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();

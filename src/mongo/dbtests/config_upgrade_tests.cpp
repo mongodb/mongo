@@ -41,19 +41,26 @@
 
 namespace mongo {
 
+    using std::string;
+
     /**
      * Specialization of the config server fixture with helpers for the tests below.
      */
     class ConfigUpgradeFixture: public ConfigServerFixture {
     public:
 
+        ConfigUpgradeFixture() : ConfigServerFixture() {
+
+        }
+
         void stopBalancer() {
             // Note: The balancer key is needed in the update portion, for some reason related to 
             // DBDirectClient
-            client().update(SettingsType::ConfigNS, 
-                            BSON(SettingsType::key("balancer")),
-                            BSON(SettingsType::key("balancer") << SettingsType::balancerStopped(true)),
-                            true, false);
+            DBDirectClient client(&_txn);
+            client.update(SettingsType::ConfigNS,
+                          BSON(SettingsType::key("balancer")),
+                          BSON(SettingsType::key("balancer") << SettingsType::balancerStopped(true)),
+                          true, false);
         }
 
         /**
@@ -63,22 +70,25 @@ namespace mongo {
 
             if (version == 0) return;
 
+            DBDirectClient client(&_txn);
+
             if (version == 1) {
                 ShardType shard;
                 shard.setName("test");
                 shard.setHost("$dummy:10000");
-                client().insert(ShardType::ConfigNS, shard.toBSON());
+                client.insert(ShardType::ConfigNS, shard.toBSON());
                 return;
             }
 
-            client().insert(VersionType::ConfigNS, BSON("_id" << 1 << "version" << version));
+            client.insert(VersionType::ConfigNS, BSON("_id" << 1 << "version" << version));
         }
 
         /**
          * Stores a newer { version, minVersion, currentVersion, clusterId } config server entry
          */
         void storeConfigVersion(const VersionType& versionInfo) {
-            client().insert(VersionType::ConfigNS, versionInfo.toBSON());
+            DBDirectClient client(&_txn);
+            client.insert(VersionType::ConfigNS, versionInfo.toBSON());
         }
 
         /**
@@ -88,7 +98,7 @@ namespace mongo {
          */
         OID storeConfigVersion(int configVersion) {
 
-            if (configVersion < UpgradeHistory_MandatoryEpochVersion) {
+            if (configVersion < CURRENT_CONFIG_VERSION) {
                 storeLegacyConfigVersion(configVersion);
                 return OID();
             }
@@ -109,13 +119,14 @@ namespace mongo {
          * Stores sample shard and ping information at the current version.
          */
         void storeShardsAndPings(int numShards, int numPings) {
+            DBDirectClient client(&_txn);
 
             for (int i = 0; i < numShards; i++) {
                 ShardType shard;
                 shard.setName(OID::gen().toString());
                 shard.setHost((string) (str::stream() << "$dummyShard:" << (i + 1) << "0000"));
 
-                client().insert(ShardType::ConfigNS, shard.toBSON());
+                client.insert(ShardType::ConfigNS, shard.toBSON());
             }
 
             for (int i = 0; i < numPings; i++) {
@@ -130,7 +141,7 @@ namespace mongo {
                     ping.setPing(ping.getPing() - 10 * 60 * 1000);
                 }
 
-                client().insert(MongosType::ConfigNS, ping.toBSON());
+                client.insert(MongosType::ConfigNS, ping.toBSON());
             }
         }
     };
@@ -161,28 +172,6 @@ namespace mongo {
         ASSERT_EQUALS(oldVersion.getCurrentVersion(), 0);
     }
 
-    TEST_F(ConfigUpgradeTests, LegacyVersion) {
-
-        //
-        // Tests detection of legacy config versions
-        //
-
-        for (int i = 1; i <= 3; i++) {
-
-            clearVersion();
-            clearShards(); // B/C version 1 is weird, needs other collections
-            storeLegacyConfigVersion(i);
-
-            // Legacy versions 2->3
-            VersionType oldVersion;
-            Status status = getConfigVersion(configSvr(), &oldVersion);
-            ASSERT(status.isOK());
-
-            ASSERT_EQUALS(oldVersion.getMinCompatibleVersion(), i);
-            ASSERT_EQUALS(oldVersion.getCurrentVersion(), i);
-        }
-    }
-
     TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
 
         //
@@ -190,8 +179,8 @@ namespace mongo {
         //
 
         VersionType newVersion;
-        newVersion.setMinCompatibleVersion(UpgradeHistory_NoEpochVersion);
-        newVersion.setCurrentVersion(UpgradeHistory_MandatoryEpochVersion);
+        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
         storeConfigVersion(newVersion);
 
         newVersion.clear();
@@ -204,8 +193,8 @@ namespace mongo {
 
         OID clusterId = OID::gen();
         newVersion.setClusterId(clusterId);
-        newVersion.setMinCompatibleVersion(UpgradeHistory_NoEpochVersion);
-        newVersion.setCurrentVersion(UpgradeHistory_MandatoryEpochVersion);
+        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
 
         clearVersion();
         storeConfigVersion(newVersion);
@@ -216,8 +205,8 @@ namespace mongo {
         status = getConfigVersion(configSvr(), &newVersion);
         ASSERT(status.isOK());
 
-        ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), UpgradeHistory_NoEpochVersion);
-        ASSERT_EQUALS(newVersion.getCurrentVersion(), UpgradeHistory_MandatoryEpochVersion);
+        ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
+        ASSERT_EQUALS(newVersion.getCurrentVersion(), CURRENT_CONFIG_VERSION);
         ASSERT_EQUALS(newVersion.getClusterId(), clusterId);
     }
 

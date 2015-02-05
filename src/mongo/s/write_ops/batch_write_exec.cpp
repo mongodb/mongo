@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/write_ops/batch_write_exec.h"
@@ -41,7 +43,10 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using std::endl;
+    using std::make_pair;
+    using std::stringstream;
+    using std::vector;
 
     BatchWriteExec::BatchWriteExec( NSTargeter* targeter,
                                     ShardResolver* resolver,

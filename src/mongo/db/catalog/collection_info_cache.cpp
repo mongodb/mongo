@@ -28,12 +28,14 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection_info_cache.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
@@ -44,26 +46,34 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kStorage);
-
     CollectionInfoCache::CollectionInfoCache( Collection* collection )
         : _collection( collection ),
           _keysComputed( false ),
           _planCache(new PlanCache(collection->ns().ns())),
           _querySettings(new QuerySettings()) { }
 
-    void CollectionInfoCache::reset() {
+    void CollectionInfoCache::reset( OperationContext* txn ) {
         LOG(1) << _collection->ns().ns() << ": clearing plan cache - collection info cache reset";
         clearQueryCache();
         _keysComputed = false;
+        computeIndexKeys( txn );
         // query settings is not affected by info cache reset.
         // index filters should persist throughout life of collection
     }
 
-    void CollectionInfoCache::computeIndexKeys() {
+    const UpdateIndexData& CollectionInfoCache::indexKeys( OperationContext* txn ) const {
+        // This requires "some" lock, and MODE_IS is an expression for that, for now.
+        dassert(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
+        invariant(_keysComputed);
+        return _indexedPaths;
+    }
+
+    void CollectionInfoCache::computeIndexKeys( OperationContext* txn ) {
+        // This function modified objects attached to the Collection so we need a write lock
+        invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
         _indexedPaths.clear();
 
-        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(true);
+        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(txn, true);
         while (i.more()) {
             IndexDescriptor* descriptor = i.next();
 

@@ -3,6 +3,15 @@
 Import("env")
 
 env.Library(
+        target='index_descriptor',
+        source=[
+            'index_descriptor.cpp',
+        ],
+        LIBDEPS=[
+        ],
+)
+
+env.Library(
         target='key_generator',
         source=[
             'btree_key_generator.cpp',

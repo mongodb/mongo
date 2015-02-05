@@ -29,14 +29,16 @@
 
 #pragma once
 
-#include <iostream>
 #include <typeinfo>
 #include <string>
 
 #include "mongo/base/status.h" // NOTE: This is safe as utils depend on base
-#include "mongo/bson/inline_decls.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/logger/log_severity.h"
+#include "mongo/logger/logger.h"
+#include "mongo/logger/logstream_builder.h"
+#include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
 
@@ -102,7 +104,6 @@ namespace mongo {
     class DBException;
     MONGO_CLIENT_API std::string causedBy( const DBException& e );
     MONGO_CLIENT_API std::string causedBy( const std::string& e );
-    MONGO_CLIENT_API bool inShutdown();
 
     /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
     class MONGO_CLIENT_API DBException : public std::exception {
@@ -174,12 +175,15 @@ namespace mongo {
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char *msg, const char *file, unsigned line);
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantFailed(const char *msg, const char *file, unsigned line);
-    MONGO_CLIENT_API void wasserted(const char *msg, const char *file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char* expr, const char* file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantFailed(const char* expr, const char* file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr, const Status& status, const char *file, unsigned line);
+    MONGO_CLIENT_API void wasserted(const char* expr, const char* file, unsigned line);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedNoTrace( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedWithStatus(
+            int msgid, const Status& status);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTrace(
             int msgid, const Status& status);
 
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
@@ -192,6 +196,7 @@ namespace mongo {
         std::string.  a stack trace is logged.
     */
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char *msg);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const std::string &msg);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char *msg);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string &msg);
 
@@ -214,9 +219,19 @@ namespace mongo {
         }
     }
 
+    MONGO_CLIENT_API inline void fassertNoTrace(int msgid, const Status& status) {
+        if (MONGO_unlikely(!status.isOK())) {
+            fassertFailedWithStatusNoTrace(msgid, status);
+        }
+    }
+
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-#define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (::mongo::uasserted(msgid, msg), 0) )
+#define MONGO_uassert(msgid, msg, expr) do {                            \
+        if (MONGO_unlikely(!(expr))) {                                      \
+            ::mongo::uasserted(msgid, msg);                             \
+        }                                                               \
+    } while (false)
 
     MONGO_CLIENT_API inline void uassertStatusOK(const Status& status) {
         if (MONGO_unlikely(!status.isOK())) {
@@ -226,14 +241,22 @@ namespace mongo {
     }
 
     /* warning only - keeps going */
-#define MONGO_wassert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_wassert(_Expression) do {                                 \
+        if (MONGO_unlikely(!(_Expression))) {                               \
+            ::mongo::wasserted(#_Expression, __FILE__, __LINE__);       \
+        }                                                               \
+    } while (false)
 
     /* display a message, no context, and throw assertionexception
 
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-#define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (::mongo::msgasserted(msgid, msg), 0) )
+#define MONGO_massert(msgid, msg, expr) do {    \
+        if (MONGO_unlikely(!(expr))) {              \
+            ::mongo::msgasserted(msgid, msg);   \
+        }                                       \
+    } while (false)
 
     MONGO_CLIENT_API inline void massertStatusOK(const Status& status) {
         if (MONGO_unlikely(!status.isOK())) {
@@ -242,25 +265,47 @@ namespace mongo {
         }
     }
 
+    MONGO_CLIENT_API inline void massertNoTraceStatusOK(const Status& status) {
+        if (MONGO_unlikely(!status.isOK())) {
+            msgassertedNoTrace((status.location() != 0 ? status.location() : status.code()),
+                        status.reason());
+        }
+    }
 
     /* same as massert except no msgid */
-#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::verifyFailed(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_verify(_Expression) do {                                  \
+        if (MONGO_unlikely(!(_Expression))) {                           \
+            ::mongo::verifyFailed(#_Expression, __FILE__, __LINE__);    \
+        }                                                               \
+    } while (false)
 
-#define MONGO_invariant(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::invariantFailed(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_invariant(_Expression) do {                               \
+        if (MONGO_unlikely(!(_Expression))) {                           \
+            ::mongo::invariantFailed(#_Expression, __FILE__, __LINE__); \
+        }                                                               \
+    } while (false)
+
+#define MONGO_invariantOK(expression) do {                                                    \
+    const ::mongo::Status _invariantOK_status = expression;                                   \
+        if (MONGO_unlikely(!_invariantOK_status.isOK())) {                                    \
+            ::mongo::invariantOKFailed(#expression, _invariantOK_status, __FILE__, __LINE__); \
+        }                                                                                     \
+    } while (false)
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
     */
 #if defined(_DEBUG)
-# define MONGO_dassert(x) fassert(16199, (x))
+# define MONGO_dassert(x) invariant(x)
 #else
 # define MONGO_dassert(x)
 #endif
 
 #ifdef MONGO_EXPOSE_MACROS
 # define dassert MONGO_dassert
-# define verify MONGO_verify
+# define verify(expression) MONGO_verify(expression)
 # define invariant MONGO_invariant
+# define invariantOK MONGO_invariantOK
 # define uassert MONGO_uassert
 # define wassert MONGO_wassert
 # define massert MONGO_massert
@@ -272,13 +317,6 @@ namespace mongo {
     // < 10000 UserException
 
     enum { ASSERT_ID_DUPKEY = 11000 };
-
-    /* throws a uassertion with an appropriate msg */
-    MONGO_COMPILER_NORETURN void streamNotGood( int code, const std::string& msg, std::ios& myios );
-
-    inline void assertStreamGood(unsigned msgid, const std::string& msg, std::ios& myios) {
-        if( !myios.good() ) streamNotGood(msgid, msg, myios);
-    }
 
     std::string demangleName( const std::type_info& typeinfo );
 
@@ -311,10 +349,16 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        ::mongo::log() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
-              << ")" << std::endl; \
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), \
+                                          ::mongo::getThreadName(), \
+                                          ::mongo::logger::LogSeverity::Log()) \
+            << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ \
+            << ")" << std::endl; \
     } catch ( ... ) { \
-        ::mongo::log() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
-              << std::endl; \
+        ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), \
+                                          ::mongo::getThreadName(), \
+                                          ::mongo::logger::LogSeverity::Log()) \
+            << "caught unknown exception in destructor (" << __FUNCTION__ << ")" \
+            << std::endl; \
     }
 

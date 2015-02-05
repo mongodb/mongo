@@ -8,6 +8,7 @@ Import("env")
 
 env.Library('base', ['mongo_version_range.cpp',
                      'range_arithmetic.cpp',
+                     'type_actionlog.cpp',
                      'type_changelog.cpp',
                      'type_chunk.cpp',
                      'type_collection.cpp',
@@ -88,8 +89,8 @@ env.CppUnitTest('type_tags_test', 'type_tags_test.cpp',
 env.Library('upgrade', ['cluster_client_internal.cpp',
                         'config_upgrade.cpp',
                         'config_upgrade_helpers.cpp',
-                        'config_upgrade_v0_to_v5.cpp',
-                        'config_upgrade_v4_to_v5.cpp'],
+                        'config_upgrade_v0_to_v6.cpp',
+                        'config_upgrade_v5_to_v6.cpp'],
             LIBDEPS=['base',
                      '$BUILD_DIR/mongo/mongocommon'])
 
@@ -223,6 +224,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/clientdriver',
         'batch_write_types',
         '$BUILD_DIR/mongo/synchronization'
     ],
@@ -343,11 +345,11 @@ env.Library(
     target='cluster_ops_impl',
     source=[
         'chunk_manager_targeter.cpp',
+        'cluster_explain.cpp',
         'cluster_write.cpp',
         'dbclient_multi_command.cpp',
         'dbclient_shard_resolver.cpp',
         'scc_fast_query_handler.cpp',
-        'write_ops/dbclient_safe_writer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',

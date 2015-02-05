@@ -34,7 +34,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -55,9 +55,10 @@ namespace mongo {
 
         ~IndexCatalogEntry();
 
-        const string& ns() const { return _ns; }
+        const std::string& ns() const { return _ns; }
 
-        void init( IndexAccessMethod* accessMethod );
+        void init( OperationContext* txn,
+                   IndexAccessMethod* accessMethod );
 
         IndexDescriptor* descriptor() { return _descriptor; }
         const IndexDescriptor* descriptor() const { return _descriptor; }
@@ -69,9 +70,9 @@ namespace mongo {
 
         /// ---------------------
 
-        const DiskLoc& head() const;
+        const RecordId& head( OperationContext* txn ) const;
 
-        void setHead( OperationContext* txn, DiskLoc newHead );
+        void setHead( OperationContext* txn, RecordId newHead );
 
         void setIsReady( bool newIsReady );
 
@@ -84,17 +85,20 @@ namespace mongo {
         void setMultikey( OperationContext* txn );
 
         // if this ready is ready for queries
-        bool isReady() const;
+        bool isReady( OperationContext* txn ) const;
 
     private:
 
-        bool _catalogIsReady() const;
-        DiskLoc _catalogHead() const;
-        bool _catalogIsMultikey() const;
+        class SetMultikeyChange;
+        class SetHeadChange;
+
+        bool _catalogIsReady( OperationContext* txn ) const;
+        RecordId _catalogHead( OperationContext* txn ) const;
+        bool _catalogIsMultikey( OperationContext* txn ) const;
 
         // -----
 
-        string _ns;
+        std::string _ns;
 
         CollectionCatalogEntry* _collection; // not owned here
 
@@ -111,7 +115,7 @@ namespace mongo {
 
         Ordering _ordering; // TODO: this might be b-tree specific
         bool _isReady; // cache of NamespaceDetails info
-        DiskLoc _head; // cache of IndexDetails
+        RecordId _head; // cache of IndexDetails
         bool _isMultikey; // cache of NamespaceDetails info
     };
 
@@ -138,7 +142,16 @@ namespace mongo {
         unsigned size() const { return _entries.size(); }
         // -----------------
 
-        bool remove( const IndexDescriptor* desc );
+        /**
+         * Removes from _entries and returns the matching entry or NULL if none matches.
+         */
+        IndexCatalogEntry* release( const IndexDescriptor* desc );
+
+        bool remove( const IndexDescriptor* desc ) {
+            IndexCatalogEntry* entry = release(desc);
+            delete entry;
+            return entry;
+        }
 
         // pass ownership to EntryContainer
         void add( IndexCatalogEntry* entry ) { _entries.mutableVector().push_back( entry ); }

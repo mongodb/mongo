@@ -28,13 +28,19 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ExpressionTests {
+
+    using boost::intrusive_ptr;
+    using std::numeric_limits;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     /** Convert BSONObj to a BSONObj with our $const wrappings. */
     static BSONObj constify(const BSONObj& obj, bool parentIsArray=false) {
@@ -3740,6 +3746,8 @@ namespace ExpressionTests {
             add<AllAnyElements::FalseViaInt>();
             add<AllAnyElements::Null>();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace ExpressionTests

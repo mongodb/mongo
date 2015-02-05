@@ -31,8 +31,8 @@
 #pragma once
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/storage/capped_callback.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
@@ -60,20 +60,13 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        virtual void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
+        virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start, bool tailable,
+                                             const RecordId& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
-
-        virtual bool compactSupported() const { return false; }
-
-        virtual Status compact( OperationContext* txn,
-                                RecordStoreCompactAdaptor* adaptor,
-                                const CompactOptions* options,
-                                CompactStats* stats );
 
         // Start from firstExtent by default.
         DiskLoc firstRecord( OperationContext* txn,
@@ -85,6 +78,7 @@ namespace mongo {
     protected:
 
         virtual bool isCapped() const { return true; }
+        virtual bool shouldPadInserts() const { return false; }
 
         virtual void setCappedDeleteCallback( CappedDocumentDeleteCallback* cb ) {
             _deleteCallback = cb;
@@ -98,14 +92,14 @@ namespace mongo {
 
     private:
         // -- start copy from cap.cpp --
-        void compact(OperationContext* txn);
-        const DiskLoc& cappedFirstDeletedInCurExtent() const;
+        void _compact(OperationContext* txn);
+        DiskLoc cappedFirstDeletedInCurExtent() const;
         void setFirstDeletedInCurExtent( OperationContext* txn, const DiskLoc& loc );
         void cappedCheckMigrate(OperationContext* txn);
         DiskLoc __capAlloc( OperationContext* txn, int len );
         bool inCapExtent( const DiskLoc &dl ) const;
-        const DiskLoc& cappedListOfAllDeletedRecords() const;
-        const DiskLoc& cappedLastDelRecLastExtent() const;
+        DiskLoc cappedListOfAllDeletedRecords() const;
+        DiskLoc cappedLastDelRecLastExtent() const;
         void setListOfAllDeletedRecords( OperationContext* txn, const DiskLoc& loc );
         void setLastDelRecLastExtent( OperationContext* txn, const DiskLoc& loc );
         Extent *theCapExtent() const;

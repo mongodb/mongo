@@ -29,12 +29,14 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include <iostream>
 
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/update.h"
@@ -43,14 +45,21 @@
 
 namespace UpdateTests {
 
+    using std::auto_ptr;
+    using std::numeric_limits;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     class ClientBase {
     public:
-        // NOTE: Not bothering to backup the old error record.
         ClientBase() : _client(&_txn) {
+            _prevError = mongo::lastError._get( false );
+            mongo::lastError.release();
             mongo::lastError.reset( new LastError() );
         }
-        ~ClientBase() {
-            mongo::lastError.release();
+        virtual ~ClientBase() {
+            mongo::lastError.reset( _prevError );
         }
 
     protected:
@@ -66,6 +75,9 @@ namespace UpdateTests {
 
         OperationContextImpl _txn;
         DBDirectClient _client;
+
+    private:
+        LastError* _prevError;
     };
 
     class Fail : public ClientBase {
@@ -1628,7 +1640,7 @@ namespace UpdateTests {
     class IndexParentOfMod : public SetBase {
     public:
         void run() {
-            _client.ensureIndex( ns(), BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns(), BSON( "a" << 1 ) ));
             _client.insert( ns(), fromjson( "{'_id':0}" ) );
             _client.update( ns(), Query(), fromjson( "{$set:{'a.b':4}}" ) );
             ASSERT_EQUALS( fromjson( "{'_id':0,a:{b:4}}" ) , _client.findOne( ns(), Query() ) );
@@ -2026,7 +2038,9 @@ namespace UpdateTests {
             add< basic::unset >();
             add< basic::setswitchint >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace UpdateTests
 

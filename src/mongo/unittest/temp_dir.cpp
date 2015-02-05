@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/unittest/temp_dir.h"
@@ -41,6 +43,9 @@
 
 
 namespace mongo {
+
+    using std::string;
+
 namespace unittest {
     namespace str = mongoutils::str;
     namespace moe = mongo::optionenvironment;

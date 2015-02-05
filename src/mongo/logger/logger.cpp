@@ -29,8 +29,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/inline_decls.h"  // For MONGO_unlikely, which should really be in
-                                      // mongo/platform/compiler.h
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 namespace logger {

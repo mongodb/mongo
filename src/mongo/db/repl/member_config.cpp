@@ -35,6 +35,7 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
@@ -48,6 +49,9 @@ namespace repl {
     const std::string MemberConfig::kArbiterOnlyFieldName = "arbiterOnly";
     const std::string MemberConfig::kBuildIndexesFieldName = "buildIndexes";
     const std::string MemberConfig::kTagsFieldName = "tags";
+    const std::string MemberConfig::kInternalVoterTagName = "$voter";
+    const std::string MemberConfig::kInternalElectableTagName = "$electable";
+    const std::string MemberConfig::kInternalAllTagName = "$all";
 
 namespace {
     const std::string kLegalMemberConfigFieldNames[] = {
@@ -113,23 +117,17 @@ namespace {
         // Parse votes field.
         //
         BSONElement votesElement = mcfg[kVotesFieldName];
-        int votes;
         if (votesElement.eoo()) {
-            votes = kVotesFieldDefault;
+            _votes = kVotesFieldDefault;
         }
         else if (votesElement.isNumber()) {
-            votes = votesElement.numberInt();
+            _votes = votesElement.numberInt();
         }
         else {
             return Status(ErrorCodes::TypeMismatch, str::stream() << kVotesFieldName <<
                           " field value has non-numeric type " <<
                           typeName(votesElement.type()));
         }
-        if (votes != 0 && votes != 1) {
-            return Status(ErrorCodes::BadValue, str::stream() << kVotesFieldName <<
-                          " field value is " << votesElement.numberInt() << " but must be 0 or 1");
-        }
-        _isVoter = bool(votes);
 
         //
         // Parse priority field.
@@ -214,6 +212,26 @@ namespace {
             return status;
         }
 
+        //
+        // Add internal tags based on other member properties.
+        //
+        
+        // Add a voter tag if this non-arbiter member votes; use _id for uniquity.
+        const std::string id = str::stream() << _id;
+        if (isVoter() && !_arbiterOnly) {
+            _tags.push_back(tagConfig->makeTag(kInternalVoterTagName, id));
+        }
+
+        // Add an electable tag if this member is electable.
+        if (isElectable()) {
+            _tags.push_back(tagConfig->makeTag(kInternalElectableTagName, id));
+        }
+
+        // Add a tag for generic counting of this node.
+        if (!_arbiterOnly) {
+            _tags.push_back(tagConfig->makeTag(kInternalAllTagName, id));
+        }
+
         return Status::OK();
     }
 
@@ -227,11 +245,15 @@ namespace {
             return Status(ErrorCodes::BadValue, str::stream() << kPriorityFieldName <<
                           " field value of " << _priority << " is out of range");
         }
+        if (_votes != 0 && _votes != 1) {
+            return Status(ErrorCodes::BadValue, str::stream() << kVotesFieldName <<
+                          " field value is " << _votes << " but must be 0 or 1");
+        }
         if (_arbiterOnly) {
             if (!_tags.empty()) {
                 return Status(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
             }
-            if (!_isVoter) {
+            if (!isVoter()) {
                 return Status(ErrorCodes::BadValue, "Arbiter must vote (cannot have 0 votes)");
             }
         }
@@ -252,6 +274,20 @@ namespace {
         return Status::OK();
     }
 
+    bool MemberConfig::hasTags(const ReplicaSetTagConfig& tagConfig) const {
+        for (std::vector<ReplicaSetTag>::const_iterator tag = _tags.begin();
+                tag != _tags.end();
+                tag++) {
+            std::string tagKey = tagConfig.getTagKey(*tag);
+            if (tagKey[0] == '$') {
+                // Filter out internal tags
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
     BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
         BSONObjBuilder configBuilder;
         configBuilder.append("_id", _id);
@@ -265,7 +301,12 @@ namespace {
         for (std::vector<ReplicaSetTag>::const_iterator tag = _tags.begin();
                 tag != _tags.end();
                 tag++) {
-            tags.append(tagConfig.getTagKey(*tag), tagConfig.getTagValue(*tag));
+            std::string tagKey = tagConfig.getTagKey(*tag);
+            if (tagKey[0] == '$') {
+                // Filter out internal tags
+                continue;
+            }
+            tags.append(tagKey, tagConfig.getTagValue(*tag));
         }
         tags.done();
 

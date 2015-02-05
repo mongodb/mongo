@@ -26,13 +26,14 @@
  * then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/intrusive_counter.h"
 
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+    using boost::intrusive_ptr;
     using namespace mongoutils;
 
     intrusive_ptr<const RCString> RCString::create(StringData s) {

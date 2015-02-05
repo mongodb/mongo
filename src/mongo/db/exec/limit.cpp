@@ -27,10 +27,15 @@
  */
 
 #include "mongo/db/exec/limit.h"
+
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::vector;
 
     // static
     const char* LimitStage::kStageType = "LIMIT";
@@ -75,12 +80,15 @@ namespace mongo {
             }
             return status;
         }
-        else {
-            if (PlanStage::NEED_TIME == status) {
-                ++_commonStats.needTime;
-            }
-            return status;
+        else if (PlanStage::NEED_TIME == status) {
+            ++_commonStats.needTime;
         }
+        else if (PlanStage::NEED_FETCH == status) {
+            ++_commonStats.needFetch;
+            *out = id;
+        }
+
+        return status;
     }
 
     void LimitStage::saveState() {
@@ -93,9 +101,9 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void LimitStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void LimitStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> LimitStage::getChildren() const {

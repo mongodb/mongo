@@ -26,11 +26,15 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using std::vector;
+
     const char DocumentSourceOut::outName[] = "$out";
 
     DocumentSourceOut::~DocumentSourceOut() {
@@ -80,9 +84,9 @@ namespace mongo {
         }
 
         // copy indexes on _outputNs to _tempNs
-        scoped_ptr<DBClientCursor> indexes(conn->getIndexes(_outputNs));
-        while (indexes->more()) {
-            MutableDocument index(Document(indexes->nextSafe()));
+        const std::list<BSONObj> indexes = conn->getIndexSpecs(_outputNs);
+        for (std::list<BSONObj>::const_iterator it = indexes.begin(); it != indexes.end(); ++it) {
+            MutableDocument index((Document(*it)));
             index.remove("_id"); // indexes shouldn't have _ids but some existing ones do
             index["ns"] = Value(_tempNs.ns());
 

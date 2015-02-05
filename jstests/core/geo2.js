@@ -2,12 +2,17 @@
 t = db.geo2
 t.drop();
 
-n = 1
+n = 1;
+arr = [];
 for ( var x=-100; x<100; x+=2 ){
     for ( var y=-100; y<100; y+=2 ){
-        t.insert( { _id : n++ , loc : [ x , y ] } )
+        arr.push( { _id : n++ , loc : [ x , y ] } );
     }
 }
+t.insert( arr );
+assert.eq( t.count(), 100 * 100 );
+assert.eq( t.count(), n - 1 );
+
 
 t.ensureIndex( { loc : "2d" } )
 
@@ -36,5 +41,5 @@ assert.gt( 3 , a( t.find( { loc : { $near : [ 50 , 50 , 3 ] } } ).limit(50) ) , 
 assert.gt( 3 , a( t.find( { loc : { $near : [ 50 , 50 ] , $maxDistance : 3 } } ).limit(50) ) , "C3" )
 
 // SERVER-8974 - test if $geoNear operator works with 2d index as well
-var geoNear_cursor = t.find( { loc : { $geoNear : [50, 50] } } ); 
-assert.eq( geoNear_cursor.count(), 100 )
+var geoNear_cursor = t.find( { loc : { $geoNear : [50, 50] } } ).limit(100);
+assert.eq( geoNear_cursor.count(true), 100 )

@@ -1,5 +1,3 @@
-if (0) {// SERVER-14143
-
 var coll = db.jstests_drop2;
 coll.drop();
 
@@ -52,4 +50,3 @@ shell1();
 shell2();
 
 coll.drop(); // in SERVER-1818, this fails
-}

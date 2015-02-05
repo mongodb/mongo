@@ -31,12 +31,12 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -79,6 +79,24 @@ namespace mongo {
      */
     class DistinctScan : public PlanStage {
     public:
+        /**
+         * Keeps track of what this distinct scan is currently doing so that it
+         * can do the right thing on the next call to work().
+         */
+        enum ScanState {
+            // Need to initialize the underlying index traversal machinery.
+            INITIALIZING,
+
+            // Skipping keys in order to check whether we have reached the end.
+            CHECKING_END,
+
+            // Retrieving the next key, and applying the filter if necessary.
+            GETTING_NEXT,
+
+            // The index scan is finished.
+            HIT_END
+        };
+
         DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet);
         virtual ~DistinctScan() { }
 
@@ -86,7 +104,7 @@ namespace mongo {
         virtual bool isEOF();
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -122,12 +140,12 @@ namespace mongo {
         // The cursor we use to navigate the tree.
         boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
 
-        // Have we hit the end of the index scan?
-        bool _hitEnd;
+        // Keeps track of what work we need to do next.
+        ScanState _scanState;
 
         // For yielding.
         BSONObj _savedKey;
-        DiskLoc _savedLoc;
+        RecordId _savedLoc;
 
         DistinctParams _params;
 

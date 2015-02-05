@@ -60,10 +60,10 @@ DB.prototype.runCommand = function( obj, extra ){
 
 DB.prototype._dbCommand = DB.prototype.runCommand;
 
-DB.prototype.adminCommand = function( obj ){
+DB.prototype.adminCommand = function( obj, extra ){
     if ( this._name == "admin" )
-        return this.runCommand( obj );
-    return this.getSiblingDB( "admin" ).runCommand( obj );
+        return this.runCommand( obj, extra );
+    return this.getSiblingDB( "admin" ).runCommand( obj, extra );
 }
 
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
@@ -86,6 +86,20 @@ DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
     </li>
     <li> max: maximum number of objects if capped (optional).</li>
     <li> usePowerOf2Sizes: if true, set usePowerOf2Sizes allocation for the collection.</li>
+    <li>
+        storageEngine: BSON document containing storage engine specific options. Format:
+                       {
+                           storageEngine: {
+                               storageEngine1: {
+                                   ...
+                               },
+                               storageEngine2: {
+                                   ...
+                               },
+                               ...
+                           }
+                       }
+    </li>
     </ul>
 
     <p>Example:</p>
@@ -97,19 +111,41 @@ DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 */
 DB.prototype.createCollection = function(name, opt) {
     var options = opt || {};
+
+    // We have special handling for the 'flags' field, and provide sugar for specific flags. If the
+    // user specifies any flags we send the field in the command. Otherwise, we leave it blank and
+    // use the server's defaults.
+    var sendFlags = false;
+    var flags = 0;
+    if (options.usePowerOf2Sizes != undefined) {
+        print("WARNING: The 'usePowerOf2Sizes' flag is ignored in 3.0 and higher as all MMAPv1 "
+            + "collections use fixed allocation sizes unless the 'noPadding' flag is specified");
+
+        sendFlags = true;
+        if (options.usePowerOf2Sizes) {
+            flags |= 1; // Flag_UsePowerOf2Sizes
+        }
+        delete options.usePowerOf2Sizes;
+    }
+    if (options.noPadding != undefined) {
+        sendFlags = true;
+        if (options.noPadding) {
+            flags |= 2; // Flag_NoPadding
+        }
+        delete options.noPadding;
+    }
+
+    // New flags must be added above here.
+    if (sendFlags) {
+        if (options.flags != undefined)
+            throw Error("Can't set 'flags' with either 'usePowerOf2Sizes' or 'noPadding'");
+        options.flags = flags;
+    }
+
     var cmd = { create: name };
-    if (options.max != undefined)
-        cmd.max = options.max;
-    if (options.autoIndexId != undefined)
-        cmd.autoIndexId = options.autoIndexId;
-    if (options.capped != undefined)
-        cmd.capped = options.capped;
-    if (options.size != undefined)
-        cmd.size = options.size;
-    if (options.usePowerOf2Sizes != undefined) 
-        cmd.flags = options.usePowerOf2Sizes ? 1 : 0;
-    var res = this._dbCommand(cmd);
-    return res;
+    Object.extend(cmd, options);
+
+    return this._dbCommand(cmd);
 }
 
 /**
@@ -245,16 +281,31 @@ DB.prototype.cloneCollection = function(from, collection, query) {
   * @return Object returned has member ok set to true if operation succeeds, false otherwise.
   * See also: db.clone()
 */
-DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password) { 
+DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password, mechanism) {
     assert( isString(fromdb) && fromdb.length );
     assert( isString(todb) && todb.length );
     fromhost = fromhost || "";
-    if ( username && password ) {
-        var n = this._adminCommand( { copydbgetnonce : 1, fromhost:fromhost } );
-        return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb, username:username, nonce:n.nonce, key:this.__pwHash( n.nonce, username, password ) } );
-    } else {
+
+    if (!mechanism) {
+        mechanism = this._getDefaultAuthenticationMechanism();
+    }
+    assert(mechanism == "SCRAM-SHA-1" || mechanism == "MONGODB-CR");
+
+    // Check for no auth or copying from localhost
+    if (!username || !password || fromhost == "") {
         return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
     }
+
+    // Use the copyDatabase native helper for SCRAM-SHA-1
+    if (mechanism == "SCRAM-SHA-1") {
+        return this.getMongo().copyDatabaseWithSCRAM(fromdb, todb, fromhost, username, password);
+    }
+
+    // Fall back to MONGODB-CR
+    var n = this._adminCommand({ copydbgetnonce : 1, fromhost:fromhost});
+    return this._adminCommand({ copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb,
+                                username:username, nonce:n.nonce,
+                                key:this.__pwHash(n.nonce, username, password) });
 }
 
 /**
@@ -282,9 +333,11 @@ DB.prototype.help = function() {
     print("\tdb.fsyncLock() flush data to disk and lock server for backups");
     print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
+    print("\tdb.getCollectionInfos()");
     print("\tdb.getCollectionNames()");
     print("\tdb.getLastError() - just returns the err msg string");
     print("\tdb.getLastErrorObj() - return full status object");
+    print("\tdb.getLogComponents()");
     print("\tdb.getMongo() get the server connection object");
     print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
     print("\tdb.getName()");
@@ -309,6 +362,7 @@ DB.prototype.help = function() {
     print("\tdb.resetError()");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.serverStatus()");
+    print("\tdb.setLogLevel(level,<component>)");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
     print("\tdb.setWriteConcern( <write concern doc> ) - sets the write concern for writes to the db");
     print("\tdb.unsetWriteConcern( <write concern doc> ) - unsets the write concern for writes to the db");
@@ -552,26 +606,29 @@ DB.prototype.getPrevError = function(){
     return this.runCommand( { getpreverror : 1 } );
 }
 
-DB.prototype._getCollectionNamesSystemNamespaces = function(){
+DB.prototype._getCollectionInfosSystemNamespaces = function(){
     var all = [];
 
     var nsLength = this._name.length + 1;
     
     var c = this.getCollection( "system.namespaces" ).find();
     while ( c.hasNext() ){
-        var name = c.next().name;
+        var infoObj = c.next();
         
-        if ( name.indexOf( "$" ) >= 0 && name.indexOf( ".oplog.$" ) < 0 )
+        if ( infoObj.name.indexOf( "$" ) >= 0 && infoObj.name.indexOf( ".oplog.$" ) < 0 )
             continue;
         
-        all.push( name.substring( nsLength ) );
+        infoObj.name = infoObj.name.substring( nsLength );
+
+        all.push( infoObj );
     }
     
-    return all.sort();
+    // Return list of objects sorted by collection name.
+    return all.sort(function(coll1, coll2) { return coll1.name.localeCompare(coll2.name); });
 }
 
 
-DB.prototype._getCollectionNamesCommand = function() {
+DB.prototype._getCollectionInfosCommand = function() {
     var res = this.runCommand( "listCollections" );
     if ( res.code == 59 ) {
         // command doesn't exist, old mongod
@@ -586,21 +643,27 @@ DB.prototype._getCollectionNamesCommand = function() {
         throw Error( "listCollections failed: " + tojson( res ) );
     }
 
-    var all = [];
-    for ( var i = 0; i < res.collections.length; i++ ) {
-        var name = res.collections[i].name;
-        all.push( name );
-    }
-
-    return all;
+    // The listCollections command returns its results sorted by collection name.  There's no need
+    // to re-sort.
+    return new DBCommandCursor(this._mongo, res).toArray();
 }
 
-DB.prototype.getCollectionNames = function(){
-    var res = this._getCollectionNamesCommand();
+/**
+ * Returns this database's list of collection metadata objects, sorted by collection name.
+ */
+DB.prototype.getCollectionInfos = function() {
+    var res = this._getCollectionInfosCommand();
     if ( res ) {
         return res;
     }
-    return this._getCollectionNamesSystemNamespaces();
+    return this._getCollectionInfosSystemNamespaces();
+}
+
+/**
+ * Returns this database's list of collection names in sorted order.
+ */
+DB.prototype.getCollectionNames = function() {
+    return this.getCollectionInfos().map(function(infoObj) { return infoObj.name; });
 }
 
 DB.prototype.tojson = function(){
@@ -656,14 +719,15 @@ DB.tsToSeconds = function(x){
   *                          of date than that, it can't recover without a complete resync
 */
 DB.prototype.getReplicationInfo = function() { 
-    var db = this.getSiblingDB("local");
+    var localdb = this.getSiblingDB("local");
 
     var result = { };
     var oplog;
-    if (db.system.namespaces.findOne({name:"local.oplog.rs"}) != null) {
+    var localCollections = localdb.getCollectionNames();
+    if (localCollections.indexOf('oplog.rs') >= 0) {
         oplog = 'oplog.rs';
     }
-    else if (db.system.namespaces.findOne({name:"local.oplog.$main"}) != null) {
+    else if (localCollections.indexOf('oplog.$main') >= 0) {
         oplog = 'oplog.$main';
     }
     else {
@@ -671,16 +735,17 @@ DB.prototype.getReplicationInfo = function() {
         return result;
     }
 
-    var ol_entry = db.system.namespaces.findOne({name:"local."+oplog});
-    if( ol_entry && ol_entry.options ) {
-        result.logSizeMB = ol_entry.options.size / ( 1024 * 1024 );
+    var ol = localdb.getCollection(oplog);
+    var ol_stats = ol.stats();
+    if( ol_stats && ol_stats.maxSize ) {
+        result.logSizeMB = ol_stats.maxSize / ( 1024 * 1024 );
     } else {
-        result.errmsg  = "local."+oplog+", or its options, not found in system.namespaces collection";
+        result.errmsg  = "Could not get stats for local."+oplog+" collection. " +
+            "collstats returned: " + tojson(ol_stats);
         return result;
     }
-    ol = db.getCollection(oplog);
 
-    result.usedMB = ol.stats().size / ( 1024 * 1024 );
+    result.usedMB = ol_stats.size / ( 1024 * 1024 );
     result.usedMB = Math.ceil( result.usedMB * 100 ) / 100;
 
     var firstc = ol.find().sort({$natural:1}).limit(1);
@@ -732,27 +797,32 @@ DB.prototype.printReplicationInfo = function() {
 
 DB.prototype.printSlaveReplicationInfo = function() {
     var startOptimeDate = null;
+    var primary = null;
 
     function getReplLag(st) {
         assert( startOptimeDate , "how could this be null (getReplLag startOptimeDate)" );
         print("\tsyncedTo: " + st.toString() );
         var ago = (startOptimeDate-st)/1000;
         var hrs = Math.round(ago/36)/100;
-        print("\t" + Math.round(ago) + " secs (" + hrs + " hrs) behind the primary ");
+        var suffix = "";
+        if (primary) {
+            suffix = "primary ";
+        }
+        else {
+            suffix = "freshest member (no primary available at the moment)";
+        }
+        print("\t" + Math.round(ago) + " secs (" + hrs + " hrs) behind the " + suffix);
     };
 
     function getMaster(members) {
-        var found;
-        members.forEach(function(row) {
-            if (row.self) {
-                found = row;
-                return false;
+        for (i in members) {
+            var row = members[i];
+            if (row.state === 1) {
+                return row;
             }
-        });
-
-        if (found) {
-            return found;
         }
+
+        return null;
     };
 
     function g(x) {
@@ -786,8 +856,23 @@ DB.prototype.printSlaveReplicationInfo = function() {
 
     if (L.system.replset.count() != 0) {
         var status = this.adminCommand({'replSetGetStatus' : 1});
-        startOptimeDate = getMaster(status.members).optimeDate; 
-        status.members.forEach(r);
+        primary = getMaster(status.members);
+        if (primary) {
+            startOptimeDate = primary.optimeDate; 
+        }
+        // no primary, find the most recent op among all members
+        else {
+            startOptimeDate = new Date(0, 0);
+            for (i in status.members) {
+                if (status.members[i].optimeDate > startOptimeDate) {
+                    startOptimeDate = status.members[i].optimeDate;
+                }
+            }
+        }
+
+        for (i in status.members) {
+            r(status.members[i]);
+        }
     }
     else if( L.sources.count() != 0 ) {
         startOptimeDate = new Date();
@@ -803,12 +888,44 @@ DB.prototype.serverBuildInfo = function(){
     return this._adminCommand( "buildinfo" );
 }
 
+// Used to trim entries from the metrics.commands that have never been executed
+getActiveCommands = function(tree) {
+    var result = { };
+    for (var i in tree) {
+        if (!tree.hasOwnProperty(i))
+            continue;
+        if (tree[i].hasOwnProperty("total")) {
+            if (tree[i].total > 0) {
+                result[i] = tree[i];
+            }
+            continue;
+        }
+        if (i == "<UNKNOWN>") {
+            if(tree[i] > 0) {
+                result[i] = tree[i];
+            }
+            continue;
+        }
+        // Handles nested commands
+        var subStatus = getActiveCommands(tree[i]);
+        if (Object.keys(subStatus).length > 0) {
+            result[i] = tree[i];
+        }
+    }
+    return result;
+}
+
 DB.prototype.serverStatus = function( options ){
     var cmd = { serverStatus : 1 };
     if ( options ) {
         Object.extend( cmd, options );
     }
-    return this._adminCommand( cmd );
+    var res = this._adminCommand( cmd );
+    // Only prune if we have a metrics tree with commands.
+    if (res.metrics && res.metrics.commands) {
+            res.metrics.commands = getActiveCommands(res.metrics.commands);
+    }
+    return res;
 }
 
 DB.prototype.hostInfo = function(){
@@ -835,7 +952,7 @@ DB.prototype.listCommands = function(){
         var s = name + ": ";
 
         if (c.adminOnly) s += " adminOnly ";
-        if (c.adminOnly) s += " slaveOk ";
+        if (c.slaveOk) s += " slaveOk ";
 
         s += "\n  ";
         s += c.help.replace(/\n/g, '\n  ');
@@ -973,9 +1090,9 @@ DB.prototype._updateUserV1 = function(name, updateObject, writeConcern) {
         setObj["roles"] = updateObject.roles;
     }
 
-    db.system.users.update({user : name, userSource : null},
-                           {$set : setObj});
-    var err = db.getLastError(writeConcern['w'], writeConcern['wtimeout']);
+    this.system.users.update({user : name, userSource : null},
+                             {$set : setObj});
+    var err = this.getLastError(writeConcern['w'], writeConcern['wtimeout']);
     if (err) {
         throw Error("Updating user failed: " + err);
     }
@@ -1011,7 +1128,7 @@ DB.prototype.logout = function(){
 // For backwards compatibility
 DB.prototype.removeUser = function( username, writeConcern ) {
     print("WARNING: db.removeUser has been deprecated, please use db.dropUser instead");
-    return db.dropUser(username, writeConcern);
+    return this.dropUser(username, writeConcern);
 }
 
 DB.prototype.dropUser = function( username, writeConcern ){
@@ -1041,7 +1158,7 @@ DB.prototype.dropUser = function( username, writeConcern ){
 DB.prototype._removeUserV1 = function(username, writeConcern) {
     this.getCollection( "system.users" ).remove( { user : username } );
 
-    var le = db.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
+    var le = this.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
 
     if (le.err) {
         throw Error( "Couldn't remove user: " + le.err );
@@ -1069,7 +1186,21 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5(nonce + username + _hashPassword(username, pass));
 }
 
-DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+DB.prototype._defaultAuthenticationMechanism = null;
+
+DB.prototype._getDefaultAuthenticationMechanism = function() {
+    // Use the default auth mechanism if set on the command line.
+    if (this._defaultAuthenticationMechanism != null)
+        return this._defaultAuthenticationMechanism;
+
+    // Use MONGODB-CR for v2.6 and earlier.
+    maxWireVersion = this.isMaster().maxWireVersion;
+    if (maxWireVersion == undefined || maxWireVersion < 3) {
+        return "MONGODB-CR";
+    }
+    return "SCRAM-SHA-1";
+}
+
 DB.prototype._defaultGssapiServiceName = null;
 
 DB.prototype._authOrThrow = function () {
@@ -1088,7 +1219,7 @@ DB.prototype._authOrThrow = function () {
     }
 
     if (params.mechanism === undefined)
-        params.mechanism = this._defaultAuthenticationMechanism;
+        params.mechanism = this._getDefaultAuthenticationMechanism();
 
     if (params.db !== undefined) {
         throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");
@@ -1322,5 +1453,12 @@ DB.prototype.unsetWriteConcern = function() {
     delete this._writeConcern;
 };
 
+DB.prototype.getLogComponents = function() {
+    return this.getMongo().getLogComponents();
+}
+
+DB.prototype.setLogLevel = function(logLevel, component) {
+    return this.getMongo().setLogLevel(logLevel, component);
+}
 
 }());

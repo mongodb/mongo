@@ -26,16 +26,22 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace {
 
     using namespace mongo;
 
+    using std::auto_ptr;
+    using std::make_pair;
     /**
      * ChunkManager targeting test
      *
@@ -266,10 +272,9 @@ namespace {
     //    -> foo.a: [1, 1]
     // Or -> foo.a: [2, 2]
     TEST(CMCollapseTreeTest, BasicAllElemMatch) {
-        Interval expectedInterval1(BSON("" << 1 << "" << 1), true, true);
-        Interval expectedInterval2(BSON("" << 2 << "" << 2), true, true);
+        Interval expectedInterval(BSON("" << 1 << "" << 1), true, true);
 
-        const char* queryStr = "{foo: {$all: [ {$elemMatch: {a:1, b:1}}, {$elemMatch: {a:2, b:2}}]}}";
+        const char* queryStr = "{foo: {$all: [ {$elemMatch: {a:1, b:1}} ]}}";
         auto_ptr<CanonicalQuery> query(canonicalize(queryStr));
         ASSERT(query.get() != NULL);
 
@@ -283,8 +288,7 @@ namespace {
 
         // Choose one of the two possible solutions.
         // Two solutions differ only by assignment of index tags.
-        ASSERT(Interval::INTERVAL_EQUALS == interval.compare(expectedInterval1)
-            || Interval::INTERVAL_EQUALS == interval.compare(expectedInterval2));
+        ASSERT(Interval::INTERVAL_EQUALS == interval.compare(expectedInterval));
     }
 
     // {a : [1, 2, 3]} -> a: [1, 1], [[1, 2, 3], [1, 2, 3]]
@@ -409,7 +413,8 @@ namespace {
         BoundList expectedList;
         expectedList.push_back(make_pair(fromjson("{a: 0}"), fromjson("{a: 0}")));
 
-        BoundList list = KeyPattern::keyBounds(fromjson("{a: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -424,7 +429,8 @@ namespace {
         BoundList expectedList;
         expectedList.push_back(make_pair(fromjson("{a: 2}"), fromjson("{a: 3}")));
 
-        BoundList list = KeyPattern::keyBounds(fromjson("{a: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -447,7 +453,8 @@ namespace {
             fromjson("{ a: 2, b: 2, c: 2 }"),
             fromjson("{ a: 3, b: 3, c: 3 }")));
 
-        BoundList list = KeyPattern::keyBounds(fromjson("{a: 1, b: 1, c: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -485,7 +492,8 @@ namespace {
             fromjson("{ a: 0, b: 6, c: 2 }"),
             fromjson("{ a: 0, b: 6, c: 3 }")));
 
-        BoundList list = KeyPattern::keyBounds(fromjson("{a: 1, b: 1, c: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -515,7 +523,9 @@ namespace {
         expectedList.push_back(make_pair(
             fromjson("{ a: 0, b: 4, c: 2 }"),
             fromjson("{ a: 1, b: 6, c: 3 }")));
-        BoundList list = KeyPattern::keyBounds(fromjson("{a: 1, b: 1, c: 1}"), indexBounds);
+
+        ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 

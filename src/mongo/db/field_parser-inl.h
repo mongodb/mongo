@@ -218,10 +218,19 @@ namespace mongo {
                 return FIELD_NONE;
         }
 
+        return extract(elem, field, out, errMsg);
+    }
+
+    template<typename T>
+    FieldParser::FieldState FieldParser::extract(BSONElement elem,
+                                                 const BSONField<std::vector<T*> >& field,
+                                                 std::vector<T*>* out,
+                                                 std::string* errMsg) {
+
         if (elem.type() != Array) {
             if (errMsg) {
                 *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                                   << "vector array" << ", found " << doc[field.name()].toString();
+                                   << "vector array" << ", found " << elem.toString();
             }
             return FIELD_INVALID;
         }

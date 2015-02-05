@@ -22,9 +22,13 @@
 
 #include "mongo/dbtests/dbtests.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -33,23 +37,31 @@
 
 namespace OplogStartTests {
 
+    using boost::scoped_ptr;
+    using std::string;
+
     class Base {
     public:
-        Base() : _lk(_txn.lockState()),
-                 _wunit(_txn.recoveryUnit()),
+        Base() : _txn(),
+                 _scopedXact(&_txn, MODE_X),
+                 _lk(_txn.lockState()),
+                 _wunit(&_txn),
                  _context(&_txn, ns()),
                  _client(&_txn) {
 
-            Collection* c = _context.db()->getCollection(&_txn, ns());
+            Collection* c = _context.db()->getCollection(ns());
             if (!c) {
                 c = _context.db()->createCollection(&_txn, ns());
             }
-            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
+            ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
         }
 
         ~Base() {
             client()->dropCollection(ns());
             _wunit.commit();
+
+            // The OplogStart stage is not allowed to outlive it's RecoveryUnit.
+            _stage.reset();
         }
 
     protected:
@@ -64,7 +76,7 @@ namespace OplogStartTests {
         }
 
         Collection* collection() {
-            return _context.db()->getCollection( &_txn, ns() );
+            return _context.db()->getCollection( ns() );
         }
 
         DBDirectClient* client() { return &_client; }
@@ -80,7 +92,7 @@ namespace OplogStartTests {
 
         void assertWorkingSetMemberHasId(WorkingSetID id, int expectedId) {
             WorkingSetMember* member = _oplogws->get(id);
-            BSONElement idEl = member->obj["_id"];
+            BSONElement idEl = member->obj.value()["_id"];
             ASSERT(!idEl.eoo());
             ASSERT(idEl.isNumber());
             ASSERT_EQUALS(idEl.numberInt(), expectedId);
@@ -93,6 +105,7 @@ namespace OplogStartTests {
     private:
         // The order of these is important in order to ensure order of destruction
         OperationContextImpl _txn;
+        ScopedTransaction _scopedXact;
         Lock::GlobalWrite _lk;
         WriteUnitOfWork _wunit;
         Client::Context _context;
@@ -350,15 +363,22 @@ namespace OplogStartTests {
         void setupTests() {
             add< OplogStartIsOldest >();
             add< OplogStartIsNewest >();
-            add< OplogStartIsNewestExtentHop >();
-            add< OplogStartOneEmptyExtent >();
-            add< OplogStartTwoEmptyExtents >();
-            add< OplogStartTwoFullExtents >();
-            add< OplogStartThreeFullOneEmpty >();
-            add< OplogStartOneFullExtent >();
-            add< OplogStartFirstExtentEmpty >();
-            add< OplogStartEOF >();
+
+            // These tests rely on extent allocation details specific to mmapv1.
+            // TODO figure out a way to generically test this.
+            if (getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1()) {
+                add< OplogStartIsNewestExtentHop >();
+                add< OplogStartOneEmptyExtent >();
+                add< OplogStartTwoEmptyExtents >();
+                add< OplogStartTwoFullExtents >();
+                add< OplogStartThreeFullOneEmpty >();
+                add< OplogStartOneFullExtent >();
+                add< OplogStartFirstExtentEmpty >();
+                add< OplogStartEOF >();
+            }
         }
-    } oplogStart;
+    };
+
+    SuiteInstance<All> oplogStart;
 
 } // namespace OplogStartTests

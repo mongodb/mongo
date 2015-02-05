@@ -31,14 +31,19 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
     extern const BSONObj reverseNaturalObj; // { $natural : -1 }
 
 namespace repl {
+    class ReplicationCoordinator;
+
     /**
      * Authenticates conn using the server's cluster-membership credentials.
      *
@@ -51,9 +56,14 @@ namespace repl {
     */
 
     class OplogReader {
-        shared_ptr<DBClientConnection> _conn;
-        shared_ptr<DBClientCursor> cursor;
+    private:
+        boost::shared_ptr<DBClientConnection> _conn;
+        boost::shared_ptr<DBClientCursor> cursor;
         int _tailingQueryOptions;
+
+        // If _conn was actively connected, _host represents the current HostAndPort of the
+        // connection.
+        HostAndPort _host;
     public:
         OplogReader();
         ~OplogReader() { }
@@ -61,6 +71,7 @@ namespace repl {
         void resetConnection() {
             cursor.reset();
             _conn.reset();
+            _host = HostAndPort();
         }
         DBClientConnection* conn() { return _conn.get(); }
         BSONObj findOne(const char *ns, const Query& q) {
@@ -74,42 +85,11 @@ namespace repl {
         static const int tcp_timeout = 30;
 
         /* ok to call if already connected */
-        bool connect(const std::string& hostname);
+        bool connect(const HostAndPort& host);
 
-        bool connect(const std::string& hostname, const OID& myRID);
-
-        bool connect(const mongo::OID& rid, const int from, const std::string& to);
-
-        void tailCheck() {
-            if( cursor.get() && cursor->isDead() ) {
-                log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
-                resetCursor();
-            }
-        }
+        void tailCheck();
 
         bool haveCursor() { return cursor.get() != 0; }
-
-        /** this is ok but commented out as when used one should consider if QueryOption_OplogReplay
-           is needed; if not fine, but if so, need to change.
-        *//*
-        void query(const char *ns, const BSONObj& query) {
-            verify( !haveCursor() );
-            cursor.reset( _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk).release() );
-        }*/
-
-        /** this can be used; it is commented out as it does not indicate
-            QueryOption_OplogReplay and that is likely important.  could be uncommented
-            just need to add that.
-            */
-        /*
-        void queryGTE(const char *ns, OpTime t) {
-            BSONObjBuilder q;
-            q.appendDate("$gte", t.asDate());
-            BSONObjBuilder q2;
-            q2.append("ts", q.done());
-            query(ns, q2.done());
-        }
-        */
 
         void query(const char *ns,
                    Query query,
@@ -143,11 +123,6 @@ namespace repl {
             return cursor->getMessage()->size();
         }
 
-        /* old mongod's can't do the await flag... */
-        bool awaitCapable() {
-            return cursor->hasResultFlag(ResultFlag_AwaitCapable);
-        }
-
         int getTailingQueryOptions() const { return _tailingQueryOptions; }
         void setTailingQueryOptions( int tailingQueryOptions ) { _tailingQueryOptions = tailingQueryOptions; }
 
@@ -158,11 +133,21 @@ namespace repl {
         BSONObj nextSafe() { return cursor->nextSafe(); }
         BSONObj next() { return cursor->next(); }
         void putBack(BSONObj op) { cursor->putBack(op); }
-        
-    private:
-        /** @return true iff connection was successful */ 
-        bool commonConnect(const std::string& hostName);
-        bool passthroughHandshake(const mongo::OID& rid, const int f);
+
+        HostAndPort getHost() const;
+
+        /**
+         * Connects this OplogReader to a valid sync source, using the provided lastOpTimeFetched
+         * and ReplicationCoordinator objects.
+         * If this function fails to connect to a sync source that is viable, this OplogReader
+         * is left unconnected, where this->conn() equals NULL.
+         * In the process of connecting, this function may add items to the repl coordinator's
+         * sync source blacklist.
+         * This function may throw DB exceptions.
+         */
+        void connectToSyncSource(OperationContext* txn, 
+                                 OpTime lastOpTimeFetched,
+                                 ReplicationCoordinator* replCoord);
     };
 
 } // namespace repl

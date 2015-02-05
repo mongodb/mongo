@@ -30,11 +30,17 @@
 
 #include "mongo/s/multi_host_query.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/bson/util/builder.h"
 
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::make_pair;
+    using std::string;
+    using std::vector;
+
     typedef boost::unique_lock<boost::mutex> boost_unique_lock;
 
     HostThreadPool::HostThreadPool(int poolSize, bool scopeAllWork) :
@@ -365,10 +371,10 @@ namespace mongo {
         {
             boost_unique_lock lk(parentMutex);
 
-            if (!parentOp)
-                return;
-
-            parentOp->noteResult(host, result);
+            if (parentOp)
+                parentOp->noteResult(host, result);
+            else if(result.isOK())
+                delete result.getValue();
         }
     }
 

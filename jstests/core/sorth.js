@@ -33,8 +33,8 @@ function find( query ) {
 function checkMatches( expectedMatch, query ) {
     result = find( query ).toArray();
     assertMatches( expectedMatch, result );
-    explain = find( query ).explain();
-    assert.eq( expectedMatch.length || 1, explain.n );
+    var count = find( query ).itcount();
+    assert.eq( expectedMatch.length || 1, count );
 }
 
 /** Reset data, index, and _sort and _hint globals. */

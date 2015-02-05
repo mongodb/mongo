@@ -32,6 +32,8 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
@@ -47,31 +49,36 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state_d.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/db.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/repl/handshake_args.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/d_logic.h"
-#include "mongo/s/stale_exception.h" // for SendStaleConfigException
+#include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mongoutils/str.h"
-
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    mongo::mutex& Client::clientsMutex = *(new mutex("clientsMutex"));
-    set<Client*>& Client::clients = *(new set<Client*>); // always be in clientsMutex when manipulating this
+    using std::string;
+    using std::stringstream;
+
+    using logger::LogComponent;
+
+    boost::mutex Client::clientsMutex;
+    ClientSet Client::clients;
 
     TSP_DEFINE(Client, currentClient)
 
@@ -79,64 +86,64 @@ namespace mongo {
        call this when your thread starts.
     */
     void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-        verify( currentClient.get() == 0 );
+        invariant(currentClient.get() == 0);
 
-        string fullDesc = desc;
-        if ( str::equals( "conn" , desc ) && mp != NULL )
+        string fullDesc;
+        if (mp != NULL) {
             fullDesc = str::stream() << desc << mp->connectionId();
+        }
+        else {
+            fullDesc = desc;
+        }
 
-        setThreadName( fullDesc.c_str() );
+        setThreadName(fullDesc.c_str());
+        mongo::lastError.initThread();
 
         // Create the client obj, attach to thread
-        Client *c = new Client( fullDesc, mp );
-        currentClient.reset(c);
-        mongo::lastError.initThread();
-        c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongod(
-                getGlobalAuthorizationManager())));
+        Client* client = new Client(fullDesc, mp);
+        client->setAuthorizationSession(
+            new AuthorizationSession(
+                new AuthzSessionExternalStateMongod(getGlobalAuthorizationManager())));
+
+        currentClient.reset(client);
+
+        // This makes the client visible to maintenance threads
+        boost::mutex::scoped_lock clientLock(clientsMutex);
+        clients.insert(client);
     }
 
-    Client::Client(const string& desc, AbstractMessagingPort *p) :
-        ClientBasic(p),
-        _shutdown(false),
-        _desc(desc),
-        _god(0),
-        _lastOp(0)
-    {
-        _hasWrittenSinceCheckpoint = false;
-        _connectionId = p ? p->connectionId() : 0;
+namespace {
+    //  Create an appropriate new locker for the storage engine in use. Caller owns.
+    Locker* newLocker() {
+        if (isMMAPV1()) {
+            return new MMAPV1LockerImpl();
+        }
+
+        return new LockerImpl<false>();
+    }
+}
+
+    Client::Client(const string& desc, AbstractMessagingPort *p)
+        : ClientBasic(p),
+          _desc(desc),
+          _threadId(boost::this_thread::get_id()),
+          _connectionId(p ? p->connectionId() : 0),
+          _god(0),
+          _txn(NULL),
+          _locker(newLocker()),
+          _lastOp(0),
+          _shutdown(false) {
+
         _curOp = new CurOp( this );
-#ifndef _WIN32
-        stringstream temp;
-        temp << hex << showbase << pthread_self();
-        _threadId = temp.str();
-#endif
-        scoped_lock bl(clientsMutex);
-        clients.insert(this);
     }
 
     Client::~Client() {
         _god = 0;
 
-        // Because both Client object pointers and logging infrastructure are stored in Thread
-        // Specific Pointers and because we do not explicitly control the order in which TSPs are
-        // deleted, it is possible for the logging infrastructure to have been deleted before
-        // this code runs.  This leads to segfaults (access violations) if this code attempts
-        // to log anything.  Therefore, disable logging from this destructor until this is fixed.
-        // TODO(tad) Force the logging infrastructure to be the last TSP to be deleted for each
-        // thread and reenable this code once that is done.
-#if 0
-        if ( _context )
-            error() << "Client::~Client _context should be null but is not; client:" << _desc << endl;
-
-        if ( ! _shutdown ) {
-            error() << "Client::shutdown not called: " << _desc << endl;
-        }
-#endif
-
         if ( ! inShutdown() ) {
             // we can't clean up safely once we're in shutdown
             {
-                scoped_lock bl(clientsMutex);
+                boost::mutex::scoped_lock clientLock(clientsMutex);
                 if ( ! _shutdown )
                     clients.erase(this);
             }
@@ -155,7 +162,7 @@ namespace mongo {
         if ( inShutdown() )
             return false;
         {
-            scoped_lock bl(clientsMutex);
+            boost::mutex::scoped_lock clientLock(clientsMutex);
             clients.erase(this);
         }
 
@@ -165,84 +172,126 @@ namespace mongo {
     BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
 
     Client::Context::Context(OperationContext* txn, const std::string& ns, Database * db)
-        : _client( currentClient.get() ), 
+        : _client(currentClient.get()),
           _justCreated(false),
-          _doVersion( true ),
-          _ns( ns ), 
+          _doVersion(true),
+          _ns(ns),
           _db(db),
           _txn(txn) {
+    }
 
+    Client::Context::Context(OperationContext* txn,
+                             const std::string& ns,
+                             Database* db,
+                             bool justCreated)
+        : _client(currentClient.get()),
+          _justCreated(justCreated),
+          _doVersion(true),
+          _ns(ns),
+          _db(db),
+          _txn(txn) {
+        _finishInit();
     }
 
     Client::Context::Context(OperationContext* txn,
                              const string& ns,
                              bool doVersion)
-        : _client( currentClient.get() ), 
+        : _client(currentClient.get()),
           _justCreated(false), // set for real in finishInit
           _doVersion(doVersion),
-          _ns( ns ), 
+          _ns(ns),
           _db(NULL),
           _txn(txn) {
 
         _finishInit();
     }
-       
-    /** "read lock, and set my context, all in one operation" 
-     *  This handles (if not recursively locked) opening an unopened database.
-     */
-    Client::ReadContext::ReadContext(
-                OperationContext* txn, const string& ns, bool doVersion) {
-        {
-            _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-            Database *db = dbHolder().get(txn, ns);
-            if( db ) {
-                _c.reset(new Context(txn, ns, db, doVersion));
-                return;
-            }
-        }
 
-        // we usually don't get here, so doesn't matter how fast this part is
-        {
-            DEV log() << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
-            if (txn->lockState()->isW()) {
-                // write locked already
-                WriteUnitOfWork wunit(txn->recoveryUnit());
-                DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                _c.reset(new Context(txn, ns, doVersion));
-                wunit.commit();
-            }
-            else if (!txn->lockState()->isRecursive()) {
-                _lk.reset(0);
-                {
-                    Lock::GlobalWrite w(txn->lockState());
-                    WriteUnitOfWork wunit(txn->recoveryUnit());
-                    Context c(txn, ns, doVersion);
-                    wunit.commit();
-                }
 
-                // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
-                _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-                _c.reset(new Context(txn, ns, doVersion));
-            }
-            else { 
-                uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
-            }
-        }
+    AutoGetDb::AutoGetDb(OperationContext* txn, const StringData& ns, LockMode mode)
+            : _dbLock(txn->lockState(), ns, mode),
+              _db(dbHolder().get(txn, ns)) {
 
-        // todo: are receipts of thousands of queries for a nonexisting database a potential 
-        //       cause of bad performance due to the write lock acquisition above?  let's fix that.
-        //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
 
-    Client::WriteContext::WriteContext(
-                OperationContext* opCtx, const std::string& ns, bool doVersion)
-        : _lk(opCtx->lockState(), ns),
-          _wunit(opCtx->recoveryUnit()),
-          _c(opCtx, ns, doVersion) {
+    AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn,
+                                         const StringData& ns,
+                                         LockMode mode)
+            :  _transaction(txn, MODE_IX),
+               _dbLock(txn->lockState(), ns, mode),
+              _db(dbHolder().get(txn, ns)) {
+        invariant(mode == MODE_IX || mode == MODE_X);
+        _justCreated = false;
+        // If the database didn't exist, relock in MODE_X
+        if (_db == NULL) {
+            if (mode != MODE_X) {
+                _dbLock.relockWithMode(MODE_X);
+            }
+            _db = dbHolder().openDb(txn, ns);
+            _justCreated = true;
+        }
     }
 
-    void Client::WriteContext::commit() {
-        _wunit.commit();
+    AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
+                                                       const std::string& ns)
+            : _txn(txn),
+              _transaction(txn, MODE_IS),
+              _db(_txn, nsToDatabaseSubstring(ns), MODE_IS),
+              _collLock(_txn->lockState(), ns, MODE_IS),
+              _coll(NULL) {
+
+        _init(ns, nsToCollectionSubstring(ns));
+    }
+
+    AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
+                                                       const NamespaceString& nss)
+            : _txn(txn),
+              _transaction(txn, MODE_IS),
+              _db(_txn, nss.db(), MODE_IS),
+              _collLock(_txn->lockState(), nss.toString(), MODE_IS),
+              _coll(NULL) {
+
+        _init(nss.toString(), nss.coll());
+    }
+
+    void AutoGetCollectionForRead::_init(const std::string& ns, const StringData& coll) {
+        massert(28535, "need a non-empty collection name", !coll.empty());
+
+        // TODO: Client::Context legacy, needs to be removed
+        _txn->getCurOp()->ensureStarted();
+        _txn->getCurOp()->setNS(ns);
+
+        // We have both the DB and collection locked, which the prerequisite to do a stable shard
+        // version check.
+        ensureShardVersionOKOrThrow(ns);
+
+        // At this point, we are locked in shared mode for the database by the DB lock in the
+        // constructor, so it is safe to load the DB pointer.
+        if (_db.getDb()) {
+            // TODO: Client::Context legacy, needs to be removed
+            _txn->getCurOp()->enter(ns.c_str(), _db.getDb()->getProfilingLevel());
+
+            _coll = _db.getDb()->getCollection(ns);
+        }
+    }
+
+    AutoGetCollectionForRead::~AutoGetCollectionForRead() {
+        // Report time spent in read lock
+        _txn->getCurOp()->recordGlobalTime(false, _timer.micros());
+    }
+
+    Client::WriteContext::WriteContext(OperationContext* opCtx, const std::string& ns)
+        : _txn(opCtx),
+          _nss(ns),
+          _autodb(opCtx, _nss.db(), MODE_IX),
+          _collk(opCtx->lockState(), ns, MODE_IX),
+          _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
+        _collection = _c.db()->getCollection( ns );
+        if ( !_collection && !_autodb.justCreated() ) {
+            // relock in MODE_X
+            _collk.relockWithMode( MODE_X, _autodb.lock() );
+            Database* db = dbHolder().get(_txn, ns );
+            invariant( db == _c.db() );
+        }
     }
 
     void Client::Context::checkNotStale() const { 
@@ -252,42 +301,25 @@ namespace mongo {
         case dbDelete:
             break;
         default: {
-            string errmsg;
-            ChunkVersion received;
-            ChunkVersion wanted;
-            if ( ! shardVersionOk( _ns , errmsg, received, wanted ) ) {
-                ostringstream os;
-                os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
-                throw SendStaleConfigException( _ns, os.str(), received, wanted );
-            }
+            ensureShardVersionOKOrThrow(_ns);
         }
         }
-    }
-
-    // invoked from ReadContext
-    Client::Context::Context(OperationContext* txn,
-                             const string& ns,
-                             Database *db,
-                             bool doVersion)
-        : _client( currentClient.get() ), 
-          _justCreated(false),
-          _doVersion( doVersion ),
-          _ns( ns ), 
-          _db(db),
-          _txn(txn) {
-
-        verify(_db);
-        if (_doVersion) checkNotStale();
-        _client->_curOp->enter( this );
     }
        
     void Client::Context::_finishInit() {
-        _db = dbHolder().getOrCreate(_txn, _ns, _justCreated);
-        invariant(_db);
+        _db = dbHolder().get(_txn, _ns);
+        if (_db) {
+            _justCreated = false;
+        }
+        else {
+            invariant(_txn->lockState()->isDbLockedForMode(nsToDatabaseSubstring(_ns), MODE_X));
+            _db = dbHolder().openDb(_txn, _ns, &_justCreated);
+            invariant(_db);
+        }
 
         if( _doVersion ) checkNotStale();
 
-        _client->_curOp->enter( this );
+        _client->_curOp->enter(_ns.c_str(), _db->getProfilingLevel());
     }
     
     Client::Context::~Context() {
@@ -305,6 +337,32 @@ namespace mongo {
                 repl::ReplicationCoordinator::modeReplSet || !_lastOp.isNull()) {
             b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
+    }
+
+    void Client::reportState(BSONObjBuilder& builder) {
+        builder.append("desc", desc());
+
+        std::stringstream ss;
+        ss << _threadId;
+        builder.append("threadId", ss.str());
+
+        if (_connectionId) {
+            builder.appendNumber("connectionId", _connectionId);
+        }
+    }
+
+    void Client::setOperationContext(OperationContext* txn) {
+        // We can only set the OperationContext once before resetting it.
+        invariant(txn != NULL && _txn == NULL);
+
+        boost::unique_lock<SpinLock> uniqueLock(_lock);
+        _txn = txn;
+    }
+
+    void Client::resetOperationContext() {
+        invariant(_txn != NULL);
+        boost::unique_lock<SpinLock> uniqueLock(_lock);
+        _txn = NULL;
     }
 
     string Client::clientAddress(bool includePort) const {
@@ -377,6 +435,7 @@ namespace mongo {
         fastmodinsert = false;
         upsert = false;
         keyUpdates = 0;  // unsigned, so -1 not possible
+        writeConflicts = 0;
         planSummary = "";
         execStats.reset();
         
@@ -404,8 +463,7 @@ namespace mongo {
                 
                 Command* curCommand = curop.getCommand();
                 if (curCommand) {
-                    mutablebson::Document cmdToLog(curop.query(), 
-                            mutablebson::Document::kInPlaceDisabled);
+                    mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
                     curCommand->redactForLogging(&cmdToLog);
                     s << curCommand->name << " ";
                     s << cmdToLog.toString();
@@ -447,6 +505,7 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
         OPDEBUG_TOSTRING_HELP_BOOL( upsert );
         OPDEBUG_TOSTRING_HELP( keyUpdates );
+        OPDEBUG_TOSTRING_HELP( writeConflicts );
         
         if ( extra.len() )
             s << " " << extra.str();
@@ -459,9 +518,6 @@ namespace mongo {
 
         s << " numYields:" << curop.numYields();
         
-        s << " ";
-        curop.lockStat().report( s );
-        
         OPDEBUG_TOSTRING_HELP( nreturned );
         if ( responseLength > 0 )
             s << " reslen:" << responseLength;
@@ -470,54 +526,58 @@ namespace mongo {
         return s.str();
     }
 
+    namespace {
+        /**
+         * Appends {name: obj} to the provided builder.  If obj is greater than maxSize, appends a
+         * string summary of obj instead of the object itself.
+         */
+        void appendAsObjOrString(const StringData& name,
+                                 const BSONObj& obj,
+                                 size_t maxSize,
+                                 BSONObjBuilder* builder) {
+            if (static_cast<size_t>(obj.objsize()) <= maxSize) {
+                builder->append(name, obj);
+            }
+            else {
+                // Generate an abbreviated serialization for the object, by passing false as the
+                // "full" argument to obj.toString().
+                const bool isArray = false;
+                const bool full = false;
+                std::string objToString = obj.toString(isArray, full);
+                if (objToString.size() <= maxSize) {
+                    builder->append(name, objToString);
+                }
+                else {
+                    // objToString is still too long, so we append to the builder a truncated form
+                    // of objToString concatenated with "...".  Instead of creating a new string
+                    // temporary, mutate objToString to do this (we know that we can mutate
+                    // characters in objToString up to and including objToString[maxSize]).
+                    objToString[maxSize - 3] = '.';
+                    objToString[maxSize - 2] = '.';
+                    objToString[maxSize - 1] = '.';
+                    builder->append(name, StringData(objToString).substr(0, maxSize));
+                }
+            }
+        }
+    }
+
 #define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.appendNumber( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
-    bool OpDebug::append(const CurOp& curop, BSONObjBuilder& b, size_t maxSize) const {
+    void OpDebug::append(const CurOp& curop, BSONObjBuilder& b) const {
+        const size_t maxElementSize = 50 * 1024;
+
         b.append( "op" , iscommand ? "command" : opToString( op ) );
         b.append( "ns" , ns.toString() );
-        
-        int queryUpdateObjSize = 0;
+
         if (!query.isEmpty()) {
-            queryUpdateObjSize += query.objsize();
+            appendAsObjOrString(iscommand ? "command" : "query", query, maxElementSize, &b);
         }
         else if (!iscommand && curop.haveQuery()) {
-            queryUpdateObjSize += curop.query()["query"].size();
+            appendAsObjOrString("query", curop.query(), maxElementSize, &b);
         }
 
         if (!updateobj.isEmpty()) {
-            queryUpdateObjSize += updateobj.objsize();
-        }
-
-        if (static_cast<size_t>(queryUpdateObjSize) > maxSize) {
-            if (!query.isEmpty()) {
-                // Use 60 since BSONObj::toString can truncate strings into 150 chars
-                // and we want to have enough room for both query and updateobj when
-                // the entire document is going to be serialized into a string
-                const string abbreviated(query.toString(false, false), 0, 60);
-                b.append(iscommand ? "command" : "query", abbreviated + "...");
-            }
-            else if (!iscommand && curop.haveQuery()) {
-                const string abbreviated(curop.query()["query"].toString(false, false), 0, 60);
-                b.append("query", abbreviated + "...");
-            }
-
-            if (!updateobj.isEmpty()) {
-                const string abbreviated(updateobj.toString(false, false), 0, 60);
-                b.append("updateobj", abbreviated + "...");
-            }
-
-            return false;
-        }
-
-        if (!query.isEmpty()) {
-            b.append(iscommand ? "command" : "query", query);
-        }
-        else if (!iscommand && curop.haveQuery()) {
-            curop.appendQuery(b, "query");
-        }
-
-        if (!updateobj.isEmpty()) {
-            b.append("updateobj", updateobj);
+            appendAsObjOrString("updateobj", updateobj, maxElementSize, &b);
         }
 
         const bool moved = (nmoved >= 1);
@@ -541,9 +601,9 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( fastmodinsert );
         OPDEBUG_APPEND_BOOL( upsert );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
+        OPDEBUG_APPEND_NUMBER( writeConflicts );
 
-        b.appendNumber( "numYield" , curop.numYields() );
-        b.append( "lockStats" , curop.lockStat().report() );
+        b.appendNumber("numYield", curop.numYields());
 
         if ( ! exceptionInfo.empty() )
             exceptionInfo.append( b , "exception" , "exceptionCode" );
@@ -553,8 +613,6 @@ namespace mongo {
         b.append( "millis" , executionTime );
 
         execStats.append(b, "execStats");
-
-        return true;
     }
 
     void saveGLEStats(const BSONObj& result, const std::string& conn) {

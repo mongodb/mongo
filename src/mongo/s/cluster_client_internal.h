@@ -102,7 +102,8 @@ namespace mongo {
     // Helper function which throws on bad GLEs for non-SCC config servers
     void _checkGLE(ScopedDbConnection& conn);
 
-    // Helper function which throws for invalid cursor initialization
+    // Helper function which throws for invalid cursor initialization.
+    // Note: cursor ownership will be passed to this function.
     DBClientCursor* _safeCursor(std::auto_ptr<DBClientCursor> cursor);
 
 }

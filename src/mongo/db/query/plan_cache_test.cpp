@@ -33,8 +33,10 @@
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
+#include <boost/scoped_ptr.hpp>
 #include <ostream>
 #include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/qlog.h"
@@ -50,7 +52,10 @@ using namespace mongo;
 
 namespace {
 
+    using boost::scoped_ptr;
     using std::auto_ptr;
+    using std::string;
+    using std::vector;
 
     static const char* ns = "somebogusns";
 
@@ -358,7 +363,8 @@ namespace {
         PlanCache planCache;
         auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
         std::vector<QuerySolution*> solns;
-        ASSERT_NOT_OK(planCache.add(*cq, solns, createDecision(1U)));
+        boost::scoped_ptr<PlanRankingDecision> decision(createDecision(1U));
+        ASSERT_NOT_OK(planCache.add(*cq, solns, decision.get()));
     }
 
     TEST(PlanCacheTest, AddValidSolution) {
@@ -444,6 +450,7 @@ namespace {
     class CachePlanSelectionTest : public mongo::unittest::Test {
     protected:
         void setUp() {
+            cq = NULL;
             params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
             addIndex(BSON("_id" << 1));
         }
@@ -463,6 +470,7 @@ namespace {
             params.indices.push_back(IndexEntry(keyPattern,
                                                 multikey,
                                                 false,
+                                                false,
                                                 "hari_king_of_the_stove",
                                                 BSONObj()));
         }
@@ -471,6 +479,7 @@ namespace {
             params.indices.push_back(IndexEntry(keyPattern,
                                                 multikey,
                                                 sparse,
+                                                false,
                                                 "note_to_self_dont_break_build",
                                                 BSONObj()));
         }
@@ -530,7 +539,18 @@ namespace {
                           const BSONObj& minObj,
                           const BSONObj& maxObj,
                           bool snapshot) {
+
+            // Clean up any previous state from a call to runQueryFull
+            delete cq;
+            cq = NULL;
+
+            for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
+                delete *it;
+            }
+
             solns.clear();
+
+
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
                                                     minObj, maxObj, snapshot,
                                                     false, // explain
@@ -630,6 +650,7 @@ namespace {
             s = QueryPlanner::planFromCache(*scopedCq.get(), params, cachedSoln,
                                             &out, &backupOut);
             ASSERT_OK(s);
+            std::auto_ptr<QuerySolution> cleanBackup(backupOut);
 
             return out;
         }
@@ -701,6 +722,7 @@ namespace {
             QuerySolution* bestSoln = firstMatchingSolution(solnJson);
             QuerySolution* planSoln = planQueryFromCache(query, sort, proj, *bestSoln);
             assertSolutionMatches(planSoln, solnJson);
+            delete planSoln;
         }
 
         /**

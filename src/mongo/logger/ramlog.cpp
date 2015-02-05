@@ -39,6 +39,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::string;
+
 namespace {
     typedef std::map<string,RamLog*> RM;
     mongo::mutex* _namedLock = NULL;

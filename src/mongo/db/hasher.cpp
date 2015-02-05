@@ -33,10 +33,15 @@
 */
 
 #include "mongo/db/hasher.h"
+
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     Hasher::Hasher( HashSeed seed ) : _seed( seed ) {
         md5_init( &_md5State );

@@ -28,8 +28,11 @@
 *    then also delete it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include "pcrecpp.h"
 
 #include "mongo/client/connpool.h"
@@ -58,12 +61,16 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::pair;
+    using std::set;
+    using std::stringstream;
+    using std::vector;
 
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
-
-    OID serverID;
 
     /* --- DBConfig --- */
 
@@ -81,7 +88,7 @@ namespace mongo {
     void DBConfig::CollectionInfo::shard( ChunkManager* manager ){
 
         // Do this *first* so we're invisible to everyone else
-        manager->loadExistingRanges( configServer.getPrimary().getConnString() );
+        manager->loadExistingRanges(configServer.getPrimary().getConnString(), NULL);
 
         //
         // Collections with no chunks are unsharded, no matter what the collections entry says
@@ -90,7 +97,7 @@ namespace mongo {
 
         if( manager->numChunks() != 0 ){
             _cm = ChunkManagerPtr( manager );
-            _key = manager->getShardKey().key().getOwned();
+            _key = manager->getShardKeyPattern().toBSON().getOwned();
             _unqiue = manager->isUnique();
             _dirty = true;
             _dropped = false;
@@ -191,9 +198,16 @@ namespace mongo {
     /**
      *
      */
-    ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , vector<BSONObj>* initPoints, vector<Shard>* initShards ) {
+    ChunkManagerPtr DBConfig::shardCollection(const string& ns,
+                                              const ShardKeyPattern& fieldsAndOrder,
+                                              bool unique,
+                                              vector<BSONObj>* initPoints,
+                                              vector<Shard>* initShards) {
+
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
-        uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
+        uassert(13648,
+                str::stream() << "can't shard collection because not all config servers are up",
+                configServer.allUp(false));
 
         ChunkManagerPtr manager;
         
@@ -207,7 +221,7 @@ namespace mongo {
 
             // Record start in changelog
             BSONObjBuilder collectionDetail;
-            collectionDetail.append("shardKey", fieldsAndOrder.key());
+            collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
             collectionDetail.append("collection", ns);
             collectionDetail.append("primary", getPrimary().toString());
             BSONArray a;
@@ -435,8 +449,10 @@ namespace mongo {
                 
             }
             
-            temp.reset( new ChunkManager( oldManager ) );
-            temp->loadExistingRanges( configServer.getPrimary().getConnString() );
+            temp.reset(new ChunkManager(oldManager->getns(),
+                                        oldManager->getShardKeyPattern(),
+                                        oldManager->isUnique()));
+            temp->loadExistingRanges(configServer.getPrimary().getConnString(), oldManager.get());
 
             if ( temp->numChunks() == 0 ) {
                 // maybe we're not sharded any more
@@ -641,7 +657,7 @@ namespace mongo {
         configServer.logChange( "dropDatabase.start" , _name , BSONObj() );
 
         // 1
-        if ( ! configServer.allUp( errmsg ) ) {
+        if (!configServer.allUp(false, errmsg)) {
             LOG(1) << "\t DBConfig::dropDatabase not all up" << endl;
             return 0;
         }
@@ -660,7 +676,7 @@ namespace mongo {
             return false;
         }
 
-        if ( ! configServer.allUp( errmsg ) ) {
+        if (!configServer.allUp(false, errmsg)) {
             log() << "error removing from config server even after checking!" << endl;
             return 0;
         }
@@ -826,7 +842,12 @@ namespace mongo {
 
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
-        _primary.setAddress( ConnectionString( fullString , ConnectionString::SYNC ) );
+        _primary = Shard(_primary.getName(),
+                         ConnectionString(fullString, ConnectionString::SYNC),
+                         _primary.getMaxSizeMB(),
+                         _primary.isDraining());
+        Shard::installShard(_primary.getName(), _primary);
+
         LOG(1) << " config string : " << fullString << endl;
 
         return true;
@@ -982,21 +1003,39 @@ namespace mongo {
         return true;
     }
 
-    bool ConfigServer::allUp() {
+    bool ConfigServer::allUp(bool localCheckOnly) {
         string errmsg;
-        return allUp( errmsg );
+        return allUp(localCheckOnly, errmsg);
     }
 
-    bool ConfigServer::allUp( string& errmsg ) {
+    bool ConfigServer::allUp(bool localCheckOnly, string& errmsg) {
         try {
             ScopedDbConnection conn(_primary.getConnString(), 30.0);
+
+            // Note: SyncClusterConnection is different from normal connection types in
+            // that it can be instantiated even if all the config servers are down.
+            if (!conn->isStillConnected()) {
+                errmsg = str::stream() << "Not all config servers "
+                                       << _primary.toString() << " are reachable";
+                LOG(1) << errmsg;
+                return false;
+            }
+
+            if (localCheckOnly) {
+                conn.done();
+                return true;
+            }
+
+            // Note: For SyncClusterConnection, gle will only be sent to the first
+            // node, and it is not even guaranteed to be invoked.
             conn->getLastError();
             conn.done();
             return true;
         }
-        catch ( DBException& ) {
-            log() << "ConfigServer::allUp : " << _primary.toString() << " seems down!" << endl;
-            errmsg = _primary.toString() + " seems down";
+        catch (const DBException& excep) {
+            errmsg = str::stream() << "Not all config servers "
+                                   << _primary.toString() << " are reachable"
+                                   << causedBy(excep);
             return false;
         }
 
@@ -1029,15 +1068,14 @@ namespace mongo {
     void ConfigServer::reloadSettings() {
         set<string> got;
 
-        ScopedDbConnection conn(_primary.getConnString(), 30.0);
-        
         try {
-            
-            auto_ptr<DBClientCursor> c = conn->query( SettingsType::ConfigNS , BSONObj() );
-            verify( c.get() );
-            while ( c->more() ) {
-                
-                BSONObj o = c->next();
+
+            ScopedDbConnection conn(_primary.getConnString(), 30.0);
+            auto_ptr<DBClientCursor> cursor = conn->query(SettingsType::ConfigNS, BSONObj());
+            verify(cursor.get());
+            while (cursor->more()) {
+
+                BSONObj o = cursor->nextSafe();
                 string name = o[SettingsType::key()].valuestrsafe();
                 got.insert( name );
                 if ( name == "chunksize" ) {
@@ -1062,10 +1100,11 @@ namespace mongo {
                     log() << "warning: unknown setting [" << name << "]" << endl;
                 }
             }
+
+            conn.done();
         }
-        catch ( DBException& e ) {
-            warning() << "couldn't load settings on config db: "
-                      << e.what() << endl;
+        catch (const DBException& ex) {
+            warning() << "couldn't load settings on config db" << causedBy(ex);
         }
 
         if ( ! got.count( "chunksize" ) ) {
@@ -1075,8 +1114,8 @@ namespace mongo {
                                                  SettingsType::chunksize(chunkSize)),
                                            WriteConcernOptions::AllConfigs,
                                            NULL );
-            if ( !result.isOK() ) {
-                warning() << "couldn't set chunkSize on config db: " << result.reason() << endl;
+            if (!result.isOK()) {
+                warning() << "couldn't set chunkSize on config db" << causedBy(result);
             }
         }
 
@@ -1087,9 +1126,8 @@ namespace mongo {
                                             WriteConcernOptions::AllConfigs,
                                             NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create ns_1_min_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create ns_1_min_1 index on config db" << causedBy(result);
         }
 
         result = clusterCreateIndex( ChunkType::ConfigNS,
@@ -1100,9 +1138,9 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create ns_1_shard_1_min_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create ns_1_shard_1_min_1 index on config db"
+                      << causedBy(result);
         }
 
         result = clusterCreateIndex( ChunkType::ConfigNS,
@@ -1112,9 +1150,8 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create ns_1_lastmod_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create ns_1_lastmod_1 index on config db" << causedBy(result);
         }
 
         result = clusterCreateIndex( ShardType::ConfigNS,
@@ -1123,20 +1160,18 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create host_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create host_1 index on config db" << causedBy(result);
         }
 
-        result = clusterCreateIndex( LocksType::ConfigNS,
-                                     BSON( LocksType::lockID() << 1 ),
-                                     true, // unique
-                                     WriteConcernOptions::AllConfigs,
-                                     NULL );
+        result = clusterCreateIndex(LocksType::ConfigNS,
+                                    BSON(LocksType::lockID() << 1),
+                                    false, // unique
+                                    WriteConcernOptions::AllConfigs,
+                                    NULL);
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create lock id index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create lock id index on config db" << causedBy(result);
         }
 
         result = clusterCreateIndex( LocksType::ConfigNS,
@@ -1146,9 +1181,9 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create state and process id index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create state and process id index on config db"
+                      << causedBy(result);
         }
 
         result = clusterCreateIndex( LockpingsType::ConfigNS,
@@ -1157,9 +1192,9 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create lockping ping time index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create lockping ping time index on config db"
+                      << causedBy(result);
         }
     }
 

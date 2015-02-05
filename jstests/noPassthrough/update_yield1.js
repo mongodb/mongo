@@ -1,6 +1,3 @@
-// SERVER-13922
-if (0) {
-
 load( "jstests/libs/slow_weekly_util.js" );
 var testServer = new SlowWeeklyMongod( "update_yield1" );
 var db = testServer.getDB( "test" );
@@ -74,5 +71,3 @@ x = db.currentOp();
 assert.eq( 0 , x.inprog.length , "weird 2" );
 
 testServer.stop();
-
-}  // if (0)

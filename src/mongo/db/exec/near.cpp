@@ -30,10 +30,13 @@
 
 #include "mongo/db/exec/near.h"
 
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+    using std::vector;
 
     NearStage::NearStage(OperationContext* txn,
                          WorkingSet* workingSet,
@@ -42,10 +45,9 @@ namespace mongo {
         : _txn(txn),
           _workingSet(workingSet),
           _collection(collection),
-          _searchState(SearchState_Buffering),
-          _limit(-1),
-          _totalReturned(0),
-          _stats(stats) {
+          _searchState(SearchState_Initializing),
+          _stats(stats),
+          _nextInterval(NULL) {
 
         // Ensure we have specific distance search stats unless a child class specified their
         // own distance stats subclass
@@ -69,13 +71,33 @@ namespace mongo {
         inclusiveMax(inclusiveMax) {
     }
 
-    void NearStage::setLimit(int limit) {
-        _limit = limit;
+
+    PlanStage::StageState NearStage::initNext() {
+        PlanStage::StageState state = initialize(_txn, _workingSet, _collection);
+        if (state == PlanStage::IS_EOF) {
+            _searchState = SearchState_Buffering;
+            return PlanStage::NEED_TIME;
+        }
+
+        invariant(state != PlanStage::ADVANCED && state != PlanStage::NEED_FETCH);
+
+        // Propagate NEED_TIME or errors upward.
+        return state;
+    }
+
+    PlanStage::StageState NearStage::initialize(OperationContext* txn,
+                                                WorkingSet* workingSet,
+                                                Collection* collection)
+    {
+        return PlanStage::IS_EOF;
     }
 
     PlanStage::StageState NearStage::work(WorkingSetID* out) {
 
         ++_stats->common.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_stats->common.executionTimeMillis);
 
         WorkingSetID toReturn = WorkingSet::INVALID_ID;
         Status error = Status::OK();
@@ -85,8 +107,11 @@ namespace mongo {
         // Work the search
         //
 
-        if (SearchState_Buffering == _searchState) {
-            nextState = bufferNext(&error);
+        if (SearchState_Initializing == _searchState) {
+            nextState = initNext();
+        }
+        else if (SearchState_Buffering == _searchState) {
+            nextState = bufferNext(&toReturn, &error);
         }
         else if (SearchState_Advancing == _searchState) {
             nextState = advanceNext(&toReturn);
@@ -106,6 +131,10 @@ namespace mongo {
         else if (PlanStage::ADVANCED == nextState) {
             *out = toReturn;
             ++_stats->common.advanced;
+        }
+        else if (PlanStage::NEED_FETCH == nextState) {
+            *out = toReturn;
+            ++_stats->common.needFetch;
         }
         else if (PlanStage::NEED_TIME == nextState) {
             ++_stats->common.needTime;
@@ -135,7 +164,8 @@ namespace mongo {
         double distance;
     };
 
-    PlanStage::StageState NearStage::bufferNext(Status* error) {
+    // Set "toReturn" when NEED_FETCH.
+    PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* error) {
 
         //
         // Try to retrieve the next covered member
@@ -157,24 +187,29 @@ namespace mongo {
                 return PlanStage::IS_EOF;
             }
 
-            _nextInterval.reset(intervalStatus.getValue());
+            // CoveredInterval and its child stage are owned by _childrenIntervals
+            _childrenIntervals.push_back(intervalStatus.getValue());
+            _nextInterval = _childrenIntervals.back();
             _nextIntervalStats.reset(new IntervalStats());
+            _nextIntervalStats->minDistanceAllowed = _nextInterval->minDistance;
+            _nextIntervalStats->maxDistanceAllowed = _nextInterval->maxDistance;
+            _nextIntervalStats->inclusiveMaxDistanceAllowed = _nextInterval->inclusiveMax;
         }
 
         WorkingSetID nextMemberID;
         PlanStage::StageState intervalState = _nextInterval->covering->work(&nextMemberID);
 
         if (PlanStage::IS_EOF == intervalState) {
-
-            _stats->children.push_back(_nextInterval->covering->getStats());
-            _nextInterval.reset();
-            _nextIntervalSeen.clear();
-
+            _nextInterval = NULL;
             _searchState = SearchState_Advancing;
             return PlanStage::NEED_TIME;
         }
         else if (PlanStage::FAILURE == intervalState) {
             *error = WorkingSetCommon::getMemberStatus(*_workingSet->get(nextMemberID));
+            return intervalState;
+        }
+        else if (PlanStage::NEED_FETCH == intervalState) {
+            *toReturn = nextMemberID;
             return intervalState;
         }
         else if (PlanStage::ADVANCED != intervalState) {
@@ -189,17 +224,19 @@ namespace mongo {
 
         // The child stage may not dedup so we must dedup them ourselves.
         if (_nextInterval->dedupCovering && nextMember->hasLoc()) {
-            if (_nextIntervalSeen.end() != _nextIntervalSeen.find(nextMember->loc))
+            if (_nextIntervalSeen.end() != _nextIntervalSeen.find(nextMember->loc)) {
+                _workingSet->free(nextMemberID);
                 return PlanStage::NEED_TIME;
+            }
         }
 
         ++_nextIntervalStats->numResultsFound;
 
         StatusWith<double> distanceStatus = computeDistance(nextMember);
 
-        // Store the member's DiskLoc, if available, for quick invalidation
+        // Store the member's RecordId, if available, for quick invalidation
         if (nextMember->hasLoc()) {
-            _nextIntervalSeen.insert(make_pair(nextMember->loc, nextMemberID));
+            _nextIntervalSeen.insert(std::make_pair(nextMember->loc, nextMemberID));
         }
 
         if (!distanceStatus.isOK()) {
@@ -245,6 +282,9 @@ namespace mongo {
         }
         else {
             // We won't pass this WSM up, so deallocate it
+            if (nextMember->hasLoc()) {
+                _nextIntervalSeen.erase(nextMember->loc);
+            }
             _workingSet->free(nextMemberID);
         }
 
@@ -253,19 +293,14 @@ namespace mongo {
 
     PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 
-        if (_limit >= 0 && _totalReturned >= _limit) {
-
-            getNearStats()->intervalStats.push_back(*_nextIntervalStats);
-            _nextIntervalStats.reset();
-
-            _searchState = SearchState_Finished;
-            return PlanStage::IS_EOF;
-        }
-
         if (_resultBuffer.empty()) {
 
             getNearStats()->intervalStats.push_back(*_nextIntervalStats);
             _nextIntervalStats.reset();
+
+            // We're done returning the documents buffered for this annulus, so we can
+            // clear out our buffered RecordIds.
+            _nextIntervalSeen.clear();
 
             _searchState = SearchState_Buffering;
             return PlanStage::NEED_TIME;
@@ -273,7 +308,14 @@ namespace mongo {
 
         *toReturn = _resultBuffer.top().resultID;
         _resultBuffer.pop();
-        ++_totalReturned;
+
+        // If we're returning something, take it out of our RecordId -> WSID map so that future
+        // calls to invalidate don't cause us to take action for a RecordId we're done with.
+        WorkingSetMember* member = _workingSet->get(*toReturn);
+        if (member->hasLoc()) {
+            _nextIntervalSeen.erase(member->loc);
+        }
+
         return PlanStage::ADVANCED;
     }
 
@@ -282,54 +324,58 @@ namespace mongo {
     }
 
     void NearStage::saveState() {
+        _txn = NULL;
         ++_stats->common.yields;
-        if (_nextInterval) {
-            _nextInterval->covering->saveState();
+        for (size_t i = 0; i < _childrenIntervals.size(); i++) {
+            _childrenIntervals[i]->covering->saveState();
         }
     }
 
     void NearStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
+        _txn = opCtx;
         ++_stats->common.unyields;
-        if (_nextInterval) {
-            _nextInterval->covering->restoreState(opCtx);
+        for (size_t i = 0; i < _childrenIntervals.size(); i++) {
+            _childrenIntervals[i]->covering->restoreState(opCtx);
         }
     }
 
-    void NearStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void NearStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_stats->common.invalidates;
-        if (_nextInterval) {
-            _nextInterval->covering->invalidate(dl, type);
+        for (size_t i = 0; i < _childrenIntervals.size(); i++) {
+            _childrenIntervals[i]->covering->invalidate(txn, dl, type);
         }
 
-        // If a result is in _resultBuffer and has a DiskLoc it will be in _nextIntervalSeen as
-        // well. It's safe to return the result w/o the DiskLoc, so just fetch the result.
-        unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher>::iterator seenIt = _nextIntervalSeen
+        // If a result is in _resultBuffer and has a RecordId it will be in _nextIntervalSeen as
+        // well. It's safe to return the result w/o the RecordId, so just fetch the result.
+        unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt = _nextIntervalSeen
             .find(dl);
 
         if (seenIt != _nextIntervalSeen.end()) {
 
             WorkingSetMember* member = _workingSet->get(seenIt->second);
             verify(member->hasLoc());
-            WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
             verify(!member->hasLoc());
 
-            // Don't keep it around in the seen map since there's no valid DiskLoc anymore
+            // Don't keep it around in the seen map since there's no valid RecordId anymore
             _nextIntervalSeen.erase(seenIt);
         }
     }
 
     vector<PlanStage*> NearStage::getChildren() const {
-        // TODO: Keep around all our interval stages and report as children
-        return vector<PlanStage*>();
+        vector<PlanStage*> children;
+        for (size_t i = 0; i < _childrenIntervals.size(); i++) {
+            children.push_back(_childrenIntervals[i]->covering.get());
+        }
+        return children;
     }
 
     PlanStageStats* NearStage::getStats() {
         PlanStageStats* statsClone = _stats->clone();
-
-        // If we have an active interval, add those child stats as well
-        if (_nextInterval)
-            statsClone->children.push_back(_nextInterval->covering->getStats());
-
+        for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
+            statsClone->children.push_back(_childrenIntervals[i]->covering->getStats());
+        }
         return statsClone;
     }
 

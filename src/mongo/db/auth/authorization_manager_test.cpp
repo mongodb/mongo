@@ -28,6 +28,7 @@
 /**
  * Unit tests of the AuthorizationManager type.
  */
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
@@ -48,6 +49,9 @@
 
 namespace mongo {
 namespace {
+
+    using boost::scoped_ptr;
+    using std::vector;
 
     TEST(RoleParsingTest, BuildRoleBSON) {
         RoleGraph graph;
@@ -152,7 +156,8 @@ namespace {
     class AuthorizationManagerTest : public ::mongo::unittest::Test {
     public:
         virtual ~AuthorizationManagerTest() {
-            authzManager->invalidateUserCache();
+            if (authzManager)
+                authzManager->invalidateUserCache();
         }
 
         void setUp() {
@@ -170,7 +175,10 @@ namespace {
     TEST_F(AuthorizationManagerTest, testAcquireV2User) {
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
 
+        OperationContextNoop txn;
+
         ASSERT_OK(externalState->insertPrivilegeDocument(
+                &txn,
                 "admin",
                 BSON("_id" << "admin.v2read" <<
                      "user" << "v2read" <<
@@ -179,6 +187,7 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("role" << "read" << "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(externalState->insertPrivilegeDocument(
+                &txn,
                 "admin",
                 BSON("_id" << "admin.v2cluster" <<
                      "user" << "v2cluster" <<
@@ -186,8 +195,6 @@ namespace {
                      "credentials" << BSON("MONGODB-CR" << "password") <<
                      "roles" << BSON_ARRAY(BSON("role" << "clusterAdmin" << "db" << "admin"))),
                 BSONObj()));
-
-        OperationContextNoop txn;
 
         User* v2read;
         ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2read", "test"), &v2read));

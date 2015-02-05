@@ -2,8 +2,8 @@ Name: mongodb-enterprise
 Conflicts: mongo-10gen, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
 Obsoletes: mongodb-enterprise-unstable, mongo-enterprise-unstable, mongo-10gen-enterprise
 Provides: mongo-10gen-enterprise
-Version: 2.7.5-pre-
-Release: 1%{?dist}
+Version: %{dynamic_version}
+Release: %{dynamic_release}%{?dist}
 Summary: MongoDB open source document-oriented database system (enterprise metapackage)
 License: AGPL 3.0
 URL: http://www.mongodb.org
@@ -33,7 +33,7 @@ This metapackage will install the mongo shell, import/export tools, other client
 
 %package server
 Summary: MongoDB database server (enterprise)
-Requires: openssl, net-snmp, net-snmp-libs, cyrus-sasl, cyrus-sasl-lib, cyrus-sasl-gssapi, krb5-libs
+Requires: openssl, net-snmp, cyrus-sasl, cyrus-sasl-plain, cyrus-sasl-gssapi
 Conflicts: mongo-10gen, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
 Obsoletes: mongo-10gen-enterprise-server
 Provides: mongo-10gen-enterprise-server
@@ -58,7 +58,7 @@ This package contains the MongoDB server software, default configuration files, 
 
 %package shell
 Summary: MongoDB shell client (enterprise)
-Requires: openssl, cyrus-sasl, cyrus-sasl-lib, cyrus-sasl-gssapi, krb5-libs
+Requires: openssl, cyrus-sasl, cyrus-sasl-plain, cyrus-sasl-gssapi
 Conflicts: mongo-10gen, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
 Obsoletes: mongo-10gen-enterprise-shell
 Provides: mongo-10gen-enterprise-shell
@@ -107,7 +107,7 @@ This package contains mongos, the MongoDB sharded cluster query router.
 
 %package tools
 Summary: MongoDB tools (enterprise)
-Requires: openssl, cyrus-sasl, cyrus-sasl-lib, cyrus-sasl-gssapi, krb5-libs
+Requires: openssl, cyrus-sasl, cyrus-sasl-plain, cyrus-sasl-gssapi
 Conflicts: mongo-10gen, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
 Obsoletes: mongo-10gen-enterprise-tools
 Provides: mongo-10gen-enterprise-tools
@@ -166,9 +166,9 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 # FIXME: remove this rm when mongosniff is back in the package
 rm -v $RPM_BUILD_ROOT/usr/share/man/man1/mongosniff.1*
-mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
-cp -v rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
-chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
+mkdir -p $RPM_BUILD_ROOT/etc/init.d
+cp -v rpm/init.d-mongod $RPM_BUILD_ROOT/etc/init.d/mongod
+chmod a+x $RPM_BUILD_ROOT/etc/init.d/mongod
 mkdir -p $RPM_BUILD_ROOT/etc
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
@@ -214,7 +214,7 @@ fi
 %config(noreplace) /etc/mongod.conf
 %{_bindir}/mongod
 %{_mandir}/man1/mongod.1*
-/etc/rc.d/init.d/mongod
+/etc/init.d/mongod
 /etc/sysconfig/mongod
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongodb

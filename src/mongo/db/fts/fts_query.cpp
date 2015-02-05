@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_spec.h"
@@ -42,9 +42,15 @@ namespace mongo {
 
         using namespace mongoutils;
 
-        Status FTSQuery::parse(const string& query, const StringData& language) {
+        using std::set;
+        using std::string;
+        using std::stringstream;
+        using std::vector;
+
+        Status FTSQuery::parse(const string& query, const StringData& language,
+                               TextIndexVersion textIndexVersion) {
             _search = query;
-            StatusWithFTSLanguage swl = FTSLanguage::make( language, TEXT_INDEX_VERSION_2 );
+            StatusWithFTSLanguage swl = FTSLanguage::make( language, textIndexVersion );
             if ( !swl.getStatus().isOK() ) {
                 return swl.getStatus();
             }

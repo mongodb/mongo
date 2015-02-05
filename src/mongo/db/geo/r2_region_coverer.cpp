@@ -26,14 +26,17 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/geo/shapes.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+    using std::less;
 
     // Definition
     int const R2RegionCoverer::kDefaultMaxCells = 8;
@@ -133,7 +136,7 @@ namespace mongo {
     // Caller owns the returned pointer
     R2RegionCoverer::Candidate* R2RegionCoverer::newCandidate( const GeoHash& cell ) {
         // Exclude the cell that doesn't intersect with the geometry.
-        Box box = _hashConverter->unhashToBox(cell);
+        Box box = _hashConverter->unhashToBoxCovering(cell);
 
         if (_region->fastDisjoint(box)) {
             return NULL;
@@ -191,7 +194,7 @@ namespace mongo {
     // Dones't take ownership of "candidate"
     int R2RegionCoverer::expandChildren( Candidate* candidate ) {
         GeoHash childCells[4];
-        candidate->cell.subdivide(childCells);
+        invariant(candidate->cell.subdivide(childCells));
 
         int numTerminals = 0;
         for (int i = 0; i < 4; ++i) {

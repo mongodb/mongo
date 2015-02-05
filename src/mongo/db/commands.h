@@ -32,12 +32,15 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client_basic.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -60,7 +63,14 @@ namespace mutablebson {
         // The type of the first field in 'cmdObj' must be mongo::String. The first field is
         // interpreted as a collection name.
         std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj) const;
+
+        // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
+        // The first field is interpreted as a collection name.
+        std::string parseNsCollectionRequired(const std::string& dbname,
+                                              const BSONObj& cmdObj) const;
     public:
+
+        typedef StringMap<Command*> CommandMap;
 
         // Return the namespace for the command. If the first field in 'cmdObj' is of type
         // mongo::String, then that field is interpreted as the collection name, and is
@@ -153,7 +163,7 @@ namespace mutablebson {
         virtual Status explain(OperationContext* txn,
                                const std::string& dbname,
                                const BSONObj& cmdObj,
-                               Explain::Verbosity verbosity,
+                               ExplainCommon::Verbosity verbosity,
                                BSONObjBuilder* out) const {
             return Status(ErrorCodes::IllegalOperation, "Cannot explain cmd: " + name);
         }
@@ -172,6 +182,12 @@ namespace mutablebson {
          * The default implementation does nothing.
          */
         virtual void redactForLogging(mutablebson::Document* cmdObj);
+
+        /**
+         * Returns a copy of "cmdObj" in a form suitable for writing to logs.
+         * Uses redactForLogging() to transform "cmdObj".
+         */
+        BSONObj getRedactedCopyForLogging(const BSONObj& cmdObj);
 
         /* Return true if a replica set secondary should go into "recovering"
            (unreadable) state while running this command.
@@ -213,9 +229,17 @@ namespace mutablebson {
 
         static void logIfSlow( const Timer& cmdTimer,  const std::string& msg);
 
-        static std::map<std::string,Command*> * _commands;
-        static std::map<std::string,Command*> * _commandsByBestName;
-        static std::map<std::string,Command*> * _webCommands;
+        static CommandMap* _commands;
+        static CommandMap* _commandsByBestName;
+        static CommandMap* _webCommands;
+
+        // Counters for how many times this command has been executed and failed
+        Counter64 _commandsExecuted;
+        Counter64 _commandsFailed;
+
+        // Pointers to hold the metrics tree references
+        ServerStatusMetricField<Counter64> _commandsExecutedMetric;
+        ServerStatusMetricField<Counter64> _commandsFailedMetric;
 
     public:
         // Stops all index builds required to run this command and returns index builds killed.
@@ -223,18 +247,21 @@ namespace mutablebson {
                                                      Database* db, 
                                                      const BSONObj& cmdObj);
 
-        static const std::map<std::string,Command*>* commandsByBestName() { return _commandsByBestName; }
-        static const std::map<std::string,Command*>* webCommands() { return _webCommands; }
+        static const CommandMap* commandsByBestName() { return _commandsByBestName; }
+        static const CommandMap* webCommands() { return _webCommands; }
+
+        // Counter for unknown commands
+        static Counter64 unknownCommands;
+
         /** @return if command was found */
         static void runAgainstRegistered(const char *ns,
                                          BSONObj& jsobj,
                                          BSONObjBuilder& anObjBuilder,
                                          int queryOptions = 0);
-        static Command * findCommand( const std::string& name );
+        static Command* findCommand( const StringData& name );
         // For mongod and webserver.
         static void execCommand(OperationContext* txn,
                                 Command* c,
-                                Client& client,
                                 int queryOptions,
                                 const char *ns,
                                 BSONObj& cmdObj,
@@ -260,6 +287,33 @@ namespace mutablebson {
         // by running a command.  Returns ErrorCodes::CommandResultSchemaViolation if "result" does
         // not look like the result of a command.
         static Status getStatusFromCommandResult(const BSONObj& result);
+
+        /**
+         * Parses cursor options from the command request object "cmdObj".  Used by commands that
+         * take cursor options.  The only cursor option currently supported is "cursor.batchSize".
+         *
+         * If a valid batch size was specified, returns Status::OK() and fills in "batchSize" with
+         * the specified value.  If no batch size was specified, returns Status::OK() and fills in
+         * "batchSize" with the provided default value.
+         *
+         * If an error occurred while parsing, returns an error Status.  If this is the case, the
+         * value pointed to by "batchSize" is unspecified.
+         */
+        static Status parseCommandCursorOptions(const BSONObj& cmdObj,
+                                                long long defaultBatchSize,
+                                                long long* batchSize);
+
+        /**
+         * Builds a cursor response object from the provided cursor identifiers and "firstBatch",
+         * and appends the response object to the provided builder under the field name "cursor".
+         *
+         * The response object has the following format:
+         *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> }.
+         */
+        static void appendCursorResponseObject(long long cursorId,
+                                               StringData cursorNamespace,
+                                               BSONArray firstBatch,
+                                               BSONObjBuilder* builder);
 
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;

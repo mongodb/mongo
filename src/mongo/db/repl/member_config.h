@@ -58,6 +58,9 @@ namespace repl {
         static const std::string kArbiterOnlyFieldName;
         static const std::string kBuildIndexesFieldName;
         static const std::string kTagsFieldName;
+        static const std::string kInternalVoterTagName;
+        static const std::string kInternalElectableTagName;
+        static const std::string kInternalAllTagName;
 
         /**
          * Default constructor, produces a MemberConfig in an undefined state.
@@ -107,7 +110,7 @@ namespace repl {
         /**
          * Returns true if this member may vote in elections.
          */
-        bool isVoter() const { return _isVoter; }
+        bool isVoter() const { return _votes != 0; }
 
         /**
          * Returns the number of votes that this member gets.
@@ -130,9 +133,15 @@ namespace repl {
         bool shouldBuildIndexes() const { return _buildIndexes; }
 
         /**
-         * Gets the number of replica set tags for this member.
+         * Gets the number of replica set tags, including internal '$' tags, for this member.
          */
         size_t getNumTags() const { return _tags.size(); }
+
+        /**
+         * Returns true if this MemberConfig has any non-internal tags, using "tagConfig" to
+         * determine the internal property of the tags.
+         */
+        bool hasTags(const ReplicaSetTagConfig& tagConfig) const;
 
         /**
          * Gets a begin iterator over the tags for this member.
@@ -159,7 +168,7 @@ namespace repl {
         int _id;
         HostAndPort _host;
         double _priority;      // 0 means can never be primary
-        bool _isVoter;       // Can this member vote? default true.
+        int _votes;            // Can this member vote? Only 0 and 1 are valid.  Default 1.
         bool _arbiterOnly;
         Seconds _slaveDelay;
         bool _hidden;          // if set, don't advertise to drivers in isMaster.

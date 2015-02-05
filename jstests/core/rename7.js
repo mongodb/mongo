@@ -27,8 +27,16 @@ assert( db_a.getCollectionNames().indexOf( "rename7" ) < 0 );
 
 assert.eq( 3, b.find().count() );
 assert( db_b.getCollectionNames().indexOf( "rename7" ) >= 0 );
-assert( b.find( {a: 1} ).explain().cursor.match( /^BtreeCursor/ ) );
 
+a.drop();
+b.drop();
+
+// Test that the dropTarget option works when renaming across databases.
+a.save( {} );
+b.save( {} );
+assert.commandFailed( admin.runCommand( {renameCollection: "db_a.rename7", to: "db_b.rename7"} ) );
+assert.commandWorked( admin.runCommand( {renameCollection: "db_a.rename7",
+                                         to: "db_b.rename7", dropTarget: true} ) );
 a.drop();
 b.drop();
 

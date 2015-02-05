@@ -26,15 +26,20 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/query/canonical_query.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/util/log.h"
 
 
 namespace {
 
+    using boost::shared_ptr;
     using std::auto_ptr;
     using std::string;
     using namespace mongo;
@@ -118,7 +123,6 @@ namespace {
         case MatchExpression::OR: return "or"; break;
         case MatchExpression::NOR: return "nr"; break;
         case MatchExpression::NOT: return "nt"; break;
-        case MatchExpression::ALL: return "al"; break;
         case MatchExpression::ELEM_MATCH_OBJECT: return "eo"; break;
         case MatchExpression::ELEM_MATCH_VALUE: return "ev"; break;
         case MatchExpression::SIZE: return "sz"; break;
@@ -151,13 +155,13 @@ namespace {
      * - CRS (flat or spherical)
      */
     void encodeGeoMatchExpression(const GeoMatchExpression* tree, mongoutils::str::stream* os) {
-        const GeoQuery& geoQuery = tree->getGeoQuery();
+        const GeoExpression& geoQuery = tree->getGeoExpression();
 
         // Type of geo query.
         switch (geoQuery.getPred()) {
-        case GeoQuery::WITHIN: *os << "wi"; break;
-        case GeoQuery::INTERSECT: *os << "in"; break;
-        case GeoQuery::INVALID: *os << "id"; break;
+        case GeoExpression::WITHIN: *os << "wi"; break;
+        case GeoExpression::INTERSECT: *os << "in"; break;
+        case GeoExpression::INVALID: *os << "id"; break;
         }
 
         // Geometry type.
@@ -170,6 +174,9 @@ namespace {
         }
         else if (SPHERE == geoQuery.getGeometry().getNativeCRS()) {
             *os << "sp";
+        }
+        else if (STRICT_SPHERE == geoQuery.getGeometry().getNativeCRS()) {
+            *os << "ss";
         }
         else {
             error() << "unknown CRS type " << (int)geoQuery.getGeometry().getNativeCRS()
@@ -186,17 +193,18 @@ namespace {
      */
     void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree,
                                       mongoutils::str::stream* os) {
-        const NearQuery& nearQuery = tree->getData();
+        const GeoNearExpression& nearQuery = tree->getData();
 
         // isNearSphere
         *os << (nearQuery.isNearSphere ? "ns" : "nr");
 
-        // CRS (flat or spherical)
-        switch (nearQuery.centroid.crs) {
+        // CRS (flat or spherical or strict-winding spherical)
+        switch (nearQuery.centroid->crs) {
         case FLAT: *os << "fl"; break;
         case SPHERE: *os << "sp"; break;
+        case STRICT_SPHERE: *os << "ss"; break;
         case UNSET:
-            error() << "unknown CRS type " << (int)nearQuery.centroid.crs
+            error() << "unknown CRS type " << (int)nearQuery.centroid->crs
                     << " in point geometry for near query";
             invariant(false);
             break;
@@ -325,6 +333,28 @@ namespace mongo {
     }
 
     // static
+    Status CanonicalQuery::canonicalize(const std::string& ns,
+                                        const BSONObj& query,
+                                        bool explain,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        const BSONObj emptyObj;
+        return CanonicalQuery::canonicalize(ns,
+                                            query,
+                                            emptyObj, // sort
+                                            emptyObj, // projection
+                                            0, // skip
+                                            0, // limit
+                                            emptyObj, // hint
+                                            emptyObj, // min
+                                            emptyObj, // max
+                                            false, // snapshot
+                                            explain,
+                                            out,
+                                            whereCallback);
+    }
+
+    // static
     Status CanonicalQuery::canonicalize(const string& ns,
                                         const BSONObj& query,
                                         long long skip,
@@ -398,17 +428,26 @@ namespace mongo {
         Status parseStatus = LiteParsedQuery::make(qm, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
+        return CanonicalQuery::canonicalize(lpq, out, whereCallback);
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(LiteParsedQuery* lpq,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        auto_ptr<LiteParsedQuery> autoLpq(lpq);
+
         // Make MatchExpression.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter(), whereCallback);
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(autoLpq->getFilter(),
+                                                                      whereCallback);
         if (!swme.isOK()) {
-            delete lpq;
             return swme.getStatus();
         }
 
         // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
         // Takes ownership of lpq and the MatchExpression* in swme.
-        Status initStatus = cq->init(lpq, whereCallback, swme.getValue());
+        Status initStatus = cq->init(autoLpq.release(), whereCallback, swme.getValue());
 
         if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
@@ -461,27 +500,28 @@ namespace mongo {
                                         bool explain,
                                         CanonicalQuery** out,
                                         const MatchExpressionParser::WhereCallback& whereCallback) {
-        LiteParsedQuery* lpq;
+        LiteParsedQuery* lpqRaw;
         // Pass empty sort and projection.
         BSONObj emptyObj;
         Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort,
-                                                   hint, minObj, maxObj, snapshot, explain, &lpq);
+                                                   hint, minObj, maxObj, snapshot, explain,
+                                                   &lpqRaw);
         if (!parseStatus.isOK()) {
             return parseStatus;
         }
+        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         // Build a parse tree from the BSONObj in the parsed query.
         StatusWithMatchExpression swme = 
                             MatchExpressionParser::parse(lpq->getFilter(), whereCallback);
         if (!swme.isOK()) {
-            delete lpq;
             return swme.getStatus();
         }
 
         // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
         // Takes ownership of lpq and the MatchExpression* in swme.
-        Status initStatus = cq->init(lpq, whereCallback, swme.getValue());
+        Status initStatus = cq->init(lpq.release(), whereCallback, swme.getValue());
 
         if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
@@ -491,6 +531,7 @@ namespace mongo {
     Status CanonicalQuery::init(LiteParsedQuery* lpq,
                                 const MatchExpressionParser::WhereCallback& whereCallback,
                                 MatchExpression* root) {
+        _isForWrite = false;
         _pq.reset(lpq);
 
         // Normalize, sort and validate tree.
@@ -623,6 +664,12 @@ namespace mongo {
             // normalizeTree(...) takes ownership of 'child', and then
             // transfers ownership of its return value to 'nme'.
             nme->resetChild(normalizeTree(child));
+        }
+        else if (MatchExpression::ELEM_MATCH_VALUE == root->matchType()) {
+            // Just normalize our children.
+            for (size_t i = 0; i < root->getChildVector()->size(); ++i) {
+                (*root->getChildVector())[i] = normalizeTree(root->getChild(i));
+            }
         }
 
         return root;

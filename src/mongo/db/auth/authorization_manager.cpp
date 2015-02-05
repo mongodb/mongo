@@ -26,10 +26,13 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_manager.h"
 
+#include <boost/bind.hpp>
 #include <boost/thread/mutex.hpp>
 #include <memory>
 #include <string>
@@ -41,11 +44,13 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/auth_helpers.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_graph.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
@@ -59,6 +64,10 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::string;
+    using std::vector;
 
     AuthInfo internalSecurity;
 
@@ -107,6 +116,7 @@ namespace mongo {
     const int AuthorizationManager::schemaVersion24;
     const int AuthorizationManager::schemaVersion26Upgrade;
     const int AuthorizationManager::schemaVersion26Final;
+    const int AuthorizationManager::schemaVersion28SCRAM;
 #endif
 
     /**
@@ -299,12 +309,14 @@ namespace mongo {
         return _externalState->hasAnyPrivilegeDocuments(txn);
     }
 
-    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded() {
+    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded(OperationContext* txn,
+                                                                int foundSchemaVersion) {
         Status status =  _externalState->updateOne(
+                txn,
                 AuthorizationManager::versionCollectionNamespace,
                 AuthorizationManager::versionDocumentQuery,
                 BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
-                                    AuthorizationManager::schemaVersion26Final)),
+                                    foundSchemaVersion)),
                 true,  // upsert
                 BSONObj());  // write concern
         if (status == ErrorCodes::NoMatchingDocument) {    // SERVER-11492
@@ -313,28 +325,33 @@ namespace mongo {
         return status;
     }
 
-    Status AuthorizationManager::insertPrivilegeDocument(const std::string& dbname,
+    Status AuthorizationManager::insertPrivilegeDocument(OperationContext* txn,
+                                                         const std::string& dbname,
                                                          const BSONObj& userObj,
                                                          const BSONObj& writeConcern) const {
-        return _externalState->insertPrivilegeDocument(dbname, userObj, writeConcern);
+        return _externalState->insertPrivilegeDocument(txn, dbname, userObj, writeConcern);
     }
 
-    Status AuthorizationManager::updatePrivilegeDocument(const UserName& user,
+    Status AuthorizationManager::updatePrivilegeDocument(OperationContext* txn,
+                                                         const UserName& user,
                                                          const BSONObj& updateObj,
                                                          const BSONObj& writeConcern) const {
-        return _externalState->updatePrivilegeDocument(user, updateObj, writeConcern);
+        return _externalState->updatePrivilegeDocument(txn, user, updateObj, writeConcern);
     }
 
-    Status AuthorizationManager::removePrivilegeDocuments(const BSONObj& query,
+    Status AuthorizationManager::removePrivilegeDocuments(OperationContext* txn,
+                                                          const BSONObj& query,
                                                           const BSONObj& writeConcern,
                                                           int* numRemoved) const {
-        return _externalState->removePrivilegeDocuments(query, writeConcern, numRemoved);
+        return _externalState->removePrivilegeDocuments(txn, query, writeConcern, numRemoved);
     }
 
-    Status AuthorizationManager::removeRoleDocuments(const BSONObj& query,
+    Status AuthorizationManager::removeRoleDocuments(OperationContext* txn,
+                                                     const BSONObj& query,
                                                      const BSONObj& writeConcern,
                                                      int* numRemoved) const {
-        Status status = _externalState->remove(rolesCollectionNamespace,
+        Status status = _externalState->remove(txn,
+                                               rolesCollectionNamespace,
                                                query,
                                                writeConcern,
                                                numRemoved);
@@ -344,9 +361,11 @@ namespace mongo {
         return status;
     }
 
-    Status AuthorizationManager::insertRoleDocument(const BSONObj& roleObj,
+    Status AuthorizationManager::insertRoleDocument(OperationContext* txn,
+                                                    const BSONObj& roleObj,
                                                     const BSONObj& writeConcern) const {
-        Status status = _externalState->insert(rolesCollectionNamespace,
+        Status status = _externalState->insert(txn,
+                                               rolesCollectionNamespace,
                                                roleObj,
                                                writeConcern);
         if (status.isOK()) {
@@ -365,10 +384,12 @@ namespace mongo {
         return status;
     }
 
-    Status AuthorizationManager::updateRoleDocument(const RoleName& role,
+    Status AuthorizationManager::updateRoleDocument(OperationContext* txn,
+                                                    const RoleName& role,
                                                     const BSONObj& updateObj,
                                                     const BSONObj& writeConcern) const {
         Status status = _externalState->updateOne(
+                txn,
                 rolesCollectionNamespace,
                 BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
                      AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
@@ -398,14 +419,16 @@ namespace mongo {
         return _externalState->query(txn, collectionName, query, projection, resultProcessor);
     }
 
-    Status AuthorizationManager::updateAuthzDocuments(const NamespaceString& collectionName,
+    Status AuthorizationManager::updateAuthzDocuments(OperationContext* txn,
+                                                      const NamespaceString& collectionName,
                                                       const BSONObj& query,
                                                       const BSONObj& updatePattern,
                                                       bool upsert,
                                                       bool multi,
                                                       const BSONObj& writeConcern,
                                                       int* nMatched) const {
-        return _externalState->update(collectionName,
+        return _externalState->update(txn,
+                                      collectionName,
                                       query,
                                       updatePattern,
                                       upsert,
@@ -495,6 +518,10 @@ namespace mongo {
             return status;
         }
         status = parser.initializeUserPrivilegesFromUserDocument(privDoc, user);
+        if (!status.isOK()) {
+            return status;
+        }
+
         return Status::OK();
     }
 
@@ -568,6 +595,7 @@ namespace mongo {
                                 "Illegal value for authorization data schema version, " <<
                                 authzVersion);
                 break;
+            case schemaVersion28SCRAM:
             case schemaVersion26Final:
             case schemaVersion26Upgrade:
                 status = _fetchUserV2(txn, userName, &user);
@@ -593,7 +621,7 @@ namespace mongo {
         user->incrementRefCount();
         // NOTE: It is not safe to throw an exception from here to the end of the method.
         if (guard.isSameCacheGeneration()) {
-            _userCache.insert(make_pair(userName, user.get()));
+            _userCache.insert(std::make_pair(userName, user.get()));
             if (_version == schemaVersionInvalid)
                 _version = authzVersion;
         }
@@ -709,6 +737,107 @@ namespace mongo {
         return _externalState->releaseAuthzUpdateLock();
     }
 
+namespace {
+
+    /**
+     * Logs that the auth schema upgrade failed because of "status" and returns "status".
+     */
+    Status logUpgradeFailed(const Status& status) {
+        log() << "Auth schema upgrade failed with " << status;
+        return status;
+    }
+
+    /** 
+     * Updates a single user document from MONGODB-CR to SCRAM credentials.
+     *
+     * Throws a DBException on errors.
+     */
+    void updateUserCredentials(OperationContext* txn,
+                               AuthzManagerExternalState* externalState,
+                               const StringData& sourceDB,
+                               const BSONObj& userDoc,
+                               const BSONObj& writeConcern) {
+        BSONElement credentialsElement = userDoc["credentials"];
+        uassert(18806,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
+                        "with missing or incorrectly formatted credentials: "
+                        << userDoc.toString(),
+                        credentialsElement.type() == Object);
+
+        BSONObj credentialsObj = credentialsElement.Obj();
+        BSONElement mongoCRElement = credentialsObj["MONGODB-CR"];
+        BSONElement scramElement = credentialsObj["SCRAM-SHA-1"];
+
+        // Ignore any user documents that already have SCRAM credentials. This should only
+        // occur if a previous authSchemaUpgrade was interrupted halfway.
+        if (!scramElement.eoo()) {
+            return;
+        }
+
+        uassert(18744,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
+                        "missing MONGODB-CR credentials :"
+                        << userDoc.toString(),
+                !mongoCRElement.eoo());
+
+        std::string hashedPassword = mongoCRElement.String();
+
+        BSONObj query = BSON("_id" <<  userDoc["_id"].String());
+        BSONObjBuilder updateBuilder;
+        {
+            BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
+            toSetBuilder << "credentials" <<
+                            BSON("SCRAM-SHA-1" << scram::generateCredentials(hashedPassword,
+                                        saslGlobalParams.scramIterationCount));
+        }
+
+        uassertStatusOK(externalState->updateOne(txn,
+                                                 NamespaceString("admin", "system.users"),
+                                                 query,
+                                                 updateBuilder.obj(),
+                                                 true,
+                                                 writeConcern));
+    }
+
+    /** Loop through all the user documents in the admin.system.users collection.
+     *  For each user document:
+     *   1. Compute SCRAM credentials based on the MONGODB-CR hash
+     *   2. Remove the MONGODB-CR hash
+     *   3. Add SCRAM credentials to the user document credentials section
+     */
+    Status updateCredentials(
+            OperationContext* txn,
+            AuthzManagerExternalState* externalState,
+            const BSONObj& writeConcern) {
+
+        // Loop through and update the user documents in admin.system.users.
+        Status status = externalState->query(
+                txn,
+                NamespaceString("admin", "system.users"),
+                BSONObj(),
+                BSONObj(),
+                boost::bind(updateUserCredentials, txn, externalState, "admin", _1, writeConcern));
+        if (!status.isOK())
+            return logUpgradeFailed(status);
+
+        // Update the schema version document.
+        status = externalState->updateOne(
+                txn,
+                AuthorizationManager::versionCollectionNamespace,
+                AuthorizationManager::versionDocumentQuery,
+                BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
+                                    AuthorizationManager::schemaVersion28SCRAM)),
+                true,
+                writeConcern);
+        if (!status.isOK())
+            return logUpgradeFailed(status);
+
+        return Status::OK();
+    }
+} //namespace
+
     Status AuthorizationManager::upgradeSchemaStep(
                             OperationContext* txn, const BSONObj& writeConcern, bool* isDone) {
         int authzVersion;
@@ -719,8 +848,12 @@ namespace mongo {
 
         switch (authzVersion) {
         case schemaVersion26Final:
-            *isDone = true;
-            return Status::OK();
+        case schemaVersion28SCRAM: {
+            Status status = updateCredentials(txn, _externalState.get(), writeConcern);
+            if (status.isOK())
+                *isDone = true;
+            return status;
+        }
         default:
             return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
                           "Do not know how to upgrade auth schema from version " << authzVersion);

@@ -1,5 +1,3 @@
-// rocks_recovery_unit.h
-
 /**
 *    Copyright (C) 2014 MongoDB Inc.
 *
@@ -30,52 +28,124 @@
 
 #pragma once
 
+#include <atomic>
 #include <map>
+#include <stack>
 #include <string>
+#include <vector>
+#include <unordered_map>
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/rocks/rocks_transaction.h"
 
 namespace rocksdb {
     class DB;
-    class WriteBatch;
+    class Snapshot;
+    class WriteBatchWithIndex;
+    class Comparator;
+    class Status;
+    class ColumnFamilyHandle;
+    class Slice;
+    class Iterator;
 }
 
 namespace mongo {
 
+    class OperationContext;
+
     class RocksRecoveryUnit : public RecoveryUnit {
         MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
     public:
-        RocksRecoveryUnit( rocksdb::DB* db, bool defaultCommit );
+        RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db, bool durable);
         virtual ~RocksRecoveryUnit();
 
-        virtual void beginUnitOfWork();
+        virtual void beginUnitOfWork(OperationContext* opCtx);
         virtual void commitUnitOfWork();
 
         virtual void endUnitOfWork();
 
-        virtual bool commitIfNeeded(bool force = false);
-
         virtual bool awaitCommit();
 
-        virtual bool isCommitNeeded() const;
+        virtual void commitAndRestart();
 
-        virtual void* writingPtr(void* data, size_t len);
+        virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }
 
-        virtual void syncDataAndTruncateJournal();
+        virtual void registerChange(Change* change);
+
+        virtual void setRollbackWritesDisabled() {}
+
+        virtual SnapshotId getSnapshotId() const;
 
         // local api
 
-        rocksdb::WriteBatch* writeBatch();
+        rocksdb::WriteBatchWithIndex* writeBatch();
+
+        const rocksdb::Snapshot* snapshot();
+        bool hasSnapshot() { return _snapshot != nullptr; }
+
+        RocksTransaction* transaction() { return &_transaction; }
+
+        rocksdb::Status Get(rocksdb::ColumnFamilyHandle* columnFamily, const rocksdb::Slice& key,
+                            std::string* value);
+
+        rocksdb::Iterator* NewIterator(rocksdb::ColumnFamilyHandle* columnFamily);
+
+        void incrementCounter(const rocksdb::Slice& counterKey,
+                              std::atomic<long long>* counter, long long delta);
+
+        long long getDeltaCounter(const rocksdb::Slice& counterKey);
+
+        void setOplogReadTill(const RecordId& loc);
+        RecordId getOplogReadTill() const { return _oplogReadTill; }
+
+        RocksRecoveryUnit* newRocksRecoveryUnit() {
+            return new RocksRecoveryUnit(_transactionEngine, _db, _durable);
+        }
+
+        struct Counter {
+            std::atomic<long long>* _value;
+            long long _delta;
+            Counter() : Counter(nullptr, 0) {}
+            Counter(std::atomic<long long>* value, long long delta) : _value(value), _delta(delta) {}
+        };
+
+        typedef std::unordered_map<std::string, Counter> CounterMap;
+
+        static RocksRecoveryUnit* getRocksRecoveryUnit(OperationContext* opCtx);
 
     private:
-        rocksdb::DB* _db; // now owned
-        bool _defaultCommit;
+        void _releaseSnapshot();
 
-        boost::scoped_ptr<rocksdb::WriteBatch> _writeBatch; // owned
+        void _commit();
+
+        void _abort();
+        RocksTransactionEngine* _transactionEngine;  // not owned
+        rocksdb::DB* _db; // not owned
+
+        const bool _durable;
+
+        RocksTransaction _transaction;
+
+        boost::scoped_ptr<rocksdb::WriteBatchWithIndex> _writeBatch; // owned
+
+        // bare because we need to call ReleaseSnapshot when we're done with this
+        const rocksdb::Snapshot* _snapshot; // owned
+
+        CounterMap _deltaCounters;
+
+        typedef OwnedPointerVector<Change> Changes;
+        Changes _changes;
+
         int _depth;
+        uint64_t _myTransactionCount;
+
+        RecordId _oplogReadTill;
     };
 
 }

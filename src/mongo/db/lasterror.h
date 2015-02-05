@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/tss.hpp>
 #include <string>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/bson/oid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
     class BSONObjBuilder;
@@ -136,15 +136,7 @@ namespace mongo {
         ~LastErrorHolder();
 
         LastError * get( bool create = false );
-        LastError * getSafe() {
-            LastError * le = get(false);
-            if ( ! le ) {
-                error() << " no LastError!" << std::endl;
-                verify( le );
-            }
-            return le;
-        }
-
+        LastError * getSafe();
         LastError * _get( bool create = false ); // may return a disabled LastError
 
         void reset( LastError * le );

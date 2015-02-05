@@ -29,21 +29,35 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/db.h"
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <iostream>
+
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/util/array.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/paths.h"
+#include "mongo/util/ptr.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
+#include "mongo/util/thread_safe_string.h"
 #include "mongo/util/time_support.h"
 
 namespace BasicTests {
+
+    using boost::scoped_ptr;
+    using boost::shared_ptr;
+    using std::cout;
+    using std::dec;
+    using std::endl;
+    using std::hex;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     class Rarely {
     public:
@@ -325,28 +339,6 @@ namespace BasicTests {
         }
     };
 
-    namespace ArrayTests {
-        class basic1 {
-        public:
-            void run() {
-                FastArray<int> a(100);
-                a.push_back( 5 );
-                a.push_back( 6 );
-
-                ASSERT_EQUALS( 2 , a.size() );
-
-                FastArray<int>::iterator i = a.begin();
-                ASSERT( i != a.end() );
-                ASSERT_EQUALS( 5 , *i );
-                ++i;
-                ASSERT( i != a.end() );
-                ASSERT_EQUALS( 6 , *i );
-                ++i;
-                ASSERT( i == a.end() );
-            }
-        };
-    };
-
     class ThreadSafeStringTest {
     public:
         void run() {
@@ -369,24 +361,6 @@ namespace BasicTests {
                 }
                 ASSERT_EQUALS( "eliot2" , foo );
             }
-        }
-    };
-
-
-    class DatabaseOwnsNS {
-    public:
-        void run() {
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
-
-            WriteUnitOfWork wunit(txn.recoveryUnit());
-            Database db( &txn, "dbtests_basictests_ownsns", NULL );
-            wunit.commit();
-
-            ASSERT( db.ownsNS( "dbtests_basictests_ownsns.x" ) );
-            ASSERT( db.ownsNS( "dbtests_basictests_ownsns.x.y" ) );
-            ASSERT( !db.ownsNS( "dbtests_basictests_ownsn.x.y" ) );
-            ASSERT( !db.ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
         }
     };
 
@@ -578,10 +552,6 @@ namespace BasicTests {
             add< SleepBackoffTest >();
             add< AssertTests >();
 
-            add< ArrayTests::basic1 >();
-
-            add< DatabaseOwnsNS >();
-
             add< PtrTests >();
 
             add< StringSplitterTest >();
@@ -597,7 +567,9 @@ namespace BasicTests {
             add< CompressionTest1 >();
 
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace BasicTests
 

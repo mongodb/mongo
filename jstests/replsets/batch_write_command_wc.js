@@ -69,7 +69,7 @@ printjson( result = coll.runCommand(request) );
 assert(result.ok);
 assert.eq(1, result.n);
 assert(result.writeConcernError);
-assert(result.writeConcernError.errInfo.wtimeout);
+assert.eq(100, result.writeConcernError.code);
 assert.eq(1, coll.count());
 
 //

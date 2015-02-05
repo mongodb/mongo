@@ -56,7 +56,9 @@ function testProperAuthorization(conn, t, testcase, r) {
                   " on db " + testcase.runOnDb +
                   " with role " + r.key;
         }
-        else if (res.ok == 0 && !testcase.expectFail) {
+        else if (res.ok == 0 && !testcase.expectFail && res.code != commandNotSupportedCode) {
+            // don't error if the test failed with code commandNotSupported since
+            // some storage engines (e.g wiredTiger) don't support some commands (e.g. touch)
             out = "command failed with " + tojson(res) +
                   " on db " + testcase.runOnDb +
                   " with role " + r.key;

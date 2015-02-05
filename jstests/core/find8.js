@@ -21,7 +21,3 @@ t.find( { a: { $gt:5,$lt:2} } ).itcount();
 // Check that we can record a plan for an 'invalid' range.
 assert( t.find( { a: { $gt:5,$lt:2} } ).explain( true ).oldPlan );
 }
-
-t.ensureIndex( {b:1} );
-// Check that if we do a table scan of an 'invalid' range in an or clause we don't check subsequent clauses.
-assert.eq( "BasicCursor", t.find( { $or:[{ a: { $gt:5,$lt:2} }, {b:1}] } ).explain().cursor );

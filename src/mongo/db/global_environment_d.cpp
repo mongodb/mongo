@@ -26,117 +26,240 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/db/global_environment_d.h"
 
-#include <set>
-
+#include "mongo/base/init.h"
+#include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
+#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-    GlobalEnvironmentMongoD::GlobalEnvironmentMongoD()
-        : _globalKill(false),
-          _registeredOpContextsMutex("RegisteredOpContextsMutex") {
-
+    MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+        setGlobalEnvironment(new GlobalEnvironmentMongoD());
+        return Status::OK();
     }
 
+    GlobalEnvironmentMongoD::GlobalEnvironmentMongoD()
+        : _globalKill(false),
+          _storageEngine(NULL) { }
+
     GlobalEnvironmentMongoD::~GlobalEnvironmentMongoD() {
-        if (!_registeredOpContexts.empty()) {
-            warning() << "Terminating with outstanding operation contexts." << endl;
-        }
+
     }
 
     StorageEngine* GlobalEnvironmentMongoD::getGlobalStorageEngine() {
-        return globalStorageEngine;
+        // We don't check that globalStorageEngine is not-NULL here intentionally.  We can encounter
+        // an error before it's initialized and proceed to exitCleanly which is equipped to deal
+        // with a NULL storage engine.
+        return _storageEngine;
     }
 
-    namespace {
-        void interruptJs(unsigned int op) {
-            if (!globalScriptEngine) {
-                return;
-            }
+    extern bool _supportsDocLocking;
 
-            if (!op) {
-                globalScriptEngine->interruptAll();
-            }
-            else {
-                globalScriptEngine->interrupt(op);
-            }
+    void GlobalEnvironmentMongoD::setGlobalStorageEngine(const std::string& name) {
+        // This should be set once.
+        invariant(!_storageEngine);
+
+        const StorageEngine::Factory* factory = _storageFactories[name];
+
+        uassert(18656, str::stream()
+            << "Cannot start server with an unknown storage engine: " << name,
+            factory);
+
+        std::string canonicalName = factory->getCanonicalName().toString();
+
+        // Do not proceed if data directory has been used by a different storage engine previously.
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
+
+        // Validate options in metadata against current startup options.
+        if (metadata.get()) {
+            uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
         }
-    }  // namespace
+
+        try {
+            _lockFile.reset(new StorageEngineLockFile(storageGlobalParams.dbpath));
+        }
+        catch (const std::exception& ex) {
+            uassert(28596, str::stream()
+                << "Unable to determine status of lock file in the data directory "
+                << storageGlobalParams.dbpath << ": " << ex.what(),
+                false);
+        }
+        if (_lockFile->createdByUncleanShutdown()) {
+            warning() << "Detected unclean shutdown - "
+                      << _lockFile->getFilespec() << " is not empty.";
+        }
+        uassertStatusOK(_lockFile->open());
+
+        ScopeGuard guard = MakeGuard(&StorageEngineLockFile::close, _lockFile.get());
+        _storageEngine = factory->create(storageGlobalParams, *_lockFile);
+        _storageEngine->finishInit();
+        uassertStatusOK(_lockFile->writePid());
+
+        // Write a new metadata file if it is not present.
+        if (!metadata.get()) {
+            metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
+            metadata->setStorageEngine(canonicalName);
+            metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
+            uassertStatusOK(metadata->write());
+        }
+
+        guard.Dismiss();
+
+        _supportsDocLocking = _storageEngine->supportsDocLocking();
+    }
+
+    void GlobalEnvironmentMongoD::shutdownGlobalStorageEngineCleanly() {
+        invariant(_storageEngine);
+        invariant(_lockFile.get());
+        _storageEngine->cleanShutdown();
+        _lockFile->clearPidAndUnlock();
+    }
+
+    void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,
+                                                        const StorageEngine::Factory* factory) {
+        // No double-registering.
+        invariant(0 == _storageFactories.count(name));
+
+        // Some sanity checks: the factory must exist,
+        invariant(factory);
+
+        // and all factories should be added before we pick a storage engine.
+        invariant(NULL == _storageEngine);
+
+        _storageFactories[name] = factory;
+    }
+
+    bool GlobalEnvironmentMongoD::isRegisteredStorageEngine(const std::string& name) {
+        return _storageFactories.count(name);
+    }
+
+    StorageFactoriesIterator* GlobalEnvironmentMongoD::makeStorageFactoriesIterator() {
+        return new StorageFactoriesIteratorMongoD(_storageFactories.begin(),
+                                                  _storageFactories.end());
+    }
+
+    StorageFactoriesIteratorMongoD::StorageFactoriesIteratorMongoD(
+        const GlobalEnvironmentMongoD::FactoryMap::const_iterator& begin,
+        const GlobalEnvironmentMongoD::FactoryMap::const_iterator& end) :
+        _curr(begin), _end(end) {
+    }
+
+
+    StorageFactoriesIteratorMongoD::~StorageFactoriesIteratorMongoD() {
+    }
+
+    bool StorageFactoriesIteratorMongoD::more() const {
+        return _curr != _end;
+    }
+
+    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::next() {
+        return _curr++->second;
+    }
+
+    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::get() const {
+        return _curr->second;
+    }
 
     void GlobalEnvironmentMongoD::setKillAllOperations() {
+        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
         _globalKill = true;
-        interruptJs(0);
+        for (size_t i = 0; i < _killOpListeners.size(); i++) {
+            try {
+                _killOpListeners[i]->interruptAll();
+            }
+            catch (...) {
+                std::terminate();
+            }
+        }
     }
 
     bool GlobalEnvironmentMongoD::getKillAllOperations() {
         return _globalKill;
     }
 
-    bool GlobalEnvironmentMongoD::killOperation(unsigned int opId) {
-        scoped_lock clientLock(Client::clientsMutex);
-        bool found = false;
+    bool GlobalEnvironmentMongoD::_killOperationsAssociatedWithClientAndOpId_inlock(
+            Client* client, unsigned int opId) {
+        for( CurOp *k = client->curop(); k; k = k->parent() ) {
+            if ( k->opNum() != opId )
+                continue;
 
-        // XXX clean up
-        {
-            for( set< Client* >::const_iterator j = Client::clients.begin();
-                 !found && j != Client::clients.end();
-                 ++j ) {
+            k->kill();
+            for( CurOp *l = client->curop(); l; l = l->parent() ) {
+                l->kill();
+            }
 
-                for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
-                    if ( k->opNum() != opId )
-                        continue;
-
-                    k->kill();
-                    for( CurOp *l = ( *j )->curop(); l; l = l->parent() ) {
-                        l->kill();
-                    }
-
-                    found = true;
+            for (size_t i = 0; i < _killOpListeners.size(); i++) {
+                try {
+                    _killOpListeners[i]->interrupt(opId);
+                }
+                catch (...) {
+                    std::terminate();
                 }
             }
+            return true;
         }
-        if ( found ) {
-            interruptJs( opId );
+        return false;
+    }
+
+    bool GlobalEnvironmentMongoD::killOperation(unsigned int opId) {
+        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
+
+        for(ClientSet::const_iterator j = Client::clients.begin();
+                j != Client::clients.end(); ++j) {
+
+            Client* client = *j;
+
+            bool found = _killOperationsAssociatedWithClientAndOpId_inlock(client, opId);
+            if (found) {
+                return true;
+            }
         }
-        return found;
+
+        return false;
+    }
+
+    void GlobalEnvironmentMongoD::killAllUserOperations(const OperationContext* txn) {
+        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+        for (ClientSet::const_iterator i = Client::clients.begin();
+                i != Client::clients.end(); i++) {
+
+            Client* client = *i;
+            if (!client->isFromUserConnection()) {
+                // Don't kill system operations.
+                continue;
+            }
+
+            if (client->curop()->opNum() == txn->getOpID()) {
+                // Don't kill ourself.
+                continue;
+            }
+
+            bool found = _killOperationsAssociatedWithClientAndOpId_inlock(
+                    client, client->curop()->opNum());
+            invariant(found);
+        }
     }
 
     void GlobalEnvironmentMongoD::unsetKillAllOperations() {
         _globalKill = false;
     }
 
-    void GlobalEnvironmentMongoD::registerOperationContext(OperationContext* txn) {
-        scoped_lock lock(_registeredOpContextsMutex);
-
-        // It is an error to register twice
-        pair<OperationContextSet::const_iterator, bool> inserted 
-                    = _registeredOpContexts.insert(txn);
-        invariant(inserted.second);
-    }
-
-    void GlobalEnvironmentMongoD::unregisterOperationContext(OperationContext* txn) {
-        scoped_lock lock(_registeredOpContextsMutex);
-
-        // It is an error to unregister twice or to unregister something that's not been registered
-        OperationContextSet::const_iterator it = _registeredOpContexts.find(txn);
-        invariant(it != _registeredOpContexts.end());
-
-        _registeredOpContexts.erase(it);
-    }
-
-    void GlobalEnvironmentMongoD::forEachOperationContext(ProcessOperationContext* procOpCtx) {
-        scoped_lock lock(_registeredOpContextsMutex);
-
-        OperationContextSet::iterator it;
-        for (it = _registeredOpContexts.begin(); it != _registeredOpContexts.end(); it++) {
-            procOpCtx->processOpContext(*it);
-        }
+    void GlobalEnvironmentMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
+        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
+        _killOpListeners.push_back(listener);
     }
 
     OperationContext* GlobalEnvironmentMongoD::newOpCtx() {

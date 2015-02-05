@@ -25,8 +25,10 @@ if ( ! _isWindows() ) {
     // test unix socket path
     var ports = allocatePorts(1);
     var path = MongoRunner.dataDir + "/sockpath";
+    mkdir(path);
+    var dataPath = MongoRunner.dataDir + "/sockpath_data";
     
-    var conn = new MongodRunner(ports[0], path, null, null, ["--unixSocketPrefix", path]);
+    var conn = new MongodRunner(ports[0], dataPath, null, null, ["--unixSocketPrefix", path]);
     conn.start();
     
     var sock2 = new Mongo(path+"/mongodb-"+ports[0]+".sock");

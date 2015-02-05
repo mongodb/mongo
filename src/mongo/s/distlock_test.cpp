@@ -27,10 +27,13 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/distlock.h"
 
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 #include <vector>
@@ -73,7 +76,11 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using boost::shared_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     class TestDistLockWithSync: public Command {
     public:

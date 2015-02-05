@@ -5,6 +5,7 @@ Import("env")
 # Core geometry shape libraries
 env.Library("geometry", [ "hash.cpp",
                           "shapes.cpp",
+                          "big_polygon.cpp",
                           "r2_region_coverer.cpp" ],
             LIBDEPS = [ "$BUILD_DIR/mongo/bson",
                         "$BUILD_DIR/third_party/s2/s2" ])
@@ -27,5 +28,9 @@ env.CppUnitTest("geoparser_test", [ "geoparser_test.cpp" ],
 env.CppUnitTest("r2_region_coverer_test", [ "r2_region_coverer_test.cpp" ],
                 LIBDEPS = [ "geometry",
                             "geoparser",
+                            "$BUILD_DIR/mongo/db/common" ]) # db/common needed for field parsing
+
+env.CppUnitTest("big_polygon_test", [ "big_polygon_test.cpp" ],
+                LIBDEPS = [ "geometry",
                             "$BUILD_DIR/mongo/db/common" ]) # db/common needed for field parsing
 

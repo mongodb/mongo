@@ -10,7 +10,6 @@ t.insert( { x : 3 } );
 t.ensureIndex( { x : 1 } );
 
 assert.eq( 3 , t.count() );
-assert.eq( 1 , t.find( { x : 2 } ).explain().nscanned );
 
 t.runCommand( "emptycapped" );
 
@@ -21,4 +20,3 @@ t.insert( { x : 2 } );
 t.insert( { x : 3 } );
 
 assert.eq( 3 , t.count() );
-assert.eq( 1 , t.find( { x : 2 } ).explain().nscanned );

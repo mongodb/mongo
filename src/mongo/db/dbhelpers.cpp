@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/dbhelpers.h"
@@ -37,9 +39,11 @@
 #include <fstream>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -50,16 +54,27 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::endl;
+    using std::ios_base;
+    using std::ofstream;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+
+    using logger::LogComponent;
 
     const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
 
@@ -75,10 +90,18 @@ namespace mongo {
         b.appendBool("unique", unique);
         BSONObj o = b.done();
 
-        Status status = collection->getIndexCatalog()->createIndex(txn, o, false);
+        MultiIndexBlock indexer(txn, collection);
+
+        Status status = indexer.init(o);
         if ( status.code() == ErrorCodes::IndexAlreadyExists )
             return;
         uassertStatusOK( status );
+
+        uassertStatusOK(indexer.insertAllDocumentsInCollection());
+
+        WriteUnitOfWork wunit(txn);
+        indexer.commit();
+        wunit.commit();
     }
 
     /* fetch a single object from collection ns that matches query
@@ -89,22 +112,22 @@ namespace mongo {
                           const BSONObj &query, 
                           BSONObj& result, 
                           bool requireIndex) {
-        DiskLoc loc = findOne( txn, collection, query, requireIndex );
+        RecordId loc = findOne( txn, collection, query, requireIndex );
         if ( loc.isNull() )
             return false;
-        result = collection->docFor(loc);
+        result = collection->docFor(txn, loc).value();
         return true;
     }
 
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    DiskLoc Helpers::findOne(OperationContext* txn,
+    RecordId Helpers::findOne(OperationContext* txn,
                              Collection* collection,
                              const BSONObj &query,
                              bool requireIndex) {
         if ( !collection )
-            return DiskLoc();
+            return RecordId();
 
         CanonicalQuery* cq;
         const WhereCallbackReal whereCallback(txn, collection->ns().db());
@@ -115,15 +138,20 @@ namespace mongo {
         PlanExecutor* rawExec;
         size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
         massert(17245, "Could not get executor for query " + query.toString(),
-                getExecutor(txn, collection, cq, &rawExec, options).isOK());
+                getExecutor(txn,
+                            collection,
+                            cq,
+                            PlanExecutor::YIELD_MANUAL,
+                            &rawExec,
+                            options).isOK());
 
         auto_ptr<PlanExecutor> exec(rawExec);
         PlanExecutor::ExecState state;
-        DiskLoc loc;
+        RecordId loc;
         if (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
             return loc;
         }
-        return DiskLoc();
+        return RecordId();
     }
 
     bool Helpers::findById(OperationContext* txn,
@@ -133,10 +161,10 @@ namespace mongo {
                            BSONObj& result,
                            bool* nsFound,
                            bool* indexFound) {
-        txn->lockState()->assertAtLeastReadLocked(ns);
-        invariant( database );
 
-        Collection* collection = database->getCollection( txn, ns );
+        invariant(database);
+
+        Collection* collection = database->getCollection( ns );
         if ( !collection ) {
             return false;
         }
@@ -145,7 +173,7 @@ namespace mongo {
             *nsFound = true;
 
         IndexCatalog* catalog = collection->getIndexCatalog();
-        const IndexDescriptor* desc = catalog->findIdIndex();
+        const IndexDescriptor* desc = catalog->findIdIndex( txn );
 
         if ( !desc )
             return false;
@@ -157,19 +185,19 @@ namespace mongo {
         BtreeBasedAccessMethod* accessMethod =
             static_cast<BtreeBasedAccessMethod*>(catalog->getIndex( desc ));
 
-        DiskLoc loc = accessMethod->findSingle( txn, query["_id"].wrap() );
+        RecordId loc = accessMethod->findSingle( txn, query["_id"].wrap() );
         if ( loc.isNull() )
             return false;
-        result = collection->docFor( loc );
+        result = collection->docFor(txn, loc).value();
         return true;
     }
 
-    DiskLoc Helpers::findById(OperationContext* txn,
+    RecordId Helpers::findById(OperationContext* txn,
                               Collection* collection,
                               const BSONObj& idquery) {
         verify(collection);
         IndexCatalog* catalog = collection->getIndexCatalog();
-        const IndexDescriptor* desc = catalog->findIdIndex();
+        const IndexDescriptor* desc = catalog->findIdIndex( txn );
         uassert(13430, "no _id index", desc);
         // See SERVER-12397.  This may not always be true.
         BtreeBasedAccessMethod* accessMethod =
@@ -184,20 +212,20 @@ namespace mongo {
        Returns: true if object exists.
     */
     bool Helpers::getSingleton(OperationContext* txn, const char *ns, BSONObj& result) {
-        Client::Context context(txn, ns);
-        auto_ptr<PlanExecutor> exec(
-            InternalPlanner::collectionScan(txn, ns, context.db()->getCollection(txn, ns)));
+        AutoGetCollectionForRead ctx(txn, ns);
+        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn, ns, ctx.getCollection()));
 
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
-        context.getClient()->curop()->done();
+        txn->getCurOp()->done();
         return PlanExecutor::ADVANCED == state;
     }
 
     bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
-        Client::Context ctx(txn, ns);
-        Collection* coll = ctx.db()->getCollection( txn, ns );
-        auto_ptr<PlanExecutor> exec(
-            InternalPlanner::collectionScan(txn, ns, coll, InternalPlanner::BACKWARD));
+        AutoGetCollectionForRead autoColl(txn, ns);
+        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
+                                                                    ns,
+                                                                    autoColl.getCollection(),
+                                                                    InternalPlanner::BACKWARD));
 
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
         return PlanExecutor::ADVANCED == state;
@@ -215,7 +243,7 @@ namespace mongo {
         Client::Context context(txn, ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(txn, requestNs);
+        UpdateRequest request(requestNs);
 
         request.setQuery(id);
         request.setUpdates(o);
@@ -225,7 +253,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(context.db(), request, &debug);
+        update(txn, context.db(), request, &debug);
     }
 
     void Helpers::putSingleton(OperationContext* txn, const char *ns, BSONObj obj) {
@@ -233,7 +261,7 @@ namespace mongo {
         Client::Context context(txn, ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(txn, requestNs);
+        UpdateRequest request(requestNs);
 
         request.setUpdates(obj);
         request.setUpsert();
@@ -241,7 +269,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(context.db(), request, &debug);
+        update(txn, context.db(), request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -251,14 +279,14 @@ namespace mongo {
         Client::Context context(txn, ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(txn, requestNs);
+        UpdateRequest request(requestNs);
 
         request.setGod();
         request.setUpdates(obj);
         request.setUpsert();
         request.setUpdateOpLog(logTheOp);
 
-        update(context.db(), request, &debug);
+        update(txn, context.db(), request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -284,16 +312,18 @@ namespace mongo {
                                          const BSONObj& shardKeyPattern,
                                          BSONObj* indexPattern ) {
 
-        Client::ReadContext context(txn, ns);
-        Collection* collection = context.ctx().db()->getCollection( txn, ns );
-        if ( !collection )
+        AutoGetCollectionForRead ctx(txn, ns);
+        Collection* collection = ctx.getCollection();
+        if (!collection) {
             return false;
+        }
 
         // Allow multiKey based on the invariant that shard keys must be single-valued.
         // Therefore, any multi-key index prefixed by shard key cannot be multikey over
         // the shard key fields.
         const IndexDescriptor* idx =
-            collection->getIndexCatalog()->findIndexByPrefix(shardKeyPattern,
+            collection->getIndexCatalog()->findIndexByPrefix(txn,
+                                                             shardKeyPattern,
                                                              false /* allow multi key */);
 
         if ( idx == NULL )
@@ -310,8 +340,6 @@ namespace mongo {
                                     bool fromMigrate,
                                     bool onlyRemoveOrphanedDocs )
     {
-        MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kSharding);
-
         Timer rangeRemoveTimer;
         const string& ns = range.ns;
 
@@ -323,7 +351,7 @@ namespace mongo {
                                         range.keyPattern,
                                         &indexKeyPatternDoc ) )
         {
-            warning() << "no index found to clean data over range of type "
+            warning(LogComponent::kSharding) << "no index found to clean data over range of type "
                       << range.keyPattern << " in " << ns << endl;
             return -1;
         }
@@ -341,10 +369,9 @@ namespace mongo {
         const BSONObj& max =
                 Helpers::toKeyFormat( indexKeyPattern.extendRangeBound(range.maxKey,maxInclusive));
 
-        LOG(1) << "begin removal of " << min << " to " << max << " in " << ns
+        MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
+               << "begin removal of " << min << " to " << max << " in " << ns
                << " with write concern: " << writeConcern.toBSON() << endl;
-
-        Client& c = cc();
 
         long long numDeleted = 0;
         
@@ -354,20 +381,22 @@ namespace mongo {
             // Scoping for write lock.
             {
                 Client::WriteContext ctx(txn, ns);
-                Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
+                Collection* collection = ctx.getCollection();
                 if ( !collection )
                     break;
 
                 IndexDescriptor* desc =
-                    collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
+                    collection->getIndexCatalog()->findIndexByKeyPattern( txn,
+                                                                          indexKeyPattern.toBSON() );
 
                 auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, desc,
                                                                        min, max,
                                                                        maxInclusive,
                                                                        InternalPlanner::FORWARD,
                                                                        InternalPlanner::IXSCAN_FETCH));
+                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-                DiskLoc rloc;
+                RecordId rloc;
                 BSONObj obj;
                 PlanExecutor::ExecState state;
                 // This may yield so we cannot touch nsd after this.
@@ -376,14 +405,14 @@ namespace mongo {
                 if (PlanExecutor::IS_EOF == state) { break; }
 
                 if (PlanExecutor::DEAD == state) {
-                    warning() << "cursor died: aborting deletion for "
+                    warning(LogComponent::kSharding) << "cursor died: aborting deletion for "
                               << min << " to " << max << " in " << ns
                               << endl;
                     break;
                 }
 
-                if (PlanExecutor::EXEC_ERROR == state) {
-                    warning() << "cursor error while trying to delete "
+                if (PlanExecutor::FAILURE == state) {
+                    warning(LogComponent::kSharding) << "cursor error while trying to delete "
                               << min << " to " << max
                               << " in " << ns << ": "
                               << WorkingSetCommon::toStatusString(obj) << endl;
@@ -391,6 +420,8 @@ namespace mongo {
                 }
 
                 verify(PlanExecutor::ADVANCED == state);
+
+                WriteUnitOfWork wuow(txn);
 
                 if ( onlyRemoveOrphanedDocs ) {
                     // Do a final check in the write lock to make absolutely sure that our
@@ -406,8 +437,8 @@ namespace mongo {
 
                     bool docIsOrphan;
                     if ( metadataNow ) {
-                        KeyPattern kp( metadataNow->getKeyPattern() );
-                        BSONObj key = kp.extractSingleKey( obj );
+                        ShardKeyPattern kp( metadataNow->getKeyPattern() );
+                        BSONObj key = kp.extractShardKeyFromDoc(obj);
                         docIsOrphan = !metadataNow->keyBelongsToMe( key )
                             && !metadataNow->keyIsPending( key );
                     }
@@ -416,12 +447,21 @@ namespace mongo {
                     }
 
                     if ( !docIsOrphan ) {
-                        warning() << "aborting migration cleanup for chunk " << min << " to " << max
+                        warning(LogComponent::kSharding)
+                                  << "aborting migration cleanup for chunk " << min << " to " << max
                                   << ( metadataNow ? (string) " at document " + obj.toString() : "" )
                                   << ", collection " << ns << " has changed " << endl;
                         break;
                     }
                 }
+
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns)) {
+                    warning() << "stepped down from primary while deleting chunk; "
+                              << "orphaning data in " << ns
+                              << " in range [" << min << ", " << max << ")";
+                    return numDeleted;
+                }
+
                 if ( callback )
                     callback->goingToDelete( obj );
 
@@ -429,7 +469,7 @@ namespace mongo {
                 collection->deleteDocument( txn, rloc, false, false, &deletedId );
                 // The above throws on failure, and so is not logged
                 repl::logOp(txn, "d", ns.c_str(), deletedId, 0, 0, fromMigrate);
-                ctx.commit();
+                wuow.commit();
                 numDeleted++;
             }
 
@@ -439,10 +479,11 @@ namespace mongo {
             if (writeConcern.shouldWaitForOtherNodes() && numDeleted > 0) {
                 repl::ReplicationCoordinator::StatusAndDuration replStatus =
                         repl::getGlobalReplicationCoordinator()->awaitReplication(txn,
-                                                                                  c.getLastOp(),
+                                                                                  txn->getClient()->getLastOp(),
                                                                                   writeConcern);
                 if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
-                    warning() << "replication to secondaries for removeRange at "
+                    warning(LogComponent::kSharding)
+                            << "replication to secondaries for removeRange at "
                                  "least 60 seconds behind";
                 }
                 else {
@@ -453,10 +494,12 @@ namespace mongo {
         }
         
         if (writeConcern.shouldWaitForOtherNodes())
-            log() << "Helpers::removeRangeUnlocked time spent waiting for replication: "  
+            log(LogComponent::kSharding)
+                  << "Helpers::removeRangeUnlocked time spent waiting for replication: "
                   << millisWaitingForReplication << "ms" << endl;
         
-        LOG(1) << "end removal of " << min << " to " << max << " in " << ns
+        MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
+               << "end removal of " << min << " to " << max << " in " << ns
                << " (took " << rangeRemoveTimer.millis() << "ms)" << endl;
 
         return numDeleted;
@@ -470,7 +513,7 @@ namespace mongo {
     Status Helpers::getLocsInRange( OperationContext* txn,
                                     const KeyRange& range,
                                     long long maxChunkSizeBytes,
-                                    set<DiskLoc>* locs,
+                                    set<RecordId>* locs,
                                     long long* numDocs,
                                     long long* estChunkSizeBytes )
     {
@@ -478,13 +521,16 @@ namespace mongo {
         *estChunkSizeBytes = 0;
         *numDocs = 0;
 
-        Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
-        if ( !collection ) return Status( ErrorCodes::NamespaceNotFound, ns );
+        AutoGetCollectionForRead ctx(txn, ns);
+
+        Collection* collection = ctx.getCollection();
+        if (!collection) {
+            return Status(ErrorCodes::NamespaceNotFound, ns);
+        }
 
         // Require single key
         IndexDescriptor *idx =
-            collection->getIndexCatalog()->findIndexByPrefix( range.keyPattern, true );
+            collection->getIndexCatalog()->findIndexByPrefix( txn, range.keyPattern, true );
 
         if ( idx == NULL ) {
             return Status( ErrorCodes::IndexNotFound, range.keyPattern.toString() );
@@ -496,10 +542,10 @@ namespace mongo {
         // sizes will vary
         long long avgDocsWhenFull;
         long long avgDocSizeBytes;
-        const long long totalDocsInNS = collection->numRecords();
+        const long long totalDocsInNS = collection->numRecords( txn );
         if ( totalDocsInNS > 0 ) {
             // TODO: Figure out what's up here
-            avgDocSizeBytes = collection->dataSize() / totalDocsInNS;
+            avgDocSizeBytes = collection->dataSize( txn ) / totalDocsInNS;
             avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
             avgDocsWhenFull = std::min( kMaxDocsPerChunk + 1,
                                         130 * avgDocsWhenFull / 100 /* slack */);
@@ -524,8 +570,9 @@ namespace mongo {
             InternalPlanner::indexScan(txn, collection, idx, min, max, false));
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        DiskLoc loc;
+        RecordId loc;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
             if ( !isLargeChunk ) {
@@ -552,7 +599,7 @@ namespace mongo {
 
     void Helpers::emptyCollection(OperationContext* txn, const char *ns) {
         Client::Context context(txn, ns);
-        deleteObjects(txn, context.db(), ns, BSONObj(), false);
+        deleteObjects(txn, context.db(), ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
     }
 
     Helpers::RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) 

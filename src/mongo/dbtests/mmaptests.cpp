@@ -28,15 +28,27 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <iostream>
 
+#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
-#include "mongo/util/timer.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
+#include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/timer.h"
 
 namespace MMapTests {
+
+    using std::endl;
+    using std::string;
 
     class LeakTest  {
         const string fn;
@@ -44,12 +56,12 @@ namespace MMapTests {
     public:
         LeakTest() :
             fn((boost::filesystem::path(storageGlobalParams.dbpath) / "testfile.map").string()),
-               optOld(storageGlobalParams.durOptions)
+               optOld(mmapv1GlobalOptions.journalOptions)
         { 
-            storageGlobalParams.durOptions = 0; // DurParanoid doesn't make sense with this test
+            mmapv1GlobalOptions.journalOptions = 0; // DurParanoid doesn't make sense with this test
         }
         ~LeakTest() {
-            storageGlobalParams.durOptions = optOld;
+            mmapv1GlobalOptions.journalOptions = optOld;
             try { boost::filesystem::remove(fn); }
             catch(...) { }
         }
@@ -58,7 +70,7 @@ namespace MMapTests {
             try { boost::filesystem::remove(fn); }
             catch(...) { }
 
-            LockState lockState;
+            MMAPV1LockerImpl lockState;
             Lock::GlobalWrite lk(&lockState);
 
             {
@@ -70,7 +82,7 @@ namespace MMapTests {
                     verify(p);
                     // write something to the private view as a test
                     if (storageGlobalParams.dur)
-                        MemoryMappedFile::makeWritable(p, 6);
+                        privateViews.makeWritable(p, 6);
                     strcpy(p, "hello");
                 }
                 if (storageGlobalParams.dur) {
@@ -101,7 +113,7 @@ namespace MMapTests {
                     char *p = (char *) f.getView();
                     verify(p);
                     if (storageGlobalParams.dur)
-                        MemoryMappedFile::makeWritable(p, 4);
+                        privateViews.makeWritable(p, 4);
                     strcpy(p, "zzz");
                 }
                 if (storageGlobalParams.dur) {
@@ -119,13 +131,64 @@ namespace MMapTests {
         }
     };
 
+    class ExtentSizing {
+    public:
+        void run() {
+            MmapV1ExtentManager em( "x", "x", false );
+
+            ASSERT_EQUALS( em.maxSize(), em.quantizeExtentSize( em.maxSize() ) );
+
+            // test that no matter what we start with, we always get to max extent size
+            for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ) {
+
+                int sz = em.initialSize( obj );
+
+                double totalExtentSize = sz;
+
+                int numFiles = 1;
+                int sizeLeftInExtent = em.maxSize() - 1;
+
+                for ( int i=0; i<100; i++ ) {
+                    sz = em.followupSize( obj , sz );
+                    ASSERT( sz >= obj );
+                    ASSERT( sz >= em.minSize() );
+                    ASSERT( sz <= em.maxSize() );
+                    ASSERT( sz <= em.maxSize() );
+
+                    totalExtentSize += sz;
+
+                    if ( sz < sizeLeftInExtent ) {
+                        sizeLeftInExtent -= sz;
+                    }
+                    else {
+                        numFiles++;
+                        sizeLeftInExtent = em.maxSize() - sz;
+                    }
+                }
+                ASSERT_EQUALS( em.maxSize(), sz );
+
+                double allocatedOnDisk = (double)numFiles * em.maxSize();
+
+                ASSERT( ( totalExtentSize / allocatedOnDisk ) > .95 );
+
+                invariant( em.numFiles() == 0 );
+            }
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "mmap" ) {}
         void setupTests() {
+            if (!getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1())
+                return;
+
             add< LeakTest >();
+            add< ExtentSizing >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 #if 0
 

@@ -27,7 +27,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
+#include "mongo/platform/basic.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -36,12 +38,17 @@
 #include <sys/types.h>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/startup_test.h"
+
+using std::endl;
+using std::numeric_limits;
+using std::vector;
 
 using namespace mongoutils;
 
@@ -251,9 +258,14 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         if ( views.empty() || fd == 0 )
             return;
-        if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) ) {
+
+        bool useFsync = sync && !ProcessInfo::preferMsyncOverFSync();
+
+        if ( useFsync ?
+            fsync(fd) != 0 :
+            msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) ) {
             // msync failed, this is very bad
-            log() << "msync failed: " << errnoWithDescription()
+            log() << (useFsync ? "fsync failed: " : "msync failed: ") << errnoWithDescription()
                   << " file: " << filename() << endl;
             dataSyncFailedHandler();
         }
@@ -269,8 +281,11 @@ namespace mongo {
             if ( _view == NULL || _fd == 0 )
                 return;
 
-            if ( msync(_view, _len, MS_SYNC ) == 0 )
+            if ( ProcessInfo::preferMsyncOverFSync() ?
+                msync(_view, _len, MS_SYNC ) == 0 :
+                fsync(_fd) == 0 ) {
                 return;
+            }
 
             if ( errno == EBADF ) {
                 // ok, we were unlocked, so this file was closed

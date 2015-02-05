@@ -4,9 +4,6 @@ t.drop();
 t.ensureIndex( {a:1} );
 t.ensureIndex( {b:1} );
 
-assert.eq.automsg( "'BasicCursor'", "t.find( {$or:[{a:2},{b:3},{}]} ).explain().cursor" );
-assert.eq.automsg( "'BasicCursor'", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).explain().cursor" );
-
 t.ensureIndex( {c:1} );
 
 t.save( {a:2} );
@@ -36,10 +33,6 @@ assert.eq.automsg( "6", "t.find( {$or:[{a:2},{b:3},{c:6}]} ).batchSize( i ).toAr
 
 t.ensureIndex( {z:"2d"} );
 
-assert.eq.automsg( "'GeoSearchCursor'", "t.find( {z:{$near:[50,50]},a:2} ).explain().cursor" );
-assert.eq.automsg( "'GeoSearchCursor'", "t.find( {z:{$near:[50,50]},$or:[{a:2}]} ).explain().cursor" );
-assert.eq.automsg( "'GeoSearchCursor'", "t.find( {$or:[{a:2}],z:{$near:[50,50]}} ).explain().cursor" );
-assert.eq.automsg( "'GeoSearchCursor'", "t.find( {$or:[{a:2},{b:3}],z:{$near:[50,50]}} ).explain().cursor" );
 assert.throws.automsg( function() { return t.find( {$or:[{z:{$near:[50,50]}},{a:2}]} ).toArray(); } );
 
 function reset() {

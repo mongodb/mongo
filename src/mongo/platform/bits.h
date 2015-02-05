@@ -29,6 +29,10 @@
 
 #pragma once
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 // figure out if we're on a 64 or 32 bit system
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_WIN64) || defined(__aarch64__) || defined(__powerpc64__)
@@ -40,33 +44,61 @@
 #endif
 
 namespace mongo {
-    // defined here so can test on linux
-    inline int mongo_firstBitSet( unsigned long long v ) {
-        if ( v == 0 )
-            return 0;
-        
-        for ( int i = 0; i<8; i++ ) {
-            unsigned long long x = ( v >> ( 8 * i ) ) & 0xFF;
-            if ( x == 0 )
-                continue;
 
-            for ( int j = 0; j < 8; j++ ) {
-                if ( ( x >> j ) & 0x1 )
-                    return ( i * 8 ) + j + 1;
-            }
-        }
-        
-        return 0;
+    /**
+     * Returns the number of leading 0-bits in num. Returns 64 if num is 0.
+     */
+    inline int countLeadingZeros64(unsigned long long num);
+
+    /**
+     * Returns the number of trailing 0-bits in num. Returns 64 if num is 0.
+     */
+    inline int countTrailingZeros64(unsigned long long num);
+
+
+#if defined(__GNUC__)
+    int countLeadingZeros64(unsigned long long num) {
+        if (num == 0) return 64;
+        return __builtin_clzll(num);
     }
-}
 
+    int countTrailingZeros64(unsigned long long num) {
+        if (num == 0) return 64;
+        return __builtin_ctzll(num);
+    }
+#elif defined(_MSC_VER) && defined(_WIN64)
+    int countLeadingZeros64(unsigned long long num) {
+        unsigned long out;
+        if (_BitScanReverse64(&out, num))
+            return 63 ^ out;
+        return 64;
+    }
 
-#if defined(__linux__)
-#define firstBitSet ffsll
-#define MONGO_SYSTEM_FFS 1
-#elif defined(__MACH__) && defined(MONGO_PLATFORM_64)
-#define firstBitSet ffsl
-#define MONGO_SYSTEM_FFS 1
+    int countTrailingZeros64(unsigned long long num) {
+        unsigned long out;
+        if (_BitScanForward64(&out, num))
+            return out;
+        return 64;
+    }
+#elif defined(_MSC_VER) && defined(_WIN32)
+    int countLeadingZeros64(unsigned long long num) {
+        unsigned long out;
+        if (_BitScanReverse(&out, static_cast<unsigned long>(num >> 32)))
+            return 31 ^ out;
+        if (_BitScanReverse(&out, static_cast<unsigned long>(num)))
+            return 63 ^ out;
+        return 64;
+    }
+
+    int countTrailingZeros64(unsigned long long num) {
+        unsigned long out;
+        if (_BitScanForward(&out, static_cast<unsigned long>(num)))
+            return out;
+        if (_BitScanForward(&out, static_cast<unsigned long>(num >> 32)))
+            return out + 32;
+        return 64;
+    }
 #else
-#define firstBitSet mongo::mongo_firstBitSet
+#  error "No bit-ops definitions for your platform"
 #endif
+}

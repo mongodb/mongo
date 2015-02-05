@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/s/scc_fast_query_handler.h"
 
 #include <vector>
@@ -37,8 +39,14 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
 
     /**
      * This parameter turns on fastest config reads for auth data only - *.system.users collections

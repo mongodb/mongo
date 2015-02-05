@@ -28,8 +28,11 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
+#include <boost/noncopyable.hpp>
 #include <set>
 
 #include "mongo/db/auth/authorization_manager.h"
@@ -44,9 +47,19 @@
 #include "mongo/s/version_manager.h"
 #include "mongo/server.h"
 #include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::endl;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     DBConnectionPool shardConnectionPool;
 
@@ -177,7 +190,13 @@ namespace mongo {
         }
 
         DBClientBase * get( const string& addr , const string& ns ) {
-            _check( ns );
+
+            {
+                // We want to report ns stats
+                scoped_spinlock lock(_lock);
+                if (ns.size() > 0)
+                    _seenNS.insert(ns);
+            }
 
             Status* s = _getStatus( addr );
 
@@ -283,19 +302,6 @@ namespace mongo {
             shardConnectionPool.release( addr , conn );
         }
 
-        void _check( const string& ns ) {
-
-            {
-                // We want to report ns stats too
-                scoped_spinlock lock( _lock );
-                if ( ns.size() == 0 || _seenNS.count( ns ) )
-                    return;
-                _seenNS.insert( ns );
-            }
-
-            checkVersions( ns );
-        }
-        
         /**
          * Appends info about the client connection pool to a BOBuilder
          * Safe to call with activeClientConnections lock
@@ -337,6 +343,7 @@ namespace mongo {
                 if (iter->second->avail != NULL) {
                     delete iter->second->avail;
                 }
+                delete iter->second;
             }
 
             _hosts.clear();
@@ -413,17 +420,17 @@ namespace mongo {
             return;
         _finishedInit = true;
 
-        if ( _ns.size() && versionManager.isVersionableCB( _conn ) ) {
+        if (versionManager.isVersionableCB(_conn)) {
             // Make sure we specified a manager for the correct namespace
-            if( _manager ) verify( _manager->getns() == _ns );
+            if (_ns.size() && _manager)
+                verify(_manager->getns() == _ns);
             _setVersion = versionManager.checkShardVersionCB( this , false , 1 );
         }
         else {
-            // Make sure we didn't specify a manager for an empty namespace
-            verify( ! _manager );
+            // Make sure we didn't specify a manager for a non-versionable connection (i.e. config)
+            verify(!_manager);
             _setVersion = false;
         }
-
     }
 
     void ShardConnection::done() {
@@ -453,18 +460,6 @@ namespace mongo {
 
     void ShardConnection::sync() {
         ClientConnections::threadInstance()->sync();
-    }
-
-    bool ShardConnection::runCommand( const string& db , const BSONObj& cmd , BSONObj& res ) {
-        verify( _conn );
-        bool ok = _conn->runCommand( db , cmd , res );
-        if ( ! ok ) {
-            if ( res["code"].numberInt() == SendStaleConfigCode ) {
-                done();
-                throw RecvStaleConfigException( res["errmsg"].String(), res );
-            }
-        }
-        return ok;
     }
 
     void ShardConnection::checkMyConnectionVersions( const string & ns ) {

@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     const BSONObj WriteConcernOptions::Default = BSONObj();
     const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));
     const BSONObj WriteConcernOptions::AllConfigs = BSONObj();

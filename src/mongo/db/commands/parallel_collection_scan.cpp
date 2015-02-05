@@ -38,15 +38,17 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
 
     class ParallelCollectionScanCmd : public Command {
     public:
 
         struct ExtentInfo {
-            ExtentInfo( DiskLoc dl, size_t s )
+            ExtentInfo( RecordId dl, size_t s )
                 : diskLoc(dl), size(s) {
             }
-            DiskLoc diskLoc;
+            RecordId diskLoc;
             size_t size;
         };
 
@@ -74,11 +76,9 @@ namespace mongo {
 
             NamespaceString ns( dbname, cmdObj[name].String() );
 
-            Client::ReadContext ctx(txn, ns.ns());
+            AutoGetCollectionForRead ctx(txn, ns.ns());
 
-            Database* db = ctx.ctx().db();
-            Collection* collection = db->getCollection( txn, ns );
-
+            Collection* collection = ctx.getCollection();
             if ( !collection )
                 return appendCommandStatus( result,
                                             Status( ErrorCodes::NamespaceNotFound,
@@ -103,9 +103,23 @@ namespace mongo {
             OwnedPointerVector<PlanExecutor> execs;
             for ( size_t i = 0; i < numCursors; i++ ) {
                 WorkingSet* ws = new WorkingSet();
-                MultiIteratorStage* mis = new MultiIteratorStage(ws, collection);
+                MultiIteratorStage* mis = new MultiIteratorStage(txn, ws, collection);
+
+                PlanExecutor* rawExec;
                 // Takes ownership of 'ws' and 'mis'.
-                execs.push_back(new PlanExecutor(ws, mis, collection));
+                Status execStatus = PlanExecutor::make(txn, ws, mis, collection,
+                                                       PlanExecutor::YIELD_AUTO, &rawExec);
+                invariant(execStatus.isOK());
+                auto_ptr<PlanExecutor> curExec(rawExec);
+
+                // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
+                // We have to deregister it, as it will be registered with ClientCursor.
+                curExec->deregisterExec();
+
+                // Need to save state while yielding locks between now and getMore().
+                curExec->saveState();
+
+                execs.push_back(curExec.release());
             }
 
             // transfer iterators to executors using a round-robin distribution.
@@ -113,6 +127,10 @@ namespace mongo {
             for (size_t i = 0; i < iterators.size(); i++) {
                 PlanExecutor* theExec = execs[i % execs.size()];
                 MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getRootStage());
+
+                // This wasn't called above as they weren't assigned yet
+                iterators[i]->saveState();
+
                 mis->addIterator(iterators.releaseAt(i));
             }
 
@@ -121,18 +139,15 @@ namespace mongo {
                 for (size_t i = 0; i < execs.size(); i++) {
                     // transfer ownership of an executor to the ClientCursor (which manages its own
                     // lifetime).
-                    ClientCursor* cc = new ClientCursor( collection, execs.releaseAt(i) );
+                    ClientCursor* cc = new ClientCursor( collection->getCursorManager(),
+                                                         execs.releaseAt(i),
+                                                         ns.ns() );
 
-                    // we are mimicking the aggregation cursor output here
-                    // that is why there are ns, ok and empty firstBatch
                     BSONObjBuilder threadResult;
-                    {
-                        BSONObjBuilder cursor;
-                        cursor.appendArray( "firstBatch", BSONObj() );
-                        cursor.append( "ns", ns );
-                        cursor.append( "id", cc->cursorid() );
-                        threadResult.append( "cursor", cursor.obj() );
-                    }
+                    appendCursorResponseObject( cc->cursorid(),
+                                                ns.ns(),
+                                                BSONArray(),
+                                                &threadResult );
                     threadResult.appendBool( "ok", 1 );
 
                     bucketsBuilder.append( threadResult.obj() );

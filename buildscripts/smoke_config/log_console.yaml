@@ -1,0 +1,16 @@
+logging:
+    version: 1
+    
+    handlers:
+        default:
+            level: INFO
+            class: logging.StreamHandler
+    
+    loggers:
+        "":
+            handlers:
+            - default        
+            level: INFO
+            propagate: True
+        
+        

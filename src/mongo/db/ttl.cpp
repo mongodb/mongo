@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ttl.h"
@@ -35,21 +37,30 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/instance.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/background.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kIndexing);
+    using std::set;
+    using std::endl;
+    using std::list;
+    using std::string;
+    using std::vector;
 
     Counter64 ttlPasses;
     Counter64 ttlDeletedDocuments;
@@ -58,153 +69,225 @@ namespace mongo {
     ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocuments", &ttlDeletedDocuments);
 
     MONGO_EXPORT_SERVER_PARAMETER( ttlMonitorEnabled, bool, true );
-    
+    MONGO_EXPORT_SERVER_PARAMETER( ttlMonitorSleepSecs, int, 60 ); //used for testing
+
     class TTLMonitor : public BackgroundJob {
     public:
         TTLMonitor(){}
         virtual ~TTLMonitor(){}
 
         virtual string name() const { return "TTLMonitor"; }
-        
+
         static string secondsExpireField;
-        
-        void doTTLForDB( OperationContext* txn, const string& dbName ) {
-
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName))
-                return;
-
-            DBDirectClient db(txn);
-            vector<BSONObj> indexes;
-            {
-                auto_ptr<DBClientCursor> cursor =
-                                db.query( dbName + ".system.indexes" ,
-                                          BSON( secondsExpireField << BSON( "$exists" << true ) ) ,
-                                          0 , /* default nToReturn */
-                                          0 , /* default nToSkip */
-                                          0 , /* default fieldsToReturn */
-                                          QueryOption_SlaveOk ); /* perform on secondaries too */
-                if ( cursor.get() ) {
-                    while ( cursor->more() ) {
-                        indexes.push_back( cursor->next().getOwned() );
-                    }
-                }
-            }
-            
-            for ( unsigned i=0; i<indexes.size(); i++ ) {
-                BSONObj idx = indexes[i];
-                
-
-                BSONObj key = idx["key"].Obj();
-                if ( key.nFields() != 1 ) {
-                    error() << "key for ttl index can only have 1 field" << endl;
-                    continue;
-                }
-                if (!idx[secondsExpireField].isNumber()) {
-                    log() << "ttl indexes require the " << secondsExpireField << " field to be "
-                          << "numeric but received a type of: "
-                          << typeName(idx[secondsExpireField].type());
-                    continue;
-                }
-
-                BSONObj query;
-                {
-                    BSONObjBuilder b;
-                    b.appendDate( "$lt" , curTimeMillis64() - ( 1000 * idx[secondsExpireField].numberLong() ) );
-                    query = BSON( key.firstElement().fieldName() << b.obj() );
-                }
-
-                LOG(1) << "TTL: " << key << " \t " << query << endl;
-
-                long long n = 0;
-                {
-                    const string ns = idx["ns"].String();
-
-                    Client::WriteContext ctx(txn,  ns );
-                    Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
-                    if ( !collection ) {
-                        // collection was dropped
-                        continue;
-                    }
-
-                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                            collection->ns().db())) {
-                        // we've stepped down since we started this function,
-                        // so we should stop working as we only do deletes on the primary
-                        break;
-                    }
-
-                    if ( collection->getIndexCatalog()->findIndexByKeyPattern( key ) == NULL ) {
-                        // index not finished yet
-                        LOG(1) << " skipping index because not finished";
-                        continue;
-                    }
-
-                    n = deleteObjects(txn, ctx.ctx().db(), ns, query, false, true);
-                    ttlDeletedDocuments.increment( n );
-                    ctx.commit();
-                }
-
-                LOG(1) << "\tTTL deleted: " << n << endl;
-            }
-            
-            
-        }
 
         virtual void run() {
             Client::initThread( name().c_str() );
             cc().getAuthorizationSession()->grantInternalAuthorization();
 
             while ( ! inShutdown() ) {
-                sleepsecs( 60 );
-                
+                sleepsecs( ttlMonitorSleepSecs );
+
                 LOG(3) << "TTLMonitor thread awake" << endl;
 
                 if ( !ttlMonitorEnabled ) {
                    LOG(1) << "TTLMonitor is disabled" << endl;
                    continue;
                 }
-                
-                OperationContextImpl txn;
 
                 if ( lockedForWriting() ) {
-                    // note: this is not perfect as you can go into fsync+lock between 
+                    // note: this is not perfect as you can go into fsync+lock between
                     // this and actually doing the delete later
                     LOG(3) << " locked for writing" << endl;
                     continue;
                 }
 
-                // if part of replSet but not in a readable state (e.g. during initial sync), skip.
-                if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                        repl::ReplicationCoordinator::modeReplSet &&
-                        !repl::getGlobalReplicationCoordinator()->getCurrentMemberState().readable())
-                    continue;
-
-                set<string> dbs;
-                {
-                    Lock::DBRead lk(txn.lockState(), "local");
-                    dbHolder().getAllShortNames( dbs );
+                try {
+                    doTTLPass();
                 }
-                
-                ttlPasses.increment();
-
-                for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {
-                    string db = *i;
-                    try {
-                        doTTLForDB( &txn, db );
-                    }
-                    catch ( DBException& e ) {
-                        error() << "error processing ttl for db: " << db << " " << e << endl;
-                    }
+                catch ( const WriteConflictException& e ) {
+                    LOG(1) << "Got WriteConflictException in TTL thread";
                 }
 
             }
+        }
+
+    private:
+
+        void doTTLPass() {
+            // Count it as active from the moment the TTL thread wakes up
+            OperationContextImpl txn;
+
+            // if part of replSet but not in a readable state (e.g. during initial sync), skip.
+            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet &&
+                !repl::getGlobalReplicationCoordinator()->getMemberState().readable())
+                return;
+
+            set<string> dbs;
+            dbHolder().getAllShortNames( dbs );
+
+            ttlPasses.increment();
+
+            for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {
+                string db = *i;
+
+                vector<BSONObj> indexes;
+                getTTLIndexesForDB(&txn, db, &indexes);
+
+                for ( vector<BSONObj>::const_iterator it = indexes.begin();
+                      it != indexes.end(); ++it ) {
+
+                    BSONObj idx = *it;
+                    try {
+                        if ( !doTTLForIndex( &txn, db, idx ) ) {
+                            break;  // stop processing TTL indexes on this database
+                        }
+                    } catch (const DBException& dbex) {
+                        error() << "Error processing ttl index: " << idx
+                                << " -- " << dbex.toString();
+                        // continue on to the next index
+                        continue;
+                    }
+                }
+            }
+        }
+
+        /**
+         * Acquire an IS-mode lock on the specified database and for each
+         * collection in the database, append the specification of all
+         * TTL indexes on those collections to the supplied vector.
+         *
+         * The index specifications are grouped by the collection to which
+         * they belong.
+         */
+        void getTTLIndexesForDB( OperationContext* txn, const string& dbName,
+                                 vector<BSONObj>* indexes ) {
+
+            invariant( indexes && indexes->empty() );
+            ScopedTransaction transaction( txn, MODE_IS );
+            Lock::DBLock dbLock( txn->lockState(), dbName, MODE_IS );
+
+            Database* db = dbHolder().get( txn, dbName );
+            if ( !db ) {
+                return;  // skip since database no longer exists
+            }
+
+            const DatabaseCatalogEntry* dbEntry = db->getDatabaseCatalogEntry();
+
+            list<string> namespaces;
+            dbEntry->getCollectionNamespaces( &namespaces );
+
+            for ( list<string>::const_iterator it = namespaces.begin();
+                  it != namespaces.end(); ++it ) {
+
+                string ns = *it;
+                Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IS );
+                CollectionCatalogEntry* coll = dbEntry->getCollectionCatalogEntry( ns );
+
+                if ( !coll ) {
+                    continue;  // skip since collection not found in catalog
+                }
+
+                vector<string> indexNames;
+                coll->getAllIndexes( txn, &indexNames );
+                for ( size_t i = 0; i < indexNames.size(); i++ ) {
+                    const string& name = indexNames[i];
+                    BSONObj spec = coll->getIndexSpec( txn, name );
+
+                    if ( spec.hasField( secondsExpireField ) ) {
+                        indexes->push_back( spec.getOwned() );
+                    }
+                }
+            }
+        }
+
+        /**
+         * Remove documents from the collection using the specified TTL index
+         * after a sufficient amount of time has passed according to its expiry
+         * specification.
+         *
+         * @return true if caller should continue processing TTL indexes of collections
+         *         on the specified database, and false otherwise
+         */
+        bool doTTLForIndex( OperationContext* txn, const string& dbName, const BSONObj& idx ) {
+            BSONObj key = idx["key"].Obj();
+            const string ns = idx["ns"].String();
+            if ( key.nFields() != 1 ) {
+                error() << "key for ttl index can only have 1 field" << endl;
+                return true;
+            }
+            if ( !idx[secondsExpireField].isNumber() ) {
+                log() << "ttl indexes require the " << secondsExpireField << " field to be "
+                      << "numeric but received a type of: "
+                      << typeName( idx[secondsExpireField].type() );
+                return true;
+            }
+
+            BSONObj query;
+            {
+                BSONObjBuilder b;
+                long long expireMs = 1000 * idx[secondsExpireField].numberLong();
+                b.appendDate( "$lt", curTimeMillis64() - expireMs );
+                query = BSON( key.firstElement().fieldName() << b.obj() );
+            }
+
+            LOG(1) << "TTL -- ns: " << ns << "key:" << key << " query: " << query << endl;
+
+            long long numDeleted = 0;
+            int attempt = 1;
+            while (1) {
+                ScopedTransaction scopedXact(txn, MODE_IX);
+                AutoGetDb autoDb(txn, dbName, MODE_IX);
+                Database* db = autoDb.getDb();
+                if (!db) {
+                    return false;
+                }
+
+                Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IX );
+
+                Collection* collection = db->getCollection( ns );
+                if ( !collection ) {
+                    // collection was dropped
+                    return true;
+                }
+
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName)) {
+                    // we've stepped down since we started this function,
+                    // so we should stop working as we only do deletes on the primary
+                    return false;
+                }
+
+                if ( collection->getIndexCatalog()->findIndexByKeyPattern( txn, key ) == NULL ) {
+                    // index not finished yet
+                    LOG(1) << " skipping index because not finished";
+                    return true;
+                }
+
+                try {
+                    numDeleted = deleteObjects(txn,
+                                               db,
+                                               ns,
+                                               query,
+                                               PlanExecutor::YIELD_AUTO,
+                                               false,
+                                               true);
+                    break;
+                }
+                catch (const WriteConflictException& dle) {
+                    WriteConflictException::logAndBackoff(attempt++, "ttl", ns);
+                }
+            }
+
+            ttlDeletedDocuments.increment(numDeleted);
+            LOG(1) << "\tTTL deleted: " << numDeleted << endl;
+            return true;
         }
     };
 
     void startTTLBackgroundJob() {
         TTLMonitor* ttl = new TTLMonitor();
         ttl->go();
-    }    
-    
+    }
+
     string TTLMonitor::secondsExpireField = "expireAfterSeconds";
 }

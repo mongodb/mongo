@@ -38,13 +38,18 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     // XXX: remove and put into storage api
     intmax_t dbSize( const string& database );
 
     class CmdListDatabases : public Command {
     public:
         virtual bool slaveOk() const {
-            return true;
+            return false;
         }
         virtual bool slaveOverrideOk() const {
             return true;
@@ -81,45 +86,32 @@ namespace mongo {
             set<string> seen;
             intmax_t totalSize = 0;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
-                BSONObjBuilder b;
-                b.append( "name", *i );
+                const string& dbname = *i;
 
-                intmax_t size = dbSize( i->c_str() );
-                b.append( "sizeOnDisk", (double) size );
-                totalSize += size;
+                BSONObjBuilder b;
+                b.append( "name", dbname );
 
                 {
-                    Client::ReadContext rc(txn, *i );
-                    b.appendBool( "empty", rc.ctx().db()->getDatabaseCatalogEntry()->isEmpty() );
+                    ScopedTransaction transaction(txn, MODE_IS);
+                    Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
+
+                    Database* db = dbHolder().get( txn, dbname );
+                    if ( !db )
+                        continue;
+
+                    const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
+                    invariant( entry );
+
+                    int64_t size = entry->sizeOnDisk( txn );
+                    b.append( "sizeOnDisk", static_cast<double>( size ) );
+                    totalSize += size;
+
+                    b.appendBool("empty", size == 0);
                 }
 
                 dbInfos.push_back( b.obj() );
 
                 seen.insert( i->c_str() );
-            }
-
-            set<string> allShortNames;
-            {
-                Lock::GlobalRead lk(txn->lockState());
-                dbHolder().getAllShortNames(allShortNames);
-            }
-
-            for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
-                string name = *i;
-
-                if ( seen.count( name ) )
-                    continue;
-
-                BSONObjBuilder b;
-                b.append( "name" , name );
-                b.append( "sizeOnDisk" , (double)1.0 );
-
-                {
-                    Client::ReadContext ctx(txn, name);
-                    b.appendBool( "empty", ctx.ctx().db()->getDatabaseCatalogEntry()->isEmpty() );
-                }
-
-                dbInfos.push_back( b.obj() );
             }
 
             result.append( "databases", dbInfos );

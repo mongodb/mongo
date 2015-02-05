@@ -29,20 +29,24 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/db.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/sync.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -50,43 +54,53 @@ using namespace mongo::repl;
 
 namespace ReplTests {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     BSONObj f( const char *s ) {
         return fromjson( s );
     }
 
     class Base {
     protected:
+        repl::ReplicationCoordinator* _prevGlobGoordinator;
         mutable OperationContextImpl _txn;
-        WriteUnitOfWork _wunit;
-
         mutable DBDirectClient _client;
 
     public:
-        Base() : _wunit( _txn.recoveryUnit()),
-                 _client(&_txn) {
-
-            oldRepl();
-            ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-            replSettings.replSet = "";
+        Base() : _prevGlobGoordinator(getGlobalReplicationCoordinator())
+               , _client(&_txn) {
+            ReplSettings replSettings;
             replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
+            ReplicationCoordinatorMock* replCoord = new ReplicationCoordinatorMock(replSettings);
+            setGlobalReplicationCoordinator(replCoord);
+
+            oldRepl();
             createOplog(&_txn);
 
             Client::WriteContext ctx(&_txn, ns());
+            WriteUnitOfWork wuow(&_txn);
 
-            Collection* c = ctx.ctx().db()->getCollection(&_txn, ns());
+            Collection* c = ctx.ctx().db()->getCollection(ns());
             if ( ! c ) {
                 c = ctx.ctx().db()->createCollection(&_txn, ns());
             }
 
-            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
+            ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
+            wuow.commit();
         }
         ~Base() {
             try {
-                getGlobalReplicationCoordinator()->getSettings().master = false;
+                delete getGlobalReplicationCoordinator();
+                setGlobalReplicationCoordinator(_prevGlobGoordinator);
+                _prevGlobGoordinator = NULL;
+
                 deleteAll( ns() );
                 deleteAll( cllNS() );
-                _wunit.commit();
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up test" );
@@ -123,137 +137,134 @@ namespace ReplTests {
             return _client.findOne( cllNS(), BSONObj() );
         }
         int count() const {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  ns() );
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( &_txn, ns() );
+            Collection* coll = db->getCollection( ns() );
             if ( !coll ) {
+                WriteUnitOfWork wunit(&_txn);
                 coll = db->createCollection( &_txn, ns() );
+                wunit.commit();
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator( &_txn, DiskLoc(), false,
-                                                    CollectionScanParams::FORWARD );
+            RecordIterator* it = coll->getIterator(&_txn);
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
             }
             delete it;
             return count;
         }
-        static int opCount() {
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
-            WriteUnitOfWork wunit(txn.recoveryUnit());
-            Client::Context ctx(&txn,  cllNS() );
+        int opCount() {
+            ScopedTransaction transaction(&_txn, MODE_X);
+            Lock::GlobalWrite lk(_txn.lockState());
+            Client::Context ctx(&_txn,  cllNS() );
 
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( &txn, cllNS() );
+            Collection* coll = db->getCollection( cllNS() );
             if ( !coll ) {
-                coll = db->createCollection( &txn, cllNS() );
+                WriteUnitOfWork wunit(&_txn);
+                coll = db->createCollection( &_txn, cllNS() );
+                wunit.commit();
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
-                                                    CollectionScanParams::FORWARD );
+            RecordIterator* it = coll->getIterator(&_txn);
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
             }
             delete it;
-            wunit.commit();
             return count;
         }
-        static void applyAllOperations() {
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+        void applyAllOperations() {
+            ScopedTransaction transaction(&_txn, MODE_X);
+            Lock::GlobalWrite lk(_txn.lockState());
             vector< BSONObj > ops;
             {
-                Client::Context ctx(&txn,  cllNS() );
+                Client::Context ctx(&_txn,  cllNS() );
                 Database* db = ctx.db();
-                Collection* coll = db->getCollection( &txn, cllNS() );
+                Collection* coll = db->getCollection( cllNS() );
 
-                RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
-                                                        CollectionScanParams::FORWARD );
+                RecordIterator* it = coll->getIterator(&_txn);
                 while ( !it->isEOF() ) {
-                    DiskLoc currLoc = it->getNext();
-                    ops.push_back(coll->docFor(currLoc));
+                    RecordId currLoc = it->getNext();
+                    ops.push_back(coll->docFor(&_txn, currLoc).value());
                 }
                 delete it;
             }
             {
-                Client::Context ctx(&txn,  ns() );
+                Client::Context ctx(&_txn,  ns() );
                 BSONObjBuilder b;
                 b.append("host", "localhost");
                 b.appendTimestamp("syncedTo", 0);
-                ReplSource a(&txn, b.obj());
+                ReplSource a(&_txn, b.obj());
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                     if ( 0 ) {
                         mongo::unittest::log() << "op: " << *i << endl;
                     }
-                    a.applyOperation( &txn, ctx.db(), *i );
+                    a.applyOperation( &_txn, ctx.db(), *i );
                 }
             }
-            wunit.commit();
         }
-        static void printAll( const char *ns ) {
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
-            WriteUnitOfWork wunit(txn.recoveryUnit());
-            Client::Context ctx(&txn,  ns );
+        void printAll( const char *ns ) {
+            ScopedTransaction transaction(&_txn, MODE_X);
+            Lock::GlobalWrite lk(_txn.lockState());
+            Client::Context ctx(&_txn,  ns );
 
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( &txn, ns );
+            Collection* coll = db->getCollection( ns );
             if ( !coll ) {
-                coll = db->createCollection( &txn, ns );
+                WriteUnitOfWork wunit(&_txn);
+                coll = db->createCollection( &_txn, ns );
+                wunit.commit();
             }
 
-            RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
-                                                    CollectionScanParams::FORWARD );
+            RecordIterator* it = coll->getIterator(&_txn);
             ::mongo::log() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
-                DiskLoc currLoc = it->getNext();
-                ::mongo::log() << coll->docFor(currLoc).toString() << endl;
+                RecordId currLoc = it->getNext();
+                ::mongo::log() << coll->docFor(&_txn, currLoc).value().toString() << endl;
             }
             delete it;
-            wunit.commit();
         }
         // These deletes don't get logged.
-        static void deleteAll( const char *ns ) {
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
-            Client::Context ctx(&txn,  ns );
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+        void deleteAll( const char *ns ) const {
+            ScopedTransaction transaction(&_txn, MODE_X);
+            Lock::GlobalWrite lk(_txn.lockState());
+            Client::Context ctx(&_txn,  ns );
+            WriteUnitOfWork wunit(&_txn);
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( &txn, ns );
+            Collection* coll = db->getCollection( ns );
             if ( !coll ) {
-                coll = db->createCollection( &txn, ns );
+                coll = db->createCollection( &_txn, ns );
             }
 
-            vector< DiskLoc > toDelete;
-            RecordIterator* it = coll->getIterator( &txn, DiskLoc(), false,
-                                                    CollectionScanParams::FORWARD );
+            vector< RecordId > toDelete;
+            RecordIterator* it = coll->getIterator(&_txn);
             while ( !it->isEOF() ) {
                 toDelete.push_back( it->getNext() );
             }
             delete it;
-            for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-                coll->deleteDocument( &txn, *i, true );
+            for( vector< RecordId >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
+                coll->deleteDocument( &_txn, *i, true );
             }
             wunit.commit();
         }
-        static void insert( const BSONObj &o ) {
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
-            Client::Context ctx(&txn,  ns() );
-            WriteUnitOfWork wunit(txn.recoveryUnit());
+        void insert( const BSONObj &o ) const {
+            ScopedTransaction transaction(&_txn, MODE_X);
+            Lock::GlobalWrite lk(_txn.lockState());
+            Client::Context ctx(&_txn,  ns() );
+            WriteUnitOfWork wunit(&_txn);
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( &txn, ns() );
+            Collection* coll = db->getCollection( ns() );
             if ( !coll ) {
-                coll = db->createCollection( &txn, ns() );
+                coll = db->createCollection( &_txn, ns() );
             }
 
             if ( o.hasField( "_id" ) ) {
-                coll->insertDocument( &txn, o, true );
+                coll->insertDocument( &_txn, o, true );
+                wunit.commit();
                 return;
             }
 
@@ -262,7 +273,7 @@ namespace ReplTests {
             id.init();
             b.appendOID( "_id", &id );
             b.appendElements( o );
-            coll->insertDocument( &txn, b.obj(), true );
+            coll->insertDocument( &_txn, b.obj(), true );
             wunit.commit();
         }
         static BSONObj wid( const char *json ) {
@@ -1245,7 +1256,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 // Add an index on 'a'.  This prevents the update from running 'in place'.
-                _client.ensureIndex( ns(), BSON( "a" << 1 ) );
+                ASSERT_OK(dbtests::createIndex( &_txn, ns(), BSON( "a" << 1 ) ));
                 insert( fromjson( "{'_id':0,z:1}" ) );
             }
         };
@@ -1387,25 +1398,6 @@ namespace ReplTests {
         }
     };
 
-    /** Check ReplSetConfig::MemberCfg equality */
-    class ReplSetMemberCfgEquality : public Base {
-    public:
-        void run() {
-            ReplSetConfig::MemberCfg m1, m2;
-            verify(m1 == m2);
-            m1.tags["x"] = "foo";
-            verify(m1 != m2);
-            m2.tags["y"] = "bar";
-            verify(m1 != m2);
-            m1.tags["y"] = "bar";
-            verify(m1 != m2);
-            m2.tags["x"] = "foo";
-            verify(m1 == m2);
-            m1.tags.clear();
-            verify(m1 != m2);
-        }
-    };
-
     class SyncTest : public Sync {
     public:
         bool returnEmpty;
@@ -1426,6 +1418,7 @@ namespace ReplTests {
             bool threw = false;
             BSONObj o = BSON("ns" << ns() << "o" << BSON("foo" << "bar") << "o2" << BSON("_id" << "in oplog" << "foo" << "bar"));
 
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
 
             // this should fail because we can't connect
@@ -1515,10 +1508,11 @@ namespace ReplTests {
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
-            add< ReplSetMemberCfgEquality >();
             add< ShouldRetry >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace ReplTests
 

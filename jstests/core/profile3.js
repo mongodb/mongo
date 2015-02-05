@@ -26,11 +26,11 @@ try {
     
     db.setProfilingLevel(2);
     
-    db.createCollection(t.getName(), {usePowerOf2Sizes: false});
+    db.createCollection(t.getName());
     t.insert( { x : 1 } );
     t.findOne( { x : 1 } );
     t.find( { x : 1 } ).count();
-    t.update( { x : 1 }, {$inc:{a:1}} );
+    t.update( { x : 1 }, {$inc:{a:1}, $set: {big: Array(128).toString()}} );
     t.update( { x : 1 }, {$inc:{a:1}} );
     t.update( { x : 0 }, {$inc:{a:1}} );
     

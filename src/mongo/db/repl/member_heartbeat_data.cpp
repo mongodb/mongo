@@ -26,68 +26,86 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include <climits>
 
 #include "mongo/db/repl/member_heartbeat_data.h"
+#include "mongo/db/repl/rslog.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
-    unsigned int MemberHeartbeatData::numPings;
-
-    MemberHeartbeatData::MemberHeartbeatData(int configIndex) :
-        _configIndex(configIndex),
-        _state(MemberState::RS_UNKNOWN), 
-        _health(-1), 
+    MemberHeartbeatData::MemberHeartbeatData() :
+        _health(-1),
         _upSince(0),
         _lastHeartbeat(0),
         _lastHeartbeatRecv(0),
-        _skew(INT_MIN), 
-        _authIssue(false), 
-        _ping(0) { 
+        _authIssue(false) {
+
+        _lastResponse.setState(MemberState::RS_UNKNOWN);
+        _lastResponse.setElectionTime(OpTime());
+        _lastResponse.setOpTime(OpTime());
     }
 
-    void MemberHeartbeatData::updateFrom(const MemberHeartbeatData& newInfo) {
-        _state = newInfo.getState();
-        _health = newInfo.getHealth();
-        _upSince = newInfo.getUpSince();
-        _lastHeartbeat = newInfo.getLastHeartbeat();
-        _lastHeartbeatMsg = newInfo.getLastHeartbeatMsg();
-        _syncSource = newInfo.getSyncSource();
-        _opTime = newInfo.getOpTime();
-        _skew = newInfo.getSkew();
-        _authIssue = newInfo.hasAuthIssue();
-        _ping = newInfo.getPing();
-        _electionTime = newInfo.getElectionTime();
-    }
-
-    void MemberHeartbeatData::setUpValues(time_t now,
-                                          MemberState state,
-                                          OpTime electionTime,
-                                          OpTime optime,
-                                          const std::string& syncingTo,
-                                          const std::string& heartbeatMessage) {
-        _authIssue = false;
+    void MemberHeartbeatData::setUpValues(Date_t now,
+                                          const HostAndPort& host,
+                                          ReplSetHeartbeatResponse hbResponse) {
         _health = 1;
-
+        if (_upSince == 0) {
+            _upSince = now;
+        }
+        _authIssue = false;
         _lastHeartbeat = now;
-        _state = state;
-        _electionTime = electionTime;
-        _opTime = optime;
-        _syncSource = syncingTo;
-        _lastHeartbeatMsg = heartbeatMessage;
+        if (!hbResponse.hasState()) {
+            hbResponse.setState(MemberState::RS_UNKNOWN);
+        }
+        if (!hbResponse.hasElectionTime()) {
+            hbResponse.setElectionTime(_lastResponse.getElectionTime());
+        }
+        if (!hbResponse.hasOpTime()) {
+            hbResponse.setOpTime(_lastResponse.getOpTime());
+        }
+
+        // Log if the state changes
+        if (_lastResponse.getState() != hbResponse.getState()){
+            log() << "Member " << host.toString() << " is now in state "
+                  << hbResponse.getState().toString() << rsLog;
+        }
+
+        _lastResponse = hbResponse;
     }
 
-    void MemberHeartbeatData::setDownValues(time_t now,
-                                            const std::string& heartbeatMessage) {
-        _authIssue = false;
-        _health = 0;
-        _state = MemberState::RS_DOWN;
+    void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
 
+        _health = 0;
+        _upSince = 0;
         _lastHeartbeat = now;
-        _lastHeartbeatMsg = heartbeatMessage;
+        _authIssue = false;
+
+        _lastResponse = ReplSetHeartbeatResponse();
+        _lastResponse.setState(MemberState::RS_DOWN);
+        _lastResponse.setElectionTime(OpTime());
+        _lastResponse.setOpTime(OpTime());
+        _lastResponse.setHbMsg(heartbeatMessage);
+        _lastResponse.setSyncingTo("");
+    }
+
+    void MemberHeartbeatData::setAuthIssue(Date_t now) {
+        _health = 0;  // set health to 0 so that this doesn't count towards majority.
+        _upSince = 0;
+        _lastHeartbeat = now;
+        _authIssue = true;
+
+        _lastResponse = ReplSetHeartbeatResponse();
+        _lastResponse.setState(MemberState::RS_UNKNOWN);
+        _lastResponse.setElectionTime(OpTime());
+        _lastResponse.setOpTime(OpTime());
+        _lastResponse.setHbMsg("");
+        _lastResponse.setSyncingTo("");
     }
 
 } // namespace repl

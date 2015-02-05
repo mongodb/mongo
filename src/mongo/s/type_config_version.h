@@ -73,7 +73,6 @@ namespace mongo {
         static const BSONField<int> currentVersion;
         static const BSONField<BSONArray> excludingMongoVersions;
         static const BSONField<OID> clusterId;
-        static const BSONField<int> version_DEPRECATED;
         static const BSONField<OID> upgradeId;
         static const BSONField<BSONObj> upgradeState;
 

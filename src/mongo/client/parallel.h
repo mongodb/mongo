@@ -33,15 +33,19 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/export_macros.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/stale_exception.h"  // for StaleConfigException
 #include "mongo/util/concurrency/mvar.h"
 
 namespace mongo {
+
+    class StaleConfigException;
 
     /**
      * holder for a server address and a query to run
@@ -79,7 +83,7 @@ namespace mongo {
     };
 
     class ParallelConnectionMetadata;
-    class FilteringClientCursor;
+    class DBClientCursorHolder;
 
     class MONGO_CLIENT_API CommandInfo {
     public:
@@ -98,10 +102,10 @@ namespace mongo {
         }
     };
 
-    typedef shared_ptr<ShardConnection> ShardConnectionPtr;
+    typedef boost::shared_ptr<ShardConnection> ShardConnectionPtr;
 
     class DBClientCursor;
-    typedef shared_ptr<DBClientCursor> DBClientCursorPtr;
+    typedef boost::shared_ptr<DBClientCursor> DBClientCursorPtr;
 
     class MONGO_CLIENT_API ParallelConnectionState {
     public:
@@ -109,6 +113,8 @@ namespace mongo {
         ParallelConnectionState() :
             count( 0 ), done( false ) { }
 
+        // Please do not reorder. cursor destructor can use conn.
+        // On a related note, never attempt to cleanup these pointers manually.
         ShardConnectionPtr conn;
         DBClientCursorPtr cursor;
 
@@ -128,7 +134,7 @@ namespace mongo {
     };
 
     typedef ParallelConnectionState PCState;
-    typedef shared_ptr<PCState> PCStatePtr;
+    typedef boost::shared_ptr<PCState> PCStatePtr;
 
     class MONGO_CLIENT_API ParallelConnectionMetadata {
     public:
@@ -160,7 +166,7 @@ namespace mongo {
     };
 
     typedef ParallelConnectionMetadata PCMData;
-    typedef shared_ptr<PCMData> PCMDataPtr;
+    typedef boost::shared_ptr<PCMData> PCMDataPtr;
 
     /**
      * Runs a query in parallel across N servers, enforcing compatible chunk versions for queries
@@ -200,6 +206,11 @@ namespace mongo {
 
         bool isCommand(){ return NamespaceString( _qSpec.ns() ).isCommand(); }
         bool isExplain(){ return _qSpec.isExplain(); }
+
+        /**
+         * Sets the batch size on all underlying cursors to 'newBatchSize'.
+         */
+        void setBatchSize(int newBatchSize);
 
         /**
          * Returns whether the collection was sharded when the cursors were established.
@@ -262,7 +273,7 @@ namespace mongo {
         std::set<ServerAndQuery> _servers;
         BSONObj _sortKey;
 
-        FilteringClientCursor * _cursors;
+        DBClientCursorHolder * _cursors;
         int _needToSkip;
 
         /**
@@ -289,37 +300,35 @@ namespace mongo {
     };
 
 
-    // TODO:  We probably don't really need this as a separate class.
-    class MONGO_CLIENT_API FilteringClientCursor {
+    /**
+     * Helper class to manage ownership of opened cursors while merging results.
+     *
+     * TODO:  Choose one set of ownership semantics so that this isn't needed - merge sort via
+     * mapreduce is the main issue since it has no metadata and this holder owns the cursors.
+     */
+    class MONGO_CLIENT_API DBClientCursorHolder {
     public:
-        FilteringClientCursor();
-        ~FilteringClientCursor();
 
-        void reset( std::auto_ptr<DBClientCursor> cursor );
-        void reset( DBClientCursor* cursor, ParallelConnectionMetadata* _pcmData = NULL );
+        DBClientCursorHolder() {}
+        ~DBClientCursorHolder() {}
 
-        bool more();
-        BSONObj next();
+        void reset(DBClientCursor* cursor, ParallelConnectionMetadata* pcmData) {
+            _cursor.reset(cursor);
+            _pcmData.reset(pcmData);
+        }
 
-        BSONObj peek();
+        DBClientCursor* get() { return _cursor.get(); }
+        ParallelConnectionMetadata* getMData() { return _pcmData.get(); }
 
-        DBClientCursor* raw() { return _cursor.get(); }
-        ParallelConnectionMetadata* rawMData(){ return _pcmData; }
-
-        // Required for new PCursor
-        void release(){
+        void release() {
             _cursor.release();
-            _pcmData = NULL;
+            _pcmData.release();
         }
 
     private:
-        void _advance();
 
         std::auto_ptr<DBClientCursor> _cursor;
-        ParallelConnectionMetadata* _pcmData;
-
-        BSONObj _next;
-        bool _done;
+        std::auto_ptr<ParallelConnectionMetadata> _pcmData;
     };
 
     /**
@@ -370,10 +379,10 @@ namespace mongo {
             int _options;
             BSONObj _cmd;
             DBClientBase * _conn;
-            scoped_ptr<AScopedConnection> _connHolder; // used if not provided a connection
+            boost::scoped_ptr<AScopedConnection> _connHolder; // used if not provided a connection
             bool _useShardConn;
 
-            scoped_ptr<DBClientCursor> _cursor;
+            boost::scoped_ptr<DBClientCursor> _cursor;
 
             BSONObj _res;
             bool _ok;
@@ -390,7 +399,7 @@ namespace mongo {
          * @param conn optional connection to use.  will use standard pooled if non-specified
          * @param useShardConn use ShardConnection
          */
-        static shared_ptr<CommandResult> spawnCommand( const std::string& server,
+        static boost::shared_ptr<CommandResult> spawnCommand( const std::string& server,
                                                        const std::string& db,
                                                        const BSONObj& cmd,
                                                        int options,

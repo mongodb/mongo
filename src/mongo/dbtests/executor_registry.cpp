@@ -34,9 +34,10 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
@@ -45,6 +46,8 @@
 
 
 namespace ExecutorRegistry {
+
+    using std::auto_ptr;
 
     class ExecutorRegistryBase {
     public:
@@ -56,12 +59,6 @@ namespace ExecutorRegistry {
 
             for (int i = 0; i < N(); ++i) {
                 _client.insert(ns(), BSON("foo" << i));
-            }
-        }
-
-        ~ExecutorRegistryBase() {
-            if (_ctx.get()) {
-                _ctx->commit();
             }
         }
 
@@ -79,23 +76,39 @@ namespace ExecutorRegistry {
             // Create a plan executor to hold it
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
-            // Owns all args
-            return new PlanExecutor(ws.release(), scan.release(), cq,
-                                    _ctx->ctx().db()->getCollection( &_opCtx, ns() ));
+            PlanExecutor* exec;
+            // Takes ownership of 'ws', 'scan', and 'cq'.
+            Status status = PlanExecutor::make(&_opCtx,
+                                               ws.release(),
+                                               scan.release(),
+                                               cq,
+                                               _ctx->ctx().db()->getCollection(ns()),
+                                               PlanExecutor::YIELD_MANUAL,
+                                               &exec);
+            ASSERT_OK(status);
+            return exec;
         }
 
         void registerExecutor( PlanExecutor* exec ) {
-            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->registerExecutor( exec );
+            WriteUnitOfWork wuow(&_opCtx);
+            _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
+                            ->getCursorManager()
+                            ->registerExecutor(exec);
+            wuow.commit();
         }
 
         void deregisterExecutor( PlanExecutor* exec ) {
-            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->deregisterExecutor( exec );
+            WriteUnitOfWork wuow(&_opCtx);
+            _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
+                            ->getCursorManager()
+                            ->deregisterExecutor(exec);
+            wuow.commit();
         }
 
         int N() { return 50; }
 
         Collection* collection() {
-            return _ctx->ctx().db()->getCollection( &_opCtx, ns() );
+            return _ctx->ctx().db()->getCollection( ns() );
         }
 
         static const char* ns() { return "unittests.ExecutorRegistryDiskLocInvalidation"; }
@@ -111,6 +124,10 @@ namespace ExecutorRegistry {
     class ExecutorRegistryDiskLocInvalid : public ExecutorRegistryBase {
     public:
         void run() {
+            if ( supportsDocLocking() ) {
+                return;
+            }
+
             auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
@@ -199,7 +216,7 @@ namespace ExecutorRegistry {
             auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
-            _client.ensureIndex(ns(), BSON("foo" << 1));
+            ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
@@ -230,7 +247,7 @@ namespace ExecutorRegistry {
             auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
-            _client.ensureIndex(ns(), BSON("foo" << 1));
+            ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
@@ -273,7 +290,6 @@ namespace ExecutorRegistry {
 
             // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
             // requires a "global write lock."
-            _ctx->commit();
             _ctx.reset();
             _client.dropDatabase("somesillydb");
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
@@ -290,7 +306,6 @@ namespace ExecutorRegistry {
             registerExecutor(run.get());
 
             // Drop our DB.  Once again, must give up the lock.
-            _ctx->commit();
             _ctx.reset();
             _client.dropDatabase("unittests");
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
@@ -298,7 +313,6 @@ namespace ExecutorRegistry {
             // Unregister and restore state.
             deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
-            _ctx->commit();
             _ctx.reset();
 
             // PlanExecutor was killed.
@@ -319,6 +333,8 @@ namespace ExecutorRegistry {
             add<ExecutorRegistryDropOneIndex>();
             add<ExecutorRegistryDropDatabase>();
         }
-    }  executorRegistryAll;
+    };
+
+    SuiteInstance<All> executorRegistryAll;
 
 }  // namespace ExecutorRegistry

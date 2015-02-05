@@ -26,8 +26,11 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <sstream>
 
@@ -45,6 +48,7 @@
 
 namespace {
 
+    using boost::scoped_ptr;
     using std::string;
     using namespace mongo;
 
@@ -65,11 +69,12 @@ namespace {
     /**
      * Retrieves a collection's plan cache from the database.
      */
-    Status getPlanCache(OperationContext* txn, Database* db, const string& ns, PlanCache** planCacheOut) {
-        invariant(db);
-
+    static Status getPlanCache(OperationContext* txn,
+                               Collection* collection,
+                               const string& ns,
+                               PlanCache** planCacheOut) {
         *planCacheOut = NULL;
-        Collection* collection = db->getCollection(txn, ns);
+
         if (NULL == collection) {
             return Status(ErrorCodes::BadValue, "no such collection");
         }
@@ -107,8 +112,6 @@ namespace {
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kCommands);
-
     using std::string;
     using std::stringstream;
     using std::vector;
@@ -138,6 +141,10 @@ namespace mongo {
 
     bool PlanCacheCommand::slaveOk() const {
         return false;
+    }
+
+    bool PlanCacheCommand::slaveOverrideOk() const {
+        return true;
     }
 
     void PlanCacheCommand::help(stringstream& ss) const {
@@ -220,10 +227,10 @@ namespace mongo {
                                                          BSONObj& cmdObj,
                                                          BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        AutoGetCollectionForRead ctx(txn, ns);
+
         PlanCache* planCache;
-        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, ctx.getCollection(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - return results with empty shapes array.
             BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
@@ -268,10 +275,10 @@ namespace mongo {
                                                BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        AutoGetCollectionForRead ctx(txn, ns);
+
         PlanCache* planCache;
-        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, ctx.getCollection(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - nothing to do. Return OK status.
             return Status::OK();
@@ -342,10 +349,10 @@ namespace mongo {
                                                    const std::string& ns,
                                                    BSONObj& cmdObj,
                                                    BSONObjBuilder* bob) {
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        AutoGetCollectionForRead ctx(txn, ns);
+
         PlanCache* planCache;
-        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, ctx.getCollection(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - return empty plans array.
             BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));

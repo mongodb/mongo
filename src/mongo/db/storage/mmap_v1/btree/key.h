@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 

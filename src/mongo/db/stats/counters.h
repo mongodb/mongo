@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/message.h"

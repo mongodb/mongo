@@ -28,9 +28,9 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 
 namespace mongo {
 
@@ -258,8 +258,8 @@ namespace mongo {
         //
 
         enum { 
-            // first bit of offsets used in _KeyNode we don't use -1 here.
-            OurNullOfs = -2
+            OurNullOfs = -2, // first bit of offsets used in _KeyNode we don't use -1 here
+            OurMaxA = 0xffffff, // highest 3-byte value
         };
 
         void Null() { 
@@ -267,26 +267,17 @@ namespace mongo {
             _a[0] = _a[1] = _a[2] = 0;
         }
 
-        void operator=(const DiskLoc& loc) {
-            ofs = loc.getOfs();
-            int la = loc.a();
-            invariant( la <= 0xffffff ); // must fit in 3 bytes
-            if( la < 0 ) {
-                if ( la != -1 ) {
-                    log() << "btree diskloc isn't negative 1: " << la << std::endl;
-                    invariant ( la == -1 );
-                }
-                la = 0;
-                ofs = OurNullOfs;
-            }
-            memcpy(_a, &la, 3); // endian
-        }
+        void operator=(const DiskLoc& loc);
 
         //
         // Type Conversion
         //
 
-        operator const DiskLoc() const { 
+        RecordId toRecordId() const {
+            return DiskLoc(*this).toRecordId();
+        }
+
+        operator DiskLoc() const {
             // endian
             if( isNull() ) return DiskLoc();
             unsigned a = *((unsigned *) (_a-1));

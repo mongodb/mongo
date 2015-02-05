@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -114,8 +115,9 @@ namespace mongo {
         // given namespace.
         Status checkAuthForQuery(const NamespaceString& ns, const BSONObj& query);
 
-        // Checks if this connection has the privileges necessary to perform a getMore on the given
-        // cursor in the given namespace.
+        // Checks if this connection has the privileges necessary to perform a getMore operation on
+        // the identified cursor, supposing that cursor is associated with the supplied namespace
+        // identifier.
         Status checkAuthForGetMore(const NamespaceString& ns, long long cursorID);
 
         // Checks if this connection has the privileges necessary to perform the given update on the
@@ -133,6 +135,11 @@ namespace mongo {
         // Checks if this connection has the privileges necessary to perform a delete on the given
         // namespace.
         Status checkAuthForDelete(const NamespaceString& ns, const BSONObj& query);
+
+        // Checks if this connection has the privileges necessary to perform a killCursor on
+        // the identified cursor, supposing that cursor is associated with the supplied namespace
+        // identifier.
+        Status checkAuthForKillCursors(const NamespaceString& ns, long long cursorID);
 
         // Checks if this connection has the privileges necessary to grant the given privilege
         // to a role.
@@ -222,7 +229,7 @@ namespace mongo {
         // lock on the admin database (to update out-of-date user privilege information).
         bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
-        scoped_ptr<AuthzSessionExternalState> _externalState;
+        boost::scoped_ptr<AuthzSessionExternalState> _externalState;
 
         // All Users who have been authenticated on this connection.
         UserSet _authenticatedUsers;

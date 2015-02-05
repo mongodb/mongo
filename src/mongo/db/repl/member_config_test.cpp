@@ -51,7 +51,7 @@ namespace {
         ASSERT_FALSE(mc.isHidden());
         ASSERT_FALSE(mc.isArbiter());
         ASSERT_TRUE(mc.shouldBuildIndexes());
-        ASSERT_EQUALS(0U, mc.getNumTags());
+        ASSERT_EQUALS(3U, mc.getNumTags());
         ASSERT_OK(mc.validate());
     }
 
@@ -157,9 +157,8 @@ namespace {
         ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << -0.5),
                                 &tagConfig));
         ASSERT_FALSE(mc.isVoter());
-        ASSERT_EQUALS(ErrorCodes::BadValue,
-                      mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << 2),
-                                    &tagConfig));
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << 2),
+                                &tagConfig));
 
         ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                       mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << Date_t(2)),
@@ -198,19 +197,65 @@ namespace {
         ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" <<
                                      "tags" << BSON("k1" << "v1" << "k2" << "v2")),
                                 &tagConfig));
-        ASSERT_EQUALS(2U, mc.getNumTags());
-        ASSERT_EQUALS(2, std::distance(mc.tagsBegin(), mc.tagsEnd()));
+        ASSERT_EQUALS(5U, mc.getNumTags());
+        ASSERT_EQUALS(5, std::distance(mc.tagsBegin(), mc.tagsEnd()));
         ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("k1", "v1")));
         ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("k2", "v2")));
+        ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("$voter", 
+                                                                                    "0")));
+        ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("$electable", 
+                                                                                    "0")));
+        ASSERT_EQUALS(1, std::count(mc.tagsBegin(), mc.tagsEnd(), tagConfig.findTag("$all", 
+                                                                                    "0")));
     }
 
     TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
         ReplicaSetTagConfig tagConfig;
         MemberConfig mc;
-        ASSERT_OK(mc.initialize(BSON("_id" << -1 << "host" << "localhost::12345"),
+        ASSERT_OK(mc.initialize(BSON("_id" << -1 << "host" << "localhost:12345"),
                                 &tagConfig));
         ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-        ASSERT_OK(mc.initialize(BSON("_id" << 256 << "host" << "localhost::12345"),
+        ASSERT_OK(mc.initialize(BSON("_id" << 256 << "host" << "localhost:12345"),
+                                &tagConfig));
+        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
+    }
+
+    TEST(MemberConfig, ValidateVotes) {
+        ReplicaSetTagConfig tagConfig;
+        MemberConfig mc;
+
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << 1.0),
+                                &tagConfig));
+        ASSERT_OK(mc.validate());
+        ASSERT_TRUE(mc.isVoter());
+
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << 0),
+                                &tagConfig));
+        ASSERT_OK(mc.validate());
+        ASSERT_FALSE(mc.isVoter());
+
+        // For backwards compatibility, truncate 1.X to 1, and 0.X to 0 (and -0.X to 0).
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << 1.5),
+                                &tagConfig));
+        ASSERT_OK(mc.validate());
+        ASSERT_TRUE(mc.isVoter());
+
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << 0.5),
+                                &tagConfig));
+        ASSERT_OK(mc.validate());
+        ASSERT_FALSE(mc.isVoter());
+
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << -0.5),
+                                &tagConfig));
+        ASSERT_OK(mc.validate());
+        ASSERT_FALSE(mc.isVoter());
+
+        // Invalid values
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << 2),
+                                &tagConfig));
+        ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
+
+        ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << -1),
                                 &tagConfig));
         ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
     }

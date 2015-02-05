@@ -38,6 +38,7 @@
 namespace mongo {
 
     class CanonicalQuery;
+    class Database;
     class OperationContext;
     class UpdateDriver;
 
@@ -46,23 +47,10 @@ namespace mongo {
      *
      * Caller must hold the appropriate database locks.
      */
-    UpdateResult update(Database* db, 
+    UpdateResult update(OperationContext* txn,
+                        Database* db, 
                         const UpdateRequest& request, 
                         OpDebug* opDebug);
-
-    /**
-     * Execute the update described by "request", using the given already-parsed
-     * driver and canonical query.
-     *
-     * NOTE: This function is really a utility method for UpdateExecutor.
-     *
-     * TODO: Move this into a private method of UpdateExecutor.
-     */
-    UpdateResult update(Database* db,
-                        const UpdateRequest& request,
-                        OpDebug* opDebug,
-                        UpdateDriver* driver,
-                        CanonicalQuery* cq);
 
     /**
      * takes the from document and returns a new document

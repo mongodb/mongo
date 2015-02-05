@@ -49,6 +49,12 @@ namespace mongo {
 
     private:
 
+        /**
+         * Initialize configDB string in config server or if already initialized,
+         * check that it matches. Returns false if an error occured.
+         */
+        bool _checkConfigString(BatchedCommandResponse* clientResponse);
+
         // Not owned here
         MultiCommandDispatch* _dispatcher;
 

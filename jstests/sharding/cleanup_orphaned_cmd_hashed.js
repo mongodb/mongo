@@ -1,5 +1,6 @@
 //
 // Tests cleanup of orphaned data in hashed sharded coll via the orphaned data cleanup command
+// @tags : [ hashed ]
 //
 
 var options = { separateConfig : true, shardOptions : { verbose : 2 } };

@@ -45,21 +45,21 @@ namespace {
     // creation function
     //
 
-    ParsedProjection* createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
+    auto_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
         StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
         ASSERT(swme.isOK());
-        MatchExpression* queryMatchExpr = swme.getValue();
+        boost::scoped_ptr<MatchExpression> queryMatchExpr(swme.getValue());
         ParsedProjection* out = NULL;
-        Status status = ParsedProjection::make(projObj, queryMatchExpr, &out);
+        Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
         if (!status.isOK()) {
             FAIL(mongoutils::str::stream() << "failed to parse projection " << projObj
                                            << " (query: " << query << "): " << status.toString());
         }
         ASSERT(out);
-        return out;
+        return auto_ptr<ParsedProjection>(out);
     }
 
-    ParsedProjection* createParsedProjection(const char* queryStr, const char* projStr) {
+    auto_ptr<ParsedProjection> createParsedProjection(const char* queryStr, const char* projStr) {
         BSONObj query = fromjson(queryStr);
         BSONObj projObj = fromjson(projStr);
         return createParsedProjection(query, projObj);
@@ -74,9 +74,10 @@ namespace {
         BSONObj projObj = fromjson(projStr);
         StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
         ASSERT(swme.isOK());
-        MatchExpression* queryMatchExpr = swme.getValue();
+        boost::scoped_ptr<MatchExpression> queryMatchExpr(swme.getValue());
         ParsedProjection* out = NULL;
-        Status status = ParsedProjection::make(projObj, queryMatchExpr, &out);
+        Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
+        boost::scoped_ptr<ParsedProjection> destroy(out);
         ASSERT(!status.isOK());
     }
 
@@ -183,6 +184,7 @@ namespace {
         BSONObj projObj = fromjson("{'a.$': 1}");
         Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
         ASSERT(!status.isOK());
+        boost::scoped_ptr<ParsedProjection> destroy(out);
 
         // Projecting onto empty field should fail.
         BSONObj emptyFieldProjObj = fromjson("{'.$': 1}");

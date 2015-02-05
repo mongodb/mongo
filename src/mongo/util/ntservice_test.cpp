@@ -114,8 +114,7 @@ TEST(NtService, RegressionSERVER_7252) {
 
 // CRUTCHES!
 namespace mongo {
-    enum ExitCode;
-    void exitCleanly(ExitCode ignored) { std::abort(); }
     void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
     }
+    void removeControlCHandler() {}
 }  // namespace mongo

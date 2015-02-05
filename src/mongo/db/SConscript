@@ -14,11 +14,14 @@ env.Library(
         'field_ref.cpp',
         'field_ref_set.cpp',
         'field_parser.cpp',
+        'get_status_from_command_result.cpp',
+        'keypattern.cpp',
         'write_concern_options.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/index_names'
     ],
 )
 
@@ -58,6 +61,14 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target= 'keypattern_test',
+    source= 'keypattern_test.cpp',
+    LIBDEPS=[
+        'common'
+    ],
+)
+
+env.CppUnitTest(
     target="dbmessage_test",
     source=[
         "dbmessage_test.cpp"
@@ -65,5 +76,36 @@ env.CppUnitTest(
     LIBDEPS=[
         "common",
         "$BUILD_DIR/mongo/clientdriver",
+    ],
+)
+env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])
+
+env.Library(
+    target='startup_warnings_common',
+    source=[
+        'startup_warnings_common.cpp',
+    ],
+    LIBDEPS=[
+    ]
+)
+
+env.Library(
+    target='startup_warnings_mongod',
+    source=[
+        'startup_warnings_mongod.cpp',
+    ],
+    LIBDEPS=[
+        'startup_warnings_common',
+        '$BUILD_DIR/mongo/processinfo',
+    ]
+)
+
+env.CppUnitTest(
+    target='startup_warnings_mongod_test',
+    source=[
+        'startup_warnings_mongod_test.cpp',
+    ],
+    LIBDEPS=[
+        'startup_warnings_mongod',
     ],
 )

@@ -48,6 +48,8 @@
 namespace mongo {
 namespace auth {
 
+    using std::vector;
+
     /**
      * Writes into *writeConcern a BSONObj describing the parameters to getLastError to use for
      * the write confirmation.
@@ -216,7 +218,6 @@ namespace auth {
         validFieldNames.insert("pwd");
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
-        validFieldNames.insert("mechanism");
 
         Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
         if (!status.isOK()) {
@@ -238,14 +239,6 @@ namespace auth {
         }
 
         parsedArgs->userName = UserName(userName, dbname);
-
-        // Parse authMechanism
-        if (cmdObj.hasField("mechanism")) {
-            status = bsonExtractStringField(cmdObj, "mechanism", &parsedArgs->mechanism);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
 
         // Parse password
         if (cmdObj.hasField("pwd")) {

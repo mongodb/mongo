@@ -57,9 +57,10 @@ var slave = rt.add();
 print ("initiation complete!");
 var sc = slave.getDB( 'd' )[ 'c' ];
 slave.setSlaveOk();
+master = rt.getMaster();
 
 print ("updating and deleting documents");
-bulk = mdc.initializeUnorderedBulkOp();
+bulk = master.getDB('d')['c'].initializeUnorderedBulkOp();
 for (i = doccount*4; i > doccount; --i) {
     bulk.find({ _id: i }).update({ $inc: { x: 1 }});
     bulk.find({ _id: i }).remove();

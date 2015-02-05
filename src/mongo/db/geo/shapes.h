@@ -28,12 +28,14 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <cmath>
 #include <string>
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2cap.h"
 #include "third_party/s2/s2cell.h"
@@ -68,7 +70,7 @@ namespace mongo {
     bool circleInteriorContainsBox(const Circle& circle, const Box& box);
     bool circleIntersectsWithBox(const Circle& circle, const Box& box);
     bool circleInteriorIntersectsWithBox(const Circle& circle, const Box& box);
-    bool edgesIntersectsWithBox(const vector<Point>& vertices, const Box& box);
+    bool edgesIntersectsWithBox(const std::vector<Point>& vertices, const Box& box);
     bool polygonContainsBox(const Polygon& polygon, const Box& box);
     bool polygonIntersectsWithBox(const Polygon& polygon, const Box& box);
 
@@ -189,8 +191,8 @@ namespace mongo {
         std::vector<Point> _points;
 
         // Cached attributes of the polygon
-        mutable scoped_ptr<Box> _bounds;
-        mutable scoped_ptr<Point> _centroid;
+        mutable boost::scoped_ptr<Box> _bounds;
+        mutable boost::scoped_ptr<Point> _centroid;
     };
 
     class R2Region {
@@ -250,8 +252,9 @@ namespace mongo {
     // Clearly this isn't right but currently it's sufficient.
     enum CRS {
         UNSET,
-        FLAT,
-        SPHERE
+        FLAT, // Equirectangular flat projection (i.e. trivial long/lat projection to flat map)
+        SPHERE, // WGS84
+        STRICT_SPHERE // WGS84 with strict winding order
     };
 
     // TODO: Make S2 less integral to these types - additional S2 shapes should be an optimization
@@ -298,7 +301,11 @@ namespace mongo {
 
         PolygonWithCRS() : crs(UNSET) {}
 
-        S2Polygon polygon;
+        boost::scoped_ptr<S2Polygon> s2Polygon;
+        // Simple polygons with strict winding order may be bigger or smaller than a hemisphere.
+        // Only used for query. We don't support storing/indexing big polygons.
+        boost::scoped_ptr<BigSimplePolygon> bigPolygon;
+
         Polygon oldPolygon;
         CRS crs;
     };
@@ -347,12 +354,15 @@ namespace mongo {
     };
 
     //
-    // Projection functions - we don't project types other than points for now
+    // Projection functions - we only project following types for now
+    //   - Point
+    //   - Polygon (from STRICT_SPHERE TO SPHERE)
     //
-
     struct ShapeProjection {
         static bool supportsProject(const PointWithCRS& point, const CRS crs);
+        static bool supportsProject(const PolygonWithCRS& polygon, const CRS crs);
         static void projectInto(PointWithCRS* point, CRS crs);
+        static void projectInto(PolygonWithCRS* point, CRS crs);
     };
 
 }  // namespace mongo

@@ -51,6 +51,9 @@
  */
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     class GeoHaystackSearchCommand : public Command {
     public:
         GeoHaystackSearchCommand() : Command("geoSearch") {}
@@ -69,23 +72,18 @@ namespace mongo {
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int,
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const string ns = dbname + "." + cmdObj.firstElement().valuestr();
-            Client::ReadContext ctx(txn, ns);
+            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
-            Database* db = ctx.ctx().db();
-            if ( !db ) {
-                errmsg = "can't find ns";
-                return false;
-            }
+            AutoGetCollectionForRead ctx(txn, ns);
 
-            Collection* collection = db->getCollection( txn, ns );
+            Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;
             }
 
             vector<IndexDescriptor*> idxs;
-            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_HAYSTACK, idxs);
+            collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_HAYSTACK, idxs);
             if (idxs.size() == 0) {
                 errmsg = "no geoSearch index";
                 return false;

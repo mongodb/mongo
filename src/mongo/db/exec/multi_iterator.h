@@ -28,25 +28,23 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
     /**
-     * Iterates over a collection using multiple underlying iterators. The extents of the
-     * collection are assigned to the iterators in a round-robin fashion.
+     * Iterates over a collection using multiple underlying RecordIterators.
      *
-     * This is a special stage which is used only for the parallelCollectionScan command
-     * (see parallel_collection_scan.cpp).
+     * This is a special stage which is not used automatically by queries. It is intended for
+     * special commands that work with RecordIterators. For example, it is used by the
+     * parallelCollectionScan and repairCursor commands
      */
     class MultiIteratorStage : public PlanStage {
     public:
-        MultiIteratorStage(WorkingSet* ws, Collection* collection)
-            : _collection(collection),
-              _ws(ws) { }
+        MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection);
 
         ~MultiIteratorStage() { }
 
@@ -64,7 +62,7 @@ namespace mongo {
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
 
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         //
         // These should not be used.
@@ -83,13 +81,18 @@ namespace mongo {
         /**
          * @return if more data
          */
-        DiskLoc _advance();
+        RecordId _advance();
 
+        OperationContext* _txn;
         Collection* _collection;
         OwnedPointerVector<RecordIterator> _iterators;
 
         // Not owned by us.
         WorkingSet* _ws;
+
+        // We allocate a working set member with this id on construction of the stage. It gets
+        // used for all fetch requests, changing the RecordId as appropriate.
+        const WorkingSetID _wsidForFetch;
     };
 
 } // namespace mongo

@@ -30,21 +30,21 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
-#include "mongo/db/instance.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
@@ -55,6 +55,10 @@ namespace mongo {
 }  // namespace mongo
 
 namespace QueryMultiPlanRunner {
+
+    using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::vector;
 
     /**
      * Create query solution.
@@ -72,36 +76,25 @@ namespace QueryMultiPlanRunner {
         MultiPlanRunnerBase() : _client(&_txn) {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         virtual ~MultiPlanRunnerBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
-            Client::WriteContext ctx(&_txn, ns());
-            _client.ensureIndex(ns(), obj);
-            ctx.commit();
-        }
-
-        IndexDescriptor* getIndex(OperationContext* txn, Database* db, const BSONObj& obj) {
-            const Collection* collection = db->getCollection( txn, ns() );
-            return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
+            ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
         }
 
         void insert(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.insert(ns(), obj);
-            ctx.commit();
         }
 
         void remove(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.remove(ns(), obj);
-            ctx.commit();
         }
 
         static const char* ns() { return "unittests.QueryStageMultiPlanRunner"; }
@@ -124,14 +117,14 @@ namespace QueryMultiPlanRunner {
 
             addIndex(BSON("foo" << 1));
 
-            Client::ReadContext ctx(&_txn, ns());
-            const Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            const Collection* coll = ctx.getCollection();
 
             // Plan 0: IXScan over foo == 7
             // Every call to work() returns something so this should clearly win (by current scoring
             // at least).
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(&_txn, ctx.ctx().db(), BSON("foo" << 1));
+            ixparams.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("foo" << 1));
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << 7);
             ixparams.bounds.endKey = BSON("" << 7);
@@ -140,11 +133,11 @@ namespace QueryMultiPlanRunner {
 
             auto_ptr<WorkingSet> sharedWs(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, sharedWs.get(), NULL);
-            auto_ptr<PlanStage> firstRoot(new FetchStage(sharedWs.get(), ix, NULL, coll));
+            auto_ptr<PlanStage> firstRoot(new FetchStage(&_txn, sharedWs.get(), ix, NULL, coll));
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
-            csparams.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
+            csparams.collection = coll;
             csparams.direction = CollectionScanParams::FORWARD;
 
             // Make the filter.
@@ -161,23 +154,27 @@ namespace QueryMultiPlanRunner {
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
 
-            MultiPlanStage* mps = new MultiPlanStage(ctx.ctx().db()->getCollection(&_txn, ns()),cq);
+            MultiPlanStage* mps = new MultiPlanStage(&_txn, ctx.getCollection(), cq);
             mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
             mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
-            // Plan 0 aka the first plan aka the index scan should be the best.
-            mps->pickBestPlan();
+            // Plan 0 aka the first plan aka the index scan should be the best. NULL means that
+            // 'mps' will not yield during plan selection.
+            mps->pickBestPlan(NULL);
             ASSERT(mps->bestPlanChosen());
             ASSERT_EQUALS(0, mps->bestPlanIdx());
 
-            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
             // Takes ownership of arguments other than 'collection'.
-            PlanExecutor exec(sharedWs.release(), mps, cq, collection);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, sharedWs.release(), mps, cq, coll,
+                                               PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             // Get all our results out.
             int results = 0;
             BSONObj obj;
-            while (PlanExecutor::ADVANCED == exec.getNext(&obj, NULL)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(&obj, NULL)) {
                 ASSERT_EQUALS(obj["foo"].numberInt(), 7);
                 ++results;
             }
@@ -198,8 +195,8 @@ namespace QueryMultiPlanRunner {
             addIndex(BSON("a" << 1));
             addIndex(BSON("b" << 1));
 
-            Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            Collection* collection = ctx.getCollection();
 
             // Query for both 'a' and 'b' and sort on 'b'.
             CanonicalQuery* cq;
@@ -209,6 +206,7 @@ namespace QueryMultiPlanRunner {
                                                 BSONObj(), // proj
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Force index intersection.
             bool forceIxisectOldValue = internalQueryForceIntersectionPlans;
@@ -216,7 +214,7 @@ namespace QueryMultiPlanRunner {
 
             // Get planner params.
             QueryPlannerParams plannerParams;
-            fillOutPlannerParams(collection, cq, &plannerParams);
+            fillOutPlannerParams(&_txn, collection, cq, &plannerParams);
             // Turn this off otherwise it pops up in some plans.
             plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
@@ -230,7 +228,7 @@ namespace QueryMultiPlanRunner {
             ASSERT_EQUALS(solutions.size(), 3U);
 
             // Fill out the MultiPlanStage.
-            scoped_ptr<MultiPlanStage> mps(new MultiPlanStage(collection, cq));
+            scoped_ptr<MultiPlanStage> mps(new MultiPlanStage(&_txn, collection, cq));
             scoped_ptr<WorkingSet> ws(new WorkingSet());
             // Put each solution from the planner into the MPR.
             for (size_t i = 0; i < solutions.size(); ++i) {
@@ -240,8 +238,8 @@ namespace QueryMultiPlanRunner {
                 mps->addPlan(solutions[i], root, ws.get());
             }
 
-            // This sets a backup plan.
-            mps->pickBestPlan();
+            // This sets a backup plan. NULL means that 'mps' will not yield.
+            mps->pickBestPlan(NULL);
             ASSERT(mps->bestPlanChosen());
             ASSERT(mps->hasBackupPlan());
 
@@ -249,7 +247,7 @@ namespace QueryMultiPlanRunner {
             QuerySolution* soln = mps->bestSolution();
             ASSERT(QueryPlannerTestLib::solutionMatches(
                              "{sort: {pattern: {b: 1}, limit: 0, node: "
-                                 "{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                 "{fetch: {node: {andSorted: {nodes: ["
                                          "{ixscan: {filter: null, pattern: {a:1}}},"
                                          "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
                              soln->root.get()));
@@ -265,7 +263,7 @@ namespace QueryMultiPlanRunner {
             // Check the document returned by the query.
             ASSERT(member->hasObj());
             BSONObj expectedDoc = BSON("_id" << 1 << "a" << 1 << "b" << 1);
-            ASSERT(expectedDoc.woCompare(member->obj) == 0);
+            ASSERT(expectedDoc.woCompare(member->obj.value()) == 0);
 
             // The blocking plan became unblocked, so we should no longer have a backup plan,
             // and the winning plan should still be the index intersection one.
@@ -273,7 +271,7 @@ namespace QueryMultiPlanRunner {
             soln = mps->bestSolution();
             ASSERT(QueryPlannerTestLib::solutionMatches(
                              "{sort: {pattern: {b: 1}, limit: 0, node: "
-                                 "{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                 "{fetch: {node: {andSorted: {nodes: ["
                                          "{ixscan: {filter: null, pattern: {a:1}}},"
                                          "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
                              soln->root.get()));
@@ -291,6 +289,8 @@ namespace QueryMultiPlanRunner {
             add<MPRCollectionScanVsHighlySelectiveIXScan>();
             add<MPRBackupPlan>();
         }
-    }  queryMultiPlanRunnerAll;
+    };
+
+    SuiteInstance<All> queryMultiPlanRunnerAll;
 
 }  // namespace QueryMultiPlanRunner

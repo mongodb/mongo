@@ -125,14 +125,27 @@ namespace mongo {
          */
         Status evaluate(const BSONObj& src, BSONObjBuilder& builder);
 
+        /**
+         * Sets the given variable
+         */
+        void setVariable(const std::string& name, const BSONElement& elem);
+
     private:
         void initializeEvaluator();
         // map that holds operators along with their respective function pointers
         typedef std::map< std::string, OperatorFn > OperatorMap;
         OperatorMap _operatorFunctions;
 
+        // map that holds variable name and value pairs
+        typedef std::map<std::string, BSONObj> VarMap;
+        VarMap _varMap;
+
         // evaluates a BSON element. This is internally called by the top level evaluate method.
-        Status _evalElem(BSONElement in, BSONObjBuilder& out);
+        Status _evalElem(const BSONElement in, BSONObjBuilder& out);
+
+        // evaluates a BSON object. This is internally called by the top level evaluate method
+        // and the _evalElem method.
+        Status _evalObj(const BSONObj& in, BSONObjBuilder& out);
 
         // An identifier for this template evaluator instance, which distinguishes it
         // from other evaluators. Useful for threaded benchruns which, say, want to insert
@@ -155,6 +168,19 @@ namespace mongo {
          */
         static Status evalRandInt(BsonTemplateEvaluator* btl, const char* fieldName,
                                   const BSONObj& in, BSONObjBuilder& out);
+
+        /*
+         * Operator method to support #RAND_INT_PLUS_THREAD : { key : { #RAND_INT_PLUS_THREAD: [10, 20] } }
+         * See #RAND_INT above for definition. This variation differs from the base in the
+         * it uses the upper bound of the requested range to segment the ranges by
+         * the thread_id of the TemplateEvaluator - thus
+         * thread 0 [0, 1000] yields 0...999
+         * thread 1 [0, 1000] yields 1000...1999
+         * etc.
+         */
+        static Status evalRandPlusThread(BsonTemplateEvaluator* btl, const char* fieldName,
+                                  const BSONObj& in, BSONObjBuilder& out);
+
         /*
          * Operator method to support #SEQ_INT :
          *    { key : { #SEQ_INT: { seq_id: 0, start: 100, step: -2, unique: true } } }
@@ -201,6 +227,13 @@ namespace mongo {
          */
         static Status evalObjId(BsonTemplateEvaluator* btl, const char* fieldName,
                                 const BSONObj& in, BSONObjBuilder& out);
+
+        /*
+         * Operator method to support variables: {_id: { #VARIABLE: "x" } }
+         *
+         */
+        static Status evalVariable(BsonTemplateEvaluator* btl, const char* fieldName,
+                                   const BSONObj& in, BSONObjBuilder& out);
 
     };
 

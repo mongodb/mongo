@@ -44,8 +44,7 @@
 namespace mongo {
 
     /* these are administrative operations / jobs
-       for a namespace running in the background, and that only one
-       at a time per namespace is permitted, and that if in progress,
+       for a namespace running in the background, and that if in progress,
        you aren't allowed to do other NamespaceDetails major manipulations
        (such as dropping ns or db) even in the foreground and must
        instead uassert.

@@ -27,11 +27,17 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/engine_v8.h"
 
+#include <iostream>
+
 #include "mongo/base/init.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
@@ -43,7 +49,11 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kQuery);
+    using std::cout;
+    using std::endl;
+    using std::map;
+    using std::string;
+    using std::stringstream;
 
 #ifndef _MSC_EXTENSIONS
     const int V8Scope::objectDepthLimit;
@@ -325,7 +335,7 @@ namespace mongo {
 
     template <typename _GCState>
     void gcCallback(v8::GCType type, v8::GCCallbackFlags flags) {
-        if (!logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)))
+        if (!shouldLog(logger::LogSeverity::Debug(1)))
              // don't collect stats unless verbose
              return;
 
@@ -352,6 +362,10 @@ namespace mongo {
      void ScriptEngine::setup() {
          if (!globalScriptEngine) {
              globalScriptEngine = new V8ScriptEngine();
+
+             if (hasGlobalEnvironment()) {
+                 getGlobalEnvironment()->registerKillOpListener(globalScriptEngine);
+             }
          }
      }
 
@@ -380,27 +394,27 @@ namespace mongo {
          }
      }
 
-     void V8Scope::registerOpId() {
+     void V8Scope::registerOperation(OperationContext* txn) {
          scoped_lock giLock(_engine->_globalInterruptLock);
-         if (_engine->haveGetCurrentOpIdCallback()) {
-             // this scope has an associated operation
-             _opId = _engine->getCurrentOpId();
-             _engine->_opToScopeMap[_opId] = this;
+         invariant(_opId == 0);
+         _opId = txn->getOpID();
+         _engine->_opToScopeMap[_opId] = this;
+         LOG(2) << "V8Scope " << static_cast<const void*>(this) << " registered for op " << _opId;
+         Status status = txn->checkForInterruptNoAssert();
+         if (!status.isOK()) {
+             kill();
          }
-         else
-             // no associated op id (e.g. running from shell)
-             _opId = 0;
-         LOG(2) << "V8Scope " << static_cast<const void*>(this) << " registered for op " << _opId << endl;
      }
 
-     void V8Scope::unregisterOpId() {
+     void V8Scope::unregisterOperation() {
          scoped_lock giLock(_engine->_globalInterruptLock);
          LOG(2) << "V8Scope " << static_cast<const void*>(this) << " unregistered for op " << _opId << endl;
-        if (_engine->haveGetCurrentOpIdCallback() || _opId != 0) {
+        if (_opId != 0) {
             // scope is currently associated with an operation id
             V8ScriptEngine::OpIdToScopeMap::iterator it = _engine->_opToScopeMap.find(_opId);
             if (it != _engine->_opToScopeMap.end())
                 _engine->_opToScopeMap.erase(it);
+            _opId = 0;
         }
     }
 
@@ -411,7 +425,7 @@ namespace mongo {
             LOG(2) << "v8 execution interrupted.  isolate: " << static_cast<const void*>(_isolate) << endl;
             return false;
         }
-        if (_pendingKill || globalScriptEngine->interrupted()) {
+        if (isKillPending()) {
             // kill flag was set before entering our callback
             LOG(2) << "marked for death while leaving callback.  isolate: " << static_cast<const void*>(_isolate) << endl;
             v8::V8::TerminateExecution(_isolate);
@@ -429,7 +443,7 @@ namespace mongo {
             LOG(2) << "v8 execution interrupted.  isolate: " << static_cast<const void*>(_isolate) << endl;
             return false;
         }
-        if (_pendingKill || globalScriptEngine->interrupted()) {
+        if (isKillPending()) {
             LOG(2) << "marked for death while leaving callback.  isolate: " << static_cast<const void*>(_isolate) << endl;
             v8::V8::TerminateExecution(_isolate);
             return false;
@@ -451,7 +465,7 @@ namespace mongo {
 
     /** check if there is a pending killOp request */
     bool V8Scope::isKillPending() const {
-        return _pendingKill || _engine->interrupted();
+        return _pendingKill;
     }
 
     OperationContext* V8Scope::getOpContext() const {
@@ -463,7 +477,7 @@ namespace mongo {
      */
     std::string V8ScriptEngine::printKnownOps_inlock() {
         stringstream out;
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             out << "  known ops: " << endl;
             for(OpIdToScopeMap::iterator iSc = _opToScopeMap.begin();
                 iSc != _opToScopeMap.end(); ++iSc) {
@@ -481,6 +495,7 @@ namespace mongo {
           _interruptLock("ScopeInterruptLock"),
           _inNativeExecution(true),
           _pendingKill(false),
+          _opId(0),
           _opCtx(NULL) {
 
         // create new isolate and enter it via a scope
@@ -554,13 +569,10 @@ namespace mongo {
 
         // install global utility functions
         installGlobalUtils(*this);
-
-        // Don't add anything that can throw after this line otherwise we won't be unregistered.
-        registerOpId();
     }
 
     V8Scope::~V8Scope() {
-        unregisterOpId();
+        unregisterOperation();
     }
 
     bool V8Scope::hasOutOfMemoryException() {
@@ -586,11 +598,11 @@ namespace mongo {
         string exceptionText;
         v8::HandleScope handle_scope;
         try {
-            v8::Local<v8::External> f =
-                    v8::External::Cast(*args.Callee()->Get(scope->strLitToV8("_native_function")));
+            v8::Local<v8::External> f = args.Callee()->GetHiddenValue(
+                scope->strLitToV8("_native_function")).As<v8::External>();
             NativeFunction function = (NativeFunction)(f->Value());
-            v8::Local<v8::External> data =
-                    v8::External::Cast(*args.Callee()->Get(scope->strLitToV8("_native_data")));
+            v8::Local<v8::External> data = args.Callee()->GetHiddenValue(
+                scope->strLitToV8("_native_data")).As<v8::External>();
             BSONObjBuilder b;
             for (int i = 0; i < args.Length(); ++i)
                 scope->v8ToMongoElement(b, BSONObjBuilder::numStr(i), args[i]);
@@ -1038,7 +1050,7 @@ namespace mongo {
 
         if (!nativeEpilogue()) {
             _error = "JavaScript execution terminated";
-            log() << _error << endl;
+            error() << _error << endl;
             uasserted(16711, _error);
         }
 
@@ -1054,7 +1066,7 @@ namespace mongo {
 
         if (!nativePrologue()) {
             _error = "JavaScript execution terminated";
-            log() << _error << endl;
+            error() << _error << endl;
             uasserted(16712, _error);
         }
 
@@ -1093,7 +1105,7 @@ namespace mongo {
         if (!nativeEpilogue()) {
             _error = "JavaScript execution terminated";
             if (reportError)
-                log() << _error << endl;
+                error() << _error << endl;
             if (assertOnError)
                 uasserted(13475, _error);
             return false;
@@ -1112,7 +1124,7 @@ namespace mongo {
         if (!nativePrologue()) {
             _error = "JavaScript execution terminated";
             if (reportError)
-                log() << _error << endl;
+                error() << _error << endl;
             if (assertOnError)
                 uasserted(16721, _error);
             return false;
@@ -1136,16 +1148,15 @@ namespace mongo {
         injectNative(field, func, _global, data);
     }
 
-    void V8Scope::injectNative(const char *field, NativeFunction func, v8::Handle<v8::Object>& obj,
+    void V8Scope::injectNative(const char* field,
+                               NativeFunction nativeFunc,
+                               v8::Handle<v8::Object>& obj,
                                void* data) {
         v8::Handle<v8::FunctionTemplate> ft = createV8Function(nativeCallback);
-        ft->Set(strLitToV8("_native_function"),
-                           v8::External::New((void*)func),
-                           v8::PropertyAttribute(v8::DontEnum | v8::ReadOnly));
-        ft->Set(strLitToV8("_native_data"),
-                           v8::External::New(data),
-                           v8::PropertyAttribute(v8::DontEnum | v8::ReadOnly));
         injectV8Function(field, ft, obj);
+        v8::Handle<v8::Function> func = ft->GetFunction();
+        func->SetHiddenValue(strLitToV8("_native_function"), v8::External::New((void*)nativeFunc));
+        func->SetHiddenValue(strLitToV8("_native_data"), v8::External::New(data));
     }
 
     v8::Handle<v8::FunctionTemplate> V8Scope::injectV8Function(const char *field, v8Function func) {
@@ -1319,11 +1330,10 @@ namespace mongo {
 
     void V8Scope::reset() {
         V8_SIMPLE_HEADER
-        unregisterOpId();
+        unregisterOperation();
         _error = "";
         _pendingKill = false;
         _inNativeExecution = true;
-        registerOpId();
     }
 
     v8::Local<v8::Value> V8Scope::newFunction(const StringData& code) {
@@ -1349,7 +1359,7 @@ namespace mongo {
         v8::HandleScope handle_scope;
         v8::Handle<v8::Function> idCons = ObjectIdFT()->GetFunction();
         v8::Handle<v8::Value> argv[1];
-        const string& idString = id.str();
+        const string& idString = id.toString();
         argv[0] = v8::String::New(idString.c_str(), idString.length());
         return handle_scope.Close(idCons->NewInstance(1, argv));
     }
@@ -1398,7 +1408,7 @@ namespace mongo {
             return newFunction(elem.valueStringData());
         case CodeWScope:
             if (!elem.codeWScopeObject().isEmpty())
-                log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
+                warning() << "CodeWScope doesn't transfer to db.eval" << endl;
             return newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1));
         case mongo::Symbol:
         case mongo::String:
@@ -1784,6 +1794,51 @@ namespace mongo {
         }
         return scope->mongoToLZV8(scope->_cpuProfiler.fetch(
                 *v8::String::Utf8Value(args[0]->ToString())));
+    }
+
+    /**
+     * Check for an error condition (e.g. empty handle, JS exception, OOM) after executing
+     * a v8 operation.
+     * @resultHandle         handle storing the result of the preceding v8 operation
+     * @try_catch            the active v8::TryCatch exception handler
+     * @param reportError    if true, log an error message
+     * @param assertOnError  if true, throw an exception if an error is detected
+     *                       if false, return value indicates error state
+     * @return true if an error was detected and assertOnError is set to false
+     *         false if no error was detected
+     */
+    template <typename _HandleType>
+    bool V8Scope::checkV8ErrorState(const _HandleType& resultHandle,
+                                    const v8::TryCatch& try_catch,
+                                    bool reportError,
+                                    bool assertOnError) {
+        bool haveError = false;
+
+        if (try_catch.HasCaught() && try_catch.CanContinue()) {
+            // normal JS exception
+            _error = v8ExceptionToSTLString(&try_catch);
+            haveError = true;
+        }
+        else if (hasOutOfMemoryException()) {
+            // out of memory exception (treated as terminal)
+            _error = "JavaScript execution failed -- v8 is out of memory";
+            haveError = true;
+        }
+        else if (resultHandle.IsEmpty() || try_catch.HasCaught()) {
+            // terminal exception (due to empty handle, termination, etc.)
+            _error = "JavaScript execution failed";
+            haveError = true;
+        }
+
+        if (haveError) {
+            if (reportError)
+                error() << _error << std::endl;
+            if (assertOnError)
+                uasserted(16722, _error);
+            return true;
+        }
+
+        return false;
     }
 
     MONGO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {

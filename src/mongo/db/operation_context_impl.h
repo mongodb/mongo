@@ -43,7 +43,11 @@ namespace mongo {
 
         virtual RecoveryUnit* recoveryUnit() const;
 
-        virtual LockState* lockState() const;
+        virtual RecoveryUnit* releaseRecoveryUnit();
+
+        virtual void setRecoveryUnit(RecoveryUnit* unit);
+
+        virtual Locker* lockState() const;
 
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name,
@@ -52,24 +56,23 @@ namespace mongo {
 
         virtual bool isGod() const;
 
-        virtual string getNS() const;
+        virtual std::string getNS() const;
 
         virtual Client* getClient() const;
 
         virtual CurOp* getCurOp() const;
 
-        virtual void checkForInterrupt(bool heedMutex = true) const;
+        virtual unsigned int getOpID() const;
 
+        virtual void checkForInterrupt() const;
         virtual Status checkForInterruptNoAssert() const;
 
         virtual bool isPrimaryFor( const StringData& ns );
 
-        virtual Transaction* getTransaction();
-
     private:
-        boost::scoped_ptr<RecoveryUnit> _recovery;
-        Transaction _tx;
-        LockState _lockState;
+        std::auto_ptr<RecoveryUnit> _recovery;
+        Client* const _client; // cached, not owned
+        Locker* const _locker; // cached, not owned
     };
 
 }  // namespace mongo

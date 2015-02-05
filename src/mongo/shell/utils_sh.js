@@ -44,6 +44,9 @@ sh.help = function() {
     print( "\tsh.getBalancerState()                     return true if enabled" );
     print( "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos" );
 
+    print( "\tsh.disableBalancing(coll)                 disable balancing on one collection" );
+    print( "\tsh.enableBalancing(coll)                  re-enable balancing on one collection" );
+
     print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
     print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
     print( "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection" );
@@ -258,12 +261,18 @@ sh.waitForBalancer = function( onOrNot, timeout, interval ){
 }
 
 sh.disableBalancing = function( coll ){
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
     var dbase = db
     if( coll instanceof DBCollection ) dbase = coll.getDB()
     dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : true } })
 }
 
 sh.enableBalancing = function( coll ){
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
     var dbase = db
     if( coll instanceof DBCollection ) dbase = coll.getDB()
     dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : false } })
@@ -367,4 +376,76 @@ sh.removeTagRange = function( ns, min, max, tag ) {
     // behavior.
     config.tags.remove( { _id : { ns : ns , min : min } , max : max , tag : tag } );
     sh._checkLastError( config );
+}
+
+sh.getBalancerLockDetails = function() {
+    var configDB = db.getSiblingDB('config');
+    var lock = configDB.locks.findOne({ _id : 'balancer' });
+    if (lock == null) {
+        return null;
+    }
+    if (lock.state == 0){
+        return null;
+    }
+    return lock;
+}
+
+sh.getBalancerWindow = function() {
+    var configDB = db.getSiblingDB('config');
+    var settings = configDB.settings.findOne({ _id : 'balancer' });
+    if ( settings == null ) {
+        return null;
+    }
+    if (settings.hasOwnProperty("activeWindow")){
+        return settings.activeWindow;
+    }
+    return null
+}
+
+sh.getActiveMigrations = function() {
+    var configDB = db.getSiblingDB('config');
+    var activeLocks = configDB.locks.find( { _id : { $ne : "balancer" }, state: {$eq:2} });
+    var result = []
+    if( activeLocks != null ){
+        activeLocks.forEach( function(lock){
+            result.push({_id:lock._id, when:lock.when});
+        })
+    }
+    return result;
+}
+
+sh.getRecentFailedRounds = function() {
+    var configDB = db.getSiblingDB('config');
+    var balErrs = configDB.actionlog.find({what:"balancer.round"}).sort({time:-1}).limit(5)
+    var result = { count : 0, lastErr : "", lastTime : " "};
+    if(balErrs != null) {
+        balErrs.forEach( function(r){
+            if(r.details.errorOccured){
+                result.count += 1;
+                result.lastErr = r.details.errmsg;
+                result.lastTime = r.time;
+            }
+        })
+    }
+    return result;
+}
+
+sh.getRecentMigrations = function() {
+    var configDB = db.getSiblingDB('config');
+    var yesterday = new Date( new Date() - 24 * 60 * 60 * 1000 );
+    var result = []
+    result = result.concat(configDB.changelog.aggregate( [
+        { $match : { time : { $gt : yesterday }, what : "moveChunk.from", "details.errmsg" : {
+            "$exists" : false } } },
+        { $group : { _id: { msg: "$details.errmsg" }, count : { "$sum":1 } } },
+        { $project : { _id : { $ifNull: [ "$_id.msg", "Success" ] }, count : "$count" } }
+    ] ).toArray());
+    result = result.concat(configDB.changelog.aggregate( [
+        { $match : { time : { $gt : yesterday }, what : "moveChunk.from", "details.errmsg" : {
+            "$exists" : true } } },
+        { $group : { _id: { msg: "$details.errmsg", from : "$details.from", to: "$details.to" },
+            count : { "$sum":1 } } },
+        { $project : { _id : "$_id.msg" , from : "$_id.from", to : "$_id.to" , count : "$count" } }
+    ] ).toArray());
+    return result;
 }

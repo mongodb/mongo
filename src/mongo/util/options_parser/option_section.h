@@ -30,7 +30,6 @@
 
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
-#include <iostream>
 #include <list>
 
 #include "mongo/base/status.h"
@@ -116,6 +115,18 @@ namespace optionenvironment {
                                              const std::string& singleName,
                                              const OptionType type,
                                              const std::string& description);
+
+        OptionDescription& addOptionChaining(const std::string& dottedName,
+                                             const std::string& singleName,
+                                             const OptionType type,
+                                             const std::string& description,
+                                             const std::string& deprecatedDottedName);
+
+        OptionDescription& addOptionChaining(const std::string& dottedName,
+            const std::string& singleName,
+            const OptionType type,
+            const std::string& description,
+            const std::vector<std::string>& deprecatedDottedNames);
 
         // These functions are used by the OptionsParser to make calls into boost::program_options
         Status getBoostOptions(po::options_description* boostOptions,

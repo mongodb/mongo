@@ -97,13 +97,10 @@ function check() {
     }
     s = sort();
     c1 = t.find( spec, { _id:null } ).sort( s ).hint( idx ).toArray();
-    c2 = t.find( spec ).sort( s ).explain().nscanned;
-    c3 = t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray();
+    c2 = t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray();
     count = t.count( spec );
-    //    assert.eq( c1, c3, "spec: " + tojson( spec ) + ", sort: " + tojson( s ) );
-    //    assert.eq( c1.length, c2 );
-    assert.eq( c1, c3 );
-    assert.eq( c3.length, count );
+    assert.eq( c1, c2 );
+    assert.eq( c2.length, count );
 }
 
 var bulk = t.initializeUnorderedBulkOp();

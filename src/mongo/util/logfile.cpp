@@ -28,11 +28,15 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/logfile.h"
 
 #include "mongo/platform/posix_fadvise.h"
+#include "mongo/util/allocator.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"
@@ -41,6 +45,9 @@
 
 using namespace mongoutils;
 
+using std::endl;
+using std::string;
+
 namespace mongo {
     struct LogfileTest : public StartupTest {
         LogfileTest() { }
@@ -48,7 +55,7 @@ namespace mongo {
             if( 0 && debug ) {
                 try {
                     LogFile f("logfile_test");
-                    void *p = malloc(16384);
+                    void *p = mongoMalloc(16384);
                     char *buf = (char*) p;
                     buf += 4095;
                     buf = (char*) (((size_t)buf)&(~0xfff));
@@ -133,7 +140,7 @@ namespace mongo {
         const char *buf = (const char *) _buf;
         size_t left = _len;
         while( left ) {
-            size_t toWrite = min(left, BlockSize);
+            size_t toWrite = std::min(left, BlockSize);
             DWORD written;
             if( !WriteFile(_fd, buf, toWrite, &written, NULL) ) {
                 DWORD e = GetLastError();
@@ -160,6 +167,11 @@ namespace mongo {
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "paths.h"
+#include <sys/ioctl.h>
+
+#ifdef __linux__
+#include <linux/fs.h>
+#endif
 
 namespace mongo {
 
@@ -175,6 +187,7 @@ namespace mongo {
                     ;
 
         _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
+        _blkSize = g_minOSPageSizeBytes;
 
 #if defined(O_DIRECT)
         _direct = true;
@@ -183,6 +196,13 @@ namespace mongo {
             options &= ~O_DIRECT;
             _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
         }
+#ifdef __linux__
+        ssize_t tmpBlkSize = ioctl(_fd, BLKBSZGET);
+        // TODO: We need some sanity checking on tmpBlkSize even if ioctl() did not fail.
+        if (tmpBlkSize > 0) {
+            _blkSize = (size_t)tmpBlkSize;
+        }
+#endif
 #else
         _direct = false;
 #endif
@@ -238,7 +258,7 @@ namespace mongo {
 
         fassert( 16144, charsToWrite >= 0 );
         fassert( 16142, _fd >= 0 );
-        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % g_minOSPageSizeBytes == 0 );  // aligned
+        fassert( 16143, reinterpret_cast<size_t>( buf ) % _blkSize == 0 );  // aligned
 
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek, just get current position

@@ -68,4 +68,11 @@ namespace mongo {
         return _actions.isSupersetOf(actions);
     }
 
+    BSONObj Privilege::toBSON() const {
+        ParsedPrivilege pp;
+        std::string errmsg;
+        invariant(ParsedPrivilege::privilegeToParsedPrivilege(*this, &pp, &errmsg));
+        return pp.toBSON();
+    }
+
 } // namespace mongo

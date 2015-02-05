@@ -29,13 +29,15 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
+#include <boost/intrusive_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -44,7 +46,7 @@ namespace mongo {
      */
     class PipelineProxyStage : public PlanStage {
     public:
-        PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
+        PipelineProxyStage(boost::intrusive_ptr<Pipeline> pipeline,
                            const boost::shared_ptr<PlanExecutor>& child,
                            WorkingSet* ws);
 
@@ -52,7 +54,7 @@ namespace mongo {
 
         virtual bool isEOF();
 
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         //
         // Manage our OperationContext. We intentionally don't propagate to the child
@@ -65,6 +67,12 @@ namespace mongo {
          * Make obj the next object returned by getNext().
          */
         void pushBack(const BSONObj& obj);
+
+        /**
+         * Return a shared pointer to the PlanExecutor that feeds the pipeline. The returned
+         * pointer may be NULL.
+         */
+        boost::shared_ptr<PlanExecutor> getChildExecutor();
 
         //
         // These should not be used.
@@ -84,8 +92,8 @@ namespace mongo {
         boost::optional<BSONObj> getNextBson();
 
         // Things in the _stash sould be returned before pulling items from _pipeline.
-        const intrusive_ptr<Pipeline> _pipeline;
-        vector<BSONObj> _stash;
+        const boost::intrusive_ptr<Pipeline> _pipeline;
+        std::vector<BSONObj> _stash;
         const bool _includeMetaData;
         boost::weak_ptr<PlanExecutor> _childExec;
 

@@ -37,7 +37,7 @@
 // so we define the following macro
 #define MONGO_EXPOSE_MACROS 1
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <iostream>
 
@@ -47,11 +47,13 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/processinfo.h"
 
 
 using namespace std;
@@ -174,7 +176,7 @@ void go() {
     }
     lf = new LogFile(fname,true);
     const unsigned sz = 1024 * 1024 * 32; // needs to be big as we are using synchronousAppend.  if we used a regular MongoFile it wouldn't have to be
-    char *buf = (char*) malloc(sz+4096);
+    char *buf = (char*) mongoMalloc(sz+4096);
     const char *p = round(buf);
     for( unsigned long long i = 0; i < len; i += sz ) { 
         lf->synchronousAppend(p, sz);
@@ -292,6 +294,7 @@ cout <<
             return EXIT_FAILURE;
         }
         cout << "parsed options:\n" << options.toString() << endl;
+        ProcessInfo::initializeSystemInfo();
 
         go();
     } 

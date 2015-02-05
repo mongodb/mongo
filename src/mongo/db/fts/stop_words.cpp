@@ -28,6 +28,7 @@
 *    it in the license file.
 */
 
+#include <boost/shared_ptr.hpp>
 #include <set>
 #include <string>
 
@@ -40,13 +41,15 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+
     namespace fts {
 
         void loadStopWordMap( StringMap< std::set< std::string > >* m );
 
         namespace {
-            StringMap<StopWords*> STOP_WORDS;
-            StopWords* empty = NULL;
+            StringMap< boost::shared_ptr<StopWords> > STOP_WORDS;
+            StopWords empty;
         }
 
 
@@ -59,22 +62,20 @@ namespace mongo {
         }
 
         const StopWords* StopWords::getStopWords( const FTSLanguage& language ) {
-            StringMap<StopWords*>::const_iterator i = STOP_WORDS.find( language.str() );
+            StringMap< boost::shared_ptr<StopWords> >::const_iterator i = STOP_WORDS.find( language.str() );
             if ( i == STOP_WORDS.end() )
-                return empty;
-            return i->second;
+                return &empty;
+            return i->second.get();
         }
 
 
         MONGO_INITIALIZER(StopWords)(InitializerContext* context) {
-            empty = new StopWords();
-
             StringMap< std::set< std::string > > raw;
             loadStopWordMap( &raw );
             for ( StringMap< std::set< std::string > >::const_iterator i = raw.begin();
                   i != raw.end();
                   ++i ) {
-                STOP_WORDS[i->first] = new StopWords( i->second );
+                STOP_WORDS[i->first].reset(new StopWords( i->second ));
             }
             return Status::OK();
         }

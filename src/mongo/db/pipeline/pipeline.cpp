@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 // This file defines functions from both of these headers
 #include "mongo/db/pipeline/pipeline.h"
@@ -44,6 +44,12 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using std::endl;
+    using std::ostringstream;
+    using std::string;
+    using std::vector;
 
     const char Pipeline::commandName[] = "aggregate";
     const char Pipeline::pipelineName[] = "pipeline";

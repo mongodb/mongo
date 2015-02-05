@@ -1,6 +1,6 @@
 var replTest = new ReplSetTest({name: 'sync2', nodes: 5});
 var nodes = replTest.nodeList();
-replTest.startSet({oplogSize: "2"});
+var conns = replTest.startSet({oplogSize: "2"});
 replTest.initiate({"_id": "sync2",
                    "members": [
                        {"_id": 0, host: nodes[0], priority: 2},
@@ -28,6 +28,11 @@ replTest.partition(3,1);
 // 4 is connected to 2
 replTest.partition(4,1);
 replTest.partition(4,3);
+
+assert.soon(function() {
+    master = replTest.getMaster();
+    return master === conns[0];
+}, 60 * 1000, "node 0 did not become primary quickly enough");
 
 jsTestLog("Checking that ops still replicate correctly");
 var option = { writeConcern: { w: 5, wtimeout: 30000 }};

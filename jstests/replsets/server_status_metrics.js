@@ -35,6 +35,7 @@ var secondary = rt.getSecondary();
 var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
+assert.commandWorked(testDB.createCollection('a'));
 assert.writeOK(testDB.b.insert({}, { writeConcern: { w: 2 }}));
 
 var ss = secondary.getDB("test").serverStatus();
@@ -74,7 +75,6 @@ assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
 
 // Write will fail because there are only 2 nodes
 assert.writeError(testDB.a.insert({ x: 1 }, { writeConcern: { w: 3, wtimeout: 50 }}));
-assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis + 50);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
 
 printjson(primary.getDB("test").serverStatus().metrics);

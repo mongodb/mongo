@@ -28,13 +28,15 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -68,7 +70,7 @@ namespace mongo {
 
     /**
      * Stage scans over an index from startKey to endKey, returning results that pass the provided
-     * filter.  Internally dedups on DiskLoc.
+     * filter.  Internally dedups on RecordId.
      *
      * TODO: we probably should split this into 2 stages: one btree-only "fast" ixscan and one that
      * strictly talks through the index API.  Need to figure out what we really want to ship down
@@ -80,6 +82,25 @@ namespace mongo {
      */
     class IndexScan : public PlanStage {
     public:
+
+        /**
+         * Keeps track of what this index scan is currently doing so that it
+         * can do the right thing on the next call to work().
+         */
+        enum ScanState {
+            // Need to initialize the underlying index traversal machinery.
+            INITIALIZING,
+
+            // Skipping keys in order to check whether we have reached the end.
+            CHECKING_END,
+
+            // Retrieving the next key, and applying the filter if necessary.
+            GETTING_NEXT,
+
+            // The index scan is finished.
+            HIT_END
+        };
+
         IndexScan(OperationContext* txn,
                   const IndexScanParams& params,
                   WorkingSet* workingSet,
@@ -91,7 +112,7 @@ namespace mongo {
         virtual bool isEOF();
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -117,31 +138,16 @@ namespace mongo {
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
 
-        // The number of keys examined during a call to checkEnd() that have not yet been
-        // accounted for by returning a NEED_TIME.
-        //
-        // Good plan ranking requires that the index scan uses one work cycle per index key
-        // examined. Since checkEnd() may examine multiple keys, we keep track of them here
-        // and make up for it later by returning NEED_TIME.
-        //
-        // Example of how this is useful for plan ranking:
-        //   Say you have indices {a: 1, b: 1} and {a: 1, x: 1, b: 1}, with predicates over
-        //   fields 'a' and 'b'. It's cheaper to use index {a: 1, b: 1}. Why? Because for
-        //   index {a: 1, x: 1, b: 1} you have to skip lots of keys due to the interceding
-        //   'x' field. This skipping is done inside checkEnd(), and we use '_checkEndKeys'
-        //   to account for it.
-        size_t _checkEndKeys;
-
         // The WorkingSet we annotate with results.  Not owned by us.
         WorkingSet* _workingSet;
 
         // Index access.
         const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
-        scoped_ptr<IndexCursor> _indexCursor;
+        boost::scoped_ptr<IndexCursor> _indexCursor;
         BSONObj _keyPattern;
 
-        // Have we hit the end of the index scan?
-        bool _hitEnd;
+        // Keeps track of what work we need to do next.
+        ScanState _scanState;
 
         // Contains expressions only over fields in the index key.  We assume this is built
         // correctly by whomever creates this class.
@@ -150,28 +156,60 @@ namespace mongo {
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
         bool _shouldDedup;
-        unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
+        unordered_set<RecordId, RecordId::Hasher> _returned;
 
         // For yielding.
         BSONObj _savedKey;
-        DiskLoc _savedLoc;
-
-        // True if there was a yield and the yield changed the cursor position.
-        bool _yieldMovedCursor;
+        RecordId _savedLoc;
 
         IndexScanParams _params;
 
-        // For our "fast" Btree-only navigation AKA the index bounds optimization.
-        scoped_ptr<IndexBoundsChecker> _checker;
+        // Stats
+        CommonStats _commonStats;
+        IndexScanStats _specificStats;
+
+        //
+        // Btree-specific navigation state.
+        //
+
+        // Either NULL or points to the same object as '_indexCursor'. The index scan stage should
+        // not need to use both IndexCursor and BtreeIndexCursor. This is being tracked in
+        // SERVER-12397.
         BtreeIndexCursor* _btreeCursor;
+
+        //
+        // If we have decided to use the BtreeIndexCursor methods for navigation, we make a decision
+        // to employ one of two different algorithms for determining when the index scan has reached
+        // the end:
+        //
+
+        //
+        // 1) If the index scan is not a single interval, then we use an IndexBoundsChecker to
+        //    determine when the index scan has reached the end.  In this case, _checker will be
+        //    non-NULL (and _endCursor will be NULL).
+        //
+
+        boost::scoped_ptr<IndexBoundsChecker> _checker;
         int _keyEltsToUse;
         bool _movePastKeyElts;
         std::vector<const BSONElement*> _keyElts;
         std::vector<bool> _keyEltsInc;
 
-        // Stats
-        CommonStats _commonStats;
-        IndexScanStats _specificStats;
+        //
+        // 2) If the index scan is a single interval, then the scan can execute faster by
+        //    checking for the end via comparison against an end cursor, rather than repeatedly
+        //    doing BSON compares against scanned keys.  In this case, _endCursor will be non-NULL
+        //    (and _checker will be NULL).
+        //
+
+        // The end cursor.
+        boost::scoped_ptr<BtreeIndexCursor> _endCursor;
+
+        // The key that the end cursor should point to.
+        BSONObj _endKey;
+
+        // Is the end key included in the range?
+        bool _endKeyInclusive;
     };
 
 }  // namespace mongo

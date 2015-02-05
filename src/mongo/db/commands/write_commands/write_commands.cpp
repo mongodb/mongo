@@ -31,16 +31,28 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/write_commands/batch_executor.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/parsed_delete.h"
+#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/query/explain.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/s/d_state.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
 
     namespace {
 
@@ -122,14 +134,13 @@ namespace mongo {
         // Internally, everything work with the namespace string as opposed to just the
         // collection name.
         NamespaceString nss(dbName, request.getNS());
-        request.setNS(nss.ns());
+        request.setNSS(nss);
 
-        BSONObj defaultWriteConcern =
-                repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
+        WriteConcernOptions defaultWriteConcern =
+            repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
 
         WriteBatchExecutor writeBatchExecutor(txn,
                                               defaultWriteConcern,
-                                              &cc(),
                                               &globalOpCounters,
                                               lastError.get());
 
@@ -137,6 +148,146 @@ namespace mongo {
 
         result.appendElements( response.toBSON() );
         return response.getOk();
+    }
+
+    Status WriteCmd::explain(OperationContext* txn,
+                             const std::string& dbname,
+                             const BSONObj& cmdObj,
+                             ExplainCommon::Verbosity verbosity,
+                             BSONObjBuilder* out) const {
+        // For now we only explain update and delete write commands.
+        if ( BatchedCommandRequest::BatchType_Update != _writeType &&
+             BatchedCommandRequest::BatchType_Delete != _writeType ) {
+            return Status( ErrorCodes::IllegalOperation,
+                           "Only update and delete write ops can be explained" );
+        }
+
+        // Parse the batch request.
+        BatchedCommandRequest request( _writeType );
+        std::string errMsg;
+        if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+            return Status( ErrorCodes::FailedToParse, errMsg );
+        }
+
+        // Note that this is a runCommmand, and therefore, the database and the collection name
+        // are in different parts of the grammar for the command. But it's more convenient to
+        // work with a NamespaceString. We built it here and replace it in the parsed command.
+        // Internally, everything work with the namespace string as opposed to just the
+        // collection name.
+        NamespaceString nsString(dbname, request.getNS());
+        request.setNSS(nsString);
+
+        // Do the validation of the batch that is shared with non-explained write batches.
+        Status isValid = WriteBatchExecutor::validateBatch( request );
+        if (!isValid.isOK()) {
+            return isValid;
+        }
+
+        // Explain must do one additional piece of validation: For now we only explain
+        // singleton batches.
+        if ( request.sizeWriteOps() != 1u ) {
+            return Status( ErrorCodes::InvalidLength,
+                           "explained write batches must be of size 1" );
+        }
+
+        ScopedTransaction scopedXact(txn, MODE_IX);
+
+        // Get a reference to the singleton batch item (it's the 0th item in the batch).
+        BatchItemRef batchItem( &request, 0 );
+
+        if ( BatchedCommandRequest::BatchType_Update == _writeType ) {
+            // Create the update request.
+            UpdateRequest updateRequest( nsString );
+            updateRequest.setQuery( batchItem.getUpdate()->getQuery() );
+            updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
+            updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
+            updateRequest.setUpsert( batchItem.getUpdate()->getUpsert() );
+            updateRequest.setUpdateOpLog( true );
+            UpdateLifecycleImpl updateLifecycle( true, updateRequest.getNamespaceString() );
+            updateRequest.setLifecycle( &updateLifecycle );
+            updateRequest.setExplain();
+
+            // Explained updates can yield.
+            updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
+            OpDebug* debug = &txn->getCurOp()->debug();
+
+            ParsedUpdate parsedUpdate( txn, &updateRequest );
+            Status parseStatus = parsedUpdate.parseRequest();
+            if ( !parseStatus.isOK() ) {
+                return parseStatus;
+            }
+
+            // Explains of write commands are read-only, but we take write locks so
+            // that timing info is more accurate.
+            AutoGetDb autoDb( txn, nsString.db(), MODE_IX );
+            Lock::CollectionLock colLock( txn->lockState(), nsString.ns(), MODE_IX );
+
+            // We check the shard version explicitly here rather than using Client::Context,
+            // as Context can do implicit database creation if the db does not exist. We want
+            // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
+            // or collections.
+            ensureShardVersionOKOrThrow( nsString.ns() );
+
+            // Get a pointer to the (possibly NULL) collection.
+            Collection* collection = NULL;
+            if ( autoDb.getDb() ) {
+                collection = autoDb.getDb()->getCollection( nsString.ns() );
+            }
+
+            PlanExecutor* rawExec;
+            uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+            // Explain the plan tree.
+            Explain::explainStages( exec.get(), verbosity, out );
+            return Status::OK();
+        }
+        else {
+            invariant( BatchedCommandRequest::BatchType_Delete == _writeType );
+
+            // Create the delete request.
+            DeleteRequest deleteRequest( nsString );
+            deleteRequest.setQuery( batchItem.getDelete()->getQuery() );
+            deleteRequest.setMulti( batchItem.getDelete()->getLimit() != 1 );
+            deleteRequest.setUpdateOpLog(true);
+            deleteRequest.setGod( false );
+            deleteRequest.setExplain();
+
+            // Explained deletes can yield.
+            deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
+            ParsedDelete parsedDelete(txn, &deleteRequest);
+            Status parseStatus = parsedDelete.parseRequest();
+            if (!parseStatus.isOK()) {
+                return parseStatus;
+            }
+
+            // Explains of write commands are read-only, but we take write locks so that timing
+            // info is more accurate.
+            AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
+            Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
+
+            // We check the shard version explicitly here rather than using Client::Context,
+            // as Context can do implicit database creation if the db does not exist. We want
+            // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
+            // or collections.
+            ensureShardVersionOKOrThrow( nsString.ns() );
+
+            // Get a pointer to the (possibly NULL) collection.
+            Collection* collection = NULL;
+            if (autoDb.getDb()) {
+                collection = autoDb.getDb()->getCollection(nsString.ns());
+            }
+
+            PlanExecutor* rawExec;
+            uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+            // Explain the plan tree.
+            Explain::explainStages(exec.get(), verbosity, out);
+            return Status::OK();
+        }
     }
 
     CmdInsert::CmdInsert() :

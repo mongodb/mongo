@@ -96,6 +96,33 @@ namespace mongo {
         static void stripInvalidAssignments(MatchExpression* node,
                                             const std::vector<IndexEntry>& indices);
 
+        /**
+         * In some special cases, we can strip most of the index assignments from the tree early
+         * on. Specifically, if we find an AND which has a child tagged for equality over a
+         * single-field unique index, then all other predicate-to-index assignments can be
+         * stripped off the subtree rooted at 'node'.
+         *
+         * This is used to ensure that we always favor key-value lookup plans over any
+         * more complex plan.
+         *
+         * Example:
+         *   Suppose you have match expression OR (AND (a==1, b==2), AND (c==3, d==4)).
+         *   There are indices on fields, 'a', 'b', 'c', and 'd'. The index on 'd' is
+         *   the only unique index.
+         *
+         *   This code will find that the subtree AND (c==3, d==4) can be answered by
+         *   looking up the value of 'd' in the unique index. Since no better plan than
+         *   a single key lookup is ever available, all assignments in this subtree
+         *   are stripped, except for the assignment of d==4 to the unique 'd' index.
+         *
+         *   Stripping the assignment for 'c' causes the planner to generate just two
+         *   possible plans:
+         *     1) an OR of an index scan over 'a' and an index scan over 'd'
+         *     2) an OR of an index scan over 'b' and an index scan over 'd'
+         */
+        static void stripUnneededAssignments(MatchExpression* node,
+                                             const std::vector<IndexEntry>& indices);
+
     private:
         /**
          * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove

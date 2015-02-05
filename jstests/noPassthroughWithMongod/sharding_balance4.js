@@ -87,11 +87,7 @@ function check( msg , dontAssert ){
         s.s.getDB("admin").runCommand({ setParameter : 1, logLevel : 2 })
         
         printjson( db.foo.findOne( { _id : parseInt( x ) } ) )
-        
-        // we will assert past this point but wait a bit to see if it is because the missing update
-        // was being held in the writeback roundtrip
-        sleep( 10000 );
-        
+
         var y = db.foo.findOne( { _id : parseInt( x ) } )
 
         if ( y ){

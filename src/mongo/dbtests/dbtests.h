@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/instance.h"
 #include "mongo/unittest/unittest.h"
 
@@ -39,6 +41,26 @@ using namespace mongo::unittest;
 using boost::shared_ptr;
 
 namespace mongo {
+    class BSONObj;
+    class OperationContext;
+    class Status;
+    class StringData;
+
+namespace dbtests {
     // This specifies default dbpath for our testing framework
     extern const std::string default_test_dbpath;
-}
+
+    /**
+     * Creates an index if it does not already exist.
+     */
+    Status createIndex(OperationContext* txn,
+                       const StringData &ns,
+                       const BSONObj& keys,
+                       bool unique = false);
+
+    /**
+     * Creates an index from a BSON spec, if it does not already exist.
+     */
+    Status createIndexFromSpec(OperationContext* txn, const StringData& ns, const BSONObj& spec);
+}  // namespace dbtests
+}  // namespace mongo

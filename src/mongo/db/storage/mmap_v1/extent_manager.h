@@ -35,12 +35,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 
 namespace mongo {
 
     class DataFile;
     class Record;
+    class RecordFetcher;
     class OperationContext;
 
     struct Extent;
@@ -54,8 +55,9 @@ namespace mongo {
      *  - responsible for figuring out how to get a new extent
      *  - can use any method it wants to do so
      *  - this structure is NOT stored on disk
-     *  - this class is NOT thread safe, locking should be above (for now)
-     *
+     *  - files will not be removed from the EM
+     *  - extent size and loc are immutable
+     *  - this class is thread safe, once constructed and init()-ialized
      */
     class ExtentManager {
         MONGO_DISALLOW_COPYING( ExtentManager );
@@ -91,7 +93,15 @@ namespace mongo {
          */
         virtual void freeExtent( OperationContext* txn, DiskLoc extent ) = 0;
 
-        virtual void freeListStats( int* numExtents, int64_t* totalFreeSize ) const = 0;
+        /**
+         * Retrieve statistics on the the free list managed by this ExtentManger.
+         * @param numExtents - non-null pointer to an int that will receive the number of extents
+         * @param totalFreeSizeBytes - non-null pointer to an int64_t receiving the total free
+         *                             space in the free list.
+         */
+        virtual void freeListStats(OperationContext* txn,
+                                   int* numExtents,
+                                   int64_t* totalFreeSizeBytes) const = 0;
 
         /**
          * @param loc - has to be for a specific Record
@@ -101,6 +111,12 @@ namespace mongo {
          * manager.
          */
         virtual Record* recordForV1( const DiskLoc& loc ) const = 0;
+
+        /**
+         * The extent manager tracks accesses to DiskLocs. This returns non-NULL if the DiskLoc has
+         * been recently accessed, and therefore has likely been paged into physical memory.
+         */
+        virtual RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const = 0;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
@@ -153,7 +169,7 @@ namespace mongo {
         };
         /**
          * Tell the system that for this extent, it will have this kind of disk access.
-         * Owner takes owernship of CacheHint
+         * Caller takes owernship of CacheHint
          */
         virtual CacheHint* cacheHint( const DiskLoc& extentLoc, const HintType& hint ) = 0;
     };

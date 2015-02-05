@@ -6,18 +6,23 @@ if has_option("rocksdb"):
     env.Library(
         target= 'storage_rocks_base',
         source= [
-            'rocks_btree_impl.cpp',
-            'rocks_collection_catalog_entry.cpp',
-            'rocks_database_catalog_entry.cpp',
             'rocks_engine.cpp',
             'rocks_record_store.cpp',
             'rocks_recovery_unit.cpp',
+            'rocks_index.cpp',
+            'rocks_transaction.cpp',
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
-            '$BUILD_DIR/mongo/db/structure/record_store',
+            '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+            '$BUILD_DIR/mongo/db/index/index_descriptor',
+            '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+            '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+            '$BUILD_DIR/mongo/db/storage/key_string',
+            '$BUILD_DIR/mongo/db/storage/oplog_hack',
             '$BUILD_DIR/mongo/foundation',
+            '$BUILD_DIR/mongo/processinfo',
             '$BUILD_DIR/third_party/shim_snappy',
             ],
         SYSLIBDEPS=["rocksdb",
@@ -28,48 +33,43 @@ if has_option("rocksdb"):
     env.Library(
         target= 'storage_rocks',
         source= [
-            'rocks_database_catalog_entry_mongod.cpp',
             'rocks_init.cpp'
             ],
         LIBDEPS= [
-            'storage_rocks_base'
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
             ]
         )
 
-    env.Library(
-        target= 'storage_rocks_fake',
-        source= [
-            'rocks_database_catalog_entry_fake.cpp',
-            ],
-        LIBDEPS= [
-            'storage_rocks_base'
-            ]
-        )
 
     env.CppUnitTest(
-        target='storage_rocks_engine_test',
-        source=['rocks_engine_test.cpp',
-                ],
-        LIBDEPS=[
-            'storage_rocks_fake'
+       target='storage_rocks_index_test',
+       source=['rocks_index_test.cpp'
+               ],
+       LIBDEPS=[
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
             ]
-        )
+       )
+
 
     env.CppUnitTest(
-        target='storage_rocks_record_store_test',
-        source=['rocks_record_store_test.cpp',
-                ],
-        LIBDEPS=[
-            'storage_rocks_fake'
+       target='storage_rocks_record_store_test',
+       source=['rocks_record_store_test.cpp'
+               ],
+       LIBDEPS=[
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
             ]
-        )
+       )
 
     env.CppUnitTest(
-        target='storage_rocks_btree_impl_test',
-        source=['rocks_btree_impl_test.cpp',
-                ],
-        LIBDEPS=[
-            'storage_rocks_fake'
+       target='storage_rocks_engine_test',
+       source=['rocks_engine_test.cpp'
+               ],
+       LIBDEPS=[
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness'
             ]
-        )
+       )
 

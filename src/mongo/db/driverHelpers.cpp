@@ -34,7 +34,7 @@
 */
 
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <string>
 #include <vector>
@@ -49,6 +49,8 @@
 #include "mongo/util/background.h"
 
 namespace mongo {
+
+    using std::string;
 
     class BasicDriverHelper : public Command {
     public:
@@ -73,7 +75,7 @@ namespace mongo {
 
             const OID& oid = cmdObj.firstElement().__oid();
             result.append( "oid" , oid );
-            result.append( "str" , oid.str() );
+            result.append( "str" , oid.toString() );
 
             return true;
         }

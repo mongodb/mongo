@@ -37,14 +37,11 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/xtime.hpp>
 
+#include "mongo/bson/inline_decls.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/heapcheck.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/time_support.h"
-
-#if defined(_DEBUG)
-#include "mongo/util/concurrency/mutexdebugger.h"
-#endif
 
 // Macro to get line as a std::string constant
 #define MONGO_STRINGIFY(X) #X
@@ -86,7 +83,9 @@ namespace mongo {
     class mutex : boost::noncopyable {
     public:
         const char * const _name;
-        mutex(const char *name) : _name(name)
+        // NOINLINE so that 'mutex::mutex' is always in the frame, this makes
+        // it easier for us to suppress the leaks caused by the static observer.
+        NOINLINE_DECL mutex(const char *name) : _name(name)
         {
             _m = new boost::timed_mutex();
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
@@ -112,25 +111,10 @@ namespace mongo {
 
         class scoped_lock : boost::noncopyable {
         public:
-#if defined(_DEBUG)
-            struct PostStaticCheck {
-                PostStaticCheck();
-            } _check;
-            mongo::mutex * const _mut;
-#endif
             scoped_lock( mongo::mutex &m ) : 
-#if defined(_DEBUG)
-            _mut(&m),
-#endif
             _l( m.boost() ) {
-#if defined(_DEBUG)
-                mutexDebugger.entering(_mut->_name);
-#endif
             }
             ~scoped_lock() {
-#if defined(_DEBUG)
-                mutexDebugger.leaving(_mut->_name);
-#endif
             }
             boost::timed_mutex::scoped_lock &boost() { return _l; }
         private:

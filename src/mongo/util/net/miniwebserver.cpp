@@ -27,10 +27,13 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/miniwebserver.h"
 
+#include <boost/shared_ptr.hpp>
 #include <pcrecpp.h>
 
 #include "mongo/util/hex.h"
@@ -38,7 +41,10 @@
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kNetworking);
+    using boost::shared_ptr;
+    using std::endl;
+    using std::stringstream;
+    using std::vector;
 
     MiniWebServer::MiniWebServer(const string& name, const string &ip, int port)
         : Listener(name, ip, port, false)

@@ -28,8 +28,9 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
+#include <boost/intrusive_ptr.hpp>
 #include <boost/unordered_set.hpp>
 
 #include "mongo/bson/bsontypes.h"
@@ -79,7 +80,7 @@ namespace mongo {
         virtual const char* getOpName() const;
         virtual void reset();
 
-        static intrusive_ptr<Accumulator> create();
+        static boost::intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorAddToSet();
@@ -95,7 +96,7 @@ namespace mongo {
         virtual const char* getOpName() const;
         virtual void reset();
 
-        static intrusive_ptr<Accumulator> create();
+        static boost::intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorFirst();
@@ -112,7 +113,7 @@ namespace mongo {
         virtual const char* getOpName() const;
         virtual void reset();
 
-        static intrusive_ptr<Accumulator> create();
+        static boost::intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorLast();
@@ -127,7 +128,7 @@ namespace mongo {
         virtual const char* getOpName() const;
         virtual void reset();
 
-        static intrusive_ptr<Accumulator> create();
+        static boost::intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorSum();
@@ -145,8 +146,8 @@ namespace mongo {
         virtual const char* getOpName() const;
         virtual void reset();
 
-        static intrusive_ptr<Accumulator> createMin();
-        static intrusive_ptr<Accumulator> createMax();
+        static boost::intrusive_ptr<Accumulator> createMin();
+        static boost::intrusive_ptr<Accumulator> createMax();
 
     private:
         AccumulatorMinMax(int theSense);
@@ -163,7 +164,7 @@ namespace mongo {
         virtual const char* getOpName() const;
         virtual void reset();
 
-        static intrusive_ptr<Accumulator> create();
+        static boost::intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorPush();
@@ -179,7 +180,7 @@ namespace mongo {
         virtual const char* getOpName() const;
         virtual void reset();
 
-        static intrusive_ptr<Accumulator> create();
+        static boost::intrusive_ptr<Accumulator> create();
 
     private:
         AccumulatorAvg();

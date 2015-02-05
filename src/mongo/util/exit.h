@@ -32,9 +32,19 @@
 
 namespace mongo {
 
+    // Note: whyMsg can never be NULL.
     void dbexit( ExitCode returnCode, const char *whyMsg = "" );
 
-    MONGO_CLIENT_API bool inShutdown();
+    /**
+     * Quickly determines if the shutdown flag is set.  May not be definitive.
+     */
+    bool inShutdown();
+
+    /**
+     * Definitively determines if the shutdown flag is set.  Calling this is more expensive
+     * than inShutdown().
+     */
+    bool inShutdownStrict();
 
 }
 

@@ -25,7 +25,11 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/db/json.h"
+
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
@@ -33,10 +37,15 @@
 #include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+    using std::ostringstream;
+    using std::string;
 
 #if 0
 #define MONGO_JSON_DEBUG(message) log() << "JSON DEBUG @ " << __FILE__\

@@ -25,7 +25,6 @@ function dotest( useIndex ) {
     assert.docEq( { _id : 5, a: 4, x : 4 }, t.findOne() );
 
     op = getLastOp();
-    assert( op.fastmod );
 }
 
 dotest( false );

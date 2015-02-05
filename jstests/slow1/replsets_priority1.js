@@ -1,5 +1,5 @@
 // come up with random priorities and make sure that the right member gets
-// elected. then kill that member and make sure then next one gets elected.
+// elected. then kill that member and make sure the next one gets elected.
 
 print("\n\n\nreplsets_priority1.js BEGIN\n");
 

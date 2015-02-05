@@ -29,7 +29,9 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/net/listen.h"

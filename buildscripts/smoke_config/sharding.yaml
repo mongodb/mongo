@@ -1,0 +1,11 @@
+# Sharding tests
+tests:
+  roots:
+  - ./jstests/sharding/*.js
+executor:
+  fixtures:
+    shell_globals:
+      fixture_class: smoke.GlobalShellFixture
+  testers:
+    jstest: {}
+

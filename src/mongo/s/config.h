@@ -35,10 +35,12 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/shardkey.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -103,7 +105,10 @@ namespace mongo {
 
         DBConfig( std::string name )
             : _name( name ) ,
-              _primary("config","") ,
+              _primary("config",
+                       "",
+                       0 /* maxSize */,
+                       false /* draining */),
               _shardingEnabled(false),
               _lock("DBConfig") ,
               _hitConfigServerLock( "DBConfig::_hitConfigServerLock" ) {
@@ -130,11 +135,11 @@ namespace mongo {
          * WARNING: It's not safe to place initial chunks onto non-primary shards using this method.
          * The initShards parameter allows legacy behavior expected by map-reduce.
          */
-        ChunkManagerPtr shardCollection( const std::string& ns ,
-                                         ShardKeyPattern fieldsAndOrder ,
-                                         bool unique ,
-                                         std::vector<BSONObj>* initPoints = 0,
-                                         std::vector<Shard>* initShards = 0 );
+        ChunkManagerPtr shardCollection(const std::string& ns,
+                                        const ShardKeyPattern& fieldsAndOrder,
+                                        bool unique,
+                                        std::vector<BSONObj>* initPoints = 0,
+                                        std::vector<Shard>* initShards = 0);
 
         /**
            @return true if there was sharding info to remove
@@ -236,8 +241,16 @@ namespace mongo {
          */
         bool checkHostsAreUnique( const std::vector<std::string>& configHosts, std::string* errmsg );
 
-        bool allUp();
-        bool allUp( std::string& errmsg );
+        /**
+         * Checks if all config servers are up.
+         *
+         * If localCheckOnly is true, only check if the socket is still open with no errors.
+         * Otherwise, also send a getLastError command with recv timeout.
+         *
+         * TODO: fix this - SERVER-15811
+         */
+        bool allUp(bool localCheckOnly);
+        bool allUp(bool localCheckOnly, std::string& errmsg);
 
         int dbConfigVersion();
         int dbConfigVersion( DBClientBase& conn );

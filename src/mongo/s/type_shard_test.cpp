@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/s/type_shard.h"
 #include "mongo/unittest/unittest.h"

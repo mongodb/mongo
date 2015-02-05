@@ -27,11 +27,15 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
+#include <iostream>
 #include <pcrecpp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -42,6 +46,7 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
@@ -52,8 +57,10 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/file.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
@@ -176,7 +183,7 @@ namespace mongo {
     void Client::initThread(const char *desc, mongo::AbstractMessagingPort *mp) {}
     void logProcessDetailsForLogRotate() {}
 
-    void exitCleanly( ExitCode code ) {
+    void exitCleanly(ExitCode code) {
         {
             mongo::mutex::scoped_lock lk(mongo::shell_utils::mongoProgramOutputMutex);
             mongo::dbexitCalled = true;
@@ -184,7 +191,7 @@ namespace mongo {
 
         ::killOps();
         ::shellHistoryDone();
-        ::_exit(0);
+        quickExit(0);
     }
 }
 
@@ -225,7 +232,7 @@ string fixHost( const std::string& url, const std::string& host, const std::stri
 
     if ( url.find( "/" ) != string::npos ) {
         cerr << "url can't have host or port if you specify them individually" << endl;
-        ::_exit(-1);
+        quickExit(-1);
     }
 
     string newurl( ( host.size() == 0 ) ? "127.0.0.1" : host );
@@ -410,7 +417,7 @@ string finishCode( string code ) {
             return "";
 
         char * linePtr = line;
-        while ( startsWith( linePtr, "... " ) )
+        while ( str::startsWith( linePtr, "... " ) )
             linePtr += 4;
 
         code += linePtr;
@@ -825,7 +832,7 @@ int _main( int argc, char* argv[], char **envp ) {
                 continue;
             }
 
-            if ( startsWith( linePtr, "edit " ) ) {
+            if ( str::startsWith( linePtr, "edit " ) ) {
                 shellHistoryAdd( linePtr );
 
                 const char* s = linePtr + 5; // skip "edit "
@@ -907,7 +914,7 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
         cerr << "exception: " << e.what() << endl;
         returnCode = 1;
     }
-    ::_exit(returnCode);
+    quickExit(returnCode);
 }
 #else // #ifdef _WIN32
 int main( int argc, char* argv[], char **envp ) {
@@ -920,6 +927,6 @@ int main( int argc, char* argv[], char **envp ) {
         cerr << "exception: " << e.what() << endl;
         returnCode = 1;
     }
-    _exit(returnCode);
+    quickExit(returnCode);
 }
 #endif // #ifdef _WIN32

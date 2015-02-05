@@ -35,10 +35,10 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/geo/hash.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/net/listen.h" // for Listener::getElapsedTimeMillis()
 
 namespace mongo {
 
@@ -64,6 +64,7 @@ namespace mongo {
                         invalidates(0),
                         advanced(0),
                         needTime(0),
+                        needFetch(0),
                         executionTimeMillis(0),
                         isEOF(false) { }
         // String giving the type of the stage. Not owned.
@@ -78,6 +79,7 @@ namespace mongo {
         // How many times was this state the return value of work(...)?
         size_t advanced;
         size_t needTime;
+        size_t needFetch;
 
         // BSON representation of a MatchExpression affixed to this node. If there
         // is no filter affixed, then 'filter' should be an empty BSONObj.
@@ -92,38 +94,12 @@ namespace mongo {
         // TODO: once we've picked a plan, collect different (or additional) stats for display to
         // the user, eg. time_t totalTimeSpent;
 
+        // TODO: keep track of the total yield time / fetch time done for a plan.
+
         bool isEOF;
     private:
         // Default constructor is illegal.
         CommonStats();
-    };
-
-    /**
-     * This class increments a counter by the time elapsed since its construction when
-     * it goes out of scope.
-     */
-    class ScopedTimer {
-    public:
-        ScopedTimer(long long* counter) : _counter(counter) {
-            _start = curTimeMillis64();
-        }
-
-        ~ScopedTimer() {
-            long long elapsed = curTimeMillis64() - _start;
-            *_counter += elapsed;
-        }
-
-    private:
-        // Default constructor disallowed.
-        ScopedTimer();
-
-        MONGO_DISALLOW_COPYING(ScopedTimer);
-
-        // Reference to the counter that we are incrementing with the elapsed time.
-        long long* _counter;
-
-        // Time at which the timer was constructed.
-        long long _start;
     };
 
     // The universal container for a stage's stats.
@@ -188,7 +164,7 @@ namespace mongo {
         size_t flaggedInProgress;
 
         // How many entries are in the map after each child?
-        // child 'i' produced children[i].common.advanced DiskLocs, of which mapAfterChild[i] were
+        // child 'i' produced children[i].common.advanced RecordIds, of which mapAfterChild[i] were
         // intersections.
         std::vector<size_t> mapAfterChild;
 
@@ -232,7 +208,7 @@ namespace mongo {
     };
 
     struct CollectionScanStats : public SpecificStats {
-        CollectionScanStats() : docsTested(0) { }
+        CollectionScanStats() : docsTested(0), direction(1) { }
 
         virtual SpecificStats* clone() const {
             CollectionScanStats* specific = new CollectionScanStats(*this);
@@ -241,20 +217,45 @@ namespace mongo {
 
         // How many documents did we check against our filter?
         size_t docsTested;
+
+        // >0 if we're traversing the collection forwards. <0 if we're traversing it
+        // backwards.
+        int direction;
     };
 
     struct CountStats : public SpecificStats {
-        CountStats() : isMultiKey(false),
-                       keysExamined(0) { }
-
-        virtual ~CountStats() { }
+        CountStats() : nCounted(0), nSkipped(0), trivialCount(false) { }
 
         virtual SpecificStats* clone() const {
             CountStats* specific = new CountStats(*this);
+            return specific;
+        }
+
+        // The result of the count.
+        long long nCounted;
+
+        // The number of results we skipped over.
+        long long nSkipped;
+
+        // A "trivial count" is one that we can answer by calling numRecords() on the
+        // collection, without actually going through any query logic.
+        bool trivialCount;
+    };
+
+    struct CountScanStats : public SpecificStats {
+        CountScanStats() : isMultiKey(false),
+                           keysExamined(0) { }
+
+        virtual ~CountScanStats() { }
+
+        virtual SpecificStats* clone() const {
+            CountScanStats* specific = new CountScanStats(*this);
             // BSON objects have to be explicitly copied.
             specific->keyPattern = keyPattern.getOwned();
             return specific;
         }
+
+        std::string indexName;
 
         BSONObj keyPattern;
 
@@ -265,13 +266,17 @@ namespace mongo {
     };
 
     struct DeleteStats : public SpecificStats {
-        DeleteStats() : docsDeleted(0) { }
+        DeleteStats() : docsDeleted(0), nInvalidateSkips(0) { }
 
         virtual SpecificStats* clone() const {
             return new DeleteStats(*this);
         }
 
         size_t docsDeleted;
+
+        // Invalidated documents can be force-fetched, causing the now invalid RecordId to
+        // be thrown out. The delete stage skips over any results which do not have a RecordId.
+        size_t nInvalidateSkips;
     };
 
     struct DistinctScanStats : public SpecificStats {
@@ -285,6 +290,8 @@ namespace mongo {
 
         // How many keys did we look at while distinct-ing?
         size_t keysExamined;
+
+        std::string indexName;
 
         BSONObj keyPattern;
     };
@@ -317,6 +324,20 @@ namespace mongo {
 
         // The total number of full documents touched by the fetch stage.
         size_t docsExamined;
+    };
+
+    struct GroupStats : public SpecificStats {
+        GroupStats() : nGroups(0) { }
+
+        virtual ~GroupStats() { }
+
+        virtual SpecificStats* clone() const {
+            GroupStats* specific = new GroupStats(*this);
+            return specific;
+        }
+
+        // The total number of groups.
+        size_t nGroups;
     };
 
     struct IDHackStats : public SpecificStats {
@@ -369,9 +390,6 @@ namespace mongo {
         // used.
         BSONObj indexBounds;
 
-        // Contains same information as indexBounds with the addition of inclusivity of bounds.
-        std::string indexBoundsVerbose;
-
         // >1 if we're traversing the index along with its order. <1 if we're traversing it
         // against the order.
         int direction;
@@ -405,6 +423,14 @@ namespace mongo {
         size_t limit;
     };
 
+    struct MockStats : public SpecificStats {
+        MockStats() { }
+
+        virtual SpecificStats* clone() const {
+            return new MockStats(*this);
+        }
+    };
+
     struct MultiPlanStats : public SpecificStats {
         MultiPlanStats() { }
 
@@ -428,7 +454,7 @@ namespace mongo {
         size_t dupsTested;
         size_t dupsDropped;
 
-        // How many calls to invalidate(...) actually removed a DiskLoc from our deduping map?
+        // How many calls to invalidate(...) actually removed a RecordId from our deduping map?
         size_t locsForgotten;
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.
@@ -522,6 +548,9 @@ namespace mongo {
         IntervalStats() :
             numResultsFound(0),
             numResultsBuffered(0),
+            minDistanceAllowed(-1),
+            maxDistanceAllowed(-1),
+            inclusiveMaxDistanceAllowed(false),
             minDistanceFound(-1),
             maxDistanceFound(-1),
             minDistanceBuffered(-1),
@@ -530,6 +559,10 @@ namespace mongo {
 
         long long numResultsFound;
         long long numResultsBuffered;
+
+        double minDistanceAllowed;
+        double maxDistanceAllowed;
+        bool inclusiveMaxDistanceAllowed;
 
         double minDistanceFound;
         double maxDistanceFound;
@@ -548,15 +581,61 @@ namespace mongo {
 
         long long totalResultsFound() {
             long long totalResultsFound = 0;
-            for (vector<IntervalStats>::iterator it = intervalStats.begin();
+            for (std::vector<IntervalStats>::iterator it = intervalStats.begin();
                 it != intervalStats.end(); ++it) {
                 totalResultsFound += it->numResultsFound;
             }
             return totalResultsFound;
         }
 
-        vector<IntervalStats> intervalStats;
+        std::vector<IntervalStats> intervalStats;
+        std::string indexName;
         BSONObj keyPattern;
+    };
+
+    struct UpdateStats : public SpecificStats {
+        UpdateStats()
+            : nMatched(0),
+              nModified(0),
+              isDocReplacement(false),
+              fastmod(false),
+              fastmodinsert(false),
+              inserted(false),
+              nInvalidateSkips(0) { }
+
+        virtual SpecificStats* clone() const {
+            return new UpdateStats(*this);
+        }
+
+        // The number of documents which match the query part of the update.
+        size_t nMatched;
+
+        // The number of documents modified by this update.
+        size_t nModified;
+
+        // True iff this is a doc-replacement style update, as opposed to a $mod update.
+        bool isDocReplacement;
+
+        // A 'fastmod' update is an in-place update that does not have to modify
+        // any indices. It's "fast" because the only work needed is changing the bits
+        // inside the document.
+        bool fastmod;
+
+        // A 'fastmodinsert' is an insert resulting from an {upsert: true} update
+        // which is a doc-replacement style update. It's "fast" because we don't need
+        // to compute the document to insert based on the modifiers.
+        bool fastmodinsert;
+
+        // Is this an {upsert: true} update that did an insert?
+        bool inserted;
+
+        // The object that was inserted. This is an empty document if no insert was performed.
+        BSONObj objInserted;
+
+        // Invalidated documents can be force-fetched, causing the now invalid RecordId to
+        // be thrown out. The update stage skips over any results which do not have the
+        // RecordId to update.
+        size_t nInvalidateSkips;
     };
 
     struct TextStats : public SpecificStats {
@@ -566,6 +645,8 @@ namespace mongo {
             TextStats* specific = new TextStats(*this);
             return specific;
         }
+
+        std::string indexName;
 
         size_t keysExamined;
 

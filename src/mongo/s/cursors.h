@@ -30,8 +30,10 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
+#include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 #include <string>
 
 #include "mongo/client/parallel.h"

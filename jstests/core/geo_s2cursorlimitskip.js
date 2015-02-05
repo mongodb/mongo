@@ -8,11 +8,11 @@ var random = Random.rand;
 
 /*
  * To test that getmore is working within 2dsphere index.
- * We insert a bunch of points, get a cursor, and fetch some
- * of the points.  Then we insert a bunch more points, and 
- * finally fetch a bunch more.
- * If the final fetches work successfully, then getmore should
- * be working
+ * We insert a bunch of points and get a cursor. We then
+ * fetch some of the points and verify that the number of
+ * query and getmore operations are correct. Finally, we
+ * fetch the rest of the points and again verify that the
+ * number of query and getmore operations are correct.
  */
 function sign() { return random() > 0.5 ? 1 : -1; }
 function insertRandomPoints(num, minDist, maxDist){
@@ -24,31 +24,48 @@ function insertRandomPoints(num, minDist, maxDist){
     }
 }
 
-var initialPointCount = 200
-var smallBit = 10
-var secondPointCount = 100
+var totalPointCount = 200;
+var initialAdvance = 10;
+var batchSize = 4;
 
 // Insert points between 0.01 and 1.0 away.
-insertRandomPoints(initialPointCount, 0.01, 1.0);
+insertRandomPoints(totalPointCount, 0.01, 1.0);
 
-var cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}}).batchSize(4);
-assert.eq(cursor.count(), initialPointCount);
+var cursor = t.find({geo: {$geoNear : {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}})
+              .batchSize(batchSize);
+assert.eq(cursor.count(), totalPointCount);
 
-for(var j = 0; j < smallBit; j++){
+// Disable profiling in order to drop the system.profile collection.
+// Then enable profiling for all operations. This is acceptable because
+// our test is blacklisted from the parallel suite.
+db.setProfilingLevel(0);
+db.system.profile.drop();
+db.setProfilingLevel(2);
+
+for (var j = 0; j < initialAdvance; j++) {
     assert(cursor.hasNext());
     cursor.next();
 }
-// We looked at (initialPointCount - smallBit) points, should be more.
+// We looked at (totalPointCount - initialAdvance) points, there should still be more.
 assert(cursor.hasNext())
 
-// Insert points outside of the shell we've tested thus far
-insertRandomPoints(secondPointCount, 2.01, 3.0);
-assert.eq(cursor.count(), initialPointCount + secondPointCount)
+// Cursor was advanced 10 times, batchSize=4 => 1 query + 2 getmore.
+assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
+assert.eq(2, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
 
-for(var k = 0; k < initialPointCount + secondPointCount - smallBit; k++){
+for (var k = initialAdvance; k < totalPointCount; k++) {
     assert(cursor.hasNext())
     var tmpPoint = cursor.next();
 }
+
+// Cursor was advanced 200 times, batchSize=4 => 1 query + 49 getmore.
+assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
+assert.eq(49, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
+
+// Disable profiling again - no longer needed for remainder of test
+db.setProfilingLevel(0);
+db.system.profile.drop();
+
 // Shouldn't be any more points to look at now.
 assert(!cursor.hasNext())
 

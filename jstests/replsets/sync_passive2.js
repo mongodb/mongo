@@ -4,8 +4,6 @@
 
 load("jstests/replsets/rslib.js");
 
-if (false) { // Test disabled until SERVER-10341 is resolved
-
 var name = "sync_passive2";
 var host = getHostName();
 
@@ -219,5 +217,3 @@ assert.soon(function() {
 }, 'failed to change sync target', 60000);
 
 replTest.stopSet();
-
-} // end test disabled

@@ -27,13 +27,17 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/shell/shell_utils_launcher.h"
 
+#include <boost/scoped_array.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 #include <map>
+#include <signal.h>
 #include <vector>
 
 #ifdef _WIN32
@@ -52,10 +56,22 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/log.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_win32.h"
 
 namespace mongo {
+
+    using boost::scoped_array;
+    using std::cout;
+    using std::endl;
+    using std::make_pair;
+    using std::map;
+    using std::pair;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     extern bool dbexitCalled;
 
@@ -267,9 +283,10 @@ namespace mongo {
 
             {
                 stringstream ss;
-                ss << "shell: started program";
-                for (unsigned i=0; i < _argv.size(); i++)
+                ss << "shell: started program (sh" << _pid << "): ";
+                for (unsigned i = 0; i < _argv.size(); i++) {
                     ss << " " << _argv[i];
+                }
                 log() << ss.str() << endl;
             }
 
@@ -373,7 +390,7 @@ namespace mongo {
                     ss << '"';
                     // escape all embedded quotes
                     for (size_t j=0; j<_argv[i].size(); ++j) {
-                        if (_argv[i][j]=='"') ss << '"';
+                        if (_argv[i][j]=='"') ss << '\\';
                         ss << _argv[i][j];
                     }
                     ss << '"';
@@ -455,7 +472,7 @@ namespace mongo {
 
                     // Async signal unsafe code reporting a terminal error condition.
                     cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
-                    ::_Exit(-1); //do not pass go, do not call atexit handlers
+                    quickExit(-1); //do not pass go, do not call atexit handlers
                 }
 
                 // Heap-check for mongos only. 'argv[0]' must be in the path format.
@@ -476,7 +493,7 @@ namespace mongo {
 
                 // Async signal unsafe code reporting a terminal error condition.
                 cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
-                ::_Exit(-1);
+                quickExit(-1);
             }
 
 #endif
@@ -539,9 +556,10 @@ namespace mongo {
 
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
             ProcessId pid = ProcessId::fromNative(singleArg( a ).numberInt());
-            BSONObj x = BSON( "" << wait_for_pid( pid ) );
+            int exit_code = -123456; // sentinel value
+            wait_for_pid( pid, true, &exit_code );
             registry.deletePid( pid );
-            return x;
+            return BSON( string("") << exit_code);
         }
 
         BSONObj StartMongoProgram( const BSONObj &a, void* data ) {
@@ -600,7 +618,7 @@ namespace mongo {
             boost::filesystem::directory_iterator i( from );
             while( i != end ) {
                 boost::filesystem::path p = *i;
-                if ( p.leaf() != "mongod.lock" ) {
+                if ( p.leaf() != "mongod.lock" && p.leaf() != "WiredTiger.lock" ) {
                     if ( boost::filesystem::is_directory( p ) ) {
                         boost::filesystem::path newDir = to / p.leaf();
                         boost::filesystem::create_directory( newDir );

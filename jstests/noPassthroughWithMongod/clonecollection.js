@@ -1,8 +1,5 @@
 // Test cloneCollection command
-// TODO(spencer): move this test out of slowNightly directory once there is a better place for tests
-// that start their own mongod's but aren't slow
 var baseName = "jstests_clonecollection";
-
 
 ports = allocatePorts( 2 );
 
@@ -23,19 +20,19 @@ assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a", { i: { 
 assert.eq( 10, t.a.find().count() , "A3" );
 
 t.a.drop();
-assert.eq( 0, t.system.indexes.find().count() , "prep 2");
+assert.eq( 0, t.a.getIndexes().length, "prep 2");
 
 f.a.ensureIndex( { i: 1 } );
-assert.eq( 2, f.system.indexes.find().count(), "expected index missing" );
+assert.eq( 2, f.a.getIndexes().length, "expected index missing" );
 assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a" ) );
-if ( t.system.indexes.find().count() != 2 ) {
-    printjson( t.system.indexes.find().toArray() );
+if ( t.a.getIndexes().length != 2 ) {
+    printjson( t.a.getIndexes());
 }
-assert.eq( 2, t.system.indexes.find().count(), "expected index missing" );
+assert.eq( 2, t.a.getIndexes().length, "expected index missing" );
 // Verify index works
-x = t.a.find( { i: 50 } ).hint( { i: 1 } ).explain()
+x = t.a.find( { i: 50 } ).hint( { i: 1 } ).explain("executionStats")
 printjson( x )
-assert.eq( 50, x.indexBounds.i[0][0] , "verify 1" );
+assert.eq( 1, x.executionStats.nReturned , "verify 1" );
 assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length, "match length did not match expected" );
 
 // Check that capped-ness is preserved on clone

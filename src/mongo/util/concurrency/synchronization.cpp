@@ -27,13 +27,39 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "synchronization.h"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "mongo/util/log.h"
+
 namespace mongo {
 
-    Notification::Notification() : _mutex ( "Notification" ){ 
+namespace {
+    ThreadIdleCallback threadIdleCallback;
+} // namespace
+
+    void registerThreadIdleCallback(ThreadIdleCallback callback) {
+        invariant(!threadIdleCallback);
+        threadIdleCallback = callback;
+    }
+
+    void markThreadIdle() {
+        if (!threadIdleCallback) {
+            return;
+        }
+        try {
+            threadIdleCallback();
+        }
+        catch (...) {
+            severe() << "Exception escaped from threadIdleCallback";
+            fassertFailedNoTrace(28603);
+        }
+    }
+
+    Notification::Notification() : _mutex ( "Notification" ) {
         lookFor = 1;
         cur = 0;
     }

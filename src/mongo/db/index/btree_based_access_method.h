@@ -28,16 +28,16 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/storage/mmap_v1/btree/bucket_deletion_notification.h"  // XXX HK this can go away
 
 namespace mongo {
 
@@ -64,20 +64,20 @@ namespace mongo {
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted);
 
         virtual Status remove(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted);
 
         virtual Status validateUpdate(OperationContext* txn,
                                       const BSONObj& from,
                                       const BSONObj& to,
-                                      const DiskLoc& loc,
+                                      const RecordId& loc,
                                       const InsertDeleteOptions& options,
                                       UpdateTicket* ticket);
 
@@ -95,28 +95,22 @@ namespace mongo {
 
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
-                                   std::set<DiskLoc>* dups );
+                                   bool dupsAllowed,
+                                   std::set<RecordId>* dups );
 
         virtual Status touch(OperationContext* txn, const BSONObj& obj);
 
         virtual Status touch(OperationContext* txn) const;
 
-        virtual Status validate(OperationContext* txn, int64_t* numKeys);
+        virtual Status validate(OperationContext* txn, bool full, int64_t* numKeys,
+                                BSONObjBuilder* output);
 
+        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
+            const;
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
         // XXX: consider migrating callers to use IndexCursor instead
-        virtual DiskLoc findSingle( OperationContext* txn, const BSONObj& key ) const;
-
-        /**
-         * Invalidates all active cursors, which point at the bucket being deleted.
-         * TODO see if there is a better place to put this.
-         */
-        class InvalidateCursorsNotification : public BucketDeletionNotification {
-        public:
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket);
-        };
-        static InvalidateCursorsNotification invalidateCursors;
+        virtual RecordId findSingle( OperationContext* txn, const BSONObj& key ) const;
 
     protected:
         // Friends who need getKeys.
@@ -127,15 +121,19 @@ namespace mongo {
 
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
+        // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
+        bool ignoreKeyTooLong(OperationContext* txn);
+
         IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
         const IndexDescriptor* _descriptor;
 
     private:
-        bool removeOneKey(OperationContext* txn,
+        void removeOneKey(OperationContext* txn,
                           const BSONObj& key,
-                          const DiskLoc& loc);
+                          const RecordId& loc,
+                          bool dupsAllowed);
 
-        scoped_ptr<SortedDataInterface> _newInterface;
+        boost::scoped_ptr<SortedDataInterface> _newInterface;
     };
 
     /**
@@ -151,7 +149,7 @@ namespace mongo {
         // These point into the sets oldKeys and newKeys.
         std::vector<BSONObj*> removed, added;
 
-        DiskLoc loc;
+        RecordId loc;
         bool dupsAllowed;
     };
 

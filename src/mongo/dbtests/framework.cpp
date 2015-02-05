@@ -28,7 +28,9 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/dbtests/framework.h"
 
@@ -40,18 +42,24 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/global_environment_d.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 #include "mongo/util/version_reporting.h"
 
 namespace moe = mongo::optionenvironment;
 
 namespace mongo {
+
+    using std::endl;
+    using std::string;
 
     namespace dbtests {
 
@@ -91,6 +99,9 @@ namespace mongo {
                     }
                     else if (minutesRunning > 1){
                         warning() << currentTestName << " has been running for more than " << minutesRunning-1 << " minutes." << endl;
+
+                        // See what is stuck
+                        getGlobalLockManager()->dump();
                     }
                 }
             }
@@ -108,7 +119,7 @@ namespace mongo {
             printOpenSSLVersion();
             printSysInfo();
 
-            initGlobalStorageEngine();
+            getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
             TestWatchDog twd;
             twd.go();

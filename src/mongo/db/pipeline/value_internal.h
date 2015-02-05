@@ -29,10 +29,13 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/bson/optime.h"
 
@@ -91,8 +94,7 @@ namespace mongo {
         ValueStorage(BSONType t, const OID& o) {
             zero();
             type = t;
-            memcpy(&oid, &o, sizeof(OID));
-            BOOST_STATIC_ASSERT(sizeof(OID) == sizeof(oid));
+            memcpy(&oid, o.view().view(), OID::kOIDSize);
         }
 
         ValueStorage(const ValueStorage& rhs) {
@@ -147,7 +149,7 @@ namespace mongo {
             putRefCountable(new RCCodeWScope(cws.code.toString(), cws.scope));
         }
 
-        void putRefCountable(intrusive_ptr<const RefCountable> ptr) {
+        void putRefCountable(boost::intrusive_ptr<const RefCountable> ptr) {
             genericRCPtr = ptr.get();
 
             if (genericRCPtr) {
@@ -174,12 +176,12 @@ namespace mongo {
             return arrayPtr->vec;
         }
 
-        intrusive_ptr<const RCCodeWScope> getCodeWScope() const {
+        boost::intrusive_ptr<const RCCodeWScope> getCodeWScope() const {
             dassert(typeid(*genericRCPtr) == typeid(const RCCodeWScope));
             return static_cast<const RCCodeWScope*>(genericRCPtr);
         }
 
-        intrusive_ptr<const RCDBRef> getDBRef() const {
+        boost::intrusive_ptr<const RCDBRef> getDBRef() const {
             dassert(typeid(*genericRCPtr) == typeid(const RCDBRef));
             return static_cast<const RCDBRef*>(genericRCPtr);
         }

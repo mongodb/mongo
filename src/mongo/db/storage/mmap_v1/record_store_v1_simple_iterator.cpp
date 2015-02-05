@@ -41,9 +41,12 @@ namespace mongo {
 
     SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(OperationContext* txn,
                                                              const SimpleRecordStoreV1* collection,
-                                                             const DiskLoc& start,
+                                                             const RecordId& start,
                                                              const CollectionScanParams::Direction& dir)
-        : _txn(txn), _curr(start), _recordStore(collection), _direction(dir) {
+            : _txn(txn)
+            , _curr(DiskLoc::fromRecordId(start))
+            , _recordStore(collection)
+            , _direction(dir) {
 
         if (_curr.isNull()) {
 
@@ -88,9 +91,9 @@ namespace mongo {
         return _curr.isNull();
     }
 
-    DiskLoc SimpleRecordStoreV1Iterator::curr() { return _curr; }
+    RecordId SimpleRecordStoreV1Iterator::curr() { return _curr.toRecordId(); }
 
-    DiskLoc SimpleRecordStoreV1Iterator::getNext() {
+    RecordId SimpleRecordStoreV1Iterator::getNext() {
         DiskLoc ret = _curr;
 
         // Move to the next thing.
@@ -103,12 +106,12 @@ namespace mongo {
             }
         }
 
-        return ret;
+        return ret.toRecordId();
     }
 
-    void SimpleRecordStoreV1Iterator::invalidate(const DiskLoc& dl) {
+    void SimpleRecordStoreV1Iterator::invalidate(const RecordId& dl) {
         // Just move past the thing being deleted.
-        if (dl == _curr) {
+        if (dl == _curr.toRecordId()) {
             // We don't care about the return of getNext so much as the side effect of moving _curr
             // to the 'next' thing.
             getNext();
@@ -118,13 +121,14 @@ namespace mongo {
     void SimpleRecordStoreV1Iterator::saveState() {
     }
 
-    bool SimpleRecordStoreV1Iterator::restoreState() {
+    bool SimpleRecordStoreV1Iterator::restoreState(OperationContext* txn) {
+        _txn = txn;
         // if the collection is dropped, then the cursor should be destroyed
         return true;
     }
 
-    RecordData SimpleRecordStoreV1Iterator::dataFor( const DiskLoc& loc ) const {
-        return _recordStore->dataFor( loc );
+    RecordData SimpleRecordStoreV1Iterator::dataFor( const RecordId& loc ) const {
+        return _recordStore->dataFor( _txn, loc );
     }
 
 }

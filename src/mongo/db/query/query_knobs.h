@@ -51,6 +51,9 @@ namespace mongo {
     // Do we have ixisect on at all?
     extern bool internalQueryPlannerEnableIndexIntersection;
 
+    // Do we use hash-based intersection for rooted $and queries?
+    extern bool internalQueryPlannerEnableHashIntersection;
+
     //
     // plan cache
     //
@@ -88,5 +91,17 @@ namespace mongo {
     // How many index scans are we willing to produce in order to obtain a sort order
     // during explodeForSort?
     extern int internalQueryMaxScansToExplode;
+
+    //
+    // Query execution.
+    //
+
+    extern int internalQueryExecMaxBlockingSortBytes;
+
+    // Yield after this many "should yield?" checks.
+    extern int internalQueryExecYieldIterations;
+
+    // Yield if it's been at least this many milliseconds since we last yielded.
+    extern int internalQueryExecYieldPeriodMS;
 
 }  // namespace mongo

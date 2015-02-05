@@ -89,9 +89,9 @@ namespace mongo {
         /**
          * Fetches the user document for "userName" from local storage, and stores it into "result".
          */
-        virtual Status _getUserDocument(OperationContext* txn,
-                                        const UserName& userName,
-                                        BSONObj* result) = 0;
+        Status _getUserDocument(OperationContext* txn,
+                                const UserName& userName,
+                                BSONObj* result);
 
         Status _getRoleDescription_inlock(const RoleName& roleName,
                                           bool showPrivileges,

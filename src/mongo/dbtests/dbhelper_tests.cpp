@@ -28,6 +28,8 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern_options.h"
@@ -35,6 +37,9 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::set;
 
     /**
      * Unit tests related to DBHelpers
@@ -61,8 +66,8 @@ namespace mongo {
 
             {
                 // Remove _id range [_min, _max).
-                Lock::DBWrite lk(txn.lockState(), ns);
-                WriteUnitOfWork wunit(txn.recoveryUnit());
+                ScopedTransaction transaction(&txn, MODE_IX);
+                Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_X);
                 Client::Context ctx(&txn,  ns );
 
                 KeyRange range( ns,
@@ -71,7 +76,6 @@ namespace mongo {
                                 BSON( "_id" << 1 ) );
                 mongo::WriteConcernOptions dummyWriteConcern;
                 Helpers::removeRange(&txn, range, false, dummyWriteConcern);
-                wunit.commit();
             }
 
             // Check that the expected documents remain.
@@ -133,12 +137,13 @@ namespace mongo {
 
         long long maxSizeBytes = 1024 * 1024 * 1024;
 
-        set<DiskLoc> locs;
+        set<RecordId> locs;
         long long numDocsFound;
         long long estSizeBytes;
         {
             // search _id range (0, 10)
-            Lock::DBRead lk(txn.lockState(), ns);
+            ScopedTransaction transaction(&txn, MODE_IS);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_S);
 
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
@@ -158,11 +163,11 @@ namespace mongo {
             ASSERT_LESS_THAN( estSizeBytes, maxSizeBytes );
 
             Database* db = dbHolder().get( &txn, nsToDatabase(range.ns) );
-            const Collection* collection = db->getCollection(&txn, ns);
+            const Collection* collection = db->getCollection(ns);
 
             // Make sure all the disklocs actually correspond to the right info
-            for ( set<DiskLoc>::const_iterator it = locs.begin(); it != locs.end(); ++it ) {
-                const BSONObj obj = collection->docFor(*it);
+            for ( set<RecordId>::const_iterator it = locs.begin(); it != locs.end(); ++it ) {
+                const BSONObj obj = collection->docFor(&txn, *it).value();
                 ASSERT_EQUALS(obj["tag"].OID(), tag);
             }
         }
@@ -181,12 +186,12 @@ namespace mongo {
 
         long long maxSizeBytes = 1024 * 1024 * 1024;
 
-        set<DiskLoc> locs;
+        set<RecordId> locs;
         long long numDocsFound;
         long long estSizeBytes;
         {
-            Lock::DBRead lk(txn.lockState(), ns);
-            Client::Context ctx(&txn,  ns );
+            ScopedTransaction transaction(&txn, MODE_IS);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_S);
 
             // search invalid index range
             KeyRange range( ns,
@@ -227,12 +232,13 @@ namespace mongo {
         // Very small max size
         long long maxSizeBytes = 10;
 
-        set<DiskLoc> locs;
+        set<RecordId> locs;
         long long numDocsFound;
         long long estSizeBytes;
         {
-            Lock::DBRead lk(txn.lockState(), ns);
-            Client::Context ctx(&txn,  ns );
+            ScopedTransaction transaction(&txn, MODE_IS);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_S);
+
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
                             BSON( "_id" << numDocsInserted ),

@@ -29,7 +29,7 @@ assert.eq( 5 , dbother.bar.findOne( { _id : 5 } ).x );
 
 s._rs[0].test.awaitReplication();
 
-s._rs[0].test.stopMaster( 15 , true )
+s._rs[0].test.stopMaster(15);
 
 // Wait for the primary to come back online...
 var primary = s._rs[0].test.getPrimary();

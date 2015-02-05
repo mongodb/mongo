@@ -45,8 +45,8 @@ namespace mongo {
         Top() : _lock("Top") { }
 
         struct UsageData {
-            UsageData() : time(0) , count(0) {}
-            UsageData( const UsageData& older , const UsageData& newer );
+            UsageData() : time(0), count(0) {}
+            UsageData( const UsageData& older, const UsageData& newer );
             long long time;
             long long count;
 
@@ -61,7 +61,7 @@ namespace mongo {
              * constructs a diff
              */
             CollectionData() {}
-            CollectionData( const CollectionData& older , const CollectionData& newer );
+            CollectionData( const CollectionData& older, const CollectionData& newer );
 
             UsageData total;
 
@@ -79,22 +79,20 @@ namespace mongo {
         typedef StringMap<CollectionData> UsageMap;
 
     public:
-        void record( const StringData& ns , int op , int lockType , long long micros , bool command );
+        void record( const StringData& ns, int op, int lockType, long long micros, bool command );
         void append( BSONObjBuilder& b );
         void cloneMap(UsageMap& out) const;
-        CollectionData getGlobalData() const { return _global; }
         void collectionDropped( const StringData& ns );
 
     public: // static stuff
         static Top global;
 
     private:
-        void _appendToUsageMap( BSONObjBuilder& b , const UsageMap& map ) const;
-        void _appendStatsEntry( BSONObjBuilder& b , const char * statsName , const UsageData& map ) const;
-        void _record( CollectionData& c , int op , int lockType , long long micros , bool command );
+        void _appendToUsageMap( BSONObjBuilder& b, const UsageMap& map ) const;
+        void _appendStatsEntry( BSONObjBuilder& b, const char * statsName, const UsageData& map ) const;
+        void _record( CollectionData& c, int op, int lockType, long long micros, bool command );
 
         mutable SimpleMutex _lock;
-        CollectionData _global;
         UsageMap _usage;
         std::string _lastDropped;
     };

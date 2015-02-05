@@ -30,6 +30,7 @@
 
 #include "mongo/db/matcher/expression_leaf.h"
 
+#include <cmath>
 #include <pcrecpp.h>
 
 #include "mongo/bson/bsonobjiterator.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -122,8 +122,8 @@ namespace mongo {
 
         // Special case handling for NaN. NaN is equal to NaN but
         // otherwise always compares to false.
-        if (isNaN(e.numberDouble()) || isNaN(_rhs.numberDouble())) {
-            bool bothNaN = isNaN(e.numberDouble()) && isNaN(_rhs.numberDouble());
+        if (std::isnan(e.numberDouble()) || std::isnan(_rhs.numberDouble())) {
+            bool bothNaN = std::isnan(e.numberDouble()) && std::isnan(_rhs.numberDouble());
             switch ( matchType() ) {
             case LT:
                 return false;

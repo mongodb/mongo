@@ -25,13 +25,12 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/util/text.h"
 
 #include "mongo/util/startup_test.h"
 #include "mongo/util/mongoutils/str.h"
-#include <boost/smart_ptr/scoped_array.hpp>
 
 namespace mongo {
     struct TextUnitTest : public StartupTest {

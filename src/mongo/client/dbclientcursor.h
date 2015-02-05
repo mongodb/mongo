@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -86,17 +86,7 @@ namespace mongo {
         void putBack( const BSONObj &o ) { _putBack.push( o.getOwned() ); }
 
         /** throws AssertionException if get back { $err : ... } */
-        BSONObj nextSafe() {
-            MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kNetworking);
-
-            BSONObj o = next();
-            if( strcmp(o.firstElementFieldName(), "$err") == 0 ) {
-                std::string s = "nextSafe(): " + o.toString();
-                LOG(5) << s;
-                uasserted(13106, s);
-            }
-            return o;
-        }
+        BSONObj nextSafe();
 
         /** peek ahead at items buffered for future next() calls.
             never requests new data from the server.  so peek only effective
@@ -130,7 +120,7 @@ namespace mongo {
            'dead' may be preset yet some data still queued and locally
            available from the dbclientcursor.
         */
-        bool isDead() const { return  !this || cursorId == 0; }
+        bool isDead() const { return cursorId == 0; }
 
         bool tailable() const { return (opts & QueryOption_CursorTailable) != 0; }
 

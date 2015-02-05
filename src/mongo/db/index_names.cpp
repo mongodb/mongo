@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     const string IndexNames::GEO_2D = "2d";
     const string IndexNames::GEO_HAYSTACK = "geoHaystack";
     const string IndexNames::GEO_2DSPHERE = "2dsphere";

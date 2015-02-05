@@ -27,11 +27,17 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/db/jsobj.h"
+
+#include <boost/functional/hash.hpp>
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/json.h"
-#include "mongo/util/md5.hpp"
+#include "mongo/util/allocator.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -68,10 +74,9 @@ namespace mongo {
     }
 
     BSONObj BSONObj::copy() const {
-        Holder *h = (Holder*) malloc(objsize() + sizeof(unsigned));
-        h->zero();
-        memcpy(h->data, objdata(), objsize());
-        return BSONObj(h);
+        char* storage = static_cast<char*>(mongoMalloc(sizeof(Holder) + objsize()));
+        memcpy(storage + sizeof(Holder), objdata(), objsize());
+        return BSONObj::takeOwnership(storage);
     }
 
     BSONObj BSONObj::getOwned() const {
@@ -82,15 +87,6 @@ namespace mongo {
 
     BSONObjIterator BSONObj::begin() const {
         return BSONObjIterator(*this);
-    }
-
-    string BSONObj::md5() const {
-        md5digest d;
-        md5_state_t st;
-        md5_init(&st);
-        md5_append( &st , (const md5_byte_t*)_objdata , objsize() );
-        md5_finish(&st, d);
-        return digestToString( d );
     }
 
     string BSONObj::jsonString( JsonStringFormat format, int pretty, bool isArray ) const {
@@ -238,6 +234,14 @@ namespace mongo {
                 return x;
         }
         return -1;
+    }
+
+    size_t BSONObj::Hasher::operator()(const BSONObj& obj) const {
+        size_t hash = 0;
+        BSONForEach(elem, obj) {
+            boost::hash_combine(hash, BSONElement::Hasher()(elem));
+        }
+        return hash;
     }
 
     bool BSONObj::isPrefixOf( const BSONObj& otherObj ) const {
@@ -653,7 +657,11 @@ namespace mongo {
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
-            if ( name == e.fieldName() )
+            // We know that e has a cached field length since BSONObjIterator::next internally
+            // called BSONElement::size on the BSONElement that it returned, so it is more
+            // efficient to re-use that information by obtaining the field name as a
+            // StringData, which will be pre-populated with the cached length.
+            if ( name == e.fieldNameStringData() )
                 return e;
         }
         return BSONElement();
@@ -672,11 +680,6 @@ namespace mongo {
     const char * BSONObj::getStringField(const StringData& name) const {
         BSONElement e = getField(name);
         return e.type() == String ? e.valuestr() : "";
-    }
-
-    bool BSONObj::isValid() const {
-        int x = objsize();
-        return x > 0 && x <= BSONObjMaxInternalSize;
     }
 
     bool BSONObj::getObjectID(BSONElement& e) const {
@@ -765,15 +768,6 @@ namespace mongo {
         return n;
     }
 
-    BSONObj::BSONObj() {
-        /* little endian ordering here, but perhaps that is ok regardless as BSON is spec'd
-           to be little endian external to the system. (i.e. the rest of the implementation of bson,
-           not this part, fails to support big endian)
-        */
-        static char p[] = { /*size*/5, 0, 0, 0, /*eoo*/0 };
-        _objdata = p;
-    }
-
     std::string BSONObj::toString( bool isArray, bool full ) const {
         if ( isEmpty() ) return (isArray ? "[]" : "{}");
         StringBuilder s;
@@ -819,50 +813,5 @@ namespace mongo {
         o.toString( s );
         return s;
     }
-
-    template <class T>
-    void BSONObj::Vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-    template <class T>
-    void BSONObj::Vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-
-    template <class T>
-    void BSONObj::vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
-    }
-    template <class T>
-    void BSONObj::vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
-    }
-
 
 } // namespace mongo

@@ -31,11 +31,12 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem.hpp>
+#include <boost/make_shared.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
 
 // Need access to internal classes
@@ -44,6 +45,7 @@
 namespace mongo {
     using namespace mongo::sorter;
     using boost::make_shared;
+    using std::pair;
 
     // Stub to avoid including the server_options library
     // TODO: This should go away once we can do these checks at compile time
@@ -545,5 +547,7 @@ namespace mongo {
             add<SorterTests::LotsOfDataWithLimit<5000,/*random=*/false> >(); // spills
             add<SorterTests::LotsOfDataWithLimit<5000,/*random=*/true> >(); // spills
         }
-    } extSortTests;
+    };
+
+    mongo::unittest::SuiteInstance<SorterSuite> extSortTests;
 }

@@ -30,11 +30,12 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
 #include <vector>
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 
 namespace mongo {
 
@@ -70,7 +71,7 @@ namespace mongo {
 
         BSONObj dump() const;
 
-        void dump(iostream& s) const;
+        void dump(std::iostream& s) const;
 
         bool isOk() const { return magic == extentSignature; }
         void assertOk() const { verify(isOk()); }

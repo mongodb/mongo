@@ -28,7 +28,8 @@
 #pragma once
 
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/db/repl/rs_config.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/replica_set_config.h"
 
 #include <string>
 #include <map>
@@ -49,7 +50,6 @@ namespace mongo {
      */
     class MockReplicaSet {
     public:
-        typedef std::map<std::string, repl::ReplSetConfig::MemberCfg> ReplConfigMap;
 
         /**
          * Creates a mock replica set and automatically mocks the isMaster
@@ -69,7 +69,7 @@ namespace mongo {
         std::string getSetName() const;
         std::string getConnectionString() const;
         std::vector<HostAndPort> getHosts() const;
-        ReplConfigMap getReplConfig() const;
+        repl::ReplicaSetConfig getReplConfig() const;
         std::string getPrimary() const;
         std::vector<std::string> getSecondaries() const;
 
@@ -81,7 +81,7 @@ namespace mongo {
          * Note: does not automatically select a new primary. Can be done manually by
          * calling setPrimary.
          */
-        void setConfig(const ReplConfigMap& newConfig);
+        void setConfig(const repl::ReplicaSetConfig& newConfig);
 
         void setPrimary(const std::string& hostAndPort);
 
@@ -134,7 +134,7 @@ namespace mongo {
 
         const std::string _setName;
         ReplNodeMap _nodeMap;
-        ReplConfigMap _replConfig;
+        repl::ReplicaSetConfig _replConfig;
 
         std::string _primaryHost;
     };

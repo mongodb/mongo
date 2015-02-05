@@ -86,4 +86,8 @@ namespace mongo {
 
         return out.str();
     }
+
+    /* @return a dump of the buffer as hex byte ascii output */
+    std::string hexdump(const char *data, unsigned len);
+
 }

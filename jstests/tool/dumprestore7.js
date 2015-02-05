@@ -43,13 +43,16 @@ var master = replTest.getMaster();
 step("try mongodump with $timestamp");
 
 var data = MongoRunner.dataDir + "/dumprestore7-dump1/";
-var query = "{\"ts\":{\"$gt\":{\"$timestamp\" : {\"t\":"+ time.ts.t + ",\"i\":" + time.ts.i +" }}}}";
+var query = "{\"ts\":{\"$gt\":{\"$timestamp\":{\"t\":"+ time.ts.t + ",\"i\":" + time.ts.i +"}}}}";
 
-runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--db", "local", "--collection", "oplog.rs", "--query", query, "--out", data );
+MongoRunner.runMongoTool( "mongodump",
+    { "host": "127.0.0.1:"+replTest.ports[0],
+      "db": "local", "collection": "oplog.rs",
+      "query": query, "out": data });
 
 step("try mongorestore from $timestamp");
 
-runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+port, "--dir", data );
+runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+port, "--dir", data, "--writeConcern", 1);
 var x = 9;
 x = conn.getDB("local").getCollection("oplog.rs").count();
 

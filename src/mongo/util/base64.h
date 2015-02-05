@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <boost/scoped_array.hpp>
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
     namespace base64 {
 

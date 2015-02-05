@@ -28,7 +28,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -38,6 +38,10 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace PipelineTests {
+
+    using boost::intrusive_ptr;
+    using std::string;
+    using std::vector;
 
     namespace FieldPath {
 
@@ -433,6 +437,8 @@ namespace PipelineTests {
             add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsMetadata>();
             add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         }
-    } myall;
-    
+    };
+
+    SuiteInstance<All> myall;
+
 } // namespace PipelineTests

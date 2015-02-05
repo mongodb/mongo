@@ -15,8 +15,8 @@ var nodes = replTest.startSet();
 replTest.initiate({
     _id : name,
     members : [
-        {_id:0, host : host+":"+port[0]},
-        {_id:1, host : host+":"+port[1]},
+        {_id:0, host : host+":"+port[0], priority: 10},
+        {_id:1, host : host+":"+port[1], priority: 0},
         {_id:2, host : host+":"+port[2], priority : 0, buildIndexes : false},
                ]});
 
@@ -51,55 +51,3 @@ assert.soon(function() {
 });
 
 replTest.stopSet();
-
-print("reconfig");
-
-var rs2 = new ReplSetTest( {name: 'reconfig-isync3', nodes: 3} );
-rs2.startSet();
-rs2.initiate();
-
-master = rs2.getMaster();
-var config = master.getDB("local").system.replset.findOne();
-config.version++;
-config.members[0].priority = 2;
-config.members[0].initialSync = {state : 2};
-config.members[1].initialSync = {state : 1};
-try {
-    master.getDB("admin").runCommand({replSetReconfig : config});
-}
-catch(e) {
-    assert((e.message || e) == "error doing query: failed");
-}
-
-// wait for a heartbeat, too, just in case sync happens before hb
-assert.soon(function() {
-    try {
-      for (var n in rs2.nodes) {
-        if (rs2.nodes[n].getDB("local").system.replset.findOne().version != 2) {
-          return false;
-        }
-      }
-    }
-    catch (e) {
-      return false;
-    }
-    return true;
-});
-
-rs2.awaitReplication();
-
-// test partitioning
-master = rs2.bridge();
-rs2.partition(0, 2);
-
-master = rs2.getMaster();
-
-master.getDB("foo").bar.baz.insert({x:1});
-rs2.awaitReplication();
-
-var option = { writeConcern: { w : 3, wtimeout : 60000 }};
-assert.writeOK(master.getDB("foo").bar.baz.insert({ x: 2 }, option));
-
-rs2.stopSet();
-
-print("initialSync3 success!");

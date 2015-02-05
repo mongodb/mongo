@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/platform/random.h"
@@ -74,9 +76,11 @@ namespace {
     TEST(StringMapTest, Basic1) {
         StringMap<int> m;
         ASSERT_EQUALS( 0U, m.size() );
+        ASSERT_EQUALS( true, m.empty() );
         m["eliot"] = 5;
         ASSERT_EQUALS( 5, m["eliot"] );
         ASSERT_EQUALS( 1U, m.size() );
+        ASSERT_EQUALS( false, m.empty() );
     }
 
     TEST(StringMapTest, Big1) {
@@ -115,21 +119,40 @@ namespace {
 
         m["eliot"] = 5;
         ASSERT_EQUALS( 5, m["eliot"] );
-        m.erase( "eliot" );
+        ASSERT_EQUALS( 1U, m.size() );
+        ASSERT_EQUALS( false, m.empty() );
+        ASSERT_EQUALS( 1U, m.erase( "eliot" ) );
         ASSERT( m.end() == m.find( "eliot" ) );
+        ASSERT_EQUALS( 0U, m.size() );
+        ASSERT_EQUALS( true, m.empty() );
         ASSERT_EQUALS( 0, m["eliot"] );
-        m.erase( "eliot" );
+        ASSERT_EQUALS( 1U, m.size() );
+        ASSERT_EQUALS( false, m.empty() );
+        ASSERT_EQUALS( 1U, m.erase( "eliot" ) );
         ASSERT( m.end() == m.find( "eliot" ) );
+        ASSERT_EQUALS( 0U, m.erase( "eliot" ) );
 
         size_t before = m.capacity();
         for ( int i = 0; i < 10000; i++ ) {
             sprintf( buf, "foo%d", i );
             m[buf] = i;
             ASSERT_EQUALS( i, m[buf] );
-            m.erase( buf );
+            ASSERT_EQUALS( 1U, m.erase( buf ) );
             ASSERT( m.end() == m.find( buf ) );
         }
         ASSERT_EQUALS( before, m.capacity() );
+    }
+
+    TEST( StringMapTest, Erase2 ) {
+        StringMap<int> m;
+        m["eliot"] = 5;
+        ASSERT_EQUALS( 1U, m.size() );
+        ASSERT_EQUALS( false, m.empty() );
+        StringMap<int>::const_iterator i = m.find( "eliot" );
+        ASSERT_EQUALS( 5, i->second );
+        m.erase( i );
+        ASSERT_EQUALS( 0U, m.size() );
+        ASSERT_EQUALS( true, m.empty() );
     }
 
     TEST( StringMapTest, Iterator1 ) {

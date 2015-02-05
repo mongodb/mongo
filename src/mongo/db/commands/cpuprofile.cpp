@@ -42,11 +42,9 @@
  * The commands defined here, and profiling, are only available when enabled at
  * build-time with the "--use-cpu-profiler" argument to scons.
  *
- * Example SCons command line, assuming you've installed google-perftools in
- * /usr/local:
+ * Example SCons command line: 
  *
- *     scons --release --use-cpu-profiler \
- *         --cpppath=/usr/local/include --libpath=/usr/local/lib
+ *     scons --release --use-cpu-profiler 
  */
 
 #include "third_party/gperftools-2.2/src/gperftools/profiler.h"
@@ -135,7 +133,8 @@ namespace mongo {
                                            std::string &errmsg,
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
-            Lock::DBWrite dbXLock(txn->lockState(), db);
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
             // The lock here is just to prevent concurrency, nothing will write.
             Client::Context ctx(txn, db);
 
@@ -154,12 +153,11 @@ namespace mongo {
                                           std::string &errmsg,
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
-            Lock::DBWrite dbXLock(txn->lockState(), db);
-            WriteUnitOfWork wunit(txn->recoveryUnit());
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
             Client::Context ctx(txn, db);
 
             ::ProfilerStop();
-            wunit.commit();
             return true;
         }
 

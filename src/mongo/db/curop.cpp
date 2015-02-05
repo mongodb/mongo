@@ -26,16 +26,24 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/curop.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
-
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::string;
 
     // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a valid
     // non-zero max time to fail immediately.  Any getmore operation on a cursor already created
@@ -67,7 +75,6 @@ namespace mongo {
     }
 
     void CurOp::_reset() {
-        _suppressFromCurop = false;
         _isCommand = false;
         _dbprofile = 0;
         _end = 0;
@@ -78,13 +85,13 @@ namespace mongo {
         _killPending.store(0);
         _numYields = 0;
         _expectedLatencyMs = 0;
-        _lockStat.reset();
     }
 
     void CurOp::reset() {
         _reset();
         _start = 0;
         _opNum = _nextOpNum.fetchAndAdd(1);
+        _ns = "";
         _debug.reset();
         _query.reset();
         _active = true; // this should be last for ui clarity
@@ -105,7 +112,7 @@ namespace mongo {
                                      int secondsBetween) {
         if ( progressMeterTotal ) {
             if ( _progressMeter.isActive() ) {
-                cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
+                error() << "old _message: " << _message << " new message:" << msg;
                 verify( ! _progressMeter.isActive() );
             }
             _progressMeter.reset( progressMeterTotal , secondsBetween );
@@ -120,7 +127,7 @@ namespace mongo {
 
     CurOp::~CurOp() {
         if ( _wrapped ) {
-            scoped_lock bl(Client::clientsMutex);
+            boost::mutex::scoped_lock clientLock(Client::clientsMutex);
             _client->_curOp = _wrapped;
         }
         _client = 0;
@@ -128,7 +135,7 @@ namespace mongo {
 
     void CurOp::setNS( const StringData& ns ) {
         // _ns copies the data in the null-terminated ptr it's given
-        _ns = ns.toString().c_str();
+        _ns = ns;
     }
 
     void CurOp::ensureStarted() {
@@ -144,10 +151,10 @@ namespace mongo {
         }
     }
 
-    void CurOp::enter( Client::Context * context ) {
+    void CurOp::enter(const char* ns, int dbProfileLevel) {
         ensureStarted();
-        _ns = context->ns();
-        _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
+        _ns = ns;
+        _dbprofile = std::max(dbProfileLevel, _dbprofile);
     }
 
     void CurOp::recordGlobalTime(bool isWriteLocked, long long micros) const {
@@ -167,7 +174,9 @@ namespace mongo {
 
         builder->append( "op" , opToString( _op ) );
 
-        builder->append("ns", _ns.toString());
+        // Fill out "ns" from our namespace member (and if it's not available, fall back to the
+        // OpDebug namespace member).
+        builder->append("ns", !_ns.empty() ? _ns.toString() : _debug.ns.toString());
 
         if (_op == dbInsert) {
             _query.append(*builder, "insert");
@@ -203,7 +212,6 @@ namespace mongo {
             builder->append("killPending", true);
 
         builder->append( "numYields" , _numYields );
-        builder->append( "lockStats" , _lockStat.report() );
     }
 
     BSONObj CurOp::description() {
@@ -211,7 +219,11 @@ namespace mongo {
         bool a = _active && _start;
         bob.append("active", a);
         bob.append( "op" , opToString( _op ) );
-        bob.append("ns", _ns.toString());
+
+        // Fill out "ns" from our namespace member (and if it's not available, fall back to the
+        // OpDebug namespace member).
+        bob.append("ns", !_ns.empty() ? _ns.toString() : _debug.ns.toString());
+
         if (_op == dbInsert) {
             _query.append(bob, "insert");
         }
@@ -278,10 +290,13 @@ namespace mongo {
     static Counter64 idhackCounter;
     static Counter64 scanAndOrderCounter;
     static Counter64 fastmodCounter;
+    static Counter64 writeConflictsCounter;
 
     static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
     static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
     static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
+    static ServerStatusMetricField<Counter64> displayWriteConflicts( "operation.writeConflicts",
+                                                                     &writeConflictsCounter );
 
     void OpDebug::recordStats() {
         if ( nreturned > 0 )
@@ -303,6 +318,8 @@ namespace mongo {
             scanAndOrderCounter.increment();
         if ( fastmod )
             fastmodCounter.increment();
+        if ( writeConflicts )
+            writeConflictsCounter.increment( writeConflicts );
     }
 
     CurOp::MaxTimeTracker::MaxTimeTracker() {

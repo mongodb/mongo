@@ -34,7 +34,10 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include <boost/noncopyable.hpp>
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/md5.hpp"
 

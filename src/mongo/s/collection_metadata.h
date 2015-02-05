@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/field_ref_set.h"
@@ -42,7 +44,7 @@ namespace mongo {
 
     // For now, we handle lifecycle of CollectionManager via shared_ptrs
     class CollectionMetadata;
-    typedef shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
+    typedef boost::shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
 
     /**
      * The collection metadata has metadata information about a collection, in particular the
@@ -174,6 +176,7 @@ namespace mongo {
          * }
          *
          * @param lookupKey passing a key that does not belong to this metadata is undefined.
+         * @param orphanRange the output range. Note that the NS is not set.
          */
         bool getNextOrphanRange( const BSONObj& lookupKey, KeyRange* orphanRange ) const;
 

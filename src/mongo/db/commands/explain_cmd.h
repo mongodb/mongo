@@ -51,16 +51,21 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
-        // TODO: make slave ok true, test explains on secondaries.
+        /**
+         * Running an explain on a secondary requires explicitly setting slaveOk.
+         */
         virtual bool slaveOk() const {
             return false;
+        }
+        virtual bool slaveOverrideOk() const {
+            return true;
         }
 
         virtual bool maintenanceOk() const { return false; }
 
         virtual bool adminOnly() const { return false; }
 
-        virtual void help( stringstream& help ) const {
+        virtual void help( std::stringstream& help ) const {
             help << "explain database reads and writes";
         }
 
@@ -74,9 +79,9 @@ namespace mongo {
                                            const BSONObj& cmdObj);
 
         virtual bool run(OperationContext* txn,
-                         const string& dbname,
+                         const std::string& dbname,
                          BSONObj& cmdObj, int options,
-                         string& errmsg,
+                         std::string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl);
 

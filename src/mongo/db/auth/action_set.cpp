@@ -25,7 +25,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/action_set.h"
 

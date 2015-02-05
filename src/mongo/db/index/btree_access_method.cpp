@@ -34,9 +34,10 @@
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/pdfile_private.h"
 
 namespace mongo {
+
+    using std::vector;
 
     // Standard Btree implementation below.
     BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree )

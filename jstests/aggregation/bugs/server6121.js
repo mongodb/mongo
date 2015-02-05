@@ -55,7 +55,7 @@ var s6121 = db.s6121.aggregate(
             date_ts: {$eq: ['$date', '$time']}
         }}
 );
-assert.eq(s6121.toArray(), [{ts_date: true, date_ts: true}
+assert.eq(s6121.toArray(), [{ts_date: false, date_ts: false}
                            ,{ts_date: false, date_ts: false}]);
 
 

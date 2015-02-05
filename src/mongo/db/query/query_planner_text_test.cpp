@@ -32,7 +32,8 @@
 
 #include "mongo/db/query/query_planner_test_lib.h"
 
-#include <ostream>
+#include <iostream>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -43,6 +44,10 @@
 #include "mongo/util/assert_util.h"
 
 using namespace mongo;
+using std::cout;
+using std::endl;
+using std::string;
+using std::vector;
 
 namespace {
 
@@ -51,6 +56,7 @@ namespace {
     class QueryPlannerTest : public mongo::unittest::Test {
     protected:
         void setUp() {
+            cq = NULL;
             params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
             addIndex(BSON("_id" << 1));
         }
@@ -73,6 +79,7 @@ namespace {
             params.indices.push_back(IndexEntry(keyPattern,
                                                 multikey,
                                                 false,
+                                                false,
                                                 "hari_king_of_the_stove",
                                                 BSONObj()));
         }
@@ -81,6 +88,7 @@ namespace {
             params.indices.push_back(IndexEntry(keyPattern,
                                                 multikey,
                                                 sparse,
+                                                false,
                                                 "note_to_self_dont_break_build",
                                                 BSONObj()));
         }
@@ -140,6 +148,15 @@ namespace {
                           const BSONObj& minObj,
                           const BSONObj& maxObj,
                           bool snapshot) {
+
+            // Clean up any previous state from a call to runQueryFull
+            delete cq;
+            cq = NULL;
+
+            for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
+                delete *it;
+            }
+
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
                                                     minObj, maxObj, snapshot,
@@ -192,6 +209,14 @@ namespace {
                                  const BSONObj& minObj,
                                  const BSONObj& maxObj,
                                  bool snapshot) {
+
+            delete cq;
+            cq = NULL;
+
+            for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
+                delete *it;
+            }
+
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
                                                     minObj, maxObj, snapshot,
@@ -446,6 +471,17 @@ namespace {
 
         assertNumSolutions(1U);
         assertSolutionExists("{text: {prefix: {a:3}, search: 'foo'}}");
+    }
+
+    // SERVER-15639: Test that predicates on index prefix fields which are not assigned to the index
+    // prefix are correctly included in the solution node filter.
+    TEST_F(QueryPlannerTest, TextInsideAndWithCompoundIndexAndMultiplePredsOnIndexPrefix) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1 << "_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$and: [{a: 1}, {a: 2}, {$text: {$search: 'foo'}}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{text: {prefix: {a: 1}, search: 'foo', filter: {a: 2}}}");
     }
 
     // SERVER-13039: Test that we don't generate invalid solutions when the TEXT node

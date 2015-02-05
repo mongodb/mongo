@@ -31,53 +31,30 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
-    // We keep a list of active cursors so that when a btree's bucket is deleted we notify the
-    // cursors that are pointing into that bucket.  This will go away with finer grained locking.
-    unordered_set<BtreeIndexCursor*> BtreeIndexCursor::_activeCursors;
-    SimpleMutex BtreeIndexCursor::_activeCursorsMutex("active_btree_index_cursors");
+    using std::string;
+    using std::vector;
 
-    BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor)
-        : _cursor(cursor) {
-
-        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
-        _activeCursors.insert(this);
-    }
-
-    BtreeIndexCursor::~BtreeIndexCursor() {
-        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
-        _activeCursors.erase(this);
-    }
+    BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor) : _cursor(cursor) { }
 
     bool BtreeIndexCursor::isEOF() const { return _cursor->isEOF(); }
 
-    void BtreeIndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
-        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
-        for (unordered_set<BtreeIndexCursor*>::iterator i = _activeCursors.begin();
-             i != _activeCursors.end(); ++i) {
-
-            (*i)->_cursor->aboutToDeleteBucket(bucket);
-        }
-    }
-
     Status BtreeIndexCursor::seek(const BSONObj& position) {
         _cursor->locate(position, 
-                        1 == _cursor->getDirection() ? minDiskLoc : maxDiskLoc);
+                        1 == _cursor->getDirection() ? RecordId::min() : RecordId::max());
         return Status::OK();
     }
 
     void BtreeIndexCursor::seek(const BSONObj& position, bool afterKey) {
-        // XXX This used a hard-coded direction of 1 and is only correct in the forward direction.
-        invariant(_cursor->getDirection() == 1);
-        _cursor->locate(position, 
-                        afterKey ? maxDiskLoc : minDiskLoc);
+        const bool forward = (1 == _cursor->getDirection());
+        _cursor->locate(position, (afterKey == forward) ? RecordId::max() : RecordId::min());
     }
 
     bool BtreeIndexCursor::pointsAt(const BtreeIndexCursor& other) {
@@ -115,8 +92,8 @@ namespace mongo {
         return _cursor->getKey();
     }
 
-    DiskLoc BtreeIndexCursor::getValue() const {
-        return _cursor->getDiskLoc();
+    RecordId BtreeIndexCursor::getValue() const {
+        return _cursor->getRecordId();
     }
 
     void BtreeIndexCursor::next() {
@@ -128,8 +105,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeIndexCursor::restorePosition() {
-        _cursor->restorePosition();
+    Status BtreeIndexCursor::restorePosition(OperationContext* txn) {
+        _cursor->restorePosition(txn);
         return Status::OK();
     }
 

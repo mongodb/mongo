@@ -34,30 +34,39 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/version.hpp>
+#include <iomanip>
+#include <iostream>
 #include <fstream>
 
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/json.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
-#include "mongo/db/instance.h"
-#include "mongo/db/json.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
-#include "mongo/db/lasterror.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
-#include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version_reporting.h"
+#include "mongo/db/concurrency/lock_state.h"
 
 #if (__cplusplus >= 201103L)
 #include <mutex>
@@ -65,17 +74,32 @@
 
 namespace PerfTests {
 
+    using boost::shared_ptr;
+    using std::cout;
+    using std::endl;
+    using std::fixed;
+    using std::ifstream;
+    using std::left;
+    using std::min;
+    using std::right;
+    using std::setprecision;
+    using std::setw;
+    using std::string;
+    using std::vector;
+
     const bool profiling = false;
 
     class ClientBase {
     public:
-        // NOTE: Not bothering to backup the old error record.
         ClientBase() : _client(&_txn) {
-            mongo::lastError.reset(new LastError());
+            _prevError = mongo::lastError._get( false );
+            mongo::lastError.release();
+            mongo::lastError.reset( new LastError() );
         }
         virtual ~ClientBase() {
-
+            mongo::lastError.reset( _prevError );
         }
+
     protected:
         void insert( const char *ns, BSONObj o ) {
             _client.insert( ns, o );
@@ -88,8 +112,10 @@ namespace PerfTests {
         }
 
         DBClientBase* client() { return &_client; }
+        OperationContext* txn() { return &_txn; }
 
     private:
+        LastError* _prevError;
         OperationContextImpl _txn;
         DBDirectClient _client;
     };
@@ -134,7 +160,7 @@ namespace PerfTests {
 
                 boost::shared_ptr<DBClientConnection> c(new DBClientConnection(false, 0, 60));
                 string err;
-                if( c->connect("perfdb.10gen.cc", err) ) {
+                if( c->connect(HostAndPort("perfdb.10gen.cc"), err) ) {
                     if( !c->auth("perf", "perf", pwd, err) ) {
                         cout << "info: authentication with stats db failed: " << err << endl;
                         verify(false);
@@ -171,6 +197,9 @@ namespace PerfTests {
         // anything you want to do before being timed
         virtual void prep() { }
 
+        // anything you want to do before threaded test
+        virtual void prepThreaded() {}
+
         virtual void timed() = 0;
 
         // optional 2nd test phase to be timed separately. You must provide it with a unique
@@ -196,8 +225,9 @@ namespace PerfTests {
         void say(unsigned long long n, long long us, string s) {
             unsigned long long rps = (n*1000*1000)/(us > 0 ? us : 1);
             cout << "stats " << setw(42) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << us/1000 << "ms ";
-            if( showDurStats() )
-                cout << dur::stats.curr->_asCSV();
+            if (showDurStats()) {
+                cout << dur::stats.curr()->_asCSV();
+            }
             cout << endl;
 
             if( conn && !conn->isFailed() ) {
@@ -247,8 +277,10 @@ namespace PerfTests {
                     b.append("rps", (int) rps);
                     b.append("millis", us/1000);
                     b.appendBool("dur", storageGlobalParams.dur);
-                    if (showDurStats() && storageGlobalParams.dur)
-                        b.append("durStats", dur::stats.curr->_asObj());
+                    if (showDurStats() && storageGlobalParams.dur) {
+                        b.append("durStats", dur::stats.asObj());
+                    }
+
                     {
                         bob inf;
                         inf.append("version", versionString);
@@ -297,8 +329,6 @@ namespace PerfTests {
             client()->dropCollection(ns());
             prep();
             int hlm = howLong();
-            dur::stats._intervalMicros = 0; // no auto rotate
-            dur::stats.curr->reset();
             mongo::Timer t;
             n = 0;
             const unsigned int Batch = batchSize();
@@ -325,7 +355,7 @@ namespace PerfTests {
             string test2name = name2();
             {
                 if( test2name != name() ) {
-                    dur::stats.curr->reset();
+                    dur::stats.curr()->reset();
                     mongo::Timer t;
                     unsigned long long n = 0;
                     while( 1 ) {
@@ -356,11 +386,12 @@ namespace PerfTests {
             static int z;
             srand( ++z ^ (unsigned) time(0));
 #endif
+            Client::initThreadIfNotAlready("perftestthr");
             OperationContextImpl txn;
             DBDirectClient c(&txn);
 
-            Client::initThreadIfNotAlready("perftestthr");
             const unsigned int Batch = batchSize();
+            prepThreaded();
             while( 1 ) {
                 unsigned int i = 0;
                 for( i = 0; i < Batch; i++ )
@@ -627,41 +658,112 @@ namespace PerfTests {
         }
     };
 
-    QLock _qlock;
+    class locker_test : public B {
+    public:
+        boost::thread_specific_ptr<ResourceId> resId;
+        boost::thread_specific_ptr<MMAPV1LockerImpl> locker;
+        boost::thread_specific_ptr<int> id;
+        boost::mutex lock;
 
-    class qlock : public B {
-    public:
-        string name() { return "qlockr"; }
-        //virtual int howLongMillis() { return 500; }
-        virtual bool showDurStats() { return false; }
-        void timed() {
-            _qlock.lock_r();
-            _qlock.unlock_r();
+        // The following members are intitialized in the constructor
+        LockMode lockMode;
+        LockMode glockMode;
+
+        locker_test(LockMode m = MODE_X, LockMode gm = MODE_IX)
+            : lockMode(m),
+              glockMode(gm) { }
+        virtual string name() {
+            return (str::stream() << "locker_contested" << lockMode);
         }
-    };
-    class qlockw : public B {
-    public:
-        string name() { return "qlockw"; }
-        //virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
+        virtual bool testThreaded() { return true; }
+        virtual void prep() {
+            resId.reset(new ResourceId(RESOURCE_COLLECTION, std::string("TestDB.collection")));
+            locker.reset(new MMAPV1LockerImpl());
+        }
+
+        virtual void prepThreaded() {
+            resId.reset(new ResourceId(RESOURCE_COLLECTION, std::string("TestDB.collection")));
+            id.reset(new int);
+            lock.lock();
+            lock.unlock();
+            locker.reset(new MMAPV1LockerImpl());
+        }
+
         void timed() {
-            _qlock.lock_w();
-            _qlock.unlock_w();
+            locker->lockGlobal(glockMode);
+            locker->lock(*resId, lockMode);
+            locker->unlockAll();
+        }
+
+        void timed2(DBClientBase* c) {
+            locker->lockGlobal(glockMode);
+            locker->lock(*resId, lockMode);
+            locker->unlockAll();
         }
     };
 
-#if 0
-    class ulock : public B {
+    class glockerIX : public locker_test {
     public:
-        string name() { return "ulock"; }
-        virtual int howLongMillis() { return 500; }
-        virtual bool showDurStats() { return false; }
+        virtual string name() {
+            return (str::stream() << "glocker" << glockMode);
+        }
+
         void timed() {
-            lk.lockAsUpgradable();
-            lk.unlockFromUpgradable();
+            locker->lockGlobal(glockMode);
+            locker->unlockAll();
+        }
+
+        void timed2(DBClientBase* c) {
+            locker->lockGlobal(glockMode);
+            locker->unlockAll();
         }
     };
-#endif
+
+    class locker_test_uncontested : public locker_test {
+    public:
+        locker_test_uncontested(LockMode m = MODE_IX, LockMode gm = MODE_IX)
+            : locker_test(m, gm) { }
+        virtual string name() {
+            return (str::stream() << "locker_uncontested" << lockMode);
+        }
+
+        virtual void prepThreaded() {
+            id.reset(new int);
+
+            lock.lock();
+            lock.unlock();
+            locker.reset(new LockerImpl<true>);
+            resId.reset(new ResourceId(RESOURCE_COLLECTION,
+                                       str::stream() << "TestDB.collection" << *id));
+        }
+    };
+
+
+    class glockerIS : public glockerIX {
+    public:
+        glockerIS() : glockerIX() { glockMode = MODE_IS; }
+    };
+
+    class locker_contestedX : public locker_test {
+    public:
+        locker_contestedX() : locker_test(MODE_X, MODE_IX) { }
+    };
+
+    class locker_contestedS : public locker_test {
+    public:
+        locker_contestedS() : locker_test(MODE_S, MODE_IS) { }
+    };
+
+    class locker_uncontestedX : public locker_test_uncontested {
+    public:
+        locker_uncontestedX() : locker_test_uncontested(MODE_X, MODE_IX) { }
+    };
+
+    class locker_uncontestedS : public locker_test_uncontested {
+    public:
+        locker_uncontestedS() : locker_test_uncontested(MODE_S, MODE_IS) { }
+    };
 
     class CTM : public B {
     public:
@@ -783,8 +885,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 3000; }
         string name() { return "thread-local-storage"; }
         void timed() {
-            if( &cc() )
-                dontOptimizeOutHopefully++;
+            dontOptimizeOutHopefully++;
         }
         virtual bool showDurStats() { return false; }
     };
@@ -895,7 +996,7 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
         virtual int howLongMillis() { return 4000; }
         void prep() {
-            p = malloc(sz);
+            p = mongoMalloc(sz);
             // this isn't a fair test as it is mostly rands but we just want a rough perf check
             static int last;
             for (unsigned i = 0; i<sz; i++) {
@@ -1068,7 +1169,7 @@ namespace PerfTests {
         string name() { return "random-inserts"; }
         void prep() {
             client()->insert( ns(), BSONObj() );
-            client()->ensureIndex(ns(), BSON("x"<<1));
+            ASSERT_OK(dbtests::createIndex(txn(), ns(), BSON("x"<<1)));
         }
         void timed() {
             int x = rand();
@@ -1088,7 +1189,7 @@ namespace PerfTests {
         virtual string name() { return "random-upserts"; }
         void prep() {
             client()->insert( ns(), BSONObj() );
-            client()->ensureIndex(ns(), BSON("x"<<1));
+            ASSERT_OK(dbtests::createIndex(txn(), ns(), BSON("x"<<1)));
         }
         void timed() {
             int x = rand();
@@ -1116,8 +1217,8 @@ namespace PerfTests {
         string name() { return T::name() + "-more-indexes"; }
         void prep() {
             T::prep();
-            this->client()->ensureIndex(this->ns(), BSON("y"<<1));
-            this->client()->ensureIndex(this->ns(), BSON("z"<<1));
+            ASSERT_OK(dbtests::createIndex(this->txn(), this->ns(), BSON("y"<<1)));
+            ASSERT_OK(dbtests::createIndex(this->txn(), this->ns(), BSON("z"<<1)));
         }
     };
 
@@ -1332,7 +1433,7 @@ namespace PerfTests {
             pstatsConnect();
             cout
                 << "stats test                                       rps------  time-- "
-                << dur::stats.curr->_CSVHeader() << endl;
+                << dur::stats.curr()->_CSVHeader() << endl;
             if( profiling ) {
                 add< Insert1 >();
             }
@@ -1373,8 +1474,12 @@ namespace PerfTests {
 #endif
                 add< rlock >();
                 add< wlock >();
-                add< qlock >();
-                add< qlockw >();
+                add< glockerIX > ();
+                add< glockerIS > ();
+                add< locker_contestedX >();
+                add< locker_uncontestedX >();
+                add< locker_contestedS >();
+                add< locker_uncontestedS >();
                 add< NotifyOne >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();

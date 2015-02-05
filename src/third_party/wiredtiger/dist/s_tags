@@ -1,0 +1,53 @@
+#! /bin/sh
+
+# Build tags file.
+#
+t=__a.c
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+# Skip this when building release packages
+test -n "$WT_RELEASE_BUILD" && exit 0
+
+# We require ctags which may not be installed.
+type ctags > /dev/null 2>&1 || {
+	echo 'skipped: ctags not found' > $t
+	exit 0
+}
+
+# Test to see what flags this ctags binary supports.
+# Use the -d, -t and -w flags to ctags if available.
+flags=""
+echo "f() { int a; }" > $t
+for i in -d -t -w --language-force=C; do
+	if ctags $i $t 2>/dev/null; then
+		flags="$i $flags"
+	fi
+done
+
+# Generate a tags file for the build directory
+(cd ../build_posix
+rm -f tags
+ctags $flags ../src/include/*.in ../src/*/*.[chi] 2>/dev/null)
+
+# Put the shared tags file in the include directory, it's at the same level in
+# the tree as the other source files.
+(cd ../src/include
+rm -f tags
+ctags $flags ../include/*.in ../*/*.[chi] 2>/dev/null)
+
+# Link the tags file into place if we're at the right level.
+link_tag()
+{
+	if test -e ../include/tags; then
+		rm -f tags && ln -s ../include/tags .
+	fi
+}
+
+# Link to the tags file from standard build and source directories.
+dirs="`python -c 'import dist; dist.print_source_dirs()'` ../src/os_win"
+for i in $dirs; do
+	if expr "$i" : ".*/include" > /dev/null; then
+		continue
+	fi
+	(cd $i && link_tag)
+done

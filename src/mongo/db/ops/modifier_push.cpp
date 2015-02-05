@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/db/ops/modifier_push.h"
 
 #include <algorithm>
@@ -41,6 +43,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::abs;
+    using std::numeric_limits;
 
     namespace mb = mutablebson;
     namespace str = mongoutils::str;

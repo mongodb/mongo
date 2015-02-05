@@ -3,15 +3,43 @@
 Import("env")
 
 env.Library(
-    target='lock_mgr',
+    target='write_conflict_exception',
     source=[
-        'lock_mgr.cpp',
+        'write_conflict_exception.cpp'
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/server_parameters'
+        ]
+)
+
+env.Library(
+    target='lock_manager',
+    source=[
+        'd_concurrency.cpp',
+        'lock_manager.cpp',
+        'lock_state.cpp',
+        'lock_stats.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/third_party/shim_boost',
         '$BUILD_DIR/mongo/foundation',
-        '$BUILD_DIR/mongo/server_parameters'
+        '$BUILD_DIR/mongo/global_environment_experiment',
+        "$BUILD_DIR/mongo/server_parameters",
+        '$BUILD_DIR/mongo/spin_lock',
+        '$BUILD_DIR/third_party/shim_boost',
     ],
 )
 
+env.CppUnitTest(
+    target='lock_manager_test',
+    source=['d_concurrency_test.cpp',
+            'deadlock_detection_test.cpp',
+            'fast_map_noalloc_test.cpp',
+            'lock_manager_test.cpp',
+            'lock_state_test.cpp',
+            'lock_stats_test.cpp',
+    ],
+    LIBDEPS=[
+        'lock_manager'
+    ]
+)

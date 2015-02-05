@@ -102,9 +102,9 @@ assert.eq(1, testDB.auth('a', 'a'));
 
 // Find out the current cached secondary in the repl connection
 conn.setSlaveOk(true);
-var secHost = testColl.find().readPref('secondary').explain().server;
+var serverInfo = testColl.find().readPref('secondary').explain().serverInfo;
 var secNodeIdx = -1;
-var secPortStr = secHost.split(':')[1];
+var secPortStr = serverInfo.port.toString();
 
 for (var x = 0; x < nodeCount; x++) {
     var nodePortStr = replTest.nodes[x].host.split(':')[1];
@@ -117,7 +117,7 @@ for (var x = 0; x < nodeCount; x++) {
 assert(secNodeIdx >= 0); // test sanity check
 
 // Kill the cached secondary
-replTest.stop(secNodeIdx, 15, true, { auth: { user: 'user', pwd: 'user' }});
+replTest.stop(secNodeIdx, 15, { auth: { user: 'user', pwd: 'user' }});
 
 assert(testDB.logout().ok);
 

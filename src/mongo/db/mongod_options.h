@@ -85,4 +85,7 @@ namespace mongo {
     StatusWith<repl::ReplSettings> parseMongodReplicationOptions(const moe::Environment& params);
 
     Status storeMongodOptions(const moe::Environment& params, const std::vector<std::string>& args);
+
+    void setGlobalReplSettings(const repl::ReplSettings& settings);
+    const repl::ReplSettings& getGlobalReplSettings();
 }

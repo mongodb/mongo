@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
 
     const std::string VersionType::ConfigNS = "config.version";
@@ -41,7 +43,6 @@ namespace mongo {
     const BSONField<int> VersionType::currentVersion("currentVersion");
     const BSONField<BSONArray> VersionType::excludingMongoVersions("excluding");
     const BSONField<OID> VersionType::clusterId("clusterId");
-    const BSONField<int> VersionType::version_DEPRECATED("version");
     const BSONField<OID> VersionType::upgradeId("upgradeId");
     const BSONField<BSONObj> VersionType::upgradeState("upgradeState");
 
@@ -82,7 +83,6 @@ namespace mongo {
 
         builder.append("_id", 1);
         if (_isMinCompatibleVersionSet) {
-            builder.append(version_DEPRECATED(), _minCompatibleVersion);
             builder.append(minCompatibleVersion(), _minCompatibleVersion);
         }
         if (_isCurrentVersionSet) builder.append(currentVersion(), _currentVersion);
@@ -109,13 +109,6 @@ namespace mongo {
                                                 &_minCompatibleVersion, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isMinCompatibleVersionSet = fieldState == FieldParser::FIELD_SET;
-
-        if (!_isMinCompatibleVersionSet) {
-            fieldState = FieldParser::extractNumber(source, version_DEPRECATED,
-                                                    &_minCompatibleVersion, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID) return false;
-            _isMinCompatibleVersionSet = fieldState == FieldParser::FIELD_SET;
-        }
 
         fieldState = FieldParser::extractNumber(source, currentVersion, &_currentVersion, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;

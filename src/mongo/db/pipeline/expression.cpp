@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression.h"
 
@@ -45,6 +45,11 @@
 
 namespace mongo {
     using namespace mongoutils;
+
+    using boost::intrusive_ptr;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     /// Helper function to easily wrap constants with $const.
     static Value serializeConstant(Value val) {
@@ -1476,7 +1481,7 @@ namespace {
 
         verify(str::equals(expr.fieldName(), "$let"));
 
-        uassert(16874, "$let only supports an object as it's argument",
+        uassert(16874, "$let only supports an object as its argument",
                 expr.type() == Object);
         const BSONObj args = expr.embeddedObject();
 

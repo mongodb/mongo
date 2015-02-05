@@ -5,6 +5,7 @@ var SERVER_CERT = "jstests/libs/server.pem";
 var CN_CERT = "jstests/libs/localhostnameCN.pem"; 
 var SAN_CERT = "jstests/libs/localhostnameSAN.pem"; 
 var CLIENT_CERT = "jstests/libs/client.pem"
+var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
 // We want to be able to control all SSL parameters
 // but still need an SSL shell hence the test is placed
@@ -65,6 +66,8 @@ testCombination(SERVER_CERT, false, true, true);
 testCombination(SERVER_CERT, true, false, true);
 testCombination(SERVER_CERT, true, true, true);
 
+// BAD_SAN_CERT has SAN=BadSAN.
+testCombination(BAD_SAN_CERT, false, false, false);
 
 // 2. Initiate ReplSetTest with invalid certs
 ssl_options = {sslMode : "requireSSL",

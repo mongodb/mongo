@@ -29,20 +29,31 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
+#include <iostream>
 #include <limits>
 
 #include "mongo/base/parse_number.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
+using boost::scoped_ptr;
+using std::auto_ptr;
+using std::cout;
+using std::endl;
 using std::string;
+using std::stringstream;
+using std::vector;
 
 namespace JSTests {
 
@@ -2156,7 +2167,9 @@ namespace JSTests {
             add< RoundTripTests::MD5 >();
             add< RoundTripTests::NullString >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace JavaJSTests
 

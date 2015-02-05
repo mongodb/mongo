@@ -19,16 +19,11 @@ function memoryException( sortSpec, querySpec ) {
         t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount()
     } );
     assert( ex.toString().match( /sort/ ) );
-    assert.throws( function() {
-        t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true )
-    } );
-    assert( ex.toString().match( /sort/ ) );
 }
 
 function noMemoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
     t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount();
-    t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true );
 }
 
 // Unindexed sorts.

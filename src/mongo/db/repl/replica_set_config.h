@@ -56,8 +56,10 @@ namespace repl {
         static const std::string kVersionFieldName;
         static const std::string kMembersFieldName;
         static const std::string kSettingsFieldName;
+        static const std::string kMajorityWriteConcernModeName;
+        static const std::string kStepDownCheckWriteConcernModeName;
 
-        static const size_t kMaxMembers = 12;
+        static const size_t kMaxMembers = 50;
         static const size_t kMaxVotingMembers = 7;
         static const Seconds kDefaultHeartbeatTimeoutPeriod;
 
@@ -78,6 +80,16 @@ namespace repl {
          * Performs basic consistency checks on the replica set configuration.
          */
         Status validate() const;
+
+        /**
+         * Checks if this configuration can satisfy the given write concern.
+         *
+         * Things that are taken into consideration include:
+         * 1. If the set has enough data-bearing members.
+         * 2. If the write concern mode exists.
+         * 3. If there are enough members for the write concern mode specified.
+         */
+        Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
 
         /**
          * Gets the version of this configuration.
@@ -119,6 +131,18 @@ namespace repl {
         const MemberConfig* findMemberByID(int id) const;
 
         /**
+         * Returns a pointer to the MemberConfig corresponding to the member with the given
+         * HostAndPort in the config, or NULL if there is no member with that address.
+         */
+        const MemberConfig* findMemberByHostAndPort(const HostAndPort& hap) const;
+
+        /**
+         * Returns a MemberConfig index position corresponding to the member with the given
+         * HostAndPort in the config, or -1 if there is no member with that address.
+         */
+        const int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
+
+        /**
          * Gets the default write concern for the replica set described by this configuration.
          */
         const WriteConcernOptions& getDefaultWriteConcern() const { return _defaultWriteConcern; }
@@ -130,15 +154,23 @@ namespace repl {
         Seconds getHeartbeatTimeoutPeriod() const { return _heartbeatTimeoutPeriod; }
 
         /**
-         * Gets the number of nodes that constitutes a "majority" in this replica set,
-         * for purposes of replicating data.
+         * Gets the amount of time to wait for a response to hearbeats sent to other
+         * nodes in the replica set, as above, but returns a Milliseconds instead of
+         * Seconds object.
          */
-        int getMajorityNumber() const { return _majorityNumber; }
+        Milliseconds getHeartbeatTimeoutPeriodMillis() const {
+            return Milliseconds(_heartbeatTimeoutPeriod.total_milliseconds());
+        }
 
         /**
          * Gets the number of votes required to win an election.
          */
         int getMajorityVoteCount() const { return _majorityVoteCount; }
+
+        /**
+         * Gets the number of voters.
+         */
+        int getTotalVotingMembers() const { return _totalVotingMembers; }
 
         /**
          * Returns true if automatic (not explicitly set) chaining is allowed.
@@ -174,7 +206,13 @@ namespace repl {
          * Returns a vector of strings which are the names of the WriteConcernModes.
          * Currently used in unit tests to compare two configs.
          */
-         std::vector<std::string> getWriteConcernNames() const;
+        std::vector<std::string> getWriteConcernNames() const;
+
+        /**
+         * Returns the number of voting data-bearing members that must acknowledge a write
+         * in order to satisfy a write concern of {w: "majority"}.
+         */
+        int getWriteMajority() const { return _writeMajority; }
 
     private:
         /**
@@ -183,10 +221,14 @@ namespace repl {
         Status _parseSettingsSubdocument(const BSONObj& settings);
 
         /**
-         * Calculates and stores the majorities for replicating data (_majorityNumber) and for
-         * electing a primary (_majorityVoteCount).
+         * Calculates and stores the majority for electing a primary (_majorityVoteCount).
          */
         void _calculateMajorities();
+
+        /**
+         * Adds internal write concern modes to the getLastErrorModes list.
+         */
+        void _addInternalWriteConcernModes();
 
         bool _isInitialized;
         long long _version;
@@ -195,8 +237,9 @@ namespace repl {
         WriteConcernOptions _defaultWriteConcern;
         Seconds _heartbeatTimeoutPeriod;
         bool _chainingAllowed;
-        int _majorityNumber;
         int _majorityVoteCount;
+        int _writeMajority;
+        int _totalVotingMembers;
         ReplicaSetTagConfig _tagConfig;
         StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     };

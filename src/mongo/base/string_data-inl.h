@@ -34,10 +34,6 @@
 namespace mongo {
 
     inline int StringData::compare(const StringData& other) const {
-        // Sizes might not have been computed yet.
-        size();
-        other.size();
-
         int res = memcmp(_data, other._data, std::min(_size, other._size));
         if (res != 0) {
             return res > 0 ? 1 : -1;

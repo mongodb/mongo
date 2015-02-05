@@ -31,7 +31,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -44,20 +43,7 @@ namespace mongo {
                       bool modifiers_,
                       unsigned long long numDocsModified_,
                       unsigned long long numMatched_,
-                      const BSONObj& upsertedObject_ )
-            : existing(existing_)
-            , modifiers(modifiers_)
-            , numDocsModified(numDocsModified_)
-            , numMatched(numMatched_) {
-            MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kQuery);
-
-            BSONElement id = upsertedObject_["_id"];
-            if ( ! existing && numMatched == 1 && !id.eoo() ) {
-                upserted = id.wrap(kUpsertedFieldName);
-            }
-
-            LOG(4) << "UpdateResult -- " << toString();
-        }
+                      const BSONObj& upsertedObject_ );
 
 
         // if existing objects were modified

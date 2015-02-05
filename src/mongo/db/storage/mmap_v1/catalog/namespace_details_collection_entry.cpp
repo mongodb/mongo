@@ -37,6 +37,9 @@
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
+
+    using std::string;
+
     NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry( const StringData& ns,
                                                                                     NamespaceDetails* details,
                                                                                     RecordStore* indexRecordStore,
@@ -51,11 +54,11 @@ namespace mongo {
         return _db->getCollectionOptions( txn, ns().ns() );
     }
 
-    int NamespaceDetailsCollectionCatalogEntry::getTotalIndexCount() const {
+    int NamespaceDetailsCollectionCatalogEntry::getTotalIndexCount( OperationContext* txn ) const {
         return _details->nIndexes + _details->indexBuildsInProgress;
     }
 
-    int NamespaceDetailsCollectionCatalogEntry::getCompletedIndexCount() const {
+    int NamespaceDetailsCollectionCatalogEntry::getCompletedIndexCount( OperationContext* txn ) const {
         return _details->nIndexes;
     }
 
@@ -63,17 +66,19 @@ namespace mongo {
         return NamespaceDetails::NIndexesMax;
     }
 
-    void NamespaceDetailsCollectionCatalogEntry::getAllIndexes( std::vector<std::string>* names ) const {
+    void NamespaceDetailsCollectionCatalogEntry::getAllIndexes( OperationContext* txn,
+                                                                std::vector<std::string>* names ) const {
         NamespaceDetails::IndexIterator i = _details->ii( true );
         while ( i.more() ) {
             const IndexDetails& id = i.next();
-            const BSONObj obj = _indexRecordStore->dataFor( id.info ).toBson();
+            const BSONObj obj = _indexRecordStore->dataFor( txn, id.info.toRecordId() ).toBson();
             names->push_back( obj.getStringField("name") );
         }
     }
 
-    bool NamespaceDetailsCollectionCatalogEntry::isIndexMultikey(const StringData& idxName) const {
-        int idxNo = _findIndexNumber( idxName );
+    bool NamespaceDetailsCollectionCatalogEntry::isIndexMultikey(OperationContext* txn,
+                                                                 const StringData& idxName) const {
+        int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
         return isIndexMultikey( idxNo );
     }
@@ -86,7 +91,7 @@ namespace mongo {
                                                                     const StringData& indexName,
                                                                     bool multikey ) {
 
-        int idxNo = _findIndexNumber( indexName );
+        int idxNo = _findIndexNumber( txn, indexName );
         invariant( idxNo >= 0 );
         return setIndexIsMultikey( txn, idxNo, multikey );
     }
@@ -118,39 +123,43 @@ namespace mongo {
         return true;
     }
 
-    DiskLoc NamespaceDetailsCollectionCatalogEntry::getIndexHead( const StringData& idxName ) const {
-        int idxNo = _findIndexNumber( idxName );
+    RecordId NamespaceDetailsCollectionCatalogEntry::getIndexHead(OperationContext* txn,
+                                                                  const StringData& idxName) const {
+        int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
-        return _details->idx( idxNo ).head;
+        return _details->idx( idxNo ).head.toRecordId();
     }
 
-    BSONObj NamespaceDetailsCollectionCatalogEntry::getIndexSpec( const StringData& idxName ) const {
-        int idxNo = _findIndexNumber( idxName );
+    BSONObj NamespaceDetailsCollectionCatalogEntry::getIndexSpec( OperationContext* txn,
+                                                                  const StringData& idxName ) const {
+        int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
         const IndexDetails& id = _details->idx( idxNo );
-        return _indexRecordStore->dataFor( id.info ).toBson();
+        return _indexRecordStore->dataFor( txn, id.info.toRecordId() ).toBson();
     }
 
     void NamespaceDetailsCollectionCatalogEntry::setIndexHead( OperationContext* txn,
                                                                const StringData& idxName,
-                                                               const DiskLoc& newHead ) {
-        int idxNo = _findIndexNumber( idxName );
+                                                               const RecordId& newHead ) {
+        int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
-        *txn->recoveryUnit()->writing( &_details->idx( idxNo ).head) = newHead;
+        *txn->recoveryUnit()->writing(&_details->idx(idxNo).head) = DiskLoc::fromRecordId(newHead);
     }
 
-    bool NamespaceDetailsCollectionCatalogEntry::isIndexReady( const StringData& idxName ) const {
-        int idxNo = _findIndexNumber( idxName );
+    bool NamespaceDetailsCollectionCatalogEntry::isIndexReady( OperationContext* txn,
+                                                               const StringData& idxName ) const {
+        int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
-        return idxNo < getCompletedIndexCount();
+        return idxNo < getCompletedIndexCount( txn );
     }
 
-    int NamespaceDetailsCollectionCatalogEntry::_findIndexNumber( const StringData& idxName ) const {
+    int NamespaceDetailsCollectionCatalogEntry::_findIndexNumber( OperationContext* txn,
+                                                                  const StringData& idxName ) const {
         NamespaceDetails::IndexIterator i = _details->ii( true );
         while ( i.more() ) {
             const IndexDetails& id = i.next();
             int idxNo = i.pos() - 1;
-            const BSONObj obj = _indexRecordStore->dataFor( id.info ).toBson();
+            const BSONObj obj = _indexRecordStore->dataFor( txn, id.info.toRecordId() ).toBson();
             if ( idxName == obj.getStringField("name") )
                 return idxNo;
         }
@@ -183,14 +192,14 @@ namespace mongo {
 
     Status NamespaceDetailsCollectionCatalogEntry::removeIndex( OperationContext* txn,
                                                                 const StringData& indexName ) {
-        int idxNo = _findIndexNumber( indexName );
+        int idxNo = _findIndexNumber( txn, indexName );
         if ( idxNo < 0 )
             return Status( ErrorCodes::NamespaceNotFound, "index not found to remove" );
 
-        DiskLoc infoLocation = _details->idx( idxNo ).info;
+        RecordId infoLocation = _details->idx( idxNo ).info.toRecordId();
 
         { // sanity check
-            BSONObj info = _indexRecordStore->dataFor( infoLocation ).toBson();
+            BSONObj info = _indexRecordStore->dataFor( txn, infoLocation ).toBson();
             invariant( info["name"].String() == indexName );
         }
 
@@ -213,10 +222,10 @@ namespace mongo {
             else
                 d->nIndexes--;
 
-            for ( int i = idxNo; i < getTotalIndexCount(); i++ )
+            for ( int i = idxNo; i < getTotalIndexCount( txn ); i++ )
                 d->idx(i) = d->idx(i+1);
 
-            d->idx( getTotalIndexCount() ) = IndexDetails();
+            d->idx( getTotalIndexCount( txn ) ) = IndexDetails();
         }
 
         // remove from system.indexes
@@ -229,50 +238,46 @@ namespace mongo {
                                                                          const IndexDescriptor* desc ) {
         BSONObj spec = desc->infoObj();
         // 1) entry in system.indexs
-        StatusWith<DiskLoc> systemIndexesEntry = _indexRecordStore->insertRecord( txn,
-                                                                                  spec.objdata(),
-                                                                                  spec.objsize(),
-                                                                                  -1 );
+        StatusWith<RecordId> systemIndexesEntry = _indexRecordStore->insertRecord( txn,
+                                                                                   spec.objdata(),
+                                                                                   spec.objsize(),
+                                                                                   false );
         if ( !systemIndexesEntry.isOK() )
             return systemIndexesEntry.getStatus();
 
         // 2) NamespaceDetails mods
         IndexDetails *id;
         try {
-            id = &_details->idx(getTotalIndexCount(), true);
+            id = &_details->idx(getTotalIndexCount( txn ), true);
         }
         catch( DBException& ) {
             _details->allocExtra(txn,
                                  ns().ns(),
                                  _db->_namespaceIndex,
-                                 getTotalIndexCount());
-            id = &_details->idx(getTotalIndexCount(), false);
+                                 getTotalIndexCount( txn ));
+            id = &_details->idx(getTotalIndexCount( txn ), false);
         }
 
-        *txn->recoveryUnit()->writing( &id->info ) = systemIndexesEntry.getValue();
+        const DiskLoc infoLoc = DiskLoc::fromRecordId(systemIndexesEntry.getValue());
+        *txn->recoveryUnit()->writing( &id->info ) = infoLoc;
         *txn->recoveryUnit()->writing( &id->head ) = DiskLoc();
 
         txn->recoveryUnit()->writingInt( _details->indexBuildsInProgress ) += 1;
 
-        // 3) indexes entry in .ns file
-        NamespaceIndex& nsi = _db->_namespaceIndex;
-        invariant( nsi.details( desc->indexNamespace() ) == NULL );
-        nsi.add_ns( txn, desc->indexNamespace(), DiskLoc(), false );
-
-        // 4) system.namespaces entry index ns
-        _db->_addNamespaceToNamespaceCollection( txn, desc->indexNamespace(), NULL);
+        // 3) indexes entry in .ns file and system.namespaces
+        _db->createNamespaceForIndex(txn, desc->indexNamespace());
 
         return Status::OK();
     }
 
     void NamespaceDetailsCollectionCatalogEntry::indexBuildSuccess( OperationContext* txn,
                                                                     const StringData& indexName ) {
-        int idxNo = _findIndexNumber( indexName );
+        int idxNo = _findIndexNumber( txn, indexName );
         fassert( 17202, idxNo >= 0 );
 
         // Make sure the newly created index is relocated to nIndexes, if it isn't already there
-        if ( idxNo != getCompletedIndexCount() ) {
-            int toIdxNo = getCompletedIndexCount();
+        if ( idxNo != getCompletedIndexCount( txn ) ) {
+            int toIdxNo = getCompletedIndexCount( txn );
 
             //_details->swapIndex( txn, idxNo, toIdxNo );
 
@@ -287,24 +292,24 @@ namespace mongo {
             setIndexIsMultikey( txn, toIdxNo, tempMultikey );
 
             idxNo = toIdxNo;
-            invariant( idxNo = _findIndexNumber( indexName ) );
+            invariant( (idxNo = _findIndexNumber( txn, indexName )) );
         }
 
         txn->recoveryUnit()->writingInt( _details->indexBuildsInProgress ) -= 1;
         txn->recoveryUnit()->writingInt( _details->nIndexes ) += 1;
 
-        invariant( isIndexReady( indexName ) );
+        invariant( isIndexReady( txn, indexName ) );
     }
 
     void NamespaceDetailsCollectionCatalogEntry::updateTTLSetting( OperationContext* txn,
                                                                    const StringData& idxName,
                                                                    long long newExpireSeconds ) {
-        int idx = _findIndexNumber( idxName );
+        int idx = _findIndexNumber( txn, idxName );
         invariant( idx >= 0 );
 
         IndexDetails& indexDetails = _details->idx( idx );
 
-        BSONObj obj = _indexRecordStore->dataFor( indexDetails.info ).toBson();
+        BSONObj obj = _indexRecordStore->dataFor( txn, indexDetails.info.toRecordId() ).toBson();
         const BSONElement oldExpireSecs = obj.getField("expireAfterSeconds");
 
         // Important that we set the new value in-place.  We are writing directly to the

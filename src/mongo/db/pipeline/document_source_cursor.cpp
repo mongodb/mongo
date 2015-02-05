@@ -26,21 +26,27 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include <boost/shared_ptr.hpp>
+
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
-#include "mongo/db/query/type_explain.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/s/d_logic.h"
-#include "mongo/s/stale_exception.h" // for SendStaleConfigException
+#include "mongo/s/d_state.h"
+
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+    using boost::shared_ptr;
+    using std::string;
 
     DocumentSourceCursor::~DocumentSourceCursor() {
         dispose();
@@ -80,8 +86,8 @@ namespace mongo {
 
         // We have already validated the sharding version when we constructed the PlanExecutor
         // so we shouldn't check it again.
-        Lock::DBRead lk(pExpCtx->opCtx->lockState(), _ns);
-        Client::Context ctx(pExpCtx->opCtx, _ns, /*doVersion=*/false);
+        const NamespaceString nss(_ns);
+        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
 
         _exec->restoreState(pExpCtx->opCtx);
 
@@ -120,7 +126,7 @@ namespace mongo {
                 state != PlanExecutor::DEAD);
 
         uassert(17285, "cursor encountered an error: " + WorkingSetCommon::toStatusString(obj),
-                state != PlanExecutor::EXEC_ERROR);
+                state != PlanExecutor::FAILURE);
 
         massert(17286, str::stream() << "Unexpected return from PlanExecutor::getNext: " << state,
                 state == PlanExecutor::IS_EOF || state == PlanExecutor::ADVANCED);
@@ -151,68 +157,21 @@ namespace mongo {
         return false;
     }
 
-namespace {
-    Document extractInfo(ptr<const TypeExplain> info) {
-        MutableDocument out;
-
-        if (info->isClausesSet()) {
-            vector<Value> clauses;
-            for (size_t i = 0; i < info->sizeClauses(); i++) {
-                clauses.push_back(Value(extractInfo(info->getClausesAt(i))));
-            }
-            out[TypeExplain::clauses()] = Value::consume(clauses);
-        }
-
-        if (info->isCursorSet())
-            out[TypeExplain::cursor()] = Value(info->getCursor());
-
-        if (info->isIsMultiKeySet())
-            out[TypeExplain::isMultiKey()] = Value(info->getIsMultiKey());
-
-        if (info->isScanAndOrderSet())
-            out[TypeExplain::scanAndOrder()] = Value(info->getScanAndOrder());
-
-#if 0 // Disabled pending SERVER-12015 since until then no aggs will be index only.
-        if (info->isIndexOnlySet())
-            out[TypeExplain::indexOnly()] = Value(info->getIndexOnly());
-#endif
-
-        if (info->isIndexBoundsSet())
-            out[TypeExplain::indexBounds()] = Value(info->getIndexBounds());
-
-        if (info->isAllPlansSet()) {
-            vector<Value> allPlans;
-            for (size_t i = 0; i < info->sizeAllPlans(); i++) {
-                allPlans.push_back(Value(extractInfo(info->getAllPlansAt(i))));
-            }
-            out[TypeExplain::allPlans()] = Value::consume(allPlans);
-        }
-
-        return out.freeze();
-    }
-} // namespace
-
     Value DocumentSourceCursor::serialize(bool explain) const {
         // we never parse a documentSourceCursor, so we only serialize for explain
         if (!explain)
             return Value();
 
-        Status explainStatus(ErrorCodes::InternalError, "");
-        scoped_ptr<TypeExplain> plan;
+        // Get planner-level explain info from the underlying PlanExecutor.
+        BSONObjBuilder explainBuilder;
         {
-            Lock::DBRead lk(pExpCtx->opCtx->lockState(), _ns);
-            Client::Context ctx(pExpCtx->opCtx, _ns, /*doVersion=*/ false);
+            const NamespaceString nss(_ns);
+            AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
 
-            massert(17392, "No _exec. Were we disposed before explained?",
-                    _exec);
+            massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
             _exec->restoreState(pExpCtx->opCtx);
-
-            TypeExplain* explainRaw;
-            explainStatus = Explain::legacyExplain(_exec.get(), &explainRaw);
-            if (explainStatus.isOK())
-                plan.reset(explainRaw);
-
+            Explain::explainStages(_exec.get(), ExplainCommon::QUERY_PLANNER, &explainBuilder);
             _exec->saveState();
         }
 
@@ -228,11 +187,10 @@ namespace {
         if (!_projection.isEmpty())
             out["fields"] = Value(_projection);
 
-        if (explainStatus.isOK()) {
-            out["plan"] = Value(extractInfo(plan));
-        } else {
-            out["planError"] = Value(explainStatus.toString());
-        }
+        // Add explain results from the query system into the agg explain output.
+        BSONObj explainObj = explainBuilder.obj();
+        invariant(explainObj.hasField("queryPlanner"));
+        out["queryPlanner"] = Value(explainObj["queryPlanner"]);
 
         return Value(DOC(getSourceName() << out.freezeToValue()));
     }

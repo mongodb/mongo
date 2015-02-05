@@ -28,7 +28,11 @@
 
 // strategy_sharded.cpp
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
+
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -44,23 +48,35 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/s/bson_serializable.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cursors.h"
+#include "mongo/s/dbclient_shard_resolver.h"
+#include "mongo/s/dbclient_multi_command.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/timer.h"
 
 // error codes 8010-8040
 
 namespace mongo {
 
-    MONGO_LOG_DEFAULT_COMPONENT_FILE(::mongo::logger::LogComponent::kSharding);
+    using boost::scoped_ptr;
+    using std::endl;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     static bool _isSystemIndexes( const char* ns ) {
         return nsToCollectionSubstring(ns) == "system.indexes";
@@ -104,8 +120,8 @@ namespace mongo {
         uassert( 10200 , "mongos: error calling db", ok );
 
         {
-            QueryResult *qr = (QueryResult *) response.singleData();
-            if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
+            QueryResult::View qr = response.singleData().view2ptr();
+            if ( qr.getResultFlags() & ResultFlag_ShardConfigStale ) {
                 dbcon.done();
                 // Version is zero b/c this is deprecated codepath
                 throw RecvStaleConfigException( r.getns(),
@@ -170,7 +186,7 @@ namespace mongo {
             if ( qSpec.isExplain() ) {
                 BSONObjBuilder explain_builder;
                 cursor->explain( explain_builder );
-                explain_builder.appendNumber( "millis",
+                explain_builder.appendNumber( "executionTimeMillis",
                                               static_cast<long long>(queryTimer.millis()) );
                 BSONObj b = explain_builder.obj();
 
@@ -448,6 +464,133 @@ namespace mongo {
 
     }
 
+    Status Strategy::commandOpWrite(const std::string& dbName,
+                                    const BSONObj& command,
+                                    BatchItemRef targetingBatchItem,
+                                    std::vector<CommandResult>* results) {
+
+        // Note that this implementation will not handle targeting retries and does not completely
+        // emulate write behavior
+
+        ChunkManagerTargeter targeter;
+        Status status =
+            targeter.init(NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
+        if (!status.isOK())
+            return status;
+
+        OwnedPointerVector<ShardEndpoint> endpointsOwned;
+        vector<ShardEndpoint*>& endpoints = endpointsOwned.mutableVector();
+
+        if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
+            ShardEndpoint* endpoint;
+            Status status = targeter.targetInsert(targetingBatchItem.getDocument(), &endpoint);
+            if (!status.isOK())
+                return status;
+            endpoints.push_back(endpoint);
+        }
+        else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
+            Status status = targeter.targetUpdate(*targetingBatchItem.getUpdate(), &endpoints);
+            if (!status.isOK())
+                return status;
+        }
+        else {
+            invariant(targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete);
+            Status status = targeter.targetDelete(*targetingBatchItem.getDelete(), &endpoints);
+            if (!status.isOK())
+                return status;
+        }
+
+        DBClientShardResolver resolver;
+        DBClientMultiCommand dispatcher;
+
+        // Assemble requests
+        for (vector<ShardEndpoint*>::const_iterator it = endpoints.begin(); it != endpoints.end();
+            ++it) {
+
+            const ShardEndpoint* endpoint = *it;
+
+            ConnectionString host;
+            Status status = resolver.chooseWriteHost(endpoint->shardName, &host);
+            if (!status.isOK())
+                return status;
+
+            RawBSONSerializable request(command);
+            dispatcher.addCommand(host, dbName, request);
+        }
+
+        // Errors reported when recv'ing responses
+        dispatcher.sendAll();
+        Status dispatchStatus = Status::OK();
+
+        // Recv responses
+        while (dispatcher.numPending() > 0) {
+
+            ConnectionString host;
+            RawBSONSerializable response;
+
+            Status status = dispatcher.recvAny(&host, &response);
+            if (!status.isOK()) {
+                // We always need to recv() all the sent operations
+                dispatchStatus = status;
+                continue;
+            }
+
+            CommandResult result;
+            result.target = host;
+            result.shardTarget = Shard::make(host.toString());
+            result.result = response.toBSON();
+
+            results->push_back(result);
+        }
+
+        return dispatchStatus;
+    }
+
+    Status Strategy::commandOpUnsharded(const std::string& db,
+                                        const BSONObj& command,
+                                        int options,
+                                        const std::string& versionedNS,
+                                        CommandResult* cmdResult) {
+
+        // Note that this implementation will not handle targeting retries and fails when the
+        // sharding metadata is too stale
+
+        DBConfigPtr conf = grid.getDBConfig(db , false);
+        if (!conf) {
+            mongoutils::str::stream ss;
+            ss << "Passthrough command failed: " << command.toString()
+               << " on ns " << versionedNS << ". Cannot find db config info.";
+            return Status(ErrorCodes::IllegalOperation, ss);
+        }
+
+        if (conf->isSharded(versionedNS)) {
+            mongoutils::str::stream ss;
+            ss << "Passthrough command failed: " << command.toString()
+               << " on ns " << versionedNS << ". Cannot run on sharded namespace.";
+            return Status(ErrorCodes::IllegalOperation, ss);
+        }
+
+        Shard primaryShard = conf->getPrimary();
+
+        BSONObj shardResult;
+        try {
+            ShardConnection conn(primaryShard, "");
+            // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
+            conn->runCommand(db, command, shardResult, options);
+            conn.done();
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        // Fill out the command result.
+        cmdResult->shardTarget = primaryShard;
+        cmdResult->result = shardResult;
+        cmdResult->target = primaryShard.getAddress();
+
+        return Status::OK();
+    }
+
     void Strategy::getMore( Request& r ) {
 
         Timer getMoreTimer;
@@ -497,7 +640,7 @@ namespace mongo {
             bool ok = conn->callRead( r.m() , response);
             uassert( 10204 , "dbgrid: getmore: error calling db", ok);
 
-            bool hasMore = (response.singleData()->getCursor() != 0);
+            bool hasMore = (response.singleData().getCursor() != 0);
 
             if ( !hasMore ) {
                 cursorCache.removeRef( id );

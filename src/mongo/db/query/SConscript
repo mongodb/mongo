@@ -16,13 +16,16 @@ env.Library(
         "planner_ixselect.cpp",
         "query_knobs.cpp",
         "query_planner.cpp",
+        "query_planner_common.cpp",
         "query_solution.cpp",
     ],
     LIBDEPS=[
+        "explain_common",
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions",
+        "$BUILD_DIR/mongo/expressions_text",
         "$BUILD_DIR/mongo/index_names",
         "$BUILD_DIR/mongo/server_parameters",
     ],
@@ -32,13 +35,13 @@ env.Library(
     target='query',
     source=[
         "explain.cpp",
-        "explain_plan.cpp",
         "get_executor.cpp",
-        "new_find.cpp",
+        "find.cpp",
         "plan_executor.cpp",
         "plan_ranker.cpp",
+        "plan_yield_policy.cpp",
+        "query_yield.cpp",
         "stage_builder.cpp",
-        "type_explain.cpp",
     ],
     LIBDEPS=[
         "query_planner",
@@ -78,6 +81,16 @@ env.Library(
         "$BUILD_DIR/mongo/index_names",
         "$BUILD_DIR/mongo/mongohasher",
         "$BUILD_DIR/mongo/server_parameters",
+    ],
+)
+
+env.Library(
+    target="explain_common",
+    source=[
+        "explain_common.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson",
     ],
 )
 
@@ -188,6 +201,16 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_planner_test_lib",
+    ],
+)
+
+env.CppUnitTest(
+    target="planner_analysis_test",
+    source=[
+        "planner_analysis_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
     ],
 )
 

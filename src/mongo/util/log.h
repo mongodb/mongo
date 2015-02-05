@@ -27,7 +27,21 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+// #pragma once is not used in this header.
+// This header attempts to enforce the rule that no logging should be done in
+// an inline function defined in a header.
+// To enforce this "no logging in header" rule, we use #include guards with a validating #else
+// clause.
+// Also, this header relies on a preprocessor macro to determine the default component for the
+// unconditional logging functions severe(), error(), warning() and log(). Disallowing multiple
+// inclusion of log.h will ensure that the default component will be set correctly.
+
+#if defined(MONGO_UTIL_LOG_H_)
+#error "mongo/util/log.h cannot be included multiple times. " \
+       "This may occur when log.h is included in a header. " \
+       "Please check your #include's."
+#else  // MONGO_UTIL_LOG_H_
+#define MONGO_UTIL_LOG_H_
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -37,6 +51,16 @@
 #include "mongo/logger/tee.h"
 #include "mongo/util/concurrency/thread_name.h"
 
+// Provide log component in global scope so that MONGO_LOG will always have a valid component.
+// Global log component will be kDefault unless overridden by MONGO_LOG_DEFAULT_COMPONENT.
+#if defined(MONGO_LOG_DEFAULT_COMPONENT)
+const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
+    MONGO_LOG_DEFAULT_COMPONENT;
+#else
+#error "mongo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
+       "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
+#endif  // MONGO_LOG_DEFAULT_COMPONENT
+
 namespace mongo {
 
 namespace logger {
@@ -44,6 +68,8 @@ namespace logger {
     Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
 
 }  // namespace logger
+
+namespace {
 
     using logger::LogstreamBuilder;
     using logger::LabeledLevel;
@@ -55,7 +81,15 @@ namespace logger {
     inline LogstreamBuilder severe() {
         return LogstreamBuilder(logger::globalLogDomain(),
                                 getThreadName(),
-                                logger::LogSeverity::Severe());
+                                logger::LogSeverity::Severe(),
+                                ::MongoLogDefaultComponent_component);
+    }
+
+    inline LogstreamBuilder severe(logger::LogComponent component) {
+        return LogstreamBuilder(logger::globalLogDomain(),
+                                getThreadName(),
+                                logger::LogSeverity::Severe(),
+                                component);
     }
 
     /**
@@ -64,7 +98,15 @@ namespace logger {
     inline LogstreamBuilder error() {
         return LogstreamBuilder(logger::globalLogDomain(),
                                 getThreadName(),
-                                logger::LogSeverity::Error());
+                                logger::LogSeverity::Error(),
+                                ::MongoLogDefaultComponent_component);
+    }
+
+    inline LogstreamBuilder error(logger::LogComponent component) {
+        return LogstreamBuilder(logger::globalLogDomain(),
+                                getThreadName(),
+                                logger::LogSeverity::Error(),
+                                component);
     }
 
     /**
@@ -73,7 +115,15 @@ namespace logger {
     inline LogstreamBuilder warning() {
         return LogstreamBuilder(logger::globalLogDomain(),
                                 getThreadName(),
-                                logger::LogSeverity::Warning());
+                                logger::LogSeverity::Warning(),
+                                ::MongoLogDefaultComponent_component);
+    }
+
+    inline LogstreamBuilder warning(logger::LogComponent component) {
+        return LogstreamBuilder(logger::globalLogDomain(),
+                                getThreadName(),
+                                logger::LogSeverity::Warning(),
+                                component);
     }
 
     /**
@@ -82,28 +132,51 @@ namespace logger {
     inline LogstreamBuilder log() {
         return LogstreamBuilder(logger::globalLogDomain(),
                                 getThreadName(),
-                                logger::LogSeverity::Log());
+                                logger::LogSeverity::Log(),
+                                ::MongoLogDefaultComponent_component);
     }
 
+    inline LogstreamBuilder log(logger::LogComponent component) {
+        return LogstreamBuilder(logger::globalLogDomain(),
+                                getThreadName(),
+                                logger::LogSeverity::Log(),
+                                component);
+    }
+
+    inline LogstreamBuilder log(logger::LogComponent::Value componentValue) {
+        return LogstreamBuilder(logger::globalLogDomain(),
+                                getThreadName(),
+                                logger::LogSeverity::Log(),
+                                componentValue);
+    }
+
+    /**
+     * Runs the same logic as log()/warning()/error(), without actually outputting a stream.
+     */
+    inline bool shouldLog(logger::LogSeverity severity) {
+        return logger::globalLogDomain()->shouldLog(::MongoLogDefaultComponent_component, severity);
+    }
+
+}  // namespace
 
 // MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.
 #define MONGO_LOG(DLEVEL) \
     if (!(::mongo::logger::globalLogDomain())->shouldLog(MongoLogDefaultComponent_component, ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), MongoLogDefaultComponent_component)
+    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), MongoLogDefaultComponent_component)
 
 #define LOG MONGO_LOG
 
 #define MONGO_LOG_COMPONENT(DLEVEL, COMPONENT1) \
     if (!(::mongo::logger::globalLogDomain())->shouldLog((COMPONENT1), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
+    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
 
 #define MONGO_LOG_COMPONENT2(DLEVEL, COMPONENT1, COMPONENT2) \
     if (!(::mongo::logger::globalLogDomain())->shouldLog((COMPONENT1), (COMPONENT2), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
+    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
 
 #define MONGO_LOG_COMPONENT3(DLEVEL, COMPONENT1, COMPONENT2, COMPONENT3) \
     if (!(::mongo::logger::globalLogDomain())->shouldLog((COMPONENT1), (COMPONENT2), (COMPONENT3), ::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
+    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL), (COMPONENT1))
 
     /**
      * Rotates the log files.  Returns true if all logs rotate successfully.
@@ -123,13 +196,6 @@ namespace logger {
         */
     std::string errnoWithPrefix( const char * prefix );
 
-    // Guard that alters the indentation level used by log messages on the current thread.
-    // Used only by mongodump (mongo/tools/dump.cpp).  Do not introduce new uses.
-    struct LogIndentLevel {
-        LogIndentLevel();
-        ~LogIndentLevel();
-    };
-
     extern Tee* const warnings; // Things put here go in serverStatus
     extern Tee* const startupWarningsLog; // Things put here get reported in MMS
 
@@ -142,23 +208,4 @@ namespace logger {
 
 } // namespace mongo
 
-/**
- * Defines default log component for MONGO_LOG.
- * Use this macro inside an implementation namespace or code block where debug messages
- * are logged using MONGO_LOG().
- *
- * Note: Do not use more than once inside any namespace/code block.
- *       Using static function instead of enum to support use inside function code block.
- */
-#define MONGO_LOG_DEFAULT_COMPONENT_FILE(COMPONENT) \
-    static const ::mongo::logger::LogComponent MongoLogDefaultComponent_component = (COMPONENT);
-
-/**
- * MONGO_LOG_DEFAULT_COMPONENT for local code block.
- */
-#define MONGO_LOG_DEFAULT_COMPONENT_LOCAL(COMPONENT) \
-    const ::mongo::logger::LogComponent MongoLogDefaultComponent_component = (COMPONENT);
-
-// Provide log component in global scope so that MONGO_LOG will always have a valid component.
-const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
-    ::mongo::logger::LogComponent::kDefault;
+#endif  // MONGO_UTIL_LOG_H_

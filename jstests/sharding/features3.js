@@ -44,7 +44,6 @@ assert.eq(numDocs, x.count, "total count");
 assert.eq(numDocs / 2, x.shards.shard0000.count, "count on shard0000");
 assert.eq(numDocs / 2, x.shards.shard0001.count, "count on shard0001");
 assert(x.totalIndexSize > 0);
-assert(x.numExtents > 0);
 
 // insert one doc into a non-sharded collection
 db.bar.insert({x: 1});
@@ -52,8 +51,6 @@ var x = db.bar.stats();
 assert.eq(1, x.count, "XXX1");
 assert.eq("test.bar", x.ns, "XXX2");
 assert(!x.sharded, "XXX3: " + tojson(x));
-
-if (0) {// SERVER-14143
 
 // fork shell and start querying the data
 var start = new Date();
@@ -140,8 +137,6 @@ join();
 var end = new Date();
 print("elapsed: " + (end.getTime() - start.getTime()));
 
-}
-
 // test fsync command on non-admin db
 x = db.runCommand("fsync");
 assert(!x.ok , "fsync on non-admin namespace should fail : " + tojson(x));
@@ -150,33 +145,13 @@ assert(x.code == 13,
 
 // test fsync on admin db
 x = db._adminCommand("fsync");
-assert(x.ok == 1 && x.numFiles > 0, "fsync failed: " + tojson(x));
+assert(x.ok == 1, "fsync failed: " + tojson(x));
+if ( x.all.shard0000 > 0 ) {
+    assert(x.numFiles > 0, "fsync failed: " + tojson(x));
+}
 
 // test fsync+lock on admin db
 x = db._adminCommand({"fsync" :1, lock:true});
 assert(!x.ok, "lock should fail: " + tojson(x));
-
-// write back stuff
-// SERVER-4194
-
-function countWritebacks(curop) {
-    print("---------------");
-    var num = 0;
-    for (var i = 0; i < curop.inprog.length; i++) {
-        var q = curop.inprog[i].query;
-        if (q && q.writebacklisten) {
-            printjson(curop.inprog[i]);
-            num++;
-        }
-    }
-    return num;
-}
-
-x = db.currentOp();
-assert.eq(0, countWritebacks(x), "without all");
-
-x = db.currentOp(true);
-y = countWritebacks(x);
-assert(y == 1 || y == 2, "with all: " + y);
 
 s.stop()

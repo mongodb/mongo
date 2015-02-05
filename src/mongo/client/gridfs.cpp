@@ -27,14 +27,14 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/gridfs.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/smart_ptr.hpp>
 #include <fcntl.h>
 #include <fstream>
+#include <iostream>
 #include <utility>
 
 #if defined(_WIN32)
@@ -49,6 +49,14 @@
 
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::ios;
+    using std::ofstream;
+    using std::ostream;
+    using std::string;
 
     const unsigned DEFAULT_CHUNK_SIZE = 255 * 1024;
 

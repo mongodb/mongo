@@ -9,8 +9,8 @@ src.drop();
 dst.drop();
 
 // Insert a date that we can format
-var formatable = ISODate("1970-01-01T05:00:00Z");
-assert.eq(formatable.valueOf(), 18000000);
+var formatable = ISODate("1970-01-02T05:00:00Z");
+assert.eq(formatable.valueOf(), 104400000);
 src.insert({ "_id" : formatable });
 
 // Insert a date that we cannot format as an ISODate string

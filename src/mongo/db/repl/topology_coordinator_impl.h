@@ -28,17 +28,15 @@
 
 #pragma once
 
-#include <limits>
 #include <string>
 #include <vector>
 
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/util/concurrency/list.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -50,246 +48,349 @@ namespace repl {
     /**
      * Represents a latency measurement for each replica set member based on heartbeat requests.
      * The measurement is an average weighted 80% to the old value, and 20% to the new value.
+     *
+     * Also stores information about heartbeat progress and retries.
      */
     class PingStats {
     public:
-        PingStats() : count(0), value(std::numeric_limits<int>::max()) {}
+        PingStats();
 
-        void hit(int millis) {
-            ++count;
-            value = value == 0 ? millis :
-                                 static_cast<unsigned long>((value * .8) + (millis * .2));
-        }
+        /**
+         * Records that a new heartbeat request started at "now".
+         *
+         * This resets the failure count used in determining whether the next request to a target
+         * should be a retry or a regularly scheduled heartbeat message.
+         */
+        void start(Date_t now);
 
-        unsigned int getCount() {
-            return count;
-        }
+        /**
+         * Records that a heartbeat request completed successfully, and that "millis" milliseconds
+         * were spent for a single network roundtrip plus remote processing time.
+         */
+        void hit(int millis);
 
-        unsigned int getMillis() {
-            return value;
-        }
+        /**
+         * Records that a heartbeat request failed.
+         */
+        void miss();
+
+        /**
+         * Gets the number of hit() calls.
+         */
+        unsigned int getCount() const { return count; }
+
+        /**
+         * Gets the weighted average round trip time for heartbeat messages to the target.
+         */
+        unsigned int getMillis() const { return value; }
+
+        /**
+         * Gets the date at which start() was last called, which is used to determine if
+         * a heartbeat should be retried or if the time limit has expired.
+         */
+        Date_t getLastHeartbeatStartDate() const { return _lastHeartbeatStartDate; }
+
+        /**
+         * Gets the number of failures since start() was last called.
+         *
+         * This value is incremented by calls to miss(), cleared by calls to start() and
+         * set to the maximum possible value by calls to hit().
+         */
+        int getNumFailuresSinceLastStart() const { return _numFailuresSinceLastStart; }
+
     private:
         unsigned int count;
         unsigned int value;
+        Date_t _lastHeartbeatStartDate;
+        int _numFailuresSinceLastStart;
     };
-
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
     public:
-        explicit TopologyCoordinatorImpl(int maxSyncSourceLagSecs);
+        /**
+         * Constructs a Topology Coordinator object.
+         * @param maxSyncSourceLagSecs a sync source is re-evaluated after it lags behind further
+         *                             than this amount.
+         **/
+        TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
 
-        virtual void setLastApplied(const OpTime& optime);
-        virtual void setCommitOkayThrough(const OpTime& optime);
-        virtual void setLastReceived(const OpTime& optime);
-        virtual void setForceSyncSourceIndex(int index);
+        ////////////////////////////////////////////////////////////
+        //
+        // Implementation of TopologyCoordinator interface
+        //
+        ////////////////////////////////////////////////////////////
 
-        // Looks up syncSource's address and returns it, for use by the Applier
+        virtual Role getRole() const;
+        virtual MemberState getMemberState() const;
         virtual HostAndPort getSyncSourceAddress() const;
-        // Chooses and sets a new sync source, based on our current knowledge of the world
-        virtual void chooseNewSyncSource(Date_t now);
-        // Does not choose a member as a sync source until time given; 
-        // call this when we have reason to believe it's a bad choice
+        virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
+        virtual int getMaintenanceCount() const;
+        virtual void setForceSyncSourceIndex(int index);
+        virtual HostAndPort chooseNewSyncSource(Date_t now, 
+                                                const OpTime& lastOpApplied);
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
-
-        // Adds function pointer to callback list; calls function when config changes
-        // Applier needs to know when things like chainingAllowed or slaveDelay change. 
-        // ReplCoord needs to know when things like the tag sets change.
-        virtual void registerConfigChangeCallback(const ConfigChangeCallbackFn& fn);
-        // ReplCoord needs to know the state to implement certain public functions
-        virtual void registerStateChangeCallback(const StateChangeCallbackFn& fn);
-        
-        // Applier calls this to notify that it's now safe to transition from SECONDARY to PRIMARY
-        virtual void signalDrainComplete();
-
-        // produces a reply to a RAFT-style RequestVote RPC
-        virtual void prepareRequestVoteResponse(const Date_t now,
-                                                const BSONObj& cmdObj,
-                                                std::string& errmsg, 
-                                                BSONObjBuilder& result);
-
-        // produces a reply to a received electCmd
-        virtual void prepareElectCmdResponse(const Date_t now,
-                                             const BSONObj& cmdObj,
-                                             BSONObjBuilder& result);
-
-        // produces a reply to a heartbeat
-        virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
-                                              Date_t now,
-                                              const ReplSetHeartbeatArgs& args,
-                                              const std::string& ourSetName,
-                                              ReplSetHeartbeatResponse* response,
-                                              Status* result);
-
-        // updates internal state with heartbeat response
-        HeartbeatResultAction updateHeartbeatData(Date_t now,
-                                                  const MemberHeartbeatData& newInfo,
-                                                  int id);
-
-        // produces a reply to a status request
+        virtual void clearSyncSourceBlacklist();
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const;
+        virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
+        virtual void setElectionSleepUntil(Date_t newTime);
+        virtual void setFollowerMode(MemberState::MS newMode);
+        virtual void adjustMaintenanceCountBy(int inc);
+        virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
+                                             const HostAndPort& target,
+                                             const OpTime& lastOpApplied,
+                                             BSONObjBuilder* response,
+                                             Status* result);
+        virtual void prepareFreshResponse(const ReplicationCoordinator::ReplSetFreshArgs& args,
+                                          Date_t now,
+                                          OpTime lastOpApplied,
+                                          BSONObjBuilder* response,
+                                          Status* result);
+        virtual void prepareElectResponse(const ReplicationCoordinator::ReplSetElectArgs& args,
+                                          Date_t now,
+                                          OpTime lastOpApplied,
+                                          BSONObjBuilder* response,
+                                          Status* result);
+        virtual Status prepareHeartbeatResponse(Date_t now,
+                                                const ReplSetHeartbeatArgs& args,
+                                                const std::string& ourSetName,
+                                                const OpTime& lastOpApplied,
+                                                ReplSetHeartbeatResponse* response);
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
                                            unsigned uptime,
+                                           const OpTime& lastOpApplied,
                                            BSONObjBuilder* response,
                                            Status* result);
-
-        // produces a reply to a freeze request
-        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
-                                           Date_t now,
-                                           int secs,
-                                           BSONObjBuilder* response,
-                                           Status* result);
-
-        // transitions PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
-        virtual void relinquishPrimary(OperationContext* txn);
-
-        // updates internal config with new config (already validated)
-        virtual void updateConfig(const ReplicationExecutor::CallbackData& cbData,
-                                  const ReplicaSetConfig& newConfig,
+        virtual void fillIsMasterForReplSet(IsMasterResponse* response);
+        virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response);
+        virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
-                                  Date_t now);
+                                  Date_t now,
+                                  OpTime lastOpApplied);
+        virtual std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
+                Date_t now,
+                const std::string& ourSetName,
+                const HostAndPort& target);
+        virtual HeartbeatResponseAction processHeartbeatResponse(
+                Date_t now,
+                Milliseconds networkRoundTripTime,
+                const HostAndPort& target,
+                const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
+                OpTime myLastOpApplied);
+        virtual bool voteForMyself(Date_t now);
+        virtual void processWinElection(OID electionId, OpTime electionOpTime);
+        virtual void processLoseElection();
+        virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied);
+        virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
+        virtual bool stepDown(Date_t until, bool force, OpTime lastOpApplied);
+        virtual bool stepDownIfPending();
+        virtual Date_t getStepDownTime() const;
 
-        // Record a ping in millis based on the round-trip time of the heartbeat for the member
-        virtual void recordPing(const HostAndPort& host, const int elapsedMillis);
+        ////////////////////////////////////////////////////////////
+        //
+        // Test support methods
+        //
+        ////////////////////////////////////////////////////////////
+
+        // Changes _memberState to newMemberState.  Only for testing.
+        void changeMemberState_forTest(const MemberState& newMemberState,
+                                       OpTime electionTime = OpTime(0,0));
+
+        // Sets "_electionTime" to "newElectionTime".  Only for testing.
+        void _setElectionTime(const OpTime& newElectionTime);
+
+        // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
+        // TODO(spencer): Remove this once we can easily call for an election in unit tests to
+        // set the current primary.
+        void _setCurrentPrimaryForTest(int primaryIndex);
+
+        // Returns _electionTime.  Only used in unittests.
+        OpTime getElectionTime() const;
+
+        // Returns _electionId.  Only used in unittests.
+        OID getElectionId() const;
+
+        // Returns _currentPrimaryIndex.  Only used in unittests.
+        int getCurrentPrimaryIndex() const;
 
     private:
 
+        enum UnelectableReason {
+            None = 0,
+            CannotSeeMajority = 1 << 0,
+            NotCloseEnoughToLatestOptime = 1 << 1,
+            ArbiterIAm = 1 << 2,
+            NotSecondary = 1 << 3,
+            NoPriority = 1 << 4,
+            StepDownPeriodActive = 1 << 5,
+            NoData = 1 << 6,
+            NotInitialized = 1 << 7,
+            VotedTooRecently = 1 << 8,
+            RefusesToStand = 1 << 9
+        };
+        typedef int UnelectableReasonMask;
+
         // Returns the number of heartbeat pings which have occurred.
-        virtual int _getTotalPings();
+        int _getTotalPings();
 
         // Returns the current "ping" value for the given member by their address
-        virtual int _getPing(const HostAndPort& host);
+        int _getPing(const HostAndPort& host);
 
-        // Determines if we will veto the member in the "fresh" command response
+        // Determines if we will veto the member specified by "args.id", given that the last op
+        // we have applied locally is "lastOpApplied".
         // If we veto, the errmsg will be filled in with a reason
-        bool _shouldVeto(const BSONObj& cmdObj, string& errmsg) const;
+        bool _shouldVetoMember(const ReplicationCoordinator::ReplSetFreshArgs& args,
+                               const Date_t& now,
+                               const OpTime& lastOpApplied,
+                               std::string* errmsg) const;
 
         // Returns the index of the member with the matching id, or -1 if none match.
-        int _getMemberIndex(int id) const; 
-
-        // Logic to determine if we should step down as primary
-        bool _shouldRelinquish() const;
+        int _getMemberIndex(int id) const;
 
         // Sees if a majority number of votes are held by members who are currently "up"
         bool _aMajoritySeemsToBeUp() const;
 
-        // Returns the total number of votes in the current config
-        int _totalVotes() const;
+        // Is otherOpTime close enough (within 10 seconds) to the latest known optime to qualify
+        // for an election
+        bool _isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime,
+                                                 const OpTime& ourLastOpApplied) const;
 
-        // Scans through all members that are 'up' and return the latest known optime
-        OpTime _latestKnownOpTime() const;
+        // Returns reason why "self" member is unelectable
+        UnelectableReasonMask _getMyUnelectableReason(
+                const Date_t now,
+                const OpTime lastOpApplied) const;
 
-        // Begins election proceedings
-        void _electSelf(Date_t now);
+        // Returns reason why memberIndex is unelectable
+        UnelectableReasonMask _getUnelectableReason(
+                int memberIndex,
+                const OpTime& lastOpApplied) const;
+
+        // Returns the nice text of why the node is unelectable
+        std::string _getUnelectableReasonString(UnelectableReasonMask ur) const;
+
+        // Return true if we are currently primary
+        bool _iAmPrimary() const;
+
+        // Scans through all members that are 'up' and return the latest known optime.
+        OpTime _latestKnownOpTime(OpTime ourLastOpApplied) const;
 
         // Scans the electable set and returns the highest priority member index
-        int _getHighestPriorityElectableIndex() const;
+        int _getHighestPriorityElectableIndex(Date_t now, OpTime lastOpApplied) const;
 
-        // Changes _memberState to newMemberState, then calls all registered callbacks
-        // for state changes.
-        void _changeMemberState(const MemberState& newMemberState);
+        // Returns true if "one" member is higher priority than "two" member
+        bool _isMemberHigherPriority(int memberOneIndex, int memberTwoIndex) const;
 
-        OpTime _lastApplied;  // the last op that the applier has actually written to the data
-        OpTime _commitOkayThrough; // the primary's latest op that won't get rolled back
-        OpTime _lastReceived; // the last op we have received from our sync source
+        // Helper shortcut to self config
+        const MemberConfig& _selfConfig() const;
 
-        // Our current state (PRIMARY, SECONDARY, etc)
-        MemberState _memberState;
-        
+        // Returns NULL if there is no primary, or the MemberConfig* for the current primary
+        const MemberConfig* _currentPrimaryMember() const;
+
+        /**
+         * Performs updating "_hbdata" and "_currentPrimaryIndex" for processHeartbeatResponse().
+         */
+        HeartbeatResponseAction _updateHeartbeatDataImpl(
+                int updatedConfigIndex,
+                const MemberState& originalState,
+                Date_t now,
+                const OpTime& lastOpApplied);
+
+        /**
+         * Updates _hbdata based on the newConfig, ensuring that every member in the newConfig
+         * has an entry in _hbdata.  If any nodes in the newConfig are also present in
+         * _currentConfig, copies their heartbeat info into the corresponding entry in the updated
+         * _hbdata vector.
+         */
+        void _updateHeartbeatDataForReconfig(const ReplicaSetConfig& newConfig,
+                                             int selfIndex,
+                                             Date_t now);
+
+        void _stepDownSelfAndReplaceWith(int newPrimary);
+
+        MemberState _getMyState() const;
+
+        /**
+         * Looks up the provided member in the blacklist and returns true if the member's blacklist
+         * expire time is after 'now'.  If the member is found but the expire time is before 'now',
+         * the member is removed from _syncSourceBlacklist and the function returns false.
+         * If the member is not found in the blacklist, the function simply returns false.
+         **/
+        bool _memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now);
+
+        // This node's role in the replication protocol.
+        Role _role;
+
         // This is a unique id that is generated and set each time we transition to PRIMARY, as the
         // result of an election.
         OID _electionId;
-        // PRIMARY server's time when the election to primary occurred
+        // The time at which the current PRIMARY was elected.
         OpTime _electionTime;
 
-        // set of electable members' _ids
-        // For implementation of priorities
-        std::set<unsigned int> _electableSet;
-
-        // the member we currently believe is primary, if one exists
+        // the index of the member we currently believe is primary, if one exists, otherwise -1
         int _currentPrimaryIndex;
-        // the member we are currently syncing from
-        // NULL if no sync source (we are primary, or we cannot connect to anyone yet)
-        int _syncSourceIndex; 
+
+        // the hostandport we are currently syncing from
+        // empty if no sync source (we are primary, or we cannot connect to anyone yet)
+        HostAndPort _syncSource;
         // These members are not chosen as sync sources for a period of time, due to connection
         // issues with them
         std::map<HostAndPort, Date_t> _syncSourceBlacklist;
         // The next sync source to be chosen, requested via a replSetSyncFrom command
         int _forceSyncSourceIndex;
         // How far this node must fall behind before considering switching sync sources
-        int _maxSyncSourceLagSecs;
-
-        // insanity follows
+        Seconds _maxSyncSourceLagSecs;
 
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"
-        char _hbmsg[256]; // we change this unlocked, thus not a std::string
+        std::string _hbmsg;
         Date_t _hbmsgTime; // when it was logged
-        void _sethbmsg(const std::string& s, int logLevel = 0);
-        // heartbeat msg to send to others; descriptive diagnostic info
-        std::string _getHbmsg() const {
-            if ( time(0)-_hbmsgTime > 120 ) return "";
-            return _hbmsg;
-        }
 
-        // Flag to prevent re-entering election code
-        bool _busyWithElectSelf;
+        // heartbeat msg to send to others; descriptive diagnostic info
+        std::string _getHbmsg(Date_t now) const;
 
         int _selfIndex; // this node's index in _members and _currentConfig
-        const MemberConfig& _selfConfig();  // Helper shortcut to self config
 
-        ReplicaSetConfig _currentConfig; // The current config, including a vector of MemberConfigs
-        std::vector<MemberHeartbeatData> _hbdata; // heartbeat data for each member
+        ReplicaSetConfig _rsConfig; // The current config, including a vector of MemberConfigs
+
+        // heartbeat data for each member.  It is guaranteed that this vector will be maintained
+        // in the same order as the MemberConfigs in _currentConfig, therefore the member config
+        // index can be used to index into this vector as well.
+        std::vector<MemberHeartbeatData> _hbdata;
+
+        // Indicates that we've received a request to stepdown from PRIMARY (likely via a heartbeat)
+        bool _stepDownPending;
 
         // Time when stepDown command expires
         Date_t _stepDownUntil;
 
-        // Block syncing -- in case we fail auth when heartbeating other nodes
-        bool _blockSync;
+        // A time before which this node will not stand for election.
+        Date_t _electionSleepUntil;
 
         // The number of calls we have had to enter maintenance mode
         int _maintenanceModeCalls;
 
-
-        // Functions to call when a reconfig is finished.  We pass the new config object.
-        std::vector<ConfigChangeCallbackFn> _configChangeCallbacks;
-
-        // Functions to call when a state change happens.  We pass the new state.
-        std::vector<StateChangeCallbackFn> _stateChangeCallbacks;
+        // The sub-mode of follower that we are in.  Legal values are RS_SECONDARY, RS_RECOVERING,
+        // RS_STARTUP2 (initial sync) and RS_ROLLBACK.  Only meaningful if _role == Role::follower.
+        // Configured via setFollowerMode().  If the sub-mode is RS_SECONDARY, then the effective
+        // sub-mode is either RS_SECONDARY or RS_RECOVERING, depending on _maintenanceModeCalls.
+        // Rather than accesing this variable direclty, one should use the getMemberState() method,
+        // which computes the replica set node state on the fly.
+        MemberState::MS _followerMode;
 
         typedef std::map<HostAndPort, PingStats> PingMap;
         // Ping stats for each member by HostAndPort;
         PingMap _pings;
 
-        // do these need settors?  the current code has no way to change these values.
-        struct HeartbeatOptions {
-        HeartbeatOptions() :  heartbeatSleepMillis(2000), 
-                heartbeatTimeoutMillis(10000),
-                heartbeatConnRetries(2) 
-            { }
-            
-            unsigned heartbeatSleepMillis;
-            unsigned heartbeatTimeoutMillis;
-            unsigned heartbeatConnRetries ;
-
-            void check() {
-                uassert(17490, "bad replset heartbeat option", heartbeatSleepMillis >= 10);
-                uassert(17491, "bad replset heartbeat option", heartbeatTimeoutMillis >= 10);
-            }
-
-            bool operator==(const HeartbeatOptions& r) const {
-                return (heartbeatSleepMillis==r.heartbeatSleepMillis && 
-                        heartbeatTimeoutMillis==r.heartbeatTimeoutMillis &&
-                        heartbeatConnRetries==r.heartbeatConnRetries);
-            }
-        } _heartbeatOptions;
-
         // Last vote info from the election
         struct LastVote {
-            LastVote() : when(0), who(0xffffffff) { }
-            Date_t when;
-            unsigned who;
-        } _lastVote;
 
+            static const Seconds leaseTime;
+
+            LastVote() : when(0), whoId(-1) { }
+            Date_t when;
+            int whoId;
+            HostAndPort whoHostAndPort;
+        } _lastVote;
 
     };
 

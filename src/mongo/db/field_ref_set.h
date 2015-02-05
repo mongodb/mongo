@@ -29,6 +29,7 @@
 #pragma once
 
 #include <set>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -38,9 +39,14 @@
 namespace mongo {
 
     /**
-     * A FieldRefSet holds a set of FieldRefs's that do not conflict with one another, that is,
-     * they target different subtrees of a given document. Two fieldRef's would conflict if they
-     * are equal or one is prefix of the other.
+     * A FieldRefSet holds a number of unique FieldRefs - a set of dotted paths into a document.
+     *
+     * The FieldRefSet provides helpful functions for efficiently finding conflicts between field
+     * ref paths - field ref paths conflict if they are equal to each other or if one is a prefix.
+     * To maintain a FieldRefSet of non-conflicting paths, always use the insert method which
+     * returns conflicting FieldRefs.
+     *
+     * FieldRefSets do not own the FieldRef paths they contain.
      */
     class FieldRefSet {
         MONGO_DISALLOW_COPYING(FieldRefSet);
@@ -57,6 +63,8 @@ namespace mongo {
 
         FieldRefSet();
 
+        FieldRefSet(const std::vector<FieldRef*>& paths);
+
         /** Returns 'true' if the set is empty */
         bool empty() const {
             return _fieldSet.empty();
@@ -68,6 +76,15 @@ namespace mongo {
 
         inline const_iterator end() const {
             return _fieldSet.end();
+        }
+
+        /**
+         * Returns true if the path does not already exist in the set, false otherwise.
+         *
+         * Note that *no* conflict resolution occurs - any path can be inserted into a set.
+         */
+        inline bool insert(const FieldRef* path) {
+            return _fieldSet.insert(path).second;
         }
 
         /**
@@ -83,6 +100,8 @@ namespace mongo {
 
         /**
          * Fills the set with the supplied FieldRef*s
+         *
+         * Note that *no* conflict resolution occurs here.
          */
         void fillFrom(const std::vector<FieldRef*>& fields);
 

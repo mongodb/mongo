@@ -30,9 +30,11 @@
 
 #pragma once
 
-#include "mongo/db/repl/connections.h"
+#include <boost/shared_ptr.hpp>
+#include <list>
+
+#include "mongo/db/jsobj.h"
 #include "mongo/util/background.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -61,32 +63,20 @@ namespace repl {
 
     private:
         std::string name() const { return "MultiCommandJob"; }
-        void run() {
-            MONGO_LOG_DEFAULT_COMPONENT_LOCAL(::mongo::logger::LogComponent::kReplication);
-
-            try {
-                ScopedConn c(d.toHost);
-                LOG(1) << "multiCommand running on host " << d.toHost;
-                d.ok = c.runCommand("admin", cmd, d.result);
-                LOG(1) << "multiCommand response: " << d.result;
-            }
-            catch (const DBException& e) {
-                LOG(1) << "dev caught " << e.what() << " on multiCommand to " << d.toHost;
-            }
-        }
+        void run();
     };
 
     inline void multiCommand(BSONObj cmd, std::list<Target>& L) {
-        std::list< shared_ptr<BackgroundJob> > jobs;
+        std::list< boost::shared_ptr<BackgroundJob> > jobs;
 
         for( std::list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
             Target& d = *i;
             _MultiCommandJob *j = new _MultiCommandJob(cmd, d);
-            jobs.push_back( shared_ptr<BackgroundJob>(j) );
+            jobs.push_back( boost::shared_ptr<BackgroundJob>(j) );
             j->go();
         }
 
-        for( std::list< shared_ptr<BackgroundJob> >::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
+        for( std::list< boost::shared_ptr<BackgroundJob> >::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
             (*i)->wait();
         }
     }

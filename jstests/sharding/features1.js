@@ -60,17 +60,17 @@ assert.eq( 5 , b.foo.getIndexKeys().length , "c index 3" );
 
 db.foo2.ensureIndex( { a : 1 } );
 s.sync();
-printjson( db.system.indexes.find( { ns : "test.foo2" } ).toArray() );
+printjson( db.foo2.getIndexes() );
 assert( s.admin.runCommand( { shardcollection : "test.foo2" , key : { num : 1 } } ).ok , "shard with index" );
 
 db.foo3.ensureIndex( { a : 1 } , true );
 s.sync();
-printjson( db.system.indexes.find( { ns : "test.foo3" } ).toArray() );
+printjson( db.foo3.getIndexes() );
 assert( ! s.admin.runCommand( { shardcollection : "test.foo3" , key : { num : 1 } } ).ok , "shard with unique index" );
 
 db.foo7.ensureIndex( { num : 1 , a : 1 } , true );
 s.sync();
-printjson( db.system.indexes.find( { ns : "test.foo7" } ).toArray() );
+printjson( db.foo7.getIndexes() );
 assert( s.admin.runCommand( { shardcollection : "test.foo7" , key : { num : 1 } } ).ok , "shard with ok unique index" );
 
 
@@ -142,7 +142,8 @@ assert( db.foo4a.isCapped() , "ca8" );
 
 db.createCollection("foo5", {capped:true, size:30000});
 assert( db.foo5.isCapped() , "cb1" );
-assert( ! s.admin.runCommand( { shardcollection : "test.foo5" , key : { num : 1 } } ).ok , "shard capped" );
+var res = s.admin.runCommand( { shardcollection : "test.foo5" , key : { num : 1 } } );
+assert( !res.ok , "shard capped: " + tojson( res ) );
 
 
 // ----- group ----
@@ -152,7 +153,7 @@ db.foo6.save( { a : 3 } );
 db.foo6.save( { a : 3 } );
 db.foo6.ensureIndex( { a : 1 } );
 s.sync();
-printjson( db.system.indexes.find( { ns : "test.foo6" } ).toArray() );
+printjson( db.foo6.getIndexes() );
 
 assert.eq( 2 , db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , 
                                 reduce : function(z,prev){ prev.count++; } } ).length );
@@ -193,7 +194,7 @@ assert( ! s.admin.runCommand( { shardcollection : "test.foo9" , key : { a : 1 } 
 
 r = db.getMongo().getDBs()
 assert.eq( 3 , r.databases.length , "listDatabases 1 : " + tojson( r ) )
-assert.lt( 10000 , r.totalSize , "listDatabases 2 : " + tojson( r ) );
+assert.eq( "number", typeof(r.totalSize) , "listDatabases 2 : " + tojson( r ) );
 
 s.stop()
 

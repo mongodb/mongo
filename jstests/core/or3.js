@@ -1,6 +1,9 @@
 t = db.jstests_or3;
 t.drop();
 
+// Include helpers for analyzing explain output.
+load("jstests/libs/analyze_plan.js");
+
 checkArrs = function( a, b, m ) {
     assert.eq( a.length, b.length, m );
     aStr = [];
@@ -37,7 +40,8 @@ doTest = function( index ) {
     checkArrs( [ { _id:6, x:1, a:2, b:1 } ], an1bn2 );
     checkArrs( t.find( { x:1, a:{$ne:1}, b:{$ne:2} } ).toArray(), an1bn2 );
     if ( index ) {
-        assert( t.find( { x:1, $nor: [ { a : 1 }, { b : 2 } ] } ).explain().cursor.match( /Btree/ ) );
+        var explain = t.find( { x:1, $nor: [ { a : 1 }, { b : 2 } ] } ).explain();
+        assert( isIxscan(explain.queryPlanner.winningPlan) );
     }
     
     an1b2 = t.find( { $nor: [ { a : 1 } ], $or: [ { b : 2 } ] } ).toArray();

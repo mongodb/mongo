@@ -32,6 +32,7 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
     using std::string;
 
     const BSONField<string> BatchedRequestMetadata::shardName("shardName");

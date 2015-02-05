@@ -37,6 +37,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+
     StatusWithMatchExpression expressionParserTextCallbackReal( const BSONObj& queryObj ) {
         // Validate queryObj, but defer construction of FTSQuery (which requires access to the
         // target namespace) until stage building time.

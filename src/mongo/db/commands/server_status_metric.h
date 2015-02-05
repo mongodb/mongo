@@ -52,7 +52,7 @@ namespace mongo {
         virtual void appendAtLeaf( BSONObjBuilder& b ) const = 0;
 
     protected:
-        static string _parseLeafName( const std::string& name );
+        static std::string _parseLeafName( const std::string& name );
 
         const std::string _name;
         const std::string _leafName;
