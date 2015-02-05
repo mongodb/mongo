@@ -80,6 +80,10 @@ namespace mongo {
                     continue;
                 else
                     return r;
+            case 's':
+                // Single-line mode specified. This just changes the behavior of the '.'
+                // character to match every character instead of every character except '\n'.
+                continue;
             case 'x': // extended
                 extended = true;
                 break;
