@@ -40,6 +40,7 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
     tablename = 'test_txn08'
     uri = 'table:' + tablename
+    nkeys = 5
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
@@ -60,6 +61,22 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         self.session2 = conn.open_session()
         return conn
 
+    def walk_log(self, match):
+	cursor = self.session.open_cursor("log:", None);
+        count = 0
+	while cursor.next() == 0:
+            # lsn.file, lsn.offset, opcount
+            keys = cursor.get_key()
+            # txnid, rectype, optype, fileid, logrec_key, logrec_value
+            values = cursor.get_value()
+            try:
+                if match in str(values[5]):   # logrec_value
+                    count += 1
+            except:
+                pass
+        cursor.close()
+        self.assertEqual(count, self.nkeys)
+
     def test_printlog_unicode(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         create_params = 'key_format=i,value_format=S'
@@ -71,7 +88,7 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         value = u'\u0001\u0002abcd\u0003\u0004'
 
         self.session.begin_transaction()
-        for k in range(5):
+        for k in range(self.nkeys):
             c.set_key(k)
             c.set_value(value)
             c.insert()
@@ -84,6 +101,11 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['printlog'], outfilename='printlog.out')
         self.check_file_contains('printlog.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')
+
+        #
+        # Check the log for these values via a log cursor
+        #
+        self.walk_log(value)
 
 if __name__ == '__main__':
     wttest.run()
