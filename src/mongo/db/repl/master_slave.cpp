@@ -286,11 +286,9 @@ namespace mongo {
             ReplSource tmp(obj);
             if ( tmp.syncedTo.isNull() ) {
                 DBDirectClient c;
-                if ( c.exists( "local.oplog.$main" ) ) {
-                    BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
-                    if ( !op.isEmpty() ) {
-                        tmp.syncedTo = op[ "ts" ].date();
-                    }
+                BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
+                if ( !op.isEmpty() ) {
+                    tmp.syncedTo = op[ "ts" ].date();
                 }
             }
             addSourceToList(v, tmp, old);

@@ -937,6 +937,14 @@ namespace mongo {
          */
         list<string> getCollectionNames( const string& db );
 
+        /**
+         * { name : "<short collection name>",
+         *   options : { }
+         * }
+         */
+        std::list<BSONObj> getCollectionInfos( const std::string& db,
+                                               const BSONObj& filter = BSONObj() );
+
         bool exists( const string& ns );
 
         /** Create an index if it does not already exist.

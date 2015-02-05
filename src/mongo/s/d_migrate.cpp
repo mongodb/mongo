@@ -1637,16 +1637,20 @@ namespace mongo {
                 Collection* collection = db->getCollection( ns );
 
                 if ( !collection ) {
-                    string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
-                    BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
-                    if ( entry["options"].isABSONObj() ) {
-                        string errmsg;
-                        if ( ! userCreateNS( ns.c_str(), entry["options"].Obj(), errmsg, true, 0 ) )
-                            warning() << "failed to create collection with options: " << errmsg
-                                      << endl;
+                    list<BSONObj> infos =
+                        conn->getCollectionInfos(nsToDatabase(ns),
+                                                 BSON("name" << nsToCollectionSubstring(ns)));
+
+                    BSONObj options;
+                    if (infos.size() > 0) {
+                        BSONObj entry = infos.front();
+                        if (entry["options"].isABSONObj()) {
+                            options = entry["options"].Obj();
+                        }
                     }
-                    else {
-                        db->createCollection( ns );
+                    if ( ! userCreateNS( ns.c_str(), options, errmsg, true, 0 ) ) {
+                        warning() << "failed to create collection [" << ns << "] "
+                                  << " with options " << options << ": " << errmsg;
                     }
                 }
             }

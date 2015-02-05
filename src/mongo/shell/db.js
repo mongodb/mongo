@@ -277,6 +277,7 @@ DB.prototype.help = function() {
     print("\tdb.fsyncLock() flush data to disk and lock server for backups");
     print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
+    print("\tdb.getCollectionInfos()");
     print("\tdb.getCollectionNames()");
     print("\tdb.getLastError() - just returns the err msg string");
     print("\tdb.getLastErrorObj() - return full status object");
@@ -547,22 +548,71 @@ DB.prototype.getPrevError = function(){
     return this.runCommand( { getpreverror : 1 } );
 }
 
-DB.prototype.getCollectionNames = function(){
+DB.prototype._getCollectionInfosSystemNamespaces = function(){
     var all = [];
 
     var nsLength = this._name.length + 1;
     
     var c = this.getCollection( "system.namespaces" ).find();
     while ( c.hasNext() ){
-        var name = c.next().name;
+        var infoObj = c.next();
         
-        if ( name.indexOf( "$" ) >= 0 && name.indexOf( ".oplog.$" ) < 0 )
+        if ( infoObj.name.indexOf( "$" ) >= 0 && infoObj.name.indexOf( ".oplog.$" ) < 0 )
             continue;
         
-        all.push( name.substring( nsLength ) );
+        infoObj.name = infoObj.name.substring( nsLength );
+
+        all.push( infoObj );
     }
     
-    return all.sort();
+    // Return list of objects sorted by collection name.
+    return all.sort(function(coll1, coll2) { return coll1.name.localeCompare(coll2.name); });
+}
+
+
+DB.prototype._getCollectionInfosCommand = function() {
+    try {
+        var res = this.runCommand( "listCollections" );
+    }
+    catch (e) {
+        // command doesn't exist, very old mongod
+        return null;
+    }
+
+    if ( res.code == 59 ) {
+        // command doesn't exist, old mongod
+        return null;
+    }
+
+    if ( !res.ok ) {
+        if ( res.errmsg && res.errmsg.startsWith( "no such cmd" ) ) {
+            return null;
+        }
+
+        throw Error( "listCollections failed: " + tojson( res ) );
+    }
+
+    // The listCollections command returns its results sorted by collection name.  There's no need
+    // to re-sort.
+    return new DBCommandCursor(this._mongo, res).toArray();
+}
+
+/**
+ * Returns this database's list of collection metadata objects, sorted by collection name.
+ */
+DB.prototype.getCollectionInfos = function() {
+    var res = this._getCollectionInfosCommand();
+    if ( res ) {
+        return res;
+    }
+    return this._getCollectionInfosSystemNamespaces();
+}
+
+/**
+ * Returns this database's list of collection names in sorted order.
+ */
+DB.prototype.getCollectionNames = function() {
+    return this.getCollectionInfos().map(function(infoObj) { return infoObj.name; });
 }
 
 DB.prototype.tojson = function(){

@@ -316,14 +316,22 @@ namespace mongo {
                                 bool mayYield, bool mayBeInterrupted, bool copyIndexes,
                                 bool logForRepl) {
 
+        const NamespaceString nss(ns);
+        const string dbname = nss.db().toString();
+
         Client::WriteContext ctx(ns);
 
         // config
-        string temp = ctx.ctx().db()->name() + ".system.namespaces";
-        BSONObj config = _conn->findOne(temp , BSON("name" << ns));
-        if (config["options"].isABSONObj())
-            if (!userCreateNS(ns.c_str(), config["options"].Obj(), errmsg, logForRepl, 0))
-                return false;
+        BSONObj filter = BSON("name" << nss.coll().toString());
+        list<BSONObj> collList = _conn->getCollectionInfos( dbname, filter);
+        if (!collList.empty()) {
+            invariant(collList.size() <= 1);
+            BSONObj col = collList.front();
+            if (col["options"].isABSONObj()) {
+                if (!userCreateNS(ns.c_str(), col["options"].Obj(), errmsg, logForRepl, 0))
+                    return false;
+            }
+        }
 
         // main data
         copy(ctx.ctx(),
@@ -336,7 +344,7 @@ namespace mongo {
         }
 
         // indexes
-        temp = ctx.ctx().db()->name() + ".system.indexes";
+        std::string temp = ctx.ctx().db()->name() + ".system.indexes";
         copy(ctx.ctx(), temp.c_str(), temp.c_str(), true, logForRepl, false, true, mayYield,
              mayBeInterrupted, BSON( "ns" << ns ));
 
@@ -388,8 +396,6 @@ namespace mongo {
             }
         }
 
-        string systemNamespacesNS = opts.fromDB + ".system.namespaces";
-
         list<BSONObj> toClone;
         if ( clonedColls ) clonedColls->clear();
         if ( opts.syncData ) {
@@ -399,24 +405,10 @@ namespace mongo {
             mayInterrupt( opts.mayBeInterrupted );
             dbtempreleaseif r( opts.mayYield );
 
-            // just using exhaust for collection copying right now
+            list<BSONObj> raw = _conn->getCollectionInfos( opts.fromDB );
+            for ( list<BSONObj>::iterator it = raw.begin(); it != raw.end(); ++it ) {
+                BSONObj collection = *it;
 
-            // todo: if snapshot (bool param to this func) is true, we need to snapshot this query?
-            //       only would be relevant if a thousands of collections -- maybe even then it is hard
-            //       to exceed a single cursor batch.
-            //       for repl it is probably ok as we apply oplog section after the clone (i.e. repl
-            //       doesnt not use snapshot=true).
-            auto_ptr<DBClientCursor> cursor = _conn->query(systemNamespacesNS, BSONObj(), 0, 0, 0,
-                                                      opts.slaveOk ? QueryOption_SlaveOk : 0);
-
-            if (!validateQueryResults(cursor, errCode, errmsg)) {
-                errmsg = str::stream() << "index query on ns " << systemNamespacesNS
-                                       << " failed: " << errmsg;
-                return false;
-            }
-
-            while ( cursor->more() ) {
-                BSONObj collection = cursor->next();
 
                 LOG(2) << "\t cloner got " << collection << endl;
 
@@ -437,30 +429,34 @@ namespace mongo {
                 }
                 verify( !e.eoo() );
                 verify( e.type() == String );
-                const char *from_name = e.valuestr();
 
-                if( strstr(from_name, ".system.") ) {
+                const NamespaceString ns(opts.fromDB, e.valuestr());
+
+                if( ns.isSystem() ) {
                     /* system.users and s.js is cloned -- but nothing else from system.
                      * system.indexes is handled specially at the end*/
-                    if( legalClientSystemNS( from_name , true ) == 0 ) {
+                    if( legalClientSystemNS( ns.ns() , true ) == 0 ) {
                         LOG(2) << "\t\t not cloning because system collection" << endl;
                         continue;
                     }
                 }
-                if( ! NamespaceString::normal( from_name ) ) {
+                if( !ns.isNormal() ) {
                     LOG(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }
 
-                if( opts.collsToIgnore.find( string( from_name ) ) != opts.collsToIgnore.end() ){
-                    LOG(2) << "\t\t ignoring collection " << from_name << endl;
+                if( opts.collsToIgnore.find( ns.ns() ) != opts.collsToIgnore.end() ){
+                    LOG(2) << "\t\t ignoring collection " << ns << endl;
                     continue;
                 }
                 else {
-                    LOG(2) << "\t\t not ignoring collection " << from_name << endl;
+                    LOG(2) << "\t\t not ignoring collection " << ns << endl;
                 }
 
-                if ( clonedColls ) clonedColls->insert( from_name );
+                if (clonedColls) {
+                    clonedColls->insert(ns.ns());
+                }
+
                 toClone.push_back( collection.getOwned() );
             }
         }
@@ -472,14 +468,10 @@ namespace mongo {
             }
             BSONObj collection = *i;
             LOG(2) << "  really will clone: " << collection << endl;
-            const char * from_name = collection["name"].valuestr();
             BSONObj options = collection.getObjectField("options");
 
-            /* change name "<fromdb>.collection" -> <todb>.collection */
-            const char *p = strchr(from_name, '.');
-            verify(p);
-            string to_name = todb + p;
-
+            string to_name = todb + "." + collection["name"].valuestr();
+            string from_name = opts.fromDB + "." + collection["name"].valuestr();
             {
                 string err;
                 const char *toname = to_name.c_str();
@@ -496,8 +488,8 @@ namespace mongo {
             Query q;
             if( opts.snapshot )
                 q.snapshot();
-            copy(context,from_name, to_name.c_str(), false, opts.logForRepl, masterSameProcess,
-                 opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, q);
+            copy(context, from_name.c_str(), to_name.c_str(), false, opts.logForRepl, 
+                 masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, q);
 
             {
                 /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
