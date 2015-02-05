@@ -24,7 +24,7 @@ var $config = (function() {
         multiUpdate: { multiUpdate: 1.0 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         assertAlways.commandWorked(db[collName].ensureIndex({a: 1}));
         assertAlways.commandWorked(db[collName].ensureIndex({b: 1}));
         assertAlways.commandWorked(db[collName].ensureIndex({c: 1}));
@@ -37,7 +37,7 @@ var $config = (function() {
     // Asserts that the number of index entries for all three entries matches the number of docs
     // in the collection. This condition should always be true for non-multikey indices. If it is
     // not true, then the index has been corrupted.
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         assertWhenOwnColl(function() {
             var numIndexKeys = db[collName].find({}, {_id: 0, a: 1}).hint({a: 1}).itcount();
             var numDocs = db[collName].find().itcount();
