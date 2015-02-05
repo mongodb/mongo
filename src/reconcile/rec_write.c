@@ -202,8 +202,9 @@ typedef struct {
 	 * because we've already been forced to split.
 	 */
 	enum {	SPLIT_BOUNDARY=0,	/* Next: a split page boundary */
-		SPLIT_TRACKING_OFF=1,	/* No boundary checks */
-		SPLIT_TRACKING_RAW=2 }	/* Underlying compression decides */
+		SPLIT_MAX=1,		/* Next: the maximum page boundary */
+		SPLIT_TRACKING_OFF=2,	/* No boundary checks */
+		SPLIT_TRACKING_RAW=3 }	/* Underlying compression decides */
 	bnd_state;
 
 	/*
@@ -1924,7 +1925,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 	WT_BOUNDARY *last, *next;
 	WT_BTREE *btree;
 	WT_PAGE_HEADER *dsk;
-	size_t len;
+	size_t inuse;
 
 	btree = S2BT(session);
 	dsk = r->dsk.mem;
@@ -1941,10 +1942,16 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 	/* Hitting a page boundary resets the dictionary, in all cases. */
 	__rec_dictionary_reset(r);
 
+	inuse = WT_PTRDIFF32(r->first_free, dsk);
 	switch (r->bnd_state) {
 	case SPLIT_BOUNDARY:
-		/* We can get here if the first key/value pair won't fit. */
-		if (r->entries == 0)
+		/*
+		 * We can get here if the first key/value pair won't fit.
+		 * Additionally, grow the buffer to contain the current item if
+		 * we haven't already consumed a reasonable portion of a split
+		 * chunk.
+		 */
+		if (inuse < r->split_size / 2)
 			break;
 
 		/*
@@ -1980,21 +1987,28 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		 * have one.  If we don't have room for another split chunk,
 		 * add whatever space remains in this page.
 		 */
-		len = WT_PTRDIFF32(r->first_free, dsk);
-		if (len + r->split_size <= r->page_size)
+		if (inuse + r->split_size <= r->page_size)
 			r->space_avail =
 			    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 		else {
 			WT_ASSERT(session, r->page_size >=
-			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + len));
+			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + inuse));
 			r->space_avail = r->page_size -
-			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
+			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + inuse);
+
+			/* There are no further boundary points. */
+			r->bnd_state = SPLIT_MAX;
 		}
 
-		/* If the next object fits into this page, we're good to go. */
+		/*
+		 * Return if the next object fits into this page, else we have
+		 * to split the page.
+		 */
 		if (r->space_avail >= next_len)
 			return (0);
 
+		/* FALLTHROUGH */
+	case SPLIT_MAX:
 		/*
 		 * We're going to have to split and create multiple pages.
 		 *
@@ -2004,16 +2018,18 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		 * any unwritten chunk of data to the beginning of the buffer.
 		 */
 		WT_RET(__rec_split_fixup(session, r));
+
+		/* We're done saving split chunks. */
+		r->bnd_state = SPLIT_TRACKING_OFF;
 		break;
 	case SPLIT_TRACKING_OFF:
 		/*
 		 * We can get here if the first key/value pair won't fit.
-		 * Additionally, grow the buffer to contain the current data if
-		 * we haven't already consumed a reasonable portion of the page.
+		 * Additionally, grow the buffer to contain the current item if
+		 * we haven't already consumed a reasonable portion of a split
+		 * chunk.
 		 */
-		if (r->entries == 0)
-			break;
-		if (WT_PTRDIFF(r->first_free, dsk) < r->page_size / 2)
+		if (inuse < r->split_size / 2)
 			break;
 
 		/*
@@ -2073,9 +2089,6 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 	 */
 	if (r->space_avail < next_len)
 		WT_RET(__rec_split_grow(session, r, next_len));
-
-	/* We're done saving split chunks. */
-	r->bnd_state = SPLIT_TRACKING_OFF;
 
 	return (0);
 }
@@ -2542,6 +2555,7 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	/* Adjust the boundary information based on our split status. */
 	switch (r->bnd_state) {
 	case SPLIT_BOUNDARY:
+	case SPLIT_MAX:
 		/*
 		 * We never split, the reconciled page fit into a maximum page
 		 * size.  Change the first boundary slot to represent the full
