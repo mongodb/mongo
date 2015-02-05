@@ -413,8 +413,11 @@ def check_db_hashes(master, slave):
                 stats["error-docs"] = e;
 
             screwy_in_slave[coll] = stats
-            if mhash == "no _id _index":
-                mOplog = mTestDB.connection.local["oplog.$main"];
+            if mhash == "no _id_ index":
+                oplog = "oplog.$main"
+                if small_oplog_rs:
+                    oplog = "oplog.rs"
+                mOplog = mTestDB.connection.local[oplog];
                 oplog_entries = list(mOplog.find({"$or": [{"ns":mTestDB[coll].full_name}, \
                                                           {"op":"c"}]}).sort("$natural", 1))
                 print "oplog for %s" % mTestDB[coll].full_name
@@ -439,7 +442,9 @@ def skipTest(path):
     parentDir = os.path.basename(parentPath)
     if small_oplog or small_oplog_rs: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js", "dropdb_race.js", 
-                        "connections_opened.js", "opcounters_write_cmd.js", "dbadmin.js"]:
+                        "connections_opened.js", "opcounters_write_cmd.js", "dbadmin.js",
+                        ## Capped tests
+                        "capped_max1.js", "capped_convertToCapped1.js", "rename.js"]:
             return True
     if use_ssl:
         # Skip tests using mongobridge since it does not support SSL
@@ -847,8 +852,7 @@ at the end of testing:""" % (src, dst)
     missing(lost_in_slave, "master", "slave")
     missing(lost_in_master, "slave", "master")
     if screwy_in_slave:
-        print """The following collections has different hashes in master and slave
-at the end of testing:"""
+        print """The following collections have different hashes in the master and slave:"""
         for coll in screwy_in_slave.keys():
             stats = screwy_in_slave[coll]
             # Counts are "approx" because they are collected after the dbhash runs and may not
@@ -856,8 +860,8 @@ at the end of testing:"""
             # possibility is that a test exited with writes still in-flight.
             print "collection: %s\t (master/slave) hashes: %s/%s counts (approx): %i/%i" % (coll, stats['hashes']['master'], stats['hashes']['slave'], stats['counts']['master'], stats['counts']['slave'])
             if "docs" in stats:
-                if (("master" in stats["docs"] and len(stats["docs"]["master"]) != 0) or
-                    ("slave" in stats["docs"] and len(stats["docs"]["slave"]) != 0)):
+                if (("master" in stats["docs"] and len(stats["docs"]["master"]) == 0) and
+                    ("slave" in stats["docs"] and len(stats["docs"]["slave"]) == 0)):
                     print "All docs matched!"
                 else:
                     print "Different Docs"
