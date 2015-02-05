@@ -184,6 +184,13 @@ namespace {
 
             Database* const db = autoDb.getDb();
 
+            if (!db) {
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::NamespaceNotFound,
+                                                  str::stream() << "source database "
+                                                  << dbname << " does not exist"));
+            }
+
             Status status = cloneCollectionAsCapped(txn, db, from, to, size, temp, true);
             return appendCommandStatus( result, status );
         }
