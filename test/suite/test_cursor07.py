@@ -83,8 +83,6 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
 
         if self.reopen:
             self.reopen_conn()
-        else:
-            self.KNOWN_FAILURE("log cursor without reopening connection")
 
         # Check for these values via a log cursor
 	c = self.session.open_cursor("log:", None)
