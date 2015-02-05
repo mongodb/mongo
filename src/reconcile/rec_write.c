@@ -2008,7 +2008,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		 */
 		if (r->entries == 0)
 			break;
-		if (WT_PTRDIFF(r->first_free, r->dsk.mem) < r->page_size / 2)
+		if (WT_PTRDIFF(r->first_free, dsk) < r->page_size / 2)
 			break;
 
 		/*
