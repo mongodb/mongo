@@ -1997,15 +1997,16 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 
 		/*
 		 * Set the space available to another split-size chunk, if we
-		 * have one.  If we don't have room for another split chunk,
-		 * add whatever space remains in this page.
+		 * have one.  If we don't have room for another split chunk
+		 * or we have exactly enough space for a split chunk
+		 * add whatever space remains in this page and avoid creating
+		 * another split boundary before fixing up.
 		 */
 		len = WT_PTRDIFF32(r->first_free, dsk);
-		if (len + r->split_size <= r->page_size) {
+		if (len + r->split_size < r->page_size)
 			r->space_avail =
 			    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
-			return (0);
-		} else {
+		else {
 			r->bnd_state = SPLIT_MAX;
 			WT_ASSERT(session, r->page_size >=
 			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + len));
@@ -2024,7 +2025,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		 *
 		 * Cycle through the saved split-point information, writing the
 		 * split chunks we have tracked.  The underlying fixup function
-		 * sets the space available and other information, and copied
+		 * sets the space available and other information, and copies
 		 * any unwritten chunk of data to the beginning of the buffer.
 		 */
 		WT_RET(__rec_split_fixup(session, r));
