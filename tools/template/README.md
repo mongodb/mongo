@@ -35,17 +35,17 @@ When you open the generated html file (by default, this is called `wtstats.html`
 
 ##### Toggling statistics
 
-To look at specific statistics, open the respective section by clicking on the section heading or the little arrow on the right. For example, click on the word "connection" in the sidebar to reveal the _connection_ stats. Click on any of the stats to toggle them on or off. You should see the stats graph appear in the main window. To toggle the entire group on or off, you can click on the circle next to the group heading. To look at one specific isolated statistic, you can shift-click on the stat. This will disable all but the chosen stat. Shift-clicking it again will return to the previous selection.
+To look at specific statistics, open the respective section by clicking on the section heading or the little arrow on the right. For example, click on the word "connection" in the sidebar to reveal the _connection_ stats. Inside a group, click on any of the contained stats to toggle them on or off. You should see the stats graph appear in the main window. To toggle the entire group on or off, you can click on the circle next to the group heading. To look at one specific isolated statistic, you can shift-click on the stat. This will disable all but the chosen stat. Shift-clicking it again will return to the previous selection.
 
 ##### Filtering statistics
 
-Depending on your WiredTiger settings, you may have gathered a large number of stats. Use the search bar above the stats groups to filter stats on keywords. For example, typing `mem` into the search bar will show all stats that have the word "mem" in them. Press the "Clear" button to clear the filter again.
+Depending on your WiredTiger settings, you may have gathered a large number of stats. Use the search bar above the stats groups to filter stats on keywords. For example, typing `mem` into the search bar will show all stats that have the substring "mem" in them. Press the "Clear" button to clear the filter again.
 
 ##### Navigating the View
 
 Once some stats are showing in the main view panel, use the mouse to hover over the graphs. A cross-hair will appear highlighting the data point closest to the mouse cursor and showing the stat name and value (y-axis). A small gray label below the x-axis will additionally show the exact x-axis value for the current data point.
 
-You can zoom into the graph via various mouse/trackpad gestures: 
+You can zoom into the graph via various mouse/trackpad gestures (some of which may not be supported by your input device):
 
 - use the scroll wheel (mouse)
 - use two-finger vertical scroll (touchpad)
@@ -67,9 +67,9 @@ The x-axis button switches between relative and absolute time, with the default 
 
 In "relative time" mode, every individual stat is assumed to start at time 0, and the x-axis displays the duration in seconds that have passed since the start. A useful use case for relative mode is when you record multiple stat files of the same data workload in succession, and want to compare them against each other. Relative mode will show the stat files overlapping, despite them being recorded at different times.
 
-Absolute time plots the stats at their exact recording times. The x-axis shows date and time of the occurrences. If stat files were recorded at different times, they will appear in the graph at different intervals on the x-axis. This mode is most useful to correlate events in wtstats with other data sources, for example system profiling or monitoring data.
+Absolute time plots the stats at their exact recording times. The x-axis shows date and time of the events. If stat files are recorded at different times, they appear in the graph at different intervals on the x-axis. This mode is most useful to correlate events in wtstats with other data sources, for example system profiling or monitoring data, based on their timestamp.
 
-The y-axis button toggles between linear and logarithmic scaling mode, the default is linear. Linear mode is most useful if the visible stats have similar value ranges. However, if you compare stats of different magnitudes, for example "bytes in cache" vs. "files open", you can switch to "log-scale" mode to avoid having one graph dominate the entire range. The same is true for outliers in a single graph: if they dominate the scale, switch to log mode for better scaling. 
+The y-axis button toggles between linear and logarithmic scaling mode, the default is linear. Linear mode is most useful if the visible stats have similar value ranges. However, if you compare stats of different magnitudes, for example "bytes in cache" vs. "files open", you can switch to "log-scale" mode to avoid having one graph dominate the entire range. The same is true for outliers in a single graph: if the outlier dominates the range, switch to log mode for better scaling. 
 
 
 ##### Display on Tablets and Phones
