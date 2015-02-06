@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -515,36 +514,27 @@ namespace {
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
+            // accept and ignore handshakes sent from old (3.0-series) nodes without erroring to
+            // enable mixed-version operation, since we no longer use the handshakes
             if (cmdObj.hasField("handshake")) {
-                // we have received a handshake, not an update message
-                // handshakes are done here to ensure the receiving end supports the update command
-
-                HandshakeArgs handshake;
-                status = handshake.initialize(cmdObj["handshake"].embeddedObject());
-                if (!status.isOK())
-                    return appendCommandStatus(result, status);
-
-                if (!handshake.hasMemberId()) {
-                    return appendCommandStatus(
-                            result,
-                            Status(ErrorCodes::NoSuchKey,
-                                   "replSetUpdatePosition handshake was missing 'member' field"));
-                }
-
-                return appendCommandStatus(
-                        result,
-                        getGlobalReplicationCoordinator()->processHandshake(txn, handshake));
+                return true;
             }
-
+            
             UpdatePositionArgs args;
             status = args.initialize(cmdObj);
             if (!status.isOK())
                 return appendCommandStatus(result, status);
-            
-            return appendCommandStatus(
-                    result,
-                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(args));
-                    
+
+            // in the case of an update from a member with an invalid replica set config,
+            // we return our current config version
+            long long configVersion = -1;
+            status = getGlobalReplicationCoordinator()->
+                processReplSetUpdatePosition(args, &configVersion);
+
+            if (status == ErrorCodes::InvalidReplicaSetConfig) {
+                result.append("configVersion", configVersion);
+            }
+            return appendCommandStatus(result, status);
         }
     } cmdReplSetUpdatePosition;
 

@@ -82,13 +82,6 @@ namespace repl {
         virtual void initiateOplog(OperationContext* txn) = 0;
 
         /**
-         * Simple wrapper around SyncSourceFeedback::forwardSlaveHandshake.  Signals to the
-         * SyncSourceFeedback thread that it needs to wake up and send a replication handshake
-         * upstream.
-         */
-        virtual void forwardSlaveHandshake() = 0;
-
-        /**
          * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the
          * SyncSourceFeedback thread that it needs to wake up and send a replSetUpdatePosition
          * command upstream.

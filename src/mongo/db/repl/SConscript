@@ -173,6 +173,7 @@ env.Library('replmocks',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/concurrency/lock_manager',
                 'repl_coordinator_interface',
+                'replica_set_messages',
                 'replication_executor',
             ])
 

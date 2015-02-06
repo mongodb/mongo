@@ -182,10 +182,7 @@ namespace {
         invariant(targetIndex >= 0);
 
         SlaveInfo& slaveInfo = _slaveInfo[targetIndex];
-        if (optime > slaveInfo.opTime && slaveInfo.rid.isSet()) {
-            // TODO(spencer): The second part of the above if-statement can be removed after 3.0
-            // but for now, to maintain compatibility with 2.6, we can't record optimes for any
-            // nodes we haven't heard from via replSetUpdatePosition yet to associate an RID.
+        if (optime > slaveInfo.opTime) {
             _updateSlaveInfoOptime_inlock(&slaveInfo, optime);
         }
     }

@@ -113,10 +113,6 @@ namespace {
         logOpInitiate(txn, BSON("msg" << "initiating set"));
     }
 
-    void ReplicationCoordinatorExternalStateImpl::forwardSlaveHandshake() {
-        _syncSourceFeedback.forwardSlaveHandshake();
-    }
-
     void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
         _syncSourceFeedback.forwardSlaveProgress();
     }

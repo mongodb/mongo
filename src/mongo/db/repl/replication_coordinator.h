@@ -53,6 +53,7 @@ namespace repl {
     class HandshakeArgs;
     class IsMasterResponse;
     class OplogReader;
+    class ReplicaSetConfig;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
     class UpdatePositionArgs;
@@ -338,15 +339,6 @@ namespace repl {
         virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
 
         /**
-         * For ourself and each secondary chaining off of us, adds a BSONObj to "handshakes"
-         * describing an invocation of the replSetUpdateCommand that can be sent to this node's
-         * sync source to handshake us and our chained secondaries, informing the sync source that
-         * we are replicating off of it.
-         */
-        virtual void prepareReplSetUpdatePositionCommandHandshakes(
-                std::vector<BSONObj>* handshakes) = 0;
-
-        /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
          */
         virtual Status processReplSetGetStatus(BSONObjBuilder* result) = 0;
@@ -362,6 +354,11 @@ namespace repl {
          * last known optimes.
          */
         virtual void appendSlaveInfoData(BSONObjBuilder* result) = 0;
+
+        /**
+         * Returns a copy of the current ReplicaSetConfig.
+         */
+        virtual ReplicaSetConfig getConfig() const = 0;
 
         /**
          * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.
@@ -477,24 +474,25 @@ namespace repl {
          * Handles an incoming replSetUpdatePosition command, updating each node's oplog progress.
          * Returns Status::OK() if all updates are processed correctly, NodeNotFound
          * if any updating node cannot be found in the config, InvalidReplicaSetConfig if the
-         * "cfgver" sent in any of the updates doesn't match our config version, or
+         * "configVersion" sent in any of the updates doesn't match our config version, or
          * NotMasterOrSecondaryCode if we are in state REMOVED or otherwise don't have a valid
          * replica set config.
          * If a non-OK status is returned, it is unspecified whether none or some of the updates
          * were applied.
+         * "configVersion" will be populated with our config version if and only if we return
+         * InvalidReplicaSetConfig.
          */
-        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates) = 0;
+        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
+                                                    long long* configVersion) = 0;
 
-        /**
-         * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
-         * Associates the node's 'remoteID' with its 'handshake' object. This association is used
-         * to update local.slaves and to forward the node's replication progress upstream when this
-         * node is being chained through.
+        /** 
+         * Handles an incoming Handshake command. Associates the node's 'remoteID' with its
+         * 'handshake' object. This association is used to update internal representation of 
+         * replication progress and to forward the node's replication progress upstream when this
+         * node is being chained through in master/slave replication.
          *
-         * Returns ErrorCodes::NodeNotFound if no replica set member exists with the given member ID
-         * and ErrorCodes::NotMasterOrSecondaryCode if we're in state REMOVED or otherwise don't
-         * have a valid config.
-         */
+         * Returns ErrorCodes::IllegalOperation if we're not running with master/slave replication.  
+         */  
         virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake) = 0;
 
         /**

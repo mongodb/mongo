@@ -57,8 +57,10 @@ namespace repl {
 
     class ElectCmdRunner;
     class FreshnessChecker;
+    class HandshakeArgs;
     class HeartbeatResponseAction;
     class OplogReader;
+    class ReplicaSetConfig;
     class SyncSourceFeedback;
     class TopologyCoordinator;
 
@@ -159,14 +161,13 @@ namespace repl {
 
         virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
-        virtual void prepareReplSetUpdatePositionCommandHandshakes(
-                std::vector<BSONObj>* handshakes);
-
         virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual void fillIsMasterForReplSet(IsMasterResponse* result);
 
         virtual void appendSlaveInfoData(BSONObjBuilder* result);
+
+        virtual ReplicaSetConfig getConfig() const;
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
@@ -200,7 +201,8 @@ namespace repl {
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* response);
 
-        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates);
+        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
+                                                    long long* configVersion);
 
         virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake);
 
@@ -241,7 +243,7 @@ namespace repl {
         /**
          * Simple wrapper around _setLastOptime_inlock to make it easier to test.
          */
-        Status setLastOptime_forTest(const OID& rid, const OpTime& ts);
+        Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& ts);
 
     private:
 
@@ -495,8 +497,11 @@ namespace repl {
         /**
          * Helper method for updating our tracking of the last optime applied by a given node.
          * This is only valid to call on replica sets.
+         * "configVersion" will be populated with our config version if it and the configVersion
+         * of "args" differ.
          */
-        Status _setLastOptime_inlock(const UpdatePositionArgs::UpdateInfo& args);
+        Status _setLastOptime_inlock(const UpdatePositionArgs::UpdateInfo& args,
+                                     long long* configVersion);
 
         /**
          * Helper method for setMyLastOptime that takes in a unique lock on

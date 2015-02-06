@@ -49,7 +49,6 @@ namespace repl {
         virtual void startMasterSlave(OperationContext* txn);
         virtual void shutdown();
         virtual void initiateOplog(OperationContext* txn);
-        virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();
         virtual OID ensureMe(OperationContext* txn);
         virtual bool isSelf(const HostAndPort& host);

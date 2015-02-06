@@ -47,21 +47,11 @@ namespace repl {
         SyncSourceFeedback();
         ~SyncSourceFeedback();
 
-        /// Ensures local.me is populated and populates it if not.
-        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
-        void ensureMe(OperationContext* txn);
-
-        /// Notifies the SyncSourceFeedbackThread to wake up and send a handshake up the replication
-        /// chain, upon receiving a handshake.
-        void forwardSlaveHandshake();
-
         /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
         /// replication progress.
         void forwardSlaveProgress();
 
         /// Loops continuously until shutdown() is called, passing updates when they are present.
-        /// TODO(spencer): Currently also can terminate when the global inShutdown() function
-        /// returns true.  Remove that once the legacy repl coordinator is gone.
         void run();
 
         /// Signals the run() method to terminate.
@@ -77,15 +67,8 @@ namespace repl {
          */
         bool replAuthenticate();
 
-        /* Sends initialization information to our sync target, also determines whether or not they
-         * support the updater command.
-         */
-        bool replHandshake(OperationContext* txn);
-
         /* Inform the sync target of our current position in the oplog, as well as the positions
          * of all secondaries chained through us.
-         * ErrorCodes::NodeNotFound indicates that the caller should re-run replHandshake before
-         * calling this again.
          */
         Status updateUpstream(OperationContext* txn);
 
@@ -96,21 +79,16 @@ namespace repl {
         /// Connect to sync target.
         bool _connect(OperationContext* txn, const HostAndPort& host);
 
-        // stores our OID to be passed along in commands
-        /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.
-        BSONObj _me;
         // the member we are currently syncing from
         HostAndPort _syncTarget;
         // our connection to our sync target
         boost::scoped_ptr<DBClientConnection> _connection;
-        // protects cond, _shutdownSignaled, and the indicator bools.
+        // protects cond, _shutdownSignaled, and _positionChanged.
         boost::mutex _mtx;
         // used to alert our thread of changes which need to be passed up the chain
         boost::condition _cond;
         // used to indicate a position change which has not yet been pushed along
         bool _positionChanged;
-        // used to indicate a connection change which has not yet been shook on
-        bool _handshakeNeeded;
         // Once this is set to true the _run method will terminate
         bool _shutdownSignaled;
     };
