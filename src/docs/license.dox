@@ -15,7 +15,7 @@ FITNESS FOR A PARTICULAR PURPOSE.  See the
 
 For a license to use the WiredTiger software under conditions other than
 those described above, or for technical support for this software, please
-contact WiredTiger, Inc. at
+contact MongoDB, Inc. at
 <a mailto="info@wiredtiger.com">info@wiredtiger.com</a>.
 
 @section license_library 3rd party software included in the WiredTiger library
