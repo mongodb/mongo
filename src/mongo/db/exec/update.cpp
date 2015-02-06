@@ -792,8 +792,6 @@ namespace mongo {
                 return PlanStage::NEED_TIME;
             }
 
-            ++_specificStats.nMatched;
-
             // Save state before making changes
             _child->saveState();
             if (supportsDocLocking()) {
@@ -831,11 +829,14 @@ namespace mongo {
                     break;
                 }
                 catch ( const WriteConflictException& de ) {
-                    if ( !_params.request->isMulti() ) {
-                        // We don't handle this here as we handle at the top level.
+                    if (_txn->lockState()->inAWriteUnitOfWork()) {
+                        // If we're in an outer WriteUnitOfWork we're not allowed to refresh our
+                        // snapshot. In this case we just re-throw.
+                        // Note that multi updates in this case are safe because the outer
+                        // WriteUnitOfWork ensure that this entire update is in one
+                        // transaction.
                         throw;
                     }
-
                     _params.opDebug->writeConflicts++;
 
                     // This is ok because we re-check all docs and predicates if the snapshot
@@ -845,7 +846,7 @@ namespace mongo {
                     _txn->checkForInterrupt();
 
                     WriteConflictException::logAndBackoff( attempt,
-                                                           "multi-update",
+                                                           "update",
                                                            _collection->ns().ns() );
 
                     if ( attempt > 2 ) {
@@ -859,6 +860,9 @@ namespace mongo {
                     }
                 }
             }
+
+            // This should be after transformAndUpdate to make sure we actually updated this doc.
+            ++_specificStats.nMatched;
 
             // Restore state after modification
 
