@@ -12,7 +12,11 @@
                                  toCollection: 'bar',
                                  size: 1024});
     assert.eq(res.ok, 0, "cloning a nonexistent collection to capped should not have worked");
-    assert.eq(res.errmsg, "source database " + dbname + " does not exist",
+    var isSharded = (db.isMaster().msg == "isdbgrid");
+
+    assert.eq(res.errmsg,
+              isSharded ? "no such cmd: cloneCollectionAsCapped"
+                        : "source database " + dbname + " does not exist",
               "converting a nonexistent to capped failed but for the wrong reason");
 
     // Database exists, but collection doesn't
@@ -22,6 +26,8 @@
                                  toCollection: 'bar',
                                  size: 1024});
     assert.eq(res.ok, 0, "cloning a nonexistent collection to capped should not have worked");
-    assert.eq(res.errmsg, "source collection " + dbname + ".foo does not exist",
+    assert.eq(res.errmsg,
+              isSharded ? "no such cmd: cloneCollectionAsCapped"
+                        : "source collection " + dbname + ".foo does not exist",
               "converting a nonexistent to capped failed but for the wrong reason");
 }());
