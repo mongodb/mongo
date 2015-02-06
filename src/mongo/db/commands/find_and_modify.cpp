@@ -112,7 +112,7 @@ namespace mongo {
             }
 
             bool ok = false;
-            int attempt = 0;
+            int attempt = 1;
             while ( 1 ) {
                 try {
                     errmsg = "";
@@ -134,10 +134,9 @@ namespace mongo {
                 }
                 catch (const WriteConflictException&) {
                     txn->getCurOp()->debug().writeConflicts++;
-                    if ( attempt++ > 1 ) {
-                        log() << "got WriteConflictException on findAndModify for " << ns
-                              <<  " retrying attempt: " << attempt;
-                    }
+                    WriteConflictException::logAndBackoff(attempt++,
+                                                          "findandmodify",
+                                                          ns);
                 }
             }
 
