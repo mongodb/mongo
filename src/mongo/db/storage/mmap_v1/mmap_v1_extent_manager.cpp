@@ -107,8 +107,8 @@ namespace mongo {
         boost::scoped_ptr<LockMongoFilesShared> _filesLock;
     };
 
-    MmapV1ExtentManager::MmapV1ExtentManager(const StringData& dbname,
-                                             const StringData& path,
+    MmapV1ExtentManager::MmapV1ExtentManager(StringData dbname,
+                                             StringData path,
                                              bool directoryPerDB)
         : _dbname(dbname.toString()),
           _path(path.toString()),

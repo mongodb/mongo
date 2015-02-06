@@ -87,7 +87,7 @@ namespace mongo {
          * @return null if cannot find
          */
         IndexDescriptor* findIndexByName( OperationContext* txn,
-                                          const StringData& name,
+                                          StringData name,
                                           bool includeUnfinishedIndexes = false ) const;
 
         /**

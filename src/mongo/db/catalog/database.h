@@ -55,7 +55,7 @@ namespace mongo {
     */
     class Database {
     public:
-        Database(OperationContext* txn, const StringData& name, DatabaseCatalogEntry* dbEntry);
+        Database(OperationContext* txn, StringData name, DatabaseCatalogEntry* dbEntry);
 
         // must call close first
         ~Database();
@@ -82,10 +82,10 @@ namespace mongo {
 
         const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
 
-        Status dropCollection( OperationContext* txn, const StringData& fullns );
+        Status dropCollection( OperationContext* txn, StringData fullns );
 
         Collection* createCollection( OperationContext* txn,
-                                      const StringData& ns,
+                                      StringData ns,
                                       const CollectionOptions& options = CollectionOptions(),
                                       bool allocateSpace = true,
                                       bool createDefaultIndexes = true );
@@ -93,17 +93,17 @@ namespace mongo {
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
          */
-        Collection* getCollection( const StringData& ns ) const ;
+        Collection* getCollection( StringData ns ) const ;
 
         Collection* getCollection( const NamespaceString& ns ) const {
             return getCollection( ns.ns() );
         }
 
-        Collection* getOrCreateCollection( OperationContext* txn, const StringData& ns );
+        Collection* getOrCreateCollection( OperationContext* txn, StringData ns );
 
         Status renameCollection( OperationContext* txn,
-                                 const StringData& fromNS,
-                                 const StringData& toNS,
+                                 StringData fromNS,
+                                 StringData toNS,
                                  bool stayTemp );
 
         /**
@@ -115,7 +115,7 @@ namespace mongo {
         static std::string duplicateUncasedName( const std::string &name,
                                                  std::set< std::string > *duplicates = 0 );
 
-        static Status validateDBName( const StringData& dbname );
+        static Status validateDBName( StringData dbname );
 
         const std::string& getSystemIndexesName() const { return _indexesName; }
     private:
@@ -127,9 +127,9 @@ namespace mongo {
          * Note: This does not add the collection to _collections map, that must be done
          * by the caller, who takes onership of the Collection*
          */
-        Collection* _getOrCreateCollectionInstance(OperationContext* txn, const StringData& fullns);
+        Collection* _getOrCreateCollectionInstance(OperationContext* txn, StringData fullns);
 
-        void _clearCollectionCache(OperationContext* txn, const StringData& fullns );
+        void _clearCollectionCache(OperationContext* txn, StringData fullns );
 
         class AddCollectionChange;
         class RemoveCollectionChange;
@@ -160,7 +160,7 @@ namespace mongo {
 
     Status userCreateNS( OperationContext* txn,
                          Database* db,
-                         const StringData& ns,
+                         StringData ns,
                          BSONObj options,
                          bool logForReplication,
                          bool createDefaultIndexes = true );

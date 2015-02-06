@@ -53,16 +53,16 @@ namespace mongo {
         int flushAllFiles( bool sync );
 
         DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                       const StringData& db );
+                                                       StringData db );
 
         virtual bool supportsDocLocking() const { return false; }
         virtual bool isMmapV1() const { return true; }
 
         virtual bool isDurable() const;
 
-        virtual Status closeDatabase(OperationContext* txn, const StringData& db);
+        virtual Status closeDatabase(OperationContext* txn, StringData db);
 
-        virtual Status dropDatabase(OperationContext* txn, const StringData& db);
+        virtual Status dropDatabase(OperationContext* txn, StringData db);
 
         virtual void cleanShutdown();
 

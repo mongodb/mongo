@@ -40,7 +40,7 @@ namespace mongo {
      * a.$ -> a
      * @return true if out is set and we made a change
      */
-    bool getCanonicalIndexField( const StringData& fullName, std::string* out );
+    bool getCanonicalIndexField( StringData fullName, std::string* out );
 
 
     /**
@@ -55,13 +55,13 @@ namespace mongo {
          * Register a path.  Any update targeting this path (or a parent of this path) will
          * trigger a recomputation of the document's index keys.
          */
-        void addPath( const StringData& path );
+        void addPath( StringData path );
 
         /**
          * Register a path component.  Any update targeting a path that contains this exact
          * component will trigger a recomputation of the document's index keys.
          */
-        void addPathComponent( const StringData& pathComponent );
+        void addPathComponent( StringData pathComponent );
 
         /**
          * Register the "wildcard" path.  All updates will trigger a recomputation of the document's
@@ -71,11 +71,11 @@ namespace mongo {
 
         void clear();
 
-        bool mightBeIndexed( const StringData& path ) const;
+        bool mightBeIndexed( StringData path ) const;
 
     private:
 
-        bool _startsWith( const StringData& a, const StringData& b ) const;
+        bool _startsWith( StringData a, StringData b ) const;
 
         std::set<std::string> _canonicalPaths;
         std::set<std::string> _pathComponents;

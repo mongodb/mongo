@@ -79,13 +79,13 @@ namespace mongo {
          * Note that even if this function returns an OK status, WT_SESSION:create() may still
          * fail with the constructed configuration string.
          */
-        static StatusWith<std::string> generateCreateString(const StringData& ns,
+        static StatusWith<std::string> generateCreateString(StringData ns,
                                                             const CollectionOptions &options,
-                                                            const StringData& extraStrings);
+                                                            StringData extraStrings);
 
         WiredTigerRecordStore(OperationContext* txn,
-                              const StringData& ns,
-                              const StringData& uri,
+                              StringData ns,
+                              StringData uri,
                               bool isCapped = false,
                               int64_t cappedMaxSize = -1,
                               int64_t cappedMaxDocs = -1,

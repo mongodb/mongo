@@ -111,7 +111,7 @@ namespace mongo {
         }
     }
 
-    RecordStoreV1Base::RecordStoreV1Base( const StringData& ns,
+    RecordStoreV1Base::RecordStoreV1Base( StringData ns,
                                           RecordStoreV1MetaData* details,
                                           ExtentManager* em,
                                           bool isSystemIndexes )

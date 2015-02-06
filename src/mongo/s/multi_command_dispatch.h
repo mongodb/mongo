@@ -57,7 +57,7 @@ namespace mongo {
          * Commands are not sent immediately, they are sent on sendAll.
          */
         virtual void addCommand( const ConnectionString& endpoint,
-                                 const StringData& dbName,
+                                 StringData dbName,
                                  const BSONSerializable& request ) = 0;
 
         /**

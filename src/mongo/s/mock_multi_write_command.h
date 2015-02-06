@@ -102,7 +102,7 @@ namespace mongo {
         }
 
         void addCommand( const ConnectionString& endpoint,
-                         const StringData& dbName,
+                         StringData dbName,
                          const BSONSerializable& request ) {
             _pending.push_back( endpoint );
         }

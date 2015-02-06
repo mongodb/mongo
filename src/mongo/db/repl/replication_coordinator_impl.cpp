@@ -1221,7 +1221,7 @@ namespace {
         return false;
     }
 
-    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& dbName) {
+    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(StringData dbName) {
         // _canAcceptNonLocalWrites is always true for standalone nodes, always false for nodes
         // started with --slave, and adjusted based on primary+drain state in replica sets.
         //

@@ -144,7 +144,7 @@ namespace mongo {
         }
     }
 
-    bool MongoVersionRange::isInRange(const StringData& version) const {
+    bool MongoVersionRange::isInRange(StringData version) const {
 
         if (maxVersion == "") {
             // If a prefix of the version specified is excluded, the specified version is
@@ -164,7 +164,7 @@ namespace mongo {
         return false;
     }
 
-    bool isInMongoVersionRanges(const StringData& version, const vector<MongoVersionRange>& ranges)
+    bool isInMongoVersionRanges(StringData version, const vector<MongoVersionRange>& ranges)
     {
         for (vector<MongoVersionRange>::const_iterator it = ranges.begin(); it != ranges.end();
                 ++it)

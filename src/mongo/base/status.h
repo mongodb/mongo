@@ -130,9 +130,9 @@ namespace mongo {
             const int location;            // unique location of the triggering line in the code
 
             static ErrorInfo* create(ErrorCodes::Error code,
-                                     const StringData& reason, int location);
+                                     StringData reason, int location);
 
-            ErrorInfo(ErrorCodes::Error code, const StringData& reason, int location);
+            ErrorInfo(ErrorCodes::Error code, StringData reason, int location);
         };
 
         ErrorInfo* _error;

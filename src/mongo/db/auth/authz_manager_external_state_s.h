@@ -105,7 +105,7 @@ namespace mongo {
                               const BSONObj& query,
                               const BSONObj& writeConcern,
                               int* numRemoved);
-        virtual bool tryAcquireAuthzUpdateLock(const StringData& why);
+        virtual bool tryAcquireAuthzUpdateLock(StringData why);
         virtual void releaseAuthzUpdateLock();
 
     private:

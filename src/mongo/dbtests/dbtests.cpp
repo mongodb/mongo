@@ -56,7 +56,7 @@ namespace dbtests {
     const std::string default_test_dbpath = "/tmp/unittest";
 
     Status createIndex(OperationContext* txn,
-                       const StringData &ns,
+                       StringData ns,
                        const BSONObj& keys,
                        bool unique) {
         BSONObjBuilder specBuilder;
@@ -70,7 +70,7 @@ namespace dbtests {
         return createIndexFromSpec(txn, ns, specBuilder.done());
     }
 
-    Status createIndexFromSpec(OperationContext* txn, const StringData& ns, const BSONObj& spec) {
+    Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& spec) {
         AutoGetOrCreateDb autoDb(txn, nsToDatabaseSubstring(ns), MODE_X);
         Collection* coll;
         {

@@ -42,7 +42,7 @@ namespace mongo {
     */
     long long deleteObjects(OperationContext* txn,
                             Database* db,
-                            const StringData& ns,
+                            StringData ns,
                             BSONObj pattern,
                             PlanExecutor::YieldPolicy policy,
                             bool justOne,

@@ -53,7 +53,7 @@ namespace mongo {
 
 namespace {
 
-    StringData _todb(const StringData& ns) {
+    StringData _todb(StringData ns) {
         size_t i = ns.find('.');
         if (i == std::string::npos) {
             uassert(13074, "db name can't be empty", ns.size());
@@ -80,7 +80,7 @@ namespace {
 
 
     Database* DatabaseHolder::get(OperationContext* txn,
-                                  const StringData& ns) const {
+                                  StringData ns) const {
 
         const StringData db = _todb(ns);
         invariant(txn->lockState()->isDbLockedForMode(db, MODE_IS));
@@ -95,7 +95,7 @@ namespace {
     }
 
     Database* DatabaseHolder::openDb(OperationContext* txn,
-                                     const StringData& ns,
+                                     StringData ns,
                                      bool* justCreated) {
 
         const StringData dbname = _todb(ns);
@@ -149,7 +149,7 @@ namespace {
     }
 
     void DatabaseHolder::close(OperationContext* txn,
-                               const StringData& ns) {
+                               StringData ns) {
         // TODO: This should be fine if only a DB X-lock
         invariant(txn->lockState()->isW());
 

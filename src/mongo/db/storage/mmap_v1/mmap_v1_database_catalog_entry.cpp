@@ -115,7 +115,7 @@ namespace {
      */
     class MMAPV1DatabaseCatalogEntry::EntryInsertion : public RecoveryUnit::Change {
     public:
-        EntryInsertion(const StringData& ns, MMAPV1DatabaseCatalogEntry* entry)
+        EntryInsertion(StringData ns, MMAPV1DatabaseCatalogEntry* entry)
             : _ns(ns.toString()), _entry(entry) { }
 
         void rollback() {
@@ -137,7 +137,7 @@ namespace {
     public:
         //  Rollback removing the collection from the cache. Takes ownership of the cachedEntry,
         //  and will delete it if removal is final.
-        EntryRemoval(const StringData& ns,
+        EntryRemoval(StringData ns,
                      MMAPV1DatabaseCatalogEntry* catalogEntry,
                      Entry *cachedEntry)
             : _ns(ns.toString()), _catalogEntry(catalogEntry), _cachedEntry(cachedEntry) { }
@@ -157,8 +157,8 @@ namespace {
     };
 
     MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry( OperationContext* txn,
-                                                            const StringData& name,
-                                                            const StringData& path,
+                                                            StringData name,
+                                                            StringData path,
                                                             bool directoryPerDB,
                                                             bool transient )
         : DatabaseCatalogEntry( name ),
@@ -213,7 +213,7 @@ namespace {
     }
 
     void MMAPV1DatabaseCatalogEntry::_removeFromCache(RecoveryUnit* ru,
-                                                      const StringData& ns) {
+                                                      StringData ns) {
         CollectionMap::iterator i = _collections.find(ns.toString());
         if (i == _collections.end()) {
             return;
@@ -229,7 +229,7 @@ namespace {
         _collections.erase(i);
     }
 
-    Status MMAPV1DatabaseCatalogEntry::dropCollection(OperationContext* txn, const StringData& ns) {
+    Status MMAPV1DatabaseCatalogEntry::dropCollection(OperationContext* txn, StringData ns) {
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
         _removeFromCache(txn->recoveryUnit(), ns);
 
@@ -259,8 +259,8 @@ namespace {
 
 
     Status MMAPV1DatabaseCatalogEntry::renameCollection( OperationContext* txn,
-                                                        const StringData& fromNS,
-                                                        const StringData& toNS,
+                                                        StringData fromNS,
+                                                        StringData toNS,
                                                         bool stayTemp ) {
         Status s = _renameSingleNamespace( txn, fromNS, toNS, stayTemp );
         if ( !s.isOK() )
@@ -332,8 +332,8 @@ namespace {
     }
 
     Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace( OperationContext* txn,
-                                                              const StringData& fromNS,
-                                                              const StringData& toNS,
+                                                              StringData fromNS,
+                                                              StringData toNS,
                                                               bool stayTemp ) {
         // some sanity checking
         NamespaceDetails* fromDetails = _namespaceIndex.details( fromNS );
@@ -494,7 +494,7 @@ namespace {
     }
 
     void MMAPV1DatabaseCatalogEntry::_ensureSystemCollection(OperationContext* txn,
-                                                             const StringData& ns) {
+                                                             StringData ns) {
 
         NamespaceDetails* details = _namespaceIndex.details(ns);
         if (details) {
@@ -636,7 +636,7 @@ namespace {
     }
 
     Status MMAPV1DatabaseCatalogEntry::createCollection( OperationContext* txn,
-                                                        const StringData& ns,
+                                                        StringData ns,
                                                         const CollectionOptions& options,
                                                         bool allocateDefaultSpace ) {
         if ( _namespaceIndex.details( ns ) ) {
@@ -710,7 +710,7 @@ namespace {
     }
 
     void MMAPV1DatabaseCatalogEntry::createNamespaceForIndex(OperationContext* txn,
-                                                             const StringData& name) {
+                                                             StringData name) {
         // This is a simplified form of createCollection.
         invariant(!_namespaceIndex.details(name));
 
@@ -725,7 +725,7 @@ namespace {
     }
 
     CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry(
-                                                                    const StringData& ns ) const {
+                                                                    StringData ns ) const {
 
         CollectionMap::const_iterator i = _collections.find( ns.toString() );
         if (i == _collections.end()) {
@@ -737,7 +737,7 @@ namespace {
     }
 
     void MMAPV1DatabaseCatalogEntry::_insertInCache(OperationContext* txn,
-                                                    const StringData& ns,
+                                                    StringData ns,
                                                     Entry* entry) {
 
         NamespaceDetails* details = _namespaceIndex.details(ns);
@@ -773,11 +773,11 @@ namespace {
         }
     }
 
-    RecordStore* MMAPV1DatabaseCatalogEntry::getRecordStore( const StringData& ns ) const {
+    RecordStore* MMAPV1DatabaseCatalogEntry::getRecordStore( StringData ns ) const {
         return _getRecordStore( ns );
     }
 
-    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getRecordStore( const StringData& ns ) const {
+    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getRecordStore( StringData ns ) const {
         CollectionMap::const_iterator i = _collections.find( ns.toString() );
         if (i == _collections.end()) {
             return NULL;
@@ -852,7 +852,7 @@ namespace {
     }
 
     void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection(OperationContext* txn,
-                                                                        const StringData& ns,
+                                                                        StringData ns,
                                                                         const BSONObj* options) {
 
         if (nsToCollectionSubstring(ns) == "system.namespaces") {
@@ -877,7 +877,7 @@ namespace {
 
     void MMAPV1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection(
                                                                     OperationContext* txn,
-                                                                    const StringData& ns ) {
+                                                                    StringData ns ) {
 
         if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
@@ -900,7 +900,7 @@ namespace {
     }
 
     CollectionOptions MMAPV1DatabaseCatalogEntry::getCollectionOptions( OperationContext* txn,
-                                                                        const StringData& ns ) const {
+                                                                        StringData ns ) const {
         if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
             return CollectionOptions();
         }

@@ -183,7 +183,7 @@ namespace mongo {
          * any $where parsers, which this callback generates. Therefore, the op context must only
          * be destroyed after these parsers and their clones (shallowClone) have been destroyed.
          */
-        WhereCallbackReal(OperationContext* txn, const StringData& dbName);
+        WhereCallbackReal(OperationContext* txn, StringData dbName);
 
         virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
 

@@ -464,7 +464,7 @@ namespace mongo {
         class TwoDPtInAnnulusExpression : public LeafMatchExpression {
         public:
 
-            TwoDPtInAnnulusExpression(const R2Annulus& annulus, const StringData& twoDPath)
+            TwoDPtInAnnulusExpression(const R2Annulus& annulus, StringData twoDPath)
                 : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS), _annulus(annulus) {
 
                 initPath(twoDPath);
@@ -519,7 +519,7 @@ namespace mongo {
 
             TwoDKeyInRegionExpression(R2Region* region,
                                       const GeoHashConverter::Parameters& hashParams,
-                                      const StringData& twoDKeyPath)
+                                      StringData twoDKeyPath)
                 : LeafMatchExpression(INTERNAL_2D_KEY_IN_REGION),
                   _region(region),
                   _unhasher(hashParams) {

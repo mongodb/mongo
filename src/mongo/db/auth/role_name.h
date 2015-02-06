@@ -49,7 +49,7 @@ namespace mongo {
     class RoleName {
     public:
         RoleName() : _splitPoint(0) {}
-        RoleName(const StringData& role, const StringData& dbname);
+        RoleName(StringData role, StringData dbname);
 
         /**
          * Gets the name of the role excluding the "@dbname" component.

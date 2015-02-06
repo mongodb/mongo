@@ -68,7 +68,7 @@ namespace mongo {
 
     CappedRecordStoreV1::CappedRecordStoreV1( OperationContext* txn,
                                               CappedDocumentDeleteCallback* collection,
-                                              const StringData& ns,
+                                              StringData ns,
                                               RecordStoreV1MetaData* details,
                                               ExtentManager* em,
                                               bool isSystemIndexes )
@@ -376,7 +376,7 @@ namespace mongo {
         return inCapExtent( next );
     }
 
-    void CappedRecordStoreV1::advanceCapExtent( OperationContext* txn, const StringData& ns ) {
+    void CappedRecordStoreV1::advanceCapExtent( OperationContext* txn, StringData ns ) {
         // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
         // (or DiskLoc() if new capExtent == firstExtent)
         if ( _details->capExtent() == _details->lastExtent(txn) )

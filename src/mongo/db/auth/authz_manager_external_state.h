@@ -220,7 +220,7 @@ namespace mongo {
          * admin.system.version collections.  This serializes all writers to the authorization
          * documents, but does not impact readers.
          */
-        virtual bool tryAcquireAuthzUpdateLock(const StringData& why) = 0;
+        virtual bool tryAcquireAuthzUpdateLock(StringData why) = 0;
 
         /**
          * Releases the lock guarding modifications to persistent authorization data, which must

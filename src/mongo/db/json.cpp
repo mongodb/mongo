@@ -86,13 +86,13 @@ namespace mongo {
                  *SINGLEQUOTE = "'",
                  *DOUBLEQUOTE = "\"";
 
-    JParse::JParse(const StringData& str)
+    JParse::JParse(StringData str)
         : _buf(str.rawData())
         , _input(_buf)
         , _input_end(_input + str.size())
     {}
 
-    Status JParse::parseError(const StringData& msg) {
+    Status JParse::parseError(StringData msg) {
         std::ostringstream ossmsg;
         ossmsg << msg;
         ossmsg << ": offset:";
@@ -102,7 +102,7 @@ namespace mongo {
         return Status(ErrorCodes::FailedToParse, ossmsg.str());
     }
 
-    Status JParse::value(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
         MONGO_JSON_DEBUG("fieldName: " << fieldName);
         if (peekToken(LBRACE)) {
             Status ret = object(fieldName, builder);
@@ -207,7 +207,7 @@ namespace mongo {
         return isArray() ? array("UNUSED", builder, false) : object("UNUSED", builder, false);
     }
 
-    Status JParse::object(const StringData& fieldName, BSONObjBuilder& builder, bool subObject) {
+    Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObject) {
         MONGO_JSON_DEBUG("fieldName: " << fieldName);
         if (!readToken(LBRACE)) {
             return parseError("Expecting '{'");
@@ -360,7 +360,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::objectIdObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::objectIdObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expected ':'");
         }
@@ -380,7 +380,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::binaryObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::binaryObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expected ':'");
         }
@@ -422,7 +422,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::dateObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::dateObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expected ':'");
         }
@@ -498,7 +498,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::timestampObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::timestampObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expecting ':'");
         }
@@ -559,7 +559,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::regexObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::regexObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expecting ':'");
         }
@@ -594,7 +594,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::dbRefObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::dbRefObject(StringData fieldName, BSONObjBuilder& builder) {
 
         BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
 
@@ -644,7 +644,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::undefinedObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::undefinedObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expecting ':'");
         }
@@ -655,7 +655,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::numberLongObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::numberLongObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expecting ':'");
         }
@@ -679,7 +679,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::minKeyObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::minKeyObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expecting ':'");
         }
@@ -690,7 +690,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::maxKeyObject(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::maxKeyObject(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(COLON)) {
             return parseError("Expecting ':'");
         }
@@ -701,7 +701,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::array(const StringData& fieldName, BSONObjBuilder& builder, bool subObject) {
+    Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObject) {
         MONGO_JSON_DEBUG("fieldName: " << fieldName);
         uint32_t index(0);
         if (!readToken(LBRACKET)) {
@@ -735,7 +735,7 @@ namespace mongo {
      * constructors, but for now it only allows "new" before Date().
      * Also note that unlike the interactive shell "Date(x)" and "new Date(x)"
      * have the same behavior.  XXX: this may not be desired. */
-    Status JParse::constructor(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::constructor(StringData fieldName, BSONObjBuilder& builder) {
         if (readToken("Date")) {
             date(fieldName, builder);
         }
@@ -745,7 +745,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::date(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::date(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(LPAREN)) {
             return parseError("Expecting '('");
         }
@@ -776,7 +776,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::timestamp(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::timestamp(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(LPAREN)) {
             return parseError("Expecting '('");
         }
@@ -819,7 +819,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::objectId(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::objectId(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(LPAREN)) {
             return parseError("Expecting '('");
         }
@@ -842,7 +842,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::numberLong(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::numberLong(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(LPAREN)) {
             return parseError("Expecting '('");
         }
@@ -865,7 +865,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::numberInt(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::numberInt(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(LPAREN)) {
             return parseError("Expecting '('");
         }
@@ -889,7 +889,7 @@ namespace mongo {
     }
 
 
-    Status JParse::dbRef(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::dbRef(StringData fieldName, BSONObjBuilder& builder) {
         BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
 
         if (!readToken(LPAREN)) {
@@ -930,7 +930,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::regex(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::regex(StringData fieldName, BSONObjBuilder& builder) {
         if (!readToken(FORWARDSLASH)) {
             return parseError("Expecting '/'");
         }
@@ -967,7 +967,7 @@ namespace mongo {
         return chars(result, "", JOPTIONS);
     }
 
-    Status JParse::regexOptCheck(const StringData& opt) {
+    Status JParse::regexOptCheck(StringData opt) {
         MONGO_JSON_DEBUG("opt: " << opt);
         std::size_t i;
         for (i = 0; i < opt.size(); i++) {
@@ -978,7 +978,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status JParse::number(const StringData& fieldName, BSONObjBuilder& builder) {
+    Status JParse::number(StringData fieldName, BSONObjBuilder& builder) {
         char* endptrll;
         char* endptrd;
         long long retll;
@@ -1207,7 +1207,7 @@ namespace mongo {
         return true;
     }
 
-    bool JParse::readField(const StringData& expectedField) {
+    bool JParse::readField(StringData expectedField) {
         MONGO_JSON_DEBUG("expectedField: " << expectedField);
         std::string nextField;
         nextField.reserve(FIELD_RESERVE_SIZE);
@@ -1231,7 +1231,7 @@ namespace mongo {
         return (strchr(matchSet, matchChar) != NULL);
     }
 
-    bool JParse::isHexString(const StringData& str) const {
+    bool JParse::isHexString(StringData str) const {
         MONGO_JSON_DEBUG("str: " << str);
         std::size_t i;
         for (i = 0; i < str.size(); i++) {
@@ -1242,7 +1242,7 @@ namespace mongo {
         return true;
     }
 
-    bool JParse::isBase64String(const StringData& str) const {
+    bool JParse::isBase64String(StringData str) const {
         MONGO_JSON_DEBUG("str: " << str);
         std::size_t i;
         for (i = 0; i < str.size(); i++) {
@@ -1296,7 +1296,7 @@ namespace mongo {
         return arr.jsonString(format, pretty, true);
     }
 
-    bool isArray(const StringData& str) {
+    bool isArray(StringData str) {
         JParse parser(str);
         return parser.isArray();
     }

@@ -64,7 +64,7 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setShardName(const StringData& shardName);
+        void setShardName(StringData shardName);
         void unsetShardName();
         bool isShardNameSet() const;
         const std::string& getShardName() const;

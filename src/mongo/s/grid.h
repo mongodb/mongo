@@ -52,7 +52,7 @@ namespace mongo {
          * gets the config the db.
          * will return an empty DBConfig if not in db already
          */
-        DBConfigPtr getDBConfig( const StringData& ns , bool create=true , const std::string& shardNameHint="" );
+        DBConfigPtr getDBConfig( StringData ns , bool create=true , const std::string& shardNameHint="" );
 
         /**
          * removes db entry.

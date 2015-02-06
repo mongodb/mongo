@@ -48,7 +48,7 @@ namespace mongo {
      */
     class InMemoryRecordStore : public RecordStore {
     public:
-        explicit InMemoryRecordStore(const StringData& ns,
+        explicit InMemoryRecordStore(StringData ns,
                                      boost::shared_ptr<void>* dataInOut,
                                      bool isCapped = false,
                                      int64_t cappedMaxSize = -1,

@@ -411,7 +411,7 @@ namespace {
 
     };
 
-    QuerySpec buildSpec(const StringData& ns, const BSONObj& query) {
+    QuerySpec buildSpec(StringData ns, const BSONObj& query) {
         return QuerySpec(ns.toString(), query, BSONObj(), 0, 0, 0);
     }
 

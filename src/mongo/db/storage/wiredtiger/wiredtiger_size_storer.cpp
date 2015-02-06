@@ -86,7 +86,7 @@ namespace mongo {
     }
 
 
-    void WiredTigerSizeStorer::store( const StringData& uri,
+    void WiredTigerSizeStorer::store( StringData uri,
                                       long long numRecords, long long dataSize ) {
         _checkMagic();
         boost::mutex::scoped_lock lk( _entriesMutex );
@@ -96,7 +96,7 @@ namespace mongo {
         entry.dirty = true;
     }
 
-    void WiredTigerSizeStorer::load( const StringData& uri,
+    void WiredTigerSizeStorer::load( StringData uri,
                                      long long* numRecords, long long* dataSize ) const {
         _checkMagic();
         boost::mutex::scoped_lock lk( _entriesMutex );

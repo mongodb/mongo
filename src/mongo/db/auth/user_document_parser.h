@@ -46,7 +46,7 @@ namespace mongo {
                                                          const BSONObj& privDoc) const;
 
         Status initializeUserRolesFromUserDocument(
-                        User* user, const BSONObj& privDoc, const StringData& dbname) const;
+                        User* user, const BSONObj& privDoc, StringData dbname) const;
     };
 
     class V2UserDocumentParser {

@@ -171,7 +171,7 @@ namespace mongo {
 
     public:
         ResourceId() : _fullHash(0) { }
-        ResourceId(ResourceType type, const StringData& ns);
+        ResourceId(ResourceType type, StringData ns);
         ResourceId(ResourceType type, const std::string& ns);
         ResourceId(ResourceType type, uint64_t hashId);
 

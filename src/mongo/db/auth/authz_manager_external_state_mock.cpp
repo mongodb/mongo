@@ -256,7 +256,7 @@ namespace {
         return Status::OK();
     }
 
-    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock(const StringData&) {
+    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock(StringData) {
         return true;
     }
 

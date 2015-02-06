@@ -489,13 +489,13 @@ namespace {
             : _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$pushAll") ?
                    ModifierPush::PUSH_ALL : ModifierPush::PUSH_NORMAL) {
             _modObj = modObj;
-            const StringData& modName = modObj.firstElement().fieldName();
+            StringData modName = modObj.firstElement().fieldName();
             ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
                                 ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
-                       const StringData& matchedField,
+                       StringData matchedField,
                        ModifierInterface::ExecInfo* execInfo) {
             return _mod.prepare(root, matchedField, execInfo);
         }

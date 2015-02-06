@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-    bool isAllDigits( const StringData& str );
+    bool isAllDigits( StringData str );
 
     // XXX document me
     // Replaces getFieldDottedOrArray without recursion nor std::string manipulation

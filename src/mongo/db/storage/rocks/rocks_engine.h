@@ -72,24 +72,24 @@ namespace mongo {
         virtual RecoveryUnit* newRecoveryUnit() override;
 
         virtual Status createRecordStore(OperationContext* opCtx,
-                                         const StringData& ns,
-                                         const StringData& ident,
+                                         StringData ns,
+                                         StringData ident,
                                          const CollectionOptions& options) override;
 
-        virtual RecordStore* getRecordStore(OperationContext* opCtx, const StringData& ns,
-                                            const StringData& ident,
+        virtual RecordStore* getRecordStore(OperationContext* opCtx, StringData ns,
+                                            StringData ident,
                                             const CollectionOptions& options) override;
 
-        virtual Status createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
+        virtual Status createSortedDataInterface(OperationContext* opCtx, StringData ident,
                                                  const IndexDescriptor* desc) override;
 
         virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
-                                                            const StringData& ident,
+                                                            StringData ident,
                                                             const IndexDescriptor* desc) override;
 
-        virtual Status dropIdent(OperationContext* opCtx, const StringData& ident) override;
+        virtual Status dropIdent(OperationContext* opCtx, StringData ident) override;
 
-        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const {
+        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const {
             return _identColumnFamilyMap.find(ident) != _identColumnFamilyMap.end();;
         }
         virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const override;
@@ -105,13 +105,13 @@ namespace mongo {
         virtual bool isDurable() const override { return _durable; }
 
         virtual int64_t getIdentSize(OperationContext* opCtx,
-                                      const StringData& ident) {
+                                      StringData ident) {
           // TODO: return correct size.
           return 1;
         }
 
         virtual Status repairIdent(OperationContext* opCtx,
-                                    const StringData& ident) {
+                                    StringData ident) {
             return Status::OK();
         }
 
@@ -123,11 +123,11 @@ namespace mongo {
         const rocksdb::DB* getDB() const { return _db.get(); }
 
     private:
-        bool _existsColumnFamily(const StringData& ident);
+        bool _existsColumnFamily(StringData ident);
         Status _createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
-                                   const StringData& ident);
-        Status _dropColumnFamily(const StringData& ident);
-        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _getColumnFamily(const StringData& ident);
+                                   StringData ident);
+        Status _dropColumnFamily(StringData ident);
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _getColumnFamily(StringData ident);
 
         std::unordered_map<std::string, Ordering> _loadOrderingMetaData(rocksdb::Iterator* itr);
         std::set<std::string> _loadCollections(rocksdb::Iterator* itr);

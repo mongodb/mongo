@@ -710,7 +710,7 @@ namespace mongo {
         global->ForceSet(v8StringData(field), v8::Number::New(_isolate, val));
     }
 
-    void V8Scope::setString(const char * field, const StringData& val) {
+    void V8Scope::setString(const char * field, StringData val) {
         V8_SIMPLE_HEADER
         v8::Local<v8::Object> global = getGlobal();
         global->ForceSet(v8StringData(field), v8StringData(val));
@@ -1017,7 +1017,7 @@ namespace mongo {
 
     // --- functions -----
 
-    bool hasFunctionIdentifier(const StringData& code) {
+    bool hasFunctionIdentifier(StringData code) {
         if (code.size() < 9 || code.find("function") != 0 )
             return false;
 
@@ -1153,7 +1153,7 @@ namespace mongo {
         return 0;
     }
 
-    bool V8Scope::exec(const StringData& code, const string& name, bool printResult,
+    bool V8Scope::exec(StringData code, const string& name, bool printResult,
                        bool reportError, bool assertOnError, int timeoutMs) {
         V8_SIMPLE_HEADER
         v8::TryCatch try_catch;
@@ -1406,7 +1406,7 @@ namespace mongo {
         _inNativeExecution = true;
     }
 
-    v8::Local<v8::Value> V8Scope::newFunction(const StringData& code) {
+    v8::Local<v8::Value> V8Scope::newFunction(StringData code) {
         v8::EscapableHandleScope handle_scope(_isolate);
         v8::TryCatch try_catch;
         string codeStr = str::stream() << "____MongoToV8_newFunction_temp = " << code;
@@ -1589,7 +1589,7 @@ namespace mongo {
     }
 
     void V8Scope::v8ToMongoNumber(BSONObjBuilder& b,
-                                  const StringData& elementName,
+                                  StringData elementName,
                                   v8::Local<v8::Number> value,
                                   BSONObj* originalParent) {
         double val = value->Value();
@@ -1607,7 +1607,7 @@ namespace mongo {
     }
 
     void V8Scope::v8ToMongoRegex(BSONObjBuilder& b,
-                                 const StringData& elementName,
+                                 StringData elementName,
                                  v8::Local<v8::RegExp> v8Regex) {
         V8String v8RegexString (v8Regex);
         StringData regex = v8RegexString;
@@ -1618,7 +1618,7 @@ namespace mongo {
     }
 
     void V8Scope::v8ToMongoDBRef(BSONObjBuilder& b,
-                                 const StringData& elementName,
+                                 StringData elementName,
                                  v8::Local<v8::Object> obj) {
         verify(DBPointerFT()->HasInstance(obj));
         v8::Local<v8::Value> theid = obj->Get(strLitToV8("id"));
@@ -1628,7 +1628,7 @@ namespace mongo {
     }
 
     void V8Scope::v8ToMongoBinData(BSONObjBuilder& b,
-                                   const StringData& elementName,
+                                   StringData elementName,
                                    v8::Local<v8::Object> obj) {
 
         verify(BinDataFT()->HasInstance(obj));
@@ -1654,7 +1654,7 @@ namespace mongo {
     }
 
     void V8Scope::v8ToMongoObject(BSONObjBuilder& b,
-                                  const StringData& elementName,
+                                  StringData elementName,
                                   v8::Local<v8::Value> value,
                                   int depth,
                                   BSONObj* originalParent) {
@@ -1688,7 +1688,7 @@ namespace mongo {
         }
     }
 
-    void V8Scope::v8ToMongoElement(BSONObjBuilder & b, const StringData& sname,
+    void V8Scope::v8ToMongoElement(BSONObjBuilder & b, StringData sname,
                                    v8::Local<v8::Value> value, int depth,
                                    BSONObj* originalParent) {
         uassert(17279,

@@ -91,9 +91,9 @@ namespace {
 
     // static
     StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
-        const StringData& ns,
+        StringData ns,
         const CollectionOptions& options,
-        const StringData& extraStrings) {
+        StringData extraStrings) {
 
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
@@ -162,8 +162,8 @@ namespace {
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
-                                                 const StringData& ns,
-                                                 const StringData& uri,
+                                                 StringData ns,
+                                                 StringData uri,
                                                  bool isCapped,
                                                  int64_t cappedMaxSize,
                                                  int64_t cappedMaxDocs,

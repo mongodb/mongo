@@ -41,7 +41,7 @@ namespace mongo {
     class KVCollectionCatalogEntry::AddIndexChange : public RecoveryUnit::Change {
     public:
         AddIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce,
-                       const StringData& ident)
+                       StringData ident)
             : _opCtx(opCtx)
             , _cce(cce)
             , _ident(ident.toString())
@@ -61,7 +61,7 @@ namespace mongo {
     class KVCollectionCatalogEntry::RemoveIndexChange : public RecoveryUnit::Change {
     public:
         RemoveIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce,
-                          const StringData& ident)
+                          StringData ident)
             : _opCtx(opCtx)
             , _cce(cce)
             , _ident(ident.toString())
@@ -82,8 +82,8 @@ namespace mongo {
 
     KVCollectionCatalogEntry::KVCollectionCatalogEntry( KVEngine* engine,
                                                         KVCatalog* catalog,
-                                                        const StringData& ns,
-                                                        const StringData& ident,
+                                                        StringData ns,
+                                                        StringData ident,
                                                         RecordStore* rs)
         : BSONCollectionCatalogEntry( ns ),
           _engine( engine ),
@@ -96,7 +96,7 @@ namespace mongo {
     }
 
     bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
-                                                      const StringData& indexName,
+                                                      StringData indexName,
                                                       bool multikey ) {
         MetaData md = _getMetaData(txn);
 
@@ -110,7 +110,7 @@ namespace mongo {
     }
 
     void KVCollectionCatalogEntry::setIndexHead( OperationContext* txn,
-                                                 const StringData& indexName,
+                                                 StringData indexName,
                                                  const RecordId& newHead ) {
         MetaData md = _getMetaData( txn );
         int offset = md.findIndexOffset( indexName );
@@ -120,7 +120,7 @@ namespace mongo {
     }
 
     Status KVCollectionCatalogEntry::removeIndex( OperationContext* txn,
-                                                  const StringData& indexName ) {
+                                                  StringData indexName ) {
         MetaData md = _getMetaData( txn );
         
         if (md.findIndexOffset(indexName) < 0)
@@ -153,7 +153,7 @@ namespace mongo {
     }
 
     void KVCollectionCatalogEntry::indexBuildSuccess( OperationContext* txn,
-                                                      const StringData& indexName ) {
+                                                      StringData indexName ) {
         MetaData md = _getMetaData( txn );
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
@@ -162,7 +162,7 @@ namespace mongo {
     }
 
     void KVCollectionCatalogEntry::updateTTLSetting( OperationContext* txn,
-                                                     const StringData& idxName,
+                                                     StringData idxName,
                                                      long long newExpireSeconds ) {
         MetaData md = _getMetaData( txn );
         int offset = md.findIndexOffset( idxName );

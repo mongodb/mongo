@@ -85,7 +85,7 @@ namespace mongo {
         ValueStorage(BSONType t, bool b)                   { zero(); type = t; boolValue = b; }
         ValueStorage(BSONType t, const Document& d)        { zero(); type = t; putDocument(d); }
         ValueStorage(BSONType t, const RCVector* a)        { zero(); type = t; putVector(a); }
-        ValueStorage(BSONType t, const StringData& s)      { zero(); type = t; putString(s); }
+        ValueStorage(BSONType t, StringData s)      { zero(); type = t; putString(s); }
         ValueStorage(BSONType t, const BSONBinData& bd)    { zero(); type = t; putBinData(bd); }
         ValueStorage(BSONType t, const BSONRegEx& re)      { zero(); type = t; putRegEx(re); }
         ValueStorage(BSONType t, const BSONCodeWScope& cs) { zero(); type = t; putCodeWScope(cs); }
@@ -130,7 +130,7 @@ namespace mongo {
         }
 
         /// These are only to be called during Value construction on an empty Value
-        void putString(const StringData& s);
+        void putString(StringData s);
         void putVector(const RCVector* v);
         void putDocument(const Document& d);
         void putRegEx(const BSONRegEx& re);

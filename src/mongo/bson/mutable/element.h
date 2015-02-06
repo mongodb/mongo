@@ -163,7 +163,7 @@ namespace mutablebson {
         Status popBack();
 
         /** Rename this Element to the provided name. */
-        Status rename(const StringData& newName);
+        Status rename(StringData newName);
 
 
         //
@@ -212,15 +212,15 @@ namespace mutablebson {
          *  exists, a non-ok Element is returned. This is not a constant time operation. This
          *  method is also available as operator[] taking a StringData for convenience.
          */
-        Element findFirstChildNamed(const StringData& name) const;
-        inline Element operator[](const StringData& name) const;
+        Element findFirstChildNamed(StringData name) const;
+        inline Element operator[](StringData name) const;
 
         /** Returns the first element found named 'name', starting the search at the current
          *  Element, and walking right. If no such Element exists, a non-ok Element is
          *  returned. This is not a constant time operation. This implementation is used in the
          *  specialized implementation of findElement<ElementType, FieldNameEquals>.
          */
-        Element findElementNamed(const StringData& name) const;
+        Element findElementNamed(StringData name) const;
 
         //
         // Counting API.
@@ -389,7 +389,7 @@ namespace mutablebson {
         Status setValueDouble(double value);
 
         /** Set the value of this Element to the given string. */
-        Status setValueString(const StringData& value);
+        Status setValueString(StringData value);
 
         /** Set the value of this Element to the given object. The data in 'value' is
          *  copied.
@@ -420,19 +420,19 @@ namespace mutablebson {
         Status setValueNull();
 
         /** Set the value of this Element to the given regex parameters. */
-        Status setValueRegex(const StringData& re, const StringData& flags);
+        Status setValueRegex(StringData re, StringData flags);
 
         /** Set the value of this Element to the given db ref parameters. */
-        Status setValueDBRef(const StringData& ns, OID oid);
+        Status setValueDBRef(StringData ns, OID oid);
 
         /** Set the value of this Element to the given code data. */
-        Status setValueCode(const StringData& value);
+        Status setValueCode(StringData value);
 
         /** Set the value of this Element to the given symbol. */
-        Status setValueSymbol(const StringData& value);
+        Status setValueSymbol(StringData value);
 
         /** Set the value of this Element to the given code and scope data. */
-        Status setValueCodeWithScope(const StringData& code, const BSONObj& scope);
+        Status setValueCodeWithScope(StringData code, const BSONObj& scope);
 
         /** Set the value of this Element to the given integer. */
         Status setValueInt(int32_t value);
@@ -506,72 +506,72 @@ namespace mutablebson {
         //
 
         /** Append the provided double value as a new field with the provided name. */
-        Status appendDouble(const StringData& fieldName, double value);
+        Status appendDouble(StringData fieldName, double value);
 
         /** Append the provided std::string value as a new field with the provided name. */
-        Status appendString(const StringData& fieldName, const StringData& value);
+        Status appendString(StringData fieldName, StringData value);
 
         /** Append the provided object as a new field with the provided name. The data in
          *  'value' is copied.
          */
-        Status appendObject(const StringData& fieldName, const BSONObj& value);
+        Status appendObject(StringData fieldName, const BSONObj& value);
 
         /** Append the provided array object as a new field with the provided name. The data in
          *  value is copied.
          */
-        Status appendArray(const StringData& fieldName, const BSONObj& value);
+        Status appendArray(StringData fieldName, const BSONObj& value);
 
         /** Append the provided binary data as a new field with the provided name. */
-        Status appendBinary(const StringData& fieldName,
+        Status appendBinary(StringData fieldName,
                             uint32_t len, mongo::BinDataType binType, const void* data);
 
         /** Append an undefined value as a new field with the provided name. */
-        Status appendUndefined(const StringData& fieldName);
+        Status appendUndefined(StringData fieldName);
 
         /** Append the provided OID as a new field with the provided name. */
-        Status appendOID(const StringData& fieldName, mongo::OID value);
+        Status appendOID(StringData fieldName, mongo::OID value);
 
         /** Append the provided bool as a new field with the provided name. */
-        Status appendBool(const StringData& fieldName, bool value);
+        Status appendBool(StringData fieldName, bool value);
 
         /** Append the provided date as a new field with the provided name. */
-        Status appendDate(const StringData& fieldName, Date_t value);
+        Status appendDate(StringData fieldName, Date_t value);
 
         /** Append a null as a new field with the provided name. */
-        Status appendNull(const StringData& fieldName);
+        Status appendNull(StringData fieldName);
 
         /** Append the provided regex data as a new field with the provided name. */
-        Status appendRegex(const StringData& fieldName,
-                           const StringData& re, const StringData& flags);
+        Status appendRegex(StringData fieldName,
+                           StringData re, StringData flags);
 
         /** Append the provided DBRef data as a new field with the provided name. */
-        Status appendDBRef(const StringData& fieldName,
-                           const StringData& ns, mongo::OID oid);
+        Status appendDBRef(StringData fieldName,
+                           StringData ns, mongo::OID oid);
 
         /** Append the provided code data as a new field with the iven name. */
-        Status appendCode(const StringData& fieldName, const StringData& value);
+        Status appendCode(StringData fieldName, StringData value);
 
         /** Append the provided symbol data as a new field with the provided name. */
-        Status appendSymbol(const StringData& fieldName, const StringData& value);
+        Status appendSymbol(StringData fieldName, StringData value);
 
         /** Append the provided code and scope data as a new field with the provided name. */
-        Status appendCodeWithScope(const StringData& fieldName,
-                                   const StringData& code, const BSONObj& scope);
+        Status appendCodeWithScope(StringData fieldName,
+                                   StringData code, const BSONObj& scope);
 
         /** Append the provided integer as a new field with the provided name. */
-        Status appendInt(const StringData& fieldName, int32_t value);
+        Status appendInt(StringData fieldName, int32_t value);
 
         /** Append the provided timestamp as a new field with the provided name. */
-        Status appendTimestamp(const StringData& fieldName, OpTime value);
+        Status appendTimestamp(StringData fieldName, OpTime value);
 
         /** Append the provided long integer as a new field with the provided name. */
-        Status appendLong(const StringData& fieldName, int64_t value);
+        Status appendLong(StringData fieldName, int64_t value);
 
         /** Append a max key as a new field with the provided name. */
-        Status appendMinKey(const StringData& fieldName);
+        Status appendMinKey(StringData fieldName);
 
         /** Append a min key as a new field with the provided name. */
-        Status appendMaxKey(const StringData& fieldName);
+        Status appendMaxKey(StringData fieldName);
 
         /** Append the given BSONElement. The data in 'value' is copied. */
         Status appendElement(const BSONElement& value);
@@ -579,7 +579,7 @@ namespace mutablebson {
         /** Append the provided number as field of the appropriate numeric type with the
          *  provided name.
          */
-        Status appendSafeNum(const StringData& fieldName, SafeNum value);
+        Status appendSafeNum(StringData fieldName, SafeNum value);
 
         /** Convert this element to its JSON representation if ok(),
          *  otherwise return !ok() message */

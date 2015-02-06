@@ -71,7 +71,7 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
-    void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
+    void massertNamespaceNotIndex( StringData ns, StringData caller ) {
         massert( 17320,
                  str::stream() << "cannot do " << caller
                  << " on namespace with a $ in it: " << ns,
@@ -80,7 +80,7 @@ namespace mongo {
 
     class Database::AddCollectionChange : public RecoveryUnit::Change {
     public:
-        AddCollectionChange(Database* db, const StringData& ns)
+        AddCollectionChange(Database* db, StringData ns)
             : _db(db)
             , _ns(ns.toString())
         {}
@@ -137,7 +137,7 @@ namespace mongo {
         }
     }
 
-    Status Database::validateDBName( const StringData& dbname ) {
+    Status Database::validateDBName( StringData dbname ) {
 
         if ( dbname.size() <= 0 )
             return Status( ErrorCodes::BadValue, "db name is empty" );
@@ -173,7 +173,7 @@ namespace mongo {
     }
 
     Collection* Database::_getOrCreateCollectionInstance(OperationContext* txn,
-                                                         const StringData& fullns) {
+                                                         StringData fullns) {
         Collection* collection = getCollection( fullns );
         if (collection) {
             return collection;
@@ -190,7 +190,7 @@ namespace mongo {
         return c;
     }
 
-    Database::Database(OperationContext* txn, const StringData& name, DatabaseCatalogEntry* dbEntry)
+    Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry* dbEntry)
         : _name(name.toString()),
           _dbEntry( dbEntry ),
           _profileName(_name + ".system.profile"),
@@ -353,7 +353,7 @@ namespace mongo {
         _dbEntry->appendExtraStats( opCtx, output, scale );
     }
 
-    Status Database::dropCollection( OperationContext* txn, const StringData& fullns ) {
+    Status Database::dropCollection( OperationContext* txn, StringData fullns ) {
         invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         LOG(1) << "dropCollection: " << fullns << endl;
@@ -422,7 +422,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Database::_clearCollectionCache(OperationContext* txn, const StringData& fullns ) {
+    void Database::_clearCollectionCache(OperationContext* txn, StringData fullns ) {
         verify( _name == nsToDatabaseSubstring( fullns ) );
         CollectionMap::const_iterator it = _collections.find( fullns.toString() );
         if ( it == _collections.end() )
@@ -435,7 +435,7 @@ namespace mongo {
         _collections.erase( it );
     }
 
-    Collection* Database::getCollection( const StringData& ns ) const {
+    Collection* Database::getCollection( StringData ns ) const {
         invariant( _name == nsToDatabaseSubstring( ns ) );
         CollectionMap::const_iterator it = _collections.find( ns );
         if ( it != _collections.end() && it->second ) {
@@ -448,8 +448,8 @@ namespace mongo {
 
 
     Status Database::renameCollection( OperationContext* txn,
-                                       const StringData& fromNS,
-                                       const StringData& toNS,
+                                       StringData fromNS,
+                                       StringData toNS,
                                        bool stayTemp ) {
 
         audit::logRenameCollection( currentClient.get(), fromNS, toNS );
@@ -477,7 +477,7 @@ namespace mongo {
         return s;
     }
 
-    Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
+    Collection* Database::getOrCreateCollection(OperationContext* txn, StringData ns) {
         Collection* c = getCollection( ns );
         if ( !c ) {
             c = createCollection( txn, ns );
@@ -486,7 +486,7 @@ namespace mongo {
     }
 
     Collection* Database::createCollection( OperationContext* txn,
-                                            const StringData& ns,
+                                            StringData ns,
                                             const CollectionOptions& options,
                                             bool allocateDefaultSpace,
                                             bool createIdIndex ) {
@@ -592,7 +592,7 @@ namespace mongo {
     */
     Status userCreateNS( OperationContext* txn,
                          Database* db,
-                         const StringData& ns,
+                         StringData ns,
                          BSONObj options,
                          bool logForReplication,
                          bool createDefaultIndexes ) {

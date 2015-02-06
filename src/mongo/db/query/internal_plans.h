@@ -65,7 +65,7 @@ namespace mongo {
          * Return a collection scan.  Caller owns pointer.
          */
         static PlanExecutor* collectionScan(OperationContext* txn,
-                                            const StringData& ns,
+                                            StringData ns,
                                             Collection* collection,
                                             const Direction direction = FORWARD,
                                             const RecordId startLoc = RecordId()) {

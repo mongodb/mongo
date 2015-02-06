@@ -51,7 +51,7 @@ namespace logger {
      * Looks up a component by its short name, or returns kNumLogComponents
      * if the shortName is invalid
      */
-    const LogComponent _getComponentForShortName(const StringData& shortName) {
+    const LogComponent _getComponentForShortName(StringData shortName) {
         for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
             LogComponent component = static_cast<LogComponent::Value>(i);
             if (component.getShortName() == shortName)

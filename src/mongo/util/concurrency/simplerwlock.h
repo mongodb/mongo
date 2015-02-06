@@ -51,7 +51,7 @@ namespace mongo {
 #endif
     public:
         const std::string name;
-        SimpleRWLock(const StringData& name = "" );
+        SimpleRWLock(StringData name = "" );
         void lock();
         void unlock();
         void lock_shared();

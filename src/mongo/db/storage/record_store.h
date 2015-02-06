@@ -121,7 +121,7 @@ namespace mongo {
     class RecordStore {
         MONGO_DISALLOW_COPYING(RecordStore);
     public:
-        RecordStore( const StringData& ns ) : _ns(ns.toString()) { }
+        RecordStore( StringData ns ) : _ns(ns.toString()) { }
 
         virtual ~RecordStore() { }
 

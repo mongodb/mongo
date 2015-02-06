@@ -38,7 +38,7 @@ namespace mongo {
 
     namespace fts {
 
-        Tokenizer::Tokenizer( const FTSLanguage& language, const StringData& str )
+        Tokenizer::Tokenizer( const FTSLanguage& language, StringData str )
             : _pos(0), _raw( str ) {
             _english = ( language.str() == "english" );
             _skipWhitespace();

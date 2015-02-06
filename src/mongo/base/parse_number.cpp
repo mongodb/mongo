@@ -59,7 +59,7 @@ namespace mongo {
      * substring with any sign characters stripped away.  "*isNegative" is set to true if the
      * number is negative, and false otherwise.
      */
-    static inline StringData _extractSign(const StringData& stringValue, bool* isNegative) {
+    static inline StringData _extractSign(StringData stringValue, bool* isNegative) {
         if (stringValue.empty()) {
             *isNegative = false;
             return stringValue;
@@ -96,7 +96,7 @@ namespace mongo {
      * "0x" or "0X" prefix, if present.
      */
     static inline StringData _extractBase(
-            const StringData& stringValue, int inputBase, int* outputBase) {
+            StringData stringValue, int inputBase, int* outputBase) {
 
         const StringData hexPrefixLower("0x", StringData::LiteralTag());
         const StringData hexPrefixUpper("0X", StringData::LiteralTag());
@@ -125,7 +125,7 @@ namespace mongo {
 
     template <typename NumberType>
     Status parseNumberFromStringWithBase(
-            const StringData& stringValue, int base, NumberType* result) {
+            StringData stringValue, int base, NumberType* result) {
 
         typedef ::std::numeric_limits<NumberType> limits;
 
@@ -193,7 +193,7 @@ namespace mongo {
     // Definition of the various supported implementations of parseNumberFromStringWithBase.
 
 #define DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(NUMBER_TYPE)          \
-    template MONGO_COMPILER_API_EXPORT Status parseNumberFromStringWithBase<NUMBER_TYPE>(const StringData&, int, NUMBER_TYPE*);
+    template MONGO_COMPILER_API_EXPORT Status parseNumberFromStringWithBase<NUMBER_TYPE>(StringData, int, NUMBER_TYPE*);
 
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long)
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long long)
@@ -226,7 +226,7 @@ namespace {
 #endif  // defined(_WIN32)
 
     template <>
-    Status parseNumberFromStringWithBase<double>(const StringData& stringValue,
+    Status parseNumberFromStringWithBase<double>(StringData stringValue,
                                                  int base,
                                                  double* result) {
         if (base != 0) {

@@ -589,10 +589,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    static void logErrMsgOrWarn(const StringData& messagePrefix,
-                                const StringData& lockName,
-                                const StringData& errMsg,
-                                const StringData& altErrMsg) {
+    static void logErrMsgOrWarn(StringData messagePrefix,
+                                StringData lockName,
+                                StringData errMsg,
+                                StringData altErrMsg) {
 
         if (errMsg.empty()) {
             LOG(DistributedLock::logLvl - 1) << messagePrefix << " '" << lockName << "' " <<

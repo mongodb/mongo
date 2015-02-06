@@ -52,7 +52,7 @@ namespace mongo {
          * documents, but does not impact readers.
          * Returns whether or not it was successful at acquiring the lock.
          */
-        bool tryLock(const StringData& why);
+        bool tryLock(StringData why);
 
         /**
          * Releases the lock guarding modifications to persistent authorization data, which must

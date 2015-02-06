@@ -944,7 +944,7 @@ namespace {
     }
 
     IndexDescriptor* IndexCatalog::findIndexByName( OperationContext* txn,
-                                                    const StringData& name,
+                                                    StringData name,
                                                     bool includeUnfinishedIndexes ) const {
         IndexIterator ii = getIndexIterator( txn, includeUnfinishedIndexes );
         while ( ii.more() ) {

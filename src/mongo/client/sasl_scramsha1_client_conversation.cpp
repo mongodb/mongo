@@ -59,7 +59,7 @@ namespace mongo {
         memset(_saltedPassword, 0, scram::hashSize);
     }
 
-    StatusWith<bool> SaslSCRAMSHA1ClientConversation::step(const StringData& inputData,
+    StatusWith<bool> SaslSCRAMSHA1ClientConversation::step(StringData inputData,
                                                            std::string* outputData) {
         std::vector<std::string> input = StringSplitter::split(inputData.toString(), ",");
         _step++;

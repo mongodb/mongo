@@ -251,7 +251,7 @@ namespace {
     }
 
     DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                                 const StringData& db ) {
+                                                                 StringData db ) {
         {
             boost::mutex::scoped_lock lk(_entryMapMutex);
             EntryMap::const_iterator iter = _entryMap.find(db.toString());
@@ -279,7 +279,7 @@ namespace {
         return entry;
     }
 
-    Status MMAPV1Engine::closeDatabase( OperationContext* txn, const StringData& db ) {
+    Status MMAPV1Engine::closeDatabase( OperationContext* txn, StringData db ) {
         // Before the files are closed, flush any potentially outstanding changes, which might
         // reference this database. Otherwise we will assert when subsequent applications of the
         // global journal entries occur, which happen to have write intents for the removed files.
@@ -292,7 +292,7 @@ namespace {
         return Status::OK();
     }
 
-    Status MMAPV1Engine::dropDatabase( OperationContext* txn, const StringData& db ) {
+    Status MMAPV1Engine::dropDatabase( OperationContext* txn, StringData db ) {
         Status status = closeDatabase( txn, db );
         if ( !status.isOK() )
             return status;

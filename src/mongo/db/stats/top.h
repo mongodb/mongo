@@ -79,10 +79,10 @@ namespace mongo {
         typedef StringMap<CollectionData> UsageMap;
 
     public:
-        void record( const StringData& ns, int op, int lockType, long long micros, bool command );
+        void record( StringData ns, int op, int lockType, long long micros, bool command );
         void append( BSONObjBuilder& b );
         void cloneMap(UsageMap& out) const;
-        void collectionDropped( const StringData& ns );
+        void collectionDropped( StringData ns );
 
     public: // static stuff
         static Top global;

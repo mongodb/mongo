@@ -51,10 +51,10 @@ namespace mongo {
         void onCreate( WiredTigerRecordStore* rs, long long nr, long long ds );
         void onDestroy( WiredTigerRecordStore* rs );
 
-        void store( const StringData& uri,
+        void store( StringData uri,
                     long long numRecords, long long dataSize );
 
-        void load( const StringData& uri,
+        void load( StringData uri,
                    long long* numRecords, long long* dataSize ) const;
 
         void loadFrom( WiredTigerSession* cursor, const std::string& uri );

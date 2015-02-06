@@ -313,7 +313,7 @@ namespace mongo {
     // Geo queries we don't need an index to answer: geoWithin and geoIntersects
     //
 
-    Status GeoMatchExpression::init( const StringData& path, const GeoExpression* query,
+    Status GeoMatchExpression::init( StringData path, const GeoExpression* query,
                                      const BSONObj& rawObj ) {
         _query.reset(query);
         _rawObj = rawObj;
@@ -390,7 +390,7 @@ namespace mongo {
     // Parse-only geo expressions: geoNear (formerly known as near).
     //
 
-    Status GeoNearMatchExpression::init( const StringData& path, const GeoNearExpression* query,
+    Status GeoNearMatchExpression::init( StringData path, const GeoNearExpression* query,
                                          const BSONObj& rawObj ) {
         _query.reset(query);
         _rawObj = rawObj;

@@ -127,7 +127,7 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setServer(const StringData& server) {
+        void setServer(StringData server) {
             _server = server.toString();
             _isServerSet = true;
         }
@@ -142,7 +142,7 @@ namespace mongo {
             return _what;
         }
 
-        void setWhat(const StringData& what) {
+        void setWhat(StringData what) {
             _what = what.toString();
             _isWhatSet = true;
         }

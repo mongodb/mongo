@@ -136,7 +136,7 @@ namespace mongo {
          * It should not be deleted by any caller.
          */
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                               const StringData& db ) = 0;
+                                                               StringData db ) = 0;
 
         /**
          * Returns whether the storage engine supports its own locking locking below the collection
@@ -161,12 +161,12 @@ namespace mongo {
         /**
          * Closes all file handles associated with a database.
          */
-        virtual Status closeDatabase( OperationContext* txn, const StringData& db ) = 0;
+        virtual Status closeDatabase( OperationContext* txn, StringData db ) = 0;
 
         /**
          * Deletes all data and metadata for a database.
          */
-        virtual Status dropDatabase( OperationContext* txn, const StringData& db ) = 0;
+        virtual Status dropDatabase( OperationContext* txn, StringData db ) = 0;
 
         /**
          * @return number of files flushed

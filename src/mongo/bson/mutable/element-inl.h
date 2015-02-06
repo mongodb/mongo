@@ -34,7 +34,7 @@ namespace mutablebson {
         return findNthChild(n);
     }
 
-    inline Element Element::operator[](const StringData& name) const {
+    inline Element Element::operator[](StringData name) const {
         return findFirstChildNamed(name);
     }
 

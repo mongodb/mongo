@@ -268,7 +268,7 @@ namespace mongo {
 
     private:
         static Status checkUniqueIndexConstraints(OperationContext* txn,
-                                                  const StringData& ns,
+                                                  StringData ns,
                                                   const BSONObj& newIdxKey) {
 
             invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));

@@ -121,7 +121,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setChangeID(const StringData& changeID) {
+        void setChangeID(StringData changeID) {
             _changeID = changeID.toString();
             _isChangeIDSet = true;
         }
@@ -136,7 +136,7 @@ namespace mongo {
             return _changeID;
         }
 
-        void setServer(const StringData& server) {
+        void setServer(StringData server) {
             _server = server.toString();
             _isServerSet = true;
         }
@@ -151,7 +151,7 @@ namespace mongo {
             return _server;
         }
 
-        void setClientAddr(const StringData& clientAddr) {
+        void setClientAddr(StringData clientAddr) {
             _clientAddr = clientAddr.toString();
             _isClientAddrSet = true;
         }
@@ -181,7 +181,7 @@ namespace mongo {
             return _time;
         }
 
-        void setWhat(const StringData& what) {
+        void setWhat(StringData what) {
             _what = what.toString();
             _isWhatSet = true;
         }
@@ -196,7 +196,7 @@ namespace mongo {
             return _what;
         }
 
-        void setNS(const StringData& ns) {
+        void setNS(StringData ns) {
             _ns = ns.toString();
             _isNsSet = true;
         }

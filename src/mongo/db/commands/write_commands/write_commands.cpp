@@ -66,11 +66,11 @@ namespace mongo {
 
     } // namespace
 
-    WriteCmd::WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
+    WriteCmd::WriteCmd( StringData name, BatchedCommandRequest::BatchType writeType ) :
         Command( name ), _writeType( writeType ) {
     }
 
-    void WriteCmd::redactTooLongLog( mutablebson::Document* cmdObj, const StringData& fieldName ) {
+    void WriteCmd::redactTooLongLog( mutablebson::Document* cmdObj, StringData fieldName ) {
         namespace mmb = mutablebson;
         mmb::Element root = cmdObj->root();
         mmb::Element field = root.findFirstChildNamed( fieldName );

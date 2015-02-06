@@ -447,7 +447,7 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName,
+    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(StringData dbName,
                                                     LockMode mode) const {
         invariant(nsIsDbOnly(dbName));
 
@@ -459,7 +459,7 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(const StringData& ns,
+    bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(StringData ns,
                                                             LockMode mode) const {
         invariant(nsIsFull(ns));
 

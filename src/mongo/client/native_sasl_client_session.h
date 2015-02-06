@@ -47,7 +47,7 @@ namespace mongo {
 
         virtual Status initialize();
 
-        virtual Status step(const StringData& inputData, std::string* outputData);
+        virtual Status step(StringData inputData, std::string* outputData);
 
         virtual bool isDone() const { return _done; }
 

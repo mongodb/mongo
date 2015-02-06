@@ -113,7 +113,7 @@ namespace mongo {
          * Currently, only boolean fields are supported.
          */
         template <typename T>
-        Status validateStorageEngineOption(const StringData& fieldName, T expectedValue) const;
+        Status validateStorageEngineOption(StringData fieldName, T expectedValue) const;
 
     private:
         std::string _dbpath;

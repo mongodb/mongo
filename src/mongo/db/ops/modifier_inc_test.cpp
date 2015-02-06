@@ -63,13 +63,13 @@ namespace {
             : _modObj(modObj)
             , _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$mul") ?
                    ModifierInc::MODE_MUL : ModifierInc::MODE_INC) {
-            const StringData& modName = modObj.firstElement().fieldName();
+            StringData modName = modObj.firstElement().fieldName();
             ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
                                 ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
-                       const StringData& matchedField,
+                       StringData matchedField,
                        ModifierInterface::ExecInfo* execInfo) {
             return _mod.prepare(root, matchedField, execInfo);
         }

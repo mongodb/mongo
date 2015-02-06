@@ -64,7 +64,7 @@ namespace mongo {
         }
 
         void FTSSpec::_scoreStringV1( const Tools& tools,
-                                      const StringData& raw,
+                                      StringData raw,
                                       TermFrequencyMap* docScores,
                                       double weight ) const {
 
@@ -120,7 +120,7 @@ namespace mongo {
             }
         }
 
-        bool FTSSpec::_weightV1( const StringData& field, double* out ) const {
+        bool FTSSpec::_weightV1( StringData field, double* out ) const {
             Weights::const_iterator i = _weights.find( field.toString() );
             if ( i == _weights.end() )
                 return false;

@@ -145,7 +145,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    std::string getMongoShellHelp(const StringData& name, const moe::OptionSection& options) {
+    std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
         StringBuilder sb;
         sb << "MongoDB shell version: " << mongo::versionString << "\n";
         sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"

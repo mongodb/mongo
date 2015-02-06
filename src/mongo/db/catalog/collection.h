@@ -103,7 +103,7 @@ namespace mongo {
     class Collection : CappedDocumentDeleteCallback, UpdateNotifier {
     public:
         Collection( OperationContext* txn,
-                    const StringData& fullNS,
+                    StringData fullNS,
                     CollectionCatalogEntry* details, // does not own
                     RecordStore* recordStore, // does not own
                     DatabaseCatalogEntry* dbce ); // does not own

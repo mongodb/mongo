@@ -715,7 +715,7 @@ namespace mutablebson {
 
         // A helper method that either inserts the field name into the field name heap and
         // updates element.
-        void insertFieldName(ElementRep& rep, const StringData& fieldName) {
+        void insertFieldName(ElementRep& rep, StringData fieldName) {
             dassert(!rep.serialized);
             rep.offset = insertFieldName(fieldName);
         }
@@ -923,12 +923,12 @@ namespace mutablebson {
             }
         }
 
-        inline bool doesNotAlias(const StringData& s) const {
+        inline bool doesNotAlias(StringData s) const {
             // StringData may come from either the field name heap or the leaf builder.
             return doesNotAliasLeafBuilder(s) && !inFieldNameHeap(s.rawData());
         }
 
-        inline bool doesNotAliasLeafBuilder(const StringData& s) const {
+        inline bool doesNotAliasLeafBuilder(StringData s) const {
             return !inLeafBuilder(s.rawData());
         }
 
@@ -1064,7 +1064,7 @@ namespace mutablebson {
 
         // Insert the given field name into the field name heap, and return an ID for this
         // field name.
-        int32_t insertFieldName(const StringData& fieldName) {
+        int32_t insertFieldName(StringData fieldName) {
             const uint32_t id = _fieldNames.size();
             if (!fieldName.empty())
                 _fieldNames.insert(
@@ -1272,7 +1272,7 @@ namespace mutablebson {
         return Status::OK();
     }
 
-    Status Element::rename(const StringData& newName) {
+    Status Element::rename(StringData newName) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
@@ -1401,7 +1401,7 @@ namespace mutablebson {
         return Element(_doc, current);
     }
 
-    Element Element::findFirstChildNamed(const StringData& name) const {
+    Element Element::findFirstChildNamed(StringData name) const {
         verify(ok());
         Document::Impl& impl = _doc->getImpl();
         Element::RepIdx current = _repIdx;
@@ -1413,7 +1413,7 @@ namespace mutablebson {
         return Element(_doc, current);
     }
 
-    Element Element::findElementNamed(const StringData& name) const {
+    Element Element::findElementNamed(StringData name) const {
         verify(ok());
         Document::Impl& impl = _doc->getImpl();
         Element::RepIdx current = _repIdx;
@@ -1695,7 +1695,7 @@ namespace mutablebson {
         return setValue(newValue._repIdx);
     }
 
-    Status Element::setValueString(const StringData& value) {
+    Status Element::setValueString(StringData value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
@@ -1790,7 +1790,7 @@ namespace mutablebson {
         return setValue(newValue._repIdx);
     }
 
-    Status Element::setValueRegex(const StringData& re, const StringData& flags) {
+    Status Element::setValueRegex(StringData re, StringData flags) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
@@ -1803,7 +1803,7 @@ namespace mutablebson {
         return setValue(newValue._repIdx);
     }
 
-    Status Element::setValueDBRef(const StringData& ns, const OID oid) {
+    Status Element::setValueDBRef(StringData ns, const OID oid) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
@@ -1815,7 +1815,7 @@ namespace mutablebson {
         return setValue(newValue._repIdx);
     }
 
-    Status Element::setValueCode(const StringData& value) {
+    Status Element::setValueCode(StringData value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
@@ -1827,7 +1827,7 @@ namespace mutablebson {
         return setValue(newValue._repIdx);
     }
 
-    Status Element::setValueSymbol(const StringData& value) {
+    Status Element::setValueSymbol(StringData value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
@@ -1839,7 +1839,7 @@ namespace mutablebson {
         return setValue(newValue._repIdx);
     }
 
-    Status Element::setValueCodeWithScope(const StringData& code, const BSONObj& scope) {
+    Status Element::setValueCodeWithScope(StringData code, const BSONObj& scope) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
 
@@ -2084,7 +2084,7 @@ namespace mutablebson {
 
         template<>
         struct SubBuilder<BSONObjBuilder> {
-            SubBuilder(BSONObjBuilder* builder, BSONType type, const StringData& fieldName)
+            SubBuilder(BSONObjBuilder* builder, BSONType type, StringData fieldName)
                 : buffer(
                     (type == mongo::Array) ?
                     builder->subarrayStart(fieldName) :
@@ -2094,7 +2094,7 @@ namespace mutablebson {
 
         template<>
         struct SubBuilder<BSONArrayBuilder> {
-            SubBuilder(BSONArrayBuilder* builder, BSONType type, const StringData&)
+            SubBuilder(BSONArrayBuilder* builder, BSONType type, StringData)
                 : buffer(
                     (type == mongo::Array) ?
                     builder->subarrayStart() :
@@ -2266,7 +2266,7 @@ namespace mutablebson {
         return getImpl().getCurrentInPlaceMode();
     }
 
-    Element Document::makeElementDouble(const StringData& fieldName, const double value) {
+    Element Document::makeElementDouble(StringData fieldName, const double value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2276,7 +2276,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementString(const StringData& fieldName, const StringData& value) {
+    Element Document::makeElementString(StringData fieldName, StringData value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
         dassert(impl.doesNotAlias(value));
@@ -2287,7 +2287,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementObject(const StringData& fieldName) {
+    Element Document::makeElementObject(StringData fieldName) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2297,7 +2297,7 @@ namespace mutablebson {
         return Element(this, newEltIdx);
     }
 
-    Element Document::makeElementObject(const StringData& fieldName, const BSONObj& value) {
+    Element Document::makeElementObject(StringData fieldName, const BSONObj& value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAliasLeafBuilder(fieldName));
         dassert(impl.doesNotAlias(value));
@@ -2315,7 +2315,7 @@ namespace mutablebson {
         return Element(this, newEltIdx);
     }
 
-    Element Document::makeElementArray(const StringData& fieldName) {
+    Element Document::makeElementArray(StringData fieldName) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2326,7 +2326,7 @@ namespace mutablebson {
         return Element(this, newEltIdx);
     }
 
-    Element Document::makeElementArray(const StringData& fieldName, const BSONObj& value) {
+    Element Document::makeElementArray(StringData fieldName, const BSONObj& value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAliasLeafBuilder(fieldName));
         dassert(impl.doesNotAlias(value));
@@ -2342,7 +2342,7 @@ namespace mutablebson {
         return Element(this, newEltIdx);
     }
 
-    Element Document::makeElementBinary(const StringData& fieldName,
+    Element Document::makeElementBinary(StringData fieldName,
                                         const uint32_t len,
                                         const mongo::BinDataType binType,
                                         const void* const data) {
@@ -2356,7 +2356,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementUndefined(const StringData& fieldName) {
+    Element Document::makeElementUndefined(StringData fieldName) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2366,13 +2366,13 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementNewOID(const StringData& fieldName) {
+    Element Document::makeElementNewOID(StringData fieldName) {
         OID newOID;
         newOID.init();
         return makeElementOID(fieldName, newOID);
     }
 
-    Element Document::makeElementOID(const StringData& fieldName, const OID value) {
+    Element Document::makeElementOID(StringData fieldName, const OID value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2382,7 +2382,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementBool(const StringData& fieldName, const bool value) {
+    Element Document::makeElementBool(StringData fieldName, const bool value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2392,7 +2392,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementDate(const StringData& fieldName, const Date_t value) {
+    Element Document::makeElementDate(StringData fieldName, const Date_t value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2402,7 +2402,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementNull(const StringData& fieldName) {
+    Element Document::makeElementNull(StringData fieldName) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2412,9 +2412,9 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementRegex(const StringData& fieldName,
-                                       const StringData& re,
-                                       const StringData& flags) {
+    Element Document::makeElementRegex(StringData fieldName,
+                                       StringData re,
+                                       StringData flags) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
         dassert(impl.doesNotAlias(re));
@@ -2426,8 +2426,8 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementDBRef(const StringData& fieldName,
-                                       const StringData& ns, const OID value) {
+    Element Document::makeElementDBRef(StringData fieldName,
+                                       StringData ns, const OID value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
         BSONObjBuilder& builder = impl.leafBuilder();
@@ -2436,7 +2436,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementCode(const StringData& fieldName, const StringData& value) {
+    Element Document::makeElementCode(StringData fieldName, StringData value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
         dassert(impl.doesNotAlias(value));
@@ -2447,7 +2447,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementSymbol(const StringData& fieldName, const StringData& value) {
+    Element Document::makeElementSymbol(StringData fieldName, StringData value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
         dassert(impl.doesNotAlias(value));
@@ -2458,8 +2458,8 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementCodeWithScope(const StringData& fieldName,
-                                               const StringData& code, const BSONObj& scope) {
+    Element Document::makeElementCodeWithScope(StringData fieldName,
+                                               StringData code, const BSONObj& scope) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
         dassert(impl.doesNotAlias(code));
@@ -2471,7 +2471,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementInt(const StringData& fieldName, const int32_t value) {
+    Element Document::makeElementInt(StringData fieldName, const int32_t value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2481,7 +2481,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementTimestamp(const StringData& fieldName, const OpTime value) {
+    Element Document::makeElementTimestamp(StringData fieldName, const OpTime value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2491,7 +2491,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementLong(const StringData& fieldName, const int64_t value) {
+    Element Document::makeElementLong(StringData fieldName, const int64_t value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2501,7 +2501,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementMinKey(const StringData& fieldName) {
+    Element Document::makeElementMinKey(StringData fieldName) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2511,7 +2511,7 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementMaxKey(const StringData& fieldName) {
+    Element Document::makeElementMaxKey(StringData fieldName) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
@@ -2543,7 +2543,7 @@ namespace mutablebson {
         }
     }
 
-    Element Document::makeElementWithNewFieldName(const StringData& fieldName,
+    Element Document::makeElementWithNewFieldName(StringData fieldName,
                                                   const BSONElement& value) {
         Impl& impl = getImpl();
 
@@ -2564,7 +2564,7 @@ namespace mutablebson {
         }
     }
 
-    Element Document::makeElementSafeNum(const StringData& fieldName, SafeNum value) {
+    Element Document::makeElementSafeNum(StringData fieldName, SafeNum value) {
 
         dassert(getImpl().doesNotAlias(fieldName));
 
@@ -2585,7 +2585,7 @@ namespace mutablebson {
         return makeElement(element, NULL);
     }
 
-    Element Document::makeElementWithNewFieldName(const StringData& fieldName,
+    Element Document::makeElementWithNewFieldName(StringData fieldName,
                                                   ConstElement element) {
         return makeElement(element, &fieldName);
     }

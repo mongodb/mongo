@@ -63,12 +63,12 @@ namespace mongo {
         setGlobalEnvironment(new GlobalEnvironmentNoop());
     }
 
-    void RangeDeleterMockEnv::addCursorId(const StringData& ns, CursorId id) {
+    void RangeDeleterMockEnv::addCursorId(StringData ns, CursorId id) {
         scoped_lock sl(_cursorMapMutex);
         _cursorMap[ns.toString()].insert(id);
     }
 
-    void RangeDeleterMockEnv::removeCursorId(const StringData& ns, CursorId id) {
+    void RangeDeleterMockEnv::removeCursorId(StringData ns, CursorId id) {
         scoped_lock sl(_cursorMapMutex);
         _cursorMap[ns.toString()].erase(id);
     }
@@ -145,7 +145,7 @@ namespace mongo {
     }
 
     void RangeDeleterMockEnv::getCursorIds(
-                    OperationContext* txn, const StringData& ns, set<CursorId>* in) {
+                    OperationContext* txn, StringData ns, set<CursorId>* in) {
         {
             scoped_lock sl(_cursorMapMutex);
             const set<CursorId>& _cursors = _cursorMap[ns.toString()];

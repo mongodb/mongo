@@ -516,7 +516,7 @@ namespace mongo {
     public:
         DocumentStream() :_stream(*this) {}
 
-        ValueStream& operator << (const StringData& name) {
+        ValueStream& operator << (StringData name) {
             _stream.name = name;
             return _stream;
         }

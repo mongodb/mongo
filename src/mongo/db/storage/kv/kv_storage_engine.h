@@ -73,13 +73,13 @@ namespace mongo {
         virtual void listDatabases( std::vector<std::string>* out ) const;
 
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                               const StringData& db );
+                                                               StringData db );
 
         virtual bool supportsDocLocking() const { return _supportsDocLocking; }
 
-        virtual Status closeDatabase( OperationContext* txn, const StringData& db );
+        virtual Status closeDatabase( OperationContext* txn, StringData db );
 
-        virtual Status dropDatabase( OperationContext* txn, const StringData& db );
+        virtual Status dropDatabase( OperationContext* txn, StringData db );
 
         virtual int flushAllFiles( bool sync );
 

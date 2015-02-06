@@ -130,7 +130,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setKey(const StringData& key) {
+        void setKey(StringData key) {
             _key = key.toString();
             _isKeySet = true;
         }

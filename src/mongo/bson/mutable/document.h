@@ -311,81 +311,81 @@ namespace mutablebson {
         //
 
         /** Create a new double Element with the given value and field name. */
-        Element makeElementDouble(const StringData& fieldName, double value);
+        Element makeElementDouble(StringData fieldName, double value);
 
         /** Create a new std::string Element with the given value and field name. */
-        Element makeElementString(const StringData& fieldName, const StringData& value);
+        Element makeElementString(StringData fieldName, StringData value);
 
         /** Create a new empty object Element with the given field name. */
-        Element makeElementObject(const StringData& fieldName);
+        Element makeElementObject(StringData fieldName);
 
         /** Create a new object Element with the given field name. The data in 'value' is
          *  copied.
          */
-        Element makeElementObject(const StringData& fieldName, const BSONObj& value);
+        Element makeElementObject(StringData fieldName, const BSONObj& value);
 
         /** Create a new empty array Element with the given field name. */
-        Element makeElementArray(const StringData& fieldName);
+        Element makeElementArray(StringData fieldName);
 
         /** Create a new array Element with the given field name. The data in 'value' is
          *  copied.
          */
-        Element makeElementArray(const StringData& fieldName, const BSONObj& value);
+        Element makeElementArray(StringData fieldName, const BSONObj& value);
 
         /** Create a new binary Element with the given data and field name. */
         Element makeElementBinary(
-            const StringData& fieldName, uint32_t len, BinDataType binType, const void* data);
+            StringData fieldName, uint32_t len, BinDataType binType, const void* data);
 
         /** Create a new undefined Element with the given field name. */
-        Element makeElementUndefined(const StringData& fieldName);
+        Element makeElementUndefined(StringData fieldName);
 
         /** Create a new OID + Element with the given field name. */
-        Element makeElementNewOID(const StringData& fieldName);
+        Element makeElementNewOID(StringData fieldName);
 
         /** Create a new OID Element with the given value and field name. */
-        Element makeElementOID(const StringData& fieldName, mongo::OID value);
+        Element makeElementOID(StringData fieldName, mongo::OID value);
 
         /** Create a new bool Element with the given value and field name. */
-        Element makeElementBool(const StringData& fieldName, bool value);
+        Element makeElementBool(StringData fieldName, bool value);
 
         /** Create a new date Element with the given value and field name. */
-        Element makeElementDate(const StringData& fieldName, Date_t value);
+        Element makeElementDate(StringData fieldName, Date_t value);
 
         /** Create a new null Element with the given field name. */
-        Element makeElementNull(const StringData& fieldName);
+        Element makeElementNull(StringData fieldName);
 
         /** Create a new regex Element with the given data and field name. */
         Element makeElementRegex(
-            const StringData& fieldName, const StringData& regex, const StringData& flags);
+            StringData fieldName, StringData regex, StringData flags);
 
         /** Create a new DBRef Element with the given data and field name. */
         Element makeElementDBRef(
-            const StringData& fieldName, const StringData& ns, mongo::OID oid);
+            StringData fieldName, StringData ns, mongo::OID oid);
 
         /** Create a new code Element with the given value and field name. */
-        Element makeElementCode(const StringData& fieldName, const StringData& value);
+        Element makeElementCode(StringData fieldName, StringData value);
 
         /** Create a new symbol Element with the given value and field name. */
-        Element makeElementSymbol(const StringData& fieldName, const StringData& value);
+        Element makeElementSymbol(StringData fieldName, StringData value);
 
         /** Create a new scoped code Element with the given data and field name. */
         Element makeElementCodeWithScope(
-            const StringData& fieldName, const StringData& code, const BSONObj& scope);
+            StringData fieldName, StringData code, const BSONObj& scope);
 
         /** Create a new integer Element with the given value and field name. */
-        Element makeElementInt(const StringData& fieldName, int32_t value);
+        Element makeElementInt(StringData fieldName, int32_t value);
 
         /** Create a new timetamp Element with the given value and field name. */
-        Element makeElementTimestamp(const StringData& fieldName, OpTime value);
+        Element makeElementTimestamp(StringData fieldName, OpTime value);
 
         /** Create a new long integer Element with the given value and field name. */
-        Element makeElementLong(const StringData& fieldName, int64_t value);
+        Element makeElementLong(StringData fieldName, int64_t value);
 
         /** Create a new min key Element with the given field name. */
-        Element makeElementMinKey(const StringData& fieldName);
+        Element makeElementMinKey(StringData fieldName);
 
         /** Create a new max key Element with the given field name. */
-        Element makeElementMaxKey(const StringData& fieldName);
+        Element makeElementMaxKey(StringData fieldName);
 
 
         //
@@ -400,12 +400,12 @@ namespace mutablebson {
         /** Construct a new Element with the same type and value as the provided BSONElement,
          *  but with a new name. The value is copied.
          */
-        Element makeElementWithNewFieldName(const StringData& fieldName, const BSONElement& elt);
+        Element makeElementWithNewFieldName(StringData fieldName, const BSONElement& elt);
 
         /** Create a new element of the appopriate type to hold the given value, with the given
          *  field name.
          */
-        Element makeElementSafeNum(const StringData& fieldName, SafeNum value);
+        Element makeElementSafeNum(StringData fieldName, SafeNum value);
 
         /** Construct a new element with the same name, type, and value as the provided mutable
          *  Element. The data is copied from the given Element. Unlike most methods in this
@@ -418,7 +418,7 @@ namespace mutablebson {
          *  Element. Unlike most methods in this class the provided Element may be from a
          *  different Document.
          */
-        Element makeElementWithNewFieldName(const StringData& fieldName, ConstElement elt);
+        Element makeElementWithNewFieldName(StringData fieldName, ConstElement elt);
 
         //
         // Accessors

@@ -84,7 +84,7 @@ namespace mongo {
     // ----
 
     Collection::Collection( OperationContext* txn,
-                            const StringData& fullNS,
+                            StringData fullNS,
                             CollectionCatalogEntry* details,
                             RecordStore* recordStore,
                             DatabaseCatalogEntry* dbce )

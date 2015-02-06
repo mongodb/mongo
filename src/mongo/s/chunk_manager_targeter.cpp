@@ -48,7 +48,7 @@ namespace mongo {
     /**
      * Helper to get the DBConfigPtr object in an exception-safe way.
      */
-    static bool getDBConfigSafe( const StringData& db, DBConfigPtr& config, string* errMsg ) {
+    static bool getDBConfigSafe( StringData db, DBConfigPtr& config, string* errMsg ) {
         try {
             config = grid.getDBConfig( db, true );
             if ( !config ) *errMsg = stream() << "could not load or create database " << db;
@@ -491,7 +491,7 @@ namespace mongo {
             else return CompareResult_GTE;
         }
 
-        ChunkVersion getShardVersion( const StringData& shardName,
+        ChunkVersion getShardVersion( StringData shardName,
                                       const ChunkManagerPtr& manager,
                                       const ShardPtr& primary ) {
 

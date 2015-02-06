@@ -155,8 +155,8 @@ namespace mongo {
     }
 
     Status RocksEngine::createRecordStore(OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
+                                          StringData ns,
+                                          StringData ident,
                                           const CollectionOptions& options) {
         if (_existsColumnFamily(ident)) {
             return Status::OK();
@@ -165,8 +165,8 @@ namespace mongo {
         return _createColumnFamily(_collectionOptions(), ident);
     }
 
-    RecordStore* RocksEngine::getRecordStore(OperationContext* opCtx, const StringData& ns,
-                                             const StringData& ident,
+    RecordStore* RocksEngine::getRecordStore(OperationContext* opCtx, StringData ns,
+                                             StringData ident,
                                              const CollectionOptions& options) {
         auto columnFamily = _getColumnFamily(ident);
         if (options.capped) {
@@ -179,7 +179,7 @@ namespace mongo {
         }
     }
 
-    Status RocksEngine::createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
+    Status RocksEngine::createSortedDataInterface(OperationContext* opCtx, StringData ident,
                                                   const IndexDescriptor* desc) {
         if (_existsColumnFamily(ident)) {
             return Status::OK();
@@ -192,7 +192,7 @@ namespace mongo {
     }
 
     SortedDataInterface* RocksEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                             const StringData& ident,
+                                                             StringData ident,
                                                              const IndexDescriptor* desc) {
         if (desc->unique()) {
             return new RocksUniqueIndex(_db.get(), _getColumnFamily(ident), ident.toString(),
@@ -203,7 +203,7 @@ namespace mongo {
         }
     }
 
-    Status RocksEngine::dropIdent(OperationContext* opCtx, const StringData& ident) {
+    Status RocksEngine::dropIdent(OperationContext* opCtx, StringData ident) {
         rocksdb::WriteBatch wb;
         // TODO is there a more efficient way?
         wb.Delete(kOrderingPrefix + ident.toString());
@@ -225,13 +225,13 @@ namespace mongo {
 
     // non public api
 
-    bool RocksEngine::_existsColumnFamily(const StringData& ident) {
+    bool RocksEngine::_existsColumnFamily(StringData ident) {
         boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
         return _identColumnFamilyMap.find(ident) != _identColumnFamilyMap.end();
     }
 
     Status RocksEngine::_createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
-                                            const StringData& ident) {
+                                            StringData ident) {
         rocksdb::ColumnFamilyHandle* cf;
         auto s = _db->CreateColumnFamily(options, ident.toString(), &cf);
         if (!s.ok()) {
@@ -242,7 +242,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status RocksEngine::_dropColumnFamily(const StringData& ident) {
+    Status RocksEngine::_dropColumnFamily(StringData ident) {
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily;
         {
             boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
@@ -258,7 +258,7 @@ namespace mongo {
     }
 
     boost::shared_ptr<rocksdb::ColumnFamilyHandle> RocksEngine::_getColumnFamily(
-        const StringData& ident) {
+        StringData ident) {
         {
             boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
             auto cf_iter = _identColumnFamilyMap.find(ident);

@@ -74,7 +74,7 @@ namespace mongo {
         explicit Value(double value)              : _storage(NumberDouble, value) {}
         explicit Value(const OpTime& value)       : _storage(Timestamp, value.asDate()) {}
         explicit Value(const OID& value)          : _storage(jstOID, value) {}
-        explicit Value(const StringData& value)   : _storage(String, value) {}
+        explicit Value(StringData value)   : _storage(String, value) {}
         explicit Value(const std::string& value)       : _storage(String, StringData(value)) {}
         explicit Value(const char* value)         : _storage(String, StringData(value)) {}
         explicit Value(const Document& doc)       : _storage(Object, doc) {}

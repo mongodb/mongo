@@ -48,7 +48,7 @@ namespace scram {
     /*
      * Computes the SaltedPassword from password, salt and iterationCount.
      */
-    void generateSaltedPassword(const StringData& hashedPassword,
+    void generateSaltedPassword(StringData hashedPassword,
                                 const unsigned char* salt,
                                 const int saltLen,
                                 const int iterationCount,

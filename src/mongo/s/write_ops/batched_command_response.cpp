@@ -340,7 +340,7 @@ namespace mongo {
         }
     }
 
-    void BatchedCommandResponse::setErrMessage(const StringData& errMessage) {
+    void BatchedCommandResponse::setErrMessage(StringData errMessage) {
         _errMessage = errMessage.toString();
         _isErrMessageSet = true;
     }

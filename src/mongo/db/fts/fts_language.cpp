@@ -49,7 +49,7 @@ namespace mongo {
              */
             struct LanguageStringCompare {
                 /** Returns true if lhs < rhs. */
-                bool operator()( const StringData& lhs, const StringData& rhs ) const {
+                bool operator()( StringData lhs, StringData rhs ) const {
                     size_t minSize = std::min( lhs.size(), rhs.size() );
 
                     for ( size_t x = 0; x < minSize; x++ ) {
@@ -185,7 +185,7 @@ namespace mongo {
         }
 
         // static
-        void FTSLanguage::registerLanguage( const StringData& languageName,
+        void FTSLanguage::registerLanguage( StringData languageName,
                                             TextIndexVersion textIndexVersion,
                                             FTSLanguage* language ) {
             verify( !languageName.empty() );
@@ -205,7 +205,7 @@ namespace mongo {
 
         // static
         void FTSLanguage::registerLanguageAlias( const FTSLanguage* language,
-                                                 const StringData& alias,
+                                                 StringData alias,
                                                  TextIndexVersion textIndexVersion ) {
             switch ( textIndexVersion ) {
             case TEXT_INDEX_VERSION_2:
@@ -229,7 +229,7 @@ namespace mongo {
         }
 
         // static
-        StatusWithFTSLanguage FTSLanguage::make( const StringData& langName,
+        StatusWithFTSLanguage FTSLanguage::make( StringData langName,
                                                  TextIndexVersion textIndexVersion ) {
             switch ( textIndexVersion ) {
                 case TEXT_INDEX_VERSION_2: {

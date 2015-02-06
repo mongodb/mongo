@@ -105,7 +105,7 @@ namespace repl {
         return true;
     }
 
-    bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(const StringData& dbName) {
+    bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(StringData dbName) {
         // TODO
         return true;
     }

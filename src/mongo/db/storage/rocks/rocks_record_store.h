@@ -79,7 +79,7 @@ namespace mongo {
 
     class RocksRecordStore : public RecordStore {
     public:
-        RocksRecordStore(const StringData& ns, const StringData& id, rocksdb::DB* db,
+        RocksRecordStore(StringData ns, StringData id, rocksdb::DB* db,
                          boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
                          bool isCapped = false, int64_t cappedMaxSize = -1,
                          int64_t cappedMaxDocs = -1,

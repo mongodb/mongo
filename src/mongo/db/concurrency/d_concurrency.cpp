@@ -109,7 +109,7 @@ namespace {
     }
 
 
-    Lock::DBLock::DBLock(Locker* locker, const StringData& db, LockMode mode)
+    Lock::DBLock::DBLock(Locker* locker, StringData db, LockMode mode)
         : _id(RESOURCE_DATABASE, db),
           _locker(locker),
           _mode(mode),
@@ -158,7 +158,7 @@ namespace {
 
 
     Lock::CollectionLock::CollectionLock(Locker* lockState,
-                                         const StringData& ns,
+                                         StringData ns,
                                          LockMode mode)
         : _id(RESOURCE_COLLECTION, ns),
           _lockState(lockState) {

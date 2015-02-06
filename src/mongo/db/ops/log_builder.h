@@ -70,7 +70,7 @@ namespace mongo {
          *
          * If any problem occurs then the operation will stop and return that error Status.
          */
-        Status addToSets(const StringData& name, const SafeNum& val);
+        Status addToSets(StringData name, const SafeNum& val);
 
         /**
          * Convenience method which calls addToSets after
@@ -78,7 +78,7 @@ namespace mongo {
          *
          * If any problem occurs then the operation will stop and return that error Status.
          */
-        Status addToSetsWithNewFieldName(const StringData& name, const mutablebson::Element val);
+        Status addToSetsWithNewFieldName(StringData name, const mutablebson::Element val);
 
         /**
          * Convenience method which calls addToSets after
@@ -86,7 +86,7 @@ namespace mongo {
          *
          * If any problem occurs then the operation will stop and return that error Status.
          */
-        Status addToSetsWithNewFieldName(const StringData& name, const BSONElement& val);
+        Status addToSetsWithNewFieldName(StringData name, const BSONElement& val);
 
         /** Add the given path as a new entry in the '$unset' section of the log. If an
          *  '$unset' section does not yet exist, it will be created. If this LogBuilder is

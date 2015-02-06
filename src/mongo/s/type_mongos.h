@@ -120,7 +120,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setName(const StringData& name) {
+        void setName(StringData name) {
             _name = name.toString();
             _isNameSet = true;
         }
@@ -181,7 +181,7 @@ namespace mongo {
         }
 
         // Optional Fields
-        void setMongoVersion(const StringData& mongoVersion) {
+        void setMongoVersion(StringData mongoVersion) {
             _mongoVersion = mongoVersion.toString();
             _isMongoVersionSet = true;
         }

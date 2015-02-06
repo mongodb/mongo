@@ -47,7 +47,7 @@ namespace mongo {
 
     public:
         // RecordId(0,0) isn't valid for records.
-        explicit HeapRecordStoreBtree(const StringData& ns): RecordStore(ns), _nextId(1) { }
+        explicit HeapRecordStoreBtree(StringData ns): RecordStore(ns), _nextId(1) { }
 
         virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
 

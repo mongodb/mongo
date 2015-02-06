@@ -214,7 +214,7 @@ namespace repl {
          * NOTE: This function can only be meaningfully called while the caller holds the global
          * lock in some mode other than MODE_NONE.
          */
-        virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
+        virtual bool canAcceptWritesForDatabase(StringData dbName) = 0;
 
         /**
          * Checks if the current replica set configuration can satisfy the given write concern.

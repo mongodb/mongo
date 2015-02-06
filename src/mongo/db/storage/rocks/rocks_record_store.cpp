@@ -135,7 +135,7 @@ namespace mongo {
         }
     }
 
-    RocksRecordStore::RocksRecordStore(const StringData& ns, const StringData& id,
+    RocksRecordStore::RocksRecordStore(StringData ns, StringData id,
                                        rocksdb::DB* db,  // not owned here
                                        boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
                                        bool isCapped, int64_t cappedMaxSize, int64_t cappedMaxDocs,

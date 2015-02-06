@@ -232,7 +232,7 @@ namespace mongo {
         return std::vector<BSONObj>();
     }
 
-    Command* Command::findCommand( const StringData& name ) {
+    Command* Command::findCommand( StringData name ) {
         CommandMap::const_iterator i = _commands->find( name );
         if ( i == _commands->end() )
             return 0;

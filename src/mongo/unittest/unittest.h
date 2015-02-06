@@ -463,8 +463,8 @@ namespace mongo {
             ComparisonAssertion_##NAME(                                 \
                     const std::string& theFile,                         \
                     unsigned theLine,                                   \
-                    const StringData& aExpression,                      \
-                    const StringData& bExpression,                      \
+                    StringData aExpression,                             \
+                    StringData bExpression,                             \
                     const A& a,                                         \
                     const B& b)  {                                      \
                 if (a OPERATOR b) {                                     \

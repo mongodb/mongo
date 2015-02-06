@@ -83,7 +83,7 @@ namespace mongo {
     }
 
     NamespaceDetails::Extra* NamespaceDetails::allocExtra( OperationContext* txn,
-                                                           const StringData& ns,
+                                                           StringData ns,
                                                            NamespaceIndex& ni,
                                                            int nindexessofar) {
 
@@ -180,7 +180,7 @@ namespace mongo {
 
     // must be called when renaming a NS to fix up extra
     void NamespaceDetails::copyingFrom( OperationContext* txn,
-                                        const StringData& thisns,
+                                        StringData thisns,
                                         NamespaceIndex& ni,
                                         NamespaceDetails* src) {
         _extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
@@ -226,7 +226,7 @@ namespace mongo {
 
     int NamespaceDetails::_catalogFindIndexByName(OperationContext* txn,
                                                   const Collection* coll,
-                                                  const StringData& name,
+                                                  StringData name,
                                                   bool includeBackgroundInProgress) const {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {

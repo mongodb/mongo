@@ -102,11 +102,11 @@ namespace mongo {
             return true;
         }
 
-        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const {
+        virtual bool isDbLockedForMode(StringData dbName, LockMode mode) const {
             return true;
         }
 
-        virtual bool isCollectionLockedForMode(const StringData& ns, LockMode mode) const {
+        virtual bool isCollectionLockedForMode(StringData ns, LockMode mode) const {
             return true;
         }
 

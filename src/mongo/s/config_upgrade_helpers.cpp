@@ -99,7 +99,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    string _extractHashFor(const BSONObj& dbHashResult, const StringData& collName) {
+    string _extractHashFor(const BSONObj& dbHashResult, StringData collName) {
 
         if (dbHashResult["collections"].type() != Object
             || dbHashResult["collections"].Obj()[collName].type() != String)

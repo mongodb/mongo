@@ -124,7 +124,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setNS(const StringData& ns) {
+        void setNS(StringData ns) {
             _ns = ns.toString();
             _isNsSet = true;
         }

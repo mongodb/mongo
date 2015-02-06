@@ -40,7 +40,7 @@ namespace mongo {
 
     using std::string;
 
-    NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry( const StringData& ns,
+    NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry( StringData ns,
                                                                                     NamespaceDetails* details,
                                                                                     RecordStore* indexRecordStore,
                                                                                     MMAPV1DatabaseCatalogEntry* db )
@@ -77,7 +77,7 @@ namespace mongo {
     }
 
     bool NamespaceDetailsCollectionCatalogEntry::isIndexMultikey(OperationContext* txn,
-                                                                 const StringData& idxName) const {
+                                                                 StringData idxName) const {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
         return isIndexMultikey( idxNo );
@@ -88,7 +88,7 @@ namespace mongo {
     }
 
     bool NamespaceDetailsCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
-                                                                    const StringData& indexName,
+                                                                    StringData indexName,
                                                                     bool multikey ) {
 
         int idxNo = _findIndexNumber( txn, indexName );
@@ -124,14 +124,14 @@ namespace mongo {
     }
 
     RecordId NamespaceDetailsCollectionCatalogEntry::getIndexHead(OperationContext* txn,
-                                                                  const StringData& idxName) const {
+                                                                  StringData idxName) const {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
         return _details->idx( idxNo ).head.toRecordId();
     }
 
     BSONObj NamespaceDetailsCollectionCatalogEntry::getIndexSpec( OperationContext* txn,
-                                                                  const StringData& idxName ) const {
+                                                                  StringData idxName ) const {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
         const IndexDetails& id = _details->idx( idxNo );
@@ -139,7 +139,7 @@ namespace mongo {
     }
 
     void NamespaceDetailsCollectionCatalogEntry::setIndexHead( OperationContext* txn,
-                                                               const StringData& idxName,
+                                                               StringData idxName,
                                                                const RecordId& newHead ) {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
@@ -147,14 +147,14 @@ namespace mongo {
     }
 
     bool NamespaceDetailsCollectionCatalogEntry::isIndexReady( OperationContext* txn,
-                                                               const StringData& idxName ) const {
+                                                               StringData idxName ) const {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
         return idxNo < getCompletedIndexCount( txn );
     }
 
     int NamespaceDetailsCollectionCatalogEntry::_findIndexNumber( OperationContext* txn,
-                                                                  const StringData& idxName ) const {
+                                                                  StringData idxName ) const {
         NamespaceDetails::IndexIterator i = _details->ii( true );
         while ( i.more() ) {
             const IndexDetails& id = i.next();
@@ -191,7 +191,7 @@ namespace mongo {
     } iu_unittest;
 
     Status NamespaceDetailsCollectionCatalogEntry::removeIndex( OperationContext* txn,
-                                                                const StringData& indexName ) {
+                                                                StringData indexName ) {
         int idxNo = _findIndexNumber( txn, indexName );
         if ( idxNo < 0 )
             return Status( ErrorCodes::NamespaceNotFound, "index not found to remove" );
@@ -271,7 +271,7 @@ namespace mongo {
     }
 
     void NamespaceDetailsCollectionCatalogEntry::indexBuildSuccess( OperationContext* txn,
-                                                                    const StringData& indexName ) {
+                                                                    StringData indexName ) {
         int idxNo = _findIndexNumber( txn, indexName );
         fassert( 17202, idxNo >= 0 );
 
@@ -302,7 +302,7 @@ namespace mongo {
     }
 
     void NamespaceDetailsCollectionCatalogEntry::updateTTLSetting( OperationContext* txn,
-                                                                   const StringData& idxName,
+                                                                   StringData idxName,
                                                                    long long newExpireSeconds ) {
         int idx = _findIndexNumber( txn, idxName );
         invariant( idx >= 0 );

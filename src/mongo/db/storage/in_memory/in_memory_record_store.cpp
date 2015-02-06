@@ -113,7 +113,7 @@ namespace mongo {
     // RecordStore
     //
 
-    InMemoryRecordStore::InMemoryRecordStore(const StringData& ns,
+    InMemoryRecordStore::InMemoryRecordStore(StringData ns,
                                              boost::shared_ptr<void>* dataInOut,
                                              bool isCapped,
                                              int64_t cappedMaxSize,

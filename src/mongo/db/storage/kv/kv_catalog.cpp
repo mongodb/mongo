@@ -58,7 +58,7 @@ namespace {
 
     class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
     public:
-        AddIdentChange(KVCatalog* catalog, const StringData& ident)
+        AddIdentChange(KVCatalog* catalog, StringData ident)
             :_catalog(catalog), _ident(ident.toString())
         {}
 
@@ -74,7 +74,7 @@ namespace {
 
     class KVCatalog::RemoveIdentChange : public RecoveryUnit::Change {
     public:
-        RemoveIdentChange(KVCatalog* catalog, const StringData& ident, const Entry& entry)
+        RemoveIdentChange(KVCatalog* catalog, StringData ident, const Entry& entry)
             :_catalog(catalog), _ident(ident.toString()), _entry(entry)
         {}
 
@@ -118,7 +118,7 @@ namespace {
         return false;
     }
 
-    std::string KVCatalog::_newUniqueIdent(const StringData& ns, const char* kind) {
+    std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
         // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
         StringBuilder buf;
         if ( _directoryPerDb ) {
@@ -159,7 +159,7 @@ namespace {
     }
 
     Status KVCatalog::newCollection( OperationContext* opCtx,
-                                     const StringData& ns,
+                                     StringData ns,
                                      const CollectionOptions& options ) {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
@@ -202,7 +202,7 @@ namespace {
         return Status::OK();
     }
 
-    std::string KVCatalog::getCollectionIdent( const StringData& ns ) const {
+    std::string KVCatalog::getCollectionIdent( StringData ns ) const {
         boost::mutex::scoped_lock lk( _identsLock );
         NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
         invariant( it != _idents.end() );
@@ -210,15 +210,15 @@ namespace {
     }
 
     std::string KVCatalog::getIndexIdent( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& idxName ) const {
+                                          StringData ns,
+                                          StringData idxName ) const {
         BSONObj obj = _findEntry( opCtx, ns );
         BSONObj idxIdent = obj["idxIdent"].Obj();
         return idxIdent[idxName].String();
     }
 
     BSONObj KVCatalog::_findEntry( OperationContext* opCtx,
-                                   const StringData& ns,
+                                   StringData ns,
                                    RecordId* out ) const {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -252,7 +252,7 @@ namespace {
     }
 
     const BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData( OperationContext* opCtx,
-                                                                       const StringData& ns ) {
+                                                                       StringData ns ) {
         BSONObj obj = _findEntry( opCtx, ns );
         LOG(3) << " fetched CCE metadata: " << obj;
         BSONCollectionCatalogEntry::MetaData md;
@@ -265,7 +265,7 @@ namespace {
     }
 
     void KVCatalog::putMetaData( OperationContext* opCtx,
-                                 const StringData& ns,
+                                 StringData ns,
                                  BSONCollectionCatalogEntry::MetaData& md ) {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -318,8 +318,8 @@ namespace {
     }
 
     Status KVCatalog::renameCollection( OperationContext* opCtx,
-                                        const StringData& fromNS,
-                                        const StringData& toNS,
+                                        StringData fromNS,
+                                        StringData toNS,
                                         bool stayTemp ) {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -370,7 +370,7 @@ namespace {
     }
 
     Status KVCatalog::dropCollection( OperationContext* opCtx,
-                                      const StringData& ns ) {
+                                      StringData ns ) {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -395,7 +395,7 @@ namespace {
         return Status::OK();
     }
 
-    std::vector<std::string> KVCatalog::getAllIdentsForDB( const StringData& db ) const {
+    std::vector<std::string> KVCatalog::getAllIdentsForDB( StringData db ) const {
         std::vector<std::string> v;
 
         {
@@ -436,7 +436,7 @@ namespace {
         return v;
     }
 
-    bool KVCatalog::isUserDataIdent( const StringData& ident ) const {
+    bool KVCatalog::isUserDataIdent( StringData ident ) const {
         return
             ident.find( "index-" ) != std::string::npos ||
             ident.find( "index/" ) != std::string::npos ||

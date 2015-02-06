@@ -1057,7 +1057,7 @@ namespace {
                 + (hashId & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits));
     }
 
-    ResourceId::ResourceId(ResourceType type, const StringData& ns)
+    ResourceId::ResourceId(ResourceType type, StringData ns)
         : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
 #ifdef _DEBUG
         _nsCopy = ns.toString();

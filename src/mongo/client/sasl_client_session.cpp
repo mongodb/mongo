@@ -41,7 +41,7 @@ namespace mongo {
 
     SaslClientSession::~SaslClientSession() {}
 
-    void SaslClientSession::setParameter(Parameter id, const StringData& value) {
+    void SaslClientSession::setParameter(Parameter id, StringData value) {
         fassert(16807, id >= 0 && id < numParameters);
         fassert(28583, value.size() < std::numeric_limits<std::size_t>::max());
 

@@ -41,7 +41,7 @@ namespace mongo {
     class SimpleRecordStoreV1 : public RecordStoreV1Base {
     public:
         SimpleRecordStoreV1( OperationContext* txn,
-                             const StringData& ns,
+                             StringData ns,
                              RecordStoreV1MetaData* details,
                              ExtentManager* em,
                              bool isSystemIndexes );

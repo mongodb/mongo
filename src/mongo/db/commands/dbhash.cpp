@@ -216,14 +216,14 @@ namespace mongo {
         return 1;
     }
 
-    void DBHashCmd::wipeCacheForCollection( const StringData& ns ) {
+    void DBHashCmd::wipeCacheForCollection( StringData ns ) {
         if ( !isCachable( ns ) )
             return;
         scoped_lock lk( _cachedHashedMutex );
         _cachedHashed.erase( ns.toString() );
     }
 
-    bool DBHashCmd::isCachable( const StringData& ns ) const {
+    bool DBHashCmd::isCachable( StringData ns ) const {
         return ns.startsWith( "config." );
     }
 

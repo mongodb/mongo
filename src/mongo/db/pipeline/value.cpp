@@ -92,7 +92,7 @@ namespace mongo {
         }
     }
 
-    void ValueStorage::putString(const StringData& s) {
+    void ValueStorage::putString(StringData s) {
         // Note: this also stores data portion of BinData
         const size_t sizeNoNUL = s.size();
         if (sizeNoNUL <= sizeof(shortStrStorage)) {

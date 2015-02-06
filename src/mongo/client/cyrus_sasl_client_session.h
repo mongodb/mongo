@@ -48,7 +48,7 @@ namespace mongo {
         /**
          * Overriding to store the password data in sasl_secret_t format
          */
-        virtual void setParameter(Parameter id, const StringData& value);
+        virtual void setParameter(Parameter id, StringData value);
 
         /**
          * Returns the value of the parameterPassword parameter in the form of a sasl_secret_t, used
@@ -60,7 +60,7 @@ namespace mongo {
 
         virtual Status initialize();
 
-        virtual Status step(const StringData& inputData, std::string* outputData);
+        virtual Status step(StringData inputData, std::string* outputData);
 
         virtual bool isDone() const { return _done; }
 

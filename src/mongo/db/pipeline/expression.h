@@ -134,12 +134,12 @@ namespace mongo {
          *
          * NOTE: Name validation is responsibility of caller.
          */
-        Variables::Id defineVariable(const StringData& name);
+        Variables::Id defineVariable(StringData name);
 
         /**
          * Returns the current Id for a variable. uasserts if the variable isn't defined.
          */
-        Variables::Id getVariable(const StringData& name) const;
+        Variables::Id getVariable(StringData name) const;
 
     private:
         StringMap<Variables::Id> _variables;

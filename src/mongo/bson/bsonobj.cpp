@@ -274,7 +274,7 @@ namespace mongo {
     }
 
     template <typename BSONElementColl>
-    void _getFieldsDotted( const BSONObj* obj, const StringData& name, BSONElementColl &ret, bool expandLastArray ) {
+    void _getFieldsDotted( const BSONObj* obj, StringData name, BSONElementColl &ret, bool expandLastArray ) {
         BSONElement e = obj->getField( name );
 
         if ( e.eoo() ) {
@@ -325,10 +325,10 @@ namespace mongo {
         }
     }
 
-    void BSONObj::getFieldsDotted(const StringData& name, BSONElementSet &ret, bool expandLastArray ) const {
+    void BSONObj::getFieldsDotted(StringData name, BSONElementSet &ret, bool expandLastArray ) const {
         _getFieldsDotted( this, name, ret, expandLastArray );
     }
-    void BSONObj::getFieldsDotted(const StringData& name, BSONElementMSet &ret, bool expandLastArray ) const {
+    void BSONObj::getFieldsDotted(StringData name, BSONElementMSet &ret, bool expandLastArray ) const {
         _getFieldsDotted( this, name, ret, expandLastArray );
     }
 
@@ -403,7 +403,7 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONElement BSONObj::getFieldUsingIndexNames(const StringData& fieldName,
+    BSONElement BSONObj::getFieldUsingIndexNames(StringData fieldName,
                                                  const BSONObj &indexKey) const {
         BSONObjIterator i( indexKey );
         int j = 0;
@@ -653,7 +653,7 @@ namespace mongo {
         }
     }
 
-    BSONElement BSONObj::getField(const StringData& name) const {
+    BSONElement BSONObj::getField(StringData name) const {
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
@@ -667,17 +667,17 @@ namespace mongo {
         return BSONElement();
     }
 
-    int BSONObj::getIntField(const StringData& name) const {
+    int BSONObj::getIntField(StringData name) const {
         BSONElement e = getField(name);
         return e.isNumber() ? (int) e.number() : std::numeric_limits< int >::min();
     }
 
-    bool BSONObj::getBoolField(const StringData& name) const {
+    bool BSONObj::getBoolField(StringData name) const {
         BSONElement e = getField(name);
         return e.type() == Bool ? e.boolean() : false;
     }
 
-    const char * BSONObj::getStringField(const StringData& name) const {
+    const char * BSONObj::getStringField(StringData name) const {
         BSONElement e = getField(name);
         return e.type() == String ? e.valuestr() : "";
     }
@@ -691,7 +691,7 @@ namespace mongo {
         return false;
     }
 
-    BSONObj BSONObj::removeField(const StringData& name) const {
+    BSONObj BSONObj::removeField(StringData name) const {
         BSONObjBuilder b;
         BSONObjIterator i(*this);
         while ( i.more() ) {
@@ -735,7 +735,7 @@ namespace mongo {
     /* return has eoo() true if no match
        supports "." notation to reach into embedded objects
     */
-    BSONElement BSONObj::getFieldDotted(const StringData& name) const {
+    BSONElement BSONObj::getFieldDotted(StringData name) const {
         BSONElement e = getField(name);
         if (e.eoo()) {
             size_t dot_offset = name.find('.');
@@ -750,7 +750,7 @@ namespace mongo {
         return e;
     }
 
-    BSONObj BSONObj::getObjectField(const StringData& name) const {
+    BSONObj BSONObj::getObjectField(StringData name) const {
         BSONElement e = getField(name);
         BSONType t = e.type();
         return t == Object || t == Array ? e.embeddedObject() : BSONObj();

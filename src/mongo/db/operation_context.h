@@ -135,7 +135,7 @@ namespace mongo {
         /**
          * @return true if this instance is primary for this namespace
          */
-        virtual bool isPrimaryFor( const StringData& ns ) = 0;
+        virtual bool isPrimaryFor( StringData ns ) = 0;
 
     protected:
         OperationContext() { }

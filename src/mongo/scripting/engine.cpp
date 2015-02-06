@@ -404,7 +404,7 @@ namespace {
         bool getBoolean(const char* field) { return _real->getBoolean(field); }
         BSONObj getObject(const char* field) { return _real->getObject(field); }
         void setNumber(const char* field, double val) { _real->setNumber(field, val); }
-        void setString(const char* field, const StringData& val) { _real->setString(field, val); }
+        void setString(const char* field, StringData val) { _real->setString(field, val); }
         void setElement(const char* field, const BSONElement& val) {
             _real->setElement(field, val);
         }
@@ -421,7 +421,7 @@ namespace {
             return _real->invoke(func, args, recv, timeoutMs, ignoreReturn,
                                  readOnlyArgs, readOnlyRecv);
         }
-        bool exec(const StringData& code, const string& name, bool printResult, bool reportError,
+        bool exec(StringData code, const string& name, bool printResult, bool reportError,
                   bool assertOnError, int timeoutMs = 0) {
             return _real->exec(code, name, printResult, reportError, assertOnError, timeoutMs);
         }

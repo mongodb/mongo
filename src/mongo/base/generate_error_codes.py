@@ -209,7 +209,7 @@ namespace mongo {
          *
          * NOTE: Also returns UnknownError for the string "UnknownError".
          */
-        static Error fromString(const StringData& name);
+        static Error fromString(StringData name);
 
         /**
          * Casts an integer "code" to an Error.  Unrecognized codes are preserved, meaning
@@ -268,7 +268,7 @@ namespace mongo {
         }
     }
 
-    ErrorCodes::Error ErrorCodes::fromString(const StringData& name) {
+    ErrorCodes::Error ErrorCodes::fromString(StringData name) {
         %(string_to_symbol_cases)s;
         return UnknownError;
     }

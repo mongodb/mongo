@@ -558,7 +558,7 @@ namespace {
         }
     }
 
-    bool RangeDeleter::canEnqueue_inlock(const StringData& ns,
+    bool RangeDeleter::canEnqueue_inlock(StringData ns,
                                          const BSONObj& min,
                                          const BSONObj& max,
                                          string* errMsg) const {

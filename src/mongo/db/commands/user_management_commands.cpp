@@ -2664,7 +2664,7 @@ namespace mongo {
          */
         static void addUser(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& db,
+                            StringData db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<UserName>* usersToDrop,
@@ -2709,7 +2709,7 @@ namespace mongo {
          */
         static void addRole(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& db,
+                            StringData db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<RoleName>* rolesToDrop,
@@ -2748,8 +2748,8 @@ namespace mongo {
          */
         Status processUsers(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& usersCollName,
-                            const StringData& db,
+                            StringData usersCollName,
+                            StringData db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the users
@@ -2831,8 +2831,8 @@ namespace mongo {
          */
         Status processRoles(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& rolesCollName,
-                            const StringData& db,
+                            StringData rolesCollName,
+                            StringData db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the roles

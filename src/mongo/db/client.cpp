@@ -207,14 +207,14 @@ namespace {
     }
 
 
-    AutoGetDb::AutoGetDb(OperationContext* txn, const StringData& ns, LockMode mode)
+    AutoGetDb::AutoGetDb(OperationContext* txn, StringData ns, LockMode mode)
             : _dbLock(txn->lockState(), ns, mode),
               _db(dbHolder().get(txn, ns)) {
 
     }
 
     AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn,
-                                         const StringData& ns,
+                                         StringData ns,
                                          LockMode mode)
             :  _transaction(txn, MODE_IX),
                _dbLock(txn->lockState(), ns, mode),
@@ -253,7 +253,7 @@ namespace {
         _init(nss.toString(), nss.coll());
     }
 
-    void AutoGetCollectionForRead::_init(const std::string& ns, const StringData& coll) {
+    void AutoGetCollectionForRead::_init(const std::string& ns, StringData coll) {
         massert(28535, "need a non-empty collection name", !coll.empty());
 
         // TODO: Client::Context legacy, needs to be removed
@@ -531,7 +531,7 @@ namespace {
          * Appends {name: obj} to the provided builder.  If obj is greater than maxSize, appends a
          * string summary of obj instead of the object itself.
          */
-        void appendAsObjOrString(const StringData& name,
+        void appendAsObjOrString(StringData name,
                                  const BSONObj& obj,
                                  size_t maxSize,
                                  BSONObjBuilder* builder) {
