@@ -526,6 +526,9 @@ namespace mongo {
                     IndexBuilder* builder = new IndexBuilder(o);
                     // This spawns a new thread and returns immediately.
                     builder->go();
+                    // Wait for thread to start and register itself
+                    dbtemprelease release;
+                    IndexBuilder::waitForBgIndexStarting();
                 }
                 else {
                     Client::Context* ctx = cc().getContext();

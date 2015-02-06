@@ -31,6 +31,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/str.h"
@@ -38,6 +39,22 @@
 namespace mongo {
 
     AtomicUInt IndexBuilder::_indexBuildCount = 0;
+
+namespace {
+    // Synchronization tools when replication spawns a background index in a new thread.
+    // The bool is 'true' when a new background index has started in a new thread but the
+    // parent thread has not yet synchronized with it.
+    bool _bgIndexStarting(false);
+    boost::mutex _bgIndexStartingMutex;
+    boost::condition_variable _bgIndexStartingCondVar;
+
+    void _setBgIndexStarting() {
+        boost::mutex::scoped_lock lk(_bgIndexStartingMutex);
+        invariant(_bgIndexStarting == false);
+        _bgIndexStarting = true;
+        _bgIndexStartingCondVar.notify_one();
+    }
+} // namespace
 
     IndexBuilder::IndexBuilder(const BSONObj& index) :
         BackgroundJob(true /* self-delete */), _index(index.getOwned()),
@@ -61,6 +78,10 @@ namespace mongo {
         cc().curop()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
         Client::WriteContext ctx(ns.getSystemIndexesCollection());
+
+        // Show which index we're background building in the curop display, and unblock waiters.
+        cc().curop()->setQuery(_index);
+        _setBgIndexStarting();
 
         Status status = build( ctx.ctx() );
         if ( !status.isOK() ) {
@@ -90,6 +111,15 @@ namespace mongo {
         return status;
     }
 
+    void IndexBuilder::waitForBgIndexStarting() {
+        boost::unique_lock<boost::mutex> lk(_bgIndexStartingMutex);
+        while (_bgIndexStarting == false) {
+            _bgIndexStartingCondVar.wait(lk);
+        }
+        // Reset for next time.
+        _bgIndexStarting = false;
+    }
+
     std::vector<BSONObj> 
     IndexBuilder::killMatchingIndexBuilds(Collection* collection,
                                           const IndexCatalog::IndexKillCriteria& criteria) {
@@ -103,6 +133,8 @@ namespace mongo {
             IndexBuilder* indexBuilder = new IndexBuilder(indexes[i]);
             // This looks like a memory leak, but indexBuilder deletes itself when it finishes
             indexBuilder->go();
+            dbtemprelease release;
+            IndexBuilder::waitForBgIndexStarting();
         }
     }
 }

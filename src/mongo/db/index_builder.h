@@ -72,6 +72,13 @@ namespace mongo {
          */
         static void restoreIndexes(const std::vector<BSONObj>& indexes);
 
+        /**
+         * Waits for a background index build to register itself.  This function must be called
+         * after starting a background index build via a BackgroundJob and before starting a
+         * subsequent one.
+         */
+        static void waitForBgIndexStarting();
+
     private:
         const BSONObj _index;
         std::string _name; // name of this builder, not related to the index
