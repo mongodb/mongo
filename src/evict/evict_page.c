@@ -327,6 +327,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	uint32_t flags;
 
 	btree = S2BT(session);
+	flags = WT_EVICTING;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -472,7 +473,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * they are not expected to split).
 	 */
 	if (__wt_page_is_modified(page)) {
-		flags = WT_EVICTING;
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
 		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
@@ -482,15 +482,16 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 		WT_ASSERT(session,
 		    !__wt_page_is_modified(page) ||
 		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));
-	} else {
-		/*
-		 * If the page was ever modified, make sure all of the updates
-		 * on the page are old enough they can be discarded from cache.
-		 */
-		if (!exclusive && mod != NULL &&
-		    !__wt_txn_visible_all(session, mod->rec_max_txn))
-			return (EBUSY);
 	}
+
+	/*
+	 * If the page was ever modified, make sure all of the updates
+	 * on the page are old enough they can be discarded from cache.
+	 */
+	if (!exclusive && mod != NULL &&
+	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
+	    !LF_ISSET(WT_SKIP_UPDATE_RESTORE))
+		return (EBUSY);
 
 	/*
 	 * Repeat the test: fail if any page in the top-level page's subtree
