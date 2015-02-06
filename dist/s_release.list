@@ -7,3 +7,5 @@ test/packing
 test/salvage
 test/snapshot
 test/thread
+tools/wtstats/template
+tools/wtstats/test
