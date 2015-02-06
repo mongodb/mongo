@@ -422,12 +422,6 @@ namespace mongo {
                                   args.userName.getUser());
             userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
                                   args.userName.getDB());
-            if (!args.hasHashedPassword) {
-                // Must be an external user
-                userObjBuilder.append("credentials", BSON("external" << true));
-            }
-
-            BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             int authzVersion;
@@ -436,15 +430,22 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            // Add SCRAM credentials for appropriate authSchemaVersions.
-            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                BSONObj scramCred = scram::generateCredentials(
-                        args.hashedPassword,
-                        saslGlobalParams.scramIterationCount);
-                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
+            BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
+            if (!args.hasHashedPassword) {
+                // Must be an external user
+                credentialsBuilder.append("external", true);
             }
-            else { // Otherwise default to MONGODB-CR.
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+            else {
+                // Add SCRAM credentials for appropriate authSchemaVersions.
+                if (authzVersion > AuthorizationManager::schemaVersion26Final) {
+                    BSONObj scramCred = scram::generateCredentials(
+                            args.hashedPassword,
+                            saslGlobalParams.scramIterationCount);
+                    credentialsBuilder.append("SCRAM-SHA-1", scramCred);
+                }
+                else { // Otherwise default to MONGODB-CR.
+                    credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+                }
             }
             credentialsBuilder.done();
 
