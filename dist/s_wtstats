@@ -13,12 +13,12 @@ type npm > /dev/null 2>&1 || {
         exit 1
 }
 
-cd ../tools/template || exit 1
+cd ../tools/wtstats/template || exit 1
 rm -f ./$out
 # Note: we don't do the npm install here, it downloads files
 test -d ./node_modules || {
         echo 's_wtstats: missing node_modules directory, install by:' >&2
-        echo '    cd ../tools/template; npm install' >&2
+        echo '    cd ../tools/wtstats/template; npm install' >&2
         exit 1
 }
 npm run build >$t 2>&1 || {
@@ -33,5 +33,5 @@ test -f ./$out || {
 }
 f=../$out
 cmp ./$out $f > /dev/null 2>&1 ||
-        (echo "Building tools/$out" && rm -f $f && cp ./$out $f)
+        (echo "Building tools/wtstats/$out" && rm -f $f && cp ./$out $f)
 exit 0
