@@ -606,6 +606,11 @@ namespace mongo {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
                 Client::Context ctx(txn, ns);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while creating collection " << ns));
+                }
 
                 WriteUnitOfWork wunit(txn);
 
