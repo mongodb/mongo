@@ -1,7 +1,7 @@
 personal_ws-1.1 en 200
 ACM
-ActiveState
 APIs
+ActiveState
 Adler's
 Atomicity
 BLOBs
@@ -59,6 +59,7 @@ NoSQL
 OPTYPE
 PRELOAD
 README
+REFGENERIC
 RedHat
 RepMgr
 Riak
@@ -149,6 +150,7 @@ dNOff
 dT
 dataN
 dataitem
+dataset
 datasets
 datastore
 dbc
@@ -272,6 +274,7 @@ maxintlpage
 maxleafitem
 maxleafpage
 md
+mem
 memalloc
 memfree
 memp
@@ -398,6 +401,7 @@ structs
 subdatabases
 subdirectory
 subpage
+substring
 superset
 sys
 sz
@@ -411,8 +415,10 @@ timestamp
 timestamps
 todo
 toolchain
+touchpad
 tpc
 tpcb
+trackpad
 transactional
 transactionally
 tt

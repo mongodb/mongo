@@ -82,8 +82,12 @@ or logged:
 @section statistics_log Statistics logging
 
 WiredTiger will optionally log database statistics into a file when the
-the ::wiredtiger_open \c statistics_log configuration is set.  The
-following example logs statistics every 30 seconds:
+the ::wiredtiger_open \c statistics_log configuration is set.
+
+The resulting statistics can be displayed using the \c wtstats visualization
+tool.  For more information, see REFGENERIC wtstats.
+
+The following example logs statistics every 30 seconds:
 
 @snippet ex_all.c Statistics logging
 

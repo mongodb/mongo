@@ -146,6 +146,9 @@ def process_lang(lang, lines):
                 result += line + '\n'
     if lang == 'java':
         result = java_post_substitutions(result)
+    # XXX
+    # Hack to set a reference to a non-language specific page.
+    result = result.replace('REFGENERIC', '@ref')
     if len(condstack) != 1:
         err('non matching @m_if/@m_endif')
     return result
