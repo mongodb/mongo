@@ -519,6 +519,11 @@ namespace mongo {
             docWasModified = false;
         }
 
+        if (!docWasModified && request->shouldStoreResultDoc()) {
+            // The update is a no-op, so the result doc is the same as the old doc.
+            _specificStats.newObj = oldObj.value().getOwned();
+        }
+
         if (docWasModified) {
 
             // Verify that no immutable fields were changed and data is valid for storage.
@@ -602,6 +607,11 @@ namespace mongo {
 
             invariant(oldObj.snapshotId() == _txn->recoveryUnit()->getSnapshotId());
             wunit.commit();
+
+            if (request->shouldStoreResultDoc()) {
+                // We just committed a single update. Hold onto the resulting document.
+                _specificStats.newObj = newObj.getOwned();
+            }
         }
 
         // Only record doc modifications if they wrote (exclude no-ops). Explains get
@@ -683,6 +693,9 @@ namespace mongo {
                 newObj.objsize() <= BSONObjMaxUserSize);
 
         _specificStats.objInserted = newObj;
+        if (request->shouldStoreResultDoc()) {
+            _specificStats.newObj = newObj;
+        }
 
         // If this is an explain, bail out now without doing the insert.
         if (request->isExplain()) {
@@ -1009,7 +1022,8 @@ namespace mongo {
                             !updateStats->isDocReplacement /* $mod or obj replacement */,
                             opDebug->nModified /* number of modified docs, no no-ops */,
                             opDebug->nMatched /* # of docs matched/updated, even no-ops */,
-                            updateStats->objInserted);
+                            updateStats->objInserted,
+                            updateStats->newObj);
     };
 
 } // namespace mongo
