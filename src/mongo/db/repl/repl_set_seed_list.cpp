@@ -80,7 +80,7 @@ namespace repl {
                 seedSet.insert(m);
                 //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if (externalState->isSelf(m)) {
-                    LOG(1) << "replSet ignoring seed " << m.toString() << " (=self)";
+                    LOG(1) << "ignoring seed " << m.toString() << " (=self)";
                 }
                 else
                     seeds.push_back(m);

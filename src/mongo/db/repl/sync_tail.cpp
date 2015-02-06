@@ -138,7 +138,7 @@ namespace repl {
             // this is often a no-op
             // but can't be 100% sure
             if( *op.getStringField("op") != 'n' ) {
-                error() << "replSet skipping bad op in oplog: " << op.toString();
+                error() << "skipping bad op in oplog: " << op.toString();
             }
             return true;
         }
@@ -607,7 +607,7 @@ namespace {
                     sleepsecs((int) sleeptime);
                 }
                 else {
-                    warning() << "replSet slavedelay causing a long sleep of " << sleeptime
+                    warning() << "slavedelay causing a long sleep of " << sleeptime
                               << " seconds";
                     // sleep(hours) would prevent reconfigs from taking effect & such!
                     long long waitUntil = b + sleeptime;

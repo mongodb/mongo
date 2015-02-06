@@ -131,7 +131,7 @@ namespace repl {
                             " are syncing, please update all nodes to 2.6 or later.",
                             errMsg.find("no such cmd") == std::string::npos);
 
-                    log() << "replSet error while handshaking the upstream updater: "
+                    error() << "Error while handshaking the upstream updater: "
                         << errMsg;
 
                     // sleep half a second if we are not in our sync source's config
@@ -163,19 +163,19 @@ namespace repl {
         if (hasConnection()) {
             return true;
         }
-        log() << "replset setting syncSourceFeedback to " << host.toString();
+        log() << "setting syncSourceFeedback to " << host.toString();
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
         try {
             if (!_connection->connect(host, errmsg) ||
                 (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
                 _resetConnection();
-                log() << "repl: " << errmsg << endl;
+                log() << errmsg << endl;
                 return false;
             }
         }
         catch (const DBException& e) {
-            log() << "Error connecting to " << host.toString() << ": " << e.what();
+            error() << "Error connecting to " << host.toString() << ": " << e.what();
             _resetConnection();
             return false;
         }

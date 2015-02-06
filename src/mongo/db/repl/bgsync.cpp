@@ -355,7 +355,7 @@ namespace {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _lastFetchedHash = o["h"].numberLong();
                 _lastOpTimeFetched = o["ts"]._opTime();
-                LOG(3) << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringPretty();
+                LOG(3) << "lastOpTimeFetched: " << _lastOpTimeFetched.toStringPretty();
             }
         }
     }
@@ -398,22 +398,22 @@ namespace {
             try {
                 BSONObj theirLastOp = r.getLastOp(rsoplog);
                 if (theirLastOp.isEmpty()) {
-                    log() << "replSet error empty query result from " << hn << " oplog";
+                    error() << "empty query result from " << hn << " oplog";
                     sleepsecs(2);
                     return true;
                 }
                 OpTime theirTS = theirLastOp["ts"]._opTime();
                 if (theirTS < _lastOpTimeFetched) {
-                    log() << "replSet we are ahead of the sync source, will try to roll back";
+                    log() << "we are ahead of the sync source, will try to roll back";
                     syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
                     return true;
                 }
                 /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
-                log() << "replSet syncTail condition 1";
+                log() << "syncTail condition 1";
                 sleepsecs(1);
             }
             catch(DBException& e) {
-                log() << "replSet error querying " << hn << ' ' << e.toString();
+                error() << "querying " << hn << ' ' << e.toString();
                 sleepsecs(2);
             }
             return true;
@@ -423,8 +423,8 @@ namespace {
         OpTime ts = o["ts"]._opTime();
         long long hash = o["h"].numberLong();
         if( ts != _lastOpTimeFetched || hash != _lastFetchedHash ) {
-            log() << "replSet our last op time fetched: " << _lastOpTimeFetched.toStringPretty();
-            log() << "replset source's GTE: " << ts.toStringPretty();
+            log() << "our last op time fetched: " << _lastOpTimeFetched.toStringPretty();
+            log() << "source's GTE: " << ts.toStringPretty();
             syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
             return true;
         }
@@ -465,7 +465,7 @@ namespace {
         _lastOpTimeFetched = _replCoord->getMyLastOptime();
         _lastFetchedHash = _lastAppliedHash;
 
-        LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << 
+        LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched <<
             " " << _lastFetchedHash;
     }
 

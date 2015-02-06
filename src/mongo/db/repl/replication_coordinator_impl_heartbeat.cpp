@@ -240,12 +240,12 @@ namespace {
         }
 
         if (status.isOK()) {
-            LOG(1) << "replset: stepdown of primary(" << cbData.request.target
+            LOG(1) << "stepdown of primary(" << cbData.request.target
                    << ") succeeded with response -- "
                    << cbData.response.getValue().data;
         }
         else {
-            warning() << "replset: stepdown of primary(" << cbData.request.target
+            warning() << "stepdown of primary(" << cbData.request.target
                       << ") failed due to " << cbData.response.getStatus();
         }
     }

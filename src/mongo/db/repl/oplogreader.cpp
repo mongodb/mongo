@@ -99,7 +99,7 @@ namespace repl {
                   !replAuthenticate(_conn.get())) ) {
 
                 resetConnection();
-                log() << "repl: " << errmsg << endl;
+                error() << errmsg << endl;
                 return false;
             }
             _host = host;
@@ -109,7 +109,7 @@ namespace repl {
 
     void OplogReader::tailCheck() {
         if( cursor.get() && cursor->isDead() ) {
-            log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
+            log() << "old cursor isDead, will initiate a new one" << std::endl;
             resetCursor();
         }
     }
@@ -126,7 +126,7 @@ namespace repl {
 
     void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
         verify( !haveCursor() );
-        LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
+        LOG(2) << ns << ".find(" << query.toString() << ')' << endl;
         cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
     }
 
@@ -165,11 +165,10 @@ namespace repl {
 
                 // Connected to at least one member, but in all cases we were too stale to use them
                 // as a sync source.
-                log() << "replSet error RS102 too stale to catch up";
-                log() << "replSet our last optime : " << lastOpTimeFetched.toStringLong();
-                log() << "replSet oldest available is " << oldestOpTimeSeen.toStringLong();
-                log() << "replSet "
-                    "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
+                error() << "RS102 too stale to catch up";
+                log() << "our last optime : " << lastOpTimeFetched.toStringLong();
+                log() << "oldest available is " << oldestOpTimeSeen.toStringLong();
+                log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
                 setMinValid(txn, oldestOpTimeSeen);
                 bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
                 if (!worked) {
@@ -181,7 +180,7 @@ namespace repl {
             }
 
             if (!connect(candidate)) {
-                LOG(2) << "replSet can't connect to " << candidate.toString() << 
+                LOG(2) << "can't connect to " << candidate.toString() <<
                     " to read operations";
                 resetConnection();
                 replCoord->blacklistSyncSource(candidate, Date_t(curTimeMillis64() + 10*1000));

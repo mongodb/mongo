@@ -61,7 +61,7 @@ namespace repl {
         // capped collections
         Collection* collection = db->getCollection(ns);
         if ( collection && collection->isCapped() ) {
-            log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
+            log() << "missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
             return BSONObj();
         }
 
@@ -100,7 +100,7 @@ namespace repl {
                 continue; // try again
             } 
             catch (DBException& e) {
-                log() << "replication assertion fetching missing object: " << e.what() << endl;
+                error() << "assertion fetching missing object: " << e.what() << endl;
                 throw;
             }
 
@@ -121,14 +121,14 @@ namespace repl {
         Database* const db = autoDb.getDb();
 
         // we don't have the object yet, which is possible on initial sync.  get it.
-        log() << "replication info adding missing object" << endl; // rare enough we can log
+        log() << "adding missing object" << endl; // rare enough we can log
 
         BSONObj missingObj = getMissingDoc(txn, db, o);
 
         if( missingObj.isEmpty() ) {
-            log() << "replication missing object not found on source. presumably deleted later in oplog" << endl;
-            log() << "replication o2: " << o.getObjectField("o2").toString() << endl;
-            log() << "replication o firstfield: " << o.getObjectField("o").firstElementFieldName() << endl;
+            log() << "missing object not found on source. presumably deleted later in oplog" << endl;
+            log() << "o2: " << o.getObjectField("o2").toString() << endl;
+            log() << "o firstfield: " << o.getObjectField("o").firstElementFieldName() << endl;
 
             return false;
         }
@@ -143,7 +143,7 @@ namespace repl {
                     str::stream() << "failed to insert missing doc: " << result.toString(),
                     result.isOK() );
 
-            LOG(1) << "replication inserted missing doc: " << missingObj.toString() << endl;
+            LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;
 
             wunit.commit();
             return true;

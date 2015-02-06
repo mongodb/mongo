@@ -877,7 +877,7 @@ namespace {
         }
         const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target);
         if (memberIndex == -1) {
-            LOG(1) << "replset: Could not find " << target  << " in current config so ignoring --"
+            LOG(1) << "Could not find " << target  << " in current config so ignoring --"
                 " current config: " << _rsConfig.toBSON();
             HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeNoAction();
             nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
@@ -1026,7 +1026,7 @@ namespace {
                     if (remotePrimaryIndex != -1) {
                         // two other nodes think they are primary (asynchronously polled) 
                         // -- wait for things to settle down.
-                        log() << "replSet info two remote primaries (transiently)";
+                        warning() << "two remote primaries (transiently)";
                         return HeartbeatResponseAction::makeNoAction();
                     }
                     remotePrimaryIndex = itIndex;
@@ -1044,7 +1044,7 @@ namespace {
                 // If we are also primary, this is a problem.  Determine who should step down.
                 if (_iAmPrimary()) {
                     OpTime remoteElectionTime = _hbdata[remotePrimaryIndex].getElectionTime();
-                    log() << "replset: another primary seen with election time " 
+                    log() << "another primary seen with election time "
                           << remoteElectionTime << " my election time is " << _electionTime;
 
                     // Step down whomever has the older election time.
@@ -1266,7 +1266,7 @@ namespace {
                 getMemberState();
             invariant(false);
         }
-        log() << "replSet " << newMemberState;
+        log() << newMemberState;
     }
 
     void TopologyCoordinatorImpl::_setCurrentPrimaryForTest(int primaryIndex) {
@@ -1518,7 +1518,7 @@ namespace {
 
         if (secs == 0) {
             _stepDownUntil = now;
-            log() << "replSet info 'unfreezing'";
+            log() << "'unfreezing'";
             response->append("info", "unfreezing");
 
             if (_followerMode == MemberState::RS_SECONDARY &&
@@ -1538,10 +1538,10 @@ namespace {
 
             if (!_iAmPrimary()) {
                 _stepDownUntil = std::max(_stepDownUntil, Date_t(now + (secs * 1000)));
-                log() << "replSet info 'freezing' for " << secs << " seconds";
+                log() << "'freezing' for " << secs << " seconds";
             }
             else {
-                log() << "replSet info received freeze command but we are primary";
+                log() << "received freeze command but we are primary";
             }
         }
     }
@@ -1871,7 +1871,7 @@ namespace {
         int selfId = _selfConfig().getId();
         if ((_lastVote.when + LastVote::leaseTime.total_milliseconds() >= now) 
             && (_lastVote.whoId != selfId)) {
-            log() << "replSet not voting yea for " << selfId <<
+            log() << "not voting yea for " << selfId <<
                 " voted for " << _lastVote.whoHostAndPort.toString() << ' ' << 
                 (now - _lastVote.when) / 1000 << " secs ago";
             return false;
@@ -1996,7 +1996,7 @@ namespace {
                     // two other nodes think they are primary (asynchronously polled)
                     // -- wait for things to settle down.
                     remotePrimaryIndex = -1;
-                    log() << "replSet info two remote primaries (transiently)";
+                    warning() << "two remote primaries (transiently)";
                     break;
                 }
                 remotePrimaryIndex = itIndex;

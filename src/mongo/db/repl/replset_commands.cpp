@@ -75,7 +75,7 @@ namespace repl {
                                            std::vector<Privilege>* out) {}
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            log() << "replSet replSetTest command received: " << cmdObj.toString();
+            log() << "replSetTest command received: " << cmdObj.toString();
 
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
@@ -234,7 +234,7 @@ namespace {
 
             if (configObj.isEmpty()) {
                 result.append("info2", "no configuration explicitly specified -- making one");
-                log() << "replSet info initiate : no configuration specified.  "
+                log() << "initiate : no configuration specified.  "
                     "Using a default configuration for the set";
 
                 ReplicationCoordinatorExternalStateImpl externalState;
@@ -261,7 +261,7 @@ namespace {
                 }
                 b.appendArray("members", members.obj());
                 configObj = b.obj();
-                log() << "replSet created this configuration for initiation : " <<
+                log() << "created this configuration for initiation : " <<
                         configObj.toString();
             }
 
@@ -691,8 +691,8 @@ namespace {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
-            DEV log() << "replSet received elect msg " << cmdObj.toString();
-            else LOG(2) << "replSet received elect msg " << cmdObj.toString();
+            DEV log() << "received elect msg " << cmdObj.toString();
+            else LOG(2) << "received elect msg " << cmdObj.toString();
 
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK())
