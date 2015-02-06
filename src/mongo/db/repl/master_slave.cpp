@@ -318,11 +318,9 @@ namespace repl {
             ReplSource tmp(txn, obj);
             if ( tmp.syncedTo.isNull() ) {
                 DBDirectClient c(txn);
-                if ( c.exists( "local.oplog.$main" ) ) {
-                    BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
-                    if ( !op.isEmpty() ) {
-                        tmp.syncedTo = op[ "ts" ].date();
-                    }
+                BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
+                if ( !op.isEmpty() ) {
+                    tmp.syncedTo = op[ "ts" ].date();
                 }
             }
             addSourceToList(txn, v, tmp, old);
