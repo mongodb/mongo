@@ -393,6 +393,7 @@ namespace mongo {
                     request.setUpdates(update);
                     request.setUpsert(upsert);
                     request.setUpdateOpLog();
+                    request.setStoreResultDoc(returnNew);
 
                     request.setYieldPolicy(PlanExecutor::YIELD_MANUAL);
 
@@ -420,30 +421,11 @@ namespace mongo {
                     }
 
                     LOG(3) << "update result: "  << res ;
-                    if ( returnNew ) {
-                        if ( !res.upserted.isEmpty() ) {
-                            BSONElement upsertedElem = res.upserted[kUpsertedFieldName];
-                            LOG(3) << "using new _id to get new doc: "
-                                   << upsertedElem;
-                            queryModified = upsertedElem.wrap("_id");
-                        }
-                        else if ( queryModified["_id"].type() ) {
-                            // we do this so that if the update changes the fields, it still matches
-                            queryModified = queryModified["_id"].wrap();
-                        }
-
-                        LOG(3) << "using modified query to return the new doc: " << queryModified;
-                        if ( ! Helpers::findOne( txn, collection, queryModified, doc ) ) {
-                            errmsg = str::stream() << "can't find object after modification  " 
-                                                   << " ns: " << ns 
-                                                   << " queryModified: " << queryModified 
-                                                   << " queryOriginal: " << query;
-                            log() << errmsg << endl;
-                            return false;
-                        }
-                        _appendHelper(result, doc, true, fields, whereCallback);
+                    if (returnNew) {
+                        dassert(!res.newObj.isEmpty());
+                        _appendHelper(result, res.newObj, true, fields, whereCallback);
                     }
-                    
+
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendBool( "updatedExisting" , res.existing );
                     le.appendNumber( "n" , res.numMatched );
@@ -451,7 +433,6 @@ namespace mongo {
                         le.append( res.upserted[kUpsertedFieldName] );
                     }
                     le.done();
-                    
                 }
             }
 
