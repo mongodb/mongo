@@ -1,4 +1,4 @@
-// Check index rebuild when MongoDB is killed
+// Check index rebuild is disabled with --noIndexBuildRetry when MongoDB is killed
 (function() {
     'use strict';
     var baseName = 'index_retry';
@@ -84,18 +84,19 @@
         dbpath: dbpath,
         port: ports[0],
         journal: '',
+        noIndexBuildRetry: '',
         restart: true});
     test = conn.getDB("test");
     t = test.getCollection(name);
 
-    assert.eq({a: 42}, t.find({a: 42}, {_id: 0}).hint({a: 1}).next(),
-              'index {a: 1} was rebuilt on startup');
+    assert.throws(function() { t.find({a: 42}).hint({a: 1}).next(); },
+                  null,
+                  'index {a: 1} was rebuilt in spite of --noIndexBuildRetry');
 
     var indexes = t.getIndexes();
-    assert.eq(2, indexes.length,
-              'unexpected number of indexes in listIndexes result: ' + tojson(indexes));
+    assert.eq(1, indexes.length, 'unfinished indexes in listIndexes result: ' + tojson(indexes));
 
-    print("Index built");
+    print("Index rebuilding disabled successfully");
 
     MongoRunner.stopMongod(ports[0]);
     print("SUCCESS!");
