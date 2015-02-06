@@ -312,8 +312,9 @@ var maxSizeTests = [
 
 // Execute all test objects
 // SERVER-17070 Auto split moves to shard node running WiredTiger, if exceeding maxSize
-if (st.d0.adminCommand({serverStatus: 1}).storageEngine.name != "wiredTiger" &&
-    st.d1.adminCommand({serverStatus: 1}).storageEngine.name != "wiredTiger") {
+var unsupported = ["wiredTiger", "rocksExperiment"];
+if (unsupported.indexOf(st.d0.adminCommand({serverStatus : 1}).storageEngine.name) == -1 &&
+    unsupported.indexOf(st.d1.adminCommand({serverStatus : 1}).storageEngine.name) == -1) {
     for (var i = 0; i < maxSizeTests.length; i++) {
         runTest(maxSizeTests[i]);
     }
