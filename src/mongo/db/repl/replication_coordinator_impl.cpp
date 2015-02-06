@@ -1336,7 +1336,6 @@ namespace {
                     // Don't include info on members we haven't heard from yet.
                     continue;
                 }
-                invariant(itr->rid.isSet());
                 BSONObjBuilder entry(arrayBuilder.subobjStart());
                 entry.append("_id", itr->rid);
                 entry.append("optime", itr->opTime);
