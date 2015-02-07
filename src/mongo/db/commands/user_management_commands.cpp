@@ -422,12 +422,6 @@ namespace mongo {
                                   args.userName.getUser());
             userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
                                   args.userName.getDB());
-            if (!args.hasHashedPassword) {
-                // Must be an external user
-                userObjBuilder.append("credentials", BSON("external" << true));
-            }
-
-            BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             int authzVersion;
@@ -436,15 +430,22 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            // Add SCRAM credentials for appropriate authSchemaVersions.
-            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                BSONObj scramCred = scram::generateCredentials(
-                        args.hashedPassword,
-                        saslGlobalParams.scramIterationCount);
-                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
+            BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
+            if (!args.hasHashedPassword) {
+                // Must be an external user
+                credentialsBuilder.append("external", true);
             }
-            else { // Otherwise default to MONGODB-CR.
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+            else {
+                // Add SCRAM credentials for appropriate authSchemaVersions.
+                if (authzVersion > AuthorizationManager::schemaVersion26Final) {
+                    BSONObj scramCred = scram::generateCredentials(
+                            args.hashedPassword,
+                            saslGlobalParams.scramIterationCount);
+                    credentialsBuilder.append("SCRAM-SHA-1", scramCred);
+                }
+                else { // Otherwise default to MONGODB-CR.
+                    credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+                }
             }
             credentialsBuilder.done();
 
@@ -2663,7 +2664,7 @@ namespace mongo {
          */
         static void addUser(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& db,
+                            StringData db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<UserName>* usersToDrop,
@@ -2708,7 +2709,7 @@ namespace mongo {
          */
         static void addRole(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& db,
+                            StringData db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<RoleName>* rolesToDrop,
@@ -2747,8 +2748,8 @@ namespace mongo {
          */
         Status processUsers(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& usersCollName,
-                            const StringData& db,
+                            StringData usersCollName,
+                            StringData db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the users
@@ -2830,8 +2831,8 @@ namespace mongo {
          */
         Status processRoles(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& rolesCollName,
-                            const StringData& db,
+                            StringData rolesCollName,
+                            StringData db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the roles

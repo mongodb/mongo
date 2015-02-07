@@ -75,7 +75,7 @@ namespace mongo {
          * Returns a pattern that matches the named database, and NamespaceStrings
          * "ns" for which ns.isSystem() is false and ns.db() == dbname.
          */
-        static ResourcePattern forDatabaseName(const StringData& dbName) {
+        static ResourcePattern forDatabaseName(StringData dbName) {
             return ResourcePattern(matchDatabaseName, NamespaceString(dbName, ""));
         }
 
@@ -83,7 +83,7 @@ namespace mongo {
          * Returns a pattern that matches NamespaceStrings "ns" for which ns.coll() ==
          * collectionName.
          */
-        static ResourcePattern forCollectionName(const StringData& collectionName) {
+        static ResourcePattern forCollectionName(StringData collectionName) {
             return ResourcePattern(matchCollectionName, NamespaceString("", collectionName));
         }
 

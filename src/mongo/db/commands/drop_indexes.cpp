@@ -38,6 +38,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -47,7 +48,9 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
 
@@ -108,31 +111,42 @@ namespace mongo {
         }
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
-            bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
-            if (!ok) {
-                return false;
-            }
-            if (!fromRepl)
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
-            wunit.commit();
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg,
+                 BSONObjBuilder& result, bool fromRepl) {
+            const std::string ns = parseNsCollectionRequired(dbname, jsobj);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
+                AutoGetDb autoDb(txn, dbname, MODE_X);
+
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while dropping indexes in " << ns));
+                }
+
+                WriteUnitOfWork wunit(txn);
+                bool ok = wrappedRun(txn, dbname, ns, autoDb.getDb(), jsobj, errmsg, result);
+                if (!ok) {
+                    return false;
+                }
+                if (!fromRepl) {
+                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                }
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropIndexes", dbname);
             return true;
         }
 
         bool wrappedRun(OperationContext* txn,
                         const string& dbname,
+                        const std::string& toDeleteNs,
+                        Database* const db,
                         BSONObj& jsobj,
                         string& errmsg,
                         BSONObjBuilder& anObjBuilder) {
-            const std::string toDeleteNs = parseNsCollectionRequired(dbname, jsobj);
             if (!serverGlobalParams.quiet) {
                 LOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
-            AutoGetDb autoDb(txn, dbname, MODE_IS);
-            Database* const db = autoDb.getDb();
             Collection* collection = db ? db->getCollection(toDeleteNs) : NULL;
 
             // If db/collection does not exist, short circuit and return.

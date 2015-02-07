@@ -47,7 +47,7 @@ namespace mongo {
         using std::stringstream;
         using std::vector;
 
-        Status FTSQuery::parse(const string& query, const StringData& language,
+        Status FTSQuery::parse(const string& query, StringData language,
                                TextIndexVersion textIndexVersion) {
             _search = query;
             StatusWithFTSLanguage swl = FTSLanguage::make( language, textIndexVersion );

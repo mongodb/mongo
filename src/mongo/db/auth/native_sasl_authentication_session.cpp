@@ -110,10 +110,10 @@ namespace {
 
     NativeSaslAuthenticationSession::~NativeSaslAuthenticationSession() {}
 
-    Status NativeSaslAuthenticationSession::start(const StringData& authenticationDatabase,
-                                                  const StringData& mechanism,
-                                                  const StringData& serviceName,
-                                                  const StringData& serviceHostname,
+    Status NativeSaslAuthenticationSession::start(StringData authenticationDatabase,
+                                                  StringData mechanism,
+                                                  StringData serviceName,
+                                                  StringData serviceHostname,
                                                   int64_t conversationId,
                                                   bool autoAuthorize) {
         fassert(18626, conversationId > 0);
@@ -145,7 +145,7 @@ namespace {
         return Status::OK();
     }
 
-    Status NativeSaslAuthenticationSession::step(const StringData& inputData,
+    Status NativeSaslAuthenticationSession::step(StringData inputData,
                                                  std::string* outputData) {
         if (!_saslConversation) {
             return Status(ErrorCodes::BadValue,

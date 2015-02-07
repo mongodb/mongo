@@ -260,10 +260,16 @@ __wt_log_slot_notify(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 int
 __wt_log_slot_wait(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	int yield_count;
+
+	yield_count = 0;
 	WT_UNUSED(session);
 
 	while (slot->slot_state > WT_LOG_SLOT_DONE)
-		__wt_yield();
+		if (++yield_count < 1000)
+			__wt_yield();
+		else
+			__wt_sleep(0, 200);
 	return (0);
 }
 

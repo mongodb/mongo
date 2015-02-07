@@ -66,7 +66,7 @@ namespace mongo {
             return;
         }
 
-        // Create authParams for legacy MONGODB-CR authentication for 2.6/2.8 mixed
+        // Create authParams for legacy MONGODB-CR authentication for 2.6/3.0 mixed
         // mode if applicable.
         mmb::Document fallback(authParamsIn);
         fallback.root().findFirstChildNamed("mechanism").setValueString("MONGODB-CR");

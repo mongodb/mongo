@@ -42,7 +42,7 @@ namespace mongo {
     public:
         CappedRecordStoreV1( OperationContext* txn,
                              CappedDocumentDeleteCallback* collection,
-                             const StringData& ns,
+                             StringData ns,
                              RecordStoreV1MetaData* details,
                              ExtentManager* em,
                              bool isSystemIndexes );
@@ -104,7 +104,7 @@ namespace mongo {
         void setLastDelRecLastExtent( OperationContext* txn, const DiskLoc& loc );
         Extent *theCapExtent() const;
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
-        void advanceCapExtent( OperationContext* txn, const StringData& ns );
+        void advanceCapExtent( OperationContext* txn, StringData ns );
         void cappedTruncateLastDelUpdate(OperationContext* txn);
 
         /**

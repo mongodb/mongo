@@ -252,7 +252,7 @@ namespace {
     }
 
     template <>
-    Status StorageEngineMetadata::validateStorageEngineOption<bool>(const StringData& fieldName,
+    Status StorageEngineMetadata::validateStorageEngineOption<bool>(StringData fieldName,
                                                                     bool expectedValue) const {
         BSONElement element = _storageEngineOptions.getField(fieldName);
         if (element.eoo()) {

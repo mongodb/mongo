@@ -661,7 +661,7 @@ namespace PerfTests {
     class locker_test : public B {
     public:
         boost::thread_specific_ptr<ResourceId> resId;
-        boost::thread_specific_ptr<Locker> locker;
+        boost::thread_specific_ptr<MMAPV1LockerImpl> locker;
         boost::thread_specific_ptr<int> id;
         boost::mutex lock;
 
@@ -679,7 +679,7 @@ namespace PerfTests {
         virtual bool testThreaded() { return true; }
         virtual void prep() {
             resId.reset(new ResourceId(RESOURCE_COLLECTION, std::string("TestDB.collection")));
-            locker.reset(new LockerImpl<true>);
+            locker.reset(new MMAPV1LockerImpl());
         }
 
         virtual void prepThreaded() {
@@ -687,7 +687,7 @@ namespace PerfTests {
             id.reset(new int);
             lock.lock();
             lock.unlock();
-            locker.reset(new LockerImpl<true>);
+            locker.reset(new MMAPV1LockerImpl());
         }
 
         void timed() {

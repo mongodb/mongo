@@ -110,7 +110,6 @@ function mixedShardTest(options1, options2, shouldSucceed) {
 ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
     options = options || {};
 
-    var nodes = this.nodes;
     var primary = this.getPrimary();
 
     // Upgrade secondaries first
@@ -120,7 +119,7 @@ ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
     nodesToUpgrade.push( primary );
 
     // We can upgrade with no primary downtime if we have enough nodes
-    var noDowntimePossible = nodes.length > 2;
+    var noDowntimePossible = this.nodes.length > 2;
 
     for( var i = 0; i < nodesToUpgrade.length; i++ ){
         var node = nodesToUpgrade[ i ];
@@ -135,25 +134,28 @@ ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
             this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
         }
         printjson(this.nodeOptions);
-        this.upgradeNode( node, options, true, user, pwd );
+        this.upgradeNode( node, options, user, pwd );
 
         if( noDowntimePossible )
             assert.eq( this.getNodeId( primary ), prevPrimaryId );
     }
 };
 
-ReplSetTest.prototype.upgradeNode = function( node, opts, waitForState, user, pwd ){
+ReplSetTest.prototype.upgradeNode = function( node, opts, user, pwd ){
+    if (user != undefined) {
+        assert.eq(1, node.getDB("admin").auth(user, pwd));
+    }
+    assert.commandWorked(node.adminCommand("replSetMaintenance"));
+    this.waitForState(node, ReplSetTest.State.RECOVERING);
+
     var newNode = this.restart( node, opts );
     if (user != undefined) {
         newNode.getDB("admin").auth(user, pwd);
     }
-    // By default, wait for primary or secondary state
-    if( waitForState == undefined ) waitForState = true;
-    if( waitForState == true ) waitForState = [ ReplSetTest.State.PRIMARY,
-                                                ReplSetTest.State.SECONDARY,
-                                                ReplSetTest.State.ARBITER ];
-    if( waitForState )
-        this.waitForState( newNode, waitForState );
+    waitForStates = [ ReplSetTest.State.PRIMARY,
+                      ReplSetTest.State.SECONDARY,
+                      ReplSetTest.State.ARBITER ];
+    this.waitForState( newNode, waitForStates );
 
     return newNode;
 };

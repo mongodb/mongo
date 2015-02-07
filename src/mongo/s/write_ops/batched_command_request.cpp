@@ -206,7 +206,7 @@ namespace mongo {
         INVOKE( setCollNameNS, nss );
     }
 
-    void BatchedCommandRequest::setNS( const StringData& collName ) {
+    void BatchedCommandRequest::setNS( StringData collName ) {
         INVOKE( setCollName, collName );
     }
 

@@ -37,10 +37,13 @@
 #include <boost/make_shared.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include <rocksdb/cache.h>
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
+#include <rocksdb/table.h>
+#include <rocksdb/filter_policy.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/db/catalog/collection_options.h"
@@ -48,8 +51,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
-#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
+#include "mongo/db/storage/rocks/rocks_index.h"
 #include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 
 #define ROCKS_TRACE log()
 
@@ -66,6 +70,20 @@ namespace mongo {
     RocksEngine::RocksEngine(const std::string& path, bool durable)
         : _path(path),
           _durable(durable) {
+
+        { // create block cache
+            uint64_t cacheSizeGB = 0;
+            ProcessInfo pi;
+            unsigned long long memSizeMB = pi.getMemSizeMB();
+            if (memSizeMB > 0) {
+                double cacheMB = memSizeMB / 2;
+                cacheSizeGB = static_cast<uint64_t>(cacheMB / 1024);
+            }
+            if (cacheSizeGB < 1) {
+                cacheSizeGB = 1;
+            }
+            _block_cache = rocksdb::NewLRUCache(cacheSizeGB * 1024 * 1024 * 1024LL);
+        }
 
         auto columnFamilyNames = _loadColumnFamilies();       // vector of column family names
         std::unordered_map<std::string, Ordering> orderings;  // column family name -> Ordering
@@ -137,8 +155,8 @@ namespace mongo {
     }
 
     Status RocksEngine::createRecordStore(OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
+                                          StringData ns,
+                                          StringData ident,
                                           const CollectionOptions& options) {
         if (_existsColumnFamily(ident)) {
             return Status::OK();
@@ -147,8 +165,8 @@ namespace mongo {
         return _createColumnFamily(_collectionOptions(), ident);
     }
 
-    RecordStore* RocksEngine::getRecordStore(OperationContext* opCtx, const StringData& ns,
-                                             const StringData& ident,
+    RecordStore* RocksEngine::getRecordStore(OperationContext* opCtx, StringData ns,
+                                             StringData ident,
                                              const CollectionOptions& options) {
         auto columnFamily = _getColumnFamily(ident);
         if (options.capped) {
@@ -161,7 +179,7 @@ namespace mongo {
         }
     }
 
-    Status RocksEngine::createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
+    Status RocksEngine::createSortedDataInterface(OperationContext* opCtx, StringData ident,
                                                   const IndexDescriptor* desc) {
         if (_existsColumnFamily(ident)) {
             return Status::OK();
@@ -174,13 +192,18 @@ namespace mongo {
     }
 
     SortedDataInterface* RocksEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                             const StringData& ident,
+                                                             StringData ident,
                                                              const IndexDescriptor* desc) {
-        return new RocksSortedDataImpl(_db.get(), _getColumnFamily(ident), ident.toString(),
-                                       Ordering::make(desc->keyPattern()));
+        if (desc->unique()) {
+            return new RocksUniqueIndex(_db.get(), _getColumnFamily(ident), ident.toString(),
+                                        Ordering::make(desc->keyPattern()));
+        } else {
+            return new RocksStandardIndex(_db.get(), _getColumnFamily(ident), ident.toString(),
+                                          Ordering::make(desc->keyPattern()));
+        }
     }
 
-    Status RocksEngine::dropIdent(OperationContext* opCtx, const StringData& ident) {
+    Status RocksEngine::dropIdent(OperationContext* opCtx, StringData ident) {
         rocksdb::WriteBatch wb;
         // TODO is there a more efficient way?
         wb.Delete(kOrderingPrefix + ident.toString());
@@ -202,19 +225,13 @@ namespace mongo {
 
     // non public api
 
-    rocksdb::ReadOptions RocksEngine::readOptionsWithSnapshot( OperationContext* opCtx ) {
-        rocksdb::ReadOptions options;
-        options.snapshot = dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() )->snapshot();
-        return options;
-    }
-
-    bool RocksEngine::_existsColumnFamily(const StringData& ident) {
+    bool RocksEngine::_existsColumnFamily(StringData ident) {
         boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
         return _identColumnFamilyMap.find(ident) != _identColumnFamilyMap.end();
     }
 
     Status RocksEngine::_createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
-                                            const StringData& ident) {
+                                            StringData ident) {
         rocksdb::ColumnFamilyHandle* cf;
         auto s = _db->CreateColumnFamily(options, ident.toString(), &cf);
         if (!s.ok()) {
@@ -225,7 +242,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status RocksEngine::_dropColumnFamily(const StringData& ident) {
+    Status RocksEngine::_dropColumnFamily(StringData ident) {
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily;
         {
             boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
@@ -241,7 +258,7 @@ namespace mongo {
     }
 
     boost::shared_ptr<rocksdb::ColumnFamilyHandle> RocksEngine::_getColumnFamily(
-        const StringData& ident) {
+        StringData ident) {
         {
             boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
             auto cf_iter = _identColumnFamilyMap.find(ident);
@@ -296,12 +313,11 @@ namespace mongo {
         return names;
     }
 
-    rocksdb::Options RocksEngine::_dbOptions() const {
+    rocksdb::Options RocksEngine::_dbOptions() {
         rocksdb::Options options(rocksdb::DBOptions(), _defaultCFOptions());
 
-        // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
-        options.IncreaseParallelism();
-        options.OptimizeLevelStyleCompaction();
+        options.max_background_compactions = 4;
+        options.max_background_flushes = 4;
 
         // create the DB if it's not already present
         options.create_if_missing = true;
@@ -313,18 +329,22 @@ namespace mongo {
     }
 
     rocksdb::ColumnFamilyOptions RocksEngine::_defaultCFOptions() {
-        rocksdb::ColumnFamilyOptions options;
         // TODO pass or set appropriate options for default CF.
-        return options;
-    }
-
-    rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() const {
         rocksdb::ColumnFamilyOptions options;
+        rocksdb::BlockBasedTableOptions table_options;
+        table_options.block_cache = _block_cache;
+        table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(10));
+        options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
+        options.max_write_buffer_number = 4;
         return options;
     }
 
-    rocksdb::ColumnFamilyOptions RocksEngine::_indexOptions(const Ordering& order) const {
-        return rocksdb::ColumnFamilyOptions();
+    rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() {
+        return _defaultCFOptions();
+    }
+
+    rocksdb::ColumnFamilyOptions RocksEngine::_indexOptions(const Ordering& order) {
+        return _defaultCFOptions();
     }
 
     Status toMongoStatus( rocksdb::Status s ) {

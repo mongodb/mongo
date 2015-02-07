@@ -40,6 +40,7 @@
 #include <rocksdb/write_batch.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_transaction.h"
@@ -55,13 +56,14 @@ namespace mongo {
           _transaction(transactionEngine),
           _writeBatch(),
           _snapshot(NULL),
-          _depth(0) {}
+          _depth(0),
+          _myTransactionCount(1) {}
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         _abort();
     }
 
-    void RocksRecoveryUnit::beginUnitOfWork() {
+    void RocksRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
         _depth++;
     }
 
@@ -116,11 +118,14 @@ namespace mongo {
 
     void RocksRecoveryUnit::registerChange(Change* change) { _changes.push_back(change); }
 
+    SnapshotId RocksRecoveryUnit::getSnapshotId() const { return SnapshotId(_myTransactionCount); }
+
     void RocksRecoveryUnit::_releaseSnapshot() {
         if (_snapshot) {
             _db->ReleaseSnapshot(_snapshot);
             _snapshot = nullptr;
         }
+        _myTransactionCount++;
     }
 
     void RocksRecoveryUnit::_commit() {
@@ -234,7 +239,7 @@ namespace mongo {
     }
 
     RocksRecoveryUnit* RocksRecoveryUnit::getRocksRecoveryUnit(OperationContext* opCtx) {
-        return dynamic_cast<RocksRecoveryUnit*>(opCtx->recoveryUnit());
+        return checked_cast<RocksRecoveryUnit*>(opCtx->recoveryUnit());
     }
 
 }

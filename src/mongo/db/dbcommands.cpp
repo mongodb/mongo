@@ -54,6 +54,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -191,7 +192,7 @@ namespace mongo {
                 return false;
             }
 
-            {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
                 AutoGetDb autoDB(txn, dbname, MODE_X);
@@ -201,6 +202,12 @@ namespace mongo {
                     return true;
                 }
                 Client::Context context(txn, dbname);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while dropping database " << dbname));
+                }
+
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
                 stopIndexBuilds(txn, db, cmdObj);
@@ -215,7 +222,7 @@ namespace mongo {
                 }
 
                 wunit.commit();
-            }
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", dbname);
 
             result.append( "dropped" , dbname );
 
@@ -487,39 +494,45 @@ namespace mongo {
                 return false;
             }
 
-            ScopedTransaction transaction(txn, MODE_IX);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
 
-            AutoGetDb autoDb(txn, dbname, MODE_X);
-            Database* const db = autoDb.getDb();
-            Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
+                AutoGetDb autoDb(txn, dbname, MODE_X);
+                Database* const db = autoDb.getDb();
+                Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
 
-            // If db/collection does not exist, short circuit and return.
-            if ( !db || !coll ) {
-                errmsg = "ns not found";
-                return false;
-            }
-            Client::Context context(txn, nsToDrop);
+                // If db/collection does not exist, short circuit and return.
+                if ( !db || !coll ) {
+                    errmsg = "ns not found";
+                    return false;
+                }
+                Client::Context context(txn, nsToDrop);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while dropping collection " << nsToDrop));
+                }
 
-            int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
+                int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
 
-            stopIndexBuilds(txn, db, cmdObj);
+                stopIndexBuilds(txn, db, cmdObj);
 
-            result.append( "ns", nsToDrop );
-            result.append( "nIndexesWas", numIndexes );
+                result.append( "ns", nsToDrop );
+                result.append( "nIndexesWas", numIndexes );
 
-            WriteUnitOfWork wunit(txn);
-            Status s = db->dropCollection( txn, nsToDrop );
+                WriteUnitOfWork wunit(txn);
+                Status s = db->dropCollection( txn, nsToDrop );
 
-            if ( !s.isOK() ) {
-                return appendCommandStatus( result, s );
-            }
+                if ( !s.isOK() ) {
+                    return appendCommandStatus( result, s );
+                }
 
-            if ( !fromRepl ) {
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
-            }
-            wunit.commit();
+                if ( !fromRepl ) {
+                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                }
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", nsToDrop);
             return true;
-
         }
     } cmdDrop;
 
@@ -589,19 +602,26 @@ namespace mongo {
                     !options["capped"].trueValue() || options["size"].isNumber() ||
                         options.hasField("$nExtents"));
 
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, ns);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
+                Client::Context ctx(txn, ns);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while creating collection " << ns));
+                }
 
-            WriteUnitOfWork wunit(txn);
+                WriteUnitOfWork wunit(txn);
 
-            // Create collection.
-            status =  userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl);
-            if ( !status.isOK() ) {
-                return appendCommandStatus( result, status );
-            }
+                // Create collection.
+                status =  userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl);
+                if ( !status.isOK() ) {
+                    return appendCommandStatus( result, status );
+                }
 
-            wunit.commit();
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", ns);
             return true;
         }
     } cmdCreate;
@@ -671,76 +691,78 @@ namespace mongo {
                 return 0;
             }
 
-            // Check shard version at startup.
-            // This will throw before we've done any work if shard version is outdated
-            // We drop and re-acquire these locks every document because md5'ing is expensive
-            scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
-            Collection* coll = ctx->getCollection();
-            const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                // Check shard version at startup.
+                // This will throw before we've done any work if shard version is outdated
+                // We drop and re-acquire these locks every document because md5'ing is expensive
+                scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
+                Collection* coll = ctx->getCollection();
+                const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
-            PlanExecutor* rawExec;
-            if (!getExecutor(txn, coll, cq, PlanExecutor::YIELD_MANUAL, &rawExec,
-                             QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
-                uasserted(17241, "Can't get executor for query " + query.toString());
-                return 0;
-            }
+                PlanExecutor* rawExec;
+                if (!getExecutor(txn, coll, cq, PlanExecutor::YIELD_MANUAL, &rawExec,
+                                 QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
+                    uasserted(17241, "Can't get executor for query " + query.toString());
+                    return 0;
+                }
 
-            auto_ptr<PlanExecutor> exec(rawExec);
-            // Process notifications when the lock is released/reacquired in the loop below
-            exec->registerExec();
+                auto_ptr<PlanExecutor> exec(rawExec);
+                // Process notifications when the lock is released/reacquired in the loop below
+                exec->registerExec();
 
-            BSONObj obj;
-            PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-                BSONElement ne = obj["n"];
-                verify(ne.isNumber());
-                int myn = ne.numberInt();
-                if ( n != myn ) {
-                    if (partialOk) {
-                        break; // skipped chunk is probably on another shard
+                BSONObj obj;
+                PlanExecutor::ExecState state;
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+                    BSONElement ne = obj["n"];
+                    verify(ne.isNumber());
+                    int myn = ne.numberInt();
+                    if ( n != myn ) {
+                        if (partialOk) {
+                            break; // skipped chunk is probably on another shard
+                        }
+                        log() << "should have chunk: " << n << " have:" << myn << endl;
+                        dumpChunks(txn, ns, query, sort);
+                        uassert( 10040 ,  "chunks out of order" , n == myn );
                     }
-                    log() << "should have chunk: " << n << " have:" << myn << endl;
-                    dumpChunks(txn, ns, query, sort);
-                    uassert( 10040 ,  "chunks out of order" , n == myn );
-                }
 
-                // make a copy of obj since we access data in it while yielding locks
-                BSONObj owned = obj.getOwned();
-                exec->saveState();
-                // UNLOCKED
-                ctx.reset();
+                    // make a copy of obj since we access data in it while yielding locks
+                    BSONObj owned = obj.getOwned();
+                    exec->saveState();
+                    // UNLOCKED
+                    ctx.reset();
 
-                int len;
-                const char * data = owned["data"].binDataClean( len );
-                // This is potentially an expensive operation, so do it out of the lock
-                md5_append( &st , (const md5_byte_t*)(data) , len );
-                n++;
+                    int len;
+                    const char * data = owned["data"].binDataClean( len );
+                    // This is potentially an expensive operation, so do it out of the lock
+                    md5_append( &st , (const md5_byte_t*)(data) , len );
+                    n++;
 
-                try {
-                    // RELOCKED
-                    ctx.reset(new AutoGetCollectionForRead(txn, ns));
-                }
-                catch (const SendStaleConfigException& ex) {
-                    LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
-                    break;
-                }
+                    try {
+                        // RELOCKED
+                        ctx.reset(new AutoGetCollectionForRead(txn, ns));
+                    }
+                    catch (const SendStaleConfigException& ex) {
+                        LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
+                        break;
+                    }
 
-                // Have the lock again. See if we were killed.
-                if (!exec->restoreState(txn)) {
-                    if (!partialOk) {
-                        uasserted(13281, "File deleted during filemd5 command");
+                    // Have the lock again. See if we were killed.
+                    if (!exec->restoreState(txn)) {
+                        if (!partialOk) {
+                            uasserted(13281, "File deleted during filemd5 command");
+                        }
                     }
                 }
-            }
 
-            if (partialOk)
-                result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
+                if (partialOk)
+                    result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
 
-            // This must be *after* the capture of md5state since it mutates st
-            md5_finish(&st, d);
+                // This must be *after* the capture of md5state since it mutates st
+                md5_finish(&st, d);
 
-            result.append( "numChunks" , n );
-            result.append( "md5" , digestToString( d ) );
+                result.append( "numChunks" , n );
+                result.append( "md5" , digestToString( d ) );
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "filemd5", dbname);
             return true;
         }
 
@@ -1033,6 +1055,12 @@ namespace mongo {
             }
 
             Client::Context ctx(txn,  ns);
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while setting collection options on " << ns));
+            }
+
             WriteUnitOfWork wunit(txn);
 
             bool ok = true;
@@ -1489,12 +1517,9 @@ namespace mongo {
         appendCommandStatus(result, retval, errmsg);
 
         // For commands from mongos, append some info to help getLastError(w) work.
-        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-            // Detect mongos connections by looking for setShardVersion to have been run previously
-            // on this connection.
-            if (shardingState.needCollectionMetadata(dbname)) {
-                appendGLEHelperData(result, txn->getClient()->getLastOp(), replCoord->getElectionId());
-            }
+        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+                shardingState.enabled()) {
+            appendGLEHelperData(result, txn->getClient()->getLastOp(), replCoord->getElectionId());
         }
         return;
     }

@@ -315,7 +315,7 @@ namespace mongo {
     // --------------------------
 
 
-    CursorManager::CursorManager( const StringData& ns )
+    CursorManager::CursorManager( StringData ns )
         : _nss( ns ),
           _mutex( "CursorManager" ) {
         _collectionCacheRuntimeId = globalCursorIdCache->created( _nss.ns() );

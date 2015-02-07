@@ -45,7 +45,7 @@ namespace mongo {
     class UserName {
     public:
         UserName() : _splitPoint(0) {}
-        UserName(const StringData& user, const StringData& dbname);
+        UserName(StringData user, StringData dbname);
 
         /**
          * Gets the user part of a UserName.

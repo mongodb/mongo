@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -286,7 +287,7 @@ namespace mongo {
         //
 
         RecordId loc;
-        BSONObj obj;
+        Snapshotted<BSONObj> obj;
         std::vector<IndexKeyDatum> keyData;
         MemberState state;
 

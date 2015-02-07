@@ -15,6 +15,7 @@
 	set_key,							\
 	set_value,							\
 	compare,							\
+	equals,								\
 	next,								\
 	prev,								\
 	reset,								\
@@ -23,6 +24,7 @@
 	insert,								\
 	update,								\
 	remove,								\
+	reconfigure,							\
 	close)								\
 	static const WT_CURSOR n = {					\
 	NULL,				/* session */			\
@@ -34,6 +36,7 @@
 	(void (*)(WT_CURSOR *, ...))(set_key),				\
 	(void (*)(WT_CURSOR *, ...))(set_value),			\
 	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(compare),		\
+	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(equals),		\
 	next,								\
 	prev,								\
 	reset,								\
@@ -43,6 +46,7 @@
 	update,								\
 	remove,								\
 	close,								\
+	(int (*)(WT_CURSOR *, const char *))(reconfigure),		\
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
 	0,				/* recno key */			\
 	{ 0 },				/* recno raw buffer */		\

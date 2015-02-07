@@ -46,6 +46,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_environment_d.h"
@@ -70,7 +71,7 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
-    void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
+    void massertNamespaceNotIndex( StringData ns, StringData caller ) {
         massert( 17320,
                  str::stream() << "cannot do " << caller
                  << " on namespace with a $ in it: " << ns,
@@ -79,7 +80,7 @@ namespace mongo {
 
     class Database::AddCollectionChange : public RecoveryUnit::Change {
     public:
-        AddCollectionChange(Database* db, const StringData& ns)
+        AddCollectionChange(Database* db, StringData ns)
             : _db(db)
             , _ns(ns.toString())
         {}
@@ -136,7 +137,7 @@ namespace mongo {
         }
     }
 
-    Status Database::validateDBName( const StringData& dbname ) {
+    Status Database::validateDBName( StringData dbname ) {
 
         if ( dbname.size() <= 0 )
             return Status( ErrorCodes::BadValue, "db name is empty" );
@@ -172,7 +173,7 @@ namespace mongo {
     }
 
     Collection* Database::_getOrCreateCollectionInstance(OperationContext* txn,
-                                                         const StringData& fullns) {
+                                                         StringData fullns) {
         Collection* collection = getCollection( fullns );
         if (collection) {
             return collection;
@@ -189,7 +190,7 @@ namespace mongo {
         return c;
     }
 
-    Database::Database(OperationContext* txn, const StringData& name, DatabaseCatalogEntry* dbEntry)
+    Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry* dbEntry)
         : _name(name.toString()),
           _dbEntry( dbEntry ),
           _profileName(_name + ".system.profile"),
@@ -262,20 +263,26 @@ namespace mongo {
             CollectionOptions options = coll->getCollectionOptions( txn );
             if ( !options.temp )
                 continue;
+            try {
+                WriteUnitOfWork wunit(txn);
+                Status status = dropCollection( txn, ns );
+                if ( !status.isOK() ) {
+                    warning() << "could not drop temp collection '" << ns << "': " << status;
+                    continue;
+                }
 
-            WriteUnitOfWork wunit(txn);
-            Status status = dropCollection( txn, ns );
-            if ( !status.isOK() ) {
-                warning() << "could not drop temp collection '" << ns << "': " << status;
-                continue;
+                string cmdNs = _name + ".$cmd";
+                repl::logOp( txn,
+                             "c",
+                             cmdNs.c_str(),
+                             BSON( "drop" << nsToCollectionSubstring( ns ) ) );
+                wunit.commit();
             }
-
-            string cmdNs = _name + ".$cmd";
-            repl::logOp( txn,
-                         "c",
-                         cmdNs.c_str(),
-                         BSON( "drop" << nsToCollectionSubstring( ns ) ) );
-            wunit.commit();
+            catch (const WriteConflictException& exp) {
+                warning() << "could not drop temp collection '" << ns << "' due to "
+                    "WriteConflictException";
+                txn->recoveryUnit()->commitAndRestart();
+            }
         }
     }
 
@@ -346,7 +353,7 @@ namespace mongo {
         _dbEntry->appendExtraStats( opCtx, output, scale );
     }
 
-    Status Database::dropCollection( OperationContext* txn, const StringData& fullns ) {
+    Status Database::dropCollection( OperationContext* txn, StringData fullns ) {
         invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         LOG(1) << "dropCollection: " << fullns << endl;
@@ -378,20 +385,11 @@ namespace mongo {
 
         audit::logDropCollection( currentClient.get(), fullns );
 
-        try {
-            Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
-            if ( !s.isOK() ) {
-                warning() << "could not drop collection, trying to drop indexes"
-                          << fullns << " because of " << s.toString();
-                return s;
-            }
-        }
-        catch( DBException& e ) {
-            stringstream ss;
-            ss << "drop: dropIndexes for collection failed. cause: " << e.what();
-            ss << ". See http://dochub.mongodb.org/core/data-recovery";
-            warning() << ss.str() << endl;
-            return Status( ErrorCodes::InternalError, ss.str() );
+        Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
+        if ( !s.isOK() ) {
+            warning() << "could not drop collection, trying to drop indexes"
+                      << fullns << " because of " << s.toString();
+            return s;
         }
 
         verify( collection->_details->getTotalIndexCount( txn ) == 0 );
@@ -399,7 +397,7 @@ namespace mongo {
 
         Top::global.collectionDropped( fullns );
 
-        Status s = _dbEntry->dropCollection( txn, fullns );
+        s = _dbEntry->dropCollection( txn, fullns );
 
         _clearCollectionCache( txn, fullns ); // we want to do this always
 
@@ -424,7 +422,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Database::_clearCollectionCache(OperationContext* txn, const StringData& fullns ) {
+    void Database::_clearCollectionCache(OperationContext* txn, StringData fullns ) {
         verify( _name == nsToDatabaseSubstring( fullns ) );
         CollectionMap::const_iterator it = _collections.find( fullns.toString() );
         if ( it == _collections.end() )
@@ -437,7 +435,7 @@ namespace mongo {
         _collections.erase( it );
     }
 
-    Collection* Database::getCollection( const StringData& ns ) const {
+    Collection* Database::getCollection( StringData ns ) const {
         invariant( _name == nsToDatabaseSubstring( ns ) );
         CollectionMap::const_iterator it = _collections.find( ns );
         if ( it != _collections.end() && it->second ) {
@@ -450,8 +448,8 @@ namespace mongo {
 
 
     Status Database::renameCollection( OperationContext* txn,
-                                       const StringData& fromNS,
-                                       const StringData& toNS,
+                                       StringData fromNS,
+                                       StringData toNS,
                                        bool stayTemp ) {
 
         audit::logRenameCollection( currentClient.get(), fromNS, toNS );
@@ -479,7 +477,7 @@ namespace mongo {
         return s;
     }
 
-    Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
+    Collection* Database::getOrCreateCollection(OperationContext* txn, StringData ns) {
         Collection* c = getCollection( ns );
         if ( !c ) {
             c = createCollection( txn, ns );
@@ -488,7 +486,7 @@ namespace mongo {
     }
 
     Collection* Database::createCollection( OperationContext* txn,
-                                            const StringData& ns,
+                                            StringData ns,
                                             const CollectionOptions& options,
                                             bool allocateDefaultSpace,
                                             bool createIdIndex ) {
@@ -594,7 +592,7 @@ namespace mongo {
     */
     Status userCreateNS( OperationContext* txn,
                          Database* db,
-                         const StringData& ns,
+                         StringData ns,
                          BSONObj options,
                          bool logForReplication,
                          bool createDefaultIndexes ) {

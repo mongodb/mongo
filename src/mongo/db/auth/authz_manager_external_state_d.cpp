@@ -179,7 +179,7 @@ namespace mongo {
         }
     }
 
-    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(const StringData& why) {
+    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(StringData why) {
         LOG(2) << "Attempting to lock user data for: " << why << endl;
         return _authzDataUpdateLock.timed_lock(
                 boost::posix_time::milliseconds(_authzUpdateLockAcquisitionTimeoutMillis));

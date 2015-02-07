@@ -132,7 +132,7 @@ namespace mongo {
     }
 
     Status ModifierRename::prepare(mutablebson::Element root,
-                                   const StringData& matchedField,
+                                   StringData matchedField,
                                    ExecInfo* execInfo) {
         // Rename doesn't work with positional fields ($)
         dassert(matchedField.empty());

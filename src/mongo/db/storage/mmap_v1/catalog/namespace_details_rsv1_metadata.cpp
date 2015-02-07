@@ -43,7 +43,7 @@ namespace mongo {
     BOOST_STATIC_ASSERT(RecordStoreV1Base::Buckets
                         == NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);
 
-    NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData( const StringData& ns,
+    NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData( StringData ns,
                                                                 NamespaceDetails* details,
                                                                 RecordStore* namespaceRecordStore )
         : _ns( ns.toString() ),

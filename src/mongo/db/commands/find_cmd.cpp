@@ -105,6 +105,8 @@ namespace mongo {
         }
         else {
             size_t options = QueryPlannerParams::DEFAULT;
+            // TODO: The version attached to the TLS cannot be relied upon, the shard
+            // version should be passed as part of the command parameter.
             if (shardingState.needCollectionMetadata(cq->getParsed().ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
@@ -136,6 +138,7 @@ namespace mongo {
                          bool fromRepl) {
         // Currently only explains of finds run through the find command. Queries that are not
         // explained use the legacy OP_QUERY path.
+        // TODO: check the comment above regarding shard versioning.
         errmsg = "find command not yet implemented";
         return false;
     }

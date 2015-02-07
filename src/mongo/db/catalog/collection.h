@@ -42,6 +42,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
@@ -99,10 +100,10 @@ namespace mongo {
      * this is NOT safe through a yield right now
      * not sure if it will be, or what yet
      */
-    class Collection : CappedDocumentDeleteCallback, UpdateMoveNotifier {
+    class Collection : CappedDocumentDeleteCallback, UpdateNotifier {
     public:
         Collection( OperationContext* txn,
-                    const StringData& fullNS,
+                    StringData fullNS,
                     CollectionCatalogEntry* details, // does not own
                     RecordStore* recordStore, // does not own
                     DatabaseCatalogEntry* dbce ); // does not own
@@ -129,13 +130,13 @@ namespace mongo {
 
         bool requiresIdIndex() const;
 
-        BSONObj docFor(OperationContext* txn, const RecordId& loc) const;
+        Snapshotted<BSONObj> docFor(OperationContext* txn, const RecordId& loc) const;
 
         /**
          * @param out - contents set to the right docs if exists, or nothing.
          * @return true iff loc exists
          */
-        bool findDoc(OperationContext* txn, const RecordId& loc, BSONObj* out) const;
+        bool findDoc(OperationContext* txn, const RecordId& loc, Snapshotted<BSONObj>* out) const;
 
         // ---- things that should move to a CollectionAccessMethod like thing
         /**
@@ -151,14 +152,6 @@ namespace mongo {
          * Caller owns all pointers in the vector.
          */
         std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
-
-
-        /**
-         * does a table scan to do a count
-         * this should only be used at a very low level
-         * does no yielding, indexes, etc...
-         */
-        int64_t countTableScan( OperationContext* txn, const MatchExpression* expression );
 
         void deleteDocument( OperationContext* txn,
                              const RecordId& loc,
@@ -205,7 +198,7 @@ namespace mongo {
          */
         StatusWith<RecordId> updateDocument( OperationContext* txn,
                                              const RecordId& oldLocation,
-                                             const BSONObj& oldDoc,
+                                             const Snapshotted<BSONObj>& oldDoc,
                                              const BSONObj& newDoc,
                                              bool enforceQuota,
                                              bool indexesAffected,
@@ -216,7 +209,7 @@ namespace mongo {
          */
         Status updateDocumentWithDamages( OperationContext* txn,
                                           const RecordId& loc,
-                                          const RecordData& oldRec,
+                                          const Snapshotted<RecordData>& oldRec,
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
@@ -290,7 +283,10 @@ namespace mongo {
                                        const char* oldBuffer,
                                        size_t oldSize );
 
-        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc );
+        Status recordStoreGoingToUpdateInPlace( OperationContext* txn,
+                                                const RecordId& loc );
+
+        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc, RecordData data );
 
         /**
          * same semantics as insertDocument, but doesn't do:

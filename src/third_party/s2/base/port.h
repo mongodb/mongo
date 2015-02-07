@@ -716,17 +716,8 @@ inline void va_copy(va_list& a, va_list& b) {
   a = b;
 }
 #endif
-using namespace std;
-#define isnan _isnan
+
 #define snprintf _snprintf
-#include "float.h"
-inline double sqrt(int x) { return sqrt((double)x); }
-inline int isinf(double x) {
-  const int float_point_class =_fpclass(x);
-  if (float_point_class == _FPCLASS_PINF) return 1;
-  if (float_point_class == _FPCLASS_NINF) return -1;
-  return 0;
-}
 #endif
 
 #ifdef COMPILER_MSVC     /* if Visual C++ */

@@ -27,7 +27,8 @@
 
 #pragma once
 
-#include "mongo/platform/float_utils.h"
+#include <cmath>
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -52,8 +53,8 @@ namespace mongo {
         if (lhs > rhs) return 1;
 
         // If none of the above cases returned, lhs or rhs must be NaN.
-        if (isNaN(lhs)) return isNaN(rhs) ? 0 : -1;
-        dassert(isNaN(rhs));
+        if (std::isnan(lhs)) return std::isnan(rhs) ? 0 : -1;
+        dassert(std::isnan(rhs));
         return 1;
     }
 
@@ -65,7 +66,7 @@ namespace mongo {
     // * Return value is always -1, 0, or 1 to ensure it is safe to negate.
     inline int compareLongToDouble(long long lhs, double rhs) {
         // All Longs are > NaN
-        if (isNaN(rhs)) return 1;
+        if (std::isnan(rhs)) return 1;
 
         // Ints with magnitude <= 2**53 can be precisely represented as doubles.
         // Additionally, doubles outside of this range can't have a fractional component.

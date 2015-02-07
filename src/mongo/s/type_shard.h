@@ -119,7 +119,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setName(const StringData& name) {
+        void setName(StringData name) {
             _name = name.toString();
             _isNameSet = true;
         }
@@ -134,7 +134,7 @@ namespace mongo {
             return _name;
         }
 
-        void setHost(const StringData& host) {
+        void setHost(StringData host) {
             _host = host.toString();
             _isHostSet = true;
         }

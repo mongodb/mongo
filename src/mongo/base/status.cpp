@@ -32,11 +32,11 @@
 
 namespace mongo {
 
-    Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, const StringData& aReason, int aLocation)
+    Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, StringData aReason, int aLocation)
         : code(aCode), reason(aReason.toString()), location(aLocation) {
     }
 
-    Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, const StringData& r, int l) {
+    Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, StringData r, int l) {
         const bool needRep = ((c != ErrorCodes::OK) ||
                               !r.empty() ||
                               (l != 0));

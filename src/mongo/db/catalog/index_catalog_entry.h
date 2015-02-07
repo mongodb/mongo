@@ -48,7 +48,7 @@ namespace mongo {
     class IndexCatalogEntry {
         MONGO_DISALLOW_COPYING( IndexCatalogEntry );
     public:
-        IndexCatalogEntry( const StringData& ns,
+        IndexCatalogEntry( StringData ns,
                            CollectionCatalogEntry* collection, // not owned
                            IndexDescriptor* descriptor, // ownership passes to me
                            CollectionInfoCache* infoCache ); // not owned, optional

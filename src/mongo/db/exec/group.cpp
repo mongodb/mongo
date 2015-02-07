@@ -101,8 +101,8 @@ namespace mongo {
         }
         _scope->setObject("$initial", _request.initial, true);
         _scope->exec("$reduce = " + _request.reduceCode, "$group reduce setup", false, true, true,
-                     100);
-        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
+                     2 * 1000);
+        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 2 * 1000);
 
         // Initialize _reduceFunction.
         _reduceFunction = _scope->createFunction("function(){ "
@@ -153,7 +153,7 @@ namespace mongo {
     BSONObj GroupStage::finalizeResults() {
         if (!_request.finalize.empty()) {
             _scope->exec("$finalize = " + _request.finalize, "$group finalize define", false,
-                         true, true, 100);
+                         true, true, 2 * 1000);
             ScriptingFunction finalizeFunction =
                 _scope->createFunction("function(){ "
                                        "  for(var i=0; i < $arr.length; i++){ "
@@ -169,7 +169,7 @@ namespace mongo {
 
         BSONObj results = _scope->getObject("$arr").getOwned();
 
-        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
+        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 2 * 1000);
         _scope->gc();
 
         return results;
@@ -225,7 +225,7 @@ namespace mongo {
             // add a fetch. We should always get fetched data, and never just key data.
             invariant(member->hasObj());
 
-            Status status = processObject(member->obj);
+            Status status = processObject(member->obj.value());
             if (!status.isOK()) {
                 *out = WorkingSetCommon::allocateStatusMember(_ws, status);
                 return PlanStage::FAILURE;
@@ -247,7 +247,7 @@ namespace mongo {
 
             *out = _ws->allocate();
             WorkingSetMember* member = _ws->get(*out);
-            member->obj = results;
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), results);
             member->state = WorkingSetMember::OWNED_OBJ;
 
             ++_commonStats.advanced;

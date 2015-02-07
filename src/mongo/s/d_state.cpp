@@ -990,13 +990,13 @@ namespace mongo {
 
         bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
-            // Compatibility error for < v2.8 mongoses still active in the cluster
-            // TODO: Remove post-2.8
+            // Compatibility error for < v3.0 mongoses still active in the cluster
+            // TODO: Remove post-3.0
             if (!cmdObj["serverID"].eoo()) {
 
                 // This mongos is too old to talk to us
-                string errMsg = stream() << "v2.8 mongod is incompatible with v2.6 mongos, "
-                                         << "a v2.6 mongos may be running in the v2.8 cluster at "
+                string errMsg = stream() << "v3.0 mongod is incompatible with v2.6 mongos, "
+                                         << "a v2.6 mongos may be running in the v3.0 cluster at "
                                          << txn->getClient()->clientAddress(false);
                 error() << errMsg;
                 return appendCommandStatus(result, Status(ErrorCodes::ProtocolError, errMsg));

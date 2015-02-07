@@ -118,7 +118,7 @@ namespace mongo {
         other->_isSessionSet = _isSessionSet;
     }
 
-    void BatchedRequestMetadata::setShardName( const StringData& shardName ) {
+    void BatchedRequestMetadata::setShardName( StringData shardName ) {
         _shardName = shardName.toString();
         _isShardNameSet = true;
     }

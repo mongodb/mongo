@@ -50,7 +50,7 @@ namespace mongo {
 
     class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
     public:
-        RemoveDBChange(KVStorageEngine* engine, const StringData& db, KVDatabaseCatalogEntry* entry)
+        RemoveDBChange(KVStorageEngine* engine, StringData db, KVDatabaseCatalogEntry* entry)
             : _engine(engine)
             , _db(db.toString())
             , _entry(entry)
@@ -205,7 +205,7 @@ namespace mongo {
     }
 
     DatabaseCatalogEntry* KVStorageEngine::getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                                    const StringData& dbName ) {
+                                                                    StringData dbName ) {
         boost::mutex::scoped_lock lk( _dbsLock );
         KVDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db ) {
@@ -215,12 +215,12 @@ namespace mongo {
         return db;
     }
 
-    Status KVStorageEngine::closeDatabase( OperationContext* txn, const StringData& db ) {
+    Status KVStorageEngine::closeDatabase( OperationContext* txn, StringData db ) {
         // This is ok to be a no-op as there is no database layer in kv.
         return Status::OK();
     }
 
-    Status KVStorageEngine::dropDatabase( OperationContext* txn, const StringData& db ) {
+    Status KVStorageEngine::dropDatabase( OperationContext* txn, StringData db ) {
 
         KVDatabaseCatalogEntry* entry;
         {

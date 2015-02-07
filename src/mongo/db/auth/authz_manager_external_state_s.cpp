@@ -288,7 +288,7 @@ namespace mongo {
         return res;
     }
 
-    bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock(const StringData& why) {
+    bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock(StringData why) {
         boost::lock_guard<boost::mutex> lkLocal(_distLockGuard);
         if (_authzDataUpdateLock.get()) {
             return false;

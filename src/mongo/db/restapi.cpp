@@ -312,13 +312,14 @@ namespace mongo {
 
         virtual void run(OperationContext* txn, stringstream& ss ) {
             Timer t;
-            readlocktry lk(txn->lockState(), 300);
-            if ( lk.got() ) {
-                _gotLock( t.millis() , ss );
+            Lock::GlobalLock globalSLock(txn->lockState(), MODE_S, 300);
+            if (globalSLock.isLocked()) {
+                _gotLock(t.millis(), ss);
             }
             else {
                 ss << "\n<b>timed out getting lock</b>\n";
             }
         }
+
     } lowLevelMongodStatus;
 }

@@ -42,7 +42,7 @@ namespace mongo {
         }
     }
 
-    bool AuthzDocumentsUpdateGuard::tryLock(const StringData& why) {
+    bool AuthzDocumentsUpdateGuard::tryLock(StringData why) {
         fassert(17126, !_lockedForUpdate);
         _lockedForUpdate = _authzManager->tryAcquireAuthzUpdateLock(why);
         return _lockedForUpdate;

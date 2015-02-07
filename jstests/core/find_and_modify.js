@@ -36,3 +36,11 @@ assert.eq(out.priority, 2);
 // return null (was {} before 1.5.4) if no matches (drivers may handle this differently)
 out = t.findAndModify({query:{no_such_field:1}, remove:1});
 assert.eq(out, null);
+
+// make sure we fail with conflicting params to findAndModify SERVER-16601
+t.insert({x:1});
+assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:true}); });
+assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:true, sort: {x:1}}); });
+assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:true, upsert:true}); });
+assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, new:true, remove:true}); });
+assert.throws(function() { t.findAndModify({query:{x:1}, upsert:true, remove:true}); });

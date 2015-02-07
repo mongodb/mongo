@@ -69,12 +69,12 @@ namespace mongo {
         /**
          * Adds an id to the current set of cursors in the given namespace.
          */
-        void addCursorId(const StringData& ns, CursorId id);
+        void addCursorId(StringData ns, CursorId id);
 
         /**
          * Removes the id from the set of open cursors in the given namespace.
          */
-        void removeCursorId(const StringData& ns, CursorId id);
+        void removeCursorId(StringData ns, CursorId id);
 
         //
         // Environment synchronization methods.
@@ -136,7 +136,7 @@ namespace mongo {
          * RangeDeleterEnv::getCursorIds. The cursors returned can be modified with
          * the setCursorId and clearCursorMap methods.
          */
-        void getCursorIds(OperationContext* txn, const StringData& ns, std::set<CursorId>* in);
+        void getCursorIds(OperationContext* txn, StringData ns, std::set<CursorId>* in);
 
     private:
         // mutex acquisition ordering:

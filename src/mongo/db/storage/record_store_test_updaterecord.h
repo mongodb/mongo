@@ -38,34 +38,50 @@
 namespace mongo {
 namespace {
 
-    class UpdateMoveNotifierSpy : public UpdateMoveNotifier {
+    class UpdateNotifierSpy : public UpdateNotifier {
     public:
-        UpdateMoveNotifierSpy( OperationContext* txn, const RecordId &loc,
+        UpdateNotifierSpy( OperationContext* txn, const RecordId &loc,
                                const char *buf, size_t size )
-                : _txn( txn ), _loc( loc ), _data( buf, size ), nCalls( 0 ) {
+                : _txn( txn ),
+                  _loc( loc ),
+                  _data( buf, size ),
+                  nMoveCalls( 0 ),
+                  nInPlaceCalls( 0 ) {
         }
 
-        ~UpdateMoveNotifierSpy() { }
+        ~UpdateNotifierSpy() { }
 
         Status recordStoreGoingToMove( OperationContext *txn,
                                        const RecordId &oldLocation,
                                        const char *oldBuffer,
                                        size_t oldSize ) {
-            nCalls++;
+            nMoveCalls++;
             ASSERT_EQUALS( _txn, txn );
             ASSERT_EQUALS( _loc, oldLocation );
             ASSERT_EQUALS( _data, oldBuffer );
             return Status::OK();
         }
 
-        int getNumCalls() const { return nCalls; }
+        Status recordStoreGoingToUpdateInPlace( OperationContext* txn,
+                                                const RecordId& loc ) {
+            nInPlaceCalls++;
+            ASSERT_EQUALS( _txn, txn );
+            ASSERT_EQUALS( _loc, loc );
+            return Status::OK();
+        }
+
+        int numMoveCallbacks() const { return nMoveCalls; }
+
+        int numInPlaceCallbacks() const { return nInPlaceCalls; }
 
     private:
         OperationContext *_txn;
         RecordId _loc;
         std::string _data;
 
-        int nCalls; // to verify that recordStoreGoingToMove() gets called once
+        // To verify the number of callbacks to the notifier.
+        int nMoveCalls;
+        int nInPlaceCalls;
     };
 
 } // namespace

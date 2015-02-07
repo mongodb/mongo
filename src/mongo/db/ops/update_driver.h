@@ -95,7 +95,7 @@ namespace mongo {
          * If a non-NULL updatedField vector* is supplied,
          * then all updated fields will be added to it.
          */
-        Status update(const StringData& matchedField,
+        Status update(StringData matchedField,
                       mutablebson::Document* doc,
                       BSONObj* logOpRec = NULL,
                       FieldRefSet* updatedFields = NULL,

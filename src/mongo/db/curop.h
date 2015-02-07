@@ -95,7 +95,7 @@ namespace mongo {
             return _get();
         }
 
-        void append( BSONObjBuilder& b , const StringData& name ) const {
+        void append( BSONObjBuilder& b , StringData name ) const {
             scoped_spinlock lk(_lock);
             BSONObj temp = _get();
             b.append( name , temp );
@@ -194,7 +194,7 @@ namespace mongo {
 
         bool haveQuery() const { return _query.have(); }
         BSONObj query() const { return _query.get();  }
-        void appendQuery( BSONObjBuilder& b , const StringData& name ) const { _query.append( b , name ); }
+        void appendQuery( BSONObjBuilder& b , StringData name ) const { _query.append( b , name ); }
         
         void enter(const char* ns, int dbProfileLevel);
         void reset();
@@ -313,7 +313,7 @@ namespace mongo {
          * generally the Context should set this up
          * but sometimes you want to do it ahead of time
          */
-        void setNS( const StringData& ns );
+        void setNS( StringData ns );
 
     private:
         friend class Client;

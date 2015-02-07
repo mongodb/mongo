@@ -94,7 +94,7 @@ namespace mongo {
         return Labeler( l, this );
     }
 
-    void BSONObjBuilderValueStream::endField( const StringData& nextFieldName ) {
+    void BSONObjBuilderValueStream::endField( StringData nextFieldName ) {
         if ( haveSubobj() ) {
             verify( _fieldName.rawData() );
             _builder->append( _fieldName, subobj()->done() );

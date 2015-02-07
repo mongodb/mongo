@@ -17,7 +17,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     // Do not create the { tid: 1, value: 1 } index so that a collection
     // scan is performed for the query and sort operations.
-    $config.setup = function setup() { };
+    $config.setup = function setup(db, collName, cluster) { };
 
     return $config;
 });

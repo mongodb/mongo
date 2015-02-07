@@ -105,7 +105,7 @@ namespace {
     // the Match expression has been successfully parsed so they can assume that
     // input is well formed.
 
-    bool isAllDigits(const StringData& str) {
+    bool isAllDigits(StringData str) {
         if (str.empty())
             return false;
 
@@ -116,7 +116,7 @@ namespace {
         return true;
     }
 
-    bool isFieldnameRedactSafe(const StringData& fieldName) {
+    bool isFieldnameRedactSafe(StringData fieldName) {
         // Can't have numeric elements in the dotted path since redacting elements from an array
         // would change the indexes.
 

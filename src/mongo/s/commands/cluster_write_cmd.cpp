@@ -108,7 +108,7 @@ namespace mongo {
          * Instantiates a command that can be invoked by "name", which will be capable of issuing
          * write batches of type "writeType", and will require privilege "action" to run.
          */
-        ClusterWriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
+        ClusterWriteCmd( StringData name, BatchedCommandRequest::BatchType writeType ) :
             Command( name ), _writeType( writeType ) {
         }
 

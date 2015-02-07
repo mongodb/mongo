@@ -80,7 +80,7 @@ namespace repl {
 
         virtual bool isMasterForReportingPurposes();
 
-        virtual bool canAcceptWritesForDatabase(const StringData& dbName);
+        virtual bool canAcceptWritesForDatabase(StringData dbName);
 
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
@@ -94,6 +94,8 @@ namespace repl {
         virtual Status setLastOptimeForSlave(const OID& rid, const OpTime& ts);
 
         virtual void setMyLastOptime(const OpTime& ts);
+
+        virtual void resetMyLastOptime();
 
         virtual void setMyHeartbeatMessage(const std::string& msg);
 
@@ -113,7 +115,7 @@ namespace repl {
 
         virtual void signalUpstreamUpdater();
 
-        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+        virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
         virtual void prepareReplSetUpdatePositionCommandHandshakes(
                 std::vector<BSONObj>* handshakes);

@@ -69,6 +69,7 @@ namespace mongo {
     ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocuments", &ttlDeletedDocuments);
 
     MONGO_EXPORT_SERVER_PARAMETER( ttlMonitorEnabled, bool, true );
+    MONGO_EXPORT_SERVER_PARAMETER( ttlMonitorSleepSecs, int, 60 ); //used for testing
 
     class TTLMonitor : public BackgroundJob {
     public:
@@ -84,7 +85,7 @@ namespace mongo {
             cc().getAuthorizationSession()->grantInternalAuthorization();
 
             while ( ! inShutdown() ) {
-                sleepsecs( 60 );
+                sleepsecs( ttlMonitorSleepSecs );
 
                 LOG(3) << "TTLMonitor thread awake" << endl;
 
@@ -100,38 +101,57 @@ namespace mongo {
                     continue;
                 }
 
-                // Count it as active from the moment the TTL thread wakes up
-                OperationContextImpl txn;
+                try {
+                    doTTLPass();
+                }
+                catch ( const WriteConflictException& e ) {
+                    LOG(1) << "Got WriteConflictException in TTL thread";
+                }
 
-                // if part of replSet but not in a readable state (e.g. during initial sync), skip.
-                if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                        repl::ReplicationCoordinator::modeReplSet &&
-                        !repl::getGlobalReplicationCoordinator()->getMemberState().readable())
-                    continue;
+            }
+        }
 
-                set<string> dbs;
-                dbHolder().getAllShortNames( dbs );
+    private:
 
-                ttlPasses.increment();
+        void doTTLPass() {
+            // Count it as active from the moment the TTL thread wakes up
+            OperationContextImpl txn;
 
-                for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {
-                    string db = *i;
+            // if part of replSet but not in a readable state (e.g. during initial sync), skip.
+            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet &&
+                !repl::getGlobalReplicationCoordinator()->getMemberState().readable())
+                return;
 
-                    vector<BSONObj> indexes;
-                    getTTLIndexesForDB(&txn, db, &indexes);
+            set<string> dbs;
+            dbHolder().getAllShortNames( dbs );
 
-                    for ( vector<BSONObj>::const_iterator it = indexes.begin();
-                          it != indexes.end(); ++it ) {
+            ttlPasses.increment();
 
-                        if ( !doTTLForIndex( &txn, db, *it ) ) {
+            for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {
+                string db = *i;
+
+                vector<BSONObj> indexes;
+                getTTLIndexesForDB(&txn, db, &indexes);
+
+                for ( vector<BSONObj>::const_iterator it = indexes.begin();
+                      it != indexes.end(); ++it ) {
+
+                    BSONObj idx = *it;
+                    try {
+                        if ( !doTTLForIndex( &txn, db, idx ) ) {
                             break;  // stop processing TTL indexes on this database
                         }
+                    } catch (const DBException& dbex) {
+                        error() << "Error processing ttl index: " << idx
+                                << " -- " << dbex.toString();
+                        // continue on to the next index
+                        continue;
                     }
                 }
             }
         }
 
-    private:
         /**
          * Acquire an IS-mode lock on the specified database and for each
          * collection in the database, append the specification of all
@@ -191,6 +211,7 @@ namespace mongo {
          */
         bool doTTLForIndex( OperationContext* txn, const string& dbName, const BSONObj& idx ) {
             BSONObj key = idx["key"].Obj();
+            const string ns = idx["ns"].String();
             if ( key.nFields() != 1 ) {
                 error() << "key for ttl index can only have 1 field" << endl;
                 return true;
@@ -210,13 +231,11 @@ namespace mongo {
                 query = BSON( key.firstElement().fieldName() << b.obj() );
             }
 
-            LOG(1) << "TTL: " << key << " \t " << query << endl;
+            LOG(1) << "TTL -- ns: " << ns << "key:" << key << " query: " << query << endl;
 
             long long numDeleted = 0;
             int attempt = 1;
             while (1) {
-                const string ns = idx["ns"].String();
-
                 ScopedTransaction scopedXact(txn, MODE_IX);
                 AutoGetDb autoDb(txn, dbName, MODE_IX);
                 Database* db = autoDb.getDb();

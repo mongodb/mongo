@@ -98,7 +98,7 @@ namespace mongo {
     }
 
     StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx,
-                                                        const StringData& uri) {
+                                                        StringData uri) {
         invariant(opCtx);
         WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, false, opCtx);
         WT_CURSOR* cursor = curwrap.get();
@@ -123,7 +123,7 @@ namespace mongo {
     }
 
     Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
-                                                  const StringData& uri,
+                                                  StringData uri,
                                                   BSONObjBuilder* bob) {
         StatusWith<std::string> metadataResult = getMetadata(opCtx, uri);
         if (!metadataResult.isOK()) {
@@ -177,7 +177,7 @@ namespace mongo {
     }
 
     StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
-                                                               const StringData& uri) {
+                                                               StringData uri) {
         BSONObjBuilder bob;
         Status status = getApplicationMetadata(opCtx, uri, &bob);
         if (!status.isOK()) {
@@ -187,7 +187,7 @@ namespace mongo {
     }
 
     Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* opCtx,
-                                                                 const StringData& uri,
+                                                                 StringData uri,
                                                                  int64_t minimumVersion,
                                                                  int64_t maximumVersion) {
 

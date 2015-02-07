@@ -113,17 +113,17 @@ namespace mongo {
          * Gets entire metadata string for collection/index at URI.
          */
         static StatusWith<std::string> getMetadata(OperationContext* opCtx,
-                                                   const StringData& uri);
+                                                   StringData uri);
 
         /**
          * Reads app_metadata for collection/index at URI as a BSON document.
          */
         static Status getApplicationMetadata(OperationContext* opCtx,
-                                             const StringData& uri,
+                                             StringData uri,
                                              BSONObjBuilder* bob);
 
         static StatusWith<BSONObj> getApplicationMetadata(OperationContext* opCtx,
-                                                          const StringData& uri);
+                                                          StringData uri);
 
         /**
          * Validates formatVersion in application metadata for 'uri'.
@@ -131,7 +131,7 @@ namespace mongo {
          * URI is used in error messages only.
          */
         static Status checkApplicationMetadataFormatVersion(OperationContext* opCtx,
-                                                            const StringData& uri,
+                                                            StringData uri,
                                                             int64_t minimumVersion,
                                                             int64_t maximumVersion);
         /**
@@ -186,7 +186,7 @@ namespace mongo {
     class WiredTigerConfigParser {
         MONGO_DISALLOW_COPYING(WiredTigerConfigParser);
     public:
-        WiredTigerConfigParser(const StringData& config) {
+        WiredTigerConfigParser(StringData config) {
             invariantWTOK(wiredtiger_config_parser_open(NULL, config.rawData(), config.size(),
                                                         &_parser));
         }

@@ -175,11 +175,13 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_ERR(__wt_epoch(session, &start_time));
 
 	/*
-	 * We compact 10% of the file on each pass, try 10 times (which is
-	 * probably overkill), and quit if we make no progress. Check for a
-	 * timeout each time through the loop.
+	 * We compact 10% of the file on each pass (but the overall size of the
+	 * file is decreasing each time, so we're not compacting 10% of the
+	 * original file each time). Try 100 times (which is clearly more than
+	 * we need); quit if we make no progress and check for a timeout each
+	 * time through the loop.
 	 */
-	for (i = 0; i < 10; ++i) {
+	for (i = 0; i < 100; ++i) {
 		WT_ERR(wt_session->checkpoint(wt_session, t->data));
 
 		session->compaction = 0;

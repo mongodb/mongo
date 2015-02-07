@@ -51,7 +51,7 @@ namespace {
 
     class DummyCappedDocumentDeleteCallback : public CappedDocumentDeleteCallback {
     public:
-        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc ) {
+        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc, RecordData data) {
             deleted.push_back( DiskLoc::fromRecordId(loc) );
             return Status::OK();
         }

@@ -35,6 +35,7 @@
 namespace mongo {
 
     class OperationContext;
+    class RecordData;
 
     /**
      * When a capped collection has to delete a document, it needs a way to tell the caller
@@ -47,8 +48,12 @@ namespace mongo {
 
         /**
          * This will be called right before loc is deleted when wrapping.
+         * If data is unowned, it is only valid inside of this call. If implementations wish to
+         * stash a pointer, they must copy it.
          */
-        virtual Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc ) = 0;
+        virtual Status aboutToDeleteCapped( OperationContext* txn,
+                                            const RecordId& loc,
+                                            RecordData data ) = 0;
     };
 
 }

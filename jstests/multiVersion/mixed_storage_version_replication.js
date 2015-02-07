@@ -421,33 +421,88 @@ var primaryChanged = function(conns, replTest, primaryIndex) {
 };
 
 /*
+ * If we have determined a collection doesn't match on two hosts, use this to print out the
+ * differences.
+ */
+function printCollectionDiff(db1, db2, collName) {
+    var coll1 = db1[collName];
+    var coll2 = db2[collName];
+    var cur1 = coll1.find().sort({$natural: 1});
+    var cur2 = coll2.find().sort({$natural: 1});
+    while (cur1.hasNext() && cur2.hasNext()) {
+        var doc1 = cur1.next();
+        var doc2 = cur2.next();
+        if (doc1 != doc2) {
+            print("Mismatching doc:");
+            printjson(doc1);
+            printjson(doc2);
+        }
+    }
+    if (cur1.hasNext()) {
+        print(db1.getMongo().host + " has extra documents:");
+        while (cur1.hasNext()) {
+            printjson(cur1.next());
+        }
+    }
+    if (cur2.hasNext()) {
+        print(db2.getMongo().host + " has extra documents:");
+        while (cur2.hasNext()) {
+            printjson(cur2.next());
+        }
+    }
+}
+
+/*
+ * Check if two databases are equal. If not, print out what the differences are to aid with
+ * debugging.
+ */
+function assertDBsEq(db1, db2) {
+    assert.eq(db1.getName(), db2.getName());
+    var hash1 = db1.runCommand({dbHash: 1});
+    var hash2 = db2.runCommand({dbHash: 1});
+    var host1 = db1.getMongo().host;
+    var host2 = db2.getMongo().host;
+    var success = true;
+    if (db1.getName() === 'local') {
+        // We don't expect the entire local collection to be the same, just the oplog.
+        if (hash1.collections["oplog.rs"] !== hash2.collections["oplog.rs"]) {
+            success = false;
+            print("oplog differs on " + host1 + " and " + host2);
+            printCollectionDiff(db1.oplog.rs, db2.oplog.rs);
+        }
+    }
+    else if (hash1.md5 != hash2.md5) {
+        print("Database " + db1.getName() + " differs on " + host1 + " and " + host2);
+        var collNames1 = db1.getCollectionNames();
+        var collNames2 = db2.getCollectionNames();
+        print("Collections: ");
+        print(collNames1);
+        print(collNames2);
+        for (var i = 0; i < Math.min(collNames1.length, collNames2.length); i++) {
+            var collName = collNames1[i];
+            if (hash1.collections[collName] !== hash2.collections[collName]) {
+                success = false;
+                print(collName + " differs:");
+                printCollectionDiff(db1, db2, collName);
+            }
+        }
+    }
+    assert.eq(success, true, "Database(s) not equal. See output above.");
+}
+
+/*
  * Check the database hashes of all databases to ensure each node of the replica set has the same
  * data.
  */
 function assertSameData(primary, conns) {
     var dbs = primary.getDBs().databases;
     for (var i in dbs) {
-        var db = dbs[i];
-        // Resulting document has the following form:
-        // {md5: <hash of all>, collections: {collectionName: <hash of that collection}, ...}
-        var primaryHash = primary.getDB(db.name).runCommand({dbHash: 1});
-        // Make sure the hash is the same on all nodes.
+        var db1 = primary.getDB(dbs[i].name);
         for (var j in conns) {
             var conn = conns[j];
             if (!isArbiter(conn)) {
-                var secondaryHash = conn.getDB(db.name).runCommand({dbHash: 1});
-                if (db.name === 'local') {
-                    // We don't expect the entire local collection to be the same, just the oplog.
-                    assert.eq(secondaryHash.collections["oplog.rs"],
-                              primaryHash.collections["oplog.rs"],
-                              "oplog differs on " + primary.host + " and " + conn.host);
-                }
-                else {
-                    assert.eq(
-                      secondaryHash.md5, primaryHash.md5,
-                      "Database " + db.name + " differs on " + primary.host + " and " + conn.host
-                    );
-                }
+                var db2 = conn.getDB(dbs[i].name);
+                assertDBsEq(db1, db2);
             }
         }
     }

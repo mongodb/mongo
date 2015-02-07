@@ -99,7 +99,7 @@ namespace mongo {
     void SavedCursorRegistry::invalidateCursorsForBucket(DiskLoc bucket) {
         // While this is not strictly necessary as an exclusive collection lock will be held,
         // it's cleaner to just make the SavedCursorRegistry thread-safe. Spinlock is OK here.
-        scoped_spinlock lock(mutex);
+        scoped_spinlock lock(_mutex);
         for (SavedCursorSet::iterator it = _cursors.begin(); it != _cursors.end();) {
             if ((*it)->bucket == bucket) {
                 (*it)->_registry = NULL; // prevent ~SavedCursor from trying to unregister
@@ -111,7 +111,7 @@ namespace mongo {
         }
     }
 
-    RecordStoreV1Base::RecordStoreV1Base( const StringData& ns,
+    RecordStoreV1Base::RecordStoreV1Base( StringData ns,
                                           RecordStoreV1MetaData* details,
                                           ExtentManager* em,
                                           bool isSystemIndexes )
@@ -370,9 +370,17 @@ namespace mongo {
                                                          const char* data,
                                                          int dataSize,
                                                          bool enforceQuota,
-                                                         UpdateMoveNotifier* notifier ) {
+                                                         UpdateNotifier* notifier ) {
         Record* oldRecord = recordFor( DiskLoc::fromRecordId(oldLocation) );
         if ( oldRecord->netLength() >= dataSize ) {
+            // Make sure to notify other queries before we do an in-place update.
+            if ( notifier ) {
+                Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace( txn,
+                                                                                   oldLocation );
+                if ( !callbackStatus.isOK() )
+                    return StatusWith<RecordId>( callbackStatus );
+            }
+
             // we fit
             memcpy( txn->recoveryUnit()->writingPtr( oldRecord->data(), dataSize ), data, dataSize );
             return StatusWith<RecordId>( oldLocation );
@@ -852,7 +860,7 @@ namespace mongo {
                                                double scale ) const {
         result->append( "lastExtentSize", _details->lastExtentSize(txn) / scale );
         result->append( "paddingFactor", 1.0 ); // hard coded
-        result->append( "paddingFactorNote", "paddingFactor is unused and unmaintained in 2.8. It "
+        result->append( "paddingFactorNote", "paddingFactor is unused and unmaintained in 3.0. It "
                                              "remains hard coded to 1.0 for compatibility only." );
         result->append( "userFlags", _details->userFlags() );
         result->appendBool( "capped", isCapped() );

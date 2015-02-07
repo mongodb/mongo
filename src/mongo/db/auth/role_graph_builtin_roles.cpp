@@ -244,7 +244,7 @@ namespace {
         return Status::OK();
     }
 
-    void addReadOnlyDbPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
+    void addReadOnlyDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges, Privilege(ResourcePattern::forDatabaseName(dbName), readRoleActions));
         Privilege::addPrivilegeToPrivilegeVector(
@@ -267,7 +267,7 @@ namespace {
                           readRoleActions));
     }
 
-    void addReadWriteDbPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
+    void addReadWriteDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
         addReadOnlyDbPrivileges(privileges, dbName);
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
@@ -278,12 +278,12 @@ namespace {
                           readWriteRoleActions));
     }
 
-    void addUserAdminDbPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
+    void addUserAdminDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
         privileges->push_back(
                 Privilege(ResourcePattern::forDatabaseName(dbName), userAdminRoleActions));
     }
 
-    void addDbAdminDbPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
+    void addDbAdminDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forDatabaseName(dbName), dbAdminRoleActions));
@@ -309,7 +309,7 @@ namespace {
                           profileActions));
     }
 
-    void addDbOwnerPrivileges(PrivilegeVector* privileges, const StringData& dbName) {
+    void addDbOwnerPrivileges(PrivilegeVector* privileges, StringData dbName) {
         addReadWriteDbPrivileges(privileges, dbName);
         addDbAdminDbPrivileges(privileges, dbName);
         addUserAdminDbPrivileges(privileges, dbName);

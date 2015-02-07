@@ -30,6 +30,7 @@
 
 #include "mongo/db/matcher/expression_leaf.h"
 
+#include <cmath>
 #include <pcrecpp.h>
 
 #include "mongo/bson/bsonobjiterator.h"
@@ -41,7 +42,7 @@
 
 namespace mongo {
 
-    Status LeafMatchExpression::initPath( const StringData& path ) {
+    Status LeafMatchExpression::initPath( StringData path ) {
         _path = path;
         return _elementPath.init( _path );
     }
@@ -75,7 +76,7 @@ namespace mongo {
     }
 
 
-    Status ComparisonMatchExpression::init( const StringData& path, const BSONElement& rhs ) {
+    Status ComparisonMatchExpression::init( StringData path, const BSONElement& rhs ) {
         _rhs = rhs;
 
         if ( rhs.eoo() ) {
@@ -121,8 +122,8 @@ namespace mongo {
 
         // Special case handling for NaN. NaN is equal to NaN but
         // otherwise always compares to false.
-        if (isNaN(e.numberDouble()) || isNaN(_rhs.numberDouble())) {
-            bool bothNaN = isNaN(e.numberDouble()) && isNaN(_rhs.numberDouble());
+        if (std::isnan(e.numberDouble()) || std::isnan(_rhs.numberDouble())) {
+            bool bothNaN = std::isnan(e.numberDouble()) && std::isnan(_rhs.numberDouble());
             switch ( matchType() ) {
             case LT:
                 return false;
@@ -236,14 +237,14 @@ namespace mongo {
     }
 
 
-    Status RegexMatchExpression::init( const StringData& path, const BSONElement& e ) {
+    Status RegexMatchExpression::init( StringData path, const BSONElement& e ) {
         if ( e.type() != RegEx )
             return Status( ErrorCodes::BadValue, "regex not a regex" );
         return init( path, e.regex(), e.regexFlags() );
     }
 
 
-    Status RegexMatchExpression::init( const StringData& path, const StringData& regex, const StringData& options ) {
+    Status RegexMatchExpression::init( StringData path, StringData regex, StringData options ) {
         if ( regex.size() > MaxPatternSize ) {
             return Status( ErrorCodes::BadValue, "Regular expression is too long" );
         }
@@ -294,7 +295,7 @@ namespace mongo {
 
     // ---------
 
-    Status ModMatchExpression::init( const StringData& path, int divisor, int remainder ) {
+    Status ModMatchExpression::init( StringData path, int divisor, int remainder ) {
         if ( divisor == 0 )
             return Status( ErrorCodes::BadValue, "divisor cannot be 0" );
         _divisor = divisor;
@@ -337,7 +338,7 @@ namespace mongo {
 
     // ------------------
 
-    Status ExistsMatchExpression::init( const StringData& path ) {
+    Status ExistsMatchExpression::init( StringData path ) {
         return initPath( path );
     }
 
@@ -371,7 +372,7 @@ namespace mongo {
 
     // ----
 
-    Status TypeMatchExpression::init( const StringData& path, int type ) {
+    Status TypeMatchExpression::init( StringData path, int type ) {
         _path = path;
         _type = type;
         return _elementPath.init( _path );
@@ -524,7 +525,7 @@ namespace mongo {
 
     // -----------
 
-    Status InMatchExpression::init( const StringData& path ) {
+    Status InMatchExpression::init( StringData path ) {
         return initPath( path );
     }
 

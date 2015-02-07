@@ -53,7 +53,7 @@ namespace mongo {
             }
         }
 
-        string Stemmer::stem( const StringData& word ) const {
+        string Stemmer::stem( StringData word ) const {
             if ( !_stemmer )
                 return word.toString();
 

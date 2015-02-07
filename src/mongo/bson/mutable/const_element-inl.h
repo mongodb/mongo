@@ -65,15 +65,15 @@ namespace mutablebson {
         return _basis[n];
     }
 
-    inline ConstElement ConstElement::findFirstChildNamed(const StringData& name) const {
+    inline ConstElement ConstElement::findFirstChildNamed(StringData name) const {
         return _basis.findFirstChildNamed(name);
     }
 
-    inline ConstElement ConstElement::operator[](const StringData& name) const {
+    inline ConstElement ConstElement::operator[](StringData name) const {
         return _basis[name];
     }
 
-    inline ConstElement ConstElement::findElementNamed(const StringData& name) const {
+    inline ConstElement ConstElement::findElementNamed(StringData name) const {
         return _basis.findElementNamed(name);
     }
 

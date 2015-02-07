@@ -686,6 +686,11 @@ namespace {
         _setMyLastOptime_inlock(&lock, ts, false);
     }
 
+    void ReplicationCoordinatorImpl::resetMyLastOptime() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        _setMyLastOptime_inlock(&lock, OpTime(), true);
+    }
+
     void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
             boost::unique_lock<boost::mutex>* lock, const OpTime& ts, bool isRollbackAllowed) {
         invariant(lock->owns_lock());
@@ -764,7 +769,7 @@ namespace {
         }
         else {
             // The command we received didn't contain a memberId, most likely this is because it
-            // came from a member running something prior to 2.8.
+            // came from a member running something prior to 3.0.
             // Fall back to finding the node by RID.
             slaveInfo = _findSlaveInfoByRID_inlock(args.rid);
             if (!slaveInfo) {
@@ -1216,7 +1221,7 @@ namespace {
         return false;
     }
 
-    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& dbName) {
+    bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(StringData dbName) {
         // _canAcceptNonLocalWrites is always true for standalone nodes, always false for nodes
         // started with --slave, and adjusted based on primary+drain state in replica sets.
         //
@@ -1313,10 +1318,14 @@ namespace {
         return self.getId();
     }
 
-    void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
+    bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
             BSONObjBuilder* cmdBuilder) {
         boost::lock_guard<boost::mutex> lock(_mutex);
         invariant(_rsConfig.isInitialized());
+        // do not send updates if we have been removed from the config
+        if (_selfIndex == -1) {
+            return false;
+        }
         cmdBuilder->append("replSetUpdatePosition", 1);
         // create an array containing objects each member connected to us and for ourself
         BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
@@ -1327,20 +1336,20 @@ namespace {
                     // Don't include info on members we haven't heard from yet.
                     continue;
                 }
-                invariant(itr->rid.isSet());
                 BSONObjBuilder entry(arrayBuilder.subobjStart());
                 entry.append("_id", itr->rid);
                 entry.append("optime", itr->opTime);
                 entry.append("memberId", itr->memberId);
                 entry.append("cfgver", _rsConfig.getConfigVersion());
-                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 3.0,
                 // we need to keep sending it for 2.6 compatibility.
-                // TODO(spencer): Remove this after 2.8 is released.
+                // TODO(spencer): Remove this after 3.0 is released.
                 const MemberConfig* member = _rsConfig.findMemberByID(itr->memberId);
                 fassert(18651, member); // We ensured the member existed in processHandshake.
                 entry.append("config", member->toBSON(_rsConfig.getTagConfig()));
             }
         }
+        return true;
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommandHandshakes(
@@ -1360,9 +1369,9 @@ namespace {
                 BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
                 subCmd.append("handshake", itr->rid);
                 subCmd.append("member", itr->memberId);
-                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 3.0,
                 // we need to keep sending it for 2.6 compatibility.
-                // TODO(spencer): Remove this after 2.8 is released.
+                // TODO(spencer): Remove this after 3.0 is released.
                 const MemberConfig* member = _rsConfig.findMemberByID(itr->memberId);
                 fassert(18650, member); // We ensured the member existed in processHandshake.
                 subCmd.append("config", member->toBSON(_rsConfig.getTagConfig()));
@@ -1399,6 +1408,12 @@ namespace {
                        this,
                        stdx::placeholders::_1,
                        response));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            response->markAsShutdownInProgress();
+            return;
+        }
+        fassert(28602, cbh.getStatus());
+
         _replExecutor.wait(cbh.getValue());
         if (isWaitingForApplierToDrain()) {
             // Report that we are secondary to ismaster callers until drain completes.
@@ -1894,6 +1909,9 @@ namespace {
         const MemberState newState = _topCoord->getMemberState();
         if (newState == _memberState) {
             if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+                invariant(_rsConfig.getNumMembers() == 1 &&
+                          _selfIndex == 0 &&
+                          _rsConfig.getMemberAt(0).isElectable());
                 return kActionWinElection;
             }
             return kActionNone;
@@ -1926,6 +1944,9 @@ namespace {
             // When transitioning to SECONDARY, the only way for _topCoord to report the candidate
             // role is if the configuration represents a single-node replica set.  In that case, the
             // overriding requirement is to elect this singleton node primary.
+            invariant(_rsConfig.getNumMembers() == 1 &&
+                      _selfIndex == 0 &&
+                      _rsConfig.getMemberAt(0).isElectable());
             result = kActionWinElection;
         }
 
@@ -2055,8 +2076,15 @@ namespace {
                  _replExecutor.now(),
                  myOptime);
          _rsConfig = newConfig;
-         log() << "new replica set config in use: " << _rsConfig.toBSON() << rsLog;
+         log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
          _selfIndex = myIndex;
+         if (_selfIndex >= 0) {
+             log() << "This node is " <<
+                 _rsConfig.getMemberAt(_selfIndex).getHostAndPort() << " in the config";
+         }
+         else {
+             log() << "This node is not a member of the config";
+         }
 
          const PostMemberStateUpdateAction action =
              _updateMemberStateFromTopologyCoordinator_inlock();

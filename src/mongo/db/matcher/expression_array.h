@@ -45,7 +45,7 @@ namespace mongo {
         ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( matchType ){}
         virtual ~ArrayMatchingMatchExpression(){}
 
-        Status initPath( const StringData& path );
+        Status initPath( StringData path );
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
 
@@ -68,7 +68,7 @@ namespace mongo {
     class ElemMatchObjectMatchExpression : public ArrayMatchingMatchExpression {
     public:
         ElemMatchObjectMatchExpression() : ArrayMatchingMatchExpression( ELEM_MATCH_OBJECT ){}
-        Status init( const StringData& path, MatchExpression* sub );
+        Status init( StringData path, MatchExpression* sub );
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
 
@@ -98,8 +98,8 @@ namespace mongo {
         ElemMatchValueMatchExpression() : ArrayMatchingMatchExpression( ELEM_MATCH_VALUE ){}
         virtual ~ElemMatchValueMatchExpression();
 
-        Status init( const StringData& path );
-        Status init( const StringData& path, MatchExpression* sub );
+        Status init( StringData path );
+        Status init( StringData path, MatchExpression* sub );
         void add( MatchExpression* sub );
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
@@ -135,7 +135,7 @@ namespace mongo {
     class SizeMatchExpression : public ArrayMatchingMatchExpression {
     public:
         SizeMatchExpression() : ArrayMatchingMatchExpression( SIZE ){}
-        Status init( const StringData& path, int size );
+        Status init( StringData path, int size );
 
         virtual SizeMatchExpression* shallowClone() const {
             SizeMatchExpression* e = new SizeMatchExpression();

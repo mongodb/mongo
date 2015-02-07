@@ -47,7 +47,7 @@ namespace mongo {
     using std::string;
 
     DBClientMultiCommand::PendingCommand::PendingCommand( const ConnectionString& endpoint,
-                                                          const StringData& dbName,
+                                                          StringData dbName,
                                                           const BSONObj& cmdObj ) :
         endpoint( endpoint ),
         dbName( dbName.toString() ),
@@ -57,7 +57,7 @@ namespace mongo {
     }
 
     void DBClientMultiCommand::addCommand( const ConnectionString& endpoint,
-                                           const StringData& dbName,
+                                           StringData dbName,
                                            const BSONSerializable& request ) {
         PendingCommand* command = new PendingCommand( endpoint, dbName, request.toBSON() );
         _pendingCommands.push_back( command );
@@ -88,7 +88,7 @@ namespace mongo {
     }
 
     // THROWS
-    static void sayAsCmd( DBClientBase* conn, const StringData& dbName, const BSONObj& cmdObj ) {
+    static void sayAsCmd( DBClientBase* conn, StringData dbName, const BSONObj& cmdObj ) {
         Message toSend;
         BSONObjBuilder usersBuilder;
         usersBuilder.appendElements(cmdObj);

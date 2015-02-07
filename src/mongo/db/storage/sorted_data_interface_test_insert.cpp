@@ -214,9 +214,11 @@ namespace mongo {
         }
     }
 
+namespace {
+
     // Insert the same key multiple times and verify that all entries exists
     // in the index when duplicates are allowed.
-    TEST( SortedDataInterface, InsertSameKeyWithDupsAllowed ) {
+    void _testInsertSameKeyWithDupsAllowed(const RecordId locs[3]) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
@@ -229,8 +231,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc2, true /* allow duplicates */ ) );
+                ASSERT_OK(sorted->insert( opCtx.get(), key1, locs[0], false));
+                ASSERT_OK(sorted->insert(opCtx.get(), key1, locs[1], true /* allow duplicates */));
                 uow.commit();
             }
         }
@@ -244,7 +246,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc3, true /* allow duplicates */ ) );
+                ASSERT_OK(sorted->insert(opCtx.get(), key1, locs[2], true /* allow duplicates */));
                 uow.commit();
             }
         }
@@ -253,6 +255,18 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
         }
+    }
+
+}  // namespace
+
+    TEST( SortedDataInterface, InsertSameKeyWithDupsAllowedLocsAscending ) {
+        const RecordId locs[3] = {loc1, loc2, loc3};
+        _testInsertSameKeyWithDupsAllowed(locs);
+    }
+
+    TEST( SortedDataInterface, InsertSameKeyWithDupsAllowedLocsDescending ) {
+        const RecordId locs[3] = {loc3, loc2, loc1};
+        _testInsertSameKeyWithDupsAllowed(locs);
     }
 
     // Insert multiple keys and verify that the number of entries

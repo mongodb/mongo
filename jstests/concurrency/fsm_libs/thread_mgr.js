@@ -92,6 +92,11 @@ var ThreadManager = function(clusterOptions, executionMode) {
             throw new Error('thread manager has not been initialized yet');
         }
 
+        var workloadData = {};
+        _workloads.forEach(function(workload) {
+            workloadData[workload] = _context[workload].config.data;
+        });
+
         var tid = 0;
         _workloads.forEach(function(workload) {
             var workloads = [workload]; // worker thread only needs to load 'workload'
@@ -102,9 +107,9 @@ var ThreadManager = function(clusterOptions, executionMode) {
             var config = _context[workload].config;
 
             for (var i = 0; i < threadCounts[workload]; ++i) {
-                config.data.tid = tid++;
                 var args = {
-                    data: config.data,
+                    tid: tid++,
+                    data: workloadData,
                     host: host,
                     latch: latch,
                     dbName: _context[workload].dbName,

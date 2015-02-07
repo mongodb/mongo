@@ -51,7 +51,6 @@
 
 using namespace std;
 using boost::scoped_ptr;
-using boost::shared_ptr;
 
 namespace mongo {
 
@@ -237,13 +236,13 @@ namespace mongo {
             }
 
         private:
-            shared_ptr<SharedData> _sharedData;
+            boost::shared_ptr<SharedData> _sharedData;
         };
 
         bool _started;
         bool _done;
         scoped_ptr<boost::thread> _thread;
-        shared_ptr<SharedData> _sharedData;
+        boost::shared_ptr<SharedData> _sharedData;
     };
 
     class CountDownLatchHolder {

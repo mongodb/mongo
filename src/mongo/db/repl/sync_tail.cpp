@@ -119,11 +119,16 @@ namespace repl {
     /* apply the log op that is in param o
        @return bool success (true) or failure (false)
     */
-    bool SyncTail::syncApply(
-                        OperationContext* txn, const BSONObj &op, bool convertUpdateToUpsert) {
+    bool SyncTail::syncApply(OperationContext* txn,
+                             const BSONObj &op,
+                             bool convertUpdateToUpsert) {
+
         if (inShutdown()) {
             return true;
         }
+
+        // Count each log op application as a separate operation, for reporting purposes
+        txn->getCurOp()->reset();
 
         const char *ns = op.getStringField("ns");
         verify(ns);
@@ -144,8 +149,11 @@ namespace repl {
 
         for ( int createCollection = 0; createCollection < 2; createCollection++ ) {
             try {
-                boost::scoped_ptr<Lock::ScopedLock> lk;
-                boost::scoped_ptr<Lock::CollectionLock> lk2;
+                boost::scoped_ptr<Lock::GlobalWrite> globalWriteLock;
+
+                // DB lock always acquires the global lock
+                boost::scoped_ptr<Lock::DBLock> dbLock;
+                boost::scoped_ptr<Lock::CollectionLock> collectionLock;
 
                 bool isIndexBuild = opType[0] == 'i' &&
                     nsToCollectionSubstring( ns ) == "system.indexes";
@@ -153,15 +161,17 @@ namespace repl {
                 if (isCommand) {
                     // a command may need a global write lock. so we will conservatively go
                     // ahead and grab one here. suboptimal. :-(
-                    lk.reset(new Lock::GlobalWrite(txn->lockState()));
+                    globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
                 }
                 else if (isIndexBuild) {
-                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                    dbLock.reset(new Lock::DBLock(txn->lockState(),
+                                                  nsToDatabaseSubstring(ns), MODE_X));
                 }
                 else if (isCrudOpType(opType)) {
                     LockMode mode = createCollection ? MODE_X : MODE_IX;
-                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
-                    lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
+                    dbLock.reset(new Lock::DBLock(txn->lockState(),
+                                                  nsToDatabaseSubstring(ns), mode));
+                    collectionLock.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
 
                     if (!createCollection && !dbHolder().get(txn, nsToDatabaseSubstring(ns))) {
                         // need to create database, try again
@@ -170,11 +180,11 @@ namespace repl {
                 }
                 else {
                     // Unknown op?
-                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                    dbLock.reset(new Lock::DBLock(txn->lockState(),
+                                                  nsToDatabaseSubstring(ns), MODE_X));
                 }
 
                 Client::Context ctx(txn, ns);
-                ctx.getClient()->curop()->reset();
 
                 if ( createCollection == 0 &&
                      !isIndexBuild &&
@@ -191,13 +201,16 @@ namespace repl {
                 opsAppliedStats.increment();
                 return ok;
             }
-            catch ( const WriteConflictException& wce ) {
+            catch (const WriteConflictException&) {
                 log() << "WriteConflictException while doing oplog application on: " << ns
                       << ", retrying.";
                 createCollection--;
             }
         }
-        invariant(!"impossible");
+
+        // Keeps the compiler warnings happy
+        invariant(false);
+        return false;
     }
 
     // The pool threads call this to prefetch each op
@@ -277,9 +290,17 @@ namespace repl {
         }
 
         applyOps(writerVectors);
-        return applyOpsToOplog(txn, &ops);
-    }
 
+        if (inShutdown()) {
+            return OpTime();
+        }
+
+        OpTime lastOpTime = writeOpsToOplog(txn, ops);
+
+        BackgroundSync::get()->notify(txn);
+
+        return lastOpTime;
+    }
 
     void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops,
                                      std::vector< std::vector<BSONObj> >* writerVectors) {
@@ -364,6 +385,10 @@ namespace repl {
             entriesApplied += ops.getDeque().size();
 
             const OpTime lastOpTime = multiApply(txn, ops.getDeque());
+
+            if (inShutdown()) {
+                return;
+            }
 
             // if the last op applied was our end, return
             if (lastOpTime == endOpTime) {
@@ -503,7 +528,16 @@ namespace {
         if (!peek_success) {
             // if we don't have anything in the queue, wait a bit for something to appear
             if (ops->empty()) {
-                replCoord->signalDrainComplete(txn);
+                if (replCoord->isWaitingForApplierToDrain()) {
+                    BackgroundSync::get()->waitUntilPaused();
+                    if (peek(&op)) {
+                        // The producer generated a last batch of ops before pausing so return
+                        // false so that we'll come back and apply them before signaling the drain
+                        // is complete.
+                        return false;
+                    }
+                    replCoord->signalDrainComplete(txn);
+                }
                 // block up to 1 second
                 _networkQueue->waitForMore();
                 return false;
@@ -552,31 +586,6 @@ namespace {
 
         // Go back for more ops
         return false;
-    }
-
-    OpTime SyncTail::applyOpsToOplog(OperationContext* txn, std::deque<BSONObj>* ops) {
-        OpTime lastOpTime;
-        {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-            WriteUnitOfWork wunit(txn);
-
-            while (!ops->empty()) {
-                const BSONObj& op = ops->front();
-                // this updates lastOpTimeApplied
-                lastOpTime = _logOpObjRS(txn, op);
-                ops->pop_front();
-             }
-            wunit.commit();
-        }
-
-        // This call may result in us assuming PRIMARY role if we'd been waiting for our sync
-        // buffer to drain and it's now empty.  This will acquire a global lock to drop all
-        // temp collections, so we must release the above lock on the local database before
-        // doing so.
-        BackgroundSync::get()->notify(txn);
-
-        return lastOpTime;
     }
 
     void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {
@@ -631,7 +640,7 @@ namespace {
         OperationContextImpl txn;
 
         // allow us to get through the magic barrier
-        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
+        txn.lockState()->setIsBatchWriter(true);
 
         bool convertUpdatesToUpserts = true;
 
@@ -663,7 +672,7 @@ namespace {
         OperationContextImpl txn;
 
         // allow us to get through the magic barrier
-        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
+        txn.lockState()->setIsBatchWriter(true);
 
         for (std::vector<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();

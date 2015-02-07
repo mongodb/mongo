@@ -31,7 +31,9 @@
 #pragma once
 
 namespace mongo {
+
     class AlignedBuilder;
+    class JSectHeader;
 
     namespace dur {
 
@@ -73,6 +75,11 @@ namespace mongo {
             @return true if there are any journal files in the journal dir.
         */
         bool haveJournalFiles(bool anyFiles=false);
+
+        /**
+         * Writes the specified uncompressed buffer to the journal.
+         */
+        void WRITETOJOURNAL(const JSectHeader& h, const AlignedBuilder& uncompressed);
 
         // in case disk controller buffers writes
         const long long ExtraKeepTimeMs = 10000;

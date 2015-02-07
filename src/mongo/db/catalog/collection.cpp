@@ -84,7 +84,7 @@ namespace mongo {
     // ----
 
     Collection::Collection( OperationContext* txn,
-                            const StringData& fullNS,
+                            StringData fullNS,
                             CollectionCatalogEntry* details,
                             RecordStore* recordStore,
                             DatabaseCatalogEntry* dbce )
@@ -152,32 +152,20 @@ namespace mongo {
         return _recordStore->getManyIterators(txn);
     }
 
-    int64_t Collection::countTableScan( OperationContext* txn, const MatchExpression* expression ) {
-        scoped_ptr<RecordIterator> iterator( getIterator( txn,
-                                                          RecordId(),
-                                                          CollectionScanParams::FORWARD ) );
-        int64_t count = 0;
-        while ( !iterator->isEOF() ) {
-            RecordId loc = iterator->getNext();
-            BSONObj obj = docFor( txn, loc );
-            if ( expression->matchesBSON( obj ) )
-                count++;
-        }
-
-        return count;
+    Snapshotted<BSONObj> Collection::docFor(OperationContext* txn, const RecordId& loc) const {
+        return Snapshotted<BSONObj>(txn->recoveryUnit()->getSnapshotId(),
+                                    _recordStore->dataFor( txn, loc ).releaseToBson());
     }
 
-    BSONObj Collection::docFor(OperationContext* txn, const RecordId& loc) const {
-        return  _recordStore->dataFor( txn, loc ).releaseToBson();
-    }
-
-    bool Collection::findDoc(OperationContext* txn, const RecordId& loc, BSONObj* out) const {
+    bool Collection::findDoc(OperationContext* txn,
+                             const RecordId& loc,
+                             Snapshotted<BSONObj>* out) const {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
 
         RecordData rd;
         if ( !_recordStore->findRecord( txn, loc, &rd ) )
             return false;
-        *out = rd.releaseToBson();
+        *out = Snapshotted<BSONObj>(txn->recoveryUnit()->getSnapshotId(), rd.releaseToBson());
         return true;
     }
 
@@ -200,7 +188,7 @@ namespace mongo {
                                                     const BSONObj& docToInsert,
                                                     bool enforceQuota ) {
 
-        uint64_t txnId = txn->recoveryUnit()->getMyTransactionCount();
+        const SnapshotId sid = txn->recoveryUnit()->getSnapshotId();
 
         if ( _indexCatalog.findIdIndex( txn ) ) {
             if ( docToInsert["_id"].eoo() ) {
@@ -211,7 +199,7 @@ namespace mongo {
         }
 
         StatusWith<RecordId> res = _insertDocument( txn, docToInsert, enforceQuota );
-        invariant( txnId == txn->recoveryUnit()->getMyTransactionCount() );
+        invariant( sid == txn->recoveryUnit()->getSnapshotId() );
         return res;
     }
 
@@ -270,13 +258,14 @@ namespace mongo {
         return loc;
     }
 
-    Status Collection::aboutToDeleteCapped( OperationContext* txn, const RecordId& loc ) {
-
-        BSONObj doc = docFor( txn, loc );
+    Status Collection::aboutToDeleteCapped( OperationContext* txn,
+                                            const RecordId& loc,
+                                            RecordData data ) {
 
         /* check if any cursors point to us.  if so, advance them. */
         _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
+        BSONObj doc = data.releaseToBson();
         _indexCatalog.unindexRecord(txn, doc, loc, false);
 
         return Status::OK();
@@ -293,11 +282,11 @@ namespace mongo {
             return;
         }
 
-        BSONObj doc = docFor( txn, loc );
+        Snapshotted<BSONObj> doc = docFor(txn, loc);
 
-        if ( deletedId ) {
-            BSONElement e = doc["_id"];
-            if ( e.type() ) {
+        if (deletedId) {
+            BSONElement e = doc.value()["_id"];
+            if (e.type()) {
                 *deletedId = e.wrap();
             }
         }
@@ -305,9 +294,9 @@ namespace mongo {
         /* check if any cursors point to us.  if so, advance them. */
         _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
-        _indexCatalog.unindexRecord(txn, doc, loc, noWarn);
+        _indexCatalog.unindexRecord(txn, doc.value(), loc, noWarn);
 
-        _recordStore->deleteRecord( txn, loc );
+        _recordStore->deleteRecord(txn, loc);
 
         _infoCache.notifyOfWriteOp();
     }
@@ -317,16 +306,17 @@ namespace mongo {
 
     StatusWith<RecordId> Collection::updateDocument( OperationContext* txn,
                                                      const RecordId& oldLocation,
-                                                     const BSONObj& objOld,
+                                                     const Snapshotted<BSONObj>& objOld,
                                                      const BSONObj& objNew,
                                                      bool enforceQuota,
                                                      bool indexesAffected,
                                                      OpDebug* debug ) {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
+        invariant(objOld.snapshotId() == txn->recoveryUnit()->getSnapshotId());
 
-        uint64_t txnId = txn->recoveryUnit()->getMyTransactionCount();
+        SnapshotId sid = txn->recoveryUnit()->getSnapshotId();
 
-        BSONElement oldId = objOld["_id"];
+        BSONElement oldId = objOld.value()["_id"];
         if ( !oldId.eoo() && ( oldId != objNew["_id"] ) )
             return StatusWith<RecordId>( ErrorCodes::InternalError,
                                          "in Collection::updateDocument _id mismatch",
@@ -349,8 +339,12 @@ namespace mongo {
                     || repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
                 UpdateTicket* updateTicket = new UpdateTicket();
                 updateTickets.mutableMap()[descriptor] = updateTicket;
-                Status ret = iam->validateUpdate(
-                    txn, objOld, objNew, oldLocation, options, updateTicket );
+                Status ret = iam->validateUpdate(txn,
+                                                 objOld.value(),
+                                                 objNew,
+                                                 oldLocation,
+                                                 options,
+                                                 updateTicket);
                 if ( !ret.isOK() ) {
                     return StatusWith<RecordId>( ret );
                 }
@@ -389,7 +383,7 @@ namespace mongo {
             Status s = _indexCatalog.indexRecord(txn, objNew, newLocation.getValue());
             if (!s.isOK())
                 return StatusWith<RecordId>(s);
-            invariant( txnId == txn->recoveryUnit()->getMyTransactionCount() );
+            invariant( sid == txn->recoveryUnit()->getSnapshotId() );
             return newLocation;
         }
 
@@ -414,9 +408,7 @@ namespace mongo {
             }
         }
 
-        // Broadcast the mutation so that query results stay correct.
-        _cursorManager.invalidateDocument(txn, oldLocation, INVALIDATION_MUTATION);
-        invariant( txnId == txn->recoveryUnit()->getMyTransactionCount() );
+        invariant( sid == txn->recoveryUnit()->getSnapshotId() );
         return newLocation;
     }
 
@@ -430,18 +422,26 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status Collection::recordStoreGoingToUpdateInPlace( OperationContext* txn,
+                                                        const RecordId& loc ) {
+        // Broadcast the mutation so that query results stay correct.
+        _cursorManager.invalidateDocument(txn, loc, INVALIDATION_MUTATION);
+        return Status::OK();
+    }
+
 
     Status Collection::updateDocumentWithDamages( OperationContext* txn,
                                                   const RecordId& loc,
-                                                  const RecordData& oldRec,
+                                                  const Snapshotted<RecordData>& oldRec,
                                                   const char* damageSource,
                                                   const mutablebson::DamageVector& damages ) {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
+        invariant(oldRec.snapshotId() == txn->recoveryUnit()->getSnapshotId());
 
         // Broadcast the mutation so that query results stay correct.
         _cursorManager.invalidateDocument(txn, loc, INVALIDATION_MUTATION);
 
-        return _recordStore->updateWithDamages( txn, loc, oldRec, damageSource, damages );
+        return _recordStore->updateWithDamages(txn, loc, oldRec.value(), damageSource, damages);
     }
 
     bool Collection::_enforceQuota( bool userEnforeQuota ) const {
@@ -546,6 +546,7 @@ namespace mongo {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant( isCapped() );
 
+        _cursorManager.invalidateAll(false);
         _recordStore->temp_cappedTruncateAfter( txn, end, inclusive );
     }
 

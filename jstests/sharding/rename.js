@@ -33,12 +33,18 @@ assert.eq(db.foo.count(), 0, '3.3');
 
 // Ensure write concern works by shutting down 1 node in a replica set shard.
 jsTest.log("Testing write concern (2)");
-replTest.stop(replTest.getNodeId(replTest.getSecondary()));
+// Kill any node. Don't care if it's a primary or secondary.
+replTest.stop(0);
 
-db.foo.insert({_id:4});
-printjson(db.foo.renameCollection('bar', true));
+replTest.awaitSecondaryNodes();
+ReplSetTest.awaitRSClientHosts(s.s,
+                               replTest.getPrimary(),
+                               { ok: true, ismaster: true },
+                               replTest.name);
+
+assert.writeOK(db.foo.insert({ _id: 4 }));
+assert.commandWorked(db.foo.renameCollection('bar', true));
 ans = db.runCommand({getLastError:1, w:3, wtimeout:5000});
-printjson(ans);
-assert.eq(ans.err, "timeout", '4.0');
+assert.eq(ans.err, "timeout", 'gle: ' + tojson(ans));
 
 s.stop();

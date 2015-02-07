@@ -51,7 +51,7 @@ namespace mongo {
             Stemmer( const FTSLanguage& language );
             ~Stemmer();
 
-            std::string stem( const StringData& word ) const;
+            std::string stem( StringData word ) const;
         private:
             struct sb_stemmer* _stemmer;
         };

@@ -81,7 +81,6 @@ namespace repl {
 
     std::vector<ReplicationExecutor::RemoteCommandRequest>
     FreshnessChecker::Algorithm::getRequests() const {
-        invariant(_targets.size());
         const MemberConfig& selfConfig = _rsConfig.getMemberAt(_selfIndex);
 
         // gather all not-down nodes, get their fullnames(or hostandport's)

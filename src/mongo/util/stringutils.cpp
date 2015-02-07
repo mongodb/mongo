@@ -61,7 +61,7 @@ namespace mongo {
     _lexOnly( lexOnly ) {
     }
 
-    int LexNumCmp::cmp( const StringData& sd1, const StringData& sd2, bool lexOnly ) {
+    int LexNumCmp::cmp( StringData sd1, StringData sd2, bool lexOnly ) {
         bool startWord = true;
 
         size_t s1 = 0;
@@ -156,10 +156,10 @@ namespace mongo {
         return 0;
     }
 
-    int LexNumCmp::cmp( const StringData& s1, const StringData& s2 ) const {
+    int LexNumCmp::cmp( StringData s1, StringData s2 ) const {
         return cmp( s1, s2, _lexOnly );
     }
-    bool LexNumCmp::operator()( const StringData& s1, const StringData& s2 ) const {
+    bool LexNumCmp::operator()( StringData s1, StringData s2 ) const {
         return cmp( s1, s2 ) < 0;
     }
 

@@ -52,7 +52,7 @@ using namespace std;
 namespace mongo {
 
 #if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
-    SimpleRWLock::SimpleRWLock(const StringData& p) : name(p.toString()) {
+    SimpleRWLock::SimpleRWLock(StringData p) : name(p.toString()) {
         InitializeSRWLock(&_lock);
     }
 # if defined(_DEBUG)
@@ -103,7 +103,7 @@ namespace mongo {
     }
 # endif
 #else
-    SimpleRWLock::SimpleRWLock(const StringData& p) : name(p.toString()) { }
+    SimpleRWLock::SimpleRWLock(StringData p) : name(p.toString()) { }
     void SimpleRWLock::lock() { m.lock(); }
     void SimpleRWLock::unlock() { m.unlock(); }
     void SimpleRWLock::lock_shared() { m.lock_shared(); }

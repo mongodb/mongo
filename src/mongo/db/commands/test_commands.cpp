@@ -40,6 +40,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
 
@@ -72,9 +73,10 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
             Database* db = ctx.db();
+
+            WriteUnitOfWork wunit(txn);
             Collection* collection = db->getCollection( ns );
             if ( !collection ) {
                 collection = db->createCollection( txn, ns );
@@ -206,6 +208,12 @@ namespace mongo {
 
             ScopedTransaction scopedXact(txn, MODE_IX);
             AutoGetDb autoDb(txn, dbname, MODE_X);
+
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while truncating collection " << ns));
+            }
 
             Database* db = autoDb.getDb();
             massert(13429, "no such database", db);

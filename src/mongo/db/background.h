@@ -55,16 +55,16 @@ namespace mongo {
     class BackgroundOperation {
         MONGO_DISALLOW_COPYING(BackgroundOperation);
     public:
-        static bool inProgForDb(const StringData& db);
-        static bool inProgForNs(const StringData& ns);
-        static void assertNoBgOpInProgForDb(const StringData& db);
-        static void assertNoBgOpInProgForNs(const StringData& ns);
-        static void awaitNoBgOpInProgForDb(const StringData& db);
-        static void awaitNoBgOpInProgForNs(const StringData& ns);
+        static bool inProgForDb(StringData db);
+        static bool inProgForNs(StringData ns);
+        static void assertNoBgOpInProgForDb(StringData db);
+        static void assertNoBgOpInProgForNs(StringData ns);
+        static void awaitNoBgOpInProgForDb(StringData db);
+        static void awaitNoBgOpInProgForNs(StringData ns);
         static void dump(std::ostream&);
 
         /* check for in progress before instantiating */
-        BackgroundOperation(const StringData& ns);
+        BackgroundOperation(StringData ns);
 
         virtual ~BackgroundOperation();
 

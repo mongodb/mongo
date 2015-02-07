@@ -79,7 +79,7 @@ namespace mongo {
 
     class RocksRecordStore : public RecordStore {
     public:
-        RocksRecordStore(const StringData& ns, const StringData& id, rocksdb::DB* db,
+        RocksRecordStore(StringData ns, StringData id, rocksdb::DB* db,
                          boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
                          bool isCapped = false, int64_t cappedMaxSize = -1,
                          int64_t cappedMaxDocs = -1,
@@ -125,7 +125,7 @@ namespace mongo {
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier );
+                                                  UpdateNotifier* notifier );
 
         virtual bool updateWithDamagesSupported() const;
 
@@ -221,6 +221,7 @@ namespace mongo {
             bool _eof;
             const RecordId _readUntilForOplog;
             RecordId _curr;
+            RecordId _lastLoc;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 

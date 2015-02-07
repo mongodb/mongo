@@ -266,6 +266,9 @@ namespace {
         sigemptyset(&addrSignals.sa_mask);
         addrSignals.sa_flags = SA_SIGINFO;
 
+        // ^\ is the stronger ^C. Log and quit hard without waiting for cleanup.
+        invariant(signal(SIGQUIT, abruptQuit) != SIG_ERR);
+
         invariant(sigaction(SIGSEGV, &addrSignals, 0) == 0);
         invariant(sigaction(SIGBUS, &addrSignals, 0) == 0);
         invariant(sigaction(SIGILL, &addrSignals, 0) == 0);

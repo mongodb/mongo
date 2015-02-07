@@ -241,6 +241,12 @@ file_config = format_meta + [
         minimum gain before prefix compression will be used on row-store
         leaf pages''',
         min=0),
+    Config('split_deepen_min_child', '0', r'''
+        minimum entries in a page to consider deepening the tree''',
+        type='int', undoc=True),
+    Config('split_deepen_per_child', '0', r'''
+        entries allocated per child when deepening the tree''',
+        type='int', undoc=True),
     Config('split_pct', '75', r'''
         the Btree page split size as a percentage of the maximum Btree
         page size, that is, when a Btree page is split, it will be
@@ -309,8 +315,18 @@ connection_runtime_config = [
             ]),
     Config('cache_size', '100MB', r'''
         maximum heap memory to allocate for the cache. A database should
-        configure either a cache_size or a shared_cache not both''',
+        configure either \c cache_size or \c shared_cache but not both''',
         min='1MB', max='10TB'),
+    Config('cache_overhead', '8', r'''
+        assume the heap allocator overhead is the specified percentage, and
+        adjust the cache size by that amount (for example, if the cache size is
+        100GB, a percentage of 10 means WiredTiger limits itself to allocating
+        90GB of memory).  This value is configurable because different heap
+        allocators have different overhead and different workloads will have
+        different heap allocation sizes and patterns, therefore applications
+        may need to adjust this value based on allocator choice and behavior
+        in measured workloads''',
+        min='0', max='30'),
     Config('checkpoint', '', r'''
         periodically checkpoint the database''',
         type='category', subconfig=[
@@ -559,6 +575,20 @@ common_wiredtiger_open = [
         ]),
 ]
 
+cursor_runtime_config = [
+    Config('append', 'false', r'''
+        append the value as a new record, creating a new record
+        number key; valid only for cursors with record number keys''',
+        type='boolean'),
+    Config('overwrite', 'true', r'''
+        configures whether the cursor's insert, update and remove
+        methods check the existing state of the record.  If \c overwrite
+        is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
+        if the record exists, WT_CURSOR::update and WT_CURSOR::remove
+        fail with ::WT_NOTFOUND if the record does not exist''',
+        type='boolean'),
+]
+
 methods = {
 'file.meta' : Method(file_meta),
 
@@ -569,6 +599,8 @@ methods = {
 'table.meta' : Method(table_meta),
 
 'cursor.close' : Method([]),
+
+'cursor.reconfigure' : Method(cursor_runtime_config),
 
 'session.close' : Method([]),
 
@@ -600,11 +632,7 @@ methods = {
 
 'session.log_printf' : Method([]),
 
-'session.open_cursor' : Method([
-    Config('append', 'false', r'''
-        append the value as a new record, creating a new record
-        number key; valid only for cursors with record number keys''',
-        type='boolean'),
+'session.open_cursor' : Method(cursor_runtime_config + [
     Config('bulk', 'false', r'''
         configure the cursor for bulk-loading, a fast, initial load
         path (see @ref tune_bulk_load for more information).  Bulk-load
@@ -640,13 +668,6 @@ methods = {
         configured with \c next_random=true only support the
         WT_CURSOR::next and WT_CURSOR::close methods.  See @ref
         cursor_random for details''',
-        type='boolean'),
-    Config('overwrite', 'true', r'''
-        configures whether the cursor's insert, update and remove
-        methods check the existing state of the record.  If \c overwrite
-        is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
-        if the record exists, WT_CURSOR::update and WT_CURSOR::remove
-        fail with ::WT_NOTFOUND if the record does not exist''',
         type='boolean'),
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if

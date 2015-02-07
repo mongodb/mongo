@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include <cmath>
+
 #include "mongo/platform/basic.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/unittest/unittest.h"
@@ -701,10 +703,10 @@ TEST(KeyStringTest, NaNs) {
     ASSERT_EQ(ks1a, ks2a);
     ASSERT_EQ(ks1d, ks2d);
 
-    ASSERT(isNaN(toBson(ks1a, ONE_ASCENDING)[""].Double()));
-    ASSERT(isNaN(toBson(ks2a, ONE_ASCENDING)[""].Double()));
-    ASSERT(isNaN(toBson(ks1d, ONE_DESCENDING)[""].Double()));
-    ASSERT(isNaN(toBson(ks2d, ONE_DESCENDING)[""].Double()));
+    ASSERT(std::isnan(toBson(ks1a, ONE_ASCENDING)[""].Double()));
+    ASSERT(std::isnan(toBson(ks2a, ONE_ASCENDING)[""].Double()));
+    ASSERT(std::isnan(toBson(ks1d, ONE_DESCENDING)[""].Double()));
+    ASSERT(std::isnan(toBson(ks2d, ONE_DESCENDING)[""].Double()));
 }
 TEST(KeyStringTest, NumberOrderLots) {
     std::vector<BSONObj> numbers;

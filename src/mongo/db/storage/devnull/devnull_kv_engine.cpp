@@ -1,5 +1,3 @@
-// devnull_kv_engine.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -28,8 +26,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/in_memory/in_memory_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -51,7 +52,7 @@ namespace mongo {
 
     class DevNullRecordStore : public RecordStore {
     public:
-        DevNullRecordStore( const StringData& ns, const CollectionOptions& options )
+        DevNullRecordStore( StringData ns, const CollectionOptions& options )
             : RecordStore( ns ), _options( options ) {
             _numInserts = 0;
             _dummy = BSON( "_id" << 1 );
@@ -104,7 +105,7 @@ namespace mongo {
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier ) {
+                                                  UpdateNotifier* notifier ) {
             return StatusWith<RecordId>( oldLocation );
         }
 
@@ -176,12 +177,25 @@ namespace mongo {
         BSONObj _dummy;
     };
 
+    class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
+        MONGO_DISALLOW_COPYING(DevNullSortedDataBuilderInterface);
+
+    public:
+        DevNullSortedDataBuilderInterface() { }
+
+        virtual Status addKey(const BSONObj& key, const RecordId& loc) {
+            return Status::OK();
+        }
+    };
+
     class DevNullSortedDataInterface : public SortedDataInterface {
     public:
         virtual ~DevNullSortedDataInterface() { }
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) { return NULL; }
+                                                           bool dupsAllowed) {
+            return new DevNullSortedDataBuilderInterface();
+        }
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
@@ -218,8 +232,8 @@ namespace mongo {
 
 
     RecordStore* DevNullKVEngine::getRecordStore( OperationContext* opCtx,
-                                                  const StringData& ns,
-                                                  const StringData& ident,
+                                                  StringData ns,
+                                                  StringData ident,
                                                   const CollectionOptions& options ) {
         if ( ident == "_mdb_catalog" ) {
             return new InMemoryRecordStore( ns, &_catalogInfo );
@@ -228,7 +242,7 @@ namespace mongo {
     }
 
     SortedDataInterface* DevNullKVEngine::getSortedDataInterface( OperationContext* opCtx,
-                                                                  const StringData& ident,
+                                                                  StringData ident,
                                                                   const IndexDescriptor* desc ) {
         return new DevNullSortedDataInterface();
     }

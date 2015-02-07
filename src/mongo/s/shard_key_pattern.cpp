@@ -203,7 +203,7 @@ namespace mongo {
     }
 
     static BSONElement extractKeyElementFromMatchable(const MatchableDocument& matchable,
-                                                      const StringData& pathStr) {
+                                                      StringData pathStr) {
         ElementPath path;
         path.init(pathStr);
         path.setTraverseNonleafArrays(false);

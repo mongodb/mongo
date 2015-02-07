@@ -98,7 +98,7 @@ namespace {
             if (!status.isOK())
                 return status;
 
-            // TODO(spencer): The following three fields are optional in 2.8, but should be made
+            // TODO(spencer): The following three fields are optional in 3.0, but should be made
             // required or ignored in 3.0
             long long cfgver;
             status = bsonExtractIntegerFieldWithDefault(entry, kConfigVersionFieldName, -1, &cfgver);

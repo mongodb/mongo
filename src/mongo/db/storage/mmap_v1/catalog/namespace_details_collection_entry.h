@@ -45,7 +45,7 @@ namespace mongo {
 
     class NamespaceDetailsCollectionCatalogEntry : public CollectionCatalogEntry {
     public:
-        NamespaceDetailsCollectionCatalogEntry( const StringData& ns,
+        NamespaceDetailsCollectionCatalogEntry( StringData ns,
                                                 NamespaceDetails* details,
                                                 RecordStore* indexRecordStore,
                                                 MMAPV1DatabaseCatalogEntry* db );
@@ -64,45 +64,45 @@ namespace mongo {
                                     std::vector<std::string>* names ) const;
 
         virtual BSONObj getIndexSpec( OperationContext* txn,
-                                      const StringData& idxName ) const;
+                                      StringData idxName ) const;
 
         virtual bool isIndexMultikey(OperationContext* txn,
-                                     const StringData& indexName) const;
+                                     StringData indexName) const;
         virtual bool isIndexMultikey(int idxNo) const;
 
         virtual bool setIndexIsMultikey(OperationContext* txn,
                                         int idxNo,
                                         bool multikey = true);
         virtual bool setIndexIsMultikey(OperationContext* txn,
-                                        const StringData& indexName,
+                                        StringData indexName,
                                         bool multikey = true);
 
         virtual RecordId getIndexHead( OperationContext* txn,
-                                       const StringData& indexName ) const;
+                                       StringData indexName ) const;
 
         virtual void setIndexHead( OperationContext* txn,
-                                   const StringData& indexName,
+                                   StringData indexName,
                                    const RecordId& newHead );
 
         virtual bool isIndexReady( OperationContext* txn,
-                                   const StringData& indexName ) const;
+                                   StringData indexName ) const;
 
         virtual Status removeIndex( OperationContext* txn,
-                                    const StringData& indexName );
+                                    StringData indexName );
 
         virtual Status prepareForIndexBuild( OperationContext* txn,
                                              const IndexDescriptor* spec );
 
         virtual void indexBuildSuccess( OperationContext* txn,
-                                        const StringData& indexName );
+                                        StringData indexName );
 
         virtual void updateTTLSetting( OperationContext* txn,
-                                       const StringData& idxName,
+                                       StringData idxName,
                                        long long newExpireSeconds );
 
         // not part of interface, but available to my storage engine
 
-        int _findIndexNumber( OperationContext* txn, const StringData& indexName) const;
+        int _findIndexNumber( OperationContext* txn, StringData indexName) const;
 
     private:
         NamespaceDetails* _details;

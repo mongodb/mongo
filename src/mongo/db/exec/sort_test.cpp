@@ -98,7 +98,7 @@ namespace {
             // Insert obj from input array into working set.
             WorkingSetMember wsm;
             wsm.state = WorkingSetMember::OWNED_OBJ;
-            wsm.obj = obj;
+            wsm.obj = Snapshotted<BSONObj>(SnapshotId(), obj);
             ms->pushBack(wsm);
         }
 
@@ -129,7 +129,7 @@ namespace {
         BSONArrayBuilder arr(bob.subarrayStart("output"));
         while (state == PlanStage::ADVANCED) {
             WorkingSetMember* member = ws.get(id);
-            const BSONObj& obj = member->obj;
+            const BSONObj& obj = member->obj.value();
             arr.append(obj);
             state = sort.work(&id);
         }

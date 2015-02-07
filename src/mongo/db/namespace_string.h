@@ -46,7 +46,7 @@ namespace mongo {
         For example <dbname>.system.users is ok for regular clients to update.
         @param write used when .system.js
     */
-    bool legalClientSystemNS( const StringData& ns , bool write );
+    bool legalClientSystemNS( StringData ns , bool write );
 
     /* e.g.
        NamespaceString ns("acme.orders");
@@ -62,13 +62,13 @@ namespace mongo {
         /**
          * Constructs a NamespaceString from the fully qualified namespace named in "ns".
          */
-        explicit NamespaceString( const StringData& ns );
+        explicit NamespaceString( StringData ns );
 
         /**
          * Constructs a NamespaceString for the given database and collection names.
          * "dbName" must not contain a ".", and "collectionName" must not start with one.
          */
-        NamespaceString( const StringData& dbName, const StringData& collectionName );
+        NamespaceString( StringData dbName, StringData collectionName );
 
         /**
          * Note that these values are derived from the mmap_v1 implementation and that
@@ -124,7 +124,7 @@ namespace mongo {
         bool isValid() const { return validDBName( db() ) && !coll().empty(); }
 
         bool operator==( const std::string& nsIn ) const { return nsIn == _ns; }
-        bool operator==( const StringData& nsIn ) const { return nsIn == _ns; }
+        bool operator==( StringData nsIn ) const { return nsIn == _ns; }
         bool operator==( const NamespaceString& nsIn ) const { return nsIn._ns == _ns; }
 
         bool operator!=( const std::string& nsIn ) const { return nsIn != _ns; }
@@ -134,7 +134,7 @@ namespace mongo {
 
         /** ( foo.bar ).getSisterNS( "blah" ) == foo.blah
          */
-        std::string getSisterNS( const StringData& local ) const;
+        std::string getSisterNS( StringData local ) const;
 
         // @return db() + ".system.indexes"
         std::string getSystemIndexesCollection() const;
@@ -146,14 +146,14 @@ namespace mongo {
          * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
          * which do not contain BSON objects in their records. ("oplog.$main" is the exception)
          */
-        static bool normal(const StringData& ns);
+        static bool normal(StringData ns);
 
         /**
          * @return true if the ns is an oplog one, otherwise false.
          */
-        static bool oplog(const StringData& ns);
+        static bool oplog(StringData ns);
 
-        static bool special(const StringData& ns);
+        static bool special(StringData ns);
 
         /**
          * samples:
@@ -169,7 +169,7 @@ namespace mongo {
          * @param db - a possible database name
          * @return if db is an allowed database name
          */
-        static bool validDBName( const StringData& dbin );
+        static bool validDBName( StringData dbin );
 
         /**
          * Takes a fully qualified namespace (ie dbname.collectionName), and returns true if
@@ -183,7 +183,7 @@ namespace mongo {
          * @param ns - a full namespace (a.b)
          * @return if db.coll is an allowed collection name
          */
-        static bool validCollectionComponent(const StringData& ns);
+        static bool validCollectionComponent(StringData ns);
 
         /**
          * Takes a collection name and returns true if it is a valid collection name.
@@ -196,7 +196,7 @@ namespace mongo {
          * @param coll - a collection name component of a namespace
          * @return if the input is a valid collection name
          */
-        static bool validCollectionName(const StringData& coll);
+        static bool validCollectionName(StringData coll);
 
     private:
 
@@ -206,7 +206,7 @@ namespace mongo {
 
 
     // "database.a.b.c" -> "database"
-    inline StringData nsToDatabaseSubstring( const StringData& ns ) {
+    inline StringData nsToDatabaseSubstring( StringData ns ) {
         size_t i = ns.find( '.' );
         if ( i == std::string::npos ) {
             massert(10078, "nsToDatabase: db too long", ns.size() < MaxDatabaseNameLen );
@@ -217,18 +217,18 @@ namespace mongo {
     }
 
     // "database.a.b.c" -> "database"
-    inline void nsToDatabase(const StringData& ns, char *database) {
+    inline void nsToDatabase(StringData ns, char *database) {
         StringData db = nsToDatabaseSubstring( ns );
         db.copyTo( database, true );
     }
 
     // TODO: make this return a StringData
-    inline std::string nsToDatabase(const StringData& ns) {
+    inline std::string nsToDatabase(StringData ns) {
         return nsToDatabaseSubstring( ns ).toString();
     }
 
     // "database.a.b.c" -> "a.b.c"
-    inline StringData nsToCollectionSubstring( const StringData& ns ) {
+    inline StringData nsToCollectionSubstring( StringData ns ) {
         size_t i = ns.find( '.' );
         massert(16886, "nsToCollectionSubstring: no .", i != std::string::npos );
         return ns.substr( i + 1 );
@@ -239,7 +239,7 @@ namespace mongo {
      * foo. = false
      * foo.a = true
      */
-    inline bool nsIsFull( const StringData& ns ) {
+    inline bool nsIsFull( StringData ns ) {
         size_t i = ns.find( '.' );
         if ( i == std::string::npos )
             return false;
@@ -253,7 +253,7 @@ namespace mongo {
      * foo. = false
      * foo.a = false
      */
-    inline bool nsIsDbOnly(const StringData& ns) {
+    inline bool nsIsDbOnly(StringData ns) {
         size_t i = ns.find('.');
         if (i == std::string::npos)
             return true;

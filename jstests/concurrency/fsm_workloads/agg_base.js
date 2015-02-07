@@ -49,7 +49,7 @@ var $config = (function() {
         query: { query: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         // load example data
         var bulk = db[collName].initializeUnorderedBulkOp();
         for (var i = 0; i < this.numDocs; ++i) {
@@ -69,7 +69,7 @@ var $config = (function() {
         assertWhenOwnColl.eq(this.numDocs / 2, db[collName].find({ flag: true }).itcount());
     }
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         assertWhenOwnColl(db[collName].drop());
     }
 

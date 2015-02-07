@@ -47,7 +47,7 @@ namespace mongo {
 
     class CursorManager {
     public:
-        CursorManager( const StringData& ns );
+        CursorManager( StringData ns );
 
         /**
          * will kill() all PlanExecutor instances it has

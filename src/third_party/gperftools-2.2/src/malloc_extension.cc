@@ -151,6 +151,10 @@ void MallocExtension::MarkThreadBusy() {
   // Default implementation does nothing
 }
 
+size_t MallocExtension::GetThreadCacheSize() {
+  return 0;
+}
+
 SysAllocator* MallocExtension::GetSystemAllocator() {
   return NULL;
 }

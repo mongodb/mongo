@@ -18,7 +18,8 @@
 
     var coll = mydb.fake;
 
-    assert.commandFailed(coll.runCommand("compact"));
+    // force:true is for replset passthroughs
+    assert.commandFailed(coll.runCommand("compact", {force:true}));
     noDB(mydb);
     assert.writeOK(coll.insert({}));
     mydb.dropDatabase();

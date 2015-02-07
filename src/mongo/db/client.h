@@ -76,7 +76,7 @@ namespace mongo {
     class AutoGetDb {
         MONGO_DISALLOW_COPYING(AutoGetDb);
     public:
-        AutoGetDb(OperationContext* txn, const StringData& ns, LockMode mode);
+        AutoGetDb(OperationContext* txn, StringData ns, LockMode mode);
 
         Database* getDb() const {
             return _db;
@@ -102,7 +102,7 @@ namespace mongo {
     class AutoGetOrCreateDb {
         MONGO_DISALLOW_COPYING(AutoGetOrCreateDb);
     public:
-        AutoGetOrCreateDb(OperationContext* txn, const StringData& ns, LockMode mode);
+        AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode);
 
         Database* getDb() {
             return _db;
@@ -147,7 +147,7 @@ namespace mongo {
 
     private:
         void _init(const std::string& ns,
-                   const StringData& coll);
+                   StringData coll);
 
         const Timer _timer;
         OperationContext* const _txn;

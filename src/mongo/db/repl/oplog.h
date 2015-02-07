@@ -29,6 +29,7 @@
 #pragma once
 
 #include <cstddef>
+#include <deque>
 #include <string>
 
 namespace mongo {
@@ -47,10 +48,11 @@ namespace repl {
     // If the collection already exists, set the 'last' OpTime if master/slave (side effect!)
     void createOplog(OperationContext* txn);
 
-    // This poorly-named function writes an op into the replica-set oplog;
-    // used internally by replication secondaries after they have applied an op
-    // Returns the newly-generated optime for the applied op.
-    OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op);
+    // This function writes ops into the replica-set oplog;
+    // used internally by replication secondaries after they have applied ops.  Updates the global
+    // optime.
+    // Returns the optime for the last op inserted.
+    OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops);
 
     const char rsoplog[] = "local.oplog.rs";
     static const int OPLOG_VERSION = 2;

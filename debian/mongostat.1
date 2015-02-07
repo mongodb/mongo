@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOSTAT" "1" "March 18, 2014" "2.6" "mongodb-manual"
+.TH "MONGOSTAT" "1" "January 30, 2015" "3.0" "mongodb-manual"
 .SH NAME
 mongostat \- MongoDB Use Statistics
 .
@@ -61,11 +61,16 @@ For an additional utility that provides MongoDB metrics see
 \fBmongotop\fP\&.
 .UNINDENT
 .UNINDENT
+.SH ACCESS CONTROL REQUIREMENTS
 .sp
-\fBmongostat\fP connects to the \fBmongod\fP instance running
-on the local host interface on TCP port \fB27017\fP; however,
-\fBmongostat\fP can connect to any accessible remote \fBmongod\fP
-instance.
+In order to connect to a \fBmongod\fP that enforces authorization
+with the \fI\-\-auth\fP option, specify the
+\fI\-\-username\fP and \fI\-\-password\fP options, and the user specified must have the
+\fBserverStatus\fP privilege action on the cluster resources.
+.sp
+The built\-in role \fBclusterMonitor\fP provides this privilege as
+well as other privileges. To create a role with just the privilege to
+run \fBmongostat\fP, see \fIcreate\-role\-for\-mongostat\fP\&.
 .SH OPTIONS
 .INDENT 0.0
 .TP
@@ -77,8 +82,8 @@ instance.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-help, \-h
-Returns information on \fBmongostat\fP options and usage.
+.B \-\-help
+Returns information on the options and use of \fBmongostat\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -94,19 +99,22 @@ Returns the \fBmongostat\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>, \-h
-Specifies a resolvable hostname for the \fBmongod\fP to which to
-connect. By default \fBmongostat\fP attempts to connect to a MongoDB instance
-running on the localhost on port number \fB27017\fP\&.
+.B \-\-host <hostname><:port>, \-h <hostname><:port>
+\fIDefault\fP: localhost:27017
 .sp
-To connect to a replica set, specify the replica set seed name and the
-seed list of set members. Use the following format:
+Specifies a resolvable hostname for the \fBmongod\fP to which to
+connect. By default, the \fBmongostat\fP attempts to connect to a MongoDB
+instance running on the localhost on port number \fB27017\fP\&.
+.sp
+To connect to a replica set, specify the
+\fBreplSetName\fP and a seed list of set members, as in
+the following:
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-<replica_set_name>/<hostname1><:port>,<hostname2:<port>,...
+<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
@@ -114,20 +122,26 @@ seed list of set members. Use the following format:
 .sp
 You can always connect directly to a single MongoDB instance by
 specifying the host and port number directly.
+.sp
+Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
+enclose the portion of an address and port combination in
+brackets (e.g. \fB[<address>]\fP).
+
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-port <port>
-Specifies the port number when the MongoDB instance is not running on the
-standard port of \fB27017\fP\&. You may also specify the port number
-using the \fB\-\-host\fP option.
+\fIDefault\fP: 27017
+.sp
+Specifies the TCP port on which the MongoDB instance listens for
+client connections.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support, which allows \fBmongostat\fP to connect to the MongoDB
-instance using an IPv6 network. All MongoDB programs and processes,
-including \fBmongostat\fP, disable IPv6 support by default.
+Enables IPv6 support and allows the \fBmongostat\fP to connect to the
+MongoDB instance using an IPv6 network. All MongoDB programs and
+processes disable IPv6 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -153,6 +167,21 @@ from the Certificate Authority. Specify the file name of the
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+If the \fBmongo\fP shell or any other tool that connects to
+\fBmongos\fP or \fBmongod\fP is run without
+\fI\-\-sslCAFile\fP, it will not attempt to validate
+server certificates. This results in vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
+processes posing as valid \fBmongod\fP or \fBmongos\fP
+instances. Ensure that you \fIalways\fP specify the CA file against which
+server certificates should be validated in cases where intrusion is a
+possibility.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -166,8 +195,8 @@ or absolute paths.
 .sp
 This option is required when using the \fI\-\-ssl\fP option to connect
 to a \fBmongod\fP or \fBmongos\fP that has
-\fBsslCAFile\fP enabled \fIwithout\fP
-\fBsslWeakCertificateValidation\fP\&.
+\fBCAFile\fP enabled \fIwithout\fP
+\fBallowConnectionsWithoutCertificates\fP\&.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -179,13 +208,13 @@ New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\-\-sslPEMKeyFile\fP). Use \fI\-\-sslPEMKeyPassword\fP only if
-the certificate\-key file is encrypted. In all cases, \fBmongostat\fP will
+\fI\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the \fBmongostat\fP will
 redact the password from all logging and reporting output.
 .sp
 If the private key in the PEM file is encrypted and you do not specify
-\fI\-\-sslPEMKeyPassword\fP, \fBmongostat\fP will prompt for a passphrase.
-See \fIssl\-certificate\-password\fP\&.
+the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongostat\fP will prompt for a passphrase. See
+\fIssl\-certificate\-password\fP\&.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -211,7 +240,7 @@ New in version 2.6.
 .sp
 Bypasses the validation checks for server certificates and allows
 the use of invalid certificates. When using the
-\fBsslAllowInvalidCertificates\fP setting, MongoDB logs as a
+\fBallowInvalidCertificates\fP setting, MongoDB logs as a
 warning the use of the invalid certificate.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
@@ -219,30 +248,49 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-sslAllowInvalidHostnames
+New in version 3.0.
+
+.sp
+Disables the validation of the hostnames in SSL certificates. Allows
+\fBmongostat\fP to connect to MongoDB instances if the hostname their
+certificates do not match the specified hostname.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-sslFIPSMode
 New in version 2.6.
 
 .sp
-Directs \fBmongostat\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must
-have a FIPS compliant OpenSSL library to use \fI\-\-sslFIPSMode\fP\&.
+Directs the \fBmongostat\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must have a FIPS compliant OpenSSL library to use
+the \fI\-\-sslFIPSMode\fP option.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+FIPS Compatible SSL is
+available only in \fI\%MongoDB Enterprise\fP\&. See
+http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u
+.B \-\-username <username>, \-u <username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-password\fP and
 \fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p
+.B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-username\fP and
 \fB\-\-authenticationDatabase\fP options.
+.sp
+If you do not specify an argument for \fI\-\-password\fP, \fBmongostat\fP will
+prompt interactively for a password on the console.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -251,22 +299,85 @@ New in version 2.4.
 
 .sp
 Specifies the database that holds the user\(aqs credentials.
-If you do not specify an authentication database, \fBmongostat\fP assumes
-that the database specified as the argument to the \fI\-\-db\fP option
-holds the user\(aqs credentials.
+.sp
+\fI\-\-authenticationDatabase\fP is required for \fBmongod\fP
+and \fBmongos\fP instances that use \fIauthentication\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
+\fIDefault\fP: MONGODB\-CR
+.sp
 New in version 2.4.
 
 .sp
-Specifies the authentication mechanism. By default, the authentication
-mechanism is \fBMONGODB\-CR\fP, which is the MongoDB challenge/response
-authentication mechanism. In MongoDB Enterprise, \fBmongostat\fP also includes
-support for \fBGSSAPI\fP to handle Kerberos authentication. See
-http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
-for more information about Kerberos authentication.
+Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
+mechanisms.
+
+.sp
+Specifies the authentication mechanism the \fBmongostat\fP instance uses to
+authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+MONGODB\-CR
+T}	T{
+MongoDB challenge/response authentication.
+T}
+_
+T{
+MONGODB\-X509
+T}	T{
+MongoDB SSL certificate authentication.
+T}
+_
+T{
+PLAIN
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+GSSAPI
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+.TE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiServiceName
+New in version 2.6.
+
+.sp
+Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+default name of \fBmongodb\fP\&.
+.sp
+This option is available only in MongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiHostName
+New in version 2.6.
+
+.sp
+Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+not match the hostname resolved by DNS.
+.sp
+This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -275,12 +386,12 @@ Disables the output of column or field names.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-rowcount <number>, \-n
+.B \-\-rowcount <number>, \-n <number>
 Controls the number of rows to output. Use in conjunction with
 the \fBsleeptime\fP argument to control the duration of a
 \fBmongostat\fP operation.
 .sp
-Unless \fI\%\-\-rowcount\fP is specified, \fBmongostat\fP
+Unless \fI\-\-rowcount\fP is specified, \fBmongostat\fP
 will return an infinite number of rows (e.g. value of \fB0\fP\&.)
 .UNINDENT
 .INDENT 0.0
@@ -311,6 +422,14 @@ respects :option:\-\-rowcount\(ga.
 .TP
 .B \-\-all
 Configures \fBmongostat\fP to return all optional \fI\%fields\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-json
+New in version 3.0.0.
+
+.sp
+Returns output for \fBmongostat\fP in \fIJSON\fP format.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -529,6 +648,12 @@ T}	T{
 \fIslave\fP
 T}
 _
+T{
+RTR
+T}	T{
+mongos process ("router")
+T}
+_
 .TE
 .UNINDENT
 .SH USAGE
@@ -606,6 +731,6 @@ mongostat \-\-discover
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2014, MongoDB, Inc.
+2011-2015
 .\" Generated by docutils manpage writer.
 .

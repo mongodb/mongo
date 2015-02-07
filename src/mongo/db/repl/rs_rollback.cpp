@@ -722,8 +722,8 @@ namespace {
 
         log() << "rollback 0";
 
-        writelocktry lk(txn->lockState(), 20000);
-        if (!lk.got()) {
+        Lock::GlobalWrite globalWrite(txn->lockState(), 20000);
+        if (!globalWrite.isLocked()) {
             warning() << "rollback couldn't get write lock in a reasonable time";
             return 2;
         }

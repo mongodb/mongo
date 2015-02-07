@@ -192,7 +192,7 @@ namespace mongo {
         void doWork();
 
         /** Returns true if the range doesn't intersect with one other range */
-        bool canEnqueue_inlock(const StringData& ns,
+        bool canEnqueue_inlock(StringData ns,
                                const BSONObj& min,
                                const BSONObj& max,
                                std::string* errMsg) const;
@@ -332,7 +332,7 @@ namespace mongo {
          * Must not throw exception.
          */
         virtual void getCursorIds(OperationContext* txn,
-                                  const StringData& ns,
+                                  StringData ns,
                                   std::set<CursorId>* openCursors) = 0;
     };
 

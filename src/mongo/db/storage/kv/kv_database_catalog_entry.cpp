@@ -44,7 +44,7 @@ namespace mongo {
     class KVDatabaseCatalogEntry::AddCollectionChange : public RecoveryUnit::Change {
     public:
         AddCollectionChange(OperationContext* opCtx, KVDatabaseCatalogEntry* dce,
-                            const StringData& collection, const StringData& ident,
+                            StringData collection, StringData ident,
                             bool dropOnRollback)
             : _opCtx(opCtx)
             , _dce(dce)
@@ -77,7 +77,7 @@ namespace mongo {
     class KVDatabaseCatalogEntry::RemoveCollectionChange : public RecoveryUnit::Change {
     public:
         RemoveCollectionChange(OperationContext* opCtx, KVDatabaseCatalogEntry* dce,
-                               const StringData& collection, const StringData& ident,
+                               StringData collection, StringData ident,
                                KVCollectionCatalogEntry* entry, bool dropOnCommit)
             : _opCtx(opCtx)
             , _dce(dce)
@@ -108,7 +108,7 @@ namespace mongo {
         const bool _dropOnCommit;
     };
 
-    KVDatabaseCatalogEntry::KVDatabaseCatalogEntry( const StringData& db, KVStorageEngine* engine )
+    KVDatabaseCatalogEntry::KVDatabaseCatalogEntry( StringData db, KVStorageEngine* engine )
         : DatabaseCatalogEntry( db ), _engine( engine ) {
 
     }
@@ -175,7 +175,7 @@ namespace mongo {
     }
 
     CollectionCatalogEntry* KVDatabaseCatalogEntry::getCollectionCatalogEntry(
-                                                                    const StringData& ns ) const {
+                                                                    StringData ns ) const {
 
         CollectionMap::const_iterator it = _collections.find( ns.toString() );
         if (it == _collections.end()) {
@@ -185,7 +185,7 @@ namespace mongo {
         return it->second;
     }
 
-    RecordStore* KVDatabaseCatalogEntry::getRecordStore( const StringData& ns ) const {
+    RecordStore* KVDatabaseCatalogEntry::getRecordStore( StringData ns ) const {
         CollectionMap::const_iterator it = _collections.find( ns.toString() );
         if (it == _collections.end()) {
             return NULL;
@@ -195,7 +195,7 @@ namespace mongo {
     }
 
     Status KVDatabaseCatalogEntry::createCollection( OperationContext* txn,
-                                                     const StringData& ns,
+                                                     StringData ns,
                                                      const CollectionOptions& options,
                                                      bool allocateDefaultSpace ) {
 
@@ -272,8 +272,8 @@ namespace mongo {
     }
 
     Status KVDatabaseCatalogEntry::renameCollection( OperationContext* txn,
-                                                     const StringData& fromNS,
-                                                     const StringData& toNS,
+                                                     StringData fromNS,
+                                                     StringData toNS,
                                                      bool stayTemp ) {
 
         invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
@@ -324,7 +324,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status KVDatabaseCatalogEntry::dropCollection(OperationContext* opCtx, const StringData& ns) {
+    Status KVDatabaseCatalogEntry::dropCollection(OperationContext* opCtx, StringData ns) {
         invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
         CollectionMap::const_iterator it = _collections.find( ns.toString() );

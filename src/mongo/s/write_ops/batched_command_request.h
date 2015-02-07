@@ -123,7 +123,7 @@ namespace mongo {
         bool isVerboseWC() const;
 
         void setNSS( const NamespaceString& nss );
-        void setNS( const StringData& collName );
+        void setNS( StringData collName );
         const std::string& getNS() const;
         const NamespaceString& getNSS() const;
 

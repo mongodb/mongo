@@ -10,6 +10,7 @@ load( './jstests/multiVersion/libs/multi_cluster.js' )
  * @param isSyncCluster {bool} use 3 config servers.
  */
 var runTest = function(isRSCluster, isSyncCluster) {
+"use strict";
 
 jsTest.log( "Starting" + ( isRSCluster ? " (replica set)" : "" ) + " cluster" + 
                          ( isSyncCluster ? " (sync)" : "" ) + "..." );
@@ -46,7 +47,7 @@ jsTest.log("Starting v2.8 mongos in 2.4 cluster...");
 var mongos = MongoRunner.runMongos({ binVersion : "2.8", configdb : configConnStr });
 assert.eq(null, mongos);
 
-mongos = MongoRunner.runMongos({ binVersion : "2.8", configdb : configConnStr, upgrade : "" })
+mongos = MongoRunner.runMongos({ binVersion : "2.8", configdb : configConnStr, upgrade : "" });
 assert.eq(null, mongos);
 
 jsTest.log("2.8 mongoses did not start or upgrade in 2.4 cluster (which is correct).");
@@ -122,6 +123,24 @@ assert.eq(version.minCompatibleVersion, 5);
 assert.eq(version.currentVersion, 6);
 assert.eq(clusterID, version.clusterId); // clusterId shouldn't change
 assert.eq(version.excluding, undefined);
+
+//
+// Verify that the config.locks { ts: 1 } index is not unique for all config servers.
+//
+
+st._configServers.forEach(function(conn) {
+    var idxList = conn.getDB('config').locks.getIndexes();
+    var foundIndex = false;
+    idxList.forEach(function(idxSpec) {
+        if (bsonWoCompare(idxSpec.key, { ts: 1 }) == 0) {
+            foundIndex = true;
+            assert.eq(idxSpec.unique, null);
+            return;
+        }
+    });
+
+    assert(foundIndex, '{ ts: 1 } index not found in ' + conn + ': ' + tojson(idxList));
+});
 
 // Make sure that you can't run 2.4 mongos
 mongos = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr });

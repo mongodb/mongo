@@ -21,8 +21,7 @@ var $config = (function() {
         function assertUpdateSuccess(db, res, nModifiedPossibilities) {
             assertAlways.eq(0, res.nUpserted, tojson(res));
 
-            var status = db.serverStatus();
-            if (isMongod(status) && !isMMAPv1(status)) {
+            if (isMongod(db) && !isMMAPv1(db)) {
                 assertWhenOwnColl.contains(1, nModifiedPossibilities, tojson(res));
                 if (db.getMongo().writeMode() === 'commands') {
                     assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
@@ -101,7 +100,7 @@ var $config = (function() {
         }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         // index on 'arr', the field being updated
         assertAlways.commandWorked(db[collName].ensureIndex({ arr: 1 }));
         for (var i = 0; i < this.numDocs; ++i) {

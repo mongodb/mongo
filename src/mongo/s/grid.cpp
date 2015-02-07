@@ -69,7 +69,7 @@ namespace mongo {
 
     MONGO_FP_DECLARE(neverBalance);
 
-    DBConfigPtr Grid::getDBConfig( const StringData& ns , bool create , const string& shardNameHint ) {
+    DBConfigPtr Grid::getDBConfig( StringData ns , bool create , const string& shardNameHint ) {
         string database = nsToDatabase( ns );
 
         if ( database == "config" )

@@ -428,12 +428,12 @@ namespace {
         return idx != -1 ? &getMemberAt(idx) : NULL;
     }
 
-    ReplicaSetTag ReplicaSetConfig::findTag(const StringData& key, const StringData& value) const {
+    ReplicaSetTag ReplicaSetConfig::findTag(StringData key, StringData value) const {
         return _tagConfig.findTag(key, value);
     }
 
     StatusWith<ReplicaSetTagPattern> ReplicaSetConfig::findCustomWriteMode(
-            const StringData& patternName) const {
+            StringData patternName) const {
 
         const StringMap<ReplicaSetTagPattern>::const_iterator iter = _customWriteConcernModes.find(
                 patternName);

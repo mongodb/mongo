@@ -63,7 +63,7 @@ namespace auth {
      * the arguments into the "parsedArgs" output param.
      */
     Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
-                                           const StringData& cmdName,
+                                           StringData cmdName,
                                            const std::string& dbname,
                                            CreateOrUpdateUserArgs* parsedArgs);
 
@@ -76,7 +76,7 @@ namespace auth {
      * use.
      */
     Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
-                                                   const StringData& cmdName,
+                                                   StringData cmdName,
                                                    const std::string& dbname,
                                                    std::string* parsedName,
                                                    std::vector<RoleName>* parsedRoleNames,
@@ -114,7 +114,7 @@ namespace auth {
      * all the arguments into the "parsedArgs" output param.
      */
     Status parseUsersInfoCommand(const BSONObj& cmdObj,
-                                 const StringData& dbname,
+                                 StringData dbname,
                                  UsersInfoArgs* parsedArgs);
 
     struct RolesInfoArgs {
@@ -130,7 +130,7 @@ namespace auth {
      * the arguments into the "parsedArgs" output param.
      */
     Status parseRolesInfoCommand(const BSONObj& cmdObj,
-                                 const StringData& dbname,
+                                 StringData dbname,
                                  RolesInfoArgs* parsedArgs);
 
     struct CreateOrUpdateRoleArgs {
@@ -149,7 +149,7 @@ namespace auth {
      * the arguments into the "parsedArgs" output param.
      */
     Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
-                                           const StringData& cmdName,
+                                           StringData cmdName,
                                            const std::string& dbname,
                                            CreateOrUpdateRoleArgs* parsedArgs);
 
@@ -159,7 +159,7 @@ namespace auth {
      * role being modified, the privileges being granted or revoked, and the write concern to use.
      */
     Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
-                                                             const StringData& cmdName,
+                                                             StringData cmdName,
                                                              const std::string& dbname,
                                                              RoleName* parsedRoleName,
                                                              PrivilegeVector* parsedPrivileges,
@@ -205,7 +205,7 @@ namespace auth {
      * Performs syntactic validation of "rolesArray", only.
      */
     Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
-                                       const StringData& dbname,
+                                       StringData dbname,
                                        std::vector<RoleName>* parsedRoleNames);
 
     /**
@@ -214,7 +214,7 @@ namespace auth {
      * Performs syntactic validation of "usersArray", only.
      */
     Status parseUserNamesFromBSONArray(const BSONArray& usersArray,
-                                       const StringData& dbname,
+                                       StringData dbname,
                                        std::vector<UserName>* parsedUserNames);
 
     struct MergeAuthzCollectionsArgs {

@@ -77,7 +77,7 @@ namespace mongo {
 
         virtual void setElement(const char* field, const BSONElement& e) = 0;
         virtual void setNumber(const char* field, double val) = 0;
-        virtual void setString(const char* field, const StringData& val) = 0;
+        virtual void setString(const char* field, StringData val) = 0;
         virtual void setObject(const char* field, const BSONObj& obj, bool readOnly=true) = 0;
         virtual void setBoolean(const char* field, bool val) = 0;
         virtual void setFunction(const char* field, const char* code) = 0;
@@ -126,10 +126,10 @@ namespace mongo {
 
         virtual void injectNative(const char* field, NativeFunction func, void* data = 0) = 0;
 
-        virtual bool exec(const StringData& code, const std::string& name, bool printResult,
+        virtual bool exec(StringData code, const std::string& name, bool printResult,
                           bool reportError, bool assertOnError, int timeoutMs = 0) = 0;
 
-        virtual void execSetup(const StringData& code, const std::string& name = "setup") {
+        virtual void execSetup(StringData code, const std::string& name = "setup") {
             exec(code, name, false, true, true, 0);
         }
 

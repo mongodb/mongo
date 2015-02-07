@@ -67,7 +67,7 @@ namespace mongo {
         virtual void checkForInterrupt() const;
         virtual Status checkForInterruptNoAssert() const;
 
-        virtual bool isPrimaryFor( const StringData& ns );
+        virtual bool isPrimaryFor( StringData ns );
 
     private:
         std::auto_ptr<RecoveryUnit> _recovery;

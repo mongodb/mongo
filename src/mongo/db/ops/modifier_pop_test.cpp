@@ -65,7 +65,7 @@ namespace {
         }
 
         Status prepare(Element root,
-                       const StringData& matchedField,
+                       StringData matchedField,
                        ModifierInterface::ExecInfo* execInfo) {
             return _mod.prepare(root, matchedField, execInfo);
         }

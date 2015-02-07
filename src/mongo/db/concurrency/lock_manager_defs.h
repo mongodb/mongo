@@ -84,6 +84,13 @@ namespace mongo {
      */
     bool isModeCovered(LockMode mode, LockMode coveringMode);
 
+    /**
+     * Returns whether the passed in mode is S or IS. Used for validation checks.
+     */
+    inline bool isSharedLockMode(LockMode mode) {
+        return (mode == MODE_IS || mode == MODE_S);
+    }
+
 
     /**
      * Return values for the locking functions of the lock manager.
@@ -164,7 +171,7 @@ namespace mongo {
 
     public:
         ResourceId() : _fullHash(0) { }
-        ResourceId(ResourceType type, const StringData& ns);
+        ResourceId(ResourceType type, StringData ns);
         ResourceId(ResourceType type, const std::string& ns);
         ResourceId(ResourceType type, uint64_t hashId);
 
@@ -217,6 +224,9 @@ namespace mongo {
     extern const ResourceId resourceIdLocalDB;
     extern const ResourceId resourceIdOplog;
 
+    // Hardcoded resource id for admin db. This is to ensure direct writes to auth collections
+    // are serialized (see SERVER-16092)
+    extern const ResourceId resourceIdAdminDB;
 
     /**
      * Interface on which granted lock requests will be notified. See the contract for the notify

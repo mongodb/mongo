@@ -56,7 +56,7 @@ var largeString = new Array(1024*10).toString();
 for (var i = 0; i < 2000; i++) {
     master.getDB('test').foo.insert({ largeString: largeString }, options);
 }
-assert(optimesAreEqual(replTest));
+assert.soon(function() { return optimesAreEqual(replTest); } );
 
 // Test that earliestOptime was updated
 info = master.getDB('admin').serverStatus({oplog:true}).oplog;

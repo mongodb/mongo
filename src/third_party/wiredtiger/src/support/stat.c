@@ -360,6 +360,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: eviction server populating queue, but not evicting pages";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
+	stats->cache_eviction_worker_evicting.desc =
+	    "cache: eviction worker thread evicting pages";
 	stats->cache_eviction_force_fail.desc =
 	    "cache: failed eviction of pages that exceeded the in-memory maximum";
 	stats->cache_eviction_hazard.desc =
@@ -387,6 +389,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: pages split during eviction";
 	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
 	stats->cache_write.desc = "cache: pages written from cache";
+	stats->cache_overhead.desc = "cache: percentage overhead";
 	stats->cache_bytes_dirty.desc =
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_pages_dirty.desc =
@@ -548,6 +551,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_server_evicting.v = 0;
 	stats->cache_eviction_server_not_evicting.v = 0;
 	stats->cache_eviction_slow.v = 0;
+	stats->cache_eviction_worker_evicting.v = 0;
 	stats->cache_eviction_force_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_inmem_split.v = 0;

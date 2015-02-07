@@ -131,8 +131,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    force_attempts < 10 &&
 			    __evict_force_check(session, page)) {
 				++force_attempts;
-				if ((ret = __wt_page_release_busy(
-				    session, ref, flags)) == EBUSY) {
+				ret = __wt_page_release_evict(session, ref);
+				if (ret == EBUSY) {
 					/* If forced eviction fails, stall. */
 					ret = 0;
 					wait_cnt += 1000;
@@ -285,6 +285,7 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
 
 	/* Increment the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
+	(void)WT_ATOMIC_ADD8(cache->bytes_read, size);
 	(void)WT_ATOMIC_ADD8(cache->pages_inmem, 1);
 
 	*pagep = page;

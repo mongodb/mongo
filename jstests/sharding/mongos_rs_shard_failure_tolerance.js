@@ -229,6 +229,8 @@ mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setSlaveOk();
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }) );
 
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
+
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("primary");
 assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
@@ -240,6 +242,8 @@ assert.throws(function() {
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("primary");
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 // Ensure read prefs override slaveok
 mongosConnNew = new Mongo( mongos.host );
@@ -257,6 +261,8 @@ mongosConnNew.setSlaveOk();
 mongosConnNew.setReadPref("primary");
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
 
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
+
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("secondary");
 assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
@@ -266,6 +272,8 @@ assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("secondary");
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("primaryPreferred");
@@ -277,6 +285,8 @@ mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("primaryPreferred");
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
 
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
+
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("secondaryPreferred");
 assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
@@ -287,6 +297,8 @@ mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("secondaryPreferred");
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
 
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
+
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("nearest");
 assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({ _id : -1 }));
@@ -296,6 +308,8 @@ assert.neq(null, mongosConnNew.getCollection( collSharded.toString() ).findOne({
 mongosConnNew = new Mongo( mongos.host );
 mongosConnNew.setReadPref("nearest");
 assert.neq(null, mongosConnNew.getCollection( collUnsharded.toString() ).findOne({ _id : 1 }));
+
+gc(); // Clean up new connections incrementally to compensate for slow win32 machine.
 
 // Writes
 mongosConnNew = new Mongo( mongos.host );

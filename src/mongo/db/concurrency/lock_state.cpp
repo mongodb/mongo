@@ -35,6 +35,7 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -139,13 +140,6 @@ namespace {
 
 
     /**
-     * Returns whether the passed in mode is S or IS. Used for validation checks.
-     */
-    bool isSharedMode(LockMode mode) {
-        return (mode == MODE_IS || mode == MODE_S);
-    }
-
-    /**
      * Whether the particular lock's release should be held until the end of the operation. We
      * delay release of exclusive locks (locks that are for write operations) in order to ensure
      * that the data they protect is committed successfully.
@@ -228,7 +222,7 @@ namespace {
         _lock.lock();
         LockRequestsMap::ConstIterator it = _requests.begin();
         while (!it.finished()) {
-            ss << " " << it.key().toString();
+            ss << " " << it.key().toString() << " held in " << modeName(it->mode);
             it.next();
         }
         _lock.unlock();
@@ -453,24 +447,24 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName,
+    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(StringData dbName,
                                                     LockMode mode) const {
         invariant(nsIsDbOnly(dbName));
 
         if (isW()) return true;
-        if (isR() && isSharedMode(mode)) return true;
+        if (isR() && isSharedLockMode(mode)) return true;
 
         const ResourceId resIdDb(RESOURCE_DATABASE, dbName);
         return isLockHeldForMode(resIdDb, mode);
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(const StringData& ns,
+    bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(StringData ns,
                                                             LockMode mode) const {
         invariant(nsIsFull(ns));
 
         if (isW()) return true;
-        if (isR() && isSharedMode(mode)) return true;
+        if (isR() && isSharedLockMode(mode)) return true;
 
         const NamespaceString nss(ns);
         const ResourceId resIdDb(RESOURCE_DATABASE, nss.db());
@@ -480,7 +474,7 @@ namespace {
         switch (dbMode) {
         case MODE_NONE: return false;
         case MODE_X: return true;
-        case MODE_S: return isSharedMode(mode);
+        case MODE_S: return isSharedLockMode(mode);
         case MODE_IX:
         case MODE_IS:
             {
@@ -726,7 +720,9 @@ namespace {
             }
 
             // If infinite timeout was requested, just keep waiting
-            if (timeoutMs == UINT_MAX) continue;
+            if (timeoutMs == UINT_MAX) {
+                continue;
+            }
 
             const unsigned elapsedTimeMs = elapsedTimeMicros / 1000;
             waitTimeMs = (elapsedTimeMs < timeoutMs) ?
@@ -788,6 +784,23 @@ namespace {
             invariant(false);
             return MODE_NONE;
         }
+    }
+
+    template<bool IsForMMAPV1>
+    bool LockerImpl<IsForMMAPV1>::hasStrongLocks() const {
+        if (!isLocked()) return false;
+
+        boost::lock_guard<SpinLock> lk(_lock);
+        LockRequestsMap::ConstIterator it = _requests.begin();
+        while (!it.finished()) {
+            if (it->mode == MODE_X || it->mode == MODE_S) {
+                return true;
+            }
+
+            it.next();
+        }
+
+        return false;
     }
 
 
@@ -868,5 +881,6 @@ namespace {
     const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, StringData("local"));
     const ResourceId resourceIdOplog =
         ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
+    const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
 
 } // namespace mongo

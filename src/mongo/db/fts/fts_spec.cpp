@@ -174,7 +174,7 @@ namespace mongo {
         }
 
         void FTSSpec::_scoreStringV2( const Tools& tools,
-                                      const StringData& raw,
+                                      StringData raw,
                                       TermFrequencyMap* docScores,
                                       double weight ) const {
 

@@ -36,7 +36,7 @@ var $config = (function() {
     var threadCount = 10;
     var iterations = 20;
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         // insert enough documents so that each thread can remove exactly one per iteration
         var num = threadCount * iterations;
         for (var i = 0; i < num; ++i) {

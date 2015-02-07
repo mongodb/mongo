@@ -121,13 +121,13 @@ namespace mongo {
         static const int schemaVersion26Upgrade = 2;
 
         /**
-         * Auth schema version for MongoDB 2.6 and 2.8 MONGODB-CR/SCRAM mixed auth mode.
+         * Auth schema version for MongoDB 2.6 and 3.0 MONGODB-CR/SCRAM mixed auth mode.
          * Users are stored in admin.system.users, roles in admin.system.roles.
          */
         static const int schemaVersion26Final = 3;
 
         /**
-         * Auth schema version for MongoDB 2.8 SCRAM only mode.
+         * Auth schema version for MongoDB 3.0 SCRAM only mode.
          * Users are stored in admin.system.users, roles in admin.system.roles.
          * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
          */
@@ -280,7 +280,7 @@ namespace mongo {
         // "system.users" collection of database "dbname".
         //
         // Returns Status::OK() if the document is good, or Status(ErrorCodes::BadValue), otherwise.
-        Status checkValidPrivilegeDocument(const StringData& dbname, const BSONObj& doc);
+        Status checkValidPrivilegeDocument(StringData dbname, const BSONObj& doc);
 
         // Given a database name and a readOnly flag return an ActionSet describing all the actions
         // that an old-style user with those attributes should be given.
@@ -384,7 +384,7 @@ namespace mongo {
          * admin.system.version collections.  This serializes all writers to the authorization
          * documents, but does not impact readers.
          */
-        bool tryAcquireAuthzUpdateLock(const StringData& why);
+        bool tryAcquireAuthzUpdateLock(StringData why);
 
         /**
          * Releases the lock guarding modifications to persistent authorization data, which must

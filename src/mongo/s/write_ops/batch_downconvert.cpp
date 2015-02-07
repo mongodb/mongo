@@ -246,7 +246,7 @@ namespace mongo {
     }
 
     Status enforceLegacyWriteConcern( MultiCommandDispatch* dispatcher,
-                                      const StringData& dbName,
+                                      StringData dbName,
                                       const BSONObj& options,
                                       const HostOpTimeMap& hostOpTimes,
                                       vector<LegacyWCResponse>* legacyWCResponses ) {

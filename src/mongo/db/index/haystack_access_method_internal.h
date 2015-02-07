@@ -62,7 +62,7 @@ namespace mongo {
         // it)
         void consider(const RecordId& loc) {
             if (limitReached()) return;
-            Point p(_collection->docFor(_txn, loc).getFieldDotted(_geoField));
+            Point p(_collection->docFor(_txn, loc).value().getFieldDotted(_geoField));
             if (distance(_near, p) > _maxDistance)
                 return;
             _locs.push_back(loc);
@@ -70,7 +70,7 @@ namespace mongo {
 
         int appendResultsTo(BSONArrayBuilder* b) {
             for (unsigned i = 0; i <_locs.size(); i++)
-                b->append(_collection->docFor(_txn, _locs[i]));
+                b->append(_collection->docFor(_txn, _locs[i]).value());
             return _locs.size();
         }
 

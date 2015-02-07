@@ -117,6 +117,12 @@ namespace mongo {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
 
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while renaming collection " << source << " to " << target));
+            }
+
             // We stay in source context the whole time. This is mostly to set the CurOp namespace.
             Client::Context ctx(txn, source);
 
@@ -310,11 +316,12 @@ namespace mongo {
                 while (!sourceIt->isEOF()) {
                     txn->checkForInterrupt();
 
-                    const BSONObj obj = sourceColl->docFor(txn, sourceIt->getNext());
+                    const Snapshotted<BSONObj> obj = sourceColl->docFor(txn, sourceIt->getNext());
 
                     WriteUnitOfWork wunit(txn);
                     // No logOp necessary because the entire renameCollection command is one logOp.
-                    Status status = targetColl->insertDocument(txn, obj, &indexer, true).getStatus();
+                    Status status =
+                        targetColl->insertDocument(txn, obj.value(), &indexer, true).getStatus();
                     if (!status.isOK())
                         return appendCommandStatus(result, status);
                     wunit.commit();

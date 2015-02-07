@@ -102,7 +102,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    std::string getTestFrameworkHelp(const StringData& name, const moe::OptionSection& options) {
+    std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options) {
         StringBuilder sb;
         sb << "usage: " << name << " [options] [suite]...\n"
             << options.helpString() << "suite: run the specified test suite(s) only\n";

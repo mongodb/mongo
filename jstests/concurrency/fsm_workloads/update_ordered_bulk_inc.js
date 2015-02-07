@@ -38,16 +38,16 @@ var $config = (function() {
 
         find: function find(db, collName) {
             var docs = db[collName].find().toArray();
-            var serverStatus = db.serverStatus();
+
             // In MMAP v1, some documents may appear twice due to moves
-            if (isMongod(serverStatus) && !isMMAPv1(serverStatus)) {
+            if (isMongod(db) && !isMMAPv1(db)) {
                 assertWhenOwnColl.eq(this.docCount, docs.length);
             }
             assertWhenOwnColl.gte(docs.length, this.docCount);
 
             // It is possible that a document was not incremented in MMAP v1 because
             // updates skip documents that were invalidated during yielding
-            if (isMongod(serverStatus) && !isMMAPv1(serverStatus)) {
+            if (isMongod(db) && !isMMAPv1(db)) {
                 docs.forEach(function(doc) {
                     assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
                 }, this);
@@ -66,7 +66,7 @@ var $config = (function() {
         find: { update: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         this.count = 0;
         for (var i = 0; i < this.docCount; ++i) {
             db[collName].insert({ _id: i });

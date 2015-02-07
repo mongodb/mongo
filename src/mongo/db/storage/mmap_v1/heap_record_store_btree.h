@@ -47,7 +47,7 @@ namespace mongo {
 
     public:
         // RecordId(0,0) isn't valid for records.
-        explicit HeapRecordStoreBtree(const StringData& ns): RecordStore(ns), _nextId(1) { }
+        explicit HeapRecordStoreBtree(StringData ns): RecordStore(ns), _nextId(1) { }
 
         virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
 
@@ -78,7 +78,7 @@ namespace mongo {
                                                  const char* data,
                                                  int len,
                                                  bool enforceQuota,
-                                                 UpdateMoveNotifier* notifier) {
+                                                 UpdateNotifier* notifier) {
             invariant(false);
         }
 
@@ -190,7 +190,7 @@ namespace mongo {
 
         virtual ~HeapRecordStoreBtreeRecoveryUnit();
 
-        virtual void beginUnitOfWork();
+        virtual void beginUnitOfWork(OperationContext* opCtx);
         virtual void commitUnitOfWork();
         virtual void endUnitOfWork();
 
@@ -204,6 +204,10 @@ namespace mongo {
         }
 
         virtual void* writingPtr(void* data, size_t len);
+
+        virtual void setRollbackWritesDisabled() {}
+
+        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
 
         // -----------------------
 

@@ -92,7 +92,7 @@ namespace OplogStartTests {
 
         void assertWorkingSetMemberHasId(WorkingSetID id, int expectedId) {
             WorkingSetMember* member = _oplogws->get(id);
-            BSONElement idEl = member->obj["_id"];
+            BSONElement idEl = member->obj.value()["_id"];
             ASSERT(!idEl.eoo());
             ASSERT(idEl.isNumber());
             ASSERT_EQUALS(idEl.numberInt(), expectedId);

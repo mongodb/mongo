@@ -31,6 +31,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -263,6 +264,12 @@ namespace mongo {
 
         _opCtx = opCtx;
 
+        // We're restoring after a yield or getMore now. If we're a yielding plan executor, reset
+        // the yield timer in order to prevent from yielding again right away.
+        if (_yieldPolicy.get()) {
+            _yieldPolicy->resetTimer();
+        }
+
         if (!_killed) {
             _root->restoreState(opCtx);
         }
@@ -275,6 +282,18 @@ namespace mongo {
     }
 
     PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, RecordId* dlOut) {
+        Snapshotted<BSONObj> snapshotted;
+        ExecState state = getNextSnapshotted(objOut ? &snapshotted : NULL, dlOut);
+
+        if (objOut) {
+            *objOut = snapshotted.value();
+        }
+
+        return state;
+    }
+
+    PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* objOut,
+                                                             RecordId* dlOut) {
         if (_killed) { return PlanExecutor::DEAD; }
 
         // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
@@ -324,7 +343,10 @@ namespace mongo {
                             hasRequestedData = false;
                         }
                         else {
-                            *objOut = member->keyData[0].keyData;
+                            // TODO: currently snapshot ids are only associated with documents, and
+                            // not with index keys.
+                            *objOut = Snapshotted<BSONObj>(SnapshotId(),
+                                                           member->keyData[0].keyData);
                         }
                     }
                     else if (member->hasObj()) {
@@ -372,7 +394,9 @@ namespace mongo {
             else {
                 verify(PlanStage::FAILURE == code);
                 if (NULL != objOut) {
-                    WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
+                    BSONObj statusObj;
+                    WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &statusObj);
+                    *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
                 }
                 return PlanExecutor::FAILURE;
             }
@@ -402,12 +426,25 @@ namespace mongo {
         // the "inner" executor. This is bad, and hopefully can be fixed down the line with the
         // unification of agg and query.
         //
+        // The CachedPlanStage is another special case. It needs to update the plan cache from
+        // its destructor. It needs to know whether it has been killed so that it can avoid
+        // touching a potentially invalid plan cache in this case.
+        //
         // TODO: get rid of this code block.
-        if (STAGE_PIPELINE_PROXY == _root->stageType()) {
-            PipelineProxyStage* proxyStage = static_cast<PipelineProxyStage*>(_root.get());
-            shared_ptr<PlanExecutor> childExec = proxyStage->getChildExecutor();
-            if (childExec) {
-                childExec->kill();
+        {
+            PlanStage* foundStage = getStageByType(_root.get(), STAGE_PIPELINE_PROXY);
+            if (foundStage) {
+                PipelineProxyStage* proxyStage = static_cast<PipelineProxyStage*>(foundStage);
+                shared_ptr<PlanExecutor> childExec = proxyStage->getChildExecutor();
+                if (childExec) {
+                    childExec->kill();
+                }
+            }
+
+            foundStage = getStageByType(_root.get(), STAGE_CACHED_PLAN);
+            if (foundStage) {
+                CachedPlanStage* cacheStage = static_cast<CachedPlanStage*>(foundStage);
+                cacheStage->kill();
             }
         }
     }

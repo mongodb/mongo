@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+    class CanonicalQuery;
     class OperationContext;
     class PlanExecutor;
 
@@ -43,7 +44,8 @@ namespace mongo {
             isMulti(false),
             shouldCallLogOp(false),
             fromMigrate(false),
-            isExplain(false) { }
+            isExplain(false),
+            canonicalQuery(NULL) { }
 
         // Should we delete all documents returned from the child (a "multi delete"), or at most one
         // (a "single delete")?
@@ -58,6 +60,9 @@ namespace mongo {
 
         // Are we explaining a delete command rather than actually executing it?
         bool isExplain;
+
+        // The parsed query predicate for this delete. Not owned here.
+        CanonicalQuery* canonicalQuery;
     };
 
     /**

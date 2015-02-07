@@ -132,7 +132,7 @@ namespace mongo {
         return StatusWith<BSONObj>( b.obj() );
     }
 
-    Status userAllowedWriteNS( const StringData& ns ) {
+    Status userAllowedWriteNS( StringData ns ) {
         return userAllowedWriteNS( nsToDatabaseSubstring( ns ), nsToCollectionSubstring( ns ) );
     }
 
@@ -140,7 +140,7 @@ namespace mongo {
         return userAllowedWriteNS( ns.db(), ns.coll() );
     }
 
-    Status userAllowedWriteNS( const StringData& db, const StringData& coll ) {
+    Status userAllowedWriteNS( StringData db, StringData coll ) {
         // validity checking
 
         if ( db.size() == 0 )

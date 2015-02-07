@@ -258,7 +258,7 @@ namespace mutablebson {
                                          BSONObj& jsobj,
                                          BSONObjBuilder& anObjBuilder,
                                          int queryOptions = 0);
-        static Command* findCommand( const StringData& name );
+        static Command* findCommand( StringData name );
         // For mongod and webserver.
         static void execCommand(OperationContext* txn,
                                 Command* c,

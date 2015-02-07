@@ -77,8 +77,8 @@ namespace {
     class InvalidRecordStoreKVEngine : public DevNullKVEngine {
     public:
         virtual Status createRecordStore( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
+                                          StringData ns,
+                                          StringData ident,
                                           const CollectionOptions& options ) {
             if (ns == "fail.me") {
                 return Status(ErrorCodes::BadValue, "failed to create record store");

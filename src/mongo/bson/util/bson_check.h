@@ -43,7 +43,7 @@ namespace mongo {
      * purposes.
      */
     template <typename Iter>
-    Status bsonCheckOnlyHasFields(const StringData& objectName,
+    Status bsonCheckOnlyHasFields(StringData objectName,
                                   const BSONObj& o,
                                   const Iter& begin,
                                   const Iter& end) {
@@ -77,7 +77,7 @@ namespace mongo {
      * of "begin".."end".
      */
     template <typename StringType, int N>
-    Status bsonCheckOnlyHasFields(const StringData& objectName,
+    Status bsonCheckOnlyHasFields(StringData objectName,
                                   const BSONObj& o,
                                   const StringType (&legals)[N]) {
         return bsonCheckOnlyHasFields(objectName, o, &legals[0], legals + N);

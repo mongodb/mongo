@@ -148,26 +148,26 @@ namespace mongo {
 
     // Utility class to allow adding a std::string to BSON as a Symbol
     struct BSONSymbol {
-        explicit BSONSymbol(const StringData& sym) :symbol(sym) {}
+        explicit BSONSymbol(StringData sym) :symbol(sym) {}
         StringData symbol;
     };
 
     // Utility class to allow adding a std::string to BSON as Code
     struct BSONCode {
-        explicit BSONCode(const StringData& str) :code(str) {}
+        explicit BSONCode(StringData str) :code(str) {}
         StringData code;
     };
 
     // Utility class to allow adding CodeWScope to BSON
     struct BSONCodeWScope {
-        explicit BSONCodeWScope(const StringData& str, const BSONObj& obj) :code(str), scope(obj) {}
+        explicit BSONCodeWScope(StringData str, const BSONObj& obj) :code(str), scope(obj) {}
         StringData code;
         BSONObj scope;
     };
 
     // Utility class to allow adding a RegEx to BSON
     struct BSONRegEx {
-        explicit BSONRegEx(const StringData& pat, const StringData& f="") :pattern(pat), flags(f) {}
+        explicit BSONRegEx(StringData pat, StringData f="") :pattern(pat), flags(f) {}
         StringData pattern;
         StringData flags;
     };
@@ -182,7 +182,7 @@ namespace mongo {
 
     // Utility class to allow adding deprecated DBRef type to BSON
     struct BSONDBRef {
-        BSONDBRef(const StringData& nameSpace, const OID& o) :ns(nameSpace), oid(o) {}
+        BSONDBRef(StringData nameSpace, const OID& o) :ns(nameSpace), oid(o) {}
         StringData ns;
         OID oid;
     };
@@ -226,7 +226,7 @@ namespace mongo {
 
         Labeler operator<<( const Labeler::Label &l );
 
-        void endField( const StringData& nextFieldName = StringData() );
+        void endField( StringData nextFieldName = StringData() );
         bool subobjStarted() const { return _fieldName != 0; }
 
         // The following methods provide API compatibility with BSONArrayBuilder

@@ -729,7 +729,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthorizationManager::tryAcquireAuthzUpdateLock(const StringData& why) {
+    bool AuthorizationManager::tryAcquireAuthzUpdateLock(StringData why) {
         return _externalState->tryAcquireAuthzUpdateLock(why);
     }
 
@@ -754,13 +754,13 @@ namespace {
      */
     void updateUserCredentials(OperationContext* txn,
                                AuthzManagerExternalState* externalState,
-                               const StringData& sourceDB,
+                               StringData sourceDB,
                                const BSONObj& userDoc,
                                const BSONObj& writeConcern) {
         BSONElement credentialsElement = userDoc["credentials"];
         uassert(18806,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "
-                        "2.6/2.8 user data schema to the 2.8 SCRAM only schema, found a user doc "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
                         "with missing or incorrectly formatted credentials: "
                         << userDoc.toString(),
                         credentialsElement.type() == Object);
@@ -777,7 +777,7 @@ namespace {
 
         uassert(18744,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "
-                        "2.6/2.8 user data schema to the 2.8 SCRAM only schema, found a user doc "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
                         "missing MONGODB-CR credentials :"
                         << userDoc.toString(),
                 !mongoCRElement.eoo());
@@ -881,13 +881,13 @@ namespace {
     }
 
 namespace {
-    bool isAuthzNamespace(const StringData& ns) {
+    bool isAuthzNamespace(StringData ns) {
         return (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
                 ns == AuthorizationManager::usersCollectionNamespace.ns() ||
                 ns == AuthorizationManager::versionCollectionNamespace.ns());
     }
 
-    bool isAuthzCollection(const StringData& coll) {
+    bool isAuthzCollection(StringData coll) {
         return (coll == AuthorizationManager::rolesCollectionNamespace.coll() ||
                 coll == AuthorizationManager::usersCollectionNamespace.coll() ||
                 coll == AuthorizationManager::versionCollectionNamespace.coll());
@@ -941,7 +941,7 @@ namespace {
 
     // Updates to users in the oplog are done by matching on the _id, which will always have the
     // form "<dbname>.<username>".  This function extracts the UserName from that string.
-    StatusWith<UserName> extractUserNameFromIdString(const StringData& idstr) {
+    StatusWith<UserName> extractUserNameFromIdString(StringData idstr) {
         size_t splitPoint = idstr.find('.');
         if (splitPoint == string::npos) {
             return StatusWith<UserName>(

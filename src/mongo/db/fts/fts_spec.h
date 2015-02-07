@@ -120,7 +120,7 @@ namespace mongo {
              * 'raw' using 'tools', and weights term scores based on 'weight'.
              */
             void _scoreStringV2( const Tools& tools,
-                                 const StringData& raw,
+                                 StringData raw,
                                  TermFrequencyMap* term_freqs,
                                  double weight ) const;
 
@@ -138,11 +138,11 @@ namespace mongo {
             //
 
             void _scoreStringV1( const Tools& tools,
-                                 const StringData& raw,
+                                 StringData raw,
                                  TermFrequencyMap* docScores,
                                  double weight ) const;
 
-            bool _weightV1( const StringData& field, double* out ) const;
+            bool _weightV1( StringData field, double* out ) const;
 
             void _scoreRecurseV1( const Tools& tools,
                                   const BSONObj& obj,

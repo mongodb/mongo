@@ -607,7 +607,11 @@ namespace mongo {
 
     static void stripInvalidAssignmentsTo2dsphereIndex(MatchExpression* node, size_t idx) {
 
-        if (Indexability::nodeCanUseIndexOnOwnField(node)) {
+        if (Indexability::nodeCanUseIndexOnOwnField(node)
+            && MatchExpression::GEO != node->matchType()
+            && MatchExpression::GEO_NEAR != node->matchType()) {
+            // We found a non-geo predicate tagged to use a V2 2dsphere index which is not
+            // and-related to a geo predicate that can use the index.
             removeIndexRelevantTag(node, idx);
             return;
         }

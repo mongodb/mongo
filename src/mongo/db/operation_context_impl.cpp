@@ -188,7 +188,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool OperationContextImpl::isPrimaryFor( const StringData& ns ) {
+    bool OperationContextImpl::isPrimaryFor( StringData ns ) {
         return repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
                 NamespaceString(ns).db());
     }

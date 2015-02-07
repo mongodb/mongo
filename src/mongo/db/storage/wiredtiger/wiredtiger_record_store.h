@@ -41,6 +41,13 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/fail_point_service.h"
+
+/**
+ * Either executes the specified operation and returns it's value or randomly throws a write
+ * conflict exception if the WTWriteConflictException failpoint is enabled.
+ */
+#define WT_OP_CHECK(x) (((MONGO_FAIL_POINT(WTWriteConflictException))) ? (WT_ROLLBACK) : (x))
 
 namespace mongo {
 
@@ -72,13 +79,13 @@ namespace mongo {
          * Note that even if this function returns an OK status, WT_SESSION:create() may still
          * fail with the constructed configuration string.
          */
-        static StatusWith<std::string> generateCreateString(const StringData& ns,
+        static StatusWith<std::string> generateCreateString(StringData ns,
                                                             const CollectionOptions &options,
-                                                            const StringData& extraStrings);
+                                                            StringData extraStrings);
 
         WiredTigerRecordStore(OperationContext* txn,
-                              const StringData& ns,
-                              const StringData& uri,
+                              StringData ns,
+                              StringData uri,
                               bool isCapped = false,
                               int64_t cappedMaxSize = -1,
                               int64_t cappedMaxDocs = -1,
@@ -123,7 +130,7 @@ namespace mongo {
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier );
+                                                  UpdateNotifier* notifier );
 
         virtual bool updateWithDamagesSupported() const;
 
@@ -196,6 +203,14 @@ namespace mongo {
         void dealtWithCappedLoc( const RecordId& loc );
         bool isCappedHidden( const RecordId& loc ) const;
 
+        bool inShutdown() const;
+        int64_t cappedDeleteAsNeeded(OperationContext* txn,
+                                     const RecordId& justInserted);
+
+        int64_t cappedDeleteAsNeeded_inlock(OperationContext* txn,
+                                            const RecordId& justInserted);
+
+        boost::timed_mutex& cappedDeleterMutex() { return _cappedDeleterMutex; }
     private:
 
         class Iterator : public RecordIterator {
@@ -248,7 +263,6 @@ namespace mongo {
         RecordId _nextId();
         void _setId(RecordId loc);
         bool cappedAndNeedDelete() const;
-        void cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted );
         void _changeNumRecords(OperationContext* txn, int64_t diff);
         void _increaseDataSize(OperationContext* txn, int amount);
         RecordData _getData( const WiredTigerCursor& cursor) const;
@@ -262,10 +276,11 @@ namespace mongo {
         const bool _isCapped;
         const bool _isOplog;
         const int64_t _cappedMaxSize;
+        const int64_t _cappedMaxSizeSlack; // when to start applying backpressure
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
         int _cappedDeleteCheckCount; // see comment in ::cappedDeleteAsNeeded
-        boost::mutex _cappedDeleterMutex; // see comment in ::cappedDeleteAsNeeded
+        mutable boost::timed_mutex _cappedDeleterMutex; // see comment in ::cappedDeleteAsNeeded
 
         const bool _useOplogHack;
 
@@ -281,5 +296,12 @@ namespace mongo {
 
         WiredTigerSizeStorer* _sizeStorer; // not owned, can be NULL
         int _sizeStorerCounter;
+
+        bool _shuttingDown;
+        bool _hasBackgroundThread;
     };
+
+    // WT failpoint to throw write conflict exceptions randomly
+    MONGO_FP_FORWARD_DECLARE(WTWriteConflictException);
+
 }

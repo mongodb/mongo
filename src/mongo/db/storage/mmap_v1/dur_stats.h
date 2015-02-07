@@ -68,6 +68,7 @@ namespace mongo {
                 uint64_t _writeToJournalMicros;
                 uint64_t _writeToDataFilesMicros;
                 uint64_t _remapPrivateViewMicros;
+                uint64_t _commitsMicros;
                 uint64_t _commitsInWriteLockMicros;
             };
 

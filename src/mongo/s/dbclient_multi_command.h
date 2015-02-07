@@ -49,7 +49,7 @@ namespace mongo {
         ~DBClientMultiCommand();
 
         void addCommand( const ConnectionString& endpoint,
-                         const StringData& dbName,
+                         StringData dbName,
                          const BSONSerializable& request );
 
         void sendAll();
@@ -66,7 +66,7 @@ namespace mongo {
         struct PendingCommand {
 
             PendingCommand( const ConnectionString& endpoint,
-                            const StringData& dbName,
+                            StringData dbName,
                             const BSONObj& cmdObj );
 
             // What to send

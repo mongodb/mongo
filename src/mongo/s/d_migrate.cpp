@@ -645,7 +645,7 @@ namespace mongo {
                         break;
 
                     RecordId dl = *cloneLocsIter;
-                    BSONObj doc;
+                    Snapshotted<BSONObj> doc;
                     if (!collection->findDoc(txn, dl, &doc)) {
                         // doc was deleted
                         continue;
@@ -655,12 +655,13 @@ namespace mongo {
                     // into consideration the overhead of BSONArray indices, and *always*
                     // append one doc.
                     if (clonedDocsArrayBuilder.arrSize() != 0 &&
-                        clonedDocsArrayBuilder.len() + doc.objsize() + 1024 > BSONObjMaxUserSize) {
+                        (clonedDocsArrayBuilder.len() + doc.value().objsize() + 1024)
+                        > BSONObjMaxUserSize) {
                         isBufferFilled = true; // break out of outer while loop
                         break;
                     }
 
-                    clonedDocsArrayBuilder.append(doc);
+                    clonedDocsArrayBuilder.append(doc.value());
                 }
 
                 _cloneLocs.erase(_cloneLocs.begin(), cloneLocsIter);
@@ -1168,7 +1169,7 @@ namespace mongo {
                 return false;
             }
 
-            // From mongos >= v2.8.
+            // From mongos >= v3.0.
             BSONElement epochElem(cmdObj["epoch"]);
             if (epochElem.type() == jstOID) {
                 OID cmdEpoch = epochElem.OID();
@@ -1941,6 +1942,14 @@ namespace mongo {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), MODE_X);
                 Client::Context ctx(txn,  ns);
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                    nsToDatabaseSubstring(ns))) {
+                    errmsg = str::stream() << "Not primary during migration: " << ns;
+                    warning() << errmsg;
+                    setState(FAIL);
+                    return;
+                }
+
                 Database* db = ctx.db();
                 Collection* collection = db->getCollection( ns );
                 if ( !collection ) {

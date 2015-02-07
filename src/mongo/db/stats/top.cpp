@@ -67,7 +67,7 @@ namespace mongo {
 
     }
 
-    void Top::record( const StringData& ns, int op, int lockType, long long micros, bool command ) {
+    void Top::record( StringData ns, int op, int lockType, long long micros, bool command ) {
         if ( ns[0] == '?' )
             return;
 
@@ -125,7 +125,7 @@ namespace mongo {
 
     }
 
-    void Top::collectionDropped( const StringData& ns ) {
+    void Top::collectionDropped( StringData ns ) {
         SimpleMutex::scoped_lock lk(_lock);
         _usage.erase(ns);
         _lastDropped = ns.toString();

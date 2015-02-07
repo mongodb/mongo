@@ -36,6 +36,7 @@
 
 #include <set>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -45,8 +46,9 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/util/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 #if 0
@@ -144,11 +146,12 @@ namespace {
                                                                   const IndexDescriptor& desc) {
         str::stream ss;
 
-        // Separate out a prefix and suffix in the default string. User configuration will
-        // override values in the prefix, but not values in the suffix.
-        ss << "type=file,leaf_page_max=16k,";
+        // Separate out a prefix and suffix in the default string. User configuration will override
+        // values in the prefix, but not values in the suffix.  Page sizes are chosen so that index
+        // keys (up to 1024 bytes) will not overflow.
+        ss << "type=file,internal_page_max=16k,leaf_page_max=16k,";
         if (wiredTigerGlobalOptions.useIndexPrefixCompression) {
-            ss << "prefix_compression,";
+            ss << "prefix_compression=true,";
         }
 
         ss << "block_compressor=" << wiredTigerGlobalOptions.indexBlockCompressor << ",";
@@ -190,7 +193,7 @@ namespace {
     int WiredTigerIndex::Create(OperationContext* txn,
                                 const std::string& uri,
                                 const std::string& config) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get( txn )->getSession()->getSession();
+        WT_SESSION* s = WiredTigerRecoveryUnit::get( txn )->getSession(txn)->getSession();
         LOG(1) << "create uri: " << uri << " config: " << config;
         return s->create(s, uri.c_str(), config.c_str());
     }
@@ -298,7 +301,7 @@ namespace {
             output->append("type", type);
         }
 
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         WT_SESSION* s = session->getSession();
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(),
                                                           "statistics=(fast)", output);
@@ -329,7 +332,7 @@ namespace {
         WT_CURSOR *c = curwrap.get();
         if (!c)
             return true;
-        int ret = c->next(c);
+        int ret = WT_OP_CHECK(c->next(c));
         if (ret == WT_NOTFOUND)
             return true;
         invariantWTOK(ret);
@@ -337,7 +340,7 @@ namespace {
     }
 
     long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const {
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         return static_cast<long long>( WiredTigerUtil::getIdentSize( session->getSession(),
                                                                      _uri ) );
     }
@@ -348,9 +351,10 @@ namespace {
         KeyString data( key, _ordering );
         WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key( c, item.Get() );
-        int ret = c->search(c);
-        if ( ret == WT_NOTFOUND )
+        int ret = WT_OP_CHECK(c->search(c));
+        if (ret == WT_NOTFOUND) {
             return false;
+        }
         invariantWTOK( ret );
 
         // If the key exists, check if we already have this loc at this key. If so, we don't
@@ -395,7 +399,7 @@ namespace {
         WT_CURSOR* openBulkCursor(WiredTigerIndex* idx) {
             // Open cursors can cause bulk open_cursor to fail with EBUSY.
             // TODO any other cases that could cause EBUSY?
-            WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(_txn)->getSession();
+            WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(_txn)->getSession(_txn);
             outerSession->closeAllCursors();
 
             // Not using cursor cache since we need to set "bulk".
@@ -448,7 +452,7 @@ namespace {
 
             _cursor->set_value(_cursor, valueItem.Get());
 
-            invariantWTOK(_cursor->insert(_cursor));
+            invariantWTOK(WT_OP_CHECK(_cursor->insert(_cursor)));
             invariantWTOK(_cursor->reset(_cursor));
 
             return Status::OK();
@@ -542,7 +546,7 @@ namespace {
             _cursor->set_key(_cursor, keyItem.Get());
             _cursor->set_value(_cursor, valueItem.Get());
 
-            invariantWTOK(_cursor->insert(_cursor));
+            invariantWTOK(WT_OP_CHECK(_cursor->insert(_cursor)));
             invariantWTOK(_cursor->reset(_cursor));
 
             _records.clear();
@@ -576,22 +580,21 @@ namespace {
 
         virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor& genOther) const {
             const WiredTigerIndexCursorBase& other =
-                dynamic_cast<const WiredTigerIndexCursorBase&>(genOther);
+                checked_cast<const WiredTigerIndexCursorBase&>(genOther);
 
             if ( _eof && other._eof )
                 return true;
             else if ( _eof || other._eof )
                 return false;
 
-            // Check the locs first since they are likely to differ and comparing them is fast.
-            if ( getRecordId() != other.getRecordId() )
+            // First try WT_CURSOR equals(), as this should be cheap.
+            int equal;
+            invariantWTOK(_cursor.get()->equals(_cursor.get(), other._cursor.get(), &equal));
+            if (!equal)
                 return false;
 
-            loadKeyIfNeeded();
-            other.loadKeyIfNeeded();
-
-            return _key.getSize() == other._key.getSize()
-                && memcmp(_key.getBuffer(), other._key.getBuffer(), _key.getSize()) == 0;
+            // WT says cursors are equal, but need to double-check that the RecordIds match.
+            return getRecordId() == other.getRecordId();
         }
 
         bool locate(const BSONObj &key, const RecordId& loc) {
@@ -659,7 +662,7 @@ namespace {
 
             if ( !wt_keeptxnopen() && !_eof ) {
                 // Ensure an active session exists, so any restored cursors will bind to it
-                WiredTigerRecoveryUnit::get(txn)->getSession();
+                WiredTigerRecoveryUnit::get(txn)->getSession(txn);
 
                 _locate(_savedLoc);
             }
@@ -677,7 +680,7 @@ namespace {
         void advanceWTCursor() {
             invalidateCache();
             WT_CURSOR *c = _cursor.get();
-            int ret = _forward ? c->next(c) : c->prev(c);
+            int ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
             if ( ret == WT_NOTFOUND ) {
                 _eof = true;
                 return;
@@ -695,7 +698,7 @@ namespace {
             const WiredTigerItem keyItem(_key.getBuffer(), _key.getSize());
             c->set_key(c, keyItem.Get());
 
-            int ret = c->search_near(c, &cmp);
+            int ret = WT_OP_CHECK(c->search_near(c, &cmp));
             if ( ret == WT_NOTFOUND ) {
                 _eof = true;
                 TRACE_CURSOR << "\t not found";
@@ -717,13 +720,13 @@ namespace {
             if (_forward) {
                 // We need to be >=
                 if (cmp < 0) {
-                    ret = c->next(c);
+                    ret = WT_OP_CHECK(c->next(c));
                 }
             }
             else {
                 // We need to be <=
                 if (cmp > 0) {
-                    ret = c->prev(c);
+                    ret = WT_OP_CHECK(c->prev(c));
                 }
             }
 
@@ -1003,15 +1006,9 @@ namespace {
         WiredTigerItem valueItem(value.getBuffer(), value.getSize());
         c->set_key( c, keyItem.Get() );
         c->set_value( c, valueItem.Get() );
-        int ret = c->insert( c );
+        int ret = WT_OP_CHECK(c->insert(c));
 
-        if ( ret == WT_ROLLBACK && !dupsAllowed ) {
-            // if there is a conflict on a unique key, it means there is a dup key
-            // even if someone else is deleting at the same time, its ok to fail this
-            // insert as a dup key as it a race
-            return dupKeyError(key);
-        }
-        else if ( ret != WT_DUPLICATE_KEY ) {
+        if ( ret != WT_DUPLICATE_KEY ) {
             return wtRCToStatus( ret );
         }
 
@@ -1019,7 +1016,7 @@ namespace {
         // we put them all in the "list"
         // Note that we can't omit AllZeros when there are multiple locs for a value. When we remove
         // down to a single value, it will be cleaned up.
-        ret = c->search(c);
+        ret = WT_OP_CHECK(c->search(c));
         invariantWTOK( ret );
 
         WT_ITEM old;
@@ -1034,7 +1031,7 @@ namespace {
             if (loc == locInIndex)
                 return Status::OK(); // already in index
 
-            if (loc < locInIndex) {
+            if (!insertedLoc && loc < locInIndex) {
                 value.appendRecordId(loc);
                 value.appendTypeBits(data.getTypeBits());
                 insertedLoc = true;
@@ -1069,7 +1066,7 @@ namespace {
 
         if ( !dupsAllowed ) {
             // nice and clear
-            int ret = c->remove(c);
+            int ret = WT_OP_CHECK(c->remove(c));
             if (ret == WT_NOTFOUND) {
                 return;
             }
@@ -1079,7 +1076,7 @@ namespace {
 
         // dups are allowed, so we have to deal with a vector of RecordIds.
 
-        int ret = c->search(c);
+        int ret = WT_OP_CHECK(c->search(c));
         if ( ret == WT_NOTFOUND )
             return;
         invariantWTOK( ret );
@@ -1099,7 +1096,7 @@ namespace {
                 if (records.empty() && !br.remaining()) {
                     // This is the common case: we are removing the only loc for this key.
                     // Remove the whole entry.
-                    invariantWTOK(c->remove(c));
+                    invariantWTOK(WT_OP_CHECK(c->remove(c)));
                     return;
                 }
 
@@ -1171,7 +1168,7 @@ namespace {
 
         c->set_key(c, keyItem.Get());
         c->set_value(c, valueItem.Get());
-        int ret = c->insert( c );
+        int ret = WT_OP_CHECK(c->insert(c));
 
         if ( ret != WT_DUPLICATE_KEY )
             return wtRCToStatus( ret );
@@ -1189,7 +1186,7 @@ namespace {
         KeyString data( key, _ordering, loc );
         WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key(c, item.Get() );
-        int ret = c->remove(c);
+        int ret = WT_OP_CHECK(c->remove(c));
         if (ret != WT_NOTFOUND) {
             invariantWTOK(ret);
         }

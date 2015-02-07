@@ -78,7 +78,7 @@ namespace {
         // via stop().
         // We must clear the sync source blacklist after calling stop()
         // because the bgsync thread, while running, may update the blacklist.
-        replCoord->setMyLastOptime(OpTime());
+        replCoord->resetMyLastOptime();
         bgsync->stop();
         replCoord->clearSyncSourceBlacklist();
 
@@ -186,11 +186,15 @@ namespace {
             LOG(2) << "Applying oplog entries from " << startOpTime.toStringPretty()
                    << " until " << stopOpTime.toStringPretty();
             syncer.oplogApplication(ctx, stopOpTime);
+
+            if (inShutdown()) {
+                return false;
+            }
         }
         catch (const DBException&) {
             log() << "replSet initial sync failed during oplog application phase, and will retry";
 
-            getGlobalReplicationCoordinator()->setMyLastOptime(OpTime());
+            getGlobalReplicationCoordinator()->resetMyLastOptime();
             BackgroundSync::get()->setLastAppliedHash(0);
 
             sleepsecs(5);
@@ -302,7 +306,9 @@ namespace {
             // prime oplog
             try {
                 _tryToApplyOpWithRetry(&txn, &init, lastOp);
-                _logOpObjRS(&txn, lastOp);
+                std::deque<BSONObj> ops;
+                ops.push_back(lastOp);
+                writeOpsToOplog(&txn, ops);
                 return Status::OK();
             } catch (DBException& e) {
                 // Return if in shutdown
@@ -332,7 +338,9 @@ namespace {
 
         // prime oplog
         _tryToApplyOpWithRetry(&txn, &init, lastOp);
-        _logOpObjRS(&txn, lastOp);
+        std::deque<BSONObj> ops;
+        ops.push_back(lastOp);
+        writeOpsToOplog(&txn, ops);
 
         std::string msg = "oplog sync 1 of 3";
         log() << msg;

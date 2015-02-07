@@ -37,7 +37,7 @@ namespace mongo {
         invariant(_depth == 0);
     }
 
-    void InMemoryRecoveryUnit::beginUnitOfWork() {
+    void InMemoryRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
         _depth++;
     }
 

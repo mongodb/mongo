@@ -60,8 +60,8 @@ var master = rs.getMaster();
 rs.awaitSecondaryNodes();
 var mId = rs.getNodeId(master);
 var slave = rs.liveNodes.slaves[0];
-
-master.getDB("test").foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }});
+assert.eq(1, master.getDB("admin").auth("foo", "bar"));
+assert.writeOK(master.getDB("test").foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }}));
 
 print("try some legal and illegal reads");
 var r = master.getDB("test").foo.findOne();
@@ -70,19 +70,11 @@ assert.eq(r.x, 1);
 slave.setSlaveOk();
 
 function doQueryOn(p) {
-    var err = {};
-    try {
+    var error = assert.throws( function() {
         r = p.getDB("test").foo.findOne();
-    }
-    catch(e) {
-        if (typeof(JSON) != "undefined") {
-            err = JSON.parse(e.message.substring(6));
-        }
-        else if (e.indexOf("13") > 0) {
-            err.code = 13;
-        }
-    }
-    assert.eq(err.code, 13);
+    }, [], "find did not throw, returned: " + tojson(r)).toString();
+    printjson(error);
+    assert.gt(error.indexOf("not authorized for query on test.foo"), -1, "error was non-auth");
 };
 
 doQueryOn(slave);

@@ -48,7 +48,7 @@ namespace mongo {
      * ErrorCodes::NoSuchKey if there are no matches.
      */
     Status bsonExtractField(const BSONObj& object,
-                            const StringData& fieldName,
+                            StringData fieldName,
                             BSONElement* outElement);
 
     /**
@@ -60,7 +60,7 @@ namespace mongo {
      * Status::OK(), the resulting value of "*outElement" is undefined.
      */
     Status bsonExtractTypedField(const BSONObj& object,
-                                 const StringData& fieldName,
+                                 StringData fieldName,
                                  BSONType type,
                                  BSONElement* outElement);
 
@@ -73,7 +73,7 @@ namespace mongo {
      * than Status::OK(), the resulting value of "*out" is undefined.
      */
     Status bsonExtractBooleanField(const BSONObj& object,
-                                   const StringData& fieldName,
+                                   StringData fieldName,
                                    bool* out);
 
     /**
@@ -87,7 +87,7 @@ namespace mongo {
      * undefined.
      */
     Status bsonExtractIntegerField(const BSONObj& object,
-                                   const StringData& fieldName,
+                                   StringData fieldName,
                                    long long* out);
 
     /**
@@ -99,7 +99,7 @@ namespace mongo {
      * Status::OK(), the resulting value of "*out" is undefined.
      */
     Status bsonExtractStringField(const BSONObj& object,
-                                  const StringData& fieldName,
+                                  StringData fieldName,
                                   std::string* out);
 
     /**
@@ -111,7 +111,7 @@ namespace mongo {
      * Status::OK(), the resulting value of "*out" is undefined.
      */
     Status bsonExtractOpTimeField(const BSONObj& object,
-                                  const StringData& fieldName,
+                                  StringData fieldName,
                                   OpTime* out);
 
     /**
@@ -123,7 +123,7 @@ namespace mongo {
      * the resulting value of "*out" is undefined.
      */
     Status bsonExtractOIDField(const BSONObj& object,
-                               const StringData& fieldName,
+                               StringData fieldName,
                                OID* out);
 
     /**
@@ -137,7 +137,7 @@ namespace mongo {
      * boolean or number, returns ErrorCodes::TypeMismatch.
      */
     Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
-                                              const StringData& fieldName,
+                                              StringData fieldName,
                                               bool defaultValue,
                                               bool* out);
 
@@ -152,7 +152,7 @@ namespace mongo {
      * ErrorCodes::BadValue.
      */
     Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
-                                              const StringData& fieldName,
+                                              StringData fieldName,
                                               long long defaultValue,
                                               long long* out);
 
@@ -167,8 +167,8 @@ namespace mongo {
      * string, returns ErrorCodes::TypeMismatch.
      */
     Status bsonExtractStringFieldWithDefault(const BSONObj& object,
-                                             const StringData& fieldName,
-                                             const StringData& defaultValue,
+                                             StringData fieldName,
+                                             StringData defaultValue,
                                              std::string* out);
 
     /**
@@ -180,7 +180,7 @@ namespace mongo {
      * values other than Status::OK(), the resulting value of *out is undefined.
      */
     Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
-                                          const StringData& fieldName,
+                                          StringData fieldName,
                                           const OID& defaultValue,
                                           OID* out);
 

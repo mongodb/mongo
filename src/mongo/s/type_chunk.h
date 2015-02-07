@@ -125,7 +125,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setName(const StringData& name) {
+        void setName(StringData name) {
             _name = name.toString();
             _isNameSet = true;
         }
@@ -140,7 +140,7 @@ namespace mongo {
             return _name;
         }
 
-        void setNS(const StringData& ns) {
+        void setNS(StringData ns) {
             _ns = ns.toString();
             _isNsSet = true;
         }
@@ -200,7 +200,7 @@ namespace mongo {
             return _version;
         }
 
-        void setShard(const StringData& shard) {
+        void setShard(StringData shard) {
             _shard = shard.toString();
             _isShardSet = true;
         }

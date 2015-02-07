@@ -46,7 +46,7 @@ namespace mongo {
      */
     class NamespaceDetailsRSV1MetaData : public RecordStoreV1MetaData {
     public:
-        explicit NamespaceDetailsRSV1MetaData( const StringData& ns,
+        explicit NamespaceDetailsRSV1MetaData( StringData ns,
                                                NamespaceDetails* details,
                                                RecordStore* namespaceRecordStore );
 

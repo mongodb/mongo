@@ -78,6 +78,8 @@ namespace mongo {
 
         static const char* kStageType;
 
+        void kill();
+
     private:
         PlanStage* getActiveChild() const;
         void updateCache();
@@ -107,6 +109,9 @@ namespace mongo {
 
         // Have we updated the cache with our plan stats yet?
         bool _updatedCache;
+
+        // Has this query been killed?
+        bool _killed;
 
         // Stats
         CommonStats _commonStats;

@@ -26,15 +26,23 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/s/config_upgrade.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/cluster_client_internal.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/config_upgrade_helpers.h"
+#include "mongo/s/type_locks.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
+    using std::list;
     using std::string;
+    using std::vector;
 
     static const char* minMongoProcessVersion = "2.6";
 
@@ -45,6 +53,49 @@ namespace mongo {
             "failed in the critical section.  Manual intervention is required to re-sync\n"
             "the config servers.\n"
             "******\n";
+
+    namespace {
+        /**
+         * Returns false if the { ts: 1 } unique index does not exist. Returns true if it does
+         * or cannot confirm that it does due to errors.
+         */
+        bool hasBadIndex(const ConnectionString& configLoc,
+                         string* errMsg) {
+            const BSONObj lockIdxKey = BSON(LocksType::lockID() << 1);
+            const NamespaceString indexNS(LocksType::ConfigNS);
+
+            vector<HostAndPort> configHosts = configLoc.getServers();
+            for (vector<HostAndPort>::const_iterator configIter = configHosts.begin();
+                    configIter != configHosts.end(); ++configIter) {
+
+                list<BSONObj> indexSpecs;
+                try {
+                    ScopedDbConnection conn(*configIter);
+                    indexSpecs = conn->getIndexSpecs(indexNS);
+                    conn.done();
+                }
+                catch (const DBException& ex) {
+                    *errMsg = str::stream() << "error while checking { ts: 1 } index"
+                                            << causedBy(ex);
+                    return true;
+                }
+
+                for (list<BSONObj>::const_iterator idxIter = indexSpecs.begin();
+                        idxIter != indexSpecs.end(); ++idxIter) {
+                    BSONObj indexSpec(*idxIter);
+                    if (indexSpec["key"].Obj().woCompare(lockIdxKey) == 0) {
+                        if (indexSpec["unique"].trueValue()) {
+                            *errMsg = str::stream() << "unique { ts: 1 } index still exists in "
+                                                    << configIter->toString();
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+    }
 
     /**
      * Upgrades v5 to v6.
@@ -87,6 +138,57 @@ namespace mongo {
         //    lastVersionInfo.getCurrentVersion()).
         // 6. Rename the backup collection to the name of the original collection with
         //    dropTarget set to true.
+
+        // Make sure the { ts: 1 } index is not unique by dropping the existing one
+        // and rebuilding the index with the right specification.
+
+        const BSONObj lockIdxKey = BSON(LocksType::lockID() << 1);
+        const NamespaceString indexNS(LocksType::ConfigNS);
+
+        bool dropOk = false;
+        try {
+            ScopedDbConnection conn(configLoc);
+            BSONObj dropResponse;
+            dropOk = conn->runCommand(indexNS.db().toString(),
+                                      BSON("dropIndexes" << indexNS.coll()
+                                           << "index" << lockIdxKey),
+                                      dropResponse);
+            conn.done();
+        }
+        catch (const DBException& ex) {
+            if (ex.getCode() == 13105) {
+                // 13105 is the exception code from SyncClusterConnection::findOne that gets
+                // thrown when one of the command responses has an "ok" field that is not true.
+                dropOk = false;
+            }
+            else {
+                *errMsg = str::stream() << "Failed to drop { ts: 1 } index" << causedBy(ex);
+                return false;
+            }
+        }
+
+        if (!dropOk && hasBadIndex(configLoc, errMsg)) {
+            // Fail only if the index still exists.
+            return false;
+        }
+
+        result = clusterCreateIndex(LocksType::ConfigNS,
+                                    BSON(LocksType::lockID() << 1),
+                                    false, // unique
+                                    WriteConcernOptions::AllConfigs,
+                                    NULL);
+
+        if (!result.isOK()) {
+            *errMsg = str::stream() << "error while creating { ts: 1 } index on config db"
+                                    << causedBy(result);
+            return false;
+        }
+
+        LOG(1) << "Checking to make sure that the right { ts: 1 } index is created...";
+
+        if (hasBadIndex(configLoc, errMsg)) {
+            return false;
+        }
 
         // We're only after the version bump in commitConfigUpgrade here since we never
         // get into the critical section.

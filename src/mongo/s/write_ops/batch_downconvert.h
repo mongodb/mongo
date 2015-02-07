@@ -61,7 +61,7 @@ namespace mongo {
      * Returns !OK if there was an error getting a GLE response
      */
     Status enforceLegacyWriteConcern( MultiCommandDispatch* dispatcher,
-                                      const StringData& dbName,
+                                      StringData dbName,
                                       const BSONObj& options,
                                       const HostOpTimeMap& hostOpTimes,
                                       std::vector<LegacyWCResponse>* wcResponses );

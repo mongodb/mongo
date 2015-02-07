@@ -90,33 +90,43 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 				WT_ERR(__wt_evict(session, ref, 1));
 			break;
 		case WT_SYNC_DISCARD:
+			/*
+			 * Ordinary discard of the page, whether clean or dirty.
+			 * If we see a dirty page in an ordinary discard (e.g.,
+			 * from sweep), give up: an update must have happened
+			 * since the file was selected for sweeping.
+			 */
+			if (__wt_page_is_modified(page))
+				WT_ERR(EBUSY);
+
+			/*
+			 * If the page contains an update that is too recent to
+			 * evict, stop.  This should never happen during
+			 * connection close, but in other paths our caller
+			 * should be prepared to deal with this case.
+			 */
+			if (page->modify != NULL &&
+			    !__wt_txn_visible_all(session,
+			    page->modify->rec_max_txn))
+				WT_ERR(EBUSY);
+
+			__wt_evict_page_clean_update(session, ref);
+			break;
 		case WT_SYNC_DISCARD_FORCE:
 			/*
-			 * Discard the page, whether clean or dirty.
-			 *
-			 * Clean the page, both to keep statistics correct, and
-			 * to let the page-discard function assert no dirty page
+			 * Forced discard of the page, whether clean or dirty.
+			 * If we see a dirty page in a forced discard, clean
+			 * the page, both to keep statistics correct, and to
+			 * let the page-discard function assert no dirty page
 			 * is ever discarded.
 			 */
 			if (__wt_page_is_modified(page)) {
 				page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, page);
 			}
-			/*
-			 * If the page contains an update that is too recent to
-			 * evict, stop.  This should never happen during
-			 * connection close, and in other paths our caller
-			 * should be prepared to deal with this case.
-			 */
-			if (syncop == WT_SYNC_DISCARD &&
-			    page->modify != NULL &&
-			    !__wt_txn_visible_all(session,
-			    page->modify->rec_max_txn))
-				WT_ERR(EBUSY);
 
-			if (syncop == WT_SYNC_DISCARD_FORCE)
-				F_SET(session, WT_SESSION_DISCARD_FORCE);
-			__wt_rec_page_clean_update(session, ref);
+			F_SET(session, WT_SESSION_DISCARD_FORCE);
+			__wt_evict_page_clean_update(session, ref);
 			F_CLR(session, WT_SESSION_DISCARD_FORCE);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);

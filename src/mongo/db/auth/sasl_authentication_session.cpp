@@ -64,8 +64,8 @@ namespace mongo {
      * requested user name.
      */
     bool isAuthorizedCommon(SaslAuthenticationSession* session,
-                            const StringData& requestedUser,
-                            const StringData& authenticatedUser) {
+                            StringData requestedUser,
+                            StringData authenticatedUser) {
 
         return requestedUser == authenticatedUser;
     }

@@ -84,7 +84,7 @@ var $config = (function() {
         rename: { rename: 1 }
     };
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
         dropDatabases(db, pattern);
     }

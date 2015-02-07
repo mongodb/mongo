@@ -214,7 +214,7 @@ namespace repl {
          * NOTE: This function can only be meaningfully called while the caller holds the global
          * lock in some mode other than MODE_NONE.
          */
-        virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
+        virtual bool canAcceptWritesForDatabase(StringData dbName) = 0;
 
         /**
          * Checks if the current replica set configuration can satisfy the given write concern.
@@ -256,6 +256,11 @@ namespace repl {
          * reset based on the contents of the oplog, and may go backwards due to rollback.
          */
         virtual void setMyLastOptime(const OpTime& ts) = 0;
+
+        /**
+         * Same as above, but used during places we need to zero our last optime.
+         */
+        virtual void resetMyLastOptime() = 0;
 
         /**
          * Updates our the message we include in heartbeat responses.
@@ -327,8 +332,10 @@ namespace repl {
         /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
          * be sent to this node's sync source to update it about our progress in replication.
+         *
+         * The returned bool indicates whether or not the command was created.
          */
-        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
+        virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
 
         /**
          * For ourself and each secondary chaining off of us, adds a BSONObj to "handshakes"

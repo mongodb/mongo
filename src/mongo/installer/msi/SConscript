@@ -94,7 +94,7 @@ major_version = "%s.%s" % (mv[0], mv[1])
 # (msi_edition, msi_platform, msi_flavor) combination
 # and change MSI ProductId on minor updates, 2.6.0 -> 2.6.1, we let Wix do automatic
 # GUID generation for us rather then build a database of GUIDs in our build system
-# For major updates, we are going to create a new directory/productid/upgrade_code ie, 2.6 -> 2.8
+# For major updates, we are going to create a new directory/productid/upgrade_code ie, 2.6 -> 3.0
 
 
 # candle: compile .wxs files into .wixobjs

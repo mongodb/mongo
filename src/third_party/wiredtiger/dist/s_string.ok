@@ -73,6 +73,7 @@ Crummey
 CustomersPhone
 DATAITEMs
 DECL
+DECR
 DESC
 DHANDLE
 DLFCN
@@ -397,6 +398,7 @@ agc
 alfred
 alloc
 allocator
+allocators
 allocfile
 allocsize
 amd
@@ -581,6 +583,7 @@ enum's
 env
 eof
 eop
+equalp
 errhandler
 errno
 errv
@@ -878,6 +881,7 @@ poptable
 pos
 posint
 posix
+pragmas
 pre
 prealloc
 preload

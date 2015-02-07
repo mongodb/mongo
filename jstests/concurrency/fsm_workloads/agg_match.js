@@ -28,7 +28,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertWhenOwnColl.eq(db[collName].count() / 2, db[otherCollName].count());
     };
 
-    $config.teardown = function teardown(db, collName) {
+    $config.teardown = function teardown(db, collName, cluster) {
         $super.teardown.apply(this, arguments);
 
         assertWhenOwnColl(db[this.getOutCollName(collName)].drop());

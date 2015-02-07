@@ -19,6 +19,7 @@ import datetime
 import imp
 import os
 import re
+import shlex
 import shutil
 import stat
 import sys
@@ -297,6 +298,10 @@ boost_choices = ['1.49', '1.56']
 add_option( "internal-boost", "Specify internal boost version to use", 1, True,
            type='choice', default=boost_choices[0], choices=boost_choices)
 
+add_option( "system-boost-lib-search-suffixes",
+            "Comma delimited sequence of boost library suffixes to search",
+            1, False )
+
 add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
 add_option( "use-system-snappy", "use system version of snappy library", 0, True )
@@ -326,6 +331,9 @@ add_option('disable-warnings-as-errors', "Don't add -Werror to compiler command 
 add_option('propagate-shell-environment',
            "Pass shell environment to sub-processes (NEVER for production builds)",
            0, False)
+
+add_option('variables-help',
+           "Print the help text for SCons variables", 0, False)
 
 if darwin:
     osx_version_choices = ['10.7', '10.8', '10.9', '10.10']
@@ -366,6 +374,64 @@ add_option('cache',
 add_option('cache-dir',
            "Specify the directory to use for caching objects if --cache is in use",
            1, False, default="$BUILD_ROOT/scons/cache")
+
+# Setup the command-line variables
+def variable_shlex_converter(val):
+    return shlex.split(val)
+
+env_vars = Variables()
+
+env_vars.Add('ARFLAGS',
+    help='Sets flags for the archiver',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CCFLAGS',
+    help='Sets flags for the C and C++ compiler',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CFLAGS',
+    help='Sets flags for the C compiler',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CPPDEFINES',
+    help='Sets pre-processor definitions for C and C++',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CPPPATH',
+    help='Adds paths to the preprocessor search path',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CXXFLAGS',
+    help='Sets flags for the C++ compiler',
+    converter=variable_shlex_converter)
+
+env_vars.Add('LIBPATH',
+    help='Adds paths to the linker search path',
+    converter=variable_shlex_converter)
+
+env_vars.Add('LIBS',
+    help='Adds extra libraries to link against',
+    converter=variable_shlex_converter)
+
+env_vars.Add('LINKFLAGS',
+    help='Sets flags for the linker',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHCCFLAGS',
+    help='Sets flags for the C and C++ compiler when building shared libraries',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHCFLAGS',
+    help='Sets flags for the C compiler when building shared libraries',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHCXXFLAGS',
+    help='Sets flags for the C++ compiler when building shared libraries',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHLINKFLAGS',
+    help='Sets flags for the linker when building shared libraries',
+    converter=variable_shlex_converter)
 
 # don't run configure if user calls --help
 if GetOption('help'):
@@ -541,8 +607,37 @@ if windows:
             msvc_script = None
         envDict['MSVC_USE_SCRIPT'] = msvc_script
 
-env = Environment(**envDict)
+env = Environment(variables=env_vars, **envDict)
 del envDict
+
+if has_option('variables-help'):
+    print env_vars.GenerateHelpText(env)
+    Exit(0)
+
+unknown_vars = env_vars.UnknownVariables()
+if unknown_vars:
+    print "Unknown variables specified: {0}".format(", ".join(unknown_vars.keys()))
+    Exit(1)
+
+
+# Add any scons options that conflict with scons variables here.
+# The first item in each tuple is the option name and the second
+# is the variable name
+variable_conflicts = [
+    ('libpath', 'LIBPATH'),
+    ('cpppath', 'CPPPATH'),
+    ('extrapath', 'CPPPATH'),
+    ('extrapathdyn', 'CPPPATH'),
+    ('extrapath', 'LIBPATH'),
+    ('extrapathdyn', 'LIBPATH'),
+    ('extralib', 'LIBS')
+]
+
+for (opt_name, var_name) in variable_conflicts:
+    if has_option(opt_name) and var_name in env:
+        print("Both option \"--{0}\" and variable {1} were specified".
+            format(opt_name, var_name))
+        Exit(1)
 
 if has_option("cache"):
     EnsureSConsVersion( 2, 3, 0 )
@@ -663,8 +758,6 @@ elif env['PYSYSPLATFORM'].startswith('sunos'):
     env['RELOBJ_LIBDEPS_START'] = '-z allextract'
     env['RELOBJ_LIBDEPS_END'] = '-z defaultextract'
     env['RELOBJ_LIBDEPS_ITEM'] = ''
-
-env["LIBPATH"] = []
 
 if has_option( "libpath" ):
     env["LIBPATH"] = [get_option( "libpath" )]
@@ -1015,6 +1108,21 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
+# boostSuffixList is used when using system boost to select a search sequence
+# for boost libraries.
+boostSuffixList = ["-mt", ""]
+if get_option("system-boost-lib-search-suffixes") is not None:
+    if not use_system_version_of_library("boost"):
+        print("The --system-boost-lib-search-suffixes option is only valid with --use-system-boost")
+        Exit(1)
+    boostSuffixList = get_option("system-boost-lib-search-suffixes")
+    if boostSuffixList == "":
+        boostSuffixList = []
+    else:
+        boostSuffixList = boostSuffixList.split(',')
+
+# boostSuffix is used when using internal boost to select which version
+# of boost is in play.
 boostSuffix = "";
 if not use_system_version_of_library("boost"):
     if get_option( "internal-boost") != "1.49":
@@ -2006,11 +2114,18 @@ def doConfigure(myenv):
 
         conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
 
-        # Note that on Windows with using-system-boost builds, the following 
+        # Note that on Windows with using-system-boost builds, the following
         # FindSysLibDep calls do nothing useful (but nothing problematic either)
-        for b in boostLibs:
-            boostlib = "boost_" + b
-            conf.FindSysLibDep( boostlib, [ boostlib + "-mt", boostlib ], language='C++' )
+        #
+        # NOTE: Pass --system-boost-lib-search-suffixes= to suppress these checks, which you
+        # might want to do if using autolib linking on Windows, for example.
+        if boostSuffixList:
+            for b in boostLibs:
+                boostlib = "boost_" + b
+                conf.FindSysLibDep(
+                    boostlib,
+                    [boostlib + suffix for suffix in boostSuffixList],
+                    language='C++')
 
     if posix_system:
         conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])

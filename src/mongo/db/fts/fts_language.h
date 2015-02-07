@@ -82,7 +82,7 @@ namespace mongo {
              * Subsequent calls to FTSLanguage::make() will recognize the newly-registered language
              * string.
              */
-            static void registerLanguage( const StringData& languageName,
+            static void registerLanguage( StringData languageName,
                                           TextIndexVersion textIndexVersion,
                                           FTSLanguage *languageOut );
 
@@ -92,7 +92,7 @@ namespace mongo {
              * newly-registered alias. 
              */
             static void registerLanguageAlias( const FTSLanguage* language,
-                                               const StringData& alias,
+                                               StringData alias,
                                                TextIndexVersion textIndexVersion );
 
             /**
@@ -110,7 +110,7 @@ namespace mongo {
              * documents needs to be processed with the English stemmer and the empty stopword list
              * (since "en" is recognized by Snowball but not the stopword processing logic).
              */
-            static StatusWith<const FTSLanguage*> make( const StringData& langName,
+            static StatusWith<const FTSLanguage*> make( StringData langName,
                                                         TextIndexVersion textIndexVersion );
 
         private:

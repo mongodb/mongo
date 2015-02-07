@@ -140,7 +140,7 @@ namespace mongo {
     }
 
     Status ModifierPull::prepare(mb::Element root,
-                                 const StringData& matchedField,
+                                 StringData matchedField,
                                  ExecInfo* execInfo) {
 
         _preparedState.reset(new PreparedState(root.getDocument()));

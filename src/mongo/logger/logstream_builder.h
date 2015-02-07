@@ -109,7 +109,7 @@ namespace logger {
 
         LogstreamBuilder& operator<<(const char *x) { stream() << x; return *this; }
         LogstreamBuilder& operator<<(const std::string& x) { stream() << x; return *this; }
-        LogstreamBuilder& operator<<(const StringData& x) { stream() << x; return *this; }
+        LogstreamBuilder& operator<<(StringData x) { stream() << x; return *this; }
         LogstreamBuilder& operator<<(char *x) { stream() << x; return *this; }
         LogstreamBuilder& operator<<(char x) { stream() << x; return *this; }
         LogstreamBuilder& operator<<(int x) { stream() << x; return *this; }

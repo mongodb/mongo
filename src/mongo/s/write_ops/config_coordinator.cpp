@@ -183,7 +183,7 @@ namespace mongo {
                 return _errMessage;
             }
 
-            void setErrMessage( const StringData& errMsg ) {
+            void setErrMessage( StringData errMsg ) {
                 _errMessage = errMsg.toString();
                 _isErrMessageSet = true;
             }
@@ -349,7 +349,7 @@ namespace mongo {
                 return _errMessage;
             }
 
-            void setErrMessage(const StringData& errMsg) {
+            void setErrMessage(StringData errMsg) {
                 _errMessage = errMsg.toString();
                 _isErrMessageSet = true;
             }

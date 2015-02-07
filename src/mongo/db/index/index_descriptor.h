@@ -170,8 +170,8 @@ namespace mongo {
              return i.next().eoo();
         }
 
-        static std::string makeIndexNamespace( const StringData& ns,
-                                          const StringData& name ) {
+        static std::string makeIndexNamespace( StringData ns,
+                                               StringData name ) {
             return ns.toString() + ".$" + name.toString();
         }
 

@@ -26,6 +26,7 @@
 
     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
     var primary = replSet.getPrimary();
+    var secondary = replSet.getSecondary();
     assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
 
     jsTestLog("do a write then ask the PRIMARY to stepdown");
@@ -72,11 +73,10 @@
     replSet.unPartition(1,0);
     replSet.unPartition(1,2);
 
-    replSet.waitForState(primary, replSet.SECONDARY, 30000);
+    replSet.waitForState(secondary, replSet.PRIMARY, 30000);
 
     jsTestLog("signal update thread to exit");
     var newPrimary = replSet.getPrimary();
-    assert.neq(primary, newPrimary, "SECONDARY did not become PRIMARY");
     assert.writeOK(newPrimary.getDB(name).foo.remove({}));
     stepDowner();
     writer();

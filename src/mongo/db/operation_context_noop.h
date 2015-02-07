@@ -91,7 +91,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual bool isPrimaryFor( const StringData& ns ) {
+        virtual bool isPrimaryFor( StringData ns ) {
             return true;
         }
 

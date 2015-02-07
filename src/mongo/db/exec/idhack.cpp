@@ -161,7 +161,7 @@ namespace mongo {
 
         if (_addKeyMetadata) {
             BSONObjBuilder bob;
-            BSONObj ownedKeyObj = member->obj["_id"].wrap().getOwned();
+            BSONObj ownedKeyObj = member->obj.value()["_id"].wrap().getOwned();
             bob.appendKeys(_key, ownedKeyObj);
             member->addComputed(new IndexKeyComputedData(bob.obj()));
         }

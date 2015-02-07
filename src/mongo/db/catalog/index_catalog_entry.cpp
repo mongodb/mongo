@@ -67,7 +67,7 @@ namespace mongo {
         IndexCatalogEntry* _catalogEntry;
     };
 
-    IndexCatalogEntry::IndexCatalogEntry( const StringData& ns,
+    IndexCatalogEntry::IndexCatalogEntry( StringData ns,
                                           CollectionCatalogEntry* collection,
                                           IndexDescriptor* descriptor,
                                           CollectionInfoCache* infoCache )

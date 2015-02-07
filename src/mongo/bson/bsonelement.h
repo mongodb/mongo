@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <string.h> // strlen
 #include <string>
 #include <vector>
@@ -38,7 +39,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/platform/cstdint.h"
-#include "mongo/platform/float_utils.h"
 
 namespace mongo {
     class OpTime;
@@ -148,7 +148,7 @@ namespace mongo {
         BSONObj wrap() const;
 
         /** Wrap this element up as a singleton object with a new name. */
-        BSONObj wrap( const StringData& newName) const;
+        BSONObj wrap( StringData newName) const;
 
         /** field name of the element.  e.g., for
             name : "Joe"
@@ -641,7 +641,7 @@ namespace mongo {
         switch( type() ) {
         case NumberDouble:
             d = numberDouble();
-            if ( isNaN( d ) ){
+            if ( std::isnan( d ) ){
                 return 0;
             }
             if ( d > (double) std::numeric_limits<long long>::max() ){

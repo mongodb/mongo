@@ -113,7 +113,7 @@ namespace mongo {
     // RecordStore
     //
 
-    InMemoryRecordStore::InMemoryRecordStore(const StringData& ns,
+    InMemoryRecordStore::InMemoryRecordStore(StringData ns,
                                              boost::shared_ptr<void>* dataInOut,
                                              bool isCapped,
                                              int64_t cappedMaxSize,
@@ -201,12 +201,14 @@ namespace mongo {
         while (cappedAndNeedDelete(txn)) {
             invariant(!_data->records.empty());
 
-            RecordId oldest = _data->records.begin()->first;
+            Records::iterator oldest = _data->records.begin();
+            RecordId id = oldest->first;
+            RecordData data = oldest->second.toRecordData();
 
             if (_cappedDeleteCallback)
-                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
+                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, id, data));
 
-            deleteRecord(txn, oldest);
+            deleteRecord(txn, id);
         }
     }
 
@@ -296,7 +298,7 @@ namespace mongo {
                                                           const char* data,
                                                           int len,
                                                           bool enforceQuota,
-                                                          UpdateMoveNotifier* notifier ) {
+                                                          UpdateNotifier* notifier ) {
         InMemoryRecord* oldRecord = recordFor( loc );
         int oldLen = oldRecord->size;
 
@@ -304,6 +306,15 @@ namespace mongo {
             return StatusWith<RecordId>( ErrorCodes::InternalError,
                                         "failing update: objects in a capped ns cannot grow",
                                         10003 );
+        }
+
+        if (notifier) {
+            // The in-memory KV engine uses the invalidation framework (does not support
+            // doc-locking), and therefore must notify that it is updating a document.
+            Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(txn, loc);
+            if (!callbackStatus.isOK()) {
+                return StatusWith<RecordId>(callbackStatus);
+            }
         }
 
         InMemoryRecord newRecord(len);

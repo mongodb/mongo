@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-    UserName::UserName(const StringData& user, const StringData& dbname) {
+    UserName::UserName(StringData user, StringData dbname) {
         _fullName.resize(user.size() + dbname.size() + 1);
         std::string::iterator iter = std::copy(user.rawData(),
                                                user.rawData() + user.size(),

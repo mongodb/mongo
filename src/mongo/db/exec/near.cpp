@@ -201,8 +201,6 @@ namespace mongo {
 
         if (PlanStage::IS_EOF == intervalState) {
             _nextInterval = NULL;
-            _nextIntervalSeen.clear();
-
             _searchState = SearchState_Advancing;
             return PlanStage::NEED_TIME;
         }
@@ -226,8 +224,10 @@ namespace mongo {
 
         // The child stage may not dedup so we must dedup them ourselves.
         if (_nextInterval->dedupCovering && nextMember->hasLoc()) {
-            if (_nextIntervalSeen.end() != _nextIntervalSeen.find(nextMember->loc))
+            if (_nextIntervalSeen.end() != _nextIntervalSeen.find(nextMember->loc)) {
+                _workingSet->free(nextMemberID);
                 return PlanStage::NEED_TIME;
+            }
         }
 
         ++_nextIntervalStats->numResultsFound;
@@ -282,6 +282,9 @@ namespace mongo {
         }
         else {
             // We won't pass this WSM up, so deallocate it
+            if (nextMember->hasLoc()) {
+                _nextIntervalSeen.erase(nextMember->loc);
+            }
             _workingSet->free(nextMemberID);
         }
 
@@ -295,12 +298,24 @@ namespace mongo {
             getNearStats()->intervalStats.push_back(*_nextIntervalStats);
             _nextIntervalStats.reset();
 
+            // We're done returning the documents buffered for this annulus, so we can
+            // clear out our buffered RecordIds.
+            _nextIntervalSeen.clear();
+
             _searchState = SearchState_Buffering;
             return PlanStage::NEED_TIME;
         }
 
         *toReturn = _resultBuffer.top().resultID;
         _resultBuffer.pop();
+
+        // If we're returning something, take it out of our RecordId -> WSID map so that future
+        // calls to invalidate don't cause us to take action for a RecordId we're done with.
+        WorkingSetMember* member = _workingSet->get(*toReturn);
+        if (member->hasLoc()) {
+            _nextIntervalSeen.erase(member->loc);
+        }
+
         return PlanStage::ADVANCED;
     }
 

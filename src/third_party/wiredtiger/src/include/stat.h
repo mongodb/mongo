@@ -176,7 +176,9 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_slow;
 	WT_STATS cache_eviction_split;
 	WT_STATS cache_eviction_walk;
+	WT_STATS cache_eviction_worker_evicting;
 	WT_STATS cache_inmem_split;
+	WT_STATS cache_overhead;
 	WT_STATS cache_pages_dirty;
 	WT_STATS cache_pages_inuse;
 	WT_STATS cache_read;

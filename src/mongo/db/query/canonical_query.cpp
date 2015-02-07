@@ -55,7 +55,7 @@ namespace {
      * Encode user-provided string. Cache key delimiters seen in the
      * user string are escaped with a backslash.
      */
-    void encodeUserString(const StringData& s, mongoutils::str::stream* os) {
+    void encodeUserString(StringData s, mongoutils::str::stream* os) {
         for (size_t i = 0; i < s.size(); ++i) {
             char c = s[i];
             switch (c) {

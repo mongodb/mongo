@@ -118,7 +118,7 @@ DB.prototype.createCollection = function(name, opt) {
     var sendFlags = false;
     var flags = 0;
     if (options.usePowerOf2Sizes != undefined) {
-        print("WARNING: The 'usePowerOf2Sizes' flag is ignored in 2.8 and higher as all MMAPv1 "
+        print("WARNING: The 'usePowerOf2Sizes' flag is ignored in 3.0 and higher as all MMAPv1 "
             + "collections use fixed allocation sizes unless the 'noPadding' flag is specified");
 
         sendFlags = true;
@@ -815,16 +815,14 @@ DB.prototype.printSlaveReplicationInfo = function() {
     };
 
     function getMaster(members) {
-        var found = null;
         for (i in members) {
             var row = members[i];
             if (row.state === 1) {
-                found = row;
-                return false;
+                return row;
             }
         }
 
-        return found;
+        return null;
     };
 
     function g(x) {
@@ -866,8 +864,8 @@ DB.prototype.printSlaveReplicationInfo = function() {
         else {
             startOptimeDate = new Date(0, 0);
             for (i in status.members) {
-                if (status.members.optimeDate > startOptimeDate) {
-                    startOptimeDate = status.members.optimeDate;
+                if (status.members[i].optimeDate > startOptimeDate) {
+                    startOptimeDate = status.members[i].optimeDate;
                 }
             }
         }
@@ -954,7 +952,7 @@ DB.prototype.listCommands = function(){
         var s = name + ": ";
 
         if (c.adminOnly) s += " adminOnly ";
-        if (c.adminOnly) s += " slaveOk ";
+        if (c.slaveOk) s += " slaveOk ";
 
         s += "\n  ";
         s += c.help.replace(/\n/g, '\n  ');

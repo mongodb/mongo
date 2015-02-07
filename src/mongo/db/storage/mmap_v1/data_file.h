@@ -79,7 +79,7 @@ namespace mongo {
         // minor layout:
         // first 4 bits - index plugin cleanliness.
         //    see IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded for details
-        // 5th bit - 1 if started with 2.8-style freelist implementation (SERVER-14081)
+        // 5th bit - 1 if started with 3.0-style freelist implementation (SERVER-14081)
         // 6th through 31st bit - reserved and must be set to 0.
         static const uint32_t kIndexPluginMask = 0xf;
         static const uint32_t kIndexes22AndOlder = 5;

@@ -91,12 +91,12 @@ namespace mongo {
         bool isClusterSet() const;
         bool getCluster() const;
 
-        void setDb(const StringData& db);
+        void setDb(StringData db);
         void unsetDb();
         bool isDbSet() const;
         const std::string& getDb() const;
 
-        void setCollection(const StringData& collection);
+        void setCollection(StringData collection);
         void unsetCollection();
         bool isCollectionSet() const;
         const std::string& getCollection() const;

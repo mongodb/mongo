@@ -793,6 +793,7 @@ namespace {
             const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
             OpTime myLastOpApplied) {
 
+        const MemberState originalState = getMemberState();
         PingStats& hbStats = _pings[target];
         invariant(hbStats.getLastHeartbeatStartDate() != Date_t(0));
         if (!hbResponse.isOK()) {
@@ -904,6 +905,7 @@ namespace {
         }
         HeartbeatResponseAction nextAction = _updateHeartbeatDataImpl(
                 memberIndex,
+                originalState,
                 now,
                 myLastOpApplied);
 
@@ -913,6 +915,7 @@ namespace {
 
     HeartbeatResponseAction TopologyCoordinatorImpl::_updateHeartbeatDataImpl(
             int updatedConfigIndex,
+            const MemberState& originalState,
             Date_t now,
             const OpTime& lastOpApplied) {
 
@@ -1086,6 +1089,19 @@ namespace {
 
         fassert(18505, _currentPrimaryIndex == -1);
 
+        const MemberState currentState = getMemberState();
+        if (originalState.recovering() && currentState.secondary()) {
+            // We just transitioned from RECOVERING to SECONDARY, this can only happen if we
+            // received a heartbeat with an auth error when previously all the heartbeats we'd
+            // received had auth errors.  In this case, don't return makeElectAction() because
+            // that could cause the election to start before the ReplicationCoordinator has updated
+            // its notion of the member state to SECONDARY.  Instead return noAction so that the
+            // ReplicationCooridinator knows to update its tracking of the member state off of the
+            // TopologyCoordinator, and leave starting the election until the next heartbeat comes
+            // back.
+            return HeartbeatResponseAction::makeNoAction();
+        }
+
         // At this point, there is no primary anywhere.  Check to see if we should become a
         // candidate.
         if (!checkShouldStandForElection(now, lastOpApplied)) {
@@ -1145,7 +1161,8 @@ namespace {
     bool TopologyCoordinatorImpl::_isOpTimeCloseEnoughToLatestToElect(
             const OpTime& otherOpTime, const OpTime& ourLastOpApplied) const {
         const OpTime latestKnownOpTime = _latestKnownOpTime(ourLastOpApplied);
-        return otherOpTime.getSecs() >= (latestKnownOpTime.getSecs() - 10);
+        // Use addition instead of subtraction to avoid overflow.
+        return otherOpTime.getSecs() + 10 >= (latestKnownOpTime.getSecs());
     }
 
     bool TopologyCoordinatorImpl::_iAmPrimary() const {

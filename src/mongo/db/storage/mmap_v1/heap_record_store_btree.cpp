@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/mmap_v1/heap_record_store_btree.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -111,7 +112,7 @@ namespace mongo {
         invariant( _depth == 0 );
     }
 
-    void HeapRecordStoreBtreeRecoveryUnit::beginUnitOfWork() {
+    void HeapRecordStoreBtreeRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
         _depth++;
     }
 
@@ -152,6 +153,7 @@ namespace mongo {
         if ( !ctx )
             return;
 
+        // This dynamic_cast has semantics, should change ideally.
         HeapRecordStoreBtreeRecoveryUnit* ru =
             dynamic_cast<HeapRecordStoreBtreeRecoveryUnit*>( ctx->recoveryUnit() );
 

@@ -114,6 +114,7 @@ namespace {
 
                 if (!serverGlobalParams.indexBuildRetry) {
                     log() << "  not rebuilding interrupted indexes";
+                    wunit.commit();
                     continue;
                 }
 
