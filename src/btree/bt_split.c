@@ -934,44 +934,43 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * modulo the usual safe free semantics. Ignore the WT_REF we're
 	 * replacing, our caller is responsible for freeing it.
 	 */
-	if (deleted_entries)
-		for (i = 0; i < parent_entries; ++i) {
-			next_ref = pindex->index[i];
-			if (next_ref == ref || next_ref->state != WT_REF_SPLIT)
-				continue;
+	for (i = 0; deleted_entries > 0 && i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		if (next_ref == ref || next_ref->state != WT_REF_SPLIT)
+			continue;
+		--deleted_entries;
 
-			/*
-			 * We set the WT_REF to split, discard it, freeing any
-			 * resources it holds.
-			 */
-			if (parent->type == WT_PAGE_ROW_INT) {
-				WT_TRET(__split_ovfl_key_cleanup(
-				    session, parent, next_ref));
-				ikey = __wt_ref_key_instantiated(next_ref);
-				if (ikey != NULL) {
-					size = sizeof(WT_IKEY) + ikey->size;
-					WT_TRET(__split_safe_free(
-					    session, split_gen, 0, ikey, size));
-					parent_decr += size;
-				}
-				/*
-				 * The page_del structure can be freed
-				 * immediately: it is only read when the ref
-				 * state is WT_REF_DELETED.  The size of the
-				 * structures wasn't added to the parent: don't
-				 * decrement.
-				 */
-				if (next_ref->page_del != NULL) {
-					__wt_free(session,
-					    next_ref->page_del->update_list);
-					__wt_free(session, next_ref->page_del);
-				}
+		/*
+		 * We set the WT_REF to split, discard it, freeing any resources
+		 * it holds.
+		 */
+		if (parent->type == WT_PAGE_ROW_INT) {
+			WT_TRET(__split_ovfl_key_cleanup(
+			    session, parent, next_ref));
+			ikey = __wt_ref_key_instantiated(next_ref);
+			if (ikey != NULL) {
+				size = sizeof(WT_IKEY) + ikey->size;
+				WT_TRET(__split_safe_free(
+				    session, split_gen, 0, ikey, size));
+				parent_decr += size;
 			}
-
-			WT_TRET(__split_safe_free(
-			    session, split_gen, 0, next_ref, sizeof(WT_REF)));
-			parent_decr += sizeof(WT_REF);
+			/*
+			 * The page_del structure can be freed immediately: it
+			 * is only read when the ref state is WT_REF_DELETED.
+			 * The size of the structure wasn't added to the parent,
+			 * don't decrement.
+			 */
+			if (next_ref->page_del != NULL) {
+				__wt_free(session,
+				    next_ref->page_del->update_list);
+				__wt_free(session, next_ref->page_del);
+			}
 		}
+
+		WT_TRET(__split_safe_free(
+		    session, split_gen, 0, next_ref, sizeof(WT_REF)));
+		parent_decr += sizeof(WT_REF);
+	}
 
 	/*
 	 * We can't free the previous page index, there may be threads using it.
