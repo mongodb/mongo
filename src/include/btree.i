@@ -17,6 +17,17 @@ __wt_ref_is_root(WT_REF *ref)
 }
 
 /*
+ * __wt_page_is_empty --
+ *	Return if the page is empty.
+ */
+static inline int
+__wt_page_is_empty(WT_PAGE *page)
+{
+	return (page->modify != NULL &&
+	    F_ISSET(page->modify, WT_PM_REC_MASK) == WT_PM_REC_EMPTY ? 1 : 0);
+}
+
+/*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */
