@@ -214,7 +214,6 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	uint64_t bucket;
 
 	conn = S2C(session);
-	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
 
 	__wt_spin_lock(session, &conn->fh_lock);
 	if (fh == NULL || fh->ref == 0 || --fh->ref > 0) {
@@ -223,6 +222,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	}
 
 	/* Remove from the list. */
+	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_FILE_REMOVE(conn, fh, bucket);
 	WT_STAT_FAST_CONN_DECR(session, file_open);
 
