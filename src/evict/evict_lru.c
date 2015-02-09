@@ -194,7 +194,6 @@ __evict_server(void *arg)
 				ret = 0;
 			}
 		}
-		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
 		/* Don't rely on signals: check periodically. */
 		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
@@ -488,7 +487,6 @@ __evict_pass(WT_SESSION_IMPL *session)
 			    &worker->tid, __evict_worker, worker));
 		}
 
-		F_SET(cache, WT_EVICT_ACTIVE);
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "Eviction pass with: Max: %" PRIu64
 		    " In use: %" PRIu64 " Dirty: %" PRIu64,
