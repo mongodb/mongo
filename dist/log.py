@@ -260,7 +260,7 @@ __wt_logop_%(name)s_print(
 \t%(arg_init)sWT_RET(__wt_logop_%(name)s_unpack(
 \t    session, pp, end%(arg_addrs)s));
 
-\tfprintf(out, "    \\"optype\\": \\"%(name)s\\",\\n");
+\tfprintf(out, " \\"optype\\": \\"%(name)s\\",\\n");
 \t%(print_args)s
 \t%(arg_fini)sreturn (0);
 }
@@ -274,10 +274,10 @@ __wt_logop_%(name)s_print(
     if has_escape(optype.fields) else ''),
     'arg_addrs' : ''.join(', &%s' % f[1] for f in optype.fields),
     'print_args' : '\n\t'.join(
-        '%sfprintf(out, "    \\"%s\\": \\"%s\\",\\n",%s);' %
+        '%sfprintf(out, "        \\"%s\\": \\"%s\\",\\n",%s);' %
         (printf_setup(f), f[1], printf_fmt(f), printf_arg(f))
         for f in optype.fields[:-1]) + str(
-        '\n\t%sfprintf(out, "    \\"%s\\": \\"%s\\"",%s);' %
+        '\n\t%sfprintf(out, "        \\"%s\\": \\"%s\\"",%s);' %
         (printf_setup(last_field), last_field[1],
             printf_fmt(last_field), printf_arg(last_field))),
 })
