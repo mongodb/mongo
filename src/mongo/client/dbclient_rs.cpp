@@ -339,6 +339,12 @@ namespace {
             return false;
         }
 
+        // If _lastSlaveOkConn is pointing to a connection to primary, make sure that it is
+        // the same as _master, as this is the connection that has the version set.
+        if (_lastSlaveOkHost == _masterHost) {
+            _lastSlaveOkConn = _master;
+        }
+
         // Make sure we don't think the host is down.
         if (_lastSlaveOkConn->isFailed() || !_getMonitor()->isHostUp(_lastSlaveOkHost)) {
             invalidateLastSlaveOkCache();
