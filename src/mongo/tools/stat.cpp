@@ -151,6 +151,7 @@ namespace mongo {
                 return -1;
 
             int maxLockedDbWidth = 0;
+            bool warned = false;
 
             while (mongoStatGlobalParams.rowCount == 0 ||
                    rowNum < mongoStatGlobalParams.rowCount) {
@@ -168,6 +169,11 @@ namespace mongo {
                     return -2;
 
                 try {
+
+                    if ( !warned && now["storageEngine"].type() ) {
+                       toolError() << "warning: detected a 3.0 mongod, some columns not applicable" << endl;
+                       warned = true;
+                    }
 
                     BSONObj out = _statUtil.doRow( prev , now );
 
@@ -230,6 +236,7 @@ namespace mongo {
 
         static void serverThread( shared_ptr<ServerState> state , int sleepTime) {
             try {
+                bool warned = false;
                 DBClientConnection conn( true );
                 conn._logLevel = logger::LogSeverity::Debug(1);
                 string errmsg;
@@ -259,6 +266,10 @@ namespace mongo {
                             scoped_lock lk( state->lock );
                             state->error = errorStream;
                             state->lastUpdate = time(0);
+                        }
+                        if ( !warned && out["storageEngine"].type() ) {
+                           toolError() << "warning: detected a 3.0 mongod, some columns not applicable" << endl;
+                           warned = true;
                         }
 
                         if ( out["shardCursorType"].type() == Object ||
