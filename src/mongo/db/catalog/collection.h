@@ -157,7 +157,8 @@ namespace mongo {
                              const RecordId& loc,
                              bool cappedOK = false,
                              bool noWarn = false,
-                             BSONObj* deletedId = 0 );
+                             BSONObj* deletedId = 0,
+                             const char* ns = "_" );
 
         /**
          * this does NOT modify the doc before inserting

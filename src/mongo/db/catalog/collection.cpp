@@ -49,6 +49,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/s/d_state.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 #include "mongo/util/log.h"
@@ -275,7 +276,8 @@ namespace mongo {
                                      const RecordId& loc,
                                      bool cappedOK,
                                      bool noWarn,
-                                     BSONObj* deletedId ) {
+                                     BSONObj* deletedId,
+                                     const char* ns ) {
         if ( isCapped() && !cappedOK ) {
             log() << "failing remove on a capped ns " << _ns << endl;
             uasserted( 10089,  "cannot remove from a capped collection" );
@@ -285,9 +287,25 @@ namespace mongo {
         Snapshotted<BSONObj> doc = docFor(txn, loc);
 
         if (deletedId) {
+            BSONObjBuilder patt;
+            if(shardingState.enabled()) {
+                if(shardingState.hasVersion(ns)) {
+                    CollectionMetadataPtr cm = shardingState.getCollectionMetadata(ns);
+                    BSONObj shardKeyObj = cm->getKeyPattern();
+                    for( BSONObj::iterator i = shardKeyObj.begin(); i.more(); ) {
+                        BSONElement shardKeyElement = i.next();
+                        BSONElement shardField = doc.value()[shardKeyElement.fieldName()];
+                        if ( shardField.eoo() == false ) {
+                            patt.append(shardField);
+                        }
+                    }
+                }
+            }
+
             BSONElement e = doc.value()["_id"];
             if (e.type()) {
-                *deletedId = e.wrap();
+                patt.append(e);
+                *deletedId = patt.obj();
             }
         }
 
