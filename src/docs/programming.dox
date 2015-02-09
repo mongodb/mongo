@@ -44,6 +44,15 @@ each of which is ordered by one or more columns.
 - @subpage statistics
 - @subpage_single upgrade
 
+@m_if{c}
+<h2>Extending WiredTiger</h2>
+- @subpage extensions
+- @subpage custom_collators
+- @subpage custom_extractors
+- @subpage custom_data_sources
+- @subpage helium
+@m_endif
+
 <h2>Performance monitoring and tuning</h2>
 - @subpage_single tune_statistics
 - @subpage_single wtperf
@@ -64,14 +73,5 @@ each of which is ordered by one or more columns.
 - @subpage_single tune_close
 - @subpage_single tune_mutex
 - @subpage_single tune_zone_reclaim
-
-@m_if{c}
-<h2>Extending WiredTiger</h2>
-- @subpage extensions
-- @subpage custom_collators
-- @subpage custom_extractors
-- @subpage custom_data_sources
-- @subpage helium
-@m_endif
 
  */
