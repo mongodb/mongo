@@ -78,8 +78,15 @@ namespace mongo {
             rollbackInnermostChanges();
         }
 
-        // Reset back to default.
-        _rollbackDisabled = false;
+        // Reset back to default if this is the last unwind of the recovery unit. That way, it can
+        // be reused for new operations.
+        if (inOutermostUnitOfWork()) {
+            dassert(_changes.empty());
+            dassert(_writes.empty());
+            _preimageBuffer.clear();
+            _mustRollback = false;
+            _rollbackDisabled = false;
+        }
 
         _startOfUncommittedChangesForLevel.pop_back();
     }
