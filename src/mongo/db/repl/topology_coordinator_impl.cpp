@@ -150,6 +150,10 @@ namespace {
 
     HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, 
                                                              const OpTime& lastOpApplied) {
+        // If we are primary, then we aren't syncing from anyone (else).
+        if (_iAmPrimary()) {
+            return HostAndPort();
+        }
 
         // If we are not a member of the current replica set configuration, no sync source is valid.
         if (_selfIndex == -1) {
@@ -1348,7 +1352,7 @@ namespace {
                     bb.appendDate("optimeDate", Date_t(lastOpApplied.getSecs() * 1000ULL));
                 }
 
-                if (!_syncSource.empty()) {
+                if (!_syncSource.empty() && !_iAmPrimary()) {
                     bb.append("syncingTo", _syncSource.toString());
                 }
 
@@ -1407,7 +1411,7 @@ namespace {
                     bb.append("authenticated", false);
                 }
                 const std::string syncSource = it->getSyncSource();
-                if (!syncSource.empty()) {
+                if (!syncSource.empty() && !state.primary()) {
                     bb.append("syncingTo", syncSource);
                 }
 
@@ -1908,6 +1912,8 @@ namespace {
         _electionId = electionId;
         _role = Role::leader;
         _currentPrimaryIndex = _selfIndex;
+        _syncSource = HostAndPort();
+        _forceSyncSourceIndex = -1;
     }
 
     void TopologyCoordinatorImpl::processLoseElection() {
