@@ -1991,10 +1991,8 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 			r->space_avail =
 			    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 		else {
-			WT_ASSERT(session, r->page_size >=
-			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + inuse));
-			r->space_avail = r->page_size -
-			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + inuse);
+			WT_ASSERT(session, r->page_size >= inuse);
+			r->space_avail = r->page_size - inuse;
 
 			/* There are no further boundary points. */
 			r->bnd_state = SPLIT_MAX;
