@@ -916,7 +916,8 @@ namespace mongo {
         bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string& errmsg ) {
             if ( id.type() != jstOID ) {
                 if ( ! info->hasID() ) {
-                    warning() << "bad serverID set in setShardVersion and none in info: " << id << endl;
+                    // this is only for connections using the WBL (<= v2.4)
+                    LOG(1) << "warning: bad serverID set in setShardVersion and none in info: " << id << endl;
                 }
                 // TODO: fix this
                 //errmsg = "need serverID to be an OID";
