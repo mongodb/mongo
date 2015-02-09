@@ -2673,22 +2673,31 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 	/*
 	 * There is probably a remnant in the working buffer that didn't get
-	 * written; copy it down to the beginning of the working buffer, and
-	 * update the starting record number.
+	 * written, copy it down to the beginning of the working buffer.
 	 *
-	 * Confirm the remnant is no larger than the available split buffer.
-	 *
-	 * Fix up our caller's information.
+	 * Confirm the remnant is no larger than a split-sized chunk, including
+	 * header. We know that's the maximum sized remnant because we only have
+	 * remnants if split switches from accumulating to a split boundary to
+	 * accumulating to the end of the page (the other path here is when we
+	 * hit a split boundary, there was room for another split chunk in the
+	 * page, and the next item still wouldn't fit, in which case there is no
+	 * remnant). So: we were accumulating to the end of the page and created
+	 * a remnant. We know the remnant cannot be as large as a split-sized
+	 * chunk, including header, because if there was room for that large a
+	 * remnant, we wouldn't have switched from accumulating to a page end.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
-	if (len > r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
+	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
 		WT_PANIC_ERR(session, EINVAL,
 		    "Reconciliation remnant too large for the split buffer");
-
 	dsk = r->dsk.mem;
 	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 	(void)memmove(dsk_start, bnd->start, len);
 
+	/*
+	 * Fix up our caller's information, including updating the starting
+	 * record number.
+	 */
 	r->entries -= r->total_entries;
 	r->first_free = dsk_start + len;
 	WT_ASSERT(session,
