@@ -332,7 +332,7 @@ __log_close_server(void *arg)
 		} else
 			/* Wait until the next event. */
 			WT_ERR(__wt_cond_wait(session,
-			    conn->log_close_cond, 10000));
+			    conn->log_close_cond, WT_MILLION));
 	}
 
 	if (0) {
