@@ -400,6 +400,38 @@ namespace {
 
     }
 
+    TEST_F(TopoCoordTest, EmptySyncSourceOnPrimary) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 10 << "host" << "hself") <<
+                              BSON("_id" << 20 << "host" << "h2") <<
+                              BSON("_id" << 30 << "host" << "h3"))),
+                     0);
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(1, 0), Milliseconds(100));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(1, 0), Milliseconds(100));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(0, 0), Milliseconds(300));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(0, 0), Milliseconds(300));
+
+        // No primary situation: should choose h2 sync source.
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+
+        // Become primary
+        makeSelfPrimary(OpTime(3.0));
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        // Check sync source
+        ASSERT_EQUALS(HostAndPort(), getTopoCoord().getSyncSourceAddress());
+    }
+
     TEST_F(TopoCoordTest, ForceSyncSource) {
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 1 <<
