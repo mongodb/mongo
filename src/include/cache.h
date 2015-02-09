@@ -115,10 +115,9 @@ struct __wt_cache {
 	 */
 #define	WT_CACHE_POOL_MANAGER	0x01	/* The active cache pool manager */
 #define	WT_CACHE_POOL_RUN	0x02	/* Cache pool thread running */
-#define	WT_EVICT_ACTIVE		0x04	/* Eviction server is active */
-#define	WT_EVICT_CLEAR_WALKS	0x08	/* Clear eviction walks */
-#define	WT_EVICT_STUCK		0x10	/* Eviction server is stuck */
-#define	WT_EVICT_WOULD_BLOCK	0x20	/* Pages that would block apps */
+#define	WT_EVICT_CLEAR_WALKS	0x04	/* Clear eviction walks */
+#define	WT_EVICT_STUCK		0x08	/* Eviction server is stuck */
+#define	WT_EVICT_WOULD_BLOCK	0x10	/* Pages that would block apps */
 	uint32_t flags;
 };
 
