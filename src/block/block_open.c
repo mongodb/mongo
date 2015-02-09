@@ -54,6 +54,12 @@ __wt_block_manager_create(
 	/* Write out the file's meta-data. */
 	ret = __wt_desc_init(session, fh, allocsize);
 
+	/*
+	 * Ensure the new file has made it to disk. Otherwise a crash
+	 * after log records exist for the file can lead to a recovery failure.
+	 */
+	WT_TRET(__wt_fsync(session, fh));
+
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, fh));
 
