@@ -1987,10 +1987,9 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		 * have one.  If we don't have room for another split chunk,
 		 * add whatever space remains in this page.
 		 */
-		if (inuse + r->split_size <= r->page_size)
-			r->space_avail =
-			    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
-		else {
+		r->space_avail =
+		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
+		if (inuse + r->space_avail > r->page_size) {
 			WT_ASSERT(session, r->page_size >= inuse);
 			r->space_avail = r->page_size - inuse;
 
@@ -2682,7 +2681,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * Fix up our caller's information.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
-	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
+	if (len > r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
 		WT_PANIC_ERR(session, EINVAL,
 		    "Reconciliation remnant too large for the split buffer");
 
