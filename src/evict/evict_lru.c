@@ -34,13 +34,17 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 		return (UINT64_MAX);
 
 	page = entry->ref->page;
-	read_gen = page->read_gen + entry->btree->evict_priority;
+
+	/* Any empty page (leaf or internal), is a good choice. */
+	if (__wt_page_is_empty(page))
+		return (WT_READGEN_OLDEST);
 
 	/*
 	 * Skew the read generation for internal pages, we prefer to evict leaf
 	 * pages.
 	 */
-	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
+	read_gen = page->read_gen + entry->btree->evict_priority;
+	if (WT_PAGE_IS_INTERNAL(page))
 		read_gen += WT_EVICT_INT_SKEW;
 
 	return (read_gen);
@@ -1082,12 +1086,22 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (__wt_ref_is_root(btree->evict_ref))
 			continue;
 		page = btree->evict_ref->page;
+		mod = page->modify;
+		modified = __wt_page_is_modified(page);
 
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
 		 */
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+			continue;
+
+		/* Pages we no longer need (clean or dirty), are found money. */
+		if (__wt_page_is_empty(page))
+			goto fast;
+
+		/* Optionally ignore clean pages. */
+		if (!modified && LF_ISSET(WT_EVICT_PASS_DIRTY))
 			continue;
 
 		/*
@@ -1099,8 +1113,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		/* Limit internal pages to 50% unless we get aggressive. */
-		if ((page->type == WT_PAGE_COL_INT ||
-		    page->type == WT_PAGE_ROW_INT) &&
+		if (WT_PAGE_IS_INTERNAL(page) &&
 		    ++internal_pages > WT_EVICT_WALK_PER_FILE / 2 &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
 			continue;
@@ -1116,24 +1129,18 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 		}
 
-		/*
+fast:		/*
 		 * If the file is being checkpointed, there's a period of time
 		 * where we can't discard dirty pages because of possible races
 		 * with the checkpointing thread.
 		 */
-		modified = __wt_page_is_modified(page);
 		if (modified && btree->checkpointing)
-			continue;
-
-		/* Optionally ignore clean pages. */
-		if (!modified && LF_ISSET(WT_EVICT_PASS_DIRTY))
 			continue;
 
 		/*
 		 * If the page is clean but has modifications that appear too
 		 * new to evict, skip it.
 		 */
-		mod = page->modify;
 		if (!modified && mod != NULL &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
 		    !__wt_txn_visible_all(session, mod->rec_max_txn))
