@@ -20,8 +20,11 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	session = conn->default_session;
 
-	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
 		SLIST_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
+		TAILQ_INIT(&conn->fhhash[i]);	/* File handle hash lists */
+		TAILQ_INIT(&conn->blockhash[i]);/* Block handle hash lists */
+	}
 
 	SLIST_INIT(&conn->dhlh);		/* Data handle list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */

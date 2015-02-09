@@ -45,7 +45,9 @@
 
 struct __wt_fh {
 	char	*name;				/* File name */
+	uint64_t name_hash;			/* Hash of name */
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
+	TAILQ_ENTRY(__wt_fh) hashq;		/* Hashed list of handles */
 
 	u_int	ref;				/* Reference count */
 
