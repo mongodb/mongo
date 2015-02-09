@@ -76,7 +76,10 @@ namespace mongo {
     }
 
     bool CachedPlanStage::isEOF() {
-        invariant(!_killed);
+        if (_killed) {
+            return true;
+        }
+
         return getActiveChild()->isEOF();
     }
 
