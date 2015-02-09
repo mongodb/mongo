@@ -29,10 +29,9 @@ __remove_file_check(WT_SESSION_IMPL *session, const char *name)
 	 * level should have closed it before removing.
 	 */
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_FOREACH(fh, &conn->fhhash[bucket], q) {
+	SLIST_FOREACH(fh, &conn->fhhash[bucket], l)
 		if (strcmp(name, fh->name) == 0)
 			break;
-	}
 	__wt_spin_unlock(session, &conn->fh_lock);
 
 	WT_ASSERT(session, fh == NULL);

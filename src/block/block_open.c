@@ -130,7 +130,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	hash = __wt_hash_city64(filename, strlen(filename));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->block_lock);
-	TAILQ_FOREACH(block, &conn->blockhash[bucket], hashq) {
+	SLIST_FOREACH(block, &conn->blockhash[bucket], hashl) {
 		if (strcmp(filename, block->name) == 0) {
 			++block->ref;
 			*blockp = block;
