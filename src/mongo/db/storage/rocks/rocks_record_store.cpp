@@ -439,7 +439,7 @@ namespace mongo {
     }
 
     bool RocksRecordStore::updateWithDamagesSupported() const {
-        return true;
+        return false;
     }
 
     Status RocksRecordStore::updateWithDamages( OperationContext* txn,
@@ -447,39 +447,7 @@ namespace mongo {
                                                 const RecordData& oldRec,
                                                 const char* damageSource,
                                                 const mutablebson::DamageVector& damages ) {
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
-        if (!ru->transaction()->registerWrite(_getTransactionID(loc))) {
-            throw WriteConflictException();
-        }
-
-        int64_t locStorage;
-        rocksdb::Slice key = _makeKey(loc, &locStorage);
-
-        // get original value
-        std::string value;
-        rocksdb::Status status;
-        status = ru->Get(_columnFamily.get(), key, &value);
-
-        if ( !status.ok() ) {
-            if ( status.IsNotFound() )
-                return Status( ErrorCodes::InternalError, "doc not found for in-place update" );
-
-            log() << "rocks Get failed, blowing up: " << status.ToString();
-            invariant( false );
-        }
-
-        // apply changes to our copy
-        for( size_t i = 0; i < damages.size(); i++ ) {
-            mutablebson::DamageEvent event = damages[i];
-            const char* sourcePtr = damageSource + event.sourceOffset;
-
-            invariant( event.targetOffset + event.size < value.length() );
-            value.replace( event.targetOffset, event.size, sourcePtr, event.size );
-        }
-
-        // write back
-        ru->writeBatch()->Put(_columnFamily.get(), key, value);
-
+        invariant(false);
         return Status::OK();
     }
 
