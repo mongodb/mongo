@@ -595,7 +595,7 @@ namespace mongo {
         // Note: this is for blocking sockets only.
         SSL_CTX_set_mode(*context, SSL_MODE_AUTO_RETRY);
 
-        massert(28606,
+        massert(28607,
                 mongoutils::str::stream() << "can't store ssl session id context: " <<
                     getSSLErrorMessage(ERR_get_error()),
                 SSL_CTX_set_session_id_context(
