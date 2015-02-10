@@ -873,7 +873,7 @@ namespace replset {
         }
         else {
             log() << "replset couldn't find a slave with id " << memberId
-                  << ", not tracking " << rid << rsLog;
+                  << " in the current config, not tracking this node" << rsLog;
         }
     }
 

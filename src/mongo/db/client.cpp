@@ -427,7 +427,7 @@ namespace mongo {
 
         _handshake = b.obj();
 
-        if (!theReplSet || !o.hasField("member")) {
+        if (!theReplSet || !o.hasField("member") || !o["member"].isNumber()) {
             return false;
         }
 
