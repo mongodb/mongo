@@ -195,7 +195,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    session, buf, ",collator=%s", lsm_tree->collator_name));
 	WT_ERR(__wt_buf_catfmt(session, buf,
 	    ",last=%" PRIu32
-	    ",chunk_count_limit=%" PRIu64
+	    ",chunk_count_limit=%" PRIu32
 	    ",chunk_max=%" PRIu64
 	    ",chunk_size=%" PRIu64
 	    ",auto_throttle=%" PRIu32
