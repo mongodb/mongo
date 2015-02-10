@@ -750,12 +750,16 @@ __wt_lsm_tree_throttle(
 	 * Don't throttle if the tree has less than a single level's number
 	 * of chunks.
 	 */
-	if (lsm_tree->nchunks < lsm_tree->merge_max)
-		lsm_tree->merge_throttle = 0;
-	else if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
-		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
-	else if (!decrease_only)
-		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_MERGES)) {
+		if (lsm_tree->nchunks < lsm_tree->merge_max)
+			lsm_tree->merge_throttle = 0;
+		else if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
+			WT_LSM_MERGE_THROTTLE_DECREASE(
+			    lsm_tree->merge_throttle);
+		else if (!decrease_only)
+			WT_LSM_MERGE_THROTTLE_INCREASE(
+			    lsm_tree->merge_throttle);
+	}
 
 	/* Put an upper bound of 1s on both throttle calculations. */
 	lsm_tree->ckpt_throttle = WT_MIN(1000000, lsm_tree->ckpt_throttle);
