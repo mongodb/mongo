@@ -24,8 +24,9 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	chunk = NULL;			/* -Wconditional-uninitialized */
 
-	/* LSM trees default to doing merges. */
-	F_SET(lsm_tree, WT_LSM_TREE_MERGES);
+	/* LSM trees inherit the merge setting from the connection. */
+	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
+		F_SET(lsm_tree, WT_LSM_TREE_MERGES);
 
 	WT_RET(__wt_metadata_search(session, lsm_tree->name, &lsmconfig));
 	WT_ERR(__wt_config_init(session, &cparser, lsmconfig));
