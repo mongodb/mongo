@@ -2063,7 +2063,23 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
-    conf = Configure(myenv)
+    def CheckBoostMinVersion(context):
+        compile_test_body = textwrap.dedent("""
+        #include <boost/version.hpp>
+
+        #if BOOST_VERSION < 104900
+        #error
+        #endif
+        """)
+
+        context.Message("Checking if system boost version is 1.49 or newer...")
+        result = context.TryCompile(compile_test_body, ".cpp")
+        context.Result(result)
+        return result
+
+    conf = Configure(myenv, custom_tests = {
+        'CheckBoostMinVersion': CheckBoostMinVersion,
+    })
     libdeps.setup_conftests(conf)
 
     if use_system_version_of_library("pcre"):
@@ -2091,6 +2107,9 @@ def doConfigure(myenv):
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
             print( "can't find boost headers" )
+            Exit(1)
+        if not conf.CheckBoostMinVersion():
+            print( "system's version of boost is too old. version 1.49 or better required")
             Exit(1)
 
         conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
