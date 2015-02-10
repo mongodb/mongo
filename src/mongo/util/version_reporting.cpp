@@ -38,6 +38,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
@@ -62,6 +63,27 @@ namespace mongo {
         log() << openSSLVersion("OpenSSL version: ") << endl;
 #endif
     }
+
+    BSONArray storageEngineList() {
+        BSONArrayBuilder engineArrayBuilder;
+
+        boost::scoped_ptr<StorageFactoriesIterator> sfi(
+            getGlobalEnvironment()->makeStorageFactoriesIterator());
+
+        if (sfi) {
+            while (sfi->more()) {
+                const StorageEngine::Factory* const& factory = sfi->next();
+                engineArrayBuilder.append(factory->getCanonicalName());
+            }
+        }
+
+        return engineArrayBuilder.arr();
+    }
+
+    void printStorageEngineList() {
+        log() << "storageEngines: " << storageEngineList() << endl;
+    }
+
 
 #ifndef _SCONS
 #if defined(_WIN32)
@@ -121,6 +143,7 @@ namespace mongo {
               << "loaderFlags" << loaderFlags()
               << "compilerFlags" << compilerFlags()
               << "allocator" << allocator()
+              << "storageEngines" << storageEngineList()
               << "versionArray" << versionArray
               << "javascriptEngine" << compiledJSEngine()
 /*TODO: add this back once the module system is in place -- maybe once we do something like serverstatus with callbacks*/
