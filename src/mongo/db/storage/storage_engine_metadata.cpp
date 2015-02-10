@@ -77,8 +77,9 @@ namespace {
             else {
                 // The storage metadata file is present but there was an issue
                 // reading its contents.
-                severe() << "Unable to verify the storage engine";
-                uassertStatusOK(status);
+                warning() << "Unable to read the existing the storage engine metadata: "
+                          << status.toString();
+                return std::auto_ptr<StorageEngineMetadata>();
             }
         }
         else if (containsMMapV1LocalNsFile(dbpath)) {
