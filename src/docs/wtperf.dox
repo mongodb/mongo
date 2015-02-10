@@ -81,50 +81,65 @@ Specify configuration strings for the WT_SESSION::create function.
 This argument is additive to the \c table_config parameter in the
 configuration file.
 
-@section monitor Monitoring wtperf performance
+@section monitor Monitoring wtperf
 
-In addition to testing a particular configuration, \c wtperf can monitor
-performance and operation latency times.  Monitoring can be enabled
-using the \c sample_interval configuration setting.  For example to
-record information every 10 seconds, add the following to the \c wtperf
-configuration file:
+Like all WiredTiger applications, the \c wtperf command can be configured
+with statistics logging, and the resulting output displayed using the
+\c wtstats visualization tool.  For more information, see @ref wtstats.
+
+In addition to statistics logging, \c wtperf can monitor performance and
+operation latency times.  Monitoring is enabled using the \c sample_interval
+configuration.  For example to record information every 10 seconds, set the
+following on the command line or add it to the \c wtperf configuration file:
 
 @code
 sample_interval=10
 @endcode
 
 Enabling monitoring causes \c wtperf to create a file \c monitor in the
-database home directory, or another directory as specified in the \c -m
-option to \c wtperf.
+database home directory (or another directory as specified using the
+\c -m option to \c wtperf).
 
-A visualization tool to see the performance over the course of the
-\c wtperf run can be found in \c tools/wtperf_stats.py.
+A visualization tool to see the performance over the course of the \c wtperf
+run can be found in \c tools/wtperf_stats/wtperf_stats.py.
 
-The following example shows how to run the \c large-lsm.wtperf
-configuration to a subdirectory of \c build_posix called \c WTPERF_RUN with
-monitoring enabled, and then generate a graph.  This example assumes you
-have all the necessary tools already installed to build WiredTiger,
-Python and python-nvd3.
+The following example shows how to run the \c medium-btree.wtperf configuration
+with monitoring enabled, and then generate a graph.
 
 @code
-cd $WIREDTIGER_SOURCE
+# Change into the WiredTiger directory.
+cd wiredtiger
+
+# Configure and build WiredTiger if not already built.
 ./configure && make
-mkdir WTPERF_RUN && ./bench/wtperf/wtperf -h WTPERF_RUN -O ./bench/wtperf/runners/large-lsm.wtperf
-cd WTPERF_RUN; python ../tools/wtperf_stats.py monitor
+
+# Remove and re-create the run directory.
+rm -rf WTPERF_RUN && mkdir WTPERF_RUN
+
+# Run the medium-btree.wtperf workload, sampling performance every 5 seconds.
+bench/wtperf/wtperf \
+    -h WTPERF_RUN \
+    -o sample_interval=5 \
+    -O bench/wtperf/runners/medium-btree.wtperf
+
+# Use the visualization tool to create HTML graph output; the output file is
+# named wtperf_stats.html.
+python tools/wtperf_stats/wtperf_stats.py WTPERF_RUN/monitor
 @endcode
 
-The python tool creates a file named \c wtperf_stats.html in the current
+The python command creates a file named \c wtperf_stats.html in the current
 working directory.  You can open the generated HTML document in your browser
 and see the generated statistics. The keys in the graph are clickable,
 including the graph included on this page.  Double clicking on one
 of the keys will show only that item.  Single clicking will
 enable or disable a particular item.
 
-The script as a few optional arguments.  For example, <code> -o file </code>
-or <code> --output file </code> to redirect the HTML output to another filename,
-and \c --abstime to display time on the X-axis in absolute time.
+The script has a few optional arguments: <code>-o file</code> or
+<code>--output file</code> to redirect the HTML output to another
+filename, and \c --abstime to display time on the X-axis in absolute
+time.
 
-For example, the file will have content like this:
+The following is example HTML output:
 
 \htmlinclude wtperf-sample.html
 
