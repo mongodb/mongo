@@ -11,10 +11,7 @@ import (
 	"io"
 )
 
-// Metadata consists of two parts, a collection's options and
-// its indexes. Options include properties like "capped" etc.
-// Metadata JSON is read in by mongorestore to properly recreate
-// collections with the proper options and indexes.
+// Metadata holds information about a collection's options and indexes.
 type Metadata struct {
 	Options bson.M        `json:"options,omitempty"`
 	Indexes []interface{} `json:"indexes"`

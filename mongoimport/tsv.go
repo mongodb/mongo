@@ -109,7 +109,7 @@ func (r *TSVInputReader) StreamDocument(ordered bool, readDocs chan bson.D) (ret
 }
 
 // Convert implements the Converter interface for TSV input. It converts a
-// CSVConverter struct to a BSON document.
+// TSVConverter struct to a BSON document.
 func (c TSVConverter) Convert() (bson.D, error) {
 	return tokensToBSON(
 		c.fields,

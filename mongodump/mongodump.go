@@ -48,7 +48,7 @@ type MongoDump struct {
 	progressManager *progress.Manager
 }
 
-// ValidateOptions checks for any incompatible sets of options
+// ValidateOptions checks for any incompatible sets of options.
 func (dump *MongoDump) ValidateOptions() error {
 	switch {
 	case dump.OutputOptions.Out == "-" && dump.ToolOptions.Namespace.Collection == "":
@@ -255,7 +255,7 @@ func (dump *MongoDump) Dump() error {
 }
 
 // DumpIntents iterates through the previously-created intents and
-// dumps all of the found collections
+// dumps all of the found collections.
 func (dump *MongoDump) DumpIntents() error {
 	resultChan := make(chan error)
 

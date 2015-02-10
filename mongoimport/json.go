@@ -137,7 +137,7 @@ func (r *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D) (re
 }
 
 // Convert implements the Converter interface for JSON input. It converts a
-// CSVConverter struct to a BSON document.
+// JSONConverter struct to a BSON document.
 func (c JSONConverter) Convert() (bson.D, error) {
 	document, err := json.UnmarshalBsonD(c.data)
 	if err != nil {
