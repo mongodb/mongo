@@ -1142,27 +1142,26 @@ fast:		/*
 		 * is modified above, we expect mod != NULL.
 		 */
 		mod = page->modify;
-		if (!modified && mod != NULL &&
-		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
+		if (!modified && mod != NULL && !LF_ISSET(
+		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_WOULD_BLOCK) &&
 		    !__wt_txn_visible_all(session, mod->rec_max_txn))
 			continue;
 
 		/*
-		 * If the oldest transaction hasn't changed since the
-		 * last time this page was written, it's unlikely that
-		 * we can make progress.  Similarly, if the most recent
-		 * update on the page is not yet globally visible,
-		 * eviction will fail.  These heuristics attempt to
-		 * avoid repeated attempts to evict the same page.
+		 * If the oldest transaction hasn't changed since the last time
+		 * this page was written, it's unlikely that we can make
+		 * progress.  Similarly, if the most recent update on the page
+		 * is not yet globally visible, eviction will fail.  These
+		 * heuristics attempt to avoid repeated attempts to evict the
+		 * same page.
 		 *
-		 * That said, if eviction is stuck, or the file is
-		 * being checkpointed, try anyway: maybe a transaction
-		 * that was running last time we wrote the page has
-		 * since rolled back, or we can help get the checkpoint
-		 * completed sooner.
+		 * That said, if eviction is stuck, or we are helping with
+		 * forced eviction, try anyway: maybe a transaction that was
+		 * running last time we wrote the page has since rolled back,
+		 * or we can help get the checkpoint completed sooner.
 		 */
-		if (modified && !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
-		    !btree->checkpointing &&
+		if (modified && !LF_ISSET(
+		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK) &&
 		    (mod->disk_snap_min == S2C(session)->txn_global.oldest_id ||
 		    !__wt_txn_visible_all(session, mod->update_txn)))
 			continue;
