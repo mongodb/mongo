@@ -780,6 +780,14 @@ namespace {
         }
         catch (...) {
             replCoord->incrementRollbackID();
+
+            if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+                warning() << "Failed to transition into " <<
+                    MemberState(MemberState::RS_RECOVERING) << "; expected to be in state " <<
+                    MemberState(MemberState::RS_ROLLBACK) << "but found self in " <<
+                    replCoord->getMemberState();
+            }
+
             throw;
         }
         replCoord->incrementRollbackID();
