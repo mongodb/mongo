@@ -71,7 +71,6 @@ Seward's
 SiH
 TXT
 URIs
-Vv
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
@@ -348,6 +347,7 @@ putValue
 putValueString
 py
 qnx
+rVv
 rdbms
 rdlock
 readlock
