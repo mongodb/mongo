@@ -3015,7 +3015,7 @@ namespace {
     TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozen) {
         BSONObj response = prepareFreezeResponse(0);
         ASSERT_EQUALS("unfreezing", response["info"].String());
-        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'unfreezing'"));
+        ASSERT_EQUALS(1, countLogLinesContaining("'unfreezing'"));
         // 1 instead of 0 because it assigns to "now" in this case
         ASSERT_EQUALS(1LL, getTopoCoord().getStepDownTime().asInt64());
     }
@@ -3024,7 +3024,7 @@ namespace {
         BSONObj response = prepareFreezeResponse(1);
         ASSERT_EQUALS("you really want to freeze for only 1 second?",
                       response["warning"].String());
-        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 1 seconds"));
+        ASSERT_EQUALS(1, countLogLinesContaining("'freezing' for 1 seconds"));
         // 1001 because "now" was incremented once during initialization + 1000 ms wait
         ASSERT_EQUALS(1001LL, getTopoCoord().getStepDownTime().asInt64());
     }
@@ -3032,7 +3032,7 @@ namespace {
     TEST_F(PrepareFreezeResponseTest, FreezeForManySeconds) {
         BSONObj response = prepareFreezeResponse(20);
         ASSERT_TRUE(response.isEmpty());
-        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 20 seconds"));
+        ASSERT_EQUALS(1, countLogLinesContaining("'freezing' for 20 seconds"));
         // 20001 because "now" was incremented once during initialization + 20000 ms wait
         ASSERT_EQUALS(20001LL, getTopoCoord().getStepDownTime().asInt64());
     }
@@ -3043,7 +3043,7 @@ namespace {
         ASSERT_EQUALS("unfreezing", response["info"].String());
         // doesn't mention being primary in this case for some reason
         ASSERT_EQUALS(0, countLogLinesContaining(
-                "replSet info received freeze command but we are primary"));
+                "received freeze command but we are primary"));
         // 1 instead of 0 because it assigns to "now" in this case
         ASSERT_EQUALS(1LL, getTopoCoord().getStepDownTime().asInt64());
     }
@@ -3054,7 +3054,7 @@ namespace {
         ASSERT_EQUALS("you really want to freeze for only 1 second?",
                       response["warning"].String());
         ASSERT_EQUALS(1, countLogLinesContaining(
-                "replSet info received freeze command but we are primary"));
+                "received freeze command but we are primary"));
         ASSERT_EQUALS(0LL, getTopoCoord().getStepDownTime().asInt64());
     }
 
@@ -3063,7 +3063,7 @@ namespace {
         BSONObj response = prepareFreezeResponse(20);
         ASSERT_TRUE(response.isEmpty());
         ASSERT_EQUALS(1, countLogLinesContaining(
-                "replSet info received freeze command but we are primary"));
+                "received freeze command but we are primary"));
         ASSERT_EQUALS(0LL, getTopoCoord().getStepDownTime().asInt64());
     }
 

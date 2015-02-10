@@ -263,7 +263,7 @@ namespace {
         net->exitNetwork();
         stopCapturingLogMessages();
         ASSERT_EQUALS(1,
-                countLogLinesContaining("replSet couldn't elect self, only received -9999 votes"));
+                countLogLinesContaining("couldn't elect self, only received -9999 votes"));
     }
 
     TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
