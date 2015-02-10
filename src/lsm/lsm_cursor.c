@@ -393,7 +393,6 @@ __clsm_open_cursors(
 	txn = &session->txn;
 	lsm_tree = clsm->lsm_tree;
 	chunk = NULL;
-	close_range_end = close_range_start = 0;
 
 	if (update) {
 		if (txn->isolation == TXN_ISO_SNAPSHOT)
@@ -527,6 +526,9 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 			else
 				close_range_end = 0;
 			WT_ASSERT(session, ngood >= close_range_end);
+		} else {
+			close_range_end = 0;
+			close_range_start = 0;
 		}
 		if (close_range_end > close_range_start) {
 			saved_gen = lsm_tree->dsk_gen;
