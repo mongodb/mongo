@@ -11,7 +11,7 @@
 const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
-const char *usage_prefix = "[-Vv] [-C config] [-h home]";
+const char *usage_prefix = "[-Vv] [-r] [-C config] [-h home]";
 int verbose;					/* Verbose flag */
 
 static const char *command;			/* Command name */
@@ -27,7 +27,7 @@ main(int argc, char *argv[])
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
 	char *p;
-	const char *cmd_config, *config;
+	const char *cmd_config, *config, *rec_config;
 
 	conn = NULL;
 	p = NULL;
@@ -52,15 +52,26 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	/* Check for standard options. */
 	cmd_config = config = NULL;
-	while ((ch = __wt_getopt(progname, argc, argv, "C:h:Vv")) != EOF)
+	/*
+	 * We default to turning recovery off by setting the config string
+	 * to disable logging.  Commands that should recover, if the
+	 * underlying database was originally using logging, will set the
+	 * rec_config to NULL.  That will run recovery if needed when
+	 * wiredtiger_open is called.
+	 */
+	rec_config = "log=(enabled=false)";
+	/* Check for standard options. */
+	while ((ch = __wt_getopt(progname, argc, argv, "C:h:rVv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			cmd_config = __wt_optarg;
 			break;
 		case 'h':			/* home directory */
 			home = __wt_optarg;
+			break;
+		case 'r':			/* recovery */
+			rec_config = NULL;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
@@ -90,20 +101,23 @@ main(int argc, char *argv[])
 			func = util_backup;
 		break;
 	case 'c':
-		if (strcmp(command, "compact") == 0)
+		if (strcmp(command, "compact") == 0) {
 			func = util_compact;
-		else if (strcmp(command, "copyright") == 0) {
+			rec_config = NULL;
+		} else if (strcmp(command, "copyright") == 0) {
 			util_copyright();
 			return (EXIT_SUCCESS);
 		} else if (strcmp(command, "create") == 0) {
 			func = util_create;
 			config = "create";
+			rec_config = NULL;
 		}
 		break;
 	case 'd':
-		if (strcmp(command, "drop") == 0)
+		if (strcmp(command, "drop") == 0) {
 			func = util_drop;
-		else if (strcmp(command, "dump") == 0)
+			rec_config = NULL;
+		} else if (strcmp(command, "dump") == 0)
 			func = util_dump;
 		break;
 	case 'l':
@@ -112,9 +126,11 @@ main(int argc, char *argv[])
 		else if (strcmp(command, "load") == 0) {
 			func = util_load;
 			config = "create";
+			rec_config = NULL;
 		} else if (strcmp(command, "loadtext") == 0) {
 			func = util_loadtext;
 			config = "create";
+			rec_config = NULL;
 		}
 		break;
 	case 'p':
@@ -124,8 +140,10 @@ main(int argc, char *argv[])
 	case 'r':
 		if (strcmp(command, "read") == 0)
 			func = util_read;
-		else if (strcmp(command, "rename") == 0)
+		else if (strcmp(command, "rename") == 0) {
 			func = util_rename;
+			rec_config = NULL;
+		}
 		break;
 	case 's':
 		if (strcmp(command, "salvage") == 0)
@@ -136,16 +154,20 @@ main(int argc, char *argv[])
 		}
 		break;
 	case 'u':
-		if (strcmp(command, "upgrade") == 0)
+		if (strcmp(command, "upgrade") == 0) {
 			func = util_upgrade;
+			rec_config = NULL;
+		}
 		break;
 	case 'v':
 		if (strcmp(command, "verify") == 0)
 			func = util_verify;
 		break;
 	case 'w':
-		if (strcmp(command, "write") == 0)
+		if (strcmp(command, "write") == 0) {
 			func = util_write;
+			rec_config = NULL;
+		}
 		break;
 	default:
 		break;
@@ -154,15 +176,22 @@ main(int argc, char *argv[])
 		return (usage());
 
 	/* Build the configuration string, as necessary. */
-	if (config == NULL)
-		config = cmd_config;
-	else if (cmd_config != NULL) {
-		len = strlen(cmd_config) + strlen(config) + 10;
+	if (cmd_config != NULL || rec_config != NULL) {
+		len = 10;		/* some slop */
+		if (config != NULL)
+			len += strlen(config);
+		if (cmd_config != NULL)
+			len += strlen(cmd_config);
+		if (rec_config != NULL)
+			len += strlen(rec_config);
 		if ((p = malloc(len)) == NULL) {
 			ret = util_err(errno, NULL);
 			goto err;
 		}
-		(void)snprintf(p, len, "%s,%s", config, cmd_config);
+		(void)snprintf(p, len, "%s,%s,%s",
+		    config == NULL ? "" : config,
+		    cmd_config == NULL ? "" : cmd_config,
+		    rec_config == NULL ? "" : rec_config);
 		config = p;
 	}
 
@@ -201,6 +230,7 @@ usage(void)
 	    "global options:\n"
 	    "\t" "-C\twiredtiger_open configuration\n"
 	    "\t" "-h\tdatabase directory\n"
+	    "\t" "-r\trun recovery if configured\n"
 	    "\t" "-V\tdisplay library version and exit\n"
 	    "\t" "-v\tverbose\n");
 	fprintf(stderr,
