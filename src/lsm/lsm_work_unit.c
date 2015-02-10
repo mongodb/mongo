@@ -360,8 +360,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointed %s",
 	    chunk->uri));
-	/*
-	 * Schedule a bloom filter create for our newly flushed chunk */
+
+	/* Schedule a bloom filter create for our newly flushed chunk. */
 	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
 		WT_RET(__wt_lsm_manager_push_entry(
 		    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
