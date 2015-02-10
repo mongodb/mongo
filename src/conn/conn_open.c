@@ -143,14 +143,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * Complain if files weren't closed, ignoring the lock file, we'll
 	 * close it in a minute.
 	 */
-	TAILQ_FOREACH(fh, &conn->fhqh, q) {
+	SLIST_FOREACH(fh, &conn->fhlh, l) {
 		if (fh == conn->lock_fh)
 			continue;
 
 		__wt_errx(session,
 		    "Connection has open file handles: %s", fh->name);
 		WT_TRET(__wt_close(session, fh));
-		fh = TAILQ_FIRST(&conn->fhqh);
+		fh = SLIST_FIRST(&conn->fhlh);
 	}
 
 	/* Shut down the eviction server thread. */

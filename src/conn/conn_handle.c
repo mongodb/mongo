@@ -22,14 +22,13 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
 		SLIST_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
-		TAILQ_INIT(&conn->fhhash[i]);	/* File handle hash lists */
-		TAILQ_INIT(&conn->blockhash[i]);/* Block handle hash lists */
+		SLIST_INIT(&conn->fhhash[i]);	/* File handle hash lists */
 	}
 
 	SLIST_INIT(&conn->dhlh);		/* Data handle list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->dsrcqh);		/* Data source list */
-	TAILQ_INIT(&conn->fhqh);		/* File list */
+	SLIST_INIT(&conn->fhlh);		/* File list */
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 	TAILQ_INIT(&conn->extractorqh);		/* Extractor list */
@@ -88,7 +87,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	 * more opaque, but for now this is simpler.
 	 */
 	WT_RET(__wt_spin_init(session, &conn->block_lock, "block manager"));
-	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+		SLIST_INIT(&conn->blockhash[i]);/* Block handle hash lists */
+	SLIST_INIT(&conn->blocklh);		/* Block manager list */
 
 	return (0);
 }

@@ -393,6 +393,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	pindex = WT_INTL_INDEX_COPY(parent);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
 	    parent, pindex->entries, children));
@@ -999,7 +1000,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%s split into parent %" PRIu32 " -> %" PRIu32
 	    " (%" PRIu32 ")",
@@ -1487,6 +1487,9 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session, ref, ref_new, new_entries,
 	    parent_decr, parent_incr, exclusive, 1, &split_gen));
+
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);
 
 	__wt_free(session, ref_new);
 
