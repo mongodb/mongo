@@ -1084,7 +1084,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (__wt_ref_is_root(btree->evict_ref))
 			continue;
 		page = btree->evict_ref->page;
-		mod = page->modify;
 		modified = __wt_page_is_modified(page);
 
 		/*
@@ -1138,7 +1137,11 @@ fast:		/*
 		/*
 		 * If the page is clean but has modifications that appear too
 		 * new to evict, skip it.
+		 *
+		 * Note: take care with ordering: if we detected that the page
+		 * is modified above, we expect mod != NULL.
 		 */
+		mod = page->modify;
 		if (!modified && mod != NULL &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
 		    !__wt_txn_visible_all(session, mod->rec_max_txn))
