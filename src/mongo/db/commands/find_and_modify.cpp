@@ -148,11 +148,13 @@ namespace mongo {
                     // but that's ok, we'll just do nothing and error out
                 }
                 else {
-                    WriteUnitOfWork wuow(txn);
-                    uassertStatusOK( userCreateNS( txn, db,
-                                                   ns, BSONObj(),
-                                                   !fromRepl ) );
-                    wuow.commit();
+                    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                        WriteUnitOfWork wuow(txn);
+                        uassertStatusOK( userCreateNS( txn, db,
+                                                       ns, BSONObj(),
+                                                       !fromRepl ) );
+                        wuow.commit();
+                    } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", ns);
                 }
 
                 errmsg = "";
