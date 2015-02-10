@@ -197,6 +197,10 @@ namespace mongo {
             }
         }
 
+        if (loops.empty()) {
+            return BAD_VALUE("Polygon has no loops.");
+        }
+
         // Check if the given loops form a valid polygon.
         // 1. If a loop contains an edge AB, then no other loop may contain AB or BA.
         // 2. No loop covers more than half of the sphere.
