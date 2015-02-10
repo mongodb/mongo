@@ -833,8 +833,12 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	lsm_tree->modified = 1;
 
-	/* Set the switch transaction in the previous chunk, if necessary. */
-	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE)
+	/*
+	 * Set the switch transaction in the previous chunk unless this is
+	 * the first chunk in a new or newly opened tree.
+	 */
+	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE &&
+	    !F_ISSET(last_chunk, WT_LSM_CHUNK_ONDISK))
 		last_chunk->switch_txn = __wt_txn_new_id(session);
 
 err:	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
