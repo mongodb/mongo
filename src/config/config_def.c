@@ -203,7 +203,7 @@ static const WT_CONFIG_CHECK confchk_lsm_subconfigs[] = {
 	{ "bloom_config", "string", NULL, NULL },
 	{ "bloom_hash_count", "int", "min=2,max=100", NULL },
 	{ "bloom_oldest", "boolean", NULL, NULL },
-	{ "chunk_count_limit", "string", NULL, NULL },
+	{ "chunk_count_limit", "int", NULL, NULL },
 	{ "chunk_max", "int", "min=100MB,max=10TB", NULL },
 	{ "chunk_size", "int", "min=512K,max=500MB", NULL },
 	{ "merge_max", "int", "min=2,max=100", NULL },

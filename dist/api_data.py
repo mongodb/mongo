@@ -92,7 +92,8 @@ lsm_config = [
             the maximum number of chunks to allow in an LSM tree. This
             option automatically times out old data. As new chunks are
             added old chunks will be removed. Enabling this option
-            disables LSM background merges'''),
+            disables LSM background merges''',
+            type='int'),
         Config('chunk_max', '5GB', r'''
             the maximum size a single chunk can be. Chunks larger than this
             size are not considered for further merges. This is a soft
