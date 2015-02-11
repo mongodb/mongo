@@ -172,9 +172,8 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	pthread_mutex_lock(&t->lock);
+	(void)pthread_mutex_lock(&t->lock);
 }
-
 #endif
 
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
