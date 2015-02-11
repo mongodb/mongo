@@ -410,7 +410,7 @@ namespace {
             // We're not actually going to delete anything, but we're going to syncronize
             // on the deleter thread.
             // Don't wait forever: we're in a transaction, we could block eviction.
-            (void)lock.timed_lock(boost::posix_time::millisec(1000));
+            (void)lock.timed_lock(boost::posix_time::millisec(200));
             return 0;
         }
         else {
@@ -421,7 +421,7 @@ namespace {
                     return 0;
 
                 // Don't wait forever: we're in a transaction, we could block eviction.
-                if (!lock.timed_lock(boost::posix_time::millisec(1000)))
+                if (!lock.timed_lock(boost::posix_time::millisec(200)))
                     return 0;
 
                 // If we already waited, let someone else do cleanup unless we are significantly
@@ -463,7 +463,7 @@ namespace {
             RecordId newestOld;
             int ret = 0;
             while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) &&
-                   (docsRemoved < 1000) &&
+                   (docsRemoved < 20000) &&
                    (ret = WT_OP_CHECK(c->next(c))) == 0) {
 
                 int64_t key;
