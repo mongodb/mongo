@@ -1903,6 +1903,16 @@ namespace mongo {
             {
                 // 0. copy system.namespaces entry if collection doesn't already exist
                 Client::WriteContext ctx(txn,  ns );
+
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                    nsToDatabaseSubstring(ns))) {
+                    errmsg = str::stream() << "Not primary during migration: " << ns
+                                           << ": checking if collection exists";
+                    warning() << errmsg;
+                    setState(FAIL);
+                    return;
+                }
+
                 // Only copy if ns doesn't already exist
                 Database* db = ctx.ctx().db();
                 Collection* collection = db->getCollection( ns );

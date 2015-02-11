@@ -229,6 +229,16 @@ namespace mongo {
                         // that day, to avoid data corruption due to lack of index cleanup.
                         txn->recoveryUnit()->commitAndRestart();
                         dbLock.relockWithMode(MODE_X);
+                        if (!fromRepl &&
+                            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                                dbname)) {
+                            return appendCommandStatus(
+                                result,
+                                Status(ErrorCodes::NotMaster, str::stream()
+                                    << "Not primary while creating background indexes in "
+                                    << ns.ns() << ": cleaning up index build failure due to "
+                                    << e.toString()));
+                        }
                     }
                     catch (...) {
                         std::terminate();
@@ -240,6 +250,12 @@ namespace mongo {
             if (indexer.getBuildInBackground()) {
                 txn->recoveryUnit()->commitAndRestart();
                 dbLock.relockWithMode(MODE_X);
+                uassert(ErrorCodes::NotMaster,
+                        str::stream() << "Not primary while completing index build in " << dbname,
+                        fromRepl ||
+                        repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                            dbname));
+
                 Database* db = dbHolder().get(txn, ns.db());
                 uassert(28551, "database dropped during index build", db);
                 uassert(28552, "collection dropped during index build",
