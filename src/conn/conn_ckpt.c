@@ -90,6 +90,13 @@ __ckpt_server(void *arg)
 		if (conn->ckpt_logsize) {
 			__wt_log_written_reset(session);
 			conn->ckpt_signalled = 0;
+
+			/*
+			 * In case the condition variable was already
+			 * signalled, do a zero-length wait to clear it so we
+			 * don't do another checkpoint immediately.
+			 */
+			WT_ERR(__wt_cond_wait(session, conn->ckpt_cond, 0));
 		}
 		/*
 		 * Wait...
