@@ -48,6 +48,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
@@ -146,6 +147,12 @@ namespace mongo {
                     mayInterrupt( _mayBeInterrupted );
                     dbtempreleaseif t( _mayYield );
                 }
+
+                uassert(ErrorCodes::NotMaster,
+                        str::stream() << "Not primary while cloning collection " << from_collection
+                                      << " to " << to_collection,
+                        !logForRepl ||
+                        isMasterNs(to_collection));
 
                 if ( isindex == false && collection == NULL ) {
                     collection = context.db()->getCollection( to_collection );
@@ -250,6 +257,13 @@ namespace mongo {
                          query, 0, options);
         }
 
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Not primary while cloning collection " << from_collection
+                              << " to " << to_collection << " with filter "
+                              << query.toString(),
+                !logForRepl ||
+                isMasterNs(from_collection));
+
         if ( indexesToBuild.size() ) {
             for (list<BSONObj>::const_iterator i = indexesToBuild.begin();
                  i != indexesToBuild.end();
@@ -320,6 +334,11 @@ namespace mongo {
         const string dbname = nss.db().toString();
 
         Client::WriteContext ctx(ns);
+
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
+                !logForRepl ||
+                isMasterNs(ns.c_str()));
 
         // config
         BSONObj filter = BSON("name" << nss.coll().toString());
@@ -466,6 +485,13 @@ namespace mongo {
                 mayInterrupt( opts.mayBeInterrupted );
                 dbtempreleaseif r( opts.mayYield );
             }
+
+            uassert(ErrorCodes::NotMaster,
+                    str::stream() << "Not primary while cloning database " << opts.fromDB
+                                  << " (after getting list of collections to clone)",
+                    !opts.logForRepl ||
+                    isMaster(todb.c_str()));
+
             BSONObj collection = *i;
             LOG(2) << "  really will clone: " << collection << endl;
             BSONObj options = collection.getObjectField("options");
