@@ -257,7 +257,7 @@ namespace mongo {
         TicketServerParameter openWriteTransactionParam(&openWriteTransaction,
                                                         "wiredTigerConcurrentWriteTransactions");
 
-        TicketHolder openReadTransaction(256);
+        TicketHolder openReadTransaction(128);
         TicketServerParameter openReadTransactionParam(&openReadTransaction,
                                                        "wiredTigerConcurrentReadTransactions");
 
