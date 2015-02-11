@@ -341,8 +341,8 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	if restore.safety == nil {
 		writeConcern["w"] = 0
 	} else {
-		if restore.safety.WMode == "majority" {
-			writeConcern["w"] = "majority"
+		if restore.safety.WMode != "" {
+			writeConcern["w"] = restore.safety.WMode
 		} else {
 			writeConcern["w"] = restore.safety.W
 		}
