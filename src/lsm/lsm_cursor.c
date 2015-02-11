@@ -385,6 +385,7 @@ __clsm_open_cursors(
 	const char *checkpoint, *ckpt_cfg[3];
 	uint64_t saved_gen;
 	u_int i, nchunks, ngood, nupdates;
+	u_int close_range_end, close_range_start;
 	int locked;
 
 	c = &clsm->iface;
@@ -508,23 +509,33 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		}
 
 		/*
-		 * Close any cursors we no longer need.  If the cursor is a
-		 * pure update cursor, close everything -- we usually only need
-		 * a single chunk open in that case and we haven't walked all
-		 * of the other slots in the loop above.
+		 * Close any cursors we no longer need.
 		 *
 		 * Drop the LSM tree lock while we do this: if the cache is
 		 * full, we may block while closing a cursor.  Save the
 		 * generation number and retry if it has changed under us.
 		 */
-		if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0)
-			ngood = 0;
 		if (clsm->cursors != NULL && ngood < clsm->nchunks) {
+			close_range_start = ngood;
+			close_range_end = clsm->nchunks;
+		} else if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0 ) {
+			close_range_start = 0;
+			close_range_end = WT_MIN(nchunks, clsm->nchunks);
+			if (close_range_end > nupdates)
+				close_range_end -= nupdates;
+			else
+				close_range_end = 0;
+			WT_ASSERT(session, ngood >= close_range_end);
+		} else {
+			close_range_end = 0;
+			close_range_start = 0;
+		}
+		if (close_range_end > close_range_start) {
 			saved_gen = lsm_tree->dsk_gen;
 			locked = 0;
 			WT_ERR(__wt_lsm_tree_readunlock(session, lsm_tree));
 			WT_ERR(__clsm_close_cursors(
-			    clsm, ngood, clsm->nchunks));
+			    clsm, close_range_start, close_range_end));
 			WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
 			locked = 1;
 			if (lsm_tree->dsk_gen != saved_gen)

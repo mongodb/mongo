@@ -18,19 +18,20 @@ __remove_file_check(WT_SESSION_IMPL *session, const char *name)
 #ifdef HAVE_DIAGNOSTIC
 	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
+	uint64_t bucket;
 
 	conn = S2C(session);
 	fh = NULL;
+	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
 
 	/*
 	 * Check if the file is open: it's an error if it is, since a higher
 	 * level should have closed it before removing.
 	 */
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_FOREACH(fh, &conn->fhqh, q) {
+	SLIST_FOREACH(fh, &conn->fhhash[bucket], l)
 		if (strcmp(name, fh->name) == 0)
 			break;
-	}
 	__wt_spin_unlock(session, &conn->fh_lock);
 
 	WT_ASSERT(session, fh == NULL);

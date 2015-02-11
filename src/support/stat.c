@@ -57,7 +57,11 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "cache: overflow pages read into cache";
 	stats->cache_overflow_value.desc =
 	    "cache: overflow values cached in memory";
+	stats->cache_eviction_deepen.desc =
+	    "cache: page split during eviction deepened the tree";
 	stats->cache_read.desc = "cache: pages read into cache";
+	stats->cache_eviction_split.desc =
+	    "cache: pages split during eviction";
 	stats->cache_write.desc = "cache: pages written from cache";
 	stats->cache_eviction_clean.desc = "cache: unmodified pages evicted";
 	stats->compress_read.desc = "compression: compressed pages read";
@@ -175,7 +179,9 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_read_overflow.v = 0;
 	stats->cache_overflow_value.v = 0;
+	stats->cache_eviction_deepen.v = 0;
 	stats->cache_read.v = 0;
+	stats->cache_eviction_split.v = 0;
 	stats->cache_write.v = 0;
 	stats->cache_eviction_clean.v = 0;
 	stats->compress_read.v = 0;
@@ -261,7 +267,9 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->cache_eviction_dirty.v += c->cache_eviction_dirty.v;
 	p->cache_read_overflow.v += c->cache_read_overflow.v;
 	p->cache_overflow_value.v += c->cache_overflow_value.v;
+	p->cache_eviction_deepen.v += c->cache_eviction_deepen.v;
 	p->cache_read.v += c->cache_read.v;
+	p->cache_eviction_split.v += c->cache_eviction_split.v;
 	p->cache_write.v += c->cache_write.v;
 	p->cache_eviction_clean.v += c->cache_eviction_clean.v;
 	p->compress_read.v += c->compress_read.v;

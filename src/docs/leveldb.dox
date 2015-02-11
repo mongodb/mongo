@@ -1,5 +1,5 @@
 /*!
-@page leveldb LevelDB compatibility API
+@page leveldb Building and installing the LevelDB compatibility API
 
 WiredTiger includes an implementation of the LevelDB API to ease integration and performance testing with existing applications.
 

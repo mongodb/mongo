@@ -1094,11 +1094,16 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest,
 	 * create a bloom filter on the oldest LSM tree chunk.  Only supported
 	 * if bloom filters are enabled., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum size a single
-	 * chunk can be.  Chunks larger than this size are not considered for
-	 * further merges.  This is a soft limit\, and chunks larger than this
-	 * value can be created.  Must be larger than chunk_size., an integer
-	 * between 100MB and 10TB; default \c 5GB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_count_limit, the maximum number
+	 * of chunks to allow in an LSM tree.  This option automatically times
+	 * out old data.  As new chunks are added old chunks will be removed.
+	 * Enabling this option disables LSM background merges., an integer;
+	 * default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum
+	 * size a single chunk can be.  Chunks larger than this size are not
+	 * considered for further merges.  This is a soft limit\, and chunks
+	 * larger than this value can be created.  Must be larger than
+	 * chunk_size., an integer between 100MB and 10TB; default \c 5GB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the
 	 * in-memory chunk of an LSM tree.  This limit is soft - it is possible
 	 * for chunks to be temporarily larger than this value.  This overrides
@@ -3505,108 +3510,112 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_EVICTION_CHECKPOINT		2035
 /*! cache: unmodified pages evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2036
+/*! cache: page split during eviction deepened the tree */
+#define	WT_STAT_DSRC_CACHE_EVICTION_DEEPEN		2037
 /*! cache: modified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2037
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2038
 /*! cache: data source pages selected for eviction unable to be evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2038
+#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2039
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		2039
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		2040
 /*! cache: internal pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2040
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2041
+/*! cache: pages split during eviction */
+#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT		2042
 /*! cache: in-memory page splits */
-#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2041
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2043
 /*! cache: overflow values cached in memory */
-#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		2042
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		2044
 /*! cache: pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ				2043
+#define	WT_STAT_DSRC_CACHE_READ				2045
 /*! cache: overflow pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2044
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2046
 /*! cache: pages written from cache */
-#define	WT_STAT_DSRC_CACHE_WRITE			2045
+#define	WT_STAT_DSRC_CACHE_WRITE			2047
 /*! compression: raw compression call failed, no additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2046
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2048
 /*! compression: raw compression call failed, additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2047
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2049
 /*! compression: raw compression call succeeded */
-#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2048
+#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2050
 /*! compression: compressed pages read */
-#define	WT_STAT_DSRC_COMPRESS_READ			2049
+#define	WT_STAT_DSRC_COMPRESS_READ			2051
 /*! compression: compressed pages written */
-#define	WT_STAT_DSRC_COMPRESS_WRITE			2050
+#define	WT_STAT_DSRC_COMPRESS_WRITE			2052
 /*! compression: page written failed to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2051
+#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2053
 /*! compression: page written was too small to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2052
+#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2054
 /*! cursor: create calls */
-#define	WT_STAT_DSRC_CURSOR_CREATE			2053
+#define	WT_STAT_DSRC_CURSOR_CREATE			2055
 /*! cursor: insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			2054
+#define	WT_STAT_DSRC_CURSOR_INSERT			2056
 /*! cursor: bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2055
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2057
 /*! cursor: cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2056
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2058
 /*! cursor: next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			2057
+#define	WT_STAT_DSRC_CURSOR_NEXT			2059
 /*! cursor: prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			2058
+#define	WT_STAT_DSRC_CURSOR_PREV			2060
 /*! cursor: remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			2059
+#define	WT_STAT_DSRC_CURSOR_REMOVE			2061
 /*! cursor: cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2060
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2062
 /*! cursor: reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			2061
+#define	WT_STAT_DSRC_CURSOR_RESET			2063
 /*! cursor: search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			2062
+#define	WT_STAT_DSRC_CURSOR_SEARCH			2064
 /*! cursor: search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2063
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2065
 /*! cursor: update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			2064
+#define	WT_STAT_DSRC_CURSOR_UPDATE			2066
 /*! cursor: cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2065
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2067
 /*! LSM: sleep for LSM checkpoint throttle */
-#define	WT_STAT_DSRC_LSM_CHECKPOINT_THROTTLE		2066
+#define	WT_STAT_DSRC_LSM_CHECKPOINT_THROTTLE		2068
 /*! LSM: chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2067
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2069
 /*! LSM: highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2068
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2070
 /*! LSM: queries that could have benefited from a Bloom filter that did
  * not exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2069
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2071
 /*! LSM: sleep for LSM merge throttle */
-#define	WT_STAT_DSRC_LSM_MERGE_THROTTLE			2070
+#define	WT_STAT_DSRC_LSM_MERGE_THROTTLE			2072
 /*! reconciliation: dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			2071
+#define	WT_STAT_DSRC_REC_DICTIONARY			2073
 /*! reconciliation: internal page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2072
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2074
 /*! reconciliation: leaf page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2073
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2075
 /*! reconciliation: maximum blocks required for a page */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2074
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2076
 /*! reconciliation: internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2075
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2077
 /*! reconciliation: leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2076
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2078
 /*! reconciliation: overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2077
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2079
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2078
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2080
 /*! reconciliation: page checksum matches */
-#define	WT_STAT_DSRC_REC_PAGE_MATCH			2079
+#define	WT_STAT_DSRC_REC_PAGE_MATCH			2081
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2080
+#define	WT_STAT_DSRC_REC_PAGES				2082
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2081
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2083
 /*! reconciliation: leaf page key bytes discarded using prefix compression */
-#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2082
+#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2084
 /*! reconciliation: internal page key bytes discarded using suffix
  * compression */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2083
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2085
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2084
+#define	WT_STAT_DSRC_SESSION_COMPACT			2086
 /*! session: open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2085
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2087
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2086
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2088
 /*! @} */
 /*
  * Statistics section: END

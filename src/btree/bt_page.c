@@ -21,7 +21,7 @@ static int  __inmem_row_leaf_entries(
  *	Check if a page matches the criteria for forced eviction.
  */
 static int
-__evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_BTREE *btree;
 
@@ -41,7 +41,8 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Eviction may be turned off (although that's rare), or we may be in
 	 * the middle of a checkpoint.
 	 */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->checkpointing)
+	if (LF_ISSET(WT_READ_NO_EVICT) ||
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->checkpointing)
 		return (0);
 
 	/*
@@ -49,6 +50,13 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * never been modified, but check to be sure.
 	 */
 	if (page->modify == NULL)
+		return (0);
+
+	/*
+	 * If the page was recently split in-memory, don't force it out: we
+	 * hope eviction will find it first.
+	 */
+	if (!__wt_txn_visible_all(session, page->modify->first_dirty_txn))
 		return (0);
 
 	/* Trigger eviction on the next page release. */
@@ -126,10 +134,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			page = ref->page;
 			WT_ASSERT(session, page != NULL);
 
-			/* Forcibly evict pages that are too big. */
-			if (!LF_ISSET(WT_READ_NO_EVICT) &&
-			    force_attempts < 10 &&
-			    __evict_force_check(session, page)) {
+			/*
+			 * Forcibly evict pages that are too big.
+			 */
+			if (force_attempts < 10 &&
+			    __evict_force_check(session, page, flags)) {
 				++force_attempts;
 				ret = __wt_page_release_evict(session, ref);
 				if (ret == EBUSY) {
