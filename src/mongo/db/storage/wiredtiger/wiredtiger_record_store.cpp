@@ -619,6 +619,7 @@ namespace {
 
     StatusWith<RecordId> WiredTigerRecordStore::updateRecord( OperationContext* txn,
                                                               const RecordId& loc,
+                                                              const RecordData& oldRec,
                                                               const char* data,
                                                               int len,
                                                               bool enforceQuota,
@@ -631,11 +632,7 @@ namespace {
         int ret = WT_OP_CHECK(c->search(c));
         invariantWTOK(ret);
 
-        WT_ITEM old_value;
-        ret = c->get_value(c, &old_value);
-        invariantWTOK(ret);
-
-        int old_length = old_value.size;
+        const int old_length = oldRec.size();
 
         c->set_key(c, _makeKey(loc));
         WiredTigerItem value(data, len);

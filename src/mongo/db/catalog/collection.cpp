@@ -355,6 +355,7 @@ namespace mongo {
         // object is removed from all indexes.
         StatusWith<RecordId> newLocation = _recordStore->updateRecord( txn,
                                                                       oldLocation,
+                                                                      RecordData(objOld.value().objdata(), objOld.value().objsize()),
                                                                       objNew.objdata(),
                                                                       objNew.objsize(),
                                                                       _enforceQuota( enforceQuota ),
