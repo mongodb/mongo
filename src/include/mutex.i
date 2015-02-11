@@ -285,7 +285,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	pthread_mutex_unlock(&t->lock);
+	(void)pthread_mutex_unlock(&t->lock);
 }
 
 #elif SPINLOCK_TYPE == SPINLOCK_MSVC
