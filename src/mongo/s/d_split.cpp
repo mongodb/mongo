@@ -847,7 +847,11 @@ namespace mongo {
             {
                 AutoGetCollectionForRead ctx(txn, ns);
                 Collection* collection = ctx.getCollection();
-                invariant(collection);
+                if (!collection) {
+                    warning() << "will not perform top-chunk checking since " << ns
+                              << " does not exist after splitting";
+                    return true;
+                }
 
                 // Allow multiKey based on the invariant that shard keys must be
                 // single-valued. Therefore, any multi-key index prefixed by shard
