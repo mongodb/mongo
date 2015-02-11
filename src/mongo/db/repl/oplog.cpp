@@ -379,10 +379,6 @@ namespace {
         if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
             _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
-        //
-        // rollback-safe logOp listeners
-        //
-        getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
 
         try {
             // TODO SERVER-15192 remove this once all listeners are rollback-safe.
@@ -396,6 +392,7 @@ namespace {
             txn->recoveryUnit()->registerChange(new RollbackPreventer());
             logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
             logOpForDbHash(ns);
+            getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
 
             if ( strstr( ns, ".system.js" ) ) {
                 Scope::storedFuncMod(); // this is terrible
@@ -786,19 +783,12 @@ namespace {
         else {
             throw MsgAssertionException( 14825 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
         }
-
-        // AuthorizationManager's logOp method registers a RecoveryUnit::Change
-        // and to do so we need to have begun a UnitOfWork
-        WriteUnitOfWork wuow(txn);
         getGlobalAuthorizationManager()->logOp(
-                txn,
                 opType,
                 ns,
                 o,
                 fieldO2.isABSONObj() ? &o2 : NULL,
                 !fieldB.eoo() ? &valueB : NULL );
-        wuow.commit();
-
         return failedUpdate;
     }
 

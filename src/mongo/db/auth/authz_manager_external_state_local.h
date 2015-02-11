@@ -65,7 +65,6 @@ namespace mongo {
                                                 std::vector<BSONObj>* result);
 
         virtual void logOp(
-                OperationContext* txn,
                 const char* op,
                 const char* ns,
                 const BSONObj& o,
@@ -81,11 +80,6 @@ namespace mongo {
             roleGraphStateConsistent,
             roleGraphStateHasCycle
         };
-
-        /**
-         * RecoveryUnit::Change subclass used to commit work for AuthzManager logOp listener.
-         */
-        class AuthzManagerLogOpHandler;
 
         /**
          * Initializes the role graph from the contents of the admin.system.roles collection.

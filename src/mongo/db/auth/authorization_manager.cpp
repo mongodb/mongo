@@ -993,14 +993,13 @@ namespace {
     }
 
     void AuthorizationManager::logOp(
-            OperationContext* txn,
             const char* op,
             const char* ns,
             const BSONObj& o,
             BSONObj* o2,
             bool* b) {
 
-        _externalState->logOp(txn, op, ns, o, o2, b);
+        _externalState->logOp(op, ns, o, o2, b);
         if (appliesToAuthzData(op, ns, o)) {
             _invalidateRelevantCacheData(op, ns, o, o2);
         }

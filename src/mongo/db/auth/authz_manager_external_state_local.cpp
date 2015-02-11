@@ -36,14 +36,12 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     using std::vector;
-    using boost::optional;
 
     AuthzManagerExternalStateLocal::AuthzManagerExternalStateLocal() :
         _roleGraphState(roleGraphStateInitial) {}
@@ -367,74 +365,7 @@ namespace {
         return status;
     }
 
-    class AuthzManagerExternalStateLocal::AuthzManagerLogOpHandler : public RecoveryUnit::Change {
-    public:
-        AuthzManagerLogOpHandler(AuthzManagerExternalStateLocal* externalState,
-                                 const std::string& op,
-                                 const std::string& ns,
-                                 const BSONObj& o,
-                                 const optional<BSONObj>& o2,
-                                 const optional<bool>& b):
-            _externalState(externalState),
-            _op(op),
-            _ns(ns),
-            _o(o.getOwned()),
-            _o2(o2 ? o2->getOwned() : o2), // since o2 is an optional<BSONObj>
-            _b(b) {
-
-        }
-
-        virtual void commit() {
-            boost::lock_guard<boost::mutex> lk(_externalState->_roleGraphMutex);
-            Status status = _externalState->_roleGraph.handleLogOp(_op.c_str(),
-                                                                   NamespaceString(_ns.c_str()),
-                                                                   _o,
-                                                                   _o2 ? _o2.get_ptr() : NULL);
-
-            if (status == ErrorCodes::OplogOperationUnsupported) {
-                _externalState->_roleGraph = RoleGraph();
-                _externalState->_roleGraphState = _externalState->roleGraphStateInitial;
-                BSONObjBuilder oplogEntryBuilder;
-                oplogEntryBuilder << "op" << _op << "ns" << _ns << "o" << _o;
-                if (_o2)
-                    oplogEntryBuilder << "o2" << _o2;
-                if (_b)
-                    oplogEntryBuilder << "b" << _b;
-                error() << "Unsupported modification to roles collection in oplog; "
-                    "restart this process to reenable user-defined roles; " << status.reason() <<
-                    "; Oplog entry: " << oplogEntryBuilder.done();
-            }
-            else if (!status.isOK()) {
-                warning() << "Skipping bad update to roles collection in oplog. " << status <<
-                    " Oplog entry: " << _op;
-            }
-            status = _externalState->_roleGraph.recomputePrivilegeData();
-            if (status == ErrorCodes::GraphContainsCycle) {
-                _externalState->_roleGraphState = _externalState->roleGraphStateHasCycle;
-                error() << "Inconsistent role graph during authorization manager initialization.  "
-                    "Only direct privileges available. " << status.reason() <<
-                    " after applying oplog entry " << _op;
-            }
-            else {
-                fassert(17183, status);
-                _externalState->_roleGraphState = _externalState->roleGraphStateConsistent;
-            }
-
-        }
-
-        virtual void rollback() { }
-
-    private:
-        AuthzManagerExternalStateLocal* _externalState;
-        const std::string _op;
-        const std::string _ns;
-        const BSONObj _o;
-        const optional<BSONObj> _o2;
-        const optional<bool> _b;
-    };
-
     void AuthzManagerExternalStateLocal::logOp(
-            OperationContext* txn,
             const char* op,
             const char* ns,
             const BSONObj& o,
@@ -444,20 +375,37 @@ namespace {
         if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
             ns == AuthorizationManager::adminCommandNamespace.ns()) {
 
-            std::string opStr(op);
-            std::string nsStr(ns);
-            optional<BSONObj> o2Copy;
-            if (o2)
-                o2Copy = *o2;
-            optional<bool> bCopy;
-            if (b)
-                bCopy = *b;
-            txn->recoveryUnit()->registerChange(new AuthzManagerLogOpHandler(this,
-                                                                             opStr,
-                                                                             nsStr,
-                                                                             o,
-                                                                             o2Copy,
-                                                                             bCopy));
+            boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
+            Status status = _roleGraph.handleLogOp(op, NamespaceString(ns), o, o2);
+
+            if (status == ErrorCodes::OplogOperationUnsupported) {
+                _roleGraph = RoleGraph();
+                _roleGraphState = roleGraphStateInitial;
+                BSONObjBuilder oplogEntryBuilder;
+                oplogEntryBuilder << "op" << op << "ns" << ns << "o" << o;
+                if (o2)
+                    oplogEntryBuilder << "o2" << *o2;
+                if (b)
+                    oplogEntryBuilder << "b" << *b;
+                error() << "Unsupported modification to roles collection in oplog; "
+                    "restart this process to reenable user-defined roles; " << status.reason() <<
+                    "; Oplog entry: " << oplogEntryBuilder.done();
+            }
+            else if (!status.isOK()) {
+                warning() << "Skipping bad update to roles collection in oplog. " << status <<
+                    " Oplog entry: " << op;
+            }
+            status = _roleGraph.recomputePrivilegeData();
+            if (status == ErrorCodes::GraphContainsCycle) {
+                _roleGraphState = roleGraphStateHasCycle;
+                error() << "Inconsistent role graph during authorization manager initialization.  "
+                    "Only direct privileges available. " << status.reason() <<
+                    " after applying oplog entry " << op;
+            }
+            else {
+                fassert(17183, status);
+                _roleGraphState = roleGraphStateConsistent;
+            }
         }
     }
 
