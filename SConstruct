@@ -268,7 +268,6 @@ add_option( "llvm-symbolizer", "name of (or path to) the LLVM symbolizer", 1, Fa
 add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
 add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
 
-add_option( "pch" , "use precompiled headers to speed up the build (experimental)" , 0 , True , "usePCH" )
 add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
 
 # debugging/profiling help
@@ -522,8 +521,6 @@ usev8 = (jsEngine != 'none')
 v8version = jsEngine[3:] if jsEngine.startswith('v8-') else 'none'
 v8suffix = '' if v8version == '3.12' else '-' + v8version
 
-usePCH = has_option( "usePCH" )
-
 # The Scons 'default' tool enables a lot of tools that we don't actually need to enable.
 # On platforms like Solaris, it actually does the wrong thing by enabling the sunstudio
 # toolchain first. As such it is simpler and more efficient to manually load the precise
@@ -543,7 +540,7 @@ def decide_platform_tools():
     else:
         return ["default"]
 
-tools = decide_platform_tools() + ["gch", "jsheader", "mergelib", "mongo_unittest", "textfile"]
+tools = decide_platform_tools() + ["jsheader", "mergelib", "mongo_unittest", "textfile"]
 
 # We defer building the env until we have determined whether we want certain values. Some values
 # in the env actually have semantics for 'None' that differ from being absent, so it is better
@@ -1410,22 +1407,6 @@ def doConfigure(myenv):
             print "WARNING: WiredTiger is not supported on 32-bit platforms, disabling support"
             wiredtiger = False
     conf.Finish()
-
-    # Enable PCH if we are on using gcc or clang and the 'Gch' tool is enabled. Otherwise,
-    # remove any pre-compiled header since the compiler may try to use it if it exists.
-    if usePCH and (using_gcc() or using_clang()):
-        if 'Gch' in dir( myenv ):
-            if using_clang():
-                # clang++ uses pch.h.pch rather than pch.h.gch
-                myenv['GCHSUFFIX'] = '.pch'
-                # clang++ only uses pch from command line
-                myenv.Prepend( CXXFLAGS=['-include pch.h'] )
-            myenv['Gch'] = myenv.Gch( "$BUILD_DIR/mongo/pch.h$GCHSUFFIX",
-                                        "src/mongo/pch.h" )[0]
-            myenv['GchSh'] = myenv[ 'Gch' ]
-    elif os.path.exists( myenv.File("$BUILD_DIR/mongo/pch.h$GCHSUFFIX").abspath ):
-        print( "removing precompiled headers" )
-        os.unlink( myenv.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath )
 
     def AddFlagIfSupported(env, tool, extension, flag, **mutation):
         def CheckFlagTest(context, tool, extension, flag):
