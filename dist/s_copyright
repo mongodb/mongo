@@ -83,7 +83,7 @@ for i in `cd .. &&
         -e '/api\/leveldb\/leveldb\//d' \
         -e '/api\/leveldb\/rocksdb\//d' \
         -e '/test\/3rdparty\//d' \
-        -e '/tools\/3rdparty\//d' \
+        -e '/tools\/wtperf_stats\/3rdparty\//d' \
 	-e 's/^\.\///'`
 do
 	check $i

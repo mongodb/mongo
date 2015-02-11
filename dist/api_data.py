@@ -88,6 +88,12 @@ lsm_config = [
             create a bloom filter on the oldest LSM tree chunk. Only
             supported if bloom filters are enabled''',
             type='boolean'),
+        Config('chunk_count_limit', '0', r'''
+            the maximum number of chunks to allow in an LSM tree. This
+            option automatically times out old data. As new chunks are
+            added old chunks will be removed. Enabling this option
+            disables LSM background merges''',
+            type='int'),
         Config('chunk_max', '5GB', r'''
             the maximum size a single chunk can be. Chunks larger than this
             size are not considered for further merges. This is a soft

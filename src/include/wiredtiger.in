@@ -1094,11 +1094,16 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest,
 	 * create a bloom filter on the oldest LSM tree chunk.  Only supported
 	 * if bloom filters are enabled., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum size a single
-	 * chunk can be.  Chunks larger than this size are not considered for
-	 * further merges.  This is a soft limit\, and chunks larger than this
-	 * value can be created.  Must be larger than chunk_size., an integer
-	 * between 100MB and 10TB; default \c 5GB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_count_limit, the maximum number
+	 * of chunks to allow in an LSM tree.  This option automatically times
+	 * out old data.  As new chunks are added old chunks will be removed.
+	 * Enabling this option disables LSM background merges., an integer;
+	 * default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum
+	 * size a single chunk can be.  Chunks larger than this size are not
+	 * considered for further merges.  This is a soft limit\, and chunks
+	 * larger than this value can be created.  Must be larger than
+	 * chunk_size., an integer between 100MB and 10TB; default \c 5GB.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, the maximum size of the
 	 * in-memory chunk of an LSM tree.  This limit is soft - it is possible
 	 * for chunks to be temporarily larger than this value.  This overrides

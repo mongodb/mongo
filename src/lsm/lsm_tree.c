@@ -378,6 +378,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_hash_count", &cval));
 	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_count_limit", &cval));
+	lsm_tree->chunk_count_limit = (uint32_t)cval.val;
+	if (cval.val == 0)
+		F_SET(lsm_tree, WT_LSM_TREE_MERGES);
+	else
+		F_CLR(lsm_tree, WT_LSM_TREE_MERGES);
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_max", &cval));
 	lsm_tree->chunk_max = (uint64_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_size", &cval));
@@ -744,12 +750,16 @@ __wt_lsm_tree_throttle(
 	 * Don't throttle if the tree has less than a single level's number
 	 * of chunks.
 	 */
-	if (lsm_tree->nchunks < lsm_tree->merge_max)
-		lsm_tree->merge_throttle = 0;
-	else if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
-		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
-	else if (!decrease_only)
-		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_MERGES)) {
+		if (lsm_tree->nchunks < lsm_tree->merge_max)
+			lsm_tree->merge_throttle = 0;
+		else if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
+			WT_LSM_MERGE_THROTTLE_DECREASE(
+			    lsm_tree->merge_throttle);
+		else if (!decrease_only)
+			WT_LSM_MERGE_THROTTLE_INCREASE(
+			    lsm_tree->merge_throttle);
+	}
 
 	/* Put an upper bound of 1s on both throttle calculations. */
 	lsm_tree->ckpt_throttle = WT_MIN(1000000, lsm_tree->ckpt_throttle);
@@ -788,7 +798,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, *last_chunk;
-	uint32_t nchunks, new_id;
+	uint32_t chunks_moved, nchunks, new_id;
 	int first_switch;
 
 	WT_RET(__wt_lsm_tree_writelock(session, lsm_tree));
@@ -833,9 +843,39 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	lsm_tree->modified = 1;
 
-	/* Set the switch transaction in the previous chunk, if necessary. */
-	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE)
+	/*
+	 * Set the switch transaction in the previous chunk unless this is
+	 * the first chunk in a new or newly opened tree.
+	 */
+	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE &&
+	    !F_ISSET(last_chunk, WT_LSM_CHUNK_ONDISK))
 		last_chunk->switch_txn = __wt_txn_new_id(session);
+
+	/*
+	 * If a maximum number of chunks are configured, drop the any chunks
+	 * past the limit.
+	 */
+	if (lsm_tree->chunk_count_limit != 0 &&
+	    lsm_tree->nchunks > lsm_tree->chunk_count_limit) {
+		chunks_moved = lsm_tree->nchunks - lsm_tree->chunk_count_limit;
+		/* Move the last chunk onto the old chunk list. */
+		WT_ERR(__wt_lsm_tree_retire_chunks(
+		    session, lsm_tree, 0, chunks_moved));
+
+		/* Update the active chunk list. */
+		lsm_tree->nchunks -= chunks_moved;
+		/* Move the remaining chunks to the start of the active list */
+		memmove(lsm_tree->chunk,
+		    lsm_tree->chunk + chunks_moved,
+		    lsm_tree->nchunks * sizeof(*lsm_tree->chunk));
+		/* Clear out the chunks at the end of the tree */
+		memset(lsm_tree->chunk + lsm_tree->nchunks,
+		    0, chunks_moved * sizeof(*lsm_tree->chunk));
+
+		/* Make sure the manager knows there is work to do. */
+		WT_ERR(__wt_lsm_manager_push_entry(
+		    session, WT_LSM_WORK_DROP, 0, lsm_tree));
+	}
 
 err:	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	/*
@@ -848,6 +888,32 @@ err:	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 		WT_RET(__wt_lsm_manager_push_entry(
 		    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
 	return (ret);
+}
+
+/*
+ * __wt_lsm_tree_retire_chunks --
+ *	Move a set of chunks onto the old chunks list.
+ *	It's the callers responsibility to update the active chunks list.
+ *	Must be called with the LSM lock held.
+ */
+int
+__wt_lsm_tree_retire_chunks(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, u_int start_chunk, u_int nchunks)
+{
+	u_int i;
+
+	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
+
+	/* Setup the array of obsolete chunks. */
+	WT_RET(__wt_realloc_def(session, &lsm_tree->old_alloc,
+	    lsm_tree->nold_chunks + nchunks, &lsm_tree->old_chunks));
+
+	/* Copy entries one at a time, so we can reuse gaps in the list. */
+	for (i = 0; i < nchunks; i++)
+		lsm_tree->old_chunks[lsm_tree->nold_chunks++] =
+		    lsm_tree->chunk[start_chunk + i];
+
+	return (0);
 }
 
 /*
