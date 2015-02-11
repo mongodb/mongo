@@ -658,6 +658,21 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 
 	manager = &S2C(session)->lsm_manager;
 
+	/*
+	 * Don't add merges or bloom filter creates if merges
+	 * or bloom filters are disabled in the tree.
+	 */
+	switch (type) {
+	case WT_LSM_WORK_BLOOM:
+		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
+			return (0);
+		break;
+	case WT_LSM_WORK_MERGE:
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_MERGES))
+			return (0);
+		break;
+	}
+
 	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
 
 	WT_RET(__wt_calloc_one(session, &entry));

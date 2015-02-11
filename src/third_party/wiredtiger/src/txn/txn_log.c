@@ -70,18 +70,21 @@ __txn_commit_printlog(
 	int firstrecord;
 
 	firstrecord = 1;
+	fprintf(out, "    \"ops\": [\n");
 
 	/* The logging subsystem zero-pads records. */
 	while (*pp < end && **pp) {
 		if (!firstrecord)
 			fprintf(out, ",\n");
+		fprintf(out, "      {");
 
 		firstrecord = 0;
 
 		WT_RET(__wt_txn_op_printlog(session, pp, end, out));
+		fprintf(out, "\n      }");
 	}
 
-	fprintf(out, "\n");
+	fprintf(out, "\n    ]\n");
 
 	return (0);
 }

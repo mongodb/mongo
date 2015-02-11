@@ -21,6 +21,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FH *fh, *tfh;
+	uint64_t bucket, hash;
 	int direct_io, f, matched, share_mode;
 	char *path;
 
@@ -30,13 +31,15 @@ __wt_open(WT_SESSION_IMPL *session,
 	filehandle = INVALID_HANDLE_VALUE;
 	filehandle_secondary = INVALID_HANDLE_VALUE;
 	direct_io = 0;
+	hash = __wt_hash_city64(name, strlen(name));
+	bucket = hash % WT_HASH_ARRAY_SIZE;
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: open", name));
 
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_FOREACH(tfh, &conn->fhqh, q)
+	SLIST_FOREACH(tfh, &conn->fhhash[bucket], l)
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
@@ -133,6 +136,7 @@ __wt_open(WT_SESSION_IMPL *session,
 setupfh:
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
+	fh->name_hash = hash;
 	fh->filehandle = filehandle;
 	fh->filehandle_secondary = filehandle_secondary;
 	fh->ref = 1;
@@ -156,7 +160,7 @@ setupfh:
 	 */
 	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_FOREACH(tfh, &conn->fhqh, q)
+	SLIST_FOREACH(tfh, &conn->fhhash[bucket], l)
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
@@ -164,7 +168,7 @@ setupfh:
 			break;
 		}
 	if (!matched) {
-		TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
+		WT_CONN_FILE_INSERT(conn, fh, bucket);
 		WT_STAT_FAST_CONN_INCR(session, file_open);
 
 		*fhp = fh;
@@ -194,6 +198,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint64_t bucket;
 
 	conn = S2C(session);
 
@@ -204,7 +209,8 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	}
 
 	/* Remove from the list. */
-	TAILQ_REMOVE(&conn->fhqh, fh, q);
+	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
+	WT_CONN_FILE_REMOVE(conn, fh, bucket);
 	WT_STAT_FAST_CONN_DECR(session, file_open);
 
 	__wt_spin_unlock(session, &conn->fh_lock);

@@ -209,11 +209,13 @@ struct __wt_bm {
  */
 struct __wt_block {
 	const char *name;		/* Name */
+	uint64_t name_hash;		/* Hash of name */
 
 	/* A list of block manager handles, sharing a file descriptor. */
 	uint32_t ref;			/* References */
 	WT_FH	*fh;			/* Backing file handle */
-	TAILQ_ENTRY(__wt_block) q;	/* Linked list of handles */
+	SLIST_ENTRY(__wt_block) l;	/* Linked list of handles */
+	SLIST_ENTRY(__wt_block) hashl;	/* Hashed list of handles */
 
 	/* Configuration information, set when the file is opened. */
 	int	 allocfirst;		/* Allocation is first-fit */

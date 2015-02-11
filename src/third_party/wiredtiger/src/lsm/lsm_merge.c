@@ -22,18 +22,9 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_CHUNK *chunk)
 {
 	size_t chunks_after_merge;
-	u_int i;
 
-	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
-
-	/* Setup the array of obsolete chunks. */
-	WT_RET(__wt_realloc_def(session, &lsm_tree->old_alloc,
-	    lsm_tree->nold_chunks + nchunks, &lsm_tree->old_chunks));
-
-	/* Copy entries one at a time, so we can reuse gaps in the list. */
-	for (i = 0; i < nchunks; i++)
-		lsm_tree->old_chunks[lsm_tree->nold_chunks++] =
-		    lsm_tree->chunk[start_chunk + i];
+	WT_RET(__wt_lsm_tree_retire_chunks(
+	    session, lsm_tree, start_chunk, nchunks));
 
 	/* Update the current chunk list. */
 	chunks_after_merge = lsm_tree->nchunks - (nchunks + start_chunk);

@@ -335,7 +335,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		recno = 0;
-		WT_INTL_FOREACH_BEGIN(session, page, ref) {
+		WT_INTL_FOREACH_BEGIN_SAFE(session, page, ref) {
 			WT_ASSERT(session, ref->key.recno > recno);
 			recno = ref->key.recno;
 		} WT_INTL_FOREACH_END;
@@ -347,7 +347,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_CLEAR(_last);
 
 		first = 1;
-		WT_INTL_FOREACH_BEGIN(session, page, ref) {
+		WT_INTL_FOREACH_BEGIN_SAFE(session, page, ref) {
 			__wt_ref_key(page, ref, &next->data, &next->size);
 			if (last->size == 0) {
 				if (first)
@@ -393,6 +393,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	pindex = WT_INTL_INDEX_COPY(parent);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
 	    parent, pindex->entries, children));
@@ -553,7 +554,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 #ifdef HAVE_DIAGNOSTIC
 		__split_verify_intl_key_order(session, child);
 #endif
-		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
+		WT_INTL_FOREACH_BEGIN_SAFE(session, child, child_ref) {
 			/*
 			 * The page's parent reference may not be wrong, as we
 			 * opened up access from the top of the tree already,
@@ -906,8 +907,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	alloc_index = NULL;
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_WITH_PAGE_INDEX(session,
-	    __split_verify_intl_key_order(session, parent));
+	__split_verify_intl_key_order(session, parent);
 #endif
 
 	/*
@@ -931,45 +931,46 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	complete = 1;
 
 	/*
-	 * Now that the new page is in place it's OK to free any deleted
-	 * refs we encountered modulo the regular safe free semantics.
+	 * The new page index is in place, free any deleted WT_REFs we found,
+	 * modulo the usual safe free semantics. Ignore the WT_REF we're
+	 * replacing, our caller is responsible for freeing it.
 	 */
-	for (i = 0; i < parent_entries; ++i) {
+	for (i = 0; deleted_entries > 0 && i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
-		/* If we set the ref to split to mark it for delete */
-		if (next_ref != ref && next_ref->state == WT_REF_SPLIT) {
-			/*
-			 * We're discarding a deleted reference.
-			 * Free any resources it holds.
-			 */
-			if (parent->type == WT_PAGE_ROW_INT) {
-				WT_TRET(__split_ovfl_key_cleanup(
-				    session, parent, next_ref));
-				ikey = __wt_ref_key_instantiated(next_ref);
-				if (ikey != NULL) {
-					size = sizeof(WT_IKEY) + ikey->size;
-					WT_TRET(__split_safe_free(
-					    session, split_gen, 0, ikey, size));
-					parent_decr += size;
-				}
-				/*
-				 * The page_del structure can be freed
-				 * immediately: it is only read when the ref
-				 * state is WT_REF_DELETED.  The size of the
-				 * structures wasn't added to the parent: don't
-				 * decrement.
-				 */
-				if (next_ref->page_del != NULL) {
-					__wt_free(session,
-					    next_ref->page_del->update_list);
-					__wt_free(session, next_ref->page_del);
-				}
-			}
+		if (next_ref == ref || next_ref->state != WT_REF_SPLIT)
+			continue;
+		--deleted_entries;
 
-			WT_TRET(__split_safe_free(
-			    session, split_gen, 0, next_ref, sizeof(WT_REF)));
-			parent_decr += sizeof(WT_REF);
+		/*
+		 * We set the WT_REF to split, discard it, freeing any resources
+		 * it holds.
+		 */
+		if (parent->type == WT_PAGE_ROW_INT) {
+			WT_TRET(__split_ovfl_key_cleanup(
+			    session, parent, next_ref));
+			ikey = __wt_ref_key_instantiated(next_ref);
+			if (ikey != NULL) {
+				size = sizeof(WT_IKEY) + ikey->size;
+				WT_TRET(__split_safe_free(
+				    session, split_gen, 0, ikey, size));
+				parent_decr += size;
+			}
+			/*
+			 * The page_del structure can be freed immediately: it
+			 * is only read when the ref state is WT_REF_DELETED.
+			 * The size of the structure wasn't added to the parent,
+			 * don't decrement.
+			 */
+			if (next_ref->page_del != NULL) {
+				__wt_free(session,
+				    next_ref->page_del->update_list);
+				__wt_free(session, next_ref->page_del);
+			}
 		}
+
+		WT_TRET(__split_safe_free(
+		    session, split_gen, 0, next_ref, sizeof(WT_REF)));
+		parent_decr += sizeof(WT_REF);
 	}
 
 	/*
@@ -999,7 +1000,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%s split into parent %" PRIu32 " -> %" PRIu32
 	    " (%" PRIu32 ")",
@@ -1487,6 +1487,9 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session, ref, ref_new, new_entries,
 	    parent_decr, parent_incr, exclusive, 1, &split_gen));
+
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);
 
 	__wt_free(session, ref_new);
 

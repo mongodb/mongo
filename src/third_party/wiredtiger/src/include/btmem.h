@@ -421,16 +421,21 @@ struct __wt_page {
 
 	/*
 	 * Macro to walk the list of references in an internal page.
+	 * Two flavors: by default, check that we have a split_gen, but
+	 * provide a "SAFE" version for code that can safely read the
+	 * page index without a split_gen.
 	 */
-#define	WT_INTL_FOREACH_BEGIN(session, page, ref) do {			\
+#define	WT_INTL_FOREACH_BEGIN_SAFE(session, page, ref) do {		\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
 	uint32_t __entries;						\
-	WT_ASSERT(session, session->split_gen != 0);			\
 	for (__pindex = WT_INTL_INDEX_COPY(page),			\
 	    __refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
+#define	WT_INTL_FOREACH_BEGIN(session, page, ref)			\
+	WT_ASSERT(session, session->split_gen != 0);			\
+	WT_INTL_FOREACH_BEGIN_SAFE(session, page, ref)
 #define	WT_INTL_FOREACH_END						\
 	}								\
 } while (0)

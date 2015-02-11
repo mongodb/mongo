@@ -43,6 +43,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_FH *fh, *tfh;
 	mode_t mode;
+	uint64_t bucket, hash;
 	int direct_io, f, fd, matched;
 	char *path;
 
@@ -56,14 +57,17 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;
+	hash = __wt_hash_city64(name, strlen(name));
+	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_FOREACH(tfh, &conn->fhqh, q)
+	SLIST_FOREACH(tfh, &conn->fhhash[bucket], l) {
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
 			matched = 1;
 			break;
 		}
+	}
 	__wt_spin_unlock(session, &conn->fh_lock);
 	if (matched)
 		return (0);
@@ -148,6 +152,7 @@ setupfh:
 
 	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
+	fh->name_hash = hash;
 	fh->fd = fd;
 	fh->ref = 1;
 	fh->direct_io = direct_io;
@@ -169,15 +174,16 @@ setupfh:
 	 */
 	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	TAILQ_FOREACH(tfh, &conn->fhqh, q)
+	SLIST_FOREACH(tfh, &conn->fhhash[bucket], l) {
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
 			matched = 1;
 			break;
 		}
+	}
 	if (!matched) {
-		TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
+		WT_CONN_FILE_INSERT(conn, fh, bucket);
 		WT_STAT_FAST_CONN_INCR(session, file_open);
 
 		*fhp = fh;
@@ -205,6 +211,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint64_t bucket;
 
 	conn = S2C(session);
 
@@ -215,7 +222,8 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	}
 
 	/* Remove from the list. */
-	TAILQ_REMOVE(&conn->fhqh, fh, q);
+	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
+	WT_CONN_FILE_REMOVE(conn, fh, bucket);
 	WT_STAT_FAST_CONN_DECR(session, file_open);
 
 	__wt_spin_unlock(session, &conn->fh_lock);
