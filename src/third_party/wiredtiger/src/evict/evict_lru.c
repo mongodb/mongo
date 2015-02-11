@@ -34,13 +34,17 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 		return (UINT64_MAX);
 
 	page = entry->ref->page;
-	read_gen = page->read_gen + entry->btree->evict_priority;
+
+	/* Any empty page (leaf or internal), is a good choice. */
+	if (__wt_page_is_empty(page))
+		return (WT_READGEN_OLDEST);
 
 	/*
 	 * Skew the read generation for internal pages, we prefer to evict leaf
 	 * pages.
 	 */
-	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
+	read_gen = page->read_gen + entry->btree->evict_priority;
+	if (WT_PAGE_IS_INTERNAL(page))
 		read_gen += WT_EVICT_INT_SKEW;
 
 	return (read_gen);
@@ -190,7 +194,6 @@ __evict_server(void *arg)
 				ret = 0;
 			}
 		}
-		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
 		/* Don't rely on signals: check periodically. */
 		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
@@ -346,7 +349,6 @@ __evict_worker(void *arg)
 	WT_DECL_RET;
 	WT_EVICT_WORKER *worker;
 	WT_SESSION_IMPL *session;
-	uint32_t flags;
 
 	worker = arg;
 	session = worker->session;
@@ -356,12 +358,11 @@ __evict_worker(void *arg)
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
 	    F_ISSET(worker, WT_EVICT_WORKER_RUN)) {
 		/* Don't spin in a busy loop if there is no work to do */
-		WT_ERR(__evict_has_work(session, &flags));
-		if (flags == 0)
+		if ((ret = __evict_lru_pages(session, 0)) == WT_NOTFOUND)
 			WT_ERR(__wt_cond_wait(
 			    session, cache->evict_waiter_cond, 10000));
 		else
-			WT_ERR(__evict_lru_pages(session, 0));
+			WT_ERR(ret);
 	}
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction worker exiting"));
@@ -484,7 +485,6 @@ __evict_pass(WT_SESSION_IMPL *session)
 			    &worker->tid, __evict_worker, worker));
 		}
 
-		F_SET(cache, WT_EVICT_ACTIVE);
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "Eviction pass with: Max: %" PRIu64
 		    " In use: %" PRIu64 " Dirty: %" PRIu64,
@@ -714,7 +714,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, int is_server)
 	while ((ret = __wt_evict_lru_page(session, is_server)) == 0 ||
 	    ret == EBUSY)
 		;
-	return (ret == WT_NOTFOUND ? 0 : ret);
+	return (ret);
 }
 
 /*
@@ -822,7 +822,7 @@ __evict_server_work(WT_SESSION_IMPL *session)
 		    cache->evict_current != NULL)
 			__wt_yield();
 	} else
-		WT_RET(__evict_lru_pages(session, 1));
+		WT_RET_NOTFOUND_OK(__evict_lru_pages(session, 1));
 
 	return (0);
 }
@@ -993,7 +993,9 @@ retry:	while (slot < max_entries && ret == 0) {
 	 * subsequent passes.
 	 */
 	if (!F_ISSET(cache, WT_EVICT_CLEAR_WALKS) && ret == 0 &&
-	    slot < max_entries && (retries < 2 || (retries < 10 && slot > 0))) {
+	    slot < max_entries && (retries < 2 ||
+	    (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) &&
+	    retries < 10 && slot > 0))) {
 		cache->evict_file_next = NULL;
 		++retries;
 		goto retry;
@@ -1082,12 +1084,21 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (__wt_ref_is_root(btree->evict_ref))
 			continue;
 		page = btree->evict_ref->page;
+		modified = __wt_page_is_modified(page);
 
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
 		 */
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+			continue;
+
+		/* Pages we no longer need (clean or dirty), are found money. */
+		if (__wt_page_is_empty(page))
+			goto fast;
+
+		/* Optionally ignore clean pages. */
+		if (!modified && LF_ISSET(WT_EVICT_PASS_DIRTY))
 			continue;
 
 		/*
@@ -1099,8 +1110,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		/* Limit internal pages to 50% unless we get aggressive. */
-		if ((page->type == WT_PAGE_COL_INT ||
-		    page->type == WT_PAGE_ROW_INT) &&
+		if (WT_PAGE_IS_INTERNAL(page) &&
 		    ++internal_pages > WT_EVICT_WALK_PER_FILE / 2 &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
 			continue;
@@ -1116,45 +1126,42 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 		}
 
-		/*
+fast:		/*
 		 * If the file is being checkpointed, there's a period of time
 		 * where we can't discard dirty pages because of possible races
 		 * with the checkpointing thread.
 		 */
-		modified = __wt_page_is_modified(page);
 		if (modified && btree->checkpointing)
-			continue;
-
-		/* Optionally ignore clean pages. */
-		if (!modified && LF_ISSET(WT_EVICT_PASS_DIRTY))
 			continue;
 
 		/*
 		 * If the page is clean but has modifications that appear too
 		 * new to evict, skip it.
+		 *
+		 * Note: take care with ordering: if we detected that the page
+		 * is modified above, we expect mod != NULL.
 		 */
 		mod = page->modify;
-		if (!modified && mod != NULL &&
-		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
+		if (!modified && mod != NULL && !LF_ISSET(
+		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_WOULD_BLOCK) &&
 		    !__wt_txn_visible_all(session, mod->rec_max_txn))
 			continue;
 
 		/*
-		 * If the oldest transaction hasn't changed since the
-		 * last time this page was written, it's unlikely that
-		 * we can make progress.  Similarly, if the most recent
-		 * update on the page is not yet globally visible,
-		 * eviction will fail.  These heuristics attempt to
-		 * avoid repeated attempts to evict the same page.
+		 * If the oldest transaction hasn't changed since the last time
+		 * this page was written, it's unlikely that we can make
+		 * progress.  Similarly, if the most recent update on the page
+		 * is not yet globally visible, eviction will fail.  These
+		 * heuristics attempt to avoid repeated attempts to evict the
+		 * same page.
 		 *
-		 * That said, if eviction is stuck, or the file is
-		 * being checkpointed, try anyway: maybe a transaction
-		 * that was running last time we wrote the page has
-		 * since rolled back, or we can help get the checkpoint
-		 * completed sooner.
+		 * That said, if eviction is stuck, or we are helping with
+		 * forced eviction, try anyway: maybe a transaction that was
+		 * running last time we wrote the page has since rolled back,
+		 * or we can help get the checkpoint completed sooner.
 		 */
-		if (modified && !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
-		    !btree->checkpointing &&
+		if (modified && !LF_ISSET(
+		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK) &&
 		    (mod->disk_snap_min == S2C(session)->txn_global.oldest_id ||
 		    !__wt_txn_visible_all(session, mod->update_txn)))
 			continue;

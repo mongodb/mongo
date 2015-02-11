@@ -370,18 +370,21 @@ __wt_btree_tree_open(
 	 */
 	WT_CLEAR(dsk);
 
-	/* Read the page, then build the in-memory version of the page. */
+	/*
+	 * Read the page, then build the in-memory version of the page. Clear
+	 * any local reference to an allocated copy of the disk image on return,
+	 * the page steals it.
+	 */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
 	WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
 	    WT_DATA_IN_ITEM(&dsk) ?
 	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED , &page));
+	dsk.mem = NULL;
 
 	/* Finish initializing the root, root reference links. */
 	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);
 
-	if (0) {
-err:		__wt_buf_free(session, &dsk);
-	}
+err:	__wt_buf_free(session, &dsk);
 	return (ret);
 }
 

@@ -708,8 +708,13 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	log->fileid = lastlog;
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_open: first log %d last log %d", firstlog, lastlog));
-	log->first_lsn.file = firstlog;
-	log->first_lsn.offset = 0;
+	if (firstlog == UINT32_MAX) {
+		WT_ASSERT(session, logcount == 0);
+		WT_INIT_LSN(&log->first_lsn);
+	} else {
+		log->first_lsn.file = firstlog;
+		log->first_lsn.offset = 0;
+	}
 
 	/*
 	 * Start logging at the beginning of the next log file, no matter

@@ -90,7 +90,16 @@ __ckpt_server(void *arg)
 		if (conn->ckpt_logsize) {
 			__wt_log_written_reset(session);
 			conn->ckpt_signalled = 0;
+
+			/*
+			 * In case we crossed the log limit during the
+			 * checkpoint and the condition variable was already
+			 * signalled, do a tiny wait to clear it so we don't do
+			 * another checkpoint immediately.
+			 */
+			WT_ERR(__wt_cond_wait(session, conn->ckpt_cond, 1));
 		}
+
 		/*
 		 * Wait...
 		 * NOTE: If the user only configured logsize, then usecs
