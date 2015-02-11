@@ -75,12 +75,11 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	u_int i;
 
 	*chunkp = NULL;
-	evict_chunk = flush_chunk = NULL;
+	chunk = evict_chunk = flush_chunk = NULL;
 
 	WT_ASSERT(session, lsm_tree->queue_ref > 0);
 	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE) ||
-	    lsm_tree->nchunks == 0)
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE) || lsm_tree->nchunks == 0)
 		return (__wt_lsm_tree_readunlock(session, lsm_tree));
 
 	/* Search for a chunk to evict and/or a chunk to flush. */
@@ -117,11 +116,14 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	} else
 		chunk = (evict_chunk != NULL) ? evict_chunk : flush_chunk;
 
-	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-	    "Flush%s: return chunk %u of %u: %s",
-	    force ? " w/ force" : "", i, lsm_tree->nchunks, chunk->uri));
+	if (chunk != NULL) {
+		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+		    "Flush%s: return chunk %u of %u: %s",
+		    force ? " w/ force" : "",
+		    i, lsm_tree->nchunks, chunk->uri));
 
-	(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
+		(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
+	}
 
 err:	WT_RET(__wt_lsm_tree_readunlock(session, lsm_tree));
 
