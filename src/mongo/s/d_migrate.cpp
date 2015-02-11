@@ -61,6 +61,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
@@ -1632,6 +1633,15 @@ namespace mongo {
             {
                 // 0. copy system.namespaces entry if collection doesn't already exist
                 Client::WriteContext ctx( ns );
+
+                if (!isMasterNs(ns.c_str())) {
+                    errmsg = str::stream() << "Not primary during migration: " << ns
+                                           << ": checking if collection exists";
+                    warning() << errmsg;
+                    state = FAIL;
+                    return;
+                }
+
                 // Only copy if ns doesn't already exist
                 Database* db = ctx.ctx().db();
                 Collection* collection = db->getCollection( ns );
@@ -1670,6 +1680,13 @@ namespace mongo {
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
                     Client::WriteContext ctx( ns );
+                    if (!isMasterNs(ns.c_str())) {
+                        errmsg = str::stream() << "Not primary during migration: " << ns;
+                        warning() << errmsg;
+                        state = FAIL;
+                        return;
+                    }
+
                     Database* db = ctx.ctx().db();
                     Collection* collection = db->getCollection( ns );
                     if ( !collection ) {
