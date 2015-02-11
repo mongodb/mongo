@@ -77,7 +77,7 @@ namespace {
             else {
                 // The storage metadata file is present but there was an issue
                 // reading its contents.
-                warning() << "Unable to read the existing the storage engine metadata: "
+                warning() << "Unable to read the existing storage engine metadata: "
                           << status.toString();
                 return std::auto_ptr<StorageEngineMetadata>();
             }
