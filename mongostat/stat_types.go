@@ -74,8 +74,18 @@ type ServerStatus struct {
 
 // WiredTiger stores information related to the WiredTiger storage engine.
 type WiredTiger struct {
-	Transaction TransactionStats `bson:"transaction"`
-	Cache       CacheStats       `bson:"cache"`
+	Transaction TransactionStats       `bson:"transaction"`
+	Concurrent  ConcurrentTransactions `bson:"concurrentTransactions"`
+	Cache       CacheStats             `bson:"cache"`
+}
+
+type ConcurrentTransactions struct {
+	Write ConcurrentTransStats `bson:"write"`
+	Read  ConcurrentTransStats `bson:"read"`
+}
+
+type ConcurrentTransStats struct {
+	Out int64 `bson:"out"`
 }
 
 // CacheStats stores cache statistics for WiredTiger.
@@ -837,12 +847,28 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 	}
 
 	if newStat.GlobalLock != nil {
+		hasWT := (newStat.WiredTiger != nil && oldStat.WiredTiger != nil)
+		//If we have wiredtiger stats, use those instead
 		if newStat.GlobalLock.CurrentQueue != nil {
-			returnVal.QueuedReaders = newStat.GlobalLock.CurrentQueue.Readers
-			returnVal.QueuedWriters = newStat.GlobalLock.CurrentQueue.Writers
+			if hasWT {
+				returnVal.QueuedReaders = newStat.GlobalLock.CurrentQueue.Readers + newStat.GlobalLock.ActiveClients.Readers - newStat.WiredTiger.Concurrent.Read.Out
+				returnVal.QueuedWriters = newStat.GlobalLock.CurrentQueue.Writers + newStat.GlobalLock.ActiveClients.Writers - newStat.WiredTiger.Concurrent.Write.Out
+				if returnVal.QueuedReaders < 0 {
+					returnVal.QueuedReaders = 0
+				}
+				if returnVal.QueuedWriters < 0 {
+					returnVal.QueuedWriters = 0
+				}
+			} else {
+				returnVal.QueuedReaders = newStat.GlobalLock.CurrentQueue.Readers
+				returnVal.QueuedWriters = newStat.GlobalLock.CurrentQueue.Writers
+			}
 		}
 
-		if newStat.GlobalLock.ActiveClients != nil {
+		if hasWT {
+			returnVal.ActiveReaders = newStat.WiredTiger.Concurrent.Read.Out
+			returnVal.ActiveWriters = newStat.WiredTiger.Concurrent.Write.Out
+		} else if newStat.GlobalLock.ActiveClients != nil {
 			returnVal.ActiveReaders = newStat.GlobalLock.ActiveClients.Readers
 			returnVal.ActiveWriters = newStat.GlobalLock.ActiveClients.Writers
 		}
