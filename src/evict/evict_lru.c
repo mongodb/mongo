@@ -349,7 +349,6 @@ __evict_worker(void *arg)
 	WT_DECL_RET;
 	WT_EVICT_WORKER *worker;
 	WT_SESSION_IMPL *session;
-	uint32_t flags;
 
 	worker = arg;
 	session = worker->session;
@@ -359,12 +358,11 @@ __evict_worker(void *arg)
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
 	    F_ISSET(worker, WT_EVICT_WORKER_RUN)) {
 		/* Don't spin in a busy loop if there is no work to do */
-		WT_ERR(__evict_has_work(session, &flags));
-		if (flags == 0)
+		if ((ret = __evict_lru_pages(session, 0)) == WT_NOTFOUND)
 			WT_ERR(__wt_cond_wait(
 			    session, cache->evict_waiter_cond, 10000));
 		else
-			WT_ERR(__evict_lru_pages(session, 0));
+			WT_ERR(ret);
 	}
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction worker exiting"));
@@ -716,7 +714,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, int is_server)
 	while ((ret = __wt_evict_lru_page(session, is_server)) == 0 ||
 	    ret == EBUSY)
 		;
-	return (ret == WT_NOTFOUND ? 0 : ret);
+	return (ret);
 }
 
 /*
@@ -824,7 +822,7 @@ __evict_server_work(WT_SESSION_IMPL *session)
 		    cache->evict_current != NULL)
 			__wt_yield();
 	} else
-		WT_RET(__evict_lru_pages(session, 1));
+		WT_RET_NOTFOUND_OK(__evict_lru_pages(session, 1));
 
 	return (0);
 }
@@ -995,7 +993,9 @@ retry:	while (slot < max_entries && ret == 0) {
 	 * subsequent passes.
 	 */
 	if (!F_ISSET(cache, WT_EVICT_CLEAR_WALKS) && ret == 0 &&
-	    slot < max_entries && (retries < 2 || (retries < 10 && slot > 0))) {
+	    slot < max_entries && (retries < 2 ||
+	    (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) &&
+	    retries < 10 && slot > 0))) {
 		cache->evict_file_next = NULL;
 		++retries;
 		goto retry;
