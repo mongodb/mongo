@@ -64,7 +64,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 // restart B, which should rollback and log a message about not rolling back the nonexistent cmd
 clearRawMongoProgramOutput();
 replTest.restart(BID);
-var msg = RegExp("replSet warning rollback no such command ");
+var msg = RegExp("rollback no such command ");
 assert.soon(function() {
     return rawMongoProgramOutput().match(msg);
 }, "Did not see a log entry about skipping the nonexistent command during rollback");
