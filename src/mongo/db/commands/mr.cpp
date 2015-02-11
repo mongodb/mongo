@@ -1007,12 +1007,9 @@ namespace mongo {
             BSONObj prev;
             BSONList all;
 
-            Collection* coll = getCollectionOrUassert(ctx->getDb(), _config.incLong);
-            invariant(coll);
-
             verify(pm == op->setMessage("m/r: (3/3) final reduce to collection",
                                         "M/R: (3/3) Final Reduce Progress",
-                                        coll->numRecords(_txn)));
+                                        _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
 
             const NamespaceString nss(_config.incLong);
             const WhereCallbackReal whereCallback(_txn, nss.db());
@@ -1025,6 +1022,9 @@ namespace mongo {
                                                 &cqRaw,
                                                 whereCallback).isOK());
             std::auto_ptr<CanonicalQuery> cq(cqRaw);
+
+            Collection* coll = getCollectionOrUassert(ctx->getDb(), _config.incLong);
+            invariant(coll);
 
             PlanExecutor* rawExec;
             verify(getExecutor(_txn,
