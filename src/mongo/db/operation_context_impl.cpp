@@ -50,15 +50,17 @@ namespace mongo {
     OperationContextImpl::OperationContextImpl()
         : _client(currentClient.get()),
           _locker(_client->getLocker()) {
+
         invariant(_locker);
+
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit());
+
         _client->setOperationContext(this);
     }
 
     OperationContextImpl::~OperationContextImpl() {
-        _locker->assertEmpty();
+        _locker->assertEmptyAndReset();
         _client->resetOperationContext();
     }
 

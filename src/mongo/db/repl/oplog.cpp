@@ -234,7 +234,7 @@ namespace {
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (ns[0] && !replCoord->canAcceptWritesForDatabase(nsToDatabaseSubstring(ns))) {
-            severe() << "replSet error : logOp() but can't accept write to collection " << ns;
+            severe() << "logOp() but can't accept write to collection " << ns;
             fassertFailed(17405);
         }
 
@@ -647,7 +647,7 @@ namespace {
                     update(txn, db, request, &debug);
 
                     if( t.millis() >= 2 ) {
-                        RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
+                        RARELY OCCASIONALLY warning() << "slow updates (no _id field) for " << ns << endl;
                     }
                 }
                 else {
@@ -695,7 +695,7 @@ namespace {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria
                         failedUpdate = true;
-                        log() << "replication failed to apply update: " << op.toString() << endl;
+                        error() << "failed to apply update: " << op.toString() << endl;
                     }
                     // need to check to see if it isn't present so we can set failedUpdate correctly.
                     // note that adds some overhead for this extra check in some cases, such as an updateCriteria
@@ -708,7 +708,7 @@ namespace {
                             // capped collections won't have an _id index
                             (!indexCatalog->haveIdIndex(txn) && Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
                             failedUpdate = true;
-                            log() << "replication couldn't find doc: " << op.toString() << endl;
+                            error() << "couldn't find doc: " << op.toString() << endl;
                         }
 
                         // Otherwise, it's present; zero objects were updated because of additional specifiers
@@ -721,7 +721,7 @@ namespace {
                     // if an regular non-mod update fails the item is (presumably) missing.
                     if( !upsert ) {
                         failedUpdate = true;
-                        log() << "replication update of non-mod failed: " << op.toString() << endl;
+                        error() << "update of non-mod failed: " << op.toString() << endl;
                     }
                 }
             }
@@ -767,7 +767,7 @@ namespace {
                     break;
                 }
                 default:
-                    warning() << "repl Failed command " << o << " on " <<
+                    warning() << "Failed command " << o << " on " <<
                         nsToDatabaseSubstring(ns) << " with status " << status <<
                         " during oplog application";
                     // fallthrough

@@ -28,158 +28,131 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_stats.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 
-    LockStats::LockStats() {
-
+    template<typename CounterType>
+    LockStats<CounterType>::LockStats() {
+        reset();
     }
 
-    void LockStats::recordAcquisition(ResourceId resId, LockMode mode) {
-        PerModeAtomicLockStats& stat = get(resId);
-        stat.stats[mode].numAcquisitions.addAndFetch(1);
-    }
-
-    void LockStats::recordWait(ResourceId resId, LockMode mode) {
-        PerModeAtomicLockStats& stat = get(resId);
-        stat.stats[mode].numWaits.addAndFetch(1);
-    }
-
-    void LockStats::recordWaitTime(ResourceId resId, LockMode mode, uint64_t waitMicros) {
-        PerModeAtomicLockStats& stat = get(resId);
-        stat.stats[mode].combinedWaitTimeMicros.addAndFetch(waitMicros);
-    }
-
-    void LockStats::recordDeadlock(ResourceId resId, LockMode mode) {
-        PerModeAtomicLockStats& stat = get(resId);
-        stat.stats[mode].numDeadlocks.addAndFetch(1);
-    }
-
-    void LockStats::append(const LockStats& other) {
-        // Append all lock stats
-        for (int i = 0; i < ResourceTypesCount; i++) {
-            for (int mode = 0; mode < LockModesCount; mode++) {
-                const AtomicLockStats& otherStats = other._stats[i].stats[mode];
-
-                AtomicLockStats& thisStats = _stats[i].stats[mode];
-                thisStats.append(otherStats);
-            }
-        }
-
-        // Append the oplog stats
-        for (int mode = 0; mode < LockModesCount; mode++) {
-            const AtomicLockStats& otherStats = other._oplogStats.stats[mode];
-
-            AtomicLockStats& thisStats = _oplogStats.stats[mode];
-            thisStats.append(otherStats);
-        }
-    }
-
-    void LockStats::report(BSONObjBuilder* builder) const {
+    template<typename CounterType>
+    void LockStats<CounterType>::report(BSONObjBuilder* builder) const {
         // All indexing below starts from offset 1, because we do not want to report/account
         // position 0, which is a sentinel value for invalid resource/no lock.
-
         for (int i = 1; i < ResourceTypesCount; i++) {
-            BSONObjBuilder resBuilder(builder->subobjStart(
-                                                resourceTypeName(static_cast<ResourceType>(i))));
-
-            _report(&resBuilder, _stats[i]);
-
-            resBuilder.done();
+            _report(builder, resourceTypeName(static_cast<ResourceType>(i)), _stats[i]);
         }
 
-        BSONObjBuilder resBuilder(builder->subobjStart("oplog"));
-        _report(&resBuilder, _oplogStats);
-        resBuilder.done();
+        _report(builder, "oplog", _oplogStats);
     }
 
-    void LockStats::_report(BSONObjBuilder* builder,
-                                        const PerModeAtomicLockStats& stat) const {
+    template<typename CounterType>
+    void LockStats<CounterType>::_report(BSONObjBuilder* builder,
+                                         const char* sectionName,
+                                         const PerModeLockStatCounters& stat) const {
+
+        boost::scoped_ptr<BSONObjBuilder> section;
 
         // All indexing below starts from offset 1, because we do not want to report/account
         // position 0, which is a sentinel value for invalid resource/no lock.
 
         // Num acquires
         {
-            BSONObjBuilder numAcquires(builder->subobjStart("acquireCount"));
+            boost::scoped_ptr<BSONObjBuilder> numAcquires;
             for (int mode = 1; mode < LockModesCount; mode++) {
-                numAcquires.append(legacyModeName(static_cast<LockMode>(mode)),
-                                   stat.stats[mode].numAcquisitions.load());
+                const long long value = CounterOps::get(stat.modeStats[mode].numAcquisitions);
+                if (value > 0) {
+                    if (!numAcquires) {
+                        if (!section) {
+                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
+                        }
+
+                        numAcquires.reset(
+                            new BSONObjBuilder(section->subobjStart("acquireCount")));
+                    }
+                    numAcquires->append(legacyModeName(static_cast<LockMode>(mode)), value);
+                }
             }
-            numAcquires.done();
         }
 
         // Num waits
         {
-            BSONObjBuilder numWaits(builder->subobjStart("acquireWaitCount"));
+            boost::scoped_ptr<BSONObjBuilder> numWaits;
             for (int mode = 1; mode < LockModesCount; mode++) {
-                numWaits.append(legacyModeName(static_cast<LockMode>(mode)),
-                                stat.stats[mode].numWaits.load());
+                const long long value = CounterOps::get(stat.modeStats[mode].numWaits);
+                if (value > 0) {
+                    if (!numWaits) {
+                        if (!section) {
+                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
+                        }
+
+                        numWaits.reset(
+                            new BSONObjBuilder(section->subobjStart("acquireWaitCount")));
+                    }
+                    numWaits->append(legacyModeName(static_cast<LockMode>(mode)), value);
+                }
             }
-            numWaits.done();
         }
 
         // Total time waiting
         {
-            BSONObjBuilder timeAcquiring(builder->subobjStart("timeAcquiringMicros"));
+            boost::scoped_ptr<BSONObjBuilder> timeAcquiring;
             for (int mode = 1; mode < LockModesCount; mode++) {
-                timeAcquiring.append(legacyModeName(static_cast<LockMode>(mode)),
-                                     stat.stats[mode].combinedWaitTimeMicros.load());
+                const long long value = CounterOps::get(stat.modeStats[mode].combinedWaitTimeMicros);
+                if (value > 0) {
+                    if (!timeAcquiring) {
+                        if (!section) {
+                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
+                        }
+
+                        timeAcquiring.reset(
+                            new BSONObjBuilder(section->subobjStart("timeAcquiringMicros")));
+                    }
+                    timeAcquiring->append(legacyModeName(static_cast<LockMode>(mode)), value);
+                }
             }
-            timeAcquiring.done();
         }
 
         // Deadlocks
         {
-            BSONObjBuilder deadlockCount(builder->subobjStart("deadlockCount"));
+            boost::scoped_ptr<BSONObjBuilder> deadlockCount;
             for (int mode = 1; mode < LockModesCount; mode++) {
-                deadlockCount.append(legacyModeName(static_cast<LockMode>(mode)),
-                                     stat.stats[mode].numDeadlocks.load());
+                const long long value = CounterOps::get(stat.modeStats[mode].numDeadlocks);
+                if (value > 0) {
+                    if (!deadlockCount) {
+                        if (!section) {
+                            section.reset(new BSONObjBuilder(builder->subobjStart(sectionName)));
+                        }
+
+                        deadlockCount.reset(
+                            new BSONObjBuilder(section->subobjStart("deadlockCount")));
+                    }
+                    deadlockCount->append(legacyModeName(static_cast<LockMode>(mode)), value);
+                }
             }
-            deadlockCount.done();
         }
     }
 
-    void LockStats::reset() {
+    template<typename CounterType>
+    void LockStats<CounterType>::reset() {
         for (int i = 0; i < ResourceTypesCount; i++) {
             for (int mode = 0; mode < LockModesCount; mode++) {
-                _stats[i].stats[mode].reset();
+                _stats[i].modeStats[mode].reset();
             }
         }
 
         for (int mode = 0; mode < LockModesCount; mode++) {
-            _oplogStats.stats[mode].reset();
-        }
-    }
-
-    LockStats::PerModeAtomicLockStats& LockStats::get(ResourceId resId) {
-        if (resId == resourceIdOplog) {
-            return _oplogStats;
-        }
-        else {
-            return _stats[resId.getType()];
+            _oplogStats.modeStats[mode].reset();
         }
     }
 
 
-    //
-    // AtomicLockStats
-    //
-
-    void LockStats::AtomicLockStats::append(const AtomicLockStats& other) {
-        numAcquisitions.addAndFetch(other.numAcquisitions.load());
-        numWaits.addAndFetch(other.numWaits.load());
-        combinedWaitTimeMicros.addAndFetch(other.combinedWaitTimeMicros.load());
-        numDeadlocks.addAndFetch(other.numDeadlocks.load());
-    }
-
-    void LockStats::AtomicLockStats::reset() {
-        numAcquisitions.store(0);
-        numWaits.store(0);
-        combinedWaitTimeMicros.store(0);
-        numDeadlocks.store(0);
-    }
+    // Ensures that there are instances compiled for LockStats for AtomicInt64 and int64_t
+    template class LockStats<int64_t>;
+    template class LockStats<AtomicInt64>;
 
 } // namespace mongo

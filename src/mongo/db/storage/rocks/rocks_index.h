@@ -40,7 +40,6 @@
 #pragma once
 
 namespace rocksdb {
-    class ColumnFamilyHandle;
     class DB;
 }
 
@@ -52,8 +51,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(RocksIndexBase);
 
     public:
-        RocksIndexBase(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                       std::string ident, Ordering order);
+        RocksIndexBase(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -73,14 +71,12 @@ namespace mongo {
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
     protected:
-        std::string _getTransactionID(const KeyString& key) const;
+        static std::string _makePrefixedKey(const std::string& prefix, const KeyString& encodedKey);
 
         rocksdb::DB* _db; // not owned
 
-        // Each index is stored as a single column family, so this stores the handle to the
-        // relevant column family
-        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
-
+        // Each key in the index is prefixed with _prefix
+        std::string _prefix;
         std::string _ident;
 
         // used to construct RocksCursors
@@ -89,8 +85,7 @@ namespace mongo {
 
     class RocksUniqueIndex : public RocksIndexBase {
     public:
-        RocksUniqueIndex(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                         std::string ident, Ordering order);
+        RocksUniqueIndex(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
 
         virtual Status insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
                               bool dupsAllowed);
@@ -103,8 +98,7 @@ namespace mongo {
 
     class RocksStandardIndex : public RocksIndexBase {
     public:
-        RocksStandardIndex(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                           std::string ident, Ordering order);
+        RocksStandardIndex(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
 
         virtual Status insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
                               bool dupsAllowed);

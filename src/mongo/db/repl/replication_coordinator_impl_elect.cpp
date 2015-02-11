@@ -123,7 +123,7 @@ namespace {
         OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
 
         if (lastOpTimeApplied == OpTime()) {
-            log() << "replSet info not trying to elect self, "
+            log() << "not trying to elect self, "
                 "do not yet have a complete set of data from any point in time";
             return;
         }
@@ -175,7 +175,7 @@ namespace {
                 if ((_selfIndex != 0) && !_sleptLastElection) {
                     const long long ms = _replExecutor.nextRandomInt64(1000) + 50;
                     const Date_t nextCandidateTime = now + ms;
-                    log() << "replSet possible election tie; sleeping " << ms << "ms until " <<
+                    log() << "possible election tie; sleeping " << ms << "ms until " <<
                         dateToISOStringLocal(nextCandidateTime);
                     _topCoord->setElectionSleepUntil(nextCandidateTime);
                     _replExecutor.scheduleWorkAt(
@@ -200,7 +200,7 @@ namespace {
                 return;
         }
 
-        log() << "replSet info electSelf";
+        log() << "running for election";
         // Secure our vote for ourself first
         if (!_topCoord->voteForMyself(now)) {
             return;
@@ -237,7 +237,7 @@ namespace {
         const int receivedVotes = _electCmdRunner->getReceivedVotes();
 
         if (receivedVotes < _rsConfig.getMajorityVoteCount()) {
-            log() << "replSet couldn't elect self, only received " << receivedVotes <<
+            log() << "couldn't elect self, only received " << receivedVotes <<
                 " votes, but needed at least " << _rsConfig.getMajorityVoteCount();
             // Suppress ourselves from standing for election again, giving other nodes a chance 
             // to win their elections.
@@ -255,11 +255,11 @@ namespace {
         }
 
         if (_rsConfig.getConfigVersion() != _freshnessChecker->getOriginalConfigVersion()) {
-            log() << "replSet config version changed during our election, ignoring result";
+            log() << "config version changed during our election, ignoring result";
             return;
         }
 
-        log() << "replSet election succeeded, assuming primary role";
+        log() << "election succeeded, assuming primary role";
 
         lossGuard.dismiss();
         _freshnessChecker.reset(NULL);

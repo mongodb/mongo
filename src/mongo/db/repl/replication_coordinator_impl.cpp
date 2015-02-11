@@ -1519,7 +1519,7 @@ namespace {
 
         int curMaintenanceCalls = _topCoord->getMaintenanceCount();
         if (activate) {
-            log() << "replSet going into maintenance mode with " << curMaintenanceCalls
+            log() << "going into maintenance mode with " << curMaintenanceCalls
                   << " other maintenance mode tasks in progress" << rsLog;
             _topCoord->adjustMaintenanceCountBy(1);
         }
@@ -1844,7 +1844,7 @@ namespace {
             return Status(ErrorCodes::InvalidReplicaSetConfig, myIndex.getStatus().reason());
         }
 
-        log() << "replSet replSetInitiate config object with " << newConfig.getNumMembers() <<
+        log() << "replSetInitiate config object with " << newConfig.getNumMembers() <<
             " members parses ok";
 
         status = checkQuorumForInitiate(
@@ -1853,13 +1853,13 @@ namespace {
                 myIndex.getValue());
 
         if (!status.isOK()) {
-            error() << "replSet replSetInitiate failed; " << status;
+            error() << "replSetInitiate failed; " << status;
             return status;
         }
 
         status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
         if (!status.isOK()) {
-            error() << "replSet replSetInitiate failed to store config document; " << status;
+            error() << "replSetInitiate failed to store config document; " << status;
             return status;
         }
 

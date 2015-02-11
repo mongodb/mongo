@@ -90,7 +90,7 @@ namespace repl {
             // trying to sync with other replicas.
             // TODO(spencer): Use a condition variable to await loading a config
             if (replCoord->getMemberState().startup()) {
-                log() << "replSet warning did not receive a valid config yet, sleeping 5 seconds ";
+                warning() << "did not receive a valid config yet, sleeping 5 seconds ";
                 sleepsecs(5);
                 continue;
             }

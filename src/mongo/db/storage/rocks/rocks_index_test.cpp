@@ -58,26 +58,18 @@ namespace mongo {
         RocksIndexHarness() : _order(Ordering::make(BSONObj())), _tempDir(_testNamespace) {
             boost::filesystem::remove_all(_tempDir.path());
             rocksdb::DB* db;
-            std::vector<rocksdb::ColumnFamilyDescriptor> cfs;
-            cfs.emplace_back();
-            cfs.emplace_back("index", rocksdb::ColumnFamilyOptions());
-            rocksdb::DBOptions db_options;
-            db_options.create_if_missing = true;
-            db_options.create_missing_column_families = true;
-            std::vector<rocksdb::ColumnFamilyHandle*> handles;
-            auto s = rocksdb::DB::Open(db_options, _tempDir.path(), cfs, &handles, &db);
+            rocksdb::Options options;
+            options.create_if_missing = true;
+            auto s = rocksdb::DB::Open(options, _tempDir.path(), &db);
             ASSERT(s.ok());
             _db.reset(db);
-            _cf.reset(handles[1]);
         }
 
         virtual SortedDataInterface* newSortedDataInterface(bool unique) {
             if (unique) {
-                return new RocksUniqueIndex(_db.get(), _cf, rocksdb::kDefaultColumnFamilyName,
-                                            _order);
+                return new RocksUniqueIndex(_db.get(), "prefix", "ident", _order);
             } else {
-                return new RocksStandardIndex(_db.get(), _cf, rocksdb::kDefaultColumnFamilyName,
-                                              _order);
+                return new RocksStandardIndex(_db.get(), "prefix", "ident", _order);
             }
         }
 
@@ -90,7 +82,6 @@ namespace mongo {
         string _testNamespace = "mongo-rocks-sorted-data-test";
         unittest::TempDir _tempDir;
         scoped_ptr<rocksdb::DB> _db;
-        shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
         RocksTransactionEngine _transactionEngine;
     };
 

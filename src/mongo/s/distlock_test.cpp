@@ -184,8 +184,33 @@ namespace mongo {
     int TestDistLockWithSync::errors;
     bool TestDistLockWithSync::keepGoing;
 
-
-
+    /**
+     * Stress test distributed lock by running multiple threads to contend with a single lock.
+     * Also has an option to make some thread terminate while holding the lock and have some
+     * other thread take over it after takeoverMS has elapsed. Note that this test does not check
+     * whether the lock was eventually overtaken and this is only valid if the LockPinger frequency
+     * is faster than takeoverMS.
+     *
+     * {
+     *   _testDistLockWithSkew: 1,
+     *
+     *   lockName: <string for distributed lock>,
+     *   host: <connection string for config server>,
+     *   seed: <numeric seed for random generator>,
+     *   numThreads: <num of threads to spawn and grab the lock>,
+     *
+     *   takeoverMS: <duration of missed ping in milliSeconds before a lock can be overtaken>,
+     *   wait: <time in milliseconds before stopping the test threads>,
+     *   skewHosts: <Array<Numeric>, numbers to be used when calling _skewClockCommand
+     *              against each config server>,
+     *   threadWait: <upper bound wait in milliSeconds while holding a lock>,
+     *
+     *   hangThreads: <integer n, where 1 out of n threads will abort after acquiring lock>,
+     *   threadSleep: <upper bound sleep duration in mSecs between each round of lock operation>,
+     *   skewRange: <maximum skew variance in milliSeconds for a thread's clock, delta will never
+     *              be greater than skewRange/2>
+     * }
+     */
     class TestDistLockWithSkew: public Command {
     public:
 

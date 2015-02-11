@@ -88,13 +88,7 @@ namespace mongo {
         virtual void killCursor(long long cursorID);
 
         virtual bool callRead(Message& toSend, Message& response);
-        
-        virtual unsigned long long count(const std::string &ns,
-                                         const BSONObj& query = BSONObj(),
-                                         int options = 0,
-                                         int limit = 0,
-                                         int skip = 0);
-        
+
         virtual ConnectionString::ConnectionType type() const;
 
         double getSoTimeout() const;

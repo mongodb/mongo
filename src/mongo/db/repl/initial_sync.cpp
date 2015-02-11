@@ -50,7 +50,7 @@ namespace repl {
     */
     void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
         if (replSetForceInitialSyncFailure > 0) {
-            log() << "replSet test code invoked, forced InitialSync failure: "
+            log() << "test code invoked, forced InitialSync failure: "
                   << replSetForceInitialSyncFailure;
             replSetForceInitialSyncFailure--;
             throw DBException("forced error",0);

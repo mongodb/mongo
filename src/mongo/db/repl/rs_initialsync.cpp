@@ -192,7 +192,7 @@ namespace {
             }
         }
         catch (const DBException&) {
-            log() << "replSet initial sync failed during oplog application phase, and will retry";
+            warning() << "initial sync failed during oplog application phase, and will retry";
 
             getGlobalReplicationCoordinator()->resetMyLastOptime();
             BackgroundSync::get()->setLastAppliedHash(0);
@@ -390,7 +390,7 @@ namespace {
             ScopedTransaction scopedXact(&txn, MODE_IX);
             AutoGetDb autodb(&txn, "local", MODE_X);
             OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
-            log() << "replSet set minValid=" << lastOpTimeWritten;
+            log() << "set minValid=" << lastOpTimeWritten;
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.

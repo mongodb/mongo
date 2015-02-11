@@ -172,14 +172,14 @@ namespace {
         doc.ownedObj = ourObj.getOwned();
         doc.ns = doc.ownedObj.getStringField("ns");
         if (*doc.ns == '\0') {
-            warning() << "replSet WARNING ignoring op on rollback no ns TODO : "
+            warning() << "ignoring op on rollback no ns TODO : "
                   << doc.ownedObj.toString();
             return;
         }
 
         BSONObj obj = doc.ownedObj.getObjectField(*op=='u' ? "o2" : "o");
         if (obj.isEmpty()) {
-            warning() << "replSet warning ignoring op on rollback : " << doc.ownedObj.toString();
+            warning() << "ignoring op on rollback : " << doc.ownedObj.toString();
             return;
         }
 
@@ -189,7 +189,7 @@ namespace {
             string cmdname = first.fieldName();
             Command* cmd = Command::findCommand(cmdname.c_str());
             if (cmd == NULL) {
-                severe() << "replSet warning rollback no such command " << first.fieldName();
+                severe() << "rollback no such command " << first.fieldName();
                 fassertFailedNoTrace(18751);
             }
             if (cmdname == "create") {
@@ -207,7 +207,7 @@ namespace {
             else if (cmdname == "dropIndexes" || cmdname == "deleteIndexes") {
                 // TODO: this is bad.  we simply full resync the collection here,
                 //       which could be very slow.
-                warning() << "replSet info rollback of dropIndexes is slow in this version of "
+                warning() << "rollback of dropIndexes is slow in this version of "
                           << "mongod";
                 string ns = nss.db().toString() + '.' + first.valuestr();
                 fixUpInfo.collectionsToResync.insert(ns);
@@ -215,7 +215,7 @@ namespace {
             }
             else if (cmdname == "renameCollection") {
                 // TODO: slow.
-                warning() << "replSet info rollback of renameCollection is slow in this version of "
+                warning() << "rollback of renameCollection is slow in this version of "
                           << "mongod";
                 string from = first.valuestr();
                 string to = obj["to"].String();
@@ -224,31 +224,31 @@ namespace {
                 return;
             }
             else if (cmdname == "dropDatabase") {
-                severe() << "replSet error rollback : can't rollback drop database full resync "
+                severe() << "rollback : can't rollback drop database full resync "
                          << "will be required";
-                log() << "replSet " << obj.toString();
+                log() << obj.toString();
                 throw RSFatalException();
             }
             else if (cmdname == "collMod") {
                 if (obj.nFields() == 2 && obj["usePowerOf2Sizes"].type() == Bool) {
-                    log() << "replSet not rolling back change of usePowerOf2Sizes: " << obj;
+                    log() << "not rolling back change of usePowerOf2Sizes: " << obj;
                 }
                 else {
-                    severe() << "replSet error cannot rollback a collMod command: " << obj;
+                    severe() << "cannot rollback a collMod command: " << obj;
                     throw RSFatalException();
                 }
             }
             else {
-                severe() << "replSet error can't rollback this command yet: "
+                severe() << "can't rollback this command yet: "
                          << obj.toString();
-                log() << "replSet cmdname=" << cmdname;
+                log() << "cmdname=" << cmdname;
                 throw RSFatalException();
             }
         }
 
         doc._id = obj["_id"];
         if (doc._id.eoo()) {
-            warning() << "replSet WARNING ignoring op on rollback no _id TODO : " << doc.ns << ' '
+            warning() << "ignoring op on rollback no _id TODO : " << doc.ns << ' '
                       << doc.ownedObj.toString();
             return;
         }
@@ -292,11 +292,11 @@ namespace {
         long long diff = static_cast<long long>(ourTime.getSecs())
                                - static_cast<long long>(theirTime.getSecs());
         // diff could be positive, negative, or zero
-        log() << "replSet info rollback our last optime:   " << ourTime.toStringPretty();
-        log() << "replSet info rollback their last optime: " << theirTime.toStringPretty();
-        log() << "replSet info rollback diff in end of log times: " << diff << " seconds";
+        log() << "rollback our last optime:   " << ourTime.toStringPretty();
+        log() << "rollback their last optime: " << theirTime.toStringPretty();
+        log() << "rollback diff in end of log times: " << diff << " seconds";
         if (diff > 1800) {
-            log() << "replSet rollback too long a time period for a rollback.";
+            severe() << "rollback too long a time period for a rollback.";
             throw RSFatalException("rollback error: not willing to roll back "
                                    "more than 30 minutes of data");
         }
@@ -309,9 +309,9 @@ namespace {
                 if (ourObj["h"].Long() == theirObj["h"].Long()) {
                     // found the point back in time where we match.
                     // todo : check a few more just to be careful about hash collisions.
-                    log() << "replSet rollback found matching events at "
+                    log() << "rollback found matching events at "
                           << ourTime.toStringPretty();
-                    log() << "replSet rollback findcommonpoint scanned : " << scanned;
+                    log() << "rollback findcommonpoint scanned : " << scanned;
                     fixUpInfo.commonPoint = ourTime;
                     fixUpInfo.commonPointOurDiskloc = ourLoc;
                     return;
@@ -320,31 +320,31 @@ namespace {
                 refetch(fixUpInfo, ourObj);
 
                 if (!oplogCursor->more()) {
-                    log() << "replSet rollback error RS100 reached beginning of remote oplog";
-                    log() << "replSet   them:      " << them->toString() << " scanned: " << scanned;
-                    log() << "replSet   theirTime: " << theirTime.toStringLong();
-                    log() << "replSet   ourTime:   " << ourTime.toStringLong();
+                    severe() << "rollback error RS100 reached beginning of remote oplog";
+                    log() << "  them:      " << them->toString() << " scanned: " << scanned;
+                    log() << "  theirTime: " << theirTime.toStringLong();
+                    log() << "  ourTime:   " << ourTime.toStringLong();
                     throw RSFatalException("RS100 reached beginning of remote oplog [2]");
                 }
                 theirObj = oplogCursor->nextSafe();
                 theirTime = theirObj["ts"]._opTime();
 
                 if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
-                    log() << "replSet rollback error RS101 reached beginning of local oplog";
-                    log() << "replSet   them:      " << them->toString() << " scanned: " << scanned;
-                    log() << "replSet   theirTime: " << theirTime.toStringLong();
-                    log() << "replSet   ourTime:   " << ourTime.toStringLong();
+                    severe() << "rollback error RS101 reached beginning of local oplog";
+                    log() << "  them:      " << them->toString() << " scanned: " << scanned;
+                    log() << "  theirTime: " << theirTime.toStringLong();
+                    log() << "  ourTime:   " << ourTime.toStringLong();
                     throw RSFatalException("RS101 reached beginning of local oplog [1]");
                 }
                 ourTime = ourObj["ts"]._opTime();
             }
             else if (theirTime > ourTime) {
                 if (!oplogCursor->more()) {
-                    log() << "replSet rollback error RS100 reached beginning of remote oplog";
-                    log() << "replSet   them:      " << them->toString() << " scanned: "
+                    severe() << "rollback error RS100 reached beginning of remote oplog";
+                    log() << "  them:      " << them->toString() << " scanned: "
                           << scanned;
-                    log() << "replSet   theirTime: " << theirTime.toStringLong();
-                    log() << "replSet   ourTime:   " << ourTime.toStringLong();
+                    log() << "  theirTime: " << theirTime.toStringLong();
+                    log() << "  ourTime:   " << ourTime.toStringLong();
                     throw RSFatalException("RS100 reached beginning of remote oplog [1]");
                 }
                 theirObj = oplogCursor->nextSafe();
@@ -354,10 +354,10 @@ namespace {
                 // theirTime < ourTime
                 refetch(fixUpInfo, ourObj);
                 if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
-                    log() << "replSet rollback error RS101 reached beginning of local oplog";
-                    log() << "replSet   them:      " << them->toString() << " scanned: " << scanned;
-                    log() << "replSet   theirTime: " << theirTime.toStringLong();
-                    log() << "replSet   ourTime:   " << ourTime.toStringLong();
+                    severe() << "rollback error RS101 reached beginning of local oplog";
+                    log() << "  them:      " << them->toString() << " scanned: " << scanned;
+                    log() << "  theirTime: " << theirTime.toStringLong();
+                    log() << "  ourTime:   " << ourTime.toStringLong();
                     throw RSFatalException("RS101 reached beginning of local oplog [2]");
                 }
                 ourTime = ourObj["ts"]._opTime();
@@ -449,7 +449,7 @@ namespace {
         // we have items we are writing that aren't from a point-in-time.  thus best not to come
         // online until we get to that point in freshness.
         OpTime minValid = newMinValid["ts"]._opTime();
-        log() << "replSet minvalid=" << minValid.toStringLong();
+        log() << "minvalid=" << minValid.toStringLong();
         setMinValid(txn, minValid);
 
         // any full collection resyncs required?
@@ -499,7 +499,7 @@ namespace {
                 }
                 else {
                     OpTime minValid = newMinValid["ts"]._opTime();
-                    log() << "replSet minvalid=" << minValid.toStringLong();
+                    log() << "minvalid=" << minValid.toStringLong();
                     setMinValid(txn, minValid);
                 }
             }
@@ -513,7 +513,7 @@ namespace {
                 err += "rbid at primary changed during resync/rollback";
             }
             if (!err.empty()) {
-                error() << "replSet error rolling back : " << err
+                severe() << "rolling back : " << err
                         << ". A full resync will be necessary.";
                 // TODO: reset minvalid so that we are permanently in fatal state
                 // TODO: don't be fatal, but rather, get all the data first.
@@ -528,7 +528,7 @@ namespace {
         for (set<string>::iterator it = fixUpInfo.toDrop.begin();
                 it != fixUpInfo.toDrop.end();
                 it++) {
-            log() << "replSet rollback drop: " << *it;
+            log() << "rollback drop: " << *it;
 
             Database* db = dbHolder().get(txn, nsToDatabaseSubstring(*it));
             if (db) {
@@ -555,7 +555,7 @@ namespace {
                 it++) {
             time_t now = time(0);
             if (now - lastProgressUpdate > progressUpdateGap) {
-                log() << "replSet " << deletes << " delete and "
+                log() << deletes << " delete and "
                       << updates << " update operations processed out of "
                       << goodVersions.size() << " total operations";
                 lastProgressUpdate = now;
@@ -603,7 +603,7 @@ namespace {
                                 long long start = Listener::getElapsedTimeMillis();
                                 RecordId loc = Helpers::findOne(txn, collection, pattern, false);
                                 if (Listener::getElapsedTimeMillis() - start > 200)
-                                    log() << "replSet warning roll back slow no _id index for "
+                                    warning() << "roll back slow no _id index for "
                                           << doc.ns << " perhaps?";
                                 // would be faster but requires index:
                                 // RecordId loc = Helpers::findById(nsd, pattern);
@@ -625,7 +625,7 @@ namespace {
                                 }
                             }
                             catch (DBException& e) {
-                                log() << "replSet error rolling back capped collection rec "
+                                error() << "rolling back capped collection rec "
                                       << doc.ns << ' ' << e.toString();
                             }
                         }
@@ -655,7 +655,7 @@ namespace {
                             }
                             catch (DBException&) {
                                 // this isn't *that* big a deal, but is bad.
-                                log() << "replSet warning rollback error querying for existence of "
+                                warning() << "rollback error querying for existence of "
                                       << doc.ns << " at the primary, ignoring";
                             }
                         }
@@ -681,7 +681,7 @@ namespace {
                 }
             }
             catch (DBException& e) {
-                log() << "replSet exception in rollback ns:" << doc.ns << ' ' << pattern.toString()
+                log() << "exception in rollback ns:" << doc.ns << ' ' << pattern.toString()
                       << ' ' << e.toString() << " ndeletes:" << deletes;
                 warn = true;
             }
@@ -692,7 +692,7 @@ namespace {
         log() << "rollback 6";
 
         // clean up oplog
-        LOG(2) << "replSet rollback truncate oplog after " <<
+        LOG(2) << "rollback truncate oplog after " <<
                 fixUpInfo.commonPoint.toStringPretty();
         // TODO: fatal error if this throws?
         oplogCollection->temp_cappedTruncateAfter(txn, fixUpInfo.commonPointOurDiskloc, false);
@@ -755,7 +755,7 @@ namespace {
                 return 2;
             }
             catch (DBException& e) {
-                warning() << string("rollback 2 exception ") + e.toString() + "; sleeping 1 min";
+                warning() << "rollback 2 exception " << e.toString() << "; sleeping 1 min";
 
                 // Release the GlobalWrite lock while sleeping. We should always come here with a
                 // GlobalWrite lock
@@ -767,7 +767,7 @@ namespace {
             }
         }
 
-        log() << "replSet rollback 3 fixup";
+        log() << "rollback 3 fixup";
 
         replCoord->incrementRollbackID();
         try {
@@ -805,7 +805,7 @@ namespace {
         {
             OpTime minvalid = getMinValid(txn);
             if( minvalid > lastOpTimeApplied ) {
-                severe() << "replSet need to rollback, but in inconsistent state" << endl;
+                severe() << "need to rollback, but in inconsistent state" << endl;
                 log() << "minvalid: " << minvalid.toString() << " our last optime: "
                       << lastOpTimeApplied.toString() << endl;
                 fassertFailedNoTrace(18750);
