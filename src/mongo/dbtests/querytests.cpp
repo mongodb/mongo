@@ -822,7 +822,6 @@ namespace QueryTests {
             _client.dropCollection( "unittests.querytests.AutoResetIndexCache" );
         }
         static const char *ns() { return "unittests.querytests.AutoResetIndexCache"; }
-        static const char *idxNs() { return "unittests.system.indexes"; }
         void index() { ASSERT_EQUALS(2u, _client.getIndexSpecs(ns()).size()); }
         void noIndex() { ASSERT_EQUALS(0u, _client.getIndexSpecs(ns()).size()); }
         void checkIndex() {
