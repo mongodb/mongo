@@ -1,5 +1,24 @@
-3.0-RC9, Feb 11 2015
+3.0-RC9, Feb 12 2015
 --------------------
+
+commit 33c146b51fdac86999e2eaa67f5636490eb441fb
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Thu Feb 12 13:44:35 2015 +1100
+
+    Disable aggregation across all open checkpoints if statistics cursors don't specify a checkpoint.
+
+commit 04ec3d021d2f8b08b69d3ea5d0f243f468c71f2e
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Thu Feb 12 13:00:49 2015 +1100
+
+    Move server thread waits to the beginning of their loops: check that we're still running before waiting.  This makes more sense to me, but also fixes a problem introduced recently where the checkpoint server could hang on shutdown if the signal from the closing thread got lost.
+
+commit 85aae87cb1e019b0bcac4854e6508f11104f5339
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Wed Feb 11 12:34:03 2015 -0500
+
+    Mimic Alex's fix in 152a0ef, to fsync created files to disk, for truncated
+    files, never surprise the upper-layer.
 
 commit f445f3bf63e3fa096479c5963f75d91e02f9b616
 Author: Michael Cahill <michael.cahill@wiredtiger.com>
