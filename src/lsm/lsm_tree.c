@@ -379,7 +379,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.bloom_hash_count", &cval));
 	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.chunk_count_limit", &cval));
-	lsm_tree->chunk_count_limit = (uint64_t)cval.val;
+	lsm_tree->chunk_count_limit = (uint32_t)cval.val;
 	if (cval.val == 0)
 		F_SET(lsm_tree, WT_LSM_TREE_MERGES);
 	else

@@ -1097,7 +1097,7 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_count_limit, the maximum number
 	 * of chunks to allow in an LSM tree.  This option automatically times
 	 * out old data.  As new chunks are added old chunks will be removed.
-	 * Enabling this option disables LSM background merges., a string;
+	 * Enabling this option disables LSM background merges., an integer;
 	 * default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum
 	 * size a single chunk can be.  Chunks larger than this size are not

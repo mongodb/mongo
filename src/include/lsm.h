@@ -193,7 +193,7 @@ struct __wt_lsm_tree {
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;
 	uint32_t bloom_hash_count;
-	uint64_t chunk_count_limit;	/* Limit number of chunks */
+	uint32_t chunk_count_limit;	/* Limit number of chunks */
 	uint64_t chunk_size;
 	uint64_t chunk_max;		/* Maximum chunk a merge creates */
 	u_int merge_min, merge_max;
@@ -207,7 +207,7 @@ struct __wt_lsm_tree {
 
 	WT_LSM_CHUNK **chunk;		/* Array of active LSM chunks */
 	size_t chunk_alloc;		/* Space allocated for chunks */
-	u_int nchunks;			/* Number of active chunks */
+	uint32_t nchunks;		/* Number of active chunks */
 	uint32_t last;			/* Last allocated ID */
 	int modified;			/* Have there been updates? */
 

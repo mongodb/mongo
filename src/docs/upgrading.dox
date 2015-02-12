@@ -1,5 +1,23 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_251 Upgrading to Version 2.5.1
+
+<dl>
+<dt>Statistics cursors on data sources</dt>
+<dd>
+Opening a statistics cursor on a data source without a \c checkpoint name
+no longer aggregates statistics for all open checkpoints on that data
+source.  The returned statistics will only be for the in-memory version of
+the data source.
+
+For applications that read and write from ordinary tables (without
+specifying a \c checkpoint), there will be no change.  Applications that
+opened cursors on checkpoints and relied on their statistics being
+aggregated into a single statistics cursor will need to open statistics
+cursors on each checkpoint.
+</dd>
+</dl>
+
 @section version_250 Upgrading to Version 2.5.0
 
 <dl>
