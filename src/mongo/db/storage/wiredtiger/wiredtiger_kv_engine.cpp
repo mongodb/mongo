@@ -176,9 +176,8 @@ namespace mongo {
                 log() << "Repairing size cache";
                 fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
             }
-            WiredTigerSizeStorer* ss = new WiredTigerSizeStorer();
-            ss->loadFrom( &session, _sizeStorerUri );
-            _sizeStorer.reset( ss );
+            _sizeStorer.reset(new WiredTigerSizeStorer(_conn, _sizeStorerUri));
+            _sizeStorer->fillCache();
         }
     }
 
@@ -215,9 +214,9 @@ namespace mongo {
                                            StringData toNS,
                                            StringData ident,
                                            const RecordStore* originalRecordStore ) const {
-        _sizeStorer->store( _uri( ident ),
-                            originalRecordStore->numRecords( opCtx ),
-                            originalRecordStore->dataSize( opCtx ) );
+        _sizeStorer->storeToCache(_uri( ident ),
+                                  originalRecordStore->numRecords( opCtx ),
+                                  originalRecordStore->dataSize( opCtx ) );
         syncSizeInfo(true);
         return Status::OK();
     }
@@ -276,14 +275,10 @@ namespace mongo {
             return;
 
         try {
-            WiredTigerSession session(_conn);
-            WT_SESSION* s = session.getSession();
-            invariantWTOK( s->begin_transaction( s, sync ? "sync=true" : NULL ) );
-            _sizeStorer->storeInto( &session, _sizeStorerUri );
-            invariantWTOK( s->commit_transaction( s, NULL ) );
+            _sizeStorer->syncCache(sync);
         }
         catch (const WriteConflictException&) {
-            // ignore, it means someone else is doing it
+            // ignore, we'll try again later.
         }
     }
 

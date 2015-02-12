@@ -219,7 +219,7 @@ namespace {
             if ( _sizeStorer ) {
                 long long numRecords;
                 long long dataSize;
-                _sizeStorer->load( uri, &numRecords, &dataSize );
+                _sizeStorer->loadFromCache( uri, &numRecords, &dataSize );
                 _numRecords.store( numRecords );
                 _dataSize.store( dataSize );
                 _sizeStorer->onCreate( this, numRecords, dataSize );
@@ -239,7 +239,7 @@ namespace {
                 }
 
                 if ( _sizeStorer ) {
-                    _sizeStorer->store( _uri, _numRecords.load(), _dataSize.load() );
+                    _sizeStorer->storeToCache( _uri, _numRecords.load(), _dataSize.load() );
                 }
             }
 
@@ -257,7 +257,6 @@ namespace {
         LOG(1) << "~WiredTigerRecordStore for: " << ns();
         if ( _sizeStorer ) {
             _sizeStorer->onDestroy( this );
-            _sizeStorer->store( _uri, _numRecords.load(), _dataSize.load() );
         }
     }
 
@@ -766,7 +765,7 @@ namespace {
 
             long long oldNumRecords;
             long long oldDataSize;
-            _sizeStorer->load(_uri, &oldNumRecords, &oldDataSize);
+            _sizeStorer->loadFromCache(_uri, &oldNumRecords, &oldDataSize);
             if (nrecords != oldNumRecords || dataSizeTotal != oldDataSize) {
                 warning() << _uri << ": Existing data in size storer ("
                           << oldNumRecords << " records " << oldDataSize << " bytes) "
@@ -775,7 +774,7 @@ namespace {
                           << "Updating size storer with new values.";
             }
 
-            _sizeStorer->store(_uri, _numRecords.load(), _dataSize.load());
+            _sizeStorer->storeToCache(_uri, _numRecords.load(), _dataSize.load());
         }
 
         output->appendNumber( "nrecords", nrecords );
@@ -932,7 +931,7 @@ namespace {
                                                        long long dataSize) {
         _numRecords.store(numRecords);
         _dataSize.store(dataSize);
-        _sizeStorer->store(_uri, numRecords, dataSize);
+        _sizeStorer->storeToCache(_uri, numRecords, dataSize);
     }
 
     RecordId WiredTigerRecordStore::_nextId() {
@@ -996,7 +995,7 @@ namespace {
         }
 
         if ( _sizeStorer && _sizeStorerCounter++ % 1000 == 0 ) {
-            _sizeStorer->store( _uri, _numRecords.load(), _dataSize.load() );
+            _sizeStorer->storeToCache( _uri, _numRecords.load(), _dataSize.load() );
         }
     }
 

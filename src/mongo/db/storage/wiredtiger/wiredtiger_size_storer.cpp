@@ -40,6 +40,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -49,16 +50,34 @@ namespace mongo {
         int MAGIC = 123123;
     }
 
-    WiredTigerSizeStorer::WiredTigerSizeStorer() {
+    WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn, const std::string& storageUri)
+            : _session(conn)
+    {
+        WT_SESSION* session = _session.getSession();
+        int ret = session->open_cursor(session, storageUri.c_str(), NULL,
+                                       "overwrite=true", &_cursor);
+        if (ret == ENOENT) {
+            // Need to create table.
+            // TODO any config options we want?
+            invariantWTOK(session->create(session, storageUri.c_str(), NULL));
+            ret = session->open_cursor(session, storageUri.c_str(), NULL,
+                                       "overwrite=true", &_cursor);
+        }
+        invariantWTOK(ret);
+
         _magic = MAGIC;
     }
 
     WiredTigerSizeStorer::~WiredTigerSizeStorer() {
+        // This shouldn't be necessary, but protects us if we screw up.
+        boost::mutex::scoped_lock cursorLock( _cursorMutex );
+
         _magic = 11111;
+        _cursor->close(_cursor);
     }
 
     void WiredTigerSizeStorer::_checkMagic() const {
-        if ( _magic == MAGIC )
+        if ( MONGO_likely(_magic == MAGIC) )
             return;
         log() << "WiredTigerSizeStorer magic wrong: " << _magic;
         invariant( _magic == MAGIC );
@@ -86,8 +105,8 @@ namespace mongo {
     }
 
 
-    void WiredTigerSizeStorer::store( StringData uri,
-                                      long long numRecords, long long dataSize ) {
+    void WiredTigerSizeStorer::storeToCache( StringData uri,
+                                             long long numRecords, long long dataSize ) {
         _checkMagic();
         boost::mutex::scoped_lock lk( _entriesMutex );
         Entry& entry = _entries[uri.toString()];
@@ -96,8 +115,8 @@ namespace mongo {
         entry.dirty = true;
     }
 
-    void WiredTigerSizeStorer::load( StringData uri,
-                                     long long* numRecords, long long* dataSize ) const {
+    void WiredTigerSizeStorer::loadFromCache( StringData uri,
+                                              long long* numRecords, long long* dataSize ) const {
         _checkMagic();
         boost::mutex::scoped_lock lk( _entriesMutex );
         Map::const_iterator it = _entries.find( uri.toString() );
@@ -110,26 +129,26 @@ namespace mongo {
         *dataSize = it->second.dataSize;
     }
 
-    void WiredTigerSizeStorer::loadFrom( WiredTigerSession* session,
-                                         const std::string& uri ) {
+    void WiredTigerSizeStorer::fillCache() {
+        boost::mutex::scoped_lock cursorLock( _cursorMutex );
         _checkMagic();
 
         Map m;
         {
-            WT_SESSION* s = session->getSession();
-            WT_CURSOR* c = NULL;
-            int ret = s->open_cursor( s, uri.c_str(), NULL, NULL, &c );
-            if ( ret == ENOENT ) {
-                // doesn't exist, we'll create later
-                return;
-            }
-            invariantWTOK( ret );
+            // Seek to beginning if needed.
+            invariantWTOK(_cursor->reset(_cursor));
 
-            while ( c->next(c) == 0 ) {
+            // Intentionally ignoring return value.
+            ON_BLOCK_EXIT(_cursor->reset, _cursor);
+
+            int cursorNextRet;
+            while ((cursorNextRet = _cursor->next(_cursor)) != WT_NOTFOUND) {
+                invariantWTOK(cursorNextRet);
+
                 WT_ITEM key;
                 WT_ITEM value;
-                invariantWTOK( c->get_key(c, &key ) );
-                invariantWTOK( c->get_value(c, &value ) );
+                invariantWTOK( _cursor->get_key(_cursor, &key ) );
+                invariantWTOK( _cursor->get_value(_cursor, &value ) );
                 std::string uriKey( reinterpret_cast<const char*>( key.data ), key.size );
                 BSONObj data( reinterpret_cast<const char*>( value.data ) );
 
@@ -141,15 +160,16 @@ namespace mongo {
                 e.dirty = false;
                 e.rs = NULL;
             }
-            invariantWTOK( c->close(c) );
         }
 
         boost::mutex::scoped_lock lk( _entriesMutex );
-        _entries = m;
+        _entries.swap(m);
     }
 
-    void WiredTigerSizeStorer::storeInto( WiredTigerSession* session,
-                                          const std::string& uri ) {
+    void WiredTigerSizeStorer::syncCache(bool syncToDisk) {
+        boost::mutex::scoped_lock cursorLock( _cursorMutex );
+        _checkMagic();
+
         Map myMap;
         {
             boost::mutex::scoped_lock lk( _entriesMutex );
@@ -173,14 +193,12 @@ namespace mongo {
             }
         }
 
-        WT_SESSION* s = session->getSession();
-        WT_CURSOR* c = NULL;
-        int ret = s->open_cursor( s, uri.c_str(), NULL, NULL, &c );
-        if ( ret == ENOENT ) {
-            invariantWTOK( s->create( s, uri.c_str(), "" ) );
-            ret = s->open_cursor( s, uri.c_str(), NULL, NULL, &c );
-        }
-        invariantWTOK( ret );
+        if (myMap.empty())
+            return; // Nothing to do.
+
+        WT_SESSION* session = _session.getSession();
+        invariantWTOK(session->begin_transaction(session, syncToDisk ? "sync=true" : ""));
+        ScopeGuard rollbacker = MakeGuard(session->rollback_transaction, session, "");
 
         for ( Map::iterator it = myMap.begin(); it != myMap.end(); ++it ) {
             string uriKey = it->first;
@@ -198,16 +216,22 @@ namespace mongo {
 
             WiredTigerItem key( uriKey.c_str(), uriKey.size() );
             WiredTigerItem value( data.objdata(), data.objsize() );
-            c->set_key( c, key.Get() );
-            c->set_value( c, value.Get() );
-            invariantWTOK( c->insert(c) );
-            entry.dirty = false;
-
-            c->reset(c);
+            _cursor->set_key( _cursor, key.Get() );
+            _cursor->set_value( _cursor, value.Get() );
+            invariantWTOK( _cursor->insert(_cursor) );
         }
 
-        invariantWTOK( c->close(c) );
+        invariantWTOK(_cursor->reset(_cursor));
 
+        rollbacker.Dismiss();
+        invariantWTOK(session->commit_transaction(session, NULL));
+
+        {
+            boost::mutex::scoped_lock lk( _entriesMutex );
+            for (Map::iterator it = _entries.begin(); it != _entries.end(); ++it) {
+                it->second.dirty = false;
+            }
+        }
     }
 
 
