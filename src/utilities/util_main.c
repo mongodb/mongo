@@ -11,10 +11,14 @@
 const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
-const char *usage_prefix = "[-Vv] [-r] [-C config] [-h home]";
+const char *usage_prefix = "[-Vv] [-R] [-C config] [-h home]";
 int verbose;					/* Verbose flag */
 
 static const char *command;			/* Command name */
+
+#define	REC_ERROR	"log=(recover=error)"
+#define	REC_LOGOFF	"log=(enabled=false)"
+#define	REC_RECOVER	"log=(recover=on)"
 
 static int usage(void);
 
@@ -54,15 +58,14 @@ main(int argc, char *argv[])
 
 	cmd_config = config = NULL;
 	/*
-	 * We default to turning recovery off by setting the config string
-	 * to disable logging.  Commands that should recover, if the
-	 * underlying database was originally using logging, will set the
-	 * rec_config to NULL.  That will run recovery if needed when
-	 * wiredtiger_open is called.
+	 * We default to returning an error if recovery needs to be run.
+	 * Generally we expect this to be run after a clean shutdown.
+	 * The printlog command disables logging entirely.  If recovery is
+	 * needed, the user can specify -R to run recovery.
 	 */
-	rec_config = "log=(enabled=false)";
+	rec_config = REC_ERROR;
 	/* Check for standard options. */
-	while ((ch = __wt_getopt(progname, argc, argv, "C:h:rVv")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:h:RVv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			cmd_config = __wt_optarg;
@@ -70,8 +73,8 @@ main(int argc, char *argv[])
 		case 'h':			/* home directory */
 			home = __wt_optarg;
 			break;
-		case 'r':			/* recovery */
-			rec_config = NULL;
+		case 'R':			/* recovery */
+			rec_config = REC_RECOVER;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
@@ -101,23 +104,20 @@ main(int argc, char *argv[])
 			func = util_backup;
 		break;
 	case 'c':
-		if (strcmp(command, "compact") == 0) {
+		if (strcmp(command, "compact") == 0)
 			func = util_compact;
-			rec_config = NULL;
-		} else if (strcmp(command, "copyright") == 0) {
+		else if (strcmp(command, "copyright") == 0) {
 			util_copyright();
 			return (EXIT_SUCCESS);
 		} else if (strcmp(command, "create") == 0) {
 			func = util_create;
 			config = "create";
-			rec_config = NULL;
 		}
 		break;
 	case 'd':
-		if (strcmp(command, "drop") == 0) {
+		if (strcmp(command, "drop") == 0)
 			func = util_drop;
-			rec_config = NULL;
-		} else if (strcmp(command, "dump") == 0)
+		else if (strcmp(command, "dump") == 0)
 			func = util_dump;
 		break;
 	case 'l':
@@ -126,24 +126,21 @@ main(int argc, char *argv[])
 		else if (strcmp(command, "load") == 0) {
 			func = util_load;
 			config = "create";
-			rec_config = NULL;
 		} else if (strcmp(command, "loadtext") == 0) {
 			func = util_loadtext;
 			config = "create";
-			rec_config = NULL;
 		}
 		break;
 	case 'p':
 		if (strcmp(command, "printlog") == 0)
 			func = util_printlog;
+			rec_config = REC_LOGOFF;
 		break;
 	case 'r':
 		if (strcmp(command, "read") == 0)
 			func = util_read;
-		else if (strcmp(command, "rename") == 0) {
+		else if (strcmp(command, "rename") == 0)
 			func = util_rename;
-			rec_config = NULL;
-		}
 		break;
 	case 's':
 		if (strcmp(command, "salvage") == 0)
@@ -154,20 +151,16 @@ main(int argc, char *argv[])
 		}
 		break;
 	case 'u':
-		if (strcmp(command, "upgrade") == 0) {
+		if (strcmp(command, "upgrade") == 0)
 			func = util_upgrade;
-			rec_config = NULL;
-		}
 		break;
 	case 'v':
 		if (strcmp(command, "verify") == 0)
 			func = util_verify;
 		break;
 	case 'w':
-		if (strcmp(command, "write") == 0) {
+		if (strcmp(command, "write") == 0)
 			func = util_write;
-			rec_config = NULL;
-		}
 		break;
 	default:
 		break;
@@ -230,7 +223,7 @@ usage(void)
 	    "global options:\n"
 	    "\t" "-C\twiredtiger_open configuration\n"
 	    "\t" "-h\tdatabase directory\n"
-	    "\t" "-r\trun recovery if configured\n"
+	    "\t" "-R\trun recovery if configured\n"
 	    "\t" "-V\tdisplay library version and exit\n"
 	    "\t" "-v\tverbose\n");
 	fprintf(stderr,

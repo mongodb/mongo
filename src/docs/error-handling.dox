@@ -49,6 +49,9 @@ This error indicates an operation did not find a value to return. This includes 
 @par <code>WT_PANIC</code>
 This error indicates an underlying problem that requires the application exit and restart. The application can exit immediately when \c WT_PANIC is returned from a WiredTiger interface, no further WiredTiger calls are required.
 
+@par <code>WT_RUN_RECOVERY</code>
+This error is generated when wiredtiger_open is configured to return an error if recovery is required to use the database.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

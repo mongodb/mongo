@@ -47,6 +47,10 @@ errors = [
         interface, no further WiredTiger calls are required.'''),
     Error('WT_RESTART', -31805,
         'restart the operation (internal)', undoc=True),
+    Error('WT_RUN_RECOVERY', -31806,
+        'recovery must be run to continue', '''
+        This error is generated when wiredtiger_open is configured
+        to return an error if recovery is required to use the database.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.

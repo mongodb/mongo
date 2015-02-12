@@ -283,6 +283,7 @@ RNG
 ROCKSDB
 RPC
 RUNDIR
+RVv
 Radu
 Recno
 Recurse
@@ -911,7 +912,6 @@ qsort
 quartile
 qup
 rS
-rVv
 rbrace
 rbracket
 rdlock

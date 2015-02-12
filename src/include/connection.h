@@ -310,6 +310,7 @@ struct __wt_connection_impl {
 #define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */
 #define	WT_CONN_LOG_EXISTED	0x04	/* Log files found */
 #define	WT_CONN_LOG_PREALLOC	0x08	/* Pre-allocation is enabled */
+#define	WT_CONN_LOG_RECOVER_ERR	0x10	/* Error if recovery required */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */

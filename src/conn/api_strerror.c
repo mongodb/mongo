@@ -32,6 +32,8 @@ __wiredtiger_error(int error)
 		return ("WT_PANIC: WiredTiger library panic");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
+	case WT_RUN_RECOVERY:
+		return ("WT_RUN_RECOVERY: recovery must be run to continue");
 	}
 	return (NULL);
 }
