@@ -62,6 +62,11 @@ namespace mongo {
                 if ( !readNumber<int>( &sz ) )
                     return Status( ErrorCodes::InvalidBSON, "invalid bson" );
 
+                if ( sz <= 0 ) {
+                    // must have NULL at the very least
+                    return Status( ErrorCodes::InvalidBSON, "invalid bson");
+                }
+
                 if ( out ) {
                     *out = StringData( _buffer + _position, sz );
                 }
