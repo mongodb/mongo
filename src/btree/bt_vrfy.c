@@ -20,9 +20,15 @@ typedef struct {
 
 	uint64_t fcnt;				/* Progress counter */
 
+#define	WT_VRFY_DIAG(vs)						\
+	((vs)->dump_address ||						\
+	    (vs)->dump_blocks || (vs)->dump_pages || (vs)->dump_shape)
 	int dump_address;			/* Debugging hooks */
-	int dump_pages;
 	int dump_blocks;
+	int dump_pages;
+	int dump_shape;
+
+	u_int depth, depth_internal[100], depth_leaf[100];
 
 	WT_ITEM *tmp1;				/* Temporary buffer */
 	WT_ITEM *tmp2;				/* Temporary buffer */
@@ -40,6 +46,32 @@ static int  __verify_row_int_key_order(
 static int  __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
 static int  __verify_tree(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __verify_tree_shape --
+ *	Dump the tree shape.
+ */
+static int
+__verify_tree_shape(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
+{
+	size_t i;
+
+	WT_RET(__wt_msg(session, "Internal page tree-depth:"));
+	for (i = 0; i < WT_ELEMENTS(vs->depth_internal); ++i)
+		if (vs->depth_internal[i] != 0)
+			WT_RET(__wt_msg(session,
+			    "\t%03zu: %u", i, vs->depth_internal[i]));
+
+	WT_RET(__wt_msg(session, "Leaf page tree-depth:"));
+	for (i = 0; i < WT_ELEMENTS(vs->depth_leaf); ++i)
+		if (vs->depth_leaf[i] != 0)
+			WT_RET(__wt_msg(session,
+			    "\t%03zu: %u", i, vs->depth_leaf[i]));
+
+	return (0);
+}
+#endif
 
 /*
  * __wt_verify --
@@ -98,7 +130,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		__verify_checkpoint_reset(vs);
 
 #ifdef HAVE_DIAGNOSTIC
-		if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
+		if (WT_VRFY_DIAG(vs))
 			WT_ERR(__wt_msg(session, "%s: checkpoint %s",
 			    btree->dhandle->name, ckpt->name));
 #endif
@@ -115,8 +147,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		    (ret = __wt_btree_tree_open(
 		    session, root_addr, root_addr_size)) == 0) {
 #ifdef HAVE_DIAGNOSTIC
-			if (vs->dump_address ||
-			    vs->dump_blocks || vs->dump_pages)
+			if (WT_VRFY_DIAG(vs))
 				WT_ERR(__wt_msg(session, "Root: %s %s",
 				    __wt_addr_string(session,
 				    root_addr, root_addr_size, vs->tmp1),
@@ -132,6 +163,12 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		/* Unload the checkpoint. */
 		WT_TRET(bm->checkpoint_unload(bm, session));
 		WT_ERR(ret);
+
+#ifdef HAVE_DIAGNOSTIC
+		/* Display the tree shape. */
+		if (vs->dump_shape)
+			WT_ERR(__verify_tree_shape(session, vs));
+#endif
 	}
 
 done:
@@ -163,18 +200,26 @@ static int
 __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 {
 	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 
-	WT_RET(__wt_config_gets(session, cfg, "dump_address", &cval));
-	vs->dump_address = cval.val != 0;
+	if ((ret = __wt_config_gets(session, cfg, "dump_address", &cval)) == 0)
+		vs->dump_address = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
 
-	WT_RET(__wt_config_gets(session, cfg, "dump_blocks", &cval));
-	vs->dump_blocks = cval.val != 0;
+	if ((ret = __wt_config_gets(session, cfg, "dump_blocks", &cval)) == 0)
+		vs->dump_blocks = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
 
-	WT_RET(__wt_config_gets(session, cfg, "dump_pages", &cval));
-	vs->dump_pages = cval.val != 0;
+	if ((ret = __wt_config_gets(session, cfg, "dump_pages", &cval)) == 0)
+		vs->dump_pages = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_gets(session, cfg, "dump_shape", &cval)) == 0)
+		vs->dump_shape = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
 
 #if !defined(HAVE_DIAGNOSTIC)
-	if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
+	if (WT_VRFY_DIAG(vs))
 		WT_RET_MSG(session, ENOTSUP,
 		    "the WiredTiger library was not built in diagnostic mode");
 #endif
@@ -195,7 +240,8 @@ __verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
 
 	*quitp = 0;
 
-	WT_RET(__wt_config_gets(session, cfg, "dump_offsets", &cval));
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_gets(session, cfg, "dump_offsets", &cval));
 	WT_RET(__wt_config_subinit(session, &list, &cval));
 	while ((ret = __wt_config_next(&list, &k, &v)) == 0) {
 		/*
@@ -233,6 +279,9 @@ __verify_checkpoint_reset(WT_VSTUFF *vs)
 
 	/* Record total is per checkpoint, reset the record count. */
 	vs->record_total = 0;
+
+	/* Tree depth. */
+	vs->depth = 1;
 }
 
 /*
@@ -270,6 +319,12 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 		WT_RET(__wt_msg(session, "%s %s",
 		    __wt_page_addr_string(session, ref, vs->tmp1),
 		    __wt_page_type_string(page->type)));
+	if (WT_PAGE_IS_INTERNAL(page))
+		++vs->depth_internal[
+		    WT_MIN(vs->depth, WT_ELEMENTS(vs->depth_internal) - 1)];
+	else
+		++vs->depth_leaf[
+		    WT_MIN(vs->depth, WT_ELEMENTS(vs->depth_internal) - 1)];
 #endif
 
 	/*
@@ -447,9 +502,11 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			}
 
 			/* Verify the subtree. */
+			++vs->depth;
 			WT_RET(__wt_page_in(session, child_ref, 0));
 			ret = __verify_tree(session, child_ref, vs);
 			WT_TRET(__wt_page_release(session, child_ref, 0));
+			--vs->depth;
 			WT_RET(ret);
 
 			__wt_cell_unpack(child_ref->addr, unpack);
@@ -475,9 +532,11 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 				    session, page, child_ref, entry, vs));
 
 			/* Verify the subtree. */
+			++vs->depth;
 			WT_RET(__wt_page_in(session, child_ref, 0));
 			ret = __verify_tree(session, child_ref, vs);
 			WT_TRET(__wt_page_release(session, child_ref, 0));
+			--vs->depth;
 			WT_RET(ret);
 
 			__wt_cell_unpack(child_ref->addr, unpack);

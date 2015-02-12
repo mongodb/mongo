@@ -723,20 +723,24 @@ methods = {
 'session.upgrade' : Method([]),
 'session.verify' : Method([
     Config('dump_address', 'false', r'''
-        Display addresses and page types as pages are verified, using
-        the application's message handler, intended for debugging''',
+        Display addresses and page types as pages are verified,
+        using the application's message handler, intended for debugging''',
         type='boolean'),
     Config('dump_blocks', 'false', r'''
-        Display the contents of on-disk blocks as they are verified, using
-        the application's message handler, intended for debugging''',
+        Display the contents of on-disk blocks as they are verified,
+        using the application's message handler, intended for debugging''',
         type='boolean'),
     Config('dump_offsets', '', r'''
-        Display the contents of specific on-disk blocks, using
-        the application's message handler, intended for debugging''',
+        Display the contents of specific on-disk blocks,
+        using the application's message handler, intended for debugging''',
         type='list'),
     Config('dump_pages', 'false', r'''
-        Display the contents of in-memory pages as they are verified, using
-        the application's message handler, intended for debugging''',
+        Display the contents of in-memory pages as they are verified,
+        using the application's message handler, intended for debugging''',
+        type='boolean'),
+    Config('dump_shape', 'false', r'''
+        Display the shape of the tree after verification,
+        using the application's message handler, intended for debugging''',
         type='boolean')
 ]),
 
