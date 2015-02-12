@@ -41,7 +41,7 @@ namespace mongo {
     using std::vector;
 
     // static
-    const char* DistinctScan::kStageType = "DISTINCT";
+    const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
     DistinctScan::DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet)
         : _txn(txn),
@@ -54,6 +54,7 @@ namespace mongo {
           _commonStats(kStageType) {
         _specificStats.keyPattern = _params.descriptor->keyPattern();
         _specificStats.indexName = _params.descriptor->indexName();
+        _specificStats.indexVersion = _params.descriptor->version();
     }
 
     void DistinctScan::initIndexCursor() {
@@ -255,7 +256,7 @@ namespace mongo {
 
     PlanStageStats* DistinctScan::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT));
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT_SCAN));
         ret->specific.reset(new DistinctScanStats(_specificStats));
         return ret.release();
     }

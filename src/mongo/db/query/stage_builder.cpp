@@ -286,7 +286,7 @@ namespace mongo {
             if (NULL == childStage) { return NULL; }
             return new KeepMutationsStage(km->filter.get(), ws, childStage);
         }
-        else if (STAGE_DISTINCT == root->getType()) {
+        else if (STAGE_DISTINCT_SCAN == root->getType()) {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
             if (NULL == collection) {

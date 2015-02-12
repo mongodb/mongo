@@ -84,6 +84,7 @@ namespace mongo {
         _specificStats.keyPattern = _keyPattern;
         _specificStats.indexName = _params.descriptor->indexName();
         _specificStats.isMultiKey = _params.descriptor->isMultikey(_txn);
+        _specificStats.indexVersion = _params.descriptor->version();
     }
 
     void IndexScan::initIndexScan() {

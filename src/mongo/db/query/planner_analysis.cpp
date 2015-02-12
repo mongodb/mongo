@@ -693,7 +693,7 @@ namespace mongo {
                                 coveredKeyObj = ixn->indexKeyPattern;
                                 QLOG() << "PROJECTION: covered via IXSCAN, using COVERED fast path";
                             }
-                            else if (STAGE_DISTINCT == leafNodes[0]->getType()) {
+                            else if (STAGE_DISTINCT_SCAN == leafNodes[0]->getType()) {
                                 projType = ProjectionNode::COVERED_ONE_INDEX;
                                 DistinctNode* dn = static_cast<DistinctNode*>(leafNodes[0]);
                                 coveredKeyObj = dn->indexKeyPattern;

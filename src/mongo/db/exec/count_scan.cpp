@@ -56,6 +56,7 @@ namespace mongo {
         _specificStats.keyPattern = _params.descriptor->keyPattern();
         _specificStats.indexName = _params.descriptor->indexName();
         _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
+        _specificStats.indexVersion = _params.descriptor->version();
     }
 
     void CountScan::initIndexCursor() {

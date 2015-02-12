@@ -243,7 +243,8 @@ namespace mongo {
     };
 
     struct CountScanStats : public SpecificStats {
-        CountScanStats() : isMultiKey(false),
+        CountScanStats() : indexVersion(0),
+                           isMultiKey(false),
                            keysExamined(0) { }
 
         virtual ~CountScanStats() { }
@@ -258,6 +259,8 @@ namespace mongo {
         std::string indexName;
 
         BSONObj keyPattern;
+
+        int indexVersion;
 
         bool isMultiKey;
 
@@ -280,7 +283,7 @@ namespace mongo {
     };
 
     struct DistinctScanStats : public SpecificStats {
-        DistinctScanStats() : keysExamined(0) { }
+        DistinctScanStats() : keysExamined(0), indexVersion(0) { }
 
         virtual SpecificStats* clone() const {
             DistinctScanStats* specific = new DistinctScanStats(*this);
@@ -294,6 +297,8 @@ namespace mongo {
         std::string indexName;
 
         BSONObj keyPattern;
+
+        int indexVersion;
     };
 
     struct FetchStats : public SpecificStats {
@@ -356,7 +361,9 @@ namespace mongo {
     };
 
     struct IndexScanStats : public SpecificStats {
-        IndexScanStats() : isMultiKey(false),
+        IndexScanStats() : indexVersion(0),
+                           direction(1),
+                           isMultiKey(false),
                            yieldMovedCursor(0),
                            dupsTested(0),
                            dupsDropped(0),
@@ -381,6 +388,8 @@ namespace mongo {
         std::string indexName;
 
         BSONObj keyPattern;
+
+        int indexVersion;
 
         // A BSON (opaque, ie. hands off other than toString() it) representation of the bounds
         // used.

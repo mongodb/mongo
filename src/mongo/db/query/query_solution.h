@@ -678,7 +678,7 @@ namespace mongo {
         DistinctNode() { }
         virtual ~DistinctNode() { }
 
-        virtual StageType getType() const { return STAGE_DISTINCT; }
+        virtual StageType getType() const { return STAGE_DISTINCT_SCAN; }
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         // This stage is created "on top" of normal planning and as such the properties

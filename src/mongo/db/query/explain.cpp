@@ -121,7 +121,7 @@ namespace {
             const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
             return spec->keysExamined;
         }
-        else if (STAGE_DISTINCT == type) {
+        else if (STAGE_DISTINCT_SCAN == type) {
             const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
             return spec->keysExamined;
         }
@@ -173,7 +173,7 @@ namespace {
             const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
             ss << " " << spec->keyPattern;
         }
-        else if (STAGE_DISTINCT == stage->stageType()) {
+        else if (STAGE_DISTINCT_SCAN == stage->stageType()) {
             const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
             ss << " " << spec->keyPattern;
         }
@@ -291,6 +291,7 @@ namespace mongo {
             bob->append("keyPattern", spec->keyPattern);
             bob->append("indexName", spec->indexName);
             bob->appendBool("isMultiKey", spec->isMultiKey);
+            bob->append("indexVersion", spec->indexVersion);
         }
         else if (STAGE_DELETE == stats.stageType) {
             DeleteStats* spec = static_cast<DeleteStats*>(stats.specific.get());
@@ -345,6 +346,7 @@ namespace mongo {
             bob->append("keyPattern", spec->keyPattern);
             bob->append("indexName", spec->indexName);
             bob->appendBool("isMultiKey", spec->isMultiKey);
+            bob->append("indexVersion", spec->indexVersion);
             bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
             if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {

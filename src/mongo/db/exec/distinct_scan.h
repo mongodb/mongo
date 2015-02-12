@@ -108,7 +108,7 @@ namespace mongo {
 
         virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_DISTINCT; }
+        virtual StageType stageType() const { return STAGE_DISTINCT_SCAN; }
 
         virtual PlanStageStats* getStats();
 
