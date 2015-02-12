@@ -83,6 +83,14 @@ __ckpt_server(void *arg)
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_CHECKPOINT)) {
+		/*
+		 * Wait...
+		 * NOTE: If the user only configured logsize, then usecs
+		 * will be 0 and this wait won't return until signalled.
+		 */
+		WT_ERR(
+		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
+
 		/* Checkpoint the database. */
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
 
@@ -99,14 +107,6 @@ __ckpt_server(void *arg)
 			 */
 			WT_ERR(__wt_cond_wait(session, conn->ckpt_cond, 1));
 		}
-
-		/*
-		 * Wait...
-		 * NOTE: If the user only configured logsize, then usecs
-		 * will be 0 and this wait won't return until signalled.
-		 */
-		WT_ERR(
-		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
 	}
 
 	if (0) {
