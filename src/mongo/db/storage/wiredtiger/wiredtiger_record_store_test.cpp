@@ -137,6 +137,9 @@ namespace mongo {
         virtual RecoveryUnit* newRecoveryUnit() {
             return new WiredTigerRecoveryUnit( _sessionCache );
         }
+
+        WT_CONNECTION* conn() const { return _conn; }
+
     private:
         unittest::TempDir _dbpath;
         WT_CONNECTION* _conn;
@@ -271,12 +274,13 @@ namespace mongo {
     }
 
     TEST(WiredTigerRecordStoreTest, SizeStorer1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         string uri = checked_cast<WiredTigerRecordStore*>( rs.get() )->getURI();
 
-        WiredTigerSizeStorer ss;
+        string indexUri = "table:myindex";
+        WiredTigerSizeStorer ss(harnessHelper->conn(), indexUri);
         checked_cast<WiredTigerRecordStore*>( rs.get() )->setSizeStorer( &ss );
 
         int N = 12;
@@ -303,7 +307,7 @@ namespace mongo {
         {
             long long numRecords;
             long long dataSize;
-            ss.load( uri, &numRecords, &dataSize );
+            ss.loadFromCache( uri, &numRecords, &dataSize );
             ASSERT_EQUALS( N, numRecords );
         }
 
@@ -318,7 +322,6 @@ namespace mongo {
             ASSERT_EQUALS( N, rs->numRecords( opCtx.get() ) );
         }
 
-        string indexUri = "table:myindex";
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             WiredTigerRecoveryUnit* ru =
@@ -331,22 +334,16 @@ namespace mongo {
                 uow.commit();
             }
 
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ss.storeInto( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(opCtx.get()),
-                              indexUri );
-                uow.commit();
-            }
+            ss.syncCache(true);
         }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WiredTigerSizeStorer ss2;
-            ss2.loadFrom( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(opCtx.get()),
-                          indexUri );
+            WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri);
+            ss2.fillCache();
             long long numRecords;
             long long dataSize;
-            ss2.load( uri, &numRecords, &dataSize );
+            ss2.loadFromCache( uri, &numRecords, &dataSize );
             ASSERT_EQUALS( N, numRecords );
         }
 
@@ -375,7 +372,7 @@ namespace {
     private:
         virtual void setUp() {
             harnessHelper.reset(new WiredTigerHarnessHelper());
-            sizeStorer.reset(new WiredTigerSizeStorer());
+            sizeStorer.reset(new WiredTigerSizeStorer(harnessHelper->conn(), "table:sizeStorer"));
             rs.reset(harnessHelper->newNonCappedRecordStore());
             WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
             wtrs->setSizeStorer(sizeStorer.get());
@@ -393,7 +390,7 @@ namespace {
             }
             ASSERT_EQUALS(expectedNumRecords, rs->numRecords(NULL));
             ASSERT_EQUALS(expectedDataSize, rs->dataSize(NULL));
-            sizeStorer->store(uri, 0, 0);
+            sizeStorer->storeToCache(uri, 0, 0);
         }
         virtual void tearDown() {
             expectedNumRecords = 0;
@@ -409,14 +406,14 @@ namespace {
         long long getNumRecords() const {
             long long numRecords;
             long long unused;
-            sizeStorer->load(uri, &numRecords, &unused);
+            sizeStorer->loadFromCache(uri, &numRecords, &unused);
             return numRecords;
         }
 
         long long getDataSize() const {
             long long unused;
             long long dataSize;
-            sizeStorer->load(uri, &unused, &dataSize);
+            sizeStorer->loadFromCache(uri, &unused, &dataSize);
             return dataSize;
         }
 
@@ -472,7 +469,7 @@ namespace {
         rs.reset(NULL);
 
         scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-        sizeStorer->store(uri, expectedNumRecords*2, expectedDataSize*2);
+        sizeStorer->storeToCache(uri, expectedNumRecords*2, expectedDataSize*2);
         rs.reset(new WiredTigerRecordStore(opCtx.get(), "a.b", uri, false, -1, -1, NULL,
                                            sizeStorer.get()));
         ASSERT_EQUALS(expectedNumRecords*2, rs->numRecords(NULL));
