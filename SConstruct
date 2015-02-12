@@ -96,7 +96,7 @@ def add_option( name, help, nargs, contributesToVariantDir,
     if type == 'choice' and not metavar:
         metavar = '[' + '|'.join(choices) + ']'
 
-    AddOption( "--" + name , 
+    AddOption( "--" + name ,
                dest=dest,
                type=type,
                nargs=nargs,
@@ -133,7 +133,7 @@ def use_system_version_of_library(name):
 
 def get_variant_dir():
     if has_option('variant-dir'):
-        return "#build/" + get_option('variant-dir') 
+        return "#build/" + get_option('variant-dir')
 
     substitute = lambda x: re.sub( "[:,\\\\/]" , "_" , x )
 
@@ -353,7 +353,7 @@ boostLibs = [ "thread" , "filesystem" , "program_options", "system" ]
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
 
 linux64  = False
-force32 = has_option( "force32" ) 
+force32 = has_option( "force32" )
 force64 = has_option( "force64" )
 if not force64 and not force32 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
@@ -443,9 +443,9 @@ else:
 
 static = has_option( "static" )
 
-noshell = has_option( "noshell" ) 
+noshell = has_option( "noshell" )
 
-usev8 = has_option( "usev8" ) 
+usev8 = has_option( "usev8" )
 
 asio = has_option( "asio" )
 
@@ -587,7 +587,7 @@ if has_option( "libpath" ):
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
-env.Prepend( CPPDEFINES=[ "_SCONS" , 
+env.Prepend( CPPDEFINES=[ "_SCONS" ,
                           "MONGO_EXPOSE_MACROS" ,
                           "SUPPORT_UTF8" ],  # for pcre
 
@@ -724,7 +724,7 @@ elif windows:
     #    The this pointer is valid only within nonstatic member functions. It cannot be used in the initializer list for a base class.
     # c4800
     # 'type' : forcing value to bool 'true' or 'false' (performance warning)
-    #    This warning is generated when a value that is not bool is assigned or coerced into type bool. 
+    #    This warning is generated when a value that is not bool is assigned or coerced into type bool.
     # c4267
     # 'var' : conversion from 'size_t' to 'type', possible loss of data
     # When compiling with /Wp64, or when compiling on a 64-bit operating system, type is 32 bits but size_t is 64 bits when compiling for 64-bit targets. To fix this warning, use size_t instead of a type.
@@ -746,12 +746,12 @@ elif windows:
 
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS"] )
 
-    # this would be for pre-compiled headers, could play with it later  
+    # this would be for pre-compiled headers, could play with it later
     #env.Append( CCFLAGS=['/Yu"pch.h"'] )
 
     # docs say don't use /FD from command line (minimal rebuild)
     # /Gy function level linking (implicit when using /Z7)
-    # /Z7 debug info goes into each individual .obj file -- no .pdb created 
+    # /Z7 debug info goes into each individual .obj file -- no .pdb created
     env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
 
     # /DEBUG will tell the linker to create a .pdb file
@@ -796,7 +796,7 @@ elif windows:
     # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
     env.Append( LINKFLAGS=["/LARGEADDRESSAWARE"] )
 
-    env.Append(LIBS=['ws2_32.lib', 'kernel32.lib', 'advapi32.lib', 'Psapi.lib', 'DbgHelp.lib', 'shell32.lib'])
+    env.Append(LIBS=['ws2_32.lib', 'kernel32.lib', 'advapi32.lib', 'Psapi.lib', 'DbgHelp.lib', 'shell32.lib', 'version.lib'])
 
     # v8 calls timeGetTime()
     if usev8:
@@ -1364,7 +1364,7 @@ def doConfigure(myenv):
 
         conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
 
-        # Note that on Windows with using-system-boost builds, the following 
+        # Note that on Windows with using-system-boost builds, the following
         # FindSysLibDep calls do nothing useful (but nothing problematic either)
         for b in boostLibs:
             boostlib = "boost_" + b
@@ -1397,10 +1397,10 @@ def doConfigure(myenv):
 
     conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
     if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
-            "sasl2", 
-            ["stddef.h","sasl/sasl.h"], 
-            "C", 
-            "sasl_version_info(0, 0, 0, 0, 0, 0);", 
+            "sasl2",
+            ["stddef.h","sasl/sasl.h"],
+            "C",
+            "sasl_version_info(0, 0, 0, 0, 0, 0);",
             autoadd=False ):
         Exit(1)
 
@@ -1409,7 +1409,7 @@ def doConfigure(myenv):
         if not conf.CheckLib("execinfo"):
             Exit(1)
 
-    # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
+    # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this
     # point.
     if get_option('allocator') == 'tcmalloc':
         if use_system_version_of_library('tcmalloc'):
@@ -1485,7 +1485,7 @@ def doStyling( env , target , source ):
         print( "astyle 2.x needed, found:" + res )
         Exit(-1)
 
-    files = utils.getAllSourceFiles() 
+    files = utils.getAllSourceFiles()
     files = filter( lambda x: not x.endswith( ".c" ) , files )
 
     cmd = "astyle --options=mongo_astyle " + " ".join( files )

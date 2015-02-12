@@ -17,6 +17,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/base/init.h"
 #include "mongo/util/file_allocator.h"
 
 #include <boost/thread.hpp>
@@ -64,6 +65,18 @@ namespace mongo {
     static inline long lseek(int fd, long offset, int origin) { return _lseek(fd, offset, origin); }
     static inline int write(int fd, const void *data, int count) { return _write(fd, data, count); }
     static inline int close(int fd) { return _close(fd); }
+
+    typedef BOOL (CALLBACK *GetVolumeInformationByHandleWPtr)(HANDLE, LPWSTR, DWORD, LPDWORD, LPDWORD, LPDWORD, LPWSTR, DWORD);
+    GetVolumeInformationByHandleWPtr GetVolumeInformationByHandleWFunc;
+
+    MONGO_INITIALIZER(InitGetVolumeInformationByHandleW)(InitializerContext *context) {
+        HMODULE kernelLib = LoadLibraryA("kernel32.dll");
+        if (kernelLib) {
+            GetVolumeInformationByHandleWFunc = reinterpret_cast<GetVolumeInformationByHandleWPtr>
+                (GetProcAddress(kernelLib, "GetVolumeInformationByHandleW"));
+        }
+        return Status::OK();
+    }
 #endif
 
     boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p){
@@ -75,7 +88,7 @@ namespace mongo {
             boost::filesystem::create_directory(parent);
             flushMyDirectory(parent); // flushes grandparent to ensure parent exists after crash
         }
-        
+
         verify(boost::filesystem::is_directory(parent));
         return parent;
     }
@@ -167,6 +180,30 @@ namespace mongo {
 #endif
     }
 
+#if defined(_WIN32)
+    static bool isFileOnNTFSVolume(int fd) {
+        if (!GetVolumeInformationByHandleWFunc) {
+            warning() << "Could not retrieve pointer to GetVolumeInformationByHandleW function";
+            return false;
+        }
+
+        HANDLE fileHandle = (HANDLE)_get_osfhandle(fd);
+        if (fileHandle == INVALID_HANDLE_VALUE) {
+            warning() << "_get_osfhandle() failed with " << _strerror(NULL);
+            return false;
+        }
+
+        WCHAR fileSystemName[MAX_PATH + 1];
+        if (!GetVolumeInformationByHandleWFunc(fileHandle, NULL, 0, NULL, 0, NULL, fileSystemName, sizeof(fileSystemName))) {
+            DWORD gle = GetLastError();
+            warning() << "GetVolumeInformationByHandleW failed with " << errnoWithDescription(gle);
+            return false;
+        }
+
+        return lstrcmpW(fileSystemName, L"NTFS") == 0;
+    }
+#endif
+
     void FileAllocator::ensureLength(int fd , long size) {
 #if !defined(_WIN32)
         if (useSparseFiles(fd)) {
@@ -206,6 +243,14 @@ namespace mongo {
             if (!ProcessInfo::isDataFileZeroingNeeded()) {
                 return;
             }
+
+#if defined(_WIN32)
+            if (!isFileOnNTFSVolume(fd)) {
+                log() << "No need to zero out datafile on non-NTFS volume" << endl;
+                return;
+            }
+#endif
+
 
             lseek(fd, 0, SEEK_SET);
 
@@ -272,7 +317,7 @@ namespace mongo {
               return fn;
         }
         return "";
-	}
+    }
 
     void FileAllocator::run( FileAllocator * fa ) {
         setThreadName( "FileAllocator" );
@@ -303,7 +348,7 @@ namespace mongo {
                 long fd = 0;
                 try {
                     log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
-                    
+
                     boost::filesystem::path parent = ensureParentDirCreated(name);
                     tmp = fa->makeTempFileName( parent );
                     ensureParentDirCreated(tmp);
@@ -366,8 +411,8 @@ namespace mongo {
                     fa->_failed = true;
                     // not erasing from pending
                     fa->_pendingUpdated.notify_all();
-                    
-                    
+
+
                     sleepsecs(10);
                     continue;
                 }
