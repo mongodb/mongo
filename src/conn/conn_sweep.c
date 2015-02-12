@@ -118,7 +118,6 @@ __sweep_server(void *arg)
 	 */
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
-
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(session,
 		    conn->sweep_cond, WT_DHANDLE_SWEEP_PERIOD * WT_MILLION));
