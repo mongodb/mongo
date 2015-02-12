@@ -7,7 +7,7 @@ if (typeof getToolTest === 'undefined') {
  */
 
 (function() {
-  var CURRENT_MONGOD_RELEASE = '2.8';
+  var CURRENT_MONGOD_RELEASE = '3.0';
 
   var toolTest = getToolTest('oplogUnreachableHostsTest');
   var commonToolArgs = getCommonToolArguments();

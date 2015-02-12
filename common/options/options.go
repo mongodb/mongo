@@ -262,7 +262,7 @@ func (o *ToolOptions) Parse() ([]string, error) {
 
 func parseHiddenOption(opts *HiddenOptions, option string, arg flags.SplitArgument, args []string) ([]string, error) {
 	if option == "dbpath" || option == "directoryperdb" || option == "journal" {
-		return args, fmt.Errorf(`--dbpath and related flags are not supported in 2.8 tools.
+		return args, fmt.Errorf(`--dbpath and related flags are not supported in 3.0 tools.
 See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`)
 	}
 

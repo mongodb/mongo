@@ -1,13 +1,13 @@
 (function() {
 
-    // skip tests requiring wiredTiger storage engine on pre 2.8 mongod
+    // skip tests requiring wiredTiger storage engine on pre 3.0 mongod
     if (TestData && TestData.storageEngine === 'wiredTiger')
         return
 
-    // Tests using mongorestore to restore a dump from a 2.6 mongod to a 2.8 mongod.
+    // Tests using mongorestore to restore a dump from a 2.6 mongod to a 3.0 mongod.
 
     jsTest.log('Testing running mongorestore restoring data from a 2.6 mongod to'+
-            ' a 2.8 mongod');
+            ' a 3.0 mongod');
 
     var toolTest = new ToolTest('26_to_28', { binVersion: '2.6' });
     toolTest.startDB('foo');
@@ -34,7 +34,7 @@
     // drop the database
     testDB.dropDatabase();
 
-    // restart the mongod as a 2.8
+    // restart the mongod as a 3.0
     stopMongod(toolTest.port);
     toolTest.m = null;
     toolTest.db = null;

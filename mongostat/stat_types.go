@@ -233,7 +233,7 @@ type LockStats struct {
 	TimeLockedMicros    ReadWriteLockTimes `bson:"timeLockedMicros"`
 	TimeAcquiringMicros ReadWriteLockTimes `bson:"timeAcquiringMicros"`
 
-	// AcquireCount is a new field of the lock stats only populated on 2.8 or newer.
+	// AcquireCount is a new field of the lock stats only populated on 3.0 or newer.
 	// Typed as a pointer so that if it is nil, mongostat can assume the field is not populated
 	// with real namespace data.
 	AcquireCount *ReadWriteLockTimes `bson:"acquireCount,omitempty"`
@@ -798,7 +798,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 	if !returnVal.IsMongos && oldStat.Locks != nil && oldStat.Locks != nil {
 		globalCheck, hasGlobal := oldStat.Locks["Global"]
 		if hasGlobal && globalCheck.AcquireCount != nil {
-			// This appears to be a 2.8+ server so the data in these fields do *not* refer to
+			// This appears to be a 3.0+ server so the data in these fields do *not* refer to
 			// actual namespaces and thus we can't compute lock %.
 			returnVal.HighestLocked = nil
 		} else {
