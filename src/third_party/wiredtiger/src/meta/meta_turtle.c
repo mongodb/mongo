@@ -74,7 +74,6 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	char *path;
 
-	fp = NULL;
 	path = NULL;
 
 	/* Look for a hot backup file: if we find it, load it. */
@@ -99,8 +98,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 
 	F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
-err:	if (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+err:	WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &value);
 	return (ret);
@@ -237,7 +235,6 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 
 	*valuep = NULL;
 
-	fp = NULL;
 	path = NULL;
 
 	/*
@@ -274,8 +271,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	/* Copy the value for the caller. */
 	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
-err:	if (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+err:	WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_scr_free(session, &buf);
 	return (ret);
 }

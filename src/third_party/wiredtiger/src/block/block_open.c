@@ -28,7 +28,13 @@ __wt_block_manager_truncate(
 	WT_ERR(__wt_ftruncate(session, fh, (wt_off_t)0));
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh, allocsize);
+	WT_ERR(__wt_desc_init(session, fh, allocsize));
+
+	/*
+	 * Ensure the truncated file has made it to disk, then the upper-level
+	 * is never surprised.
+	 */
+	WT_ERR(__wt_fsync(session, fh));
 
 	/* Close the file handle. */
 err:	WT_TRET(__wt_close(session, fh));
@@ -55,8 +61,8 @@ __wt_block_manager_create(
 	ret = __wt_desc_init(session, fh, allocsize);
 
 	/*
-	 * Ensure the new file has made it to disk. Otherwise a crash
-	 * after log records exist for the file can lead to a recovery failure.
+	 * Ensure the truncated file has made it to disk, then the upper-level
+	 * is never surprised.
 	 */
 	WT_TRET(__wt_fsync(session, fh));
 
