@@ -31,6 +31,7 @@
 #include "mongo/db/dbdirectclient.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
@@ -171,38 +172,32 @@ namespace mongo {
 
     const HostAndPort DBDirectClient::dummyHost("0.0.0.0", 0);
 
-    extern long long runCount(OperationContext* txn,
-                              const string& ns,
-                              const BSONObj &cmd,
-                              string &err,
-                              int &errCode);
-
     unsigned long long DBDirectClient::count(const string& ns,
                                              const BSONObj& query,
                                              int options,
                                              int limit,
                                              int skip) {
+        BSONObj cmdObj = _countCmd(ns, query, options, limit, skip);
 
-        if (skip < 0) {
-            warning() << "setting negative skip value: " << skip
-                << " to zero in query: " << query << endl;
-            skip = 0;
+        NamespaceString nsString(ns);
+        std::string dbname = nsString.db().toString();
+
+        Command* countCmd = Command::findCommand("count");
+        invariant(countCmd);
+
+        std::string errmsg;
+        BSONObjBuilder result;
+        bool fromRepl = false;
+        bool runRetval = countCmd->run(_txn, dbname, cmdObj, options, errmsg, result, fromRepl);
+        if (!runRetval) {
+            Command::appendCommandStatus(result, runRetval, errmsg);
+            Status commandStatus = Command::getStatusFromCommandResult(result.obj());
+            invariant(!commandStatus.isOK());
+            uassertStatusOK(commandStatus);
         }
 
-        string errmsg;
-        int errCode;
-        long long res = runCount(_txn,
-            ns,
-            _countCmd(ns, query, options, limit, skip),
-            errmsg,
-            errCode);
-
-        if (res == -1) {
-            // namespace doesn't exist
-            return 0;
-        }
-        massert(errCode, str::stream() << "count failed in DBDirectClient: " << errmsg, res >= 0);
-        return (unsigned long long)res;
+        BSONObj resultObj = result.obj();
+        return static_cast<unsigned long long>(resultObj["n"].numberLong());
     }
 
 }  // namespace mongo
