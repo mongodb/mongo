@@ -20,7 +20,7 @@ typedef struct {
 
 	uint64_t fcnt;				/* Progress counter */
 
-#define	WT_VRFY_DIAG(vs)						\
+#define	WT_VRFY_DUMP(vs)						\
 	((vs)->dump_address ||						\
 	    (vs)->dump_blocks || (vs)->dump_pages || (vs)->dump_shape)
 	int dump_address;			/* Debugging hooks */
@@ -35,8 +35,6 @@ typedef struct {
 } WT_VSTUFF;
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
-static int  __verify_config(WT_SESSION_IMPL *, const char *[], WT_VSTUFF *);
-static int  __verify_config_offsets(WT_SESSION_IMPL *, const char *[], int *);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, size_t, WT_VSTUFF *);
 static int  __verify_overflow_cell(
@@ -47,10 +45,76 @@ static int  __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
 static int  __verify_tree(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
 
-#ifdef HAVE_DIAGNOSTIC
+/*
+ * __verify_config --
+ *	Debugging: verification supports dumping pages in various formats.
+ */
+static int
+__verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+
+	if ((ret = __wt_config_gets(session, cfg, "dump_address", &cval)) == 0)
+		vs->dump_address = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_gets(session, cfg, "dump_blocks", &cval)) == 0)
+		vs->dump_blocks = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_gets(session, cfg, "dump_pages", &cval)) == 0)
+		vs->dump_pages = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_gets(session, cfg, "dump_shape", &cval)) == 0)
+		vs->dump_shape = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
+
+	return (0);
+}
+
+/*
+ * __verify_config_offsets --
+ *	Debugging: optionally dump specific blocks from the file.
+ */
+static int
+__verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
+{
+	WT_CONFIG list;
+	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_RET;
+	u_long offset;
+
+	*quitp = 0;
+
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_gets(session, cfg, "dump_offsets", &cval));
+	WT_RET(__wt_config_subinit(session, &list, &cval));
+	while ((ret = __wt_config_next(&list, &k, &v)) == 0) {
+		/*
+		 * Quit after dumping the requested blocks.  (That's hopefully
+		 * what the user wanted, all of this stuff is just hooked into
+		 * verify because that's where we "dump blocks" for debugging.)
+		 */
+		*quitp = 1;
+		if (v.len != 0 || sscanf(k.str, "%lu", &offset) != 1)
+			WT_RET_MSG(session, EINVAL,
+			    "unexpected dump offset format");
+#if !defined(HAVE_DIAGNOSTIC)
+		WT_RET_MSG(session, ENOTSUP,
+		    "the WiredTiger library was not built in diagnostic mode");
+#else
+		WT_TRET(
+		    __wt_debug_offset_blind(session, (wt_off_t)offset, NULL));
+#endif
+	}
+	return (ret == WT_NOTFOUND ? 0 : ret);
+}
+
 /*
  * __verify_tree_shape --
- *	Dump the tree shape.
+ *	Debugging: optionally dump the tree shape.
  */
 static int
 __verify_tree_shape(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
@@ -71,7 +135,6 @@ __verify_tree_shape(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 
 	return (0);
 }
-#endif
 
 /*
  * __wt_verify --
@@ -129,11 +192,10 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);
 
-#ifdef HAVE_DIAGNOSTIC
-		if (WT_VRFY_DIAG(vs))
+		if (WT_VRFY_DUMP(vs))
 			WT_ERR(__wt_msg(session, "%s: checkpoint %s",
 			    btree->dhandle->name, ckpt->name));
-#endif
+
 		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt->raw.data, ckpt->raw.size,
@@ -146,14 +208,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		if (root_addr_size != 0 &&
 		    (ret = __wt_btree_tree_open(
 		    session, root_addr, root_addr_size)) == 0) {
-#ifdef HAVE_DIAGNOSTIC
-			if (WT_VRFY_DIAG(vs))
+			if (WT_VRFY_DUMP(vs))
 				WT_ERR(__wt_msg(session, "Root: %s %s",
 				    __wt_addr_string(session,
 				    root_addr, root_addr_size, vs->tmp1),
 				    __wt_page_type_string(
 				    btree->root.page->type)));
-#endif
+
 			WT_WITH_PAGE_INDEX(session,
 			    ret = __verify_tree(session, &btree->root, vs));
 
@@ -164,11 +225,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_TRET(bm->checkpoint_unload(bm, session));
 		WT_ERR(ret);
 
-#ifdef HAVE_DIAGNOSTIC
 		/* Display the tree shape. */
 		if (vs->dump_shape)
 			WT_ERR(__verify_tree_shape(session, vs));
-#endif
 	}
 
 done:
@@ -190,78 +249,6 @@ err:	/* Inform the underlying block manager we're done. */
 	__wt_scr_free(session, &vs->tmp2);
 
 	return (ret);
-}
-
-/*
- * __verify_config --
- *	Debugging: verification supports dumping pages in various formats.
- */
-static int
-__verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
-{
-	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
-
-	if ((ret = __wt_config_gets(session, cfg, "dump_address", &cval)) == 0)
-		vs->dump_address = cval.val != 0;
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_gets(session, cfg, "dump_blocks", &cval)) == 0)
-		vs->dump_blocks = cval.val != 0;
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_gets(session, cfg, "dump_pages", &cval)) == 0)
-		vs->dump_pages = cval.val != 0;
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_gets(session, cfg, "dump_shape", &cval)) == 0)
-		vs->dump_shape = cval.val != 0;
-	WT_RET_NOTFOUND_OK(ret);
-
-#if !defined(HAVE_DIAGNOSTIC)
-	if (WT_VRFY_DIAG(vs))
-		WT_RET_MSG(session, ENOTSUP,
-		    "the WiredTiger library was not built in diagnostic mode");
-#endif
-	return (0);
-}
-
-/*
- * __verify_config_offsets --
- *	Debugging: optionally dump specific blocks from the file.
- */
-static int
-__verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
-{
-	WT_CONFIG list;
-	WT_CONFIG_ITEM cval, k, v;
-	WT_DECL_RET;
-	u_long offset;
-
-	*quitp = 0;
-
-	WT_RET_NOTFOUND_OK(
-	    __wt_config_gets(session, cfg, "dump_offsets", &cval));
-	WT_RET(__wt_config_subinit(session, &list, &cval));
-	while ((ret = __wt_config_next(&list, &k, &v)) == 0) {
-		/*
-		 * Quit after dumping the requested blocks.  (That's hopefully
-		 * what the user wanted, all of this stuff is just hooked into
-		 * verify because that's where we "dump blocks" for debugging.)
-		 */
-		*quitp = 1;
-		if (v.len != 0 || sscanf(k.str, "%lu", &offset) != 1)
-			WT_RET_MSG(session, EINVAL,
-			    "unexpected dump offset format");
-#if !defined(HAVE_DIAGNOSTIC)
-		WT_RET_MSG(session, ENOTSUP,
-		    "the WiredTiger library was not built in diagnostic mode");
-#else
-		WT_TRET(
-		    __wt_debug_offset_blind(session, (wt_off_t)offset, NULL));
-#endif
-	}
-	return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*
@@ -314,7 +301,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	WT_RET(__wt_verbose(session, WT_VERB_VERIFY, "%s %s",
 	    __wt_page_addr_string(session, ref, vs->tmp1),
 	    __wt_page_type_string(page->type)));
-#ifdef HAVE_DIAGNOSTIC
+
 	if (vs->dump_address)
 		WT_RET(__wt_msg(session, "%s %s",
 		    __wt_page_addr_string(session, ref, vs->tmp1),
@@ -325,7 +312,6 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	else
 		++vs->depth_leaf[
 		    WT_MIN(vs->depth, WT_ELEMENTS(vs->depth_internal) - 1)];
-#endif
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -353,13 +339,11 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	if (++vs->fcnt % 10 == 0)
 		WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
-#ifdef HAVE_DIAGNOSTIC
-	/* Optionally dump the blocks or page in debugging mode. */
+	/* Optionally dump the blocks or page. */
 	if (vs->dump_blocks)
 		WT_RET(__wt_debug_disk(session, page->dsk, NULL));
 	if (vs->dump_pages)
 		WT_RET(__wt_debug_page(session, page, NULL));
-#endif
 
 	/*
 	 * Column-store key order checks: check the page's record number and
