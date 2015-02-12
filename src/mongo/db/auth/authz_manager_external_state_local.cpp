@@ -36,6 +36,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_document_parser.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -365,7 +366,85 @@ namespace {
         return status;
     }
 
+    class AuthzManagerExternalStateLocal::AuthzManagerLogOpHandler : public RecoveryUnit::Change {
+    public:
+
+        // None of the parameters below (except externalState) need to live longer than
+        // the instantiations of this class
+        AuthzManagerLogOpHandler(AuthzManagerExternalStateLocal* externalState,
+                                 const char* op,
+                                 const char* ns,
+                                 const BSONObj& o,
+                                 const BSONObj* o2,
+                                 const bool* b):
+            _externalState(externalState),
+            _op(op),
+            _ns(ns),
+            _o(o.getOwned()),
+
+            _isO2Set(o2 ? true : false),
+            _o2(_isO2Set ? o2->getOwned() : BSONObj()),
+
+            _isBSet(b ? true : false),
+            _b(_isBSet ? *b : false) {
+
+        }
+
+        virtual void commit() {
+            boost::lock_guard<boost::mutex> lk(_externalState->_roleGraphMutex);
+            Status status = _externalState->_roleGraph.handleLogOp(_op.c_str(),
+                                                                   NamespaceString(_ns.c_str()),
+                                                                   _o,
+                                                                   _isO2Set ? &_o2 : NULL);
+
+            if (status == ErrorCodes::OplogOperationUnsupported) {
+                _externalState->_roleGraph = RoleGraph();
+                _externalState->_roleGraphState = _externalState->roleGraphStateInitial;
+                BSONObjBuilder oplogEntryBuilder;
+                oplogEntryBuilder << "op" << _op << "ns" << _ns << "o" << _o;
+                if (_isO2Set)
+                    oplogEntryBuilder << "o2" << _o2;
+                if (_isBSet)
+                    oplogEntryBuilder << "b" << _b;
+                error() << "Unsupported modification to roles collection in oplog; "
+                    "restart this process to reenable user-defined roles; " << status.reason() <<
+                    "; Oplog entry: " << oplogEntryBuilder.done();
+            }
+            else if (!status.isOK()) {
+                warning() << "Skipping bad update to roles collection in oplog. " << status <<
+                    " Oplog entry: " << _op;
+            }
+            status = _externalState->_roleGraph.recomputePrivilegeData();
+            if (status == ErrorCodes::GraphContainsCycle) {
+                _externalState->_roleGraphState = _externalState->roleGraphStateHasCycle;
+                error() << "Inconsistent role graph during authorization manager initialization.  "
+                    "Only direct privileges available. " << status.reason() <<
+                    " after applying oplog entry " << _op;
+            }
+            else {
+                fassert(17183, status);
+                _externalState->_roleGraphState = _externalState->roleGraphStateConsistent;
+            }
+
+        }
+
+        virtual void rollback() { }
+
+    private:
+        AuthzManagerExternalStateLocal* _externalState;
+        const std::string _op;
+        const std::string _ns;
+        const BSONObj _o;
+
+        const bool _isO2Set;
+        const BSONObj _o2;
+
+        const bool _isBSet;
+        const bool _b;
+    };
+
     void AuthzManagerExternalStateLocal::logOp(
+            OperationContext* txn,
             const char* op,
             const char* ns,
             const BSONObj& o,
@@ -375,37 +454,12 @@ namespace {
         if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
             ns == AuthorizationManager::adminCommandNamespace.ns()) {
 
-            boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
-            Status status = _roleGraph.handleLogOp(op, NamespaceString(ns), o, o2);
-
-            if (status == ErrorCodes::OplogOperationUnsupported) {
-                _roleGraph = RoleGraph();
-                _roleGraphState = roleGraphStateInitial;
-                BSONObjBuilder oplogEntryBuilder;
-                oplogEntryBuilder << "op" << op << "ns" << ns << "o" << o;
-                if (o2)
-                    oplogEntryBuilder << "o2" << *o2;
-                if (b)
-                    oplogEntryBuilder << "b" << *b;
-                error() << "Unsupported modification to roles collection in oplog; "
-                    "restart this process to reenable user-defined roles; " << status.reason() <<
-                    "; Oplog entry: " << oplogEntryBuilder.done();
-            }
-            else if (!status.isOK()) {
-                warning() << "Skipping bad update to roles collection in oplog. " << status <<
-                    " Oplog entry: " << op;
-            }
-            status = _roleGraph.recomputePrivilegeData();
-            if (status == ErrorCodes::GraphContainsCycle) {
-                _roleGraphState = roleGraphStateHasCycle;
-                error() << "Inconsistent role graph during authorization manager initialization.  "
-                    "Only direct privileges available. " << status.reason() <<
-                    " after applying oplog entry " << op;
-            }
-            else {
-                fassert(17183, status);
-                _roleGraphState = roleGraphStateConsistent;
-            }
+            txn->recoveryUnit()->registerChange(new AuthzManagerLogOpHandler(this,
+                                                                             op,
+                                                                             ns,
+                                                                             o,
+                                                                             o2,
+                                                                             b));
         }
     }
 

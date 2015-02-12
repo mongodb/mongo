@@ -427,7 +427,8 @@ namespace mongo {
          * Hook called by replication code to let the AuthorizationManager observe changes
          * to relevant collections.
          */
-        void logOp(const char* opstr,
+        void logOp(OperationContext* txn,
+                   const char* opstr,
                    const char* ns,
                    const BSONObj& obj,
                    BSONObj* patt,
