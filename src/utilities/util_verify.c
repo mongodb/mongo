@@ -10,6 +10,18 @@
 
 static int usage(void);
 
+#undef OPT_ARGS
+#undef USAGE_ARGS
+#ifdef HAVE_DIAGNOSTIC
+#define	OPT_ARGS	"d:"
+#define	USAGE_ARGS	\
+	"[-d dump_address | dump_blocks | dump_offsets=#,# | "\
+	"dump_pages | dump_shape] uri"
+#else
+#define	OPT_ARGS	""
+#define	USAGE_ARGS	"uri"
+#endif
+
 int
 util_verify(WT_SESSION *session, int argc, char *argv[])
 {
@@ -20,7 +32,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 
 	dump_address = dump_blocks = dump_pages = dump_shape = 0;
 	config = dump_offsets = name = NULL;
-	while ((ch = __wt_getopt(progname, argc, argv, "d:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, OPT_ARGS)) != EOF)
 		switch (ch) {
 		case 'd':
 			if (strcmp(__wt_optarg, "dump_address") == 0)
@@ -108,8 +120,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "verify [-d dump_address | dump_blocks | "
-	    "dump_offsets=#,# | dump_pages | dump_shape] uri\n",
-	    progname, usage_prefix);
+	    "verify %s\n",
+	    progname, usage_prefix, USAGE_ARGS);
 	return (1);
 }
