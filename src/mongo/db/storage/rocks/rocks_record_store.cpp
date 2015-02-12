@@ -191,7 +191,10 @@ namespace mongo {
     int64_t RocksRecordStore::storageSize(OperationContext* txn, BSONObjBuilder* extraInfo,
                                           int infoLevel) const {
         // we're lying, but that's the best we can do for now
-        return _dataSize.load();
+        // We need to make it multiple of 256 to make
+        // jstests/concurrency/fsm_workloads/convert_to_capped_collection.js happy
+        return static_cast<int64_t>(
+            std::max(_dataSize.load() & (~255), static_cast<long long>(256)));
     }
 
     RecordData RocksRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {

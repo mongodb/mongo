@@ -544,7 +544,10 @@ namespace mongo {
         }
         rocksdb::Range wholeRange(_prefix, nextPrefix);
         _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
-        return static_cast<long long>(storageSize);
+        // There might be some bytes in the WAL that we don't count here. Some
+        // tests depend on the fact that non-empty indexes have non-zero sizes
+        return static_cast<long long>(
+            std::max(storageSize, static_cast<uint64_t>(1)));
     }
 
     std::string RocksIndexBase::_makePrefixedKey(const std::string& prefix,
