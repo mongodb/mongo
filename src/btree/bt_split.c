@@ -799,12 +799,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	uint64_t split_gen;
 	uint32_t children, i, j;
 	uint32_t deleted_entries, parent_entries, result_entries;
-	int complete, hazard, locked;
+	int complete, hazard;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
 	alloc_index = pindex = NULL;
 	parent_ref = NULL;
-	complete = hazard = locked = 0;
+	complete = hazard = 0;
 	parent_entries = 0;
 
 	/*
@@ -830,7 +830,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		}
 		__wt_yield();
 	}
-	locked = 1;
 
 	/*
 	 * We have exclusive access to split the parent, and at this point, the
@@ -1044,8 +1043,7 @@ err:	if (!complete)
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
-	if (locked)
-		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+	F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 
 	if (hazard)
 		WT_TRET(__wt_hazard_clear(session, parent));
