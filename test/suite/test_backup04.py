@@ -104,10 +104,10 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         # run recovery in order to apply all the logs and check the data.
         #
         if dir_full == None:
-            self.runWt(['-r', 'dump', uri], outfilename=full_name)
+            self.runWt(['-R', 'dump', uri], outfilename=full_name)
         else:
-            self.runWt(['-r', '-h', dir_full, 'dump', uri], outfilename=full_name)
-        self.runWt(['-r', '-h', dir_incr, 'dump', uri], outfilename=incr_name)
+            self.runWt(['-R', '-h', dir_full, 'dump', uri], outfilename=full_name)
+        self.runWt(['-R', '-h', dir_incr, 'dump', uri], outfilename=incr_name)
         self.assertEqual(True,
             compare_files(self, full_name, incr_name))
 
