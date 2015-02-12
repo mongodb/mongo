@@ -187,8 +187,6 @@ namespace mongo {
             cleanShutdown();
         }
 
-        _sizeStorer.reset( NULL );
-
         _sessionCache.reset( NULL );
     }
 
@@ -196,7 +194,8 @@ namespace mongo {
         log() << "WiredTigerKVEngine shutting down";
         syncSizeInfo(true);
         if (_conn) {
-            // this must be the last thing we do before _conn->close();
+            // these must be the last things we do before _conn->close();
+            _sizeStorer.reset( NULL );
             _sessionCache->shuttingDown();
 
 #if !__has_feature(address_sanitizer)
