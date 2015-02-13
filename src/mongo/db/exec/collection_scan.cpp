@@ -66,7 +66,7 @@ namespace mongo {
         _specificStats.direction = params.direction;
 
         // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
-        // for anything other than passing up NEED_FETCH. We use the loc and owned obj state, but
+        // for anything other than passing up NEED_YIELD. We use the loc and owned obj state, but
         // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
         WorkingSetMember* member = _workingSet->get(_wsidForFetch);
         member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
@@ -114,7 +114,7 @@ namespace mongo {
                 // Leave us in a state to try again next time.
                 _iter.reset();
                 *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_FETCH;
+                return PlanStage::NEED_YIELD;
             }
 
             ++_commonStats.needTime;
@@ -136,9 +136,8 @@ namespace mongo {
         _lastSeenLoc = curr;
 
         // See if the record we're about to access is in memory. If not, pass a fetch request up.
-        // Note that curr() does not touch the record (on MMAPv1 which is the only place we use
-        // NEED_FETCH) so we are able to yield before touching the record, as long as we do so
-        // before calling getNext().
+        // Note that curr() does not touch the record. This way, we are able to yield before
+        // fetching the record.
         {
             std::auto_ptr<RecordFetcher> fetcher(
                 _params.collection->documentNeedsFetch(_txn, curr));
@@ -148,8 +147,8 @@ namespace mongo {
                 // Pass the RecordFetcher off to the WSM.
                 member->setFetcher(fetcher.release());
                 *out = _wsidForFetch;
-                _commonStats.needFetch++;
-                return NEED_FETCH;
+                _commonStats.needYield++;
+                return NEED_YIELD;
             }
         }
 
@@ -166,7 +165,7 @@ namespace mongo {
             // If getNext thows, it leaves us on the original document.
             invariant(_iter->curr() == curr);
             *out = WorkingSet::INVALID_ID;
-            return PlanStage::NEED_FETCH;
+            return PlanStage::NEED_YIELD;
         }
 
         WorkingSetID id = _workingSet->allocate();

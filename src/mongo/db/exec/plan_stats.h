@@ -64,7 +64,7 @@ namespace mongo {
                         invalidates(0),
                         advanced(0),
                         needTime(0),
-                        needFetch(0),
+                        needYield(0),
                         executionTimeMillis(0),
                         isEOF(false) { }
         // String giving the type of the stage. Not owned.
@@ -79,7 +79,7 @@ namespace mongo {
         // How many times was this state the return value of work(...)?
         size_t advanced;
         size_t needTime;
-        size_t needFetch;
+        size_t needYield;
 
         // BSON representation of a MatchExpression affixed to this node. If there
         // is no filter affixed, then 'filter' should be an empty BSONObj.
@@ -311,10 +311,6 @@ namespace mongo {
 
         // Have we seen anything that already had an object?
         size_t alreadyHasObj;
-
-        // How many fetches weren't in memory?  it's common.needFetch.
-        // How many total fetches did we do?  it's common.advanced.
-        // So the number of fetches that were in memory are common.advanced - common.needFetch.
 
         // How many records were we forced to fetch as the result of an invalidation?
         size_t forcedFetches;

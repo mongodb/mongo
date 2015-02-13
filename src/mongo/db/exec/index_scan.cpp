@@ -200,7 +200,7 @@ namespace mongo {
                 _endCursor.reset();
                 _btreeCursor = NULL;
                 *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_FETCH;
+                return PlanStage::NEED_YIELD;
             }
         }
 
@@ -212,7 +212,7 @@ namespace mongo {
                 // checkEnd only fails in ways that is safe to call again after yielding.
                 _scanState = CHECKING_END;
                 *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_FETCH;
+                return PlanStage::NEED_YIELD;
             }
         }
 
@@ -246,7 +246,7 @@ namespace mongo {
                 // If next throws, it leaves us at the original position.
                 invariant(_indexCursor->getValue() == loc);
                 *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_FETCH;
+                return PlanStage::NEED_YIELD;
             }
 
             if (_shouldDedup) {

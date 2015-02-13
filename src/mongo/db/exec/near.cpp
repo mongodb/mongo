@@ -125,9 +125,9 @@ namespace mongo {
             *out = toReturn;
             ++_stats->common.advanced;
         }
-        else if (PlanStage::NEED_FETCH == nextState) {
+        else if (PlanStage::NEED_YIELD == nextState) {
             *out = toReturn;
-            ++_stats->common.needFetch;
+            ++_stats->common.needYield;
         }
         else if (PlanStage::NEED_TIME == nextState) {
             ++_stats->common.needTime;
@@ -157,7 +157,7 @@ namespace mongo {
         double distance;
     };
 
-    // Set "toReturn" when NEED_FETCH.
+    // Set "toReturn" when NEED_YIELD.
     PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* error) {
 
         //
@@ -201,7 +201,7 @@ namespace mongo {
             *error = WorkingSetCommon::getMemberStatus(*_workingSet->get(nextMemberID));
             return intervalState;
         }
-        else if (PlanStage::NEED_FETCH == intervalState) {
+        else if (PlanStage::NEED_YIELD == intervalState) {
             *toReturn = nextMemberID;
             return intervalState;
         }

@@ -46,7 +46,7 @@ namespace mongo {
           _ws(ws),
           _wsidForFetch(_ws->allocate()) {
         // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
-        // for anything other than passing up NEED_FETCH. We use the loc and owned obj state, but
+        // for anything other than passing up NEED_YIELD. We use the loc and owned obj state, but
         // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
         WorkingSetMember* member = _ws->get(_wsidForFetch);
         member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
@@ -76,7 +76,7 @@ namespace mongo {
                 // Pass the RecordFetcher off to the WSM on which we're performing the fetch.
                 member->setFetcher(fetcher.release());
                 *out = _wsidForFetch;
-                return NEED_FETCH;
+                return NEED_YIELD;
             }
 
             obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
@@ -91,7 +91,7 @@ namespace mongo {
             invariant(!_iterators.empty());
             invariant(_iterators.back()->curr() == curr);
             *out = WorkingSet::INVALID_ID;
-            return NEED_FETCH;
+            return NEED_YIELD;
         }
 
         if (curr.isNull())

@@ -123,7 +123,7 @@ namespace mongo {
                 _btreeCursor.reset();
                 _endCursor.reset();
                 *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_FETCH;
+                return PlanStage::NEED_YIELD;
             }
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
@@ -140,7 +140,7 @@ namespace mongo {
             // The cursor shouldn't have moved.
             invariant(_btreeCursor->getValue() == loc);
             *out = WorkingSet::INVALID_ID;
-            return PlanStage::NEED_FETCH;
+            return PlanStage::NEED_YIELD;
         }
 
         checkEnd();

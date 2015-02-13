@@ -317,13 +317,12 @@ namespace mongo {
         size_t writeConflictsInARow = 0;
 
         for (;;) {
-            // There are two conditions which cause us to yield if we have an YIELD_AUTO
-            // policy:
+            // These are the conditions which can cause us to yield:
             //   1) The yield policy's timer elapsed, or
-            //   2) some stage requested a yield due to a document fetch (NEED_FETCH).
-            // In both cases, the actual yielding happens here.
+            //   2) some stage requested a yield due to a document fetch, or
+            //   3) we need to yield and retry due to a WriteConflictException.
+            // In all cases, the actual yielding happens here.
             if (_yieldPolicy->shouldYield()) {
-                // Here's where we yield.
                 _yieldPolicy->yield(fetcher.get());
 
                 if (_killed) {
@@ -338,7 +337,7 @@ namespace mongo {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState code = _root->work(&id);
 
-            if (code != PlanStage::NEED_FETCH)
+            if (code != PlanStage::NEED_YIELD)
                 writeConflictsInARow = 0;
 
             if (PlanStage::ADVANCED == code) {
@@ -390,9 +389,7 @@ namespace mongo {
                 }
                 // This result didn't have the data the caller wanted, try again.
             }
-            else if (PlanStage::NEED_FETCH == code) {
-                // Yielding on a NEED_FETCH is handled above, so there's not much to do here.
-                // Just verify that the NEED_FETCH gave us back a WSM that is actually fetchable.
+            else if (PlanStage::NEED_YIELD == code) {
                 if (id == WorkingSet::INVALID_ID) {
                     if (!_yieldPolicy->allowedToYield()) throw WriteConflictException();
                     _opCtx->getCurOp()->debug().writeConflicts++;
@@ -410,6 +407,7 @@ namespace mongo {
                     fetcher.reset(member->releaseFetcher());
                 }
 
+                // If we're allowed to, we will yield next time through the loop.
                 if (_yieldPolicy->allowedToYield()) _yieldPolicy->forceYield();
             }
             else if (PlanStage::NEED_TIME == code) {

@@ -395,7 +395,7 @@ namespace mongo {
             // Clean up working set.
             workingSet->free(workingSetID);
             return PlanStage::IS_EOF;
-        } else if (state == PlanStage::NEED_FETCH) {
+        } else if (state == PlanStage::NEED_YIELD) {
             *out = workingSetID;
         }
 
@@ -1067,7 +1067,7 @@ namespace mongo {
             // Clean up working set.
             workingSet->free(workingSetID);
             return PlanStage::IS_EOF;
-        } else if (state == PlanStage::NEED_FETCH) {
+        } else if (state == PlanStage::NEED_YIELD) {
             *out = workingSetID;
         }
 

@@ -119,29 +119,28 @@ namespace mongo {
             // nothing output in the out parameter.
             NEED_TIME,
 
-            // The storage engine says we need to yield, possibly to fetch a record from disk.
+            // The storage engine says we need to yield, possibly to fetch a record from disk, or
+            // due to an aborted transaction in the storage layer.
             //
-            // TODO this should be renamed NEED_YIELD.
+            // Full yield request semantics:
             //
-            // Full fetch semantics:
-            //
-            // Each stage that receives a NEED_FETCH from a child must propagate the NEED_FETCH up
+            // Each stage that receives a NEED_YIELD from a child must propagate the NEED_YIELD up
             // and perform no work.
             //
             // If a yield is requested due to a WriteConflict, the out parameter of work(...) should
             // be populated with WorkingSet::INVALID_ID. If it is illegal to yield, a
             // WriteConflictException will be thrown.
             //
-            // A fetch-requesting stage populates the out parameter of work(...) with a WSID that
+            // A yield-requesting stage populates the out parameter of work(...) with a WSID that
             // refers to a WSM with a Fetcher*. If it is illegal to yield, this is ignored. This
             // difference in behavior can be removed once SERVER-16051 is resolved.
             //
             // The plan executor is responsible for yielding and, if requested, paging in the data
-            // upon receipt of a NEED_FETCH. The plan executor does NOT free the WSID of the
+            // upon receipt of a NEED_YIELD. The plan executor does NOT free the WSID of the
             // requested fetch. The stage that requested the fetch holds the WSID of the loc it
             // wants fetched. On the next call to work() that stage can assume a fetch was performed
             // on the WSM that the held WSID refers to.
-            NEED_FETCH,
+            NEED_YIELD,
 
             // Something went wrong but it's not an internal error.  Perhaps our collection was
             // dropped or state deleted.
@@ -165,8 +164,8 @@ namespace mongo {
             else if (NEED_TIME == state) {
                 return "NEED_TIME";
             }
-            else if (NEED_FETCH == state) {
-                return "NEED_FETCH";
+            else if (NEED_YIELD == state) {
+                return "NEED_YIELD";
             }
             else if (DEAD == state) {
                 return "DEAD";

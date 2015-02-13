@@ -81,7 +81,7 @@ namespace mongo {
             catch (const WriteConflictException& wce) {
                 _subIterators.clear();
                 *out = WorkingSet::INVALID_ID;
-                return NEED_FETCH;
+                return NEED_YIELD;
             }
         }
 
@@ -99,7 +99,7 @@ namespace mongo {
         const RecordId loc = _subIterators.back()->curr();
         if (loc.isNull()) return PlanStage::NEED_TIME;
 
-        // TODO: should we ever try and return NEED_FETCH here?
+        // TODO: should we ever try and return NEED_YIELD here?
         const BSONObj obj = _subIterators.back()->dataFor(loc).releaseToBson();
         if (!_filter->matchesBSON(obj)) {
             _done = true;

@@ -148,8 +148,8 @@ namespace mongo {
                 _idBeingPagedIn = id;
                 member->setFetcher(fetcher.release());
                 *out = id;
-                _commonStats.needFetch++;
-                return NEED_FETCH;
+                _commonStats.needYield++;
+                return NEED_YIELD;
             }
 
             // The doc was already in memory, so we go ahead and return it.
@@ -170,8 +170,8 @@ namespace mongo {
                 _workingSet->free(id);
 
             *out = WorkingSet::INVALID_ID;
-            _commonStats.needFetch++;
-            return NEED_FETCH;
+            _commonStats.needYield++;
+            return NEED_YIELD;
         }
     }
 

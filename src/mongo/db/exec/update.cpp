@@ -859,8 +859,8 @@ namespace mongo {
                 _idRetrying = id;
                 memberFreer.Dismiss(); // Keep this member around so we can retry updating it.
                 *out = WorkingSet::INVALID_ID;
-                _commonStats.needFetch++;
-                return NEED_FETCH;
+                _commonStats.needYield++;
+                return NEED_YIELD;
             }
 
             // This should be after transformAndUpdate to make sure we actually updated this doc.
@@ -877,8 +877,8 @@ namespace mongo {
                 // Note we don't need to retry anything in this case since the update already
                 // was committed.
                 *out = WorkingSet::INVALID_ID;
-                _commonStats.needFetch++;
-                return NEED_FETCH;
+                _commonStats.needYield++;
+                return NEED_YIELD;
             }
 
             ++_commonStats.needTime;
@@ -905,8 +905,8 @@ namespace mongo {
         else if (PlanStage::NEED_TIME == status) {
             ++_commonStats.needTime;
         }
-        else if (PlanStage::NEED_FETCH == status) {
-            ++_commonStats.needFetch;
+        else if (PlanStage::NEED_YIELD == status) {
+            ++_commonStats.needYield;
             *out = id;
         }
 

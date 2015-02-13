@@ -76,8 +76,8 @@ namespace mongo {
      * Prerequisites: None; is a leaf node.
      * Output type: LOC_AND_OBJ_UNOWNED.
      *
-     * TODO: Should the TextStage ever generate NEED_FETCH requests? Right now this stage could
-     * reduce concurrency by failing to request a yield during fetch.
+     * TODO: Should the TextStage ever generate NEED_YIELD requests for fetching MMAP v1 records?
+     * Right now this stage could reduce concurrency by failing to request a yield during fetch.
      */
     class TextStage : public PlanStage {
     public:

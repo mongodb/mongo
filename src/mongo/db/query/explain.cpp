@@ -231,7 +231,7 @@ namespace mongo {
             bob->appendNumber("works", stats.common.works);
             bob->appendNumber("advanced", stats.common.advanced);
             bob->appendNumber("needTime", stats.common.needTime);
-            bob->appendNumber("needFetch", stats.common.needFetch);
+            bob->appendNumber("needYield", stats.common.needYield);
             bob->appendNumber("saveState", stats.common.yields);
             bob->appendNumber("restoreState", stats.common.unyields);
             bob->appendNumber("isEOF", stats.common.isEOF);

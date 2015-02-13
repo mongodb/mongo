@@ -179,8 +179,8 @@ namespace mongo {
                 _idRetrying = id;
                 memberFreer.Dismiss(); // Keep this member around so we can retry deleting it.
                 *out = WorkingSet::INVALID_ID;
-                _commonStats.needFetch++;
-                return NEED_FETCH;
+                _commonStats.needYield++;
+                return NEED_YIELD;
             }
 
             //  As restoreState may restore (recreate) cursors, cursors are tied to the
@@ -193,8 +193,8 @@ namespace mongo {
                 // Note we don't need to retry anything in this case since the delete already
                 // was committed.
                 *out = WorkingSet::INVALID_ID;
-                _commonStats.needFetch++;
-                return NEED_FETCH;
+                _commonStats.needYield++;
+                return NEED_YIELD;
             }
 
             ++_commonStats.needTime;
@@ -215,9 +215,9 @@ namespace mongo {
         else if (PlanStage::NEED_TIME == status) {
             ++_commonStats.needTime;
         }
-        else if (PlanStage::NEED_FETCH == status) {
+        else if (PlanStage::NEED_YIELD == status) {
             *out = id;
-            ++_commonStats.needFetch;
+            ++_commonStats.needYield;
         }
 
         return status;

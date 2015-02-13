@@ -92,7 +92,7 @@ namespace mongo {
                 _internalState = INIT_SCANS;
                 _scanners.clear();
                 *out = WorkingSet::INVALID_ID;
-                stageState = NEED_FETCH;
+                stageState = NEED_YIELD;
             }
             break;
 
@@ -115,8 +115,8 @@ namespace mongo {
         case PlanStage::NEED_TIME:
             ++_commonStats.needTime;
             break;
-        case PlanStage::NEED_FETCH:
-            ++_commonStats.needFetch;
+        case PlanStage::NEED_YIELD:
+            ++_commonStats.needYield;
             break;
         default:
             break;
@@ -311,8 +311,8 @@ namespace mongo {
         catch (const WriteConflictException& wce) {
             // Do this record again next time around.
             *out = WorkingSet::INVALID_ID;
-            _commonStats.needFetch++;
-            return NEED_FETCH;
+            _commonStats.needYield++;
+            return NEED_YIELD;
         }
 
         _scoreIterator++;
@@ -425,7 +425,7 @@ namespace mongo {
                 catch (const WriteConflictException& wce) {
                     _idRetrying = wsid;
                     *out = WorkingSet::INVALID_ID;
-                    return NEED_FETCH;
+                    return NEED_YIELD;
                 }
                 catch (const TextMatchableDocument::DocumentDeletedException&) {
                     // We attempted to fetch the document but decided it should be excluded from the

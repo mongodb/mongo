@@ -114,8 +114,8 @@ namespace mongo {
             _commonStats.needTime++;
             return PlanStage::NEED_TIME;
         }
-        else if (PlanStage::NEED_FETCH == childStatus) {
-            _commonStats.needFetch++;
+        else if (PlanStage::NEED_YIELD == childStatus) {
+            _commonStats.needYield++;
         }
         else if (PlanStage::NEED_TIME == childStatus) {
             _commonStats.needTime++;

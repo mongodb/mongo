@@ -143,8 +143,8 @@ namespace mongo {
             if (PlanStage::NEED_TIME == state) {
                 ++_commonStats.needTime;
             }
-            else if (PlanStage::NEED_FETCH == state) {
-                ++_commonStats.needFetch;
+            else if (PlanStage::NEED_YIELD == state) {
+                ++_commonStats.needYield;
                 *out = id;
             }
 
@@ -262,8 +262,8 @@ namespace mongo {
             if (PlanStage::NEED_TIME == state) {
                 ++_commonStats.needTime;
             }
-            else if (PlanStage::NEED_FETCH == state) {
-                ++_commonStats.needFetch;
+            else if (PlanStage::NEED_YIELD == state) {
+                ++_commonStats.needYield;
                 *out = id;
             }
 

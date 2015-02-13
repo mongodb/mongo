@@ -56,9 +56,8 @@ namespace mongo {
         static void prepareForSnapshotChange(WorkingSet* workingSet);
 
         /**
-         * After a NEED_FETCH is requested, this is used to actually retrieve the document
-         * corresponding to 'member' from 'collection', and to set the state of 'member'
-         * appropriately.
+         * Retrieves the document corresponding to 'member' from 'collection', and sets the state of
+         * 'member' appropriately.
          *
          * If false is returned, the document should not be considered for the result set. It is the
          * caller's responsibility to free 'member' in this case.

@@ -105,7 +105,7 @@ namespace mongo {
                 verify(member->hasLoc());
 
                 // We might need to retrieve 'nextLoc' from secondary storage, in which case we send
-                // a NEED_FETCH request up to the PlanExecutor.
+                // a NEED_YIELD request up to the PlanExecutor.
                 std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn,
                                                                                      member->loc));
                 if (NULL != fetcher.get()) {
@@ -114,8 +114,8 @@ namespace mongo {
                     _idRetrying = id;
                     member->setFetcher(fetcher.release());
                     *out = id;
-                    _commonStats.needFetch++;
-                    return NEED_FETCH;
+                    _commonStats.needYield++;
+                    return NEED_YIELD;
                 }
 
                 // The doc is already in memory, so go ahead and grab it. Now we have a RecordId
@@ -130,8 +130,8 @@ namespace mongo {
                 catch (const WriteConflictException& wce) {
                     _idRetrying = id;
                     *out = WorkingSet::INVALID_ID;
-                    _commonStats.needFetch++;
-                    return NEED_FETCH;
+                    _commonStats.needYield++;
+                    return NEED_YIELD;
                 }
             }
 
@@ -153,8 +153,8 @@ namespace mongo {
         else if (PlanStage::NEED_TIME == status) {
             ++_commonStats.needTime;
         }
-        else if (PlanStage::NEED_FETCH == status) {
-            ++_commonStats.needFetch;
+        else if (PlanStage::NEED_YIELD == status) {
+            ++_commonStats.needYield;
             *out = id;
         }
 

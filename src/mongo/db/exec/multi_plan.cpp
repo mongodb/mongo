@@ -150,21 +150,20 @@ namespace mongo {
         else if (PlanStage::NEED_TIME == state) {
             _commonStats.needTime++;
         }
-        else if (PlanStage::NEED_FETCH == state) {
-            _commonStats.needFetch++;
+        else if (PlanStage::NEED_YIELD == state) {
+            _commonStats.needYield++;
         }
 
         return state;
     }
 
     Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
-        // There are two conditions which cause us to yield during plan selection if we have a
-        // YIELD_AUTO policy:
+        // These are the conditions which can cause us to yield:
         //   1) The yield policy's timer elapsed, or
-        //   2) some stage requested a yield due to a document fetch (NEED_FETCH).
-        // In both cases, the actual yielding happens here.
+        //   2) some stage requested a yield due to a document fetch, or
+        //   3) we need to yield and retry due to a WriteConflictException.
+        // In all cases, the actual yielding happens here.
         if (yieldPolicy->shouldYield()) {
-            // Here's where we yield.
             bool alive = yieldPolicy->yield(_fetcher.get());
 
             if (!alive) {
@@ -379,9 +378,7 @@ namespace mongo {
                 // Assumes that the ranking will pick this plan.
                 doneWorking = true;
             }
-            else if (PlanStage::NEED_FETCH == state) {
-                // Yielding for a NEED_FETCH is handled above. Here we just make sure that the
-                // WSM is fetchable as a sanity check.
+            else if (PlanStage::NEED_YIELD == state) {
                 if (id == WorkingSet::INVALID_ID) {
                     if (!yieldPolicy->allowedToYield())
                         throw WriteConflictException();
