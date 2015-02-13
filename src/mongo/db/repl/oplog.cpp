@@ -383,6 +383,7 @@ namespace {
         // rollback-safe logOp listeners
         //
         getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
+        logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
 
         try {
             // TODO SERVER-15192 remove this once all listeners are rollback-safe.
@@ -394,7 +395,6 @@ namespace {
                 }
             };
             txn->recoveryUnit()->registerChange(new RollbackPreventer());
-            logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
             logOpForDbHash(ns);
 
             if ( strstr( ns, ".system.js" ) ) {

@@ -352,48 +352,12 @@ namespace mongo {
                 return;
             }
 
-            BSONObj it;
-
-            switch ( opstr[0] ) {
-
-            case 'd': {
-
-                if (notInActiveChunk) {
-                    // we don't want to xfer things we're cleaning
-                    // as then they'll be deleted on TO
-                    // which is bad
-                    return;
-                }
-
-                scoped_lock sl(_mutex);
-                // can't filter deletes :(
-                _deleted.push_back( ide.wrap() );
-                _memoryUsed += ide.size() + 5;
-                return;
-            }
-
-            case 'i':
-                it = obj;
-                break;
-
-            case 'u':
-                Client::Context ctx(txn, _ns);
-                if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), ide.wrap(), it)) {
-                    warning() << "logOpForSharding couldn't find: " << ide
-                              << " even though should have" << migrateLog;
-                    return;
-                }
-                break;
-
-            }
-
-            if (!isInRange(it, _min, _max, _shardKeyPattern)) {
-                return;
-            }
-
-            scoped_lock sl(_mutex);
-            _reload.push_back(ide.wrap());
-            _memoryUsed += ide.size() + 5;
+            txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this,
+                                                                            txn,
+                                                                            ide,
+                                                                            obj,
+                                                                            op,
+                                                                            notInActiveChunk));
         }
 
         /**
@@ -733,6 +697,91 @@ namespace mongo {
     private:
         bool _getActive() const { scoped_lock lk(_mutex); return _active; }
         void _setActive( bool b ) { scoped_lock lk(_mutex); _active = b; }
+
+        /**
+         * Used to commit work for LogOpForSharding.
+         */
+        class LogOpForShardingHandler : public RecoveryUnit::Change {
+        public:
+            LogOpForShardingHandler(MigrateFromStatus* migrateFromStatus,
+                                    OperationContext* txn,
+                                    const BSONElement& ide,
+                                    const BSONObj& obj,
+                                    const char op,
+                                    const bool notInActiveChunk):
+                _migrateFromStatus(migrateFromStatus),
+                _txn(txn),
+                _ide(ide),
+                _obj(obj.getOwned()),
+                _op(op),
+                _notInActiveChunk(notInActiveChunk) {
+
+            }
+
+            virtual void commit() {
+                dassert(_txn->lockState()->isWriteLocked()); // Must have Global IX.
+
+                BSONObj it;
+
+                switch ( _op ) {
+
+                case 'd': {
+
+                    if (_notInActiveChunk) {
+                        // we don't want to xfer things we're cleaning
+                        // as then they'll be deleted on TO
+                        // which is bad
+                        return;
+                    }
+
+                    scoped_lock sl(_migrateFromStatus->_mutex);
+                    // can't filter deletes :(
+                    _migrateFromStatus->_deleted.push_back( _ide.wrap() );
+                    _migrateFromStatus->_memoryUsed += _ide.size() + 5;
+                    return;
+                }
+
+                case 'i':
+                    it = _obj;
+                    break;
+
+                case 'u':
+                    Client::Context ctx(_txn, _migrateFromStatus->_ns);
+                    if (!Helpers::findById(_txn,
+                                           ctx.db(),
+                                           _migrateFromStatus->_ns.c_str(),
+                                           _ide.wrap(),
+                                           it)) {
+                        warning() << "logOpForSharding couldn't find: " << _ide
+                                  << " even though should have" << migrateLog;
+                        return;
+                    }
+                    break;
+
+                }
+
+                if (!isInRange(it,
+                               _migrateFromStatus->_min,
+                               _migrateFromStatus->_max,
+                               _migrateFromStatus->_shardKeyPattern)) {
+                    return;
+                }
+
+                scoped_lock sl(_migrateFromStatus->_mutex);
+                _migrateFromStatus->_reload.push_back(_ide.wrap());
+                _migrateFromStatus->_memoryUsed += _ide.size() + 5;
+            }
+
+            virtual void rollback() { }
+
+        private:
+            MigrateFromStatus* _migrateFromStatus;
+            OperationContext* _txn;
+            const BSONElement _ide;
+            const BSONObj _obj;
+            const char _op;
+            const bool _notInActiveChunk;
+        };
 
         /**
          * Used to receive invalidation notifications.
