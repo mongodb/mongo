@@ -631,7 +631,7 @@ namespace mongo {
 
         //  This is an upsert into a non-existing database, so need an exclusive lock
         //  to avoid deadlock
-        {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ParsedUpdate parsedUpdate(txn, &request);
             uassertStatusOK(parsedUpdate.parseRequest());
 
@@ -669,7 +669,7 @@ namespace mongo {
             UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), &op.debug());
 
             lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
-        }
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "update", ns.ns());
     }
 
     void receivedDelete(OperationContext* txn, Message& m, CurOp& op) {
