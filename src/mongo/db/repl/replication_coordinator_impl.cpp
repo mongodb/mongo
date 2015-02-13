@@ -1433,11 +1433,11 @@ namespace {
 
     void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        BSONArrayBuilder slaves(result->subarrayStart("slaves"));
+        BSONArrayBuilder replicationProgress(result->subarrayStart("replicationProgress"));
         {
             for (SlaveInfoVector::const_iterator itr = _slaveInfo.begin();
                     itr != _slaveInfo.end(); ++itr) {
-                BSONObjBuilder entry(slaves.subobjStart());
+                BSONObjBuilder entry(replicationProgress.subobjStart());
                 entry.append("rid", itr->rid);
                 entry.append("optime", itr->opTime);
                 entry.append("host", itr->hostAndPort.toString());
