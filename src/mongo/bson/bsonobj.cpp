@@ -86,10 +86,6 @@ namespace mongo {
         return copy();
     }
 
-    BSONObjIterator BSONObj::begin() const {
-        return BSONObjIterator(*this);
-    }
-
     string BSONObj::jsonString( JsonStringFormat format, int pretty, bool isArray ) const {
 
         if ( isEmpty() ) return isArray ? "[]" : "{}";

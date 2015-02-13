@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
 #include <boost/scoped_array.hpp>
 #include <list>
 #include <set>
@@ -510,13 +509,15 @@ namespace mongo {
         friend class BSONObjIterator;
         typedef BSONObjIterator iterator;
 
-        /** use something like this:
-            for( BSONObj::iterator i = myObj.begin(); i.more(); ) {
-                BSONElement e = i.next();
-                ...
-            }
-        */
+        /**
+         * These enable range-based for loops over BSONObjs:
+         *
+         *      for (BSONElement elem : BSON("a" << 1 << "b" << 2)) {
+         *          ... // Do something with elem
+         *      }
+         */
         BSONObjIterator begin() const;
+        BSONObjIterator end() const;
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
             verify( objsize() );
@@ -595,14 +596,16 @@ namespace mongo {
 
        The BSONObj must stay in scope for the duration of the iterator's execution.
 
-       todo: we may want to make a more stl-like iterator interface for this
-             with things like begin() and end()
+       todo: Finish making this an STL-compatible iterator.
+                Need iterator_catagory et al (maybe inherit from std::iterator).
+                Need operator->
+                operator* should return a const reference not a value.
     */
     class BSONObjIterator {
     public:
         /** Create an iterator for a BSON object.
         */
-        BSONObjIterator(const BSONObj& jso) {
+        explicit BSONObjIterator(const BSONObj& jso) {
             int sz = jso.objsize();
             if ( MONGO_unlikely(sz == 0) ) {
                 _pos = _theend = 0;
@@ -615,6 +618,12 @@ namespace mongo {
         BSONObjIterator( const char * start , const char * end ) {
             _pos = start + 4;
             _theend = end - 1;
+        }
+
+        static BSONObjIterator endOf(const BSONObj& obj) {
+            BSONObjIterator end(obj);
+            end._pos = end._theend;
+            return end;
         }
 
         /** @return true if more elements exist to be enumerated. */
@@ -640,18 +649,39 @@ namespace mongo {
 
             return e;
         }
+
         BSONElement next() {
             verify( _pos <= _theend );
             BSONElement e(_pos);
             _pos += e.size();
             return e;
         }
-        void operator++() { next(); }
-        void operator++(int) { next(); }
+
+        /** pre-increment */
+        BSONObjIterator& operator++() {
+            next();
+            return *this;
+        }
+
+        /** post-increment */
+        BSONObjIterator operator++(int) {
+            BSONObjIterator oldPos = *this;
+            next();
+            return oldPos;
+        }
 
         BSONElement operator*() {
             verify( _pos <= _theend );
             return BSONElement(_pos);
+        }
+
+        bool operator==(const BSONObjIterator& other) {
+            dassert(_theend == other._theend);
+            return _pos == other._pos;
+        }
+
+        bool operator!=(const BSONObjIterator& other) {
+            return !(*this == other);
         }
 
     private:
@@ -704,30 +734,14 @@ namespace mongo {
         BSONArrayIteratorSorted( const BSONArray &array );
     };
 
-    /** Similar to BOOST_FOREACH
-     *
-     *  because the iterator is defined outside of the for, you must use {} around
-     *  the surrounding scope. Don't do this:
-     *
-     *  if (foo)
-     *      BSONForEach(e, obj)
-     *          doSomething(e);
-     *
-     *  but this is OK:
-     *
-     *  if (foo) {
-     *      BSONForEach(e, obj)
-     *          doSomething(e);
-     *  }
-     *
-     */
+    inline BSONObjIterator BSONObj::begin() const { return BSONObjIterator(*this); }
+    inline BSONObjIterator BSONObj::end() const { return BSONObjIterator::endOf(*this); }
 
-#define BSONForEach(e, obj)                                     \
-    BSONObjIterator BOOST_PP_CAT(it_,__LINE__)(obj);            \
-    for ( BSONElement e;                                        \
-            (BOOST_PP_CAT(it_,__LINE__).more() ?                  \
-             (e = BOOST_PP_CAT(it_,__LINE__).next(), true) :  \
-             false) ;                                         \
-            /*nothing*/ )
+    /**
+     * Similar to BOOST_FOREACH
+     *
+     * DEPRECATED: Use range-based for loops now.
+     */
+#define BSONForEach(elemName, obj) for (BSONElement elemName : (obj))
 
 }
