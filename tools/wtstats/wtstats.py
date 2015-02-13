@@ -58,15 +58,18 @@ def munge(args, title, values):
     if title.split(' ')[1] != 'spinlock' and \
       title.split(' ', 1)[1] in no_scale_per_second_list:
         seconds = 1
+    elif 'wtperf' in title and 'per second' not in title:
+        seconds = 1
     else:
         t1, v1 = values[1]
         seconds = (parsetime(t1) - start_time).seconds
-        ylabel += ' per second'
+        if not ylabel.endswith('per second'):
+            ylabel += ' per second'
         if seconds == 0:
             seconds = 1
 
     stats_cleared = False
-    if args.clear or title.split(' ', 1)[1] in no_clear_list:
+    if args.clear or title.split(' ', 1)[1] in no_clear_list or 'wtperf' in title:
         stats_cleared = True
 
     # Split the values into a dictionary of y-axis values keyed by the x axis
@@ -120,12 +123,32 @@ def main():
                     yield s
 
     d = defaultdict(list)
-    for f in getfiles(args.files):
-        for line in open(f, 'rU'):
-            month, day, time, v, title = line.strip('\n').split(" ", 4)
-            d[title].append((month + " " + day + " " + time, v))
 
-    # Process the series, eliminate constants
+    for f in getfiles(args.files):
+        wtperf_mode = False
+        for line in open(f, 'rU'):
+            if line.startswith('#time'):
+                # wtperf file, read headings and switch to wtperf mode
+                wtperf_mode = True
+                wtperf_headings = line.strip('\n').split(',')[1:]
+                continue
+
+            elif wtperf_mode:
+                # wtperf file, all stats are on a single line
+                month, day, time, values = re.split(r'[ ,]', line.strip('\n'), 3)
+                values = values.split(',')
+                for i, v in enumerate(values):
+                    if v == 'N': 
+                        v = 0
+                    d['wtperf: ' + wtperf_headings[i]].append((month + " " + day + " " + time, v))
+
+            else:
+                # wtstats file, one stat per line
+                month, day, time, v, title = line.strip('\n').split(" ", 4)
+                d[title].append((month + " " + day + " " + time, v))
+
+
+    # Process the series, eliminate constants, delete totalsec for wtperf
     for title, values in sorted(d.iteritems()):
         skip = True
         t0, v0 = values[0]
@@ -133,6 +156,10 @@ def main():
             if v != v0:
                 skip = False
                 break
+        
+        if title == 'wtperf: totalsec':
+            skip = True
+
         if skip:
             #print "Skipping", title
             del d[title]
@@ -230,17 +257,19 @@ def main():
         # Ignore entries if a list of regular expressions was given
         if args.include and not [r for r in args.include if r.search(title)]:
             continue
-        prefix = title if prefix is None else common_prefix(prefix, title)
-        suffix = title if suffix is None else common_suffix(title, suffix)
+        if not 'wtperf' in title:
+            prefix = title if prefix is None else common_prefix(prefix, title)
+            suffix = title if suffix is None else common_suffix(title, suffix)
         results.append((title, ydata))
 
     # Process titles, eliminate common prefixes and suffixes
     if prefix or suffix:
         new_results = []
         for title, ydata in results:
-            title = title[len(prefix):]
-            if suffix:
-                title = title[:-len(suffix)]
+            if 'wtperf' not in title:
+                title = title[len(prefix):]
+                if suffix:
+                    title = title[:-len(suffix)]
             new_results.append((title, ydata))
         results = new_results
 
