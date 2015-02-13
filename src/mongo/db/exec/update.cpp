@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/log.h"
+#include "mongo/s/d_state.h"
 
 namespace mongo {
 
@@ -595,7 +596,28 @@ namespace mongo {
 
             // Call logOp if requested, and we're not an explain.
             if (request->shouldCallLogOp() && !logObj.isEmpty() && !request->isExplain()) {
-                BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
+                //BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
+                BSONObjBuilder patt;
+                
+                if(shardingState.enabled()) {
+                    const char* ns = request->getNamespaceString().ns().c_str();
+                    if(shardingState.hasVersion(ns)) {
+                        CollectionMetadataPtr cm = shardingState.getCollectionMetadata(ns);
+                        BSONObj shardKeyObj = cm->getKeyPattern();
+                        for( BSONObj::iterator i = shardKeyObj.begin(); i.more(); ) {
+                            BSONElement shardKeyElement = i.next();
+                            BSONElement shardField = newObj.getField(shardKeyElement.fieldName());
+                            if ( shardField.eoo() == false ) {
+                                patt.append(shardField);
+                            }
+                        }
+                    }
+                }
+                BSONElement id;
+                if(newObj.getObjectID( id )) {
+                    patt.append(id);
+                }
+                BSONObj idQuery = patt.obj();
                 repl::logOp(_txn,
                             "u",
                             request->getNamespaceString().ns().c_str(),
