@@ -3,7 +3,9 @@ package mongofiles
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -17,11 +19,13 @@ import (
 
 // List of possible commands for mongofiles.
 const (
-	List   = "list"
-	Search = "search"
-	Put    = "put"
-	Get    = "get"
-	Delete = "delete"
+	List     = "list"
+	Search   = "search"
+	Put      = "put"
+	Get      = "get"
+	GetID    = "get_id"
+	Delete   = "delete"
+	DeleteID = "delete_id"
 )
 
 // MongoFiles is a container for the user-specified options and
@@ -72,7 +76,7 @@ func (mf *MongoFiles) ValidateCommand(args []string) error {
 		} else {
 			fileName = args[1]
 		}
-	case Search, Put, Get, Delete:
+	case Search, Put, Get, Delete, GetID, DeleteID:
 		// also make sure the supporting argument isn't literally an
 		// empty string for example, mongofiles get ""
 		if len(args) == 1 || args[1] == "" {
@@ -112,11 +116,16 @@ func (mf *MongoFiles) findAndDisplay(gfs *mgo.GridFS, query bson.M) (string, err
 }
 
 // Return the local filename, as specified by the --local flag. Defaults to
-// mf.FileName if not present.
-func (mf *MongoFiles) getLocalFileName() string {
+// the GridFile's name if not present. If GridFile is nil, uses the filename
+// given on the command line.
+func (mf *MongoFiles) getLocalFileName(gridFile *mgo.GridFile) string {
 	localFileName := mf.StorageOptions.LocalFileName
 	if localFileName == "" {
-		localFileName = mf.FileName
+		if gridFile != nil {
+			localFileName = gridFile.Name()
+		} else {
+			localFileName = mf.FileName
+		}
 	}
 	return localFileName
 }
@@ -128,26 +137,79 @@ func (mf *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
 		return "", fmt.Errorf("error opening GridFS file '%s': %v", mf.FileName, err)
 	}
 	defer gFile.Close()
+	if err = mf.writeFileToDisk(gFile); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("finished writing to: %s\n", mf.getLocalFileName(gFile)), nil
+}
 
-	localFileName := mf.getLocalFileName()
+// handle logic for 'get_id' command
+func (mf *MongoFiles) handleGetID(gfs *mgo.GridFS) (string, error) {
+	id, err := mf.parseID()
+	if err != nil {
+		return "", err
+	}
+	// with the parsed _id, grab the file and write it to disk
+	gFile, err := gfs.OpenId(id)
+	if err != nil {
+		return "", fmt.Errorf("error opening GridFS file with _id %s: %v", mf.FileName, err)
+	}
+	log.Logf(log.Always, "found file '%v' with _id %v", gFile.Name(), mf.FileName)
+	defer gFile.Close()
+	if err = mf.writeFileToDisk(gFile); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("finished writing to: %s\n", mf.getLocalFileName(gFile)), nil
+}
+
+// logic for deleting a file with 'delete_id'
+func (mf *MongoFiles) handleDeleteID(gfs *mgo.GridFS) (string, error) {
+	id, err := mf.parseID()
+	if err != nil {
+		return "", err
+	}
+	if err = gfs.RemoveId(id); err != nil {
+		return "", fmt.Errorf("error while removing file with _id %v from GridFS: %v\n", mf.FileName, err)
+	}
+	return fmt.Sprintf("successfully deleted file with _id %v from GridFS\n", mf.FileName), nil
+}
+
+// parse and convert extended JSON
+func (mf *MongoFiles) parseID() (interface{}, error) {
+	// parse the id using extended json
+	var asJSON interface{}
+	err := json.Unmarshal([]byte(mf.FileName), &asJSON)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error parsing _id as json: %v; make sure you are properly escaping input", err)
+	}
+	id, err := bsonutil.ConvertJSONValueToBSON(asJSON)
+	if err != nil {
+		return nil, fmt.Errorf("error converting _id to bson: %v", err)
+	}
+	return id, nil
+}
+
+// write a file from gridFS to the filesystem
+func (mf *MongoFiles) writeFileToDisk(gridFile *mgo.GridFile) error {
+	localFileName := mf.getLocalFileName(gridFile)
 	localFile, err := os.Create(localFileName)
 	if err != nil {
-		return "", fmt.Errorf("error while opening local file '%v': %v\n", localFileName, err)
+		return fmt.Errorf("error while opening local file '%v': %v\n", localFileName, err)
 	}
 	defer localFile.Close()
 	log.Logf(log.DebugLow, "created local file '%v'", localFileName)
 
-	_, err = io.Copy(localFile, gFile)
+	_, err = io.Copy(localFile, gridFile)
 	if err != nil {
-		return "", fmt.Errorf("error while writing data into local file '%v': %v\n", localFileName, err)
+		return fmt.Errorf("error while writing data into local file '%v': %v\n", localFileName, err)
 	}
-
-	return fmt.Sprintf("Finished writing to: %s\n", localFileName), nil
+	return nil
 }
 
 // handle logic for 'put' command.
 func (mf *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
-	localFileName := mf.getLocalFileName()
+	localFileName := mf.getLocalFileName(nil)
 
 	var output string
 
@@ -222,7 +284,7 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 	session.SetSocketTimeout(0)
 
 	if displayHost {
-		log.Logf(log.Always, "connected to: %v\n", connUrl)
+		log.Logf(log.Always, "connected to: %v", connUrl)
 	}
 
 	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks
@@ -272,6 +334,13 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 			return "", err
 		}
 
+	case GetID:
+
+		output, err = mf.handleGetID(gfs)
+		if err != nil {
+			return "", err
+		}
+
 	case Put:
 
 		output, err = mf.handlePut(gfs)
@@ -286,6 +355,13 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 			return "", fmt.Errorf("error while removing '%v' from GridFS: %v\n", mf.FileName, err)
 		}
 		output = fmt.Sprintf("successfully deleted all instances of '%v' from GridFS\n", mf.FileName)
+
+	case DeleteID:
+
+		output, err = mf.handleDeleteID(gfs)
+		if err != nil {
+			return "", err
+		}
 
 	}
 

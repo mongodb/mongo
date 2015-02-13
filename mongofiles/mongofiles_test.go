@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -97,13 +98,22 @@ func simpleMongoFilesInstance(args []string) (*MongoFiles, error) {
 
 	mongofiles := MongoFiles{
 		ToolOptions:     toolOptions,
-		StorageOptions:  &StorageOptions{GridFSPrefix: "fs"},
+		StorageOptions:  &StorageOptions{GridFSPrefix: "fs", DB: testDB},
 		SessionProvider: sessionProvider,
 		Command:         args[0],
 		FileName:        args[1],
 	}
 
 	return &mongofiles, nil
+}
+
+// get an id of an existing file, for _id access
+func idOfFile(mf *MongoFiles, filename string) string {
+	session, _ := mf.SessionProvider.GetSession()
+	gfs := session.DB(mf.StorageOptions.DB).GridFS(mf.StorageOptions.GridFSPrefix)
+	gFile, _ := gfs.Open(filename)
+	bytes, _ := json.Marshal(gFile.Id())
+	return fmt.Sprintf("ObjectId(%v)", string(bytes))
 }
 
 // test output needs some cleaning
@@ -154,7 +164,7 @@ func fileExists(name string) bool {
 // Test that it works whenever valid arguments are passed in and that
 // it barfs whenever invalid ones are passed
 func TestValidArguments(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.IntegrationTestType)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("With a MongoFiles instance", t, func() {
 		args := []string{"search", "file"}
@@ -204,7 +214,9 @@ func TestValidArguments(t *testing.T) {
 func TestMongoFilesCommands(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.IntegrationTestType)
 
-	Convey("Testing the various commands:(get|put|delete|search|list). With a MongoDump instance", t, func() {
+	Convey("Testing the various commands (get|get_id|put|delete|delete_id|search|list) "+
+		"with a MongoDump instance", t, func() {
+
 		bytesExpected, err := setUpGridFSTestData()
 		So(err, ShouldBeNil)
 
@@ -322,6 +334,45 @@ func TestMongoFilesCommands(t *testing.T) {
 			})
 		})
 
+		Convey("Testing the 'get_id' command with a file that is in GridFS should", func() {
+			// hack to grab an _id
+			args := []string{"get", "testfile1"}
+			mf, _ := simpleMongoFilesInstance(args)
+			idString := idOfFile(mf, "testfile1")
+
+			args = []string{"get_id", idString}
+			mf, err = simpleMongoFilesInstance(args)
+			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
+
+			Convey("copy the file to the local filesystem", func() {
+				str, err := mf.Run(false)
+				So(err, ShouldBeNil)
+				So(len(str), ShouldNotEqual, 0)
+
+				testFile, err := os.Open("testfile1")
+				So(err, ShouldBeNil)
+				defer testFile.Close()
+
+				// pretty small file; so read all
+				testFile1Bytes, err := ioutil.ReadAll(testFile)
+				So(err, ShouldBeNil)
+				So(len(testFile1Bytes), ShouldEqual, bytesExpected[0])
+			})
+
+			Reset(func() {
+				// remove 'testfile1' or 'testfile1copy'
+				if fileExists("testfile1") {
+					err = os.Remove("testfile1")
+				}
+				So(err, ShouldBeNil)
+				if fileExists("testfile1copy") {
+					err = os.Remove("testfile1copy")
+				}
+				So(err, ShouldBeNil)
+			})
+		})
+
 		Convey("Testing the 'put' command by putting some lorem ipsum file with 287613 bytes should", func() {
 			args := []string{"put", "lorem_ipsum_287613_bytes.txt"}
 
@@ -348,7 +399,6 @@ func TestMongoFilesCommands(t *testing.T) {
 					lines := cleanAndTokenizeTestOutput(str)
 					filesGotten, _ := getFilesAndBytesFromLines(lines)
 					So(len(lines), ShouldEqual, len(filesExpected)+1)
-
 					So(filesGotten, ShouldContain, "lorem_ipsum_287613_bytes.txt")
 				})
 
@@ -412,6 +462,42 @@ func TestMongoFilesCommands(t *testing.T) {
 		Convey("Testing the 'delete' command with a file that is in GridFS should", func() {
 			args := []string{"delete", "testfile2"}
 
+			mf, err := simpleMongoFilesInstance(args)
+			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
+
+			Convey("delete the file from GridFS", func() {
+				str, err := mf.Run(false)
+				So(err, ShouldBeNil)
+				So(len(str), ShouldNotEqual, 0)
+
+				Convey("check that the file has been deleted from GridFS", func() {
+					args = []string{"list", ""}
+					mfAfter, err := simpleMongoFilesInstance(args)
+					So(err, ShouldBeNil)
+					So(mf, ShouldNotBeNil)
+
+					str, err = mfAfter.Run(false)
+					So(err, ShouldBeNil)
+
+					lines := cleanAndTokenizeTestOutput(str)
+					So(len(lines), ShouldEqual, len(filesExpected)-1)
+
+					filesGotten, bytesGotten := getFilesAndBytesFromLines(lines)
+
+					So(filesGotten, ShouldNotContain, "testfile2")
+					So(bytesGotten, ShouldNotContain, bytesExpected[1])
+				})
+			})
+		})
+
+		Convey("Testing the 'delete_id' command with a file that is in GridFS should", func() {
+			// hack to grab an _id
+			args := []string{"get", "testfile2"}
+			mf, _ := simpleMongoFilesInstance(args)
+			idString := idOfFile(mf, "testfile2")
+
+			args = []string{"delete_id", idString}
 			mf, err := simpleMongoFilesInstance(args)
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)

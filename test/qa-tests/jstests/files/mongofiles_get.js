@@ -20,6 +20,7 @@ load('jstests/files/util/mongofiles_common.js');
 
     // ensure the file was inserted
     assert.eq(1, db.fs.files.count(), 'unexpected fs.files count 1');
+    var fileId = db.fs.files.findOne()._id
 
     jsTest.log('Getting file with ' + passthrough.name + ' passthrough');
 
@@ -31,6 +32,11 @@ load('jstests/files/util/mongofiles_common.js');
     var expected = md5sumFile(getFile);
 
     assert.eq(actual, expected, 'mismatched md5 sum - expected ' + expected + ' got ' + actual);
+
+    // ensure tool runs get_id without error
+    assert.eq(runMongoProgram.apply(this, ['mongofiles', '--port', conn.port, '--local', getFile , 'get_id', fileId.tojson()].concat(passthrough.args)), 0, 'put 2 failed');
+    expected = md5sumFile(getFile);
+    assert.eq(actual, expected, 'mismatched md5 sum on _id - expected ' + expected + ' got ' + actual);
 
     t.stop();
   };

@@ -1,15 +1,17 @@
 package mongofiles
 
-var Usage = `<options> <command> <filename>
+var Usage = `<options> <command> <filename or _id>
 
 Manipulate gridfs files using the command line.
 
 Possible commands include:
-	list   - list all files; 'filename' is an optional prefix which listed filenames must begin with
-	search - search all files; 'filename' is a substring which listed filenames must contain
-	put    - add a file with filename 'filename'
-	get    - get a file with filename 'filename'
-	delete - delete all files with filename 'filename'
+	list      - list all files; 'filename' is an optional prefix which listed filenames must begin with
+	search    - search all files; 'filename' is a substring which listed filenames must contain
+	put       - add a file with filename 'filename'
+	get       - get a file with filename 'filename'
+	get_id    - get a file with the given '_id'
+	delete    - delete all files with filename 'filename'
+	delete_id - delete a file with the given '_id'
 
 See http://docs.mongodb.org/manual/reference/program/mongofiles/ for more information.`
 
