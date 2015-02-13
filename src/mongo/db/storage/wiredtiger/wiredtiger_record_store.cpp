@@ -508,10 +508,18 @@ namespace {
                 ret = WT_OP_CHECK(start->next(start));
                 invariantWTOK(ret);
 
-                invariantWTOK(session->truncate(session, NULL, start, c, NULL));
-                _changeNumRecords(txn, -docsRemoved);
-                _increaseDataSize(txn, -sizeSaved);
-                wuow.commit();
+                ret = session->truncate(session, NULL, start, c, NULL);
+                if (ret == ENOENT) {
+                    // TODO we should remove this case once SERVER-17141 is resolved
+                    log() << "Got ENOENT truncating capped collection. Will try again later.";
+                    docsRemoved = 0;
+                }
+                else {
+                    invariantWTOK(ret);
+                    _changeNumRecords(txn, -docsRemoved);
+                    _increaseDataSize(txn, -sizeSaved);
+                    wuow.commit();
+                }
             }
         }
         catch ( const WriteConflictException& wce ) {
