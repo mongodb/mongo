@@ -37,6 +37,7 @@
 #include <boost/shared_ptr.hpp>
 #include <memory>
 #include <algorithm>
+#include <utility>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
@@ -800,7 +801,7 @@ namespace mongo {
         if (!_eof && loc == _curr && _iterator->Valid() && _iterator->status().ok()) {
             SharedBuffer data = SharedBuffer::allocate(_iterator->value().size());
             memcpy(data.get(), _iterator->value().data(), _iterator->value().size());
-            return RecordData(data.moveFrom(), _iterator->value().size());
+            return RecordData(std::move(data), _iterator->value().size());
         }
         return RocksRecordStore::_getDataFor(_db, _prefix, _txn, loc);
     }
