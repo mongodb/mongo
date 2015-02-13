@@ -17,6 +17,7 @@
 
 #include <cstring>
 #include <deque>
+#include <limits>
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
@@ -242,6 +243,8 @@ namespace mongo {
                 int sz;
                 if ( !buffer->readNumber<int>( &sz ) )
                     return makeError("invalid bson", idElem);
+                if ( sz < 0 || sz == std::numeric_limits<int>::max() )
+                    return makeError("invalid size in bson", idElem);
                 if ( !buffer->skip( 1 + sz ) )
                     return makeError("invalid bson", idElem);
                 return Status::OK();
