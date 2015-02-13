@@ -33,18 +33,15 @@ var (
 	// the types of tests that should be run
 	testTypes = flag.String("test.types", UnitTestType, "Comma-separated list of the"+
 		" types of tests to be run")
-	// above, split on the comma
-	testTypesParsed []string
 )
 
 func HasTestType(testType string) bool {
-	// parse if necessary
-	if testTypesParsed == nil {
-		testTypesParsed = strings.Split(*testTypes, ",")
+	if !flag.Parsed() {
+		flag.Parse()
 	}
 
 	// skip the test if the passed-in type is not being run
-	for _, typ := range testTypesParsed {
+	for _, typ := range strings.Split(*testTypes, ",") {
 		if typ == testType {
 			return true
 		}
