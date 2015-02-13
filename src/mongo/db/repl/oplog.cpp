@@ -376,42 +376,19 @@ namespace {
                BSONObj* patt,
                bool* b,
                bool fromMigrate) {
+
         if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
             _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
+
         //
         // rollback-safe logOp listeners
         //
         getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
         logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
         logOpForDbHash(txn, ns);
-
         if ( strstr( ns, ".system.js" ) ) {
             Scope::storedFuncMod(txn);
-        }
-
-        try {
-            // TODO SERVER-15192 remove this once all listeners are rollback-safe.
-            class RollbackPreventer : public RecoveryUnit::Change {
-                virtual void commit() {}
-                virtual void rollback() {
-                    severe() << "Rollback of logOp not currently allowed (SERVER-15192)";
-                    fassertFailed(18805);
-                }
-            };
-            txn->recoveryUnit()->registerChange(new RollbackPreventer());
-        }
-        catch (const DBException& ex) {
-            severe() << "Fatal DBException in logOp(): " << ex.toString();
-            std::terminate();
-        }
-        catch (const std::exception& ex) {
-            severe() << "Fatal std::exception in logOp(): " << ex.what();
-            std::terminate();
-        }
-        catch (...) {
-            severe() << "Fatal error in logOp()";
-            std::terminate();
         }
     }
 
