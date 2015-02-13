@@ -102,9 +102,14 @@ namespace mongo {
         public:
             RocksCursorBase(OperationContext* txn, rocksdb::DB* db, std::string prefix,
                             bool forward, Ordering order)
-                : _db(db), _prefix(prefix), _forward(forward), _order(order), _isKeyCurrent(false) {
+                : _db(db),
+                  _prefix(prefix),
+                  _forward(forward),
+                  _order(order),
+                  _locateCacheValid(false) {
                 auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
                 _iterator.reset(ru->NewIterator(_prefix));
+                _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
                 checkStatus();
             }
 
@@ -130,16 +135,41 @@ namespace mongo {
 
                 // even if keys are equal, record IDs might be different (for unique indexes, since
                 // in non-unique indexes RecordID is already encoded in the key)
-                return getRecordId() == other.getRecordId();
+                return _loc == other._loc;
+            }
+
+            virtual void advance() {
+                // Advance on a cursor at the end is a no-op
+                if (isEOF()) {
+                    return;
+                }
+                advanceCursor();
+                updatePosition();
             }
 
             bool locate(const BSONObj& key, const RecordId& loc) {
                 const BSONObj finalKey = stripFieldNames(key);
-                fillKey(finalKey, loc);
-                bool result = _locate(loc);
+
+                if (_locateCacheValid == true && finalKey == _locateCacheKey &&
+                    loc == _locateCacheRecordId) {
+                    // exact same call to locate()
+                    return _locateCacheResult;
+                }
+
+                fillQuery(finalKey, loc, &_query);
+                bool result = _locate(_query, loc);
+                updatePosition();
                 // An explicit search at the start of the range should always return false
                 if (loc == RecordId::min() || loc == RecordId::max()) {
-                    return false;
+                    result = false;
+                }
+
+                {
+                    // memoization
+                    _locateCacheKey = finalKey.getOwned();
+                    _locateCacheRecordId = loc;
+                    _locateCacheResult = result;
+                    _locateCacheValid = true;
                 }
                 return result;
             }
@@ -159,8 +189,9 @@ namespace mongo {
                                          keyEndInclusive,
                                          getDirection() );
 
-                fillKey(key, RecordId());
-                _locate(RecordId());
+                fillQuery(key, RecordId(), &_query);
+                _locate(_query, RecordId());
+                updatePosition();
             }
 
             /**
@@ -177,57 +208,60 @@ namespace mongo {
             }
 
             BSONObj getKey() const {
-                if (_isKeyCurrent && !_keyBson.isEmpty()) {
-                    return _keyBson;
+                if (isEOF()) {
+                    return BSONObj();
                 }
-                loadKeyIfNeeded();
-                _keyBson =
-                    KeyString::toBson(_key.getBuffer(), _key.getSize(), _order, getTypeBits());
-                return _keyBson;
+
+                if (!_keyBsonCache.isEmpty()) {
+                    return _keyBsonCache;
+                }
+
+                _keyBsonCache =
+                    KeyString::toBson(_key.getBuffer(), _key.getSize(), _order, _typeBits);
+
+                return _keyBsonCache;
             }
+
+            RecordId getRecordId() const { return _loc; }
 
             void savePosition() {
                 _savedEOF = isEOF();
-
-                if (!_savedEOF) {
-                    loadKeyIfNeeded();
-                    _savedRecordId = getRecordId();
-                }
-                _iterator.reset();
             }
 
             void restorePosition(OperationContext* txn) {
                 auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-                _iterator.reset(ru->NewIterator(_prefix));
+                if (_currentSequenceNumber != ru->snapshot()->GetSequenceNumber()) {
+                    _iterator.reset(ru->NewIterator(_prefix));
+                    _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
 
-                if (!_savedEOF) {
-                    _locate(_savedRecordId);
+                    if (!_savedEOF) {
+                        _locate(_key, _loc);
+                        updatePosition();
+                    }
                 }
             }
 
         protected:
             // Uses _key for the key. Implemented by unique and standard index
-            virtual bool _locate(RecordId loc) = 0;
+            virtual bool _locate(const KeyString& query, RecordId loc) = 0;
 
-            // Must invalidateCache()
-            virtual void fillKey(const BSONObj& key, RecordId loc) = 0;
+            virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const = 0;
 
-            virtual const KeyString::TypeBits& getTypeBits() const = 0;
+            // Called after _key has been filled in. Must not throw WriteConflictException.
+            virtual void updateLocAndTypeBits() = 0;
+
 
             void advanceCursor() {
-                invalidateCache();
                 if (_forward) {
                     _iterator->Next();
                 } else {
                     _iterator->Prev();
                 }
-                checkStatus();
             }
 
-            // Seeks to _key. Returns true on exact match.
-            bool seekCursor() {
-                invalidateCache();
-                const rocksdb::Slice keySlice(_key.getBuffer(), _key.getSize());
+            // Seeks to query. Returns true on exact match.
+            bool seekCursor(const KeyString& query) {
+                const rocksdb::Slice keySlice(query.getBuffer(), query.getSize());
                 _iterator->Seek(keySlice);
                 checkStatus();
                 if (!_iterator->Valid()) {
@@ -256,19 +290,22 @@ namespace mongo {
                 return false;
             }
 
-            void loadKeyIfNeeded() const {
-                if (_isKeyCurrent) {
+            void updatePosition() {
+                if (isEOF()) {
+                    _loc = RecordId();
                     return;
                 }
 
+                checkStatus();
+
                 auto key = _iterator->key();
                 _key.resetFromBuffer(key.data(), key.size());
-                _isKeyCurrent = true;
-            }
+                _keyBsonCache = BSONObj();    // Invalidate cached BSONObj.
 
-            virtual void invalidateCache() {
-                _isKeyCurrent = false;
-                _keyBson = BSONObj();
+                _locateCacheValid = false;    // Invalidate locate cache
+                _locateCacheKey = BSONObj();  // Invalidate locate cache
+
+                updateLocAndTypeBits();
             }
 
             void checkStatus() {
@@ -288,26 +325,30 @@ namespace mongo {
             // These are for storing savePosition/restorePosition state
             bool _savedEOF;
             RecordId _savedRecordId;
+            rocksdb::SequenceNumber _currentSequenceNumber;
 
-            // These are all lazily loaded caches.
-            mutable BSONObj _keyBson;    // if isEmpty, it is invalid and must be loaded from _key.
-            mutable bool _isKeyCurrent;  // true if _key matches where the cursor is pointing
-            mutable KeyString _key;
+            KeyString _key;
+            KeyString::TypeBits _typeBits;
+            RecordId _loc;
+            mutable BSONObj _keyBsonCache;  // if isEmpty, cache invalid and must be loaded from
+                                            // _key.
+
+            KeyString _query;
+
+            // These are for caching repeated calls to locate()
+            bool _locateCacheValid;
+            BSONObj _locateCacheKey;
+            RecordId _locateCacheRecordId;
+            bool _locateCacheResult;
         };
 
         class RocksStandardCursor : public RocksCursorBase {
         public:
             RocksStandardCursor(OperationContext* txn, rocksdb::DB* db, std::string prefix,
                                 bool forward, Ordering order)
-                : RocksCursorBase(txn, db, prefix, forward, order), _isTypeBitsValid(false) {}
+                : RocksCursorBase(txn, db, prefix, forward, order) {}
 
-            virtual void invalidateCache() {
-                RocksCursorBase::invalidateCache();
-                _loc = RecordId();
-                _isTypeBitsValid = false;
-            }
-
-            virtual void fillKey(const BSONObj& key, RecordId loc) {
+            virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const {
                 // Null cursors should start at the zero key to maintain search ordering in the
                 // collator.
                 // Reverse cursors should start on the last matching key.
@@ -315,159 +356,69 @@ namespace mongo {
                     loc = _forward ? RecordId::min() : RecordId::max();
                 }
 
-                _key.resetToKey(key, _order, loc);
-                invalidateCache();
+                query->resetToKey(key, _order, loc);
             }
-            virtual bool _locate(RecordId loc) {
+
+            virtual bool _locate(const KeyString& query, RecordId loc) {
                 // loc already encoded in _key
-                return seekCursor();
+                return seekCursor(query);
             }
 
-            virtual RecordId getRecordId() const {
-                if (isEOF()) {
-                    return RecordId();
-                }
-
-                if (_loc.isNull()) {
-                    loadKeyIfNeeded();
-                    _loc = KeyString::decodeRecordIdAtEnd(_key.getBuffer(), _key.getSize());
-                }
-
-                dassert(!_loc.isNull());
-                return _loc;
+            virtual void updateLocAndTypeBits() {
+                _loc = KeyString::decodeRecordIdAtEnd(_key.getBuffer(), _key.getSize());
+                auto value = _iterator->value();
+                BufReader br(value.data(), value.size());
+                _typeBits.resetFromBuffer(&br);
             }
-
-            virtual void advance() {
-                // Advance on a cursor at the end is a no-op
-                if (isEOF()) {
-                    return;
-                }
-                advanceCursor();
-            }
-
-            virtual const KeyString::TypeBits& getTypeBits() const {
-                if (!_isTypeBitsValid) {
-                    auto value = _iterator->value();
-                    BufReader br(value.data(), value.size());
-                    _typeBits.resetFromBuffer(&br);
-                    _isTypeBitsValid = true;
-                }
-
-                return _typeBits;
-            }
-
-        private:
-            mutable RecordId _loc;
-
-            mutable bool _isTypeBitsValid;
-            mutable KeyString::TypeBits _typeBits;
         };
 
         class RocksUniqueCursor : public RocksCursorBase {
         public:
             RocksUniqueCursor(OperationContext* txn, rocksdb::DB* db, std::string prefix,
                               bool forward, Ordering order)
-                : RocksCursorBase(txn, db, prefix, forward, order), _recordsIndex(0) {}
+                : RocksCursorBase(txn, db, prefix, forward, order) {}
 
-            virtual void invalidateCache() {
-                RocksCursorBase::invalidateCache();
-                _records.clear();
+            virtual void fillQuery(const BSONObj& key, RecordId loc, KeyString* query) const {
+                query->resetToKey(key, _order);  // loc doesn't go in _query for unique indexes
             }
 
-            virtual void fillKey(const BSONObj& key, RecordId loc) {
-                invalidateCache();
-                _key.resetToKey(key, _order);  // loc doesn't go in _key for unique indexes
-            }
-
-            virtual bool _locate(RecordId loc) {
-                if (!seekCursor()) {
+            virtual bool _locate(const KeyString& query, RecordId loc) {
+                if (!seekCursor(query)) {
                     // If didn't seek to exact key, start at beginning of wherever we ended up.
                     return false;
                 }
                 dassert(!isEOF());
 
-                if (loc.isNull()) {
-                    // Null loc means means start and beginning or end of array as needed.
-                    // so nothing to do
-                    return true;
-                }
+                // If we get here we need to look at the actual RecordId for this key and make sure
+                // we are supposed to see it.
 
-                // If we get here we need to make sure we are positioned at the correct point of the
-                // _records vector.
-                if (_forward) {
-                    while (getRecordId() < loc) {
-                        _recordsIndex++;
-                        if (_recordsIndex == _records.size()) {
-                            // This means we exhausted the scan and didn't find a record in range.
-                            advanceCursor();
-                            return false;
-                        }
-                    }
-                } else {
-                    while (getRecordId() > loc) {
-                        _recordsIndex++;
-                        if (_recordsIndex == _records.size()) {
-                            advanceCursor();
-                            return false;
-                        }
-                    }
+                auto value = _iterator->value();
+                BufReader br(value.data(), value.size());
+                RecordId locInIndex = KeyString::decodeRecordId(&br);
+
+                if ((_forward && (locInIndex < loc)) || (!_forward && (locInIndex > loc))) {
+                    advanceCursor();
                 }
 
                 return true;
             }
 
-            virtual RecordId getRecordId() const {
-                if (isEOF()) {
-                    return RecordId();
-                }
+            void updateLocAndTypeBits() {
+                // We assume that cursors can only ever see unique indexes in their "pristine"
+                // state,
+                // where no duplicates are possible. The cases where dups are allowed should hold
+                // sufficient locks to ensure that no cursor ever sees them.
 
-                loadValueIfNeeded();
-                dassert(!_records[_recordsIndex].first.isNull());
-                return _records[_recordsIndex].first;
-            }
-
-            virtual void advance() {
-                // Advance on a cursor at the end is a no-op
-                if (isEOF()) {
-                    return;
-                }
-
-                // We may just be advancing within the RecordIds for this key.
-                loadValueIfNeeded();
-                _recordsIndex++;
-                if (_recordsIndex == _records.size()) {
-                    advanceCursor();
-                }
-            }
-
-            virtual const KeyString::TypeBits& getTypeBits() const {
-                invariant(!isEOF());
-                loadValueIfNeeded();
-                return _records[_recordsIndex].second;
-            }
-
-        private:
-            void loadValueIfNeeded() const {
-                if (!_records.empty()) {
-                    return;
-                }
-
-                _recordsIndex = 0;
                 auto value = _iterator->value();
                 BufReader br(value.data(), value.size());
-                while (br.remaining()) {
-                    RecordId loc = KeyString::decodeRecordId(&br);
-                    _records.push_back(std::make_pair(loc, KeyString::TypeBits::fromBuffer(&br)));
-                }
-                invariant(!_records.empty());
+                _loc = KeyString::decodeRecordId(&br);
+                _typeBits.resetFromBuffer(&br);
 
-                if (!_forward) {
-                    std::reverse(_records.begin(), _records.end());
+                if (!br.atEof()) {
+                    severe() << "Unique index cursor seeing multiple records for key " << getKey();
+                    fassertFailed(28609);
                 }
             }
-
-            mutable size_t _recordsIndex;
-            mutable std::vector<std::pair<RecordId, KeyString::TypeBits> > _records;
         };
 
         // TODO optimize and create two implementations -- one for unique and one for standard index
