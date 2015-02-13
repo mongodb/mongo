@@ -56,8 +56,8 @@ namespace mongo {
     DBHashCmd dbhashCmd;
 
 
-    void logOpForDbHash(const char* ns) {
-        dbhashCmd.wipeCacheForCollection( ns );
+    void logOpForDbHash(OperationContext* txn, const char* ns) {
+        dbhashCmd.wipeCacheForCollection(txn, ns);
     }
 
     // ----
@@ -216,11 +216,30 @@ namespace mongo {
         return 1;
     }
 
-    void DBHashCmd::wipeCacheForCollection( StringData ns ) {
+    class DBHashCmd::DBHashLogOpHandler : public RecoveryUnit::Change {
+    public:
+        DBHashLogOpHandler(DBHashCmd* dCmd,
+                           StringData ns):
+            _dCmd(dCmd),
+            _ns(ns.toString()) {
+
+        }
+        void commit() {
+            scoped_lock lk( _dCmd->_cachedHashedMutex );
+            _dCmd->_cachedHashed.erase(_ns);
+        }
+        void rollback() { }
+
+    private:
+        DBHashCmd *_dCmd;
+        const std::string _ns;
+    };
+
+    void DBHashCmd::wipeCacheForCollection(OperationContext* txn,
+                                           StringData ns) {
         if ( !isCachable( ns ) )
             return;
-        scoped_lock lk( _cachedHashedMutex );
-        _cachedHashed.erase( ns.toString() );
+        txn->recoveryUnit()->registerChange(new DBHashLogOpHandler(this, ns));
     }
 
     bool DBHashCmd::isCachable( StringData ns ) const {

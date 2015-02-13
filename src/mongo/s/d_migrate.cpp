@@ -354,7 +354,7 @@ namespace mongo {
 
             txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this,
                                                                             txn,
-                                                                            ide,
+                                                                            ide.wrap(),
                                                                             obj,
                                                                             op,
                                                                             notInActiveChunk));
@@ -705,13 +705,13 @@ namespace mongo {
         public:
             LogOpForShardingHandler(MigrateFromStatus* migrateFromStatus,
                                     OperationContext* txn,
-                                    const BSONElement& ide,
+                                    const BSONObj& idObj,
                                     const BSONObj& obj,
                                     const char op,
                                     const bool notInActiveChunk):
                 _migrateFromStatus(migrateFromStatus),
                 _txn(txn),
-                _ide(ide),
+                _idObj(idObj.getOwned()),
                 _obj(obj.getOwned()),
                 _op(op),
                 _notInActiveChunk(notInActiveChunk) {
@@ -736,8 +736,8 @@ namespace mongo {
 
                     scoped_lock sl(_migrateFromStatus->_mutex);
                     // can't filter deletes :(
-                    _migrateFromStatus->_deleted.push_back( _ide.wrap() );
-                    _migrateFromStatus->_memoryUsed += _ide.size() + 5;
+                    _migrateFromStatus->_deleted.push_back(_idObj);
+                    _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
                     return;
                 }
 
@@ -750,9 +750,10 @@ namespace mongo {
                     if (!Helpers::findById(_txn,
                                            ctx.db(),
                                            _migrateFromStatus->_ns.c_str(),
-                                           _ide.wrap(),
+                                           _idObj,
                                            it)) {
-                        warning() << "logOpForSharding couldn't find: " << _ide
+                        warning() << "logOpForSharding couldn't find: "
+                                  << _idObj.firstElement()
                                   << " even though should have" << migrateLog;
                         return;
                     }
@@ -768,8 +769,8 @@ namespace mongo {
                 }
 
                 scoped_lock sl(_migrateFromStatus->_mutex);
-                _migrateFromStatus->_reload.push_back(_ide.wrap());
-                _migrateFromStatus->_memoryUsed += _ide.size() + 5;
+                _migrateFromStatus->_reload.push_back(_idObj);
+                _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
             }
 
             virtual void rollback() { }
@@ -777,7 +778,7 @@ namespace mongo {
         private:
             MigrateFromStatus* _migrateFromStatus;
             OperationContext* _txn;
-            const BSONElement _ide;
+            const BSONObj _idObj;
             const BSONObj _obj;
             const char _op;
             const bool _notInActiveChunk;

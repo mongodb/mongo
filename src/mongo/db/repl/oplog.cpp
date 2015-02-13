@@ -384,6 +384,11 @@ namespace {
         //
         getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
         logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
+        logOpForDbHash(txn, ns);
+
+        if ( strstr( ns, ".system.js" ) ) {
+            Scope::storedFuncMod(txn);
+        }
 
         try {
             // TODO SERVER-15192 remove this once all listeners are rollback-safe.
@@ -395,11 +400,6 @@ namespace {
                 }
             };
             txn->recoveryUnit()->registerChange(new RollbackPreventer());
-            logOpForDbHash(ns);
-
-            if ( strstr( ns, ".system.js" ) ) {
-                Scope::storedFuncMod(); // this is terrible
-            }
         }
         catch (const DBException& ex) {
             severe() << "Fatal DBException in logOp(): " << ex.toString();
