@@ -33,9 +33,6 @@
 #include <sstream>
 #include <vector>
 
-#include <boost/noncopyable.hpp>
-#include <boost/thread/xtime.hpp>
-
 #include "mongo/client/export_macros.h"
 #include "mongo/util/concurrency/rwlock.h"
 
@@ -63,7 +60,7 @@ namespace mongo {
     };
 
     // lock order: lock dbMutex before this if you lock both
-    class MONGO_CLIENT_API LockMongoFilesShared {
+    class LockMongoFilesShared {
         friend class LockMongoFilesExclusive;
         static RWLockRecursiveNongreedy mmmutex;
         static unsigned era;
@@ -83,7 +80,7 @@ namespace mongo {
         static void assertAtLeastReadLocked() { mmmutex.assertAtLeastReadLocked(); }
     };
 
-    class MONGO_CLIENT_API LockMongoFilesExclusive {
+    class LockMongoFilesExclusive {
         RWLockRecursive::Exclusive lk;
     public:
         LockMongoFilesExclusive() : lk(LockMongoFilesShared::mmmutex) {
@@ -92,7 +89,8 @@ namespace mongo {
     };
 
     /* the administrative-ish stuff here */
-    class MongoFile : boost::noncopyable {
+    class MongoFile {
+        MONGO_DISALLOW_COPYING(MongoFile);
     public:
         /** Flushable has to fail nicely if the underlying object gets killed */
         class Flushable {
@@ -101,6 +99,7 @@ namespace mongo {
             virtual void flush() = 0;
         };
 
+        MongoFile() {}
         virtual ~MongoFile() {}
 
         enum Options {
@@ -163,8 +162,11 @@ namespace mongo {
           DurableMappedFile *a = finder.find("file_name_a");
           DurableMappedFile *b = finder.find("file_name_b");
     */
-    class MONGO_CLIENT_API MongoFileFinder : boost::noncopyable {
+    class MongoFileFinder {
+        MONGO_DISALLOW_COPYING(MongoFileFinder);
     public:
+        MongoFileFinder() { }
+
         /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
         */

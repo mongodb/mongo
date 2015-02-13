@@ -346,7 +346,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -384,7 +384,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -419,7 +419,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             RecordId loc1;
             RecordId loc2;
@@ -468,7 +468,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -502,7 +502,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -535,7 +535,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -573,7 +573,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);

@@ -126,18 +126,17 @@ namespace QueryPlanExecutor {
          *
          * The caller takes ownership of the returned PlanExecutor*.
          */
-        PlanExecutor* makeIndexScanExec(Client::Context& context,
-                                                BSONObj& indexSpec, int start, int end) {
+        PlanExecutor* makeIndexScanExec(Database* db, BSONObj& indexSpec, int start, int end) {
             // Build the index scan stage.
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(context.db(), indexSpec);
+            ixparams.descriptor = getIndex(db, indexSpec);
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << start);
             ixparams.bounds.endKey = BSON("" << end);
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
 
-            const Collection* coll = context.db()->getCollection(ns());
+            const Collection* coll = db->getCollection(ns());
 
             auto_ptr<WorkingSet> ws(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, ws.get(), NULL);
@@ -238,7 +237,7 @@ namespace QueryPlanExecutor {
             BSONObj indexSpec = BSON("a" << 1);
             addIndex(indexSpec);
 
-            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.ctx(), indexSpec, 7, 10));
+            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
             registerExec(exec.get());
 
             BSONObj objOut;
@@ -270,7 +269,7 @@ namespace QueryPlanExecutor {
 
             // Create the PlanExecutor which feeds the aggregation pipeline.
             boost::shared_ptr<PlanExecutor> innerExec(
-                makeIndexScanExec(ctx.ctx(), indexSpec, 7, 10));
+                makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
 
             // Create the aggregation pipeline.
             boost::intrusive_ptr<ExpressionContext> expCtx =
@@ -389,7 +388,7 @@ namespace QueryPlanExecutor {
             addIndex(indexSpec);
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.ctx(), indexSpec, 2, 5));
+            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 2, 5));
 
             BSONObj objOut;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));

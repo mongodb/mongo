@@ -688,7 +688,7 @@ namespace repl {
         // mongos will not send requests there. That's why the last argument is false (do not do
         // version checking).
         Client::Context ctx(txn, ns, false);
-        ctx.getClient()->curop()->reset();
+        txn->getCurOp()->reset();
 
         bool empty = !ctx.db()->getDatabaseCatalogEntry()->hasUserData();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;

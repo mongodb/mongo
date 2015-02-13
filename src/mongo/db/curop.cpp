@@ -37,6 +37,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/json.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -45,9 +46,9 @@ namespace mongo {
 
     using std::string;
 
-    // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a valid
-    // non-zero max time to fail immediately.  Any getmore operation on a cursor already created
-    // with a valid non-zero max time will also fail immediately.
+    // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
+    // valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
+    // created with a valid non-zero max time will also fail immediately.
     //
     // This fail point cannot be used with the maxTimeNeverTimeOut fail point.
     MONGO_FP_DECLARE(maxTimeAlwaysTimeOut);
@@ -58,7 +59,10 @@ namespace mongo {
     // This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
     MONGO_FP_DECLARE(maxTimeNeverTimeOut);
 
-    // todo : move more here
+
+    BSONObj CachedBSONObjBase::_tooBig =
+                                    fromjson("{\"$msg\":\"query not recording (too large)\"}");
+
 
     CurOp::CurOp( Client * client , CurOp * wrapped ) :
         _client(client),

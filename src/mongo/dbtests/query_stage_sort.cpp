@@ -221,7 +221,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -241,7 +241,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -270,7 +270,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -291,7 +291,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -397,7 +397,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -494,7 +494,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);

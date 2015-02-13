@@ -31,11 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/util/mmap.h"
+
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/text.h"
 #include "mongo/util/timer.h"
@@ -150,10 +150,11 @@ namespace mongo {
     }
 
     MemoryMappedFile::MemoryMappedFile()
-        : _uniqueId(mmfNextId.fetchAndAdd(1)) {
-        fd = 0;
-        maphandle = 0;
-        len = 0;
+        : _uniqueId(mmfNextId.fetchAndAdd(1)),
+          fd(0),
+          maphandle(0),
+          len(0) {
+
         created();
     }
 

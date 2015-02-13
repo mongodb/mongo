@@ -269,7 +269,7 @@ namespace {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
-        ctx.getClient()->setLastOp( slot.first );
+        txn->getClient()->setLastOp( slot.first );
 
         wunit.commit();
 
@@ -335,7 +335,7 @@ namespace {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
 
-        ctx.getClient()->setLastOp( slot.first );
+        txn->getClient()->setLastOp(slot.first);
 
         wunit.commit();
     }
@@ -462,7 +462,7 @@ namespace {
                 long long hash = ops.back()["h"].numberLong();
                 bgsync->setLastAppliedHash(hash);
 
-                ctx.getClient()->setLastOp(lastOptime);
+                txn->getClient()->setLastOp(lastOptime);
 
                 replCoord->setMyLastOptime(lastOptime);
                 setNewOptime(lastOptime);

@@ -260,7 +260,7 @@ namespace QueryStageUpdate {
                 CurOp& curOp = *c.curop();
                 OpDebug* opDebug = &curOp.debug();
                 UpdateDriver driver( (UpdateDriver::Options()) );
-                Database* db = ctx.ctx().db();
+                Database* db = ctx.db();
                 Collection* coll = db->getCollection(ns());
 
                 // Get the RecordIds that would be returned by an in-order scan.

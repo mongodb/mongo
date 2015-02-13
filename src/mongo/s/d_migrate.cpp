@@ -1963,7 +1963,7 @@ namespace mongo {
                 }
 
                 // Only copy if ns doesn't already exist
-                Database* db = ctx.ctx().db();
+                Database* db = ctx.db();
                 Collection* collection = db->getCollection( ns );
 
                 if ( !collection ) {
@@ -2165,7 +2165,7 @@ namespace mongo {
                                                     min,
                                                     max,
                                                     shardKeyPattern,
-                                                    cx.ctx().db(),
+                                                    cx.db(),
                                                     docToClone,
                                                     &localDoc)) {
                                 string errMsg =
@@ -2430,7 +2430,7 @@ namespace mongo {
                                   false /* god */,
                                   true /* fromMigrate */);
 
-                    *lastOpApplied = ctx.getClient()->getLastOp().asDate();
+                    *lastOpApplied = txn->getClient()->getLastOp().asDate();
                     didAnything = true;
                 }
             }
@@ -2448,7 +2448,7 @@ namespace mongo {
                                             min,
                                             max,
                                             shardKeyPattern,
-                                            cx.ctx().db(),
+                                            cx.db(),
                                             updatedDoc,
                                             &localDoc)) {
                         string errMsg =
@@ -2466,7 +2466,7 @@ namespace mongo {
                     // We are in write lock here, so sure we aren't killing
                     Helpers::upsert( txn, ns , updatedDoc , true );
 
-                    *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
+                    *lastOpApplied = txn->getClient()->getLastOp().asDate();
                     didAnything = true;
                 }
             }

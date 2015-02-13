@@ -1288,10 +1288,10 @@ namespace QueryTests {
                                      BSON("_id" << 20) , res , true));
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
+            ASSERT( Helpers::findById( &_txn, ctx.db(), ns() , BSON( "_id" << 20 ) , res ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( ! Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 200 ) , res ) );
+            ASSERT( ! Helpers::findById( &_txn, ctx.db(), ns() , BSON( "_id" << 200 ) , res ) );
 
             long long slow;
             long long fast;
@@ -1566,7 +1566,7 @@ namespace QueryTests {
             
             {
                 Client::WriteContext ctx(&_txn,  ns() );
-                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( ns() )
+                ClientCursorPin pinCursor( ctx.db()->getCollection( ns() )
                                                          ->getCursorManager(),
                                            cursorId );
                 string expectedAssertion =

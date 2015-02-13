@@ -82,7 +82,7 @@ namespace ExecutorRegistry {
                                                ws.release(),
                                                scan.release(),
                                                cq,
-                                               _ctx->ctx().db()->getCollection(ns()),
+                                               _ctx->db()->getCollection(ns()),
                                                PlanExecutor::YIELD_MANUAL,
                                                &exec);
             ASSERT_OK(status);
@@ -91,24 +91,24 @@ namespace ExecutorRegistry {
 
         void registerExecutor( PlanExecutor* exec ) {
             WriteUnitOfWork wuow(&_opCtx);
-            _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
-                            ->getCursorManager()
-                            ->registerExecutor(exec);
+            _ctx->db()->getOrCreateCollection(&_opCtx, ns())
+                      ->getCursorManager()
+                      ->registerExecutor(exec);
             wuow.commit();
         }
 
         void deregisterExecutor( PlanExecutor* exec ) {
             WriteUnitOfWork wuow(&_opCtx);
-            _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
-                            ->getCursorManager()
-                            ->deregisterExecutor(exec);
+            _ctx->db()->getOrCreateCollection(&_opCtx, ns())
+                      ->getCursorManager()
+                      ->deregisterExecutor(exec);
             wuow.commit();
         }
 
         int N() { return 50; }
 
         Collection* collection() {
-            return _ctx->ctx().db()->getCollection( ns() );
+            return _ctx->db()->getCollection(ns());
         }
 
         static const char* ns() { return "unittests.ExecutorRegistryDiskLocInvalidation"; }

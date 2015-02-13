@@ -85,9 +85,9 @@ namespace ReplTests {
             Client::WriteContext ctx(&_txn, ns());
             WriteUnitOfWork wuow(&_txn);
 
-            Collection* c = ctx.ctx().db()->getCollection(ns());
+            Collection* c = ctx.db()->getCollection(ns());
             if ( ! c ) {
-                c = ctx.ctx().db()->createCollection(&_txn, ns());
+                c = ctx.db()->createCollection(&_txn, ns());
             }
 
             ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
