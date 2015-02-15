@@ -297,7 +297,7 @@ add_option( "use-system-wiredtiger", "use system version of wiredtiger library",
 # library choices
 boost_choices = ['1.49', '1.56']
 add_option( "internal-boost", "Specify internal boost version to use", 1, True,
-           type='choice', default=boost_choices[0], choices=boost_choices)
+           type='choice', default=boost_choices[1], choices=boost_choices)
 
 add_option( "system-boost-lib-search-suffixes",
             "Comma delimited sequence of boost library suffixes to search",
