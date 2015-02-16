@@ -101,7 +101,7 @@ database home directory (or another directory as specified using the
 \c -m option to \c wtperf).
 
 The same visualization tool, \c wtstats, can be used to view a combined
-chart with both the \c monitor output and the stastics logging output
+chart with both the \c monitor output and the statistics logging output
 at the same time.
 
 The following example shows how to run the \c medium-btree.wtperf configuration
