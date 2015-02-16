@@ -483,8 +483,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_verbose(session, WT_VERB_RECOVERY,
 	    "Main recovery loop: starting at %u/%" PRIuMAX,
 	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset));
-	WT_ERR(__wt_log_needs_recovery(
-	    session, &r.ckpt_lsn, &needs_rec));
+	WT_ERR(__wt_log_needs_recovery(session, &r.ckpt_lsn, &needs_rec));
 	/*
 	 * Check if the database was shut down cleanly.  If not
 	 * return an error if the user does not want automatic
