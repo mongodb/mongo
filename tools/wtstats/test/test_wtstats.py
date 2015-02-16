@@ -75,7 +75,8 @@ def helper_run_with_fixture(kwargs=None):
     # path replacement
     kwargs['--output'] = os.path.join(test_dir, kwargs['--output'])
 
-    statsfile = os.path.join(test_dir, 'WiredTigerStat.fixture')
+    statsfile = os.path.join(test_dir, kwargs['files'] if 'files' in kwargs else 'WiredTigerStat.fixture')
+    print "ST", statsfile
 
     arglist = ['./wtstats', statsfile]
     for item in kwargs.items():
@@ -175,7 +176,51 @@ def test_output_option():
     outfile = '_foo_bar_baz.html'
     helper_run_with_fixture({'--output': outfile})
     assert os.path.exists(os.path.join(test_dir, outfile))
-    
+
+@with_setup(setUp, tearDown)
+def test_monitor_stats_start_with_wtperf():
+    """ wtstats should be able to parse wtperf monitor files """
+
+    outfile = '_foo_bar_baz.html'
+    helper_run_with_fixture({'files': 'monitor.fixture', '--output': outfile})
+    data = helper_get_json_from_file(outfile)
+
+    series_keys = map(lambda x: x['key'], data['series'])
+    for key in series_keys:
+        assert key.startswith('wtperf:')
+
+    assert os.path.exists(os.path.join(test_dir, outfile))
+
+
+@with_setup(setUp, tearDown)
+def test_monitor_stats_convert_us_to_ms():
+    """ wtstats should convert monitor stats us to ms """
+
+    outfile = '_foo_bar_baz.html'
+    helper_run_with_fixture({'files': 'monitor.fixture', '--output': outfile})
+    data = helper_get_json_from_file(outfile)
+
+    series_keys = map(lambda x: x['key'], data['series'])
+    for key in series_keys:
+        assert '(uS)' not in key
+
+    values = (item['values'] for item in data['series'] if item['key'] == 'wtperf: insert maximum latency (ms)').next().values()
+    assert max(values) == 103687 / 1000.
+
+
+
+@with_setup(setUp, tearDown)
+def test_directory_with_wtstats_and_wtperf():
+    """ wtstats should be able to parse directories containing both types """
+
+    outfile = '_test_output_file.html'
+    helper_run_with_fixture({'files': '.', '--output': outfile})
+    data = helper_get_json_from_file(outfile)
+
+    series_keys = map(lambda x: x['key'], data['series'])
+    assert any(map(lambda title: 'block-manager' in title, series_keys))
+    assert any(map(lambda title: 'wtperf' in title, series_keys))
+
 
 @with_setup(setUp, tearDown)
 def test_add_ext_if_missing():
