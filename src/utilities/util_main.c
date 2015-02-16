@@ -132,9 +132,10 @@ main(int argc, char *argv[])
 		}
 		break;
 	case 'p':
-		if (strcmp(command, "printlog") == 0)
+		if (strcmp(command, "printlog") == 0) {
 			func = util_printlog;
 			rec_config = REC_LOGOFF;
+		}
 		break;
 	case 'r':
 		if (strcmp(command, "read") == 0)
