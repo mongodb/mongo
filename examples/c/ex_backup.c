@@ -72,18 +72,18 @@ compare_backups(int i)
 	 */
 	if (i == 0)
 		(void)snprintf(buf, sizeof(buf),
-		    "../../wt -h %s dump logtest > %s.%d",
+		    "../../wt -R -h %s dump logtest > %s.%d",
 		    home, full_out, i);
 	else
 		(void)snprintf(buf, sizeof(buf),
-		    "../../wt -h %s.%d dump logtest > %s.%d",
+		    "../../wt -R -h %s.%d dump logtest > %s.%d",
 		    home_full, i, full_out, i);
 	ret = system(buf);
 	/*
 	 * Now run dump on the incremental directory.
 	 */
 	(void)snprintf(buf, sizeof(buf),
-	    "../../wt -h %s.%d dump logtest > %s.%d",
+	    "../../wt -R -h %s.%d dump logtest > %s.%d",
 	    home_incr, i, incr_out, i);
 	ret = system(buf);
 

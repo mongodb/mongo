@@ -1976,6 +1976,9 @@ struct __wt_connection {
  * are created relative to the database home., a string; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean
  * flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery
+ * or error if recovery needs to run after an unclean shutdown., a string\,
+ * chosen from the following options: \c "error"\, \c "on"; default \c on.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management., a set of related configuration options defined below.}
@@ -2621,6 +2624,12 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 /*! Restart the operation (internal). */
 #define	WT_RESTART	-31805
 /*! @endcond */
+/*!
+ * Recovery must be run to continue.
+ * This error is generated when wiredtiger_open is configured to return an error
+ * if recovery is required to use the database.
+ */
+#define	WT_RUN_RECOVERY	-31806
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

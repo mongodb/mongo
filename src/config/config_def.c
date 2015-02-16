@@ -319,6 +319,7 @@ static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ "file_max", "int", "min=100KB,max=2GB", NULL },
 	{ "path", "string", NULL, NULL },
 	{ "prealloc", "boolean", NULL, NULL },
+	{ "recover", "string", "choices=[\"error\",\"on\"]", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -692,7 +693,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
 	  "file_extend=,hazard_max=1000,log=(archive=,compressor=,enabled=0"
-	  ",file_max=100MB,path=,prealloc=),lsm_manager=(merge=,"
+	  ",file_max=100MB,path=,prealloc=,recover=on),lsm_manager=(merge=,"
 	  "worker_thread_max=4),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=100,session_scratch_max=2MB,shared_cache=(chunk=10MB"
 	  ",name=,reserve=0,size=500MB),statistics=none,"
@@ -710,7 +711,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
 	  "file_extend=,hazard_max=1000,log=(archive=,compressor=,enabled=0"
-	  ",file_max=100MB,path=,prealloc=),lsm_manager=(merge=,"
+	  ",file_max=100MB,path=,prealloc=,recover=on),lsm_manager=(merge=,"
 	  "worker_thread_max=4),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=100,session_scratch_max=2MB,shared_cache=(chunk=10MB"
 	  ",name=,reserve=0,size=500MB),statistics=none,"
@@ -727,8 +728,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "direct_io=,error_prefix=,eviction=(threads_max=1,threads_min=1),"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,"
-	  "compressor=,enabled=0,file_max=100MB,path=,prealloc=),"
-	  "lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,mmap=,"
+	  "compressor=,enabled=0,file_max=100MB,path=,prealloc=,recover=on)"
+	  ",lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,mmap=,"
 	  "multiprocess=0,session_max=100,session_scratch_max=2MB,"
 	  "shared_cache=(chunk=10MB,name=,reserve=0,size=500MB),"
 	  "statistics=none,statistics_log=(on_close=0,"
@@ -744,8 +745,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "direct_io=,error_prefix=,eviction=(threads_max=1,threads_min=1),"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,"
-	  "compressor=,enabled=0,file_max=100MB,path=,prealloc=),"
-	  "lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,mmap=,"
+	  "compressor=,enabled=0,file_max=100MB,path=,prealloc=,recover=on)"
+	  ",lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,mmap=,"
 	  "multiprocess=0,session_max=100,session_scratch_max=2MB,"
 	  "shared_cache=(chunk=10MB,name=,reserve=0,size=500MB),"
 	  "statistics=none,statistics_log=(on_close=0,"
