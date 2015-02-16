@@ -40,5 +40,6 @@ while true; do
 	fi
 	# Save a copy of the database directory exactly as it was at the crash.
 	cp -rp RUNDIR $rundir2
-	$wtcmd -h RUNDIR verify $uri || exit 1
+	# Force recovery to run.
+	$wtcmd -R -h RUNDIR verify $uri || exit 1
 done
