@@ -1074,7 +1074,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	for (evict = start, pages_walked = 0, internal_pages = restarts = 0;
 	    evict < end && pages_walked < WT_EVICT_MAX_PER_FILE &&
 	    (ret == 0 || ret == WT_NOTFOUND);
-	    ret = __wt_tree_walk(session, &btree->evict_ref, &pages_walked, walk_flags)) {
+	    ret = __wt_tree_walk(
+	    session, &btree->evict_ref, &pages_walked, walk_flags)) {
 		if (btree->evict_ref == NULL) {
 			/*
 			 * Take care with terminating this loop.

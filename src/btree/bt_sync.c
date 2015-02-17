@@ -67,7 +67,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			page = walk->page;
 			if (__wt_page_is_modified(page) &&
-			    __wt_txn_visible_all(session, page->modify->update_txn)) {
+			    __wt_txn_visible_all(
+			    session, page->modify->update_txn)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_refresh(session, 1);
 				leaf_bytes += page->memory_footprint;
