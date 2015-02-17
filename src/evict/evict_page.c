@@ -320,13 +320,11 @@ static int
 __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
     int exclusive, int top, int *inmem_splitp, int *istreep)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	uint32_t flags;
 
-	btree = S2BT(session);
 	flags = WT_EVICTING;
 
 	/*
@@ -369,46 +367,9 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 		WT_RET(ret);
 	}
 
-	/*
-	 * If the tree was deepened, there's a requirement that newly created
-	 * internal pages not be evicted until all threads are known to have
-	 * exited the original page index array, because evicting an internal
-	 * page discards its WT_REF array, and a thread traversing the original
-	 * page index array might see an freed WT_REF.  During the split we set
-	 * a transaction value, once that's globally visible, we know we can
-	 * evict the created page.
-	 */
-	if (!exclusive && mod != NULL && WT_PAGE_IS_INTERNAL(page) &&
-	    !__wt_txn_visible_all(session, mod->mod_split_txn))
+	/* Check whether the page can be evicted. */
+	if (!__wt_page_can_evict(session, page, 0))
 		return (EBUSY);
-
-	/*
-	 * If the file is being checkpointed, we can't evict dirty pages:
-	 * if we write a page and free the previous version of the page, that
-	 * previous version might be referenced by an internal page already
-	 * been written in the checkpoint, leaving the checkpoint inconsistent.
-	 *
-	 * Don't rely on new updates being skipped by the transaction used
-	 * for transaction reads: (1) there are paths that dirty pages for
-	 * artificial reasons; (2) internal pages aren't transactional; and
-	 * (3) if an update was skipped during the checkpoint (leaving the page
-	 * dirty), then rolled back, we could still successfully overwrite a
-	 * page and corrupt the checkpoint.
-	 *
-	 * Further, we can't race with the checkpoint's reconciliation of
-	 * an internal page as we evict a clean child from the page's subtree.
-	 * This works in the usual way: eviction locks the page and then checks
-	 * for existing hazard pointers, the checkpoint thread reconciling an
-	 * internal page acquires hazard pointers on child pages it reads, and
-	 * is blocked by the exclusive lock.
-	 */
-	if (mod != NULL && btree->checkpointing &&
-	    (__wt_page_is_modified(page) ||
-	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
-		return (EBUSY);
-	}
 
 	/*
 	 * Check for an append-only workload needing an in-memory split.

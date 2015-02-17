@@ -37,12 +37,9 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    page->type != WT_PAGE_ROW_LEAF)
 		return (0);
 
-	/*
-	 * Eviction may be turned off (although that's rare), or we may be in
-	 * the middle of a checkpoint.
-	 */
+	/* Eviction may be turned off. */
 	if (LF_ISSET(WT_READ_NO_EVICT) ||
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->checkpointing)
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
 	/*
@@ -52,15 +49,12 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	if (page->modify == NULL)
 		return (0);
 
-	/*
-	 * If the page was recently split in-memory, don't force it out: we
-	 * hope eviction will find it first.
-	 */
-	if (!__wt_txn_visible_all(session, page->modify->first_dirty_txn))
-		return (0);
-
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
+
+	/* If eviction cannot succeed, don't try. */
+	if (!__wt_page_can_evict(session, page, 1))
+		return (0);
 
 	return (1);
 }

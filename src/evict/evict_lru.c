@@ -839,7 +839,7 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int max_entries, old_slot, retries, slot;
+	u_int max_entries, old_slot, retries, slot, spins;
 	int incr, dhandle_locked;
 	WT_DECL_SPINLOCK_ID(id);
 
@@ -885,8 +885,16 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * reference count to keep it alive while we sweep.
 		 */
 		if (!dhandle_locked) {
-			if ((ret = __wt_spin_trylock(
-			    session, &conn->dhandle_lock, &id)) != 0)
+			for (spins = 0; (ret = __wt_spin_trylock(
+			    session, &conn->dhandle_lock, &id)) == EBUSY &&
+			    !F_ISSET(cache, WT_EVICT_CLEAR_WALKS);
+			    spins++) {
+				if (spins < 1000)
+					__wt_yield();
+				else
+					__wt_sleep(0, 1000);
+			}
+			if (ret != 0)
 				break;
 			dhandle_locked = 1;
 		}
@@ -1126,12 +1134,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 		}
 
-fast:		/*
-		 * If the file is being checkpointed, there's a period of time
-		 * where we can't discard dirty pages because of possible races
-		 * with the checkpointing thread.
-		 */
-		if (modified && btree->checkpointing)
+fast:		/* If the page can't be evicted, give up. */
+		if (!__wt_page_can_evict(session, page, 0))
 			continue;
 
 		/*
