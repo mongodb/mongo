@@ -423,6 +423,8 @@ namespace {
                 return appendCommandStatus(result, status);
             }
 
+            log() << "Attempting to step down in response to replSetStepDown command";
+
             status = getGlobalReplicationCoordinator()->stepDown(
                     txn,
                     force,
