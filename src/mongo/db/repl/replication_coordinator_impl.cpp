@@ -2313,6 +2313,25 @@ namespace {
             return;
         }
         _topCoord->blacklistSyncSource(host, until);
+
+        CBHStatus cbh = _replExecutor.scheduleWorkAt(
+                until,
+                stdx::bind(&ReplicationCoordinatorImpl::_unblacklistSyncSource,
+                           this,
+                           stdx::placeholders::_1,
+                           host));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(28610, cbh.getStatus());
+    }
+
+    void ReplicationCoordinatorImpl::_unblacklistSyncSource(
+            const ReplicationExecutor::CallbackData& cbData,
+            const HostAndPort& host) {
+        if (cbData.status == ErrorCodes::CallbackCanceled)
+            return;
+        _topCoord->unblacklistSyncSource(host, _replExecutor.now());
     }
 
     void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
@@ -2351,7 +2370,8 @@ namespace {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
         }
-        *shouldChange = _topCoord->shouldChangeSyncSource(currentSource);
+
+        *shouldChange = _topCoord->shouldChangeSyncSource(currentSource, _replExecutor.now());
     }
 
     bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) {

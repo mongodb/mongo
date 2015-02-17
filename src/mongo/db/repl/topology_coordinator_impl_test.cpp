@@ -459,8 +459,8 @@ namespace {
         getTopoCoord().setForceSyncSourceIndex(1);
         // force should cause shouldChangeSyncSource() to return true
         // even if the currentSource is the force target
-        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h2")));
-        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h3")));
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h2"), now()));
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h3"), now()));
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
@@ -3780,14 +3780,14 @@ namespace {
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceMemberNotInConfig) {
         // In this test, the TopologyCoordinator should tell us to change sync sources away from
         // "host4" since "host4" is absent from the config
-        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host4")));
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host4"), now()));
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceMemberHasYetToHeartbeat) {
         // In this test, the TopologyCoordinator should not tell us to change sync sources away from
         // "host2" since we do not yet have a heartbeat (and as a result do not yet have an optime)
         // for "host2"
-        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherHappierMemberExists) {
@@ -3816,7 +3816,49 @@ namespace {
 
         // set up complete, time for actual check
         startCapturingLogMessages();
-        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsBlackListed) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+        // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
+        // "host3", since "host3" is blacklisted
+        // Then, confirm that unblacklisting only works if time has passed the blacklist time.
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(400,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        getTopoCoord().blacklistSyncSource(HostAndPort("host3"), now() + 100);
+
+        // set up complete, time for actual check
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
+
+        // unblacklist with too early a time (node should remained blacklisted)
+        getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + 90);
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
+
+        // unblacklist and it should succeed
+        getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + 100);
+        startCapturingLogMessages();
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
         stopCapturingLogMessages();
         ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
     }
@@ -3849,7 +3891,7 @@ namespace {
         // set up complete, time for actual check
         nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0", lastOpTimeApplied);
         ASSERT_NO_ACTION(nextAction.getAction());
-        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsNotReadable) {
@@ -3878,7 +3920,7 @@ namespace {
         ASSERT_NO_ACTION(nextAction.getAction());
 
         // set up complete, time for actual check
-        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexes) {
@@ -3914,7 +3956,7 @@ namespace {
         ASSERT_NO_ACTION(nextAction.getAction());
 
         // set up complete, time for actual check
-        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexesNorDoWe) {
@@ -3952,7 +3994,7 @@ namespace {
 
         // set up complete, time for actual check
         startCapturingLogMessages();
-        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
         stopCapturingLogMessages();
         ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
     }

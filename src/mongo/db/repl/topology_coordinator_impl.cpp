@@ -316,22 +316,29 @@ namespace {
         return _syncSource;
     }
 
-    bool TopologyCoordinatorImpl::_memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now)
-    {
-        std::map<HostAndPort,Date_t>::iterator blacklisted =
+    bool TopologyCoordinatorImpl::_memberIsBlacklisted(const MemberConfig& memberConfig,
+                                                       Date_t now) const {
+        std::map<HostAndPort,Date_t>::const_iterator blacklisted =
             _syncSourceBlacklist.find(memberConfig.getHostAndPort());
         if (blacklisted != _syncSourceBlacklist.end()) {
             if (blacklisted->second > now) {
                 return true;
             }
-            // Do some veto housekeeping; side-effect!
-            _syncSourceBlacklist.erase(blacklisted);
         }
         return false;
     }
 
     void TopologyCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+        LOG(2) << "blacklisting " << host << " until " << until.toString();
         _syncSourceBlacklist[host] = until;
+    }
+
+    void TopologyCoordinatorImpl::unblacklistSyncSource(const HostAndPort& host, Date_t now) {
+        std::map<HostAndPort, Date_t>::iterator hostItr = _syncSourceBlacklist.find(host);
+        if (hostItr != _syncSourceBlacklist.end() && now >= hostItr->second) {
+            LOG(2) << "unblacklisting " << host;
+            _syncSourceBlacklist.erase(hostItr);
+        }
     }
 
     void TopologyCoordinatorImpl::clearSyncSourceBlacklist() {
@@ -2026,8 +2033,8 @@ namespace {
         return _maintenanceModeCalls;
     }
 
-    bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) const
-    {
+    bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                         Date_t now) const {
         // Methodology:
         // If there exists a viable sync source member other than currentSource, whose oplog has
         // reached an optime greater than _maxSyncSourceLagSecs later than currentSource's, return
@@ -2061,6 +2068,7 @@ namespace {
             if (it->up() &&
                 (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
                 it->getState().readable() &&
+                !_memberIsBlacklisted(candidateConfig, now) &&
                 goalSecs < it->getOpTime().getSecs()) {
                 log() << "changing sync target because current sync target's most recent OpTime is "
                       << currentOpTime.toStringLong() << " which is more than "
