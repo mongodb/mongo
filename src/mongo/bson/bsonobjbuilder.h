@@ -68,10 +68,13 @@ namespace mongo {
             , _s(this)
             , _tracker(0)
             , _doneCalled(false) {
-            // Reserve space for a holder object at the beginning of the buffer, followed by
+            // Skip over space for a holder object at the beginning of the buffer, followed by
             // space for the object length. The length is filled in by _done.
             _b.skip(sizeof(BSONObj::Holder));
             _b.skip(sizeof(int));
+
+            // Reserve space for the EOO byte. This means _done() can't fail.
+            _b.reserveBytes(1);
         }
 
         /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder
@@ -84,9 +87,13 @@ namespace mongo {
             , _s(this)
             , _tracker(0)
             , _doneCalled(false) {
-            // Reserve space for the object length, which is filled in by _done. We don't need a holder
-            // since we are a sub-builder, and some parent builder has already made the reservation.
+            // Skip over space for the object length, which is filled in by _done. We don't need a
+            // holder since we are a sub-builder, and some parent builder has already made the
+            // reservation.
             _b.skip(sizeof(int));
+
+            // Reserve space for the EOO byte. This means _done() can't fail.
+            _b.reserveBytes(1);
         }
 
         BSONObjBuilder( const BSONSizeTracker & tracker )
@@ -99,6 +106,9 @@ namespace mongo {
             // See the comments in the first constructor for details.
             _b.skip(sizeof(BSONObj::Holder));
             _b.skip(sizeof(int));
+
+            // Reserve space for the EOO byte. This means _done() can't fail.
+            _b.reserveBytes(1);
         }
 
         ~BSONObjBuilder() {
@@ -622,6 +632,7 @@ namespace mongo {
         BSONObj asTempObj() {
             BSONObj temp(_done());
             _b.setlen(_b.len()-1); //next append should overwrite the EOO
+            _b.reserveBytes(1); // Rereserve room for the real EOO
             _doneCalled = false;
             return temp;
         }
@@ -703,8 +714,14 @@ namespace mongo {
                 return _b.buf() + _offset;
 
             _doneCalled = true;
+
+            // TODO remove this or find some way to prevent it from failing. Since this is intended
+            // for use with BSON() literal queries, it is less likely to result in oversized BSON.
             _s.endField();
+
+            _b.claimReservedBytes(1); // Prevents adding EOO from failing.
             _b.appendNum((char) EOO);
+
             char *data = _b.buf() + _offset;
             int size = _b.len() - _offset;
             DataView(data).writeLE(size);
