@@ -190,10 +190,6 @@ mongo_tools_variables:
       mongodb_args: &auth_startup_args_string "--auth "
 
 functions:
-  "attach tool":
-    command: attach.task_files
-    params:
-      "${tool} (${edition|community})": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
 
   "build tool":
     command: shell.exec
@@ -407,6 +403,7 @@ functions:
       permissions: public-read
       content_type: text/html
       build_variants: ["ubuntu", "windows-64"]
+      display_name: ${coverage_pkg}-html
 
   "upload text coverage":
     command: s3.put
@@ -419,12 +416,7 @@ functions:
       permissions: public-read
       content_type: text/plain
       build_variants: ["ubuntu", "windows-64"]
-
-  "attach coverage reports":
-    command: attach.task_files
-    params:
-      "${coverage_pkg} coverage (html)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${coverage_pkg}/${task_id}.html
-      "${coverage_pkg} coverage (text)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${coverage_pkg}/${task_id}.txt
+      display_name: ${coverage_pkg}-text
 
   "setup credentials" :
     command: shell.exec
@@ -459,6 +451,7 @@ functions:
       bucket: mciuploads
       permissions: public-read
       content_type: application/octet-stream
+      display_name: ${tool}
 
 pre:
   - command: expansions.fetch
@@ -553,17 +546,11 @@ tasks:
     - func: "upload tool"
       vars:
         tool: bsondump
-    - func: "attach tool"
-      vars:
-        tool: bsondump
     # mongodump
     - func: "build tool"
       vars:
         tool: mongodump
     - func: "upload tool"
-      vars:
-        tool: mongodump
-    - func: "attach tool"
       vars:
         tool: mongodump
     # mongoexport
@@ -573,17 +560,11 @@ tasks:
     - func: "upload tool"
       vars:
         tool: mongoexport
-    - func: "attach tool"
-      vars:
-        tool: mongoexport
     # mongofiles
     - func: "build tool"
       vars:
         tool: mongofiles
     - func: "upload tool"
-      vars:
-        tool: mongofiles
-    - func: "attach tool"
       vars:
         tool: mongofiles
     # mongoimport
@@ -593,17 +574,11 @@ tasks:
     - func: "upload tool"
       vars:
         tool: mongoimport
-    - func: "attach tool"
-      vars:
-        tool: mongoimport
     # mongooplog
     - func: "build tool"
       vars:
         tool: mongooplog
     - func: "upload tool"
-      vars:
-        tool: mongooplog
-    - func: "attach tool"
       vars:
         tool: mongooplog
     # mongorestore
@@ -613,9 +588,6 @@ tasks:
     - func: "upload tool"
       vars:
         tool: mongorestore
-    - func: "attach tool"
-      vars:
-        tool: mongorestore
     # mongostat
     - func: "build tool"
       vars:
@@ -623,17 +595,11 @@ tasks:
     - func: "upload tool"
       vars:
         tool: mongostat
-    - func: "attach tool"
-      vars:
-        tool: mongostat
     # mongotop
     - func: "build tool"
       vars:
         tool: mongotop
     - func: "upload tool"
-      vars:
-        tool: mongotop
-    - func: "attach tool"
       vars:
         tool: mongotop
 
@@ -1102,7 +1068,6 @@ tasks:
             value: "mongoimport"
     - func: "upload html coverage"
     - func: "upload text coverage"
-    - func: "attach coverage reports"
     - command: expansions.update
       params:
         updates:
@@ -1110,7 +1075,6 @@ tasks:
             value: "mongoexport"
     - func: "upload html coverage"
     - func: "upload text coverage"
-    - func: "attach coverage reports"
     - command: expansions.update
       params:
         updates:
@@ -1118,7 +1082,6 @@ tasks:
             value: "mongostat"
     - func: "upload html coverage"
     - func: "upload text coverage"
-    - func: "attach coverage reports"
     - command: expansions.update
       params:
         updates:
@@ -1126,7 +1089,6 @@ tasks:
             value: "mongooplog"
     - func: "upload html coverage"
     - func: "upload text coverage"
-    - func: "attach coverage reports"
     - command: expansions.update
       params:
         updates:
@@ -1134,7 +1096,6 @@ tasks:
             value: "mongodump"
     - func: "upload html coverage"
     - func: "upload text coverage"
-    - func: "attach coverage reports"
     - command: expansions.update
       params:
         updates:
@@ -1142,7 +1103,6 @@ tasks:
             value: "mongorestore"
     - func: "upload html coverage"
     - func: "upload text coverage"
-    - func: "attach coverage reports"
 
 - name: util
   commands:
