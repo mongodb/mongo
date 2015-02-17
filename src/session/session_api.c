@@ -670,7 +670,11 @@ __session_truncate(WT_SESSION *wt_session,
 
 done:
 err:	TXN_API_END_RETRY(session, ret, 0);
-	return ((ret) == WT_NOTFOUND ? ENOENT : (ret));
+
+	/*
+	 * Only map WT_NOTFOUND to ENOENT if a URI was specified.
+	 */
+	return (ret == WT_NOTFOUND && uri != NULL ? ENOENT : ret);
 }
 
 /*
