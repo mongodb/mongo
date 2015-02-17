@@ -55,6 +55,9 @@ namespace mongo {
         BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
             _b.appendNum((unsigned)0); // ref-count
             _b.skip(4); /*leave room for size field and ref-count*/
+
+            // Reserve space for the EOO byte. This means _done() can't fail.
+            _b.reserveBytes(1);
         }
 
         /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder
@@ -62,11 +65,17 @@ namespace mongo {
          */
         BSONObjBuilder( BufBuilder &baseBuilder ) : _b( baseBuilder ), _buf( 0 ), _offset( baseBuilder.len() ), _s( this ) , _tracker(0) , _doneCalled(false) {
             _b.skip( 4 );
+
+            // Reserve space for the EOO byte. This means _done() can't fail.
+            _b.reserveBytes(1);
         }
 
         BSONObjBuilder( const BSONSizeTracker & tracker ) : _b(_buf) , _buf(tracker.getSize() + sizeof(unsigned) ), _offset( sizeof(unsigned) ), _s( this ) , _tracker( (BSONSizeTracker*)(&tracker) ) , _doneCalled(false) {
             _b.appendNum((unsigned)0); // ref-count
             _b.skip(4);
+
+            // Reserve space for the EOO byte. This means _done() can't fail.
+            _b.reserveBytes(1);
         }
 
         ~BSONObjBuilder() {
@@ -600,6 +609,7 @@ namespace mongo {
         BSONObj asTempObj() {
             BSONObj temp(_done());
             _b.setlen(_b.len()-1); //next append should overwrite the EOO
+            _b.reserveBytes(1); // Rereserve room for the real EOO
             _doneCalled = false;
             return temp;
         }
@@ -681,8 +691,14 @@ namespace mongo {
                 return _b.buf() + _offset;
 
             _doneCalled = true;
+
+            // TODO remove this or find some way to prevent it from failing. Since this is intended
+            // for use with BSON() literal queries, it is less likely to result in oversized BSON.
             _s.endField();
+
+            _b.claimReservedBytes(1); // Prevents adding EOO from failing.
             _b.appendNum((char) EOO);
+
             char *data = _b.buf() + _offset;
             int size = _b.len() - _offset;
             *((int*)data) = size;
