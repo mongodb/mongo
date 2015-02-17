@@ -125,6 +125,7 @@ namespace mongo {
                 data = 0;
             }
             l = 0;
+            reservedBytes = 0;
         }
         ~_BufBuilder() { kill(); }
 
@@ -137,9 +138,11 @@ namespace mongo {
 
         void reset() {
             l = 0;
+            reservedBytes = 0;
         }
         void reset( int maxSize ) {
             l = 0;
+            reservedBytes = 0;
             if ( maxSize && size > maxSize ) {
                 al.Free(data);
                 data = (char*)al.Malloc(maxSize);
@@ -222,11 +225,34 @@ namespace mongo {
         inline char* grow(int by) {
             int oldlen = l;
             int newLen = l + by;
-            if ( newLen > size ) {
-                grow_reallocate(newLen);
+            int minSize = newLen + reservedBytes;
+            if ( minSize > size ) {
+                grow_reallocate(minSize);
             }
             l = newLen;
             return data + oldlen;
+        }
+
+        /**
+         * Reserve room for some number of bytes to be claimed at a later time.
+         */
+        void reserveBytes(int bytes) {
+            int minSize = l + reservedBytes + bytes;
+            if (minSize > size)
+                grow_reallocate(minSize);
+
+            // This must happen *after* any attempt to grow.
+            reservedBytes += bytes;
+        }
+
+        /**
+         * Claim an earlier reservation of some number of bytes. These bytes must already have been
+         * reserved. Appends of up to this many bytes immediately following a claim are
+         * guaranteed to succeed without a need to reallocate.
+         */
+        void claimReservedBytes(int bytes) {
+            invariant(reservedBytes >= bytes);
+            reservedBytes -= bytes;
         }
 
     private:
@@ -241,10 +267,11 @@ namespace mongo {
 
 
         /* "slow" portion of 'grow()'  */
-        void NOINLINE_DECL grow_reallocate(int newLen) {
+        void NOINLINE_DECL grow_reallocate(int minSize) {
             int a = 64;
-            while( a < newLen ) 
+            while (a < minSize)
                 a = a * 2;
+
             if ( a > BufferMaxSize ) {
                 std::stringstream ss;
                 ss << "BufBuilder attempted to grow() to " << a << " bytes, past the 64MB limit.";
@@ -259,6 +286,7 @@ namespace mongo {
         char *data;
         int l;
         int size;
+        int reservedBytes; // eagerly grow_reallocate to keep this many bytes of spare room.
 
         friend class StringBuilderImpl<Allocator>;
     };
