@@ -225,6 +225,47 @@ err:		WT_PANIC_MSG(session, ret, "cache eviction server error");
 }
 
 /*
+ * __evict_workers_resize --
+ *	Resize the array of eviction workers (as needed after a reconfigure).
+ *	We don't do this during the reconfigure because the eviction server
+ *	thread owns these structures.
+ */
+static int
+__evict_workers_resize(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_EVICT_WORKER *workers;
+	size_t alloc;
+	u_int i;
+
+	conn = S2C(session);
+
+	alloc = conn->evict_workers_alloc * sizeof(*workers);
+	WT_RET(__wt_realloc(session, &alloc,
+	    conn->evict_workers_max * sizeof(*workers), &conn->evict_workctx));
+	workers = conn->evict_workctx;
+
+	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
+		WT_ERR(__wt_open_internal_session(conn,
+		    "eviction-worker", 0, 0, &workers[i].session));
+		workers[i].id = i;
+		F_SET(workers[i].session, WT_SESSION_CAN_WAIT);
+
+		if (i < conn->evict_workers_min) {
+			++conn->evict_workers;
+			F_SET(&workers[i], WT_EVICT_WORKER_RUN);
+			WT_ERR(__wt_thread_create(
+			    workers[i].session, &workers[i].tid,
+			    __evict_worker, &workers[i]));
+		}
+	}
+
+err:	conn->evict_workers_alloc = conn->evict_workers_max;
+	return (ret);
+}
+
+/*
  * __wt_evict_create --
  *	Start the eviction server thread.
  */
@@ -232,8 +273,6 @@ int
 __wt_evict_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_EVICT_WORKER *workers;
-	u_int i;
 
 	conn = S2C(session);
 
@@ -252,27 +291,6 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	 */
 	if (conn->evict_workers_max == 0)
 		F_SET(session, WT_SESSION_CAN_WAIT);
-
-	if (conn->evict_workers_max > 0) {
-		WT_RET(__wt_calloc_def(
-		    session, conn->evict_workers_max, &workers));
-		conn->evict_workctx = workers;
-
-		for (i = 0; i < conn->evict_workers_max; i++) {
-			WT_RET(__wt_open_internal_session(conn,
-			    "eviction-worker", 0, 0, &workers[i].session));
-			workers[i].id = i;
-			F_SET(workers[i].session, WT_SESSION_CAN_WAIT);
-
-			if (i < conn->evict_workers_min) {
-				++conn->evict_workers;
-				F_SET(&workers[i], WT_EVICT_WORKER_RUN);
-				WT_RET(__wt_thread_create(
-				    workers[i].session, &workers[i].tid,
-				    __evict_worker, &workers[i]));
-			}
-		}
-	}
 
 	/*
 	 * Start the primary eviction server thread after the worker threads
@@ -314,9 +332,10 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 	}
 	/* Handle shutdown when cleaning up after a failed open */
 	if (conn->evict_workctx != NULL) {
-		for (i = 0; i < conn->evict_workers_max; i++) {
+		for (i = 0; i < conn->evict_workers_alloc; i++) {
 			wt_session = &conn->evict_workctx[i].session->iface;
-			WT_TRET(wt_session->close(wt_session, NULL));
+			if (wt_session != NULL)
+				WT_TRET(wt_session->close(wt_session, NULL));
 		}
 		__wt_free(session, conn->evict_workctx);
 	}
@@ -479,6 +498,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 			WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 			    "Starting evict worker: %"PRIu32"\n",
 			    conn->evict_workers));
+			if (conn->evict_workers >= conn->evict_workers_alloc)
+				WT_RET(__evict_workers_resize(session));
 			worker = &conn->evict_workctx[conn->evict_workers++];
 			F_SET(worker, WT_EVICT_WORKER_RUN);
 			WT_RET(__wt_thread_create(session,
