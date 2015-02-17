@@ -34,12 +34,15 @@ while true; do
 	rm -rf $rundir2
 	$tcmd $config -q abort=1 logging=1 timer=$timer
 
-	uri='file:wt'
-	if `$wtcmd -h RUNDIR list | egrep table > /dev/null`; then
-		uri='table:wt'
-	fi
 	# Save a copy of the database directory exactly as it was at the crash.
 	cp -rp RUNDIR $rundir2
+
+	# We aborted, so recovery is required
+	if `$wtcmd -R -h RUNDIR list | egrep table > /dev/null`; then
+		uri='table:wt'
+	else
+		uri='file:wt'
+	fi
 	# Force recovery to run.
 	$wtcmd -R -h RUNDIR verify $uri || exit 1
 done
