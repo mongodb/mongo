@@ -28,30 +28,53 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/ops/update.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
 
     using std::string;
 
-    NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry( StringData ns,
-                                                                                    NamespaceDetails* details,
-                                                                                    RecordStore* indexRecordStore,
-                                                                                    MMAPV1DatabaseCatalogEntry* db )
+    NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry(
+            StringData ns,
+            NamespaceDetails* details,
+            RecordStore* namespacesRecordStore,
+            RecordStore* indexRecordStore,
+            MMAPV1DatabaseCatalogEntry* db )
         : CollectionCatalogEntry( ns ),
           _details( details ),
+          _namespacesRecordStore(namespacesRecordStore),
           _indexRecordStore( indexRecordStore ),
           _db( db ) {
     }
 
     CollectionOptions NamespaceDetailsCollectionCatalogEntry::getCollectionOptions(OperationContext* txn) const {
-        return _db->getCollectionOptions( txn, ns().ns() );
+        CollectionOptions options = _db->getCollectionOptions( txn, ns().ns() );
+
+        if (options.flagsSet) {
+            if (options.flags != _details->userFlags) {
+                warning() << "system.namespaces and NamespaceDetails disagree about userFlags."
+                          << " system.namespaces: " << options.flags
+                          << " NamespaceDetails: " << _details->userFlags;
+                dassert(options.flags == _details->userFlags);
+            }
+        }
+
+        // Fill in the actual flags from the NamespaceDetails.
+        // Leaving flagsSet alone since it indicates whether the user actively set the flags.
+        options.flags = _details->userFlags;
+
+        return options;
     }
 
     int NamespaceDetailsCollectionCatalogEntry::getTotalIndexCount( OperationContext* txn ) const {
@@ -334,5 +357,40 @@ namespace mongo {
         }
     }
 
+    void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {
+        NamespaceDetailsRSV1MetaData md(ns().ns(), _details);
+        md.replaceUserFlags(txn, newValue);
+
+        if ( !_namespacesRecordStore )
+            return;
+
+        boost::scoped_ptr<RecordIterator> iterator( _namespacesRecordStore->getIterator(txn) );
+        while ( !iterator->isEOF() ) {
+            RecordId loc = iterator->getNext();
+
+            BSONObj oldEntry = iterator->dataFor( loc ).toBson();
+            BSONElement e = oldEntry["name"];
+            if ( e.type() != String )
+                continue;
+
+            if ( e.String() != ns().ns() )
+                continue;
+
+            BSONObj newEntry =
+                applyUpdateOperators( oldEntry,
+                                      BSON( "$set" << BSON( "options.flags" << newValue) ) );
+
+            StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(txn,
+                                                                               loc,
+                                                                               newEntry.objdata(),
+                                                                               newEntry.objsize(),
+                                                                               false,
+                                                                               NULL);
+            fassert( 17486, result.isOK() );
+            return;
+        }
+
+        fassertFailed( 17488 );
+    }
 
 }

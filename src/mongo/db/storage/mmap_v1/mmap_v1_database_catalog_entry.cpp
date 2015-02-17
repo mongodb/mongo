@@ -306,6 +306,7 @@ namespace {
                 // fix IndexDetails pointer
                 NamespaceDetailsCollectionCatalogEntry ce( toNS,
                                                            details,
+                                                           _getNamespaceRecordStore(),
                                                            systemIndexRecordStore,
                                                            this );
                 int indexI = ce._findIndexNumber( txn, indexName );
@@ -557,8 +558,7 @@ namespace {
             nsEntry = new Entry();
 
             NamespaceDetailsRSV1MetaData* md = new NamespaceDetailsRSV1MetaData(nsn.toString(),
-                                                                                nsDetails,
-                                                                                NULL);
+                                                                                nsDetails);
             nsEntry->recordStore.reset(new SimpleRecordStoreV1(txn,
                                                                nsn.toString(),
                                                                md,
@@ -570,9 +570,7 @@ namespace {
             indexEntry = new Entry();
 
             NamespaceDetailsRSV1MetaData* md =
-                new NamespaceDetailsRSV1MetaData(nsi.toString(),
-                                                 indexDetails,
-                                                 nsEntry->recordStore.get());
+                new NamespaceDetailsRSV1MetaData(nsi.toString(), indexDetails);
 
             indexEntry->recordStore.reset(new SimpleRecordStoreV1(txn,
                                                                   nsi.toString(),
@@ -589,6 +587,7 @@ namespace {
             nsEntry->catalogEntry.reset(
                         new NamespaceDetailsCollectionCatalogEntry(nsn.toString(),
                                                                    nsDetails,
+                                                                   nsEntry->recordStore.get(),
                                                                    indexEntry->recordStore.get(),
                                                                    this));
         }
@@ -597,6 +596,7 @@ namespace {
             indexEntry->catalogEntry.reset(
                         new NamespaceDetailsCollectionCatalogEntry(nsi.toString(),
                                                                    indexDetails,
+                                                                   nsEntry->recordStore.get(),
                                                                    indexEntry->recordStore.get(),
                                                                    this));
         }
@@ -648,25 +648,13 @@ namespace {
         _addNamespaceToNamespaceCollection( txn, ns, &optionsAsBSON );
 
         _namespaceIndex.add_ns( txn, ns, DiskLoc(), options.capped );
+        NamespaceDetails* details = _namespaceIndex.details(ns);
 
-        // allocation strategy set explicitly in flags or by server-wide default
-        if ( !options.capped ) {
-            NamespaceDetailsRSV1MetaData md( ns,
-                                             _namespaceIndex.details( ns ),
-                                             _getNamespaceRecordStore() );
+        // Set the flags.
+        NamespaceDetailsRSV1MetaData(ns, details).replaceUserFlags(txn, options.flags);
 
-            if ( options.flagsSet ) {
-                md.setUserFlag( txn, options.flags );
-            }
-            else {
-                // For compatibility with previous versions if the user sets no flags,
-                // we set Flag_UsePowerOf2Sizes in case the user downgrades
-                md.setUserFlag(txn, NamespaceDetails::Flag_UsePowerOf2Sizes);
-            }
-        }
-        else if ( options.cappedMaxDocs > 0 ) {
-            txn->recoveryUnit()->writingInt( _namespaceIndex.details( ns )->maxDocsInCapped ) =
-                options.cappedMaxDocs;
+        if (options.capped && options.cappedMaxDocs > 0) {
+            txn->recoveryUnit()->writingInt( details->maxDocsInCapped ) = options.cappedMaxDocs;
         }
 
         Entry*& entry = _collections[ns.toString()];
@@ -746,14 +734,11 @@ namespace {
         entry->catalogEntry.reset(
             new NamespaceDetailsCollectionCatalogEntry(ns,
                                                        details,
+                                                       _getNamespaceRecordStore(),
                                                        _getIndexRecordStore(),
                                                        this));
 
-        auto_ptr<NamespaceDetailsRSV1MetaData> md(
-            new NamespaceDetailsRSV1MetaData(ns,
-                                             details,
-                                             _getNamespaceRecordStore()));
-
+        auto_ptr<NamespaceDetailsRSV1MetaData> md(new NamespaceDetailsRSV1MetaData(ns, details));
         const NamespaceString nss(ns);
 
         if (details->isCapped) {
@@ -793,14 +778,6 @@ namespace {
         const string& type = entry->descriptor()->getAccessMethodName();
 
         string ns = collection->ns().ns();
-
-        if ( IndexNames::TEXT == type ||
-             entry->descriptor()->getInfoElement("expireAfterSeconds").isNumber() ) {
-            NamespaceDetailsRSV1MetaData md( ns,
-                                             _namespaceIndex.details( ns ),
-                                             _getNamespaceRecordStore() );
-            md.setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
-        }
 
         RecordStoreV1Base* rs = _getRecordStore(entry->descriptor()->indexNamespace());
         invariant(rs);

@@ -33,7 +33,6 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update.h"
 
 namespace mongo {
 
@@ -44,11 +43,9 @@ namespace mongo {
                         == NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);
 
     NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData( StringData ns,
-                                                                NamespaceDetails* details,
-                                                                RecordStore* namespaceRecordStore )
+                                                                NamespaceDetails* details )
         : _ns( ns.toString() ),
-          _details( details ),
-          _namespaceRecordStore( namespaceRecordStore ) {
+          _details( details ) {
     }
 
     const DiskLoc& NamespaceDetailsRSV1MetaData::capExtent() const {
@@ -169,7 +166,6 @@ namespace mongo {
             return false;
 
         txn->recoveryUnit()->writingInt( _details->userFlags) |= flag;
-        _syncUserFlags( txn );
         return true;
     }
 
@@ -178,7 +174,6 @@ namespace mongo {
             return false;
 
         txn->recoveryUnit()->writingInt(_details->userFlags) &= ~flag;
-        _syncUserFlags( txn );
         return true;
     }
 
@@ -187,7 +182,6 @@ namespace mongo {
             return false;
 
         txn->recoveryUnit()->writingInt(_details->userFlags) = flags;
-        _syncUserFlags( txn );
         return true;
     }
 
@@ -207,37 +201,4 @@ namespace mongo {
             return numeric_limits<long long>::max();
         return _details->maxDocsInCapped;
     }
-
-    void NamespaceDetailsRSV1MetaData::_syncUserFlags( OperationContext* txn ) {
-        if ( !_namespaceRecordStore )
-            return;
-
-        scoped_ptr<RecordIterator> iterator( _namespaceRecordStore->getIterator(txn) );
-        while ( !iterator->isEOF() ) {
-            RecordId loc = iterator->getNext();
-
-            BSONObj oldEntry = iterator->dataFor( loc ).toBson();
-            BSONElement e = oldEntry["name"];
-            if ( e.type() != String )
-                continue;
-
-            if ( e.String() != _ns )
-                continue;
-
-            BSONObj newEntry = applyUpdateOperators( oldEntry,
-                                                     BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
-
-            StatusWith<RecordId> result = _namespaceRecordStore->updateRecord(txn,
-                                                                              loc,
-                                                                              newEntry.objdata(),
-                                                                              newEntry.objsize(),
-                                                                              false,
-                                                                              NULL);
-            fassert( 17486, result.isOK() );
-            return;
-        }
-
-        fassertFailed( 17488 );
-    }
-
 }

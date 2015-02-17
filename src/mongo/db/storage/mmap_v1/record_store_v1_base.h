@@ -160,11 +160,6 @@ namespace mongo {
 
         static const int bucketSizes[];
 
-        enum UserFlags {
-            Flag_UsePowerOf2Sizes = 1 << 0,
-            Flag_NoPadding = 1 << 1,
-        };
-
         // ------------
 
         class IntraExtentIterator;
@@ -258,10 +253,6 @@ namespace mongo {
 
         /* return which "deleted bucket" for this size object */
         static int bucket(int size);
-
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL );
 
         virtual void updateStatsAfterRepair(OperationContext* txn,
                                             long long numRecords,

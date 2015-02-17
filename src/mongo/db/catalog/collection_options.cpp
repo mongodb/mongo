@@ -57,7 +57,9 @@ namespace mongo {
         initialNumExtents = 0;
         initialExtentSizes.clear();
         autoIndexId = DEFAULT;
-        flags = 0;
+        // For compatibility with previous versions if the user sets no flags,
+        // we set Flag_UsePowerOf2Sizes in case the user downgrades.
+        flags = Flag_UsePowerOf2Sizes;
         flagsSet = false;
         temp = false;
         storageEngine = BSONObj();

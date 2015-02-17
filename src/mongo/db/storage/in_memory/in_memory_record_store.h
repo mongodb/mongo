@@ -111,10 +111,6 @@ namespace mongo {
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL );
-
         virtual void increaseStorageSize( OperationContext* txn,  int size, bool enforceQuota );
 
         virtual int64_t storageSize( OperationContext* txn,

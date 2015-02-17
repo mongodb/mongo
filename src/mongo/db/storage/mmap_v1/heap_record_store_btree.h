@@ -131,12 +131,6 @@ namespace mongo {
             invariant(false);
         }
 
-        virtual Status setCustomOption(OperationContext* txn,
-                                       const BSONElement& option,
-                                       BSONObjBuilder* info = NULL) {
-            invariant(false);
-        }
-
         virtual void increaseStorageSize(OperationContext* txn,  int size, bool enforceQuota) {
             invariant(false);
         }

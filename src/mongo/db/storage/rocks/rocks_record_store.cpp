@@ -587,17 +587,6 @@ namespace mongo {
         result->append( "stats", statsString );
     }
 
-    Status RocksRecordStore::setCustomOption( OperationContext* txn,
-                                              const BSONElement& option,
-                                              BSONObjBuilder* info ) {
-        string optionName = option.fieldName();
-        if ( optionName == "usePowerOf2Sizes" ) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::InvalidOptions, "Invalid option: " + optionName);
-    }
-
     Status RocksRecordStore::oplogDiskLocRegister(OperationContext* txn, const OpTime& opTime) {
         invariant(_isOplog);
         StatusWith<RecordId> record = oploghack::keyForOptime(opTime);
