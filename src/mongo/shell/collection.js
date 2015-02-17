@@ -988,13 +988,16 @@ DBCollection.prototype.getShardVersion = function(){
     return this._db._adminCommand( { getShardVersion : this._fullName } );
 }
 
-DBCollection.prototype._getIndexesSystemIndexes = function(){
+DBCollection.prototype._getIndexesSystemIndexes = function(filter){
     var si = this.getDB().getCollection( "system.indexes" );
-    return si.find( { ns : this.getFullName() } ).toArray();
+    var query = { ns : this.getFullName() };
+    if (filter)
+        query = Object.extend(query, filter)
+    return si.find( query ).toArray();
 }
 
-DBCollection.prototype._getIndexesCommand = function(){
-    var res = this.runCommand( "listIndexes" );
+DBCollection.prototype._getIndexesCommand = function(filter){
+    var res = this.runCommand( "listIndexes", filter );
 
     if ( !res.ok ) {
 
@@ -1018,12 +1021,12 @@ DBCollection.prototype._getIndexesCommand = function(){
     return new DBCommandCursor(this._mongo, res).toArray();
 }
 
-DBCollection.prototype.getIndexes = function(){
-    var res = this._getIndexesCommand();
+DBCollection.prototype.getIndexes = function(filter){
+    var res = this._getIndexesCommand(filter);
     if ( res ) {
         return res;
     }
-    return this._getIndexesSystemIndexes();
+    return this._getIndexesSystemIndexes(filter);
 }
 
 DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
