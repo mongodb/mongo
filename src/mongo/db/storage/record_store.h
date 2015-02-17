@@ -326,15 +326,6 @@ namespace mongo {
         }
 
         /**
-         * @return Status::OK() if option hanlded
-         *         InvalidOptions is option not supported
-         *         other errors indicate option supported, but error setting
-         */
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL ) = 0;
-
-        /**
          * Return the RecordId of an oplog entry as close to startingPosition as possible without
          * being higher. If there are no entries <= startingPosition, return RecordId().
          *

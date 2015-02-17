@@ -45,8 +45,9 @@ namespace mongo {
 
     class NamespaceDetailsCollectionCatalogEntry : public CollectionCatalogEntry {
     public:
-        NamespaceDetailsCollectionCatalogEntry( const StringData& ns,
+        NamespaceDetailsCollectionCatalogEntry( StringData ns,
                                                 NamespaceDetails* details,
+                                                RecordStore* namespacesRecordStore,
                                                 RecordStore* indexRecordStore,
                                                 MMAPV1DatabaseCatalogEntry* db );
 
@@ -100,12 +101,15 @@ namespace mongo {
                                        const StringData& idxName,
                                        long long newExpireSeconds );
 
+        virtual void updateFlags(OperationContext* txn, int newValue);
+
         // not part of interface, but available to my storage engine
 
         int _findIndexNumber( OperationContext* txn, const StringData& indexName) const;
 
     private:
         NamespaceDetails* _details;
+        RecordStore* _namespacesRecordStore;
         RecordStore* _indexRecordStore;
         MMAPV1DatabaseCatalogEntry* _db;
 

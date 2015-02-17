@@ -167,10 +167,6 @@ namespace mongo {
                                         BSONObjBuilder* result,
                                         double scale ) const;
 
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL );
-
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
                                               RecordId end,
                                               bool inclusive);

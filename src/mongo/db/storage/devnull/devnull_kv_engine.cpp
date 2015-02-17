@@ -159,12 +159,6 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL ) {
-            return Status::OK();
-        }
-
         virtual void updateStatsAfterRepair(OperationContext* txn,
                                             long long numRecords,
                                             long long dataSize) {

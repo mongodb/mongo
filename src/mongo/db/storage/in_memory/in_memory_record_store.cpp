@@ -459,20 +459,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status InMemoryRecordStore::setCustomOption(
-                OperationContext* txn, const BSONElement& option, BSONObjBuilder* info) {
-        StringData name = option.fieldName();
-        if ( name == "usePowerOf2Sizes" ) {
-            // we ignore, so just say ok
-            return Status::OK();
-        }
-
-        return Status( ErrorCodes::InvalidOptions,
-                       mongoutils::str::stream()
-                       << "unknown custom option to InMemoryRecordStore: "
-                       << name );
-    }
-
     void InMemoryRecordStore::increaseStorageSize(OperationContext* txn,
                                                   int size, bool enforceQuota) {
         // unclear what this would mean for this class. For now, just error if called.

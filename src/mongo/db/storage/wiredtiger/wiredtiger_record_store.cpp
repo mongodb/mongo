@@ -847,25 +847,6 @@ namespace {
 
     }
 
-    Status WiredTigerRecordStore::setCustomOption( OperationContext* txn,
-                                                   const BSONElement& option,
-                                                   BSONObjBuilder* info ) {
-        string optionName = option.fieldName();
-        if ( !option.isBoolean() ) {
-            return Status( ErrorCodes::BadValue, "Invalid Value" );
-        }
-        // TODO: expose some WiredTiger configurations
-        if ( optionName == "usePowerOf2Sizes" ) {
-            return Status::OK();
-        } else
-        if ( optionName.compare( "verify_checksums" ) == 0 ) {
-        }
-        else
-            return Status( ErrorCodes::InvalidOptions, "Invalid Option" );
-
-        return Status::OK();
-    }
-
     Status WiredTigerRecordStore::oplogDiskLocRegister( OperationContext* txn,
                                                         const OpTime& opTime ) {
         StatusWith<RecordId> loc = oploghack::keyForOptime( opTime );

@@ -968,36 +968,4 @@ namespace mongo {
         // extent headers.
         invariant(false);
     }
-
-    Status RecordStoreV1Base::setCustomOption( OperationContext* txn,
-                                               const BSONElement& option,
-                                               BSONObjBuilder* info ) {
-        const StringData name = option.fieldNameStringData();
-        const int flag = (name == "usePowerOf2Sizes") ? Flag_UsePowerOf2Sizes :
-                         (name == "noPadding") ? Flag_NoPadding :
-                         0;
-        if (flag) {
-            bool oldSetting = _details->isUserFlagSet(flag);
-            bool newSetting = option.trueValue();
-
-            if ( oldSetting != newSetting ) {
-                // change userFlags
-                info->appendBool( name.toString() + "_old", oldSetting );
-
-                if ( newSetting )
-                    _details->setUserFlag( txn, flag );
-                else
-                    _details->clearUserFlag( txn, flag );
-
-                invariant(_details->isUserFlagSet(flag) == newSetting);
-
-                info->appendBool( name.toString() + "_new", newSetting );
-            }
-
-            return Status::OK();
-        }
-
-        return Status( ErrorCodes::InvalidOptions,
-                       str::stream() << "no such option: " << option.fieldName() );
-    }
 }
