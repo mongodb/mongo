@@ -13,7 +13,8 @@
  *	Move to the next/previous page in the tree.
  */
 int
-__wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
+__wt_tree_walk(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *refcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -177,6 +178,9 @@ restart:	/*
 			--slot;
 		else
 			++slot;
+
+		if (refcntp != NULL)
+			++*refcntp;
 
 		for (descending = 0;;) {
 			ref = pindex->index[slot];

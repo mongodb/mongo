@@ -56,7 +56,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 
 		flags |= WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
 		for (walk = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
 			if (walk == NULL)
 				break;
 
@@ -107,7 +107,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;
 		for (walk = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
 			if (walk == NULL)
 				break;
 
@@ -173,6 +173,12 @@ err:	/* On error, clear any left-over tree walk. */
 		 */
 		btree->checkpointing = 0;
 		WT_FULL_BARRIER();
+
+		/*
+		 * If this tree was being skipped by the eviction server during
+		 * the checkpoint, clear the wait.
+		 */
+		btree->evict_walk_period = 0;
 
 		/*
 		 * Wake the eviction server, in case application threads have
