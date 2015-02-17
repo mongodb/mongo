@@ -368,7 +368,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 	/* Check whether the page can be evicted. */
-	if (!__wt_page_can_evict(session, page, 0))
+	if (!exclusive && !__wt_page_can_evict(session, page, 0))
 		return (EBUSY);
 
 	/*
