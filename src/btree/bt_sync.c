@@ -137,7 +137,6 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			}
 		}
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
