@@ -50,9 +50,11 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/platform/endian.h"
+#include "mongo/util/background.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -146,6 +148,7 @@ namespace mongo {
           _prefix(std::move(prefix)),
           _isCapped(isCapped),
           _cappedMaxSize(cappedMaxSize),
+          _cappedMaxSizeSlack(std::min(cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),
           _cappedMaxDocs(cappedMaxDocs),
           _cappedDeleteCallback(cappedDeleteCallback),
           _cappedDeleteCheckCount(0),
@@ -155,7 +158,8 @@ namespace mongo {
                                                            : nullptr),
           _ident(id.toString()),
           _dataSizeKey(std::string("\0\0\0\0", 4) + "datasize-" + id.toString()),
-          _numRecordsKey(std::string("\0\0\0\0", 4) + "numrecords-" + id.toString()) {
+          _numRecordsKey(std::string("\0\0\0\0", 4) + "numrecords-" + id.toString()),
+          _shuttingDown(false) {
 
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
@@ -187,6 +191,15 @@ namespace mongo {
         _dataSize.store(RocksRecoveryUnit::getCounterValue(_db, _dataSizeKey));
         invariant(_dataSize.load() >= 0);
         invariant(_numRecords.load() >= 0);
+
+        _hasBackgroundThread = RocksEngine::initRsOplogBackgroundThread(ns);
+    }
+
+    RocksRecordStore::~RocksRecordStore() {
+        {
+            boost::timed_mutex::scoped_lock lk(_cappedDeleterMutex);
+            _shuttingDown = true;
+        }
     }
 
     int64_t RocksRecordStore::storageSize(OperationContext* txn, BSONObjBuilder* extraInfo,
@@ -218,7 +231,7 @@ namespace mongo {
 
         ru->writeBatch()->Delete(key);
 
-        _changeNumRecords(txn, false);
+        _changeNumRecords(txn, -1);
         _increaseDataSize(txn, -oldLength);
     }
 
@@ -241,18 +254,15 @@ namespace mongo {
         return false;
     }
 
-    void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
-                                                const RecordId& justInserted) {
+    int64_t RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
+                                                   const RecordId& justInserted) {
         if (!_isCapped) {
-          return;
+          return 0;
         }
 
         // We only want to do the checks occasionally as they are expensive.
         // This variable isn't thread safe, but has loose semantics anyway.
-        dassert( !_isOplog || _cappedMaxDocs == -1 );
-        if ( _cappedMaxDocs == -1 && // Max docs has to be exact, so have to check every time.
-             _cappedDeleteCheckCount++ % 100 > 0 )
-            return;
+        dassert(!_isOplog || _cappedMaxDocs == -1);
 
         long long dataSizeDelta = 0, numRecordsDelta = 0;
         if (!_isOplog) {
@@ -262,70 +272,130 @@ namespace mongo {
         }
 
         if (!cappedAndNeedDelete(dataSizeDelta, numRecordsDelta)) {
-            return;
+            return 0;
         }
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-        boost::mutex::scoped_lock lock(_cappedDeleterMutex, boost::try_to_lock);
-        if (!lock) {
-            return;
+        boost::timed_mutex::scoped_lock lock(_cappedDeleterMutex, boost::defer_lock);
+
+        if (_cappedMaxDocs != -1) {
+            lock.lock(); // Max docs has to be exact, so have to check every time.
+        }
+        else if(_hasBackgroundThread) {
+            // We are foreground, and there is a background thread,
+
+            // Check if we need some back pressure.
+            if ((_dataSize.load() - _cappedMaxSize) < _cappedMaxSizeSlack) {
+                return 0;
+            }
+
+            // Back pressure needed!
+            // We're not actually going to delete anything, but we're going to syncronize
+            // on the deleter thread.
+            (void)lock.timed_lock(boost::posix_time::millisec(200));
+            return 0;
+        } else {
+            if (!lock.try_lock()) {
+                // Someone else is deleting old records. Apply back-pressure if too far behind,
+                // otherwise continue.
+                if ((_dataSize.load() - _cappedMaxSize) < _cappedMaxSizeSlack)
+                    return 0;
+
+                if (!lock.timed_lock(boost::posix_time::millisec(200)))
+                    return 0;
+
+                // If we already waited, let someone else do cleanup unless we are significantly
+                // over the limit.
+                if ((_dataSize.load() - _cappedMaxSize) < (2 * _cappedMaxSizeSlack))
+                    return 0;
+            }
         }
 
+        return cappedDeleteAsNeeded_inlock(txn, justInserted);
+    }
+
+    int64_t RocksRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn,
+                                                          const RecordId& justInserted) {
         // we do this is a sub transaction in case it aborts
         RocksRecoveryUnit* realRecoveryUnit =
             checked_cast<RocksRecoveryUnit*>(txn->releaseRecoveryUnit());
         invariant(realRecoveryUnit);
         txn->setRecoveryUnit(realRecoveryUnit->newRocksRecoveryUnit());
 
+        int64_t dataSize = _dataSize.load() + realRecoveryUnit->getDeltaCounter(_dataSizeKey);
+        int64_t numRecords = _numRecords.load() + realRecoveryUnit->getDeltaCounter(_numRecordsKey);
+
+        int64_t sizeOverCap = (dataSize > _cappedMaxSize) ? dataSize - _cappedMaxSize : 0;
+        int64_t sizeSaved = 0;
+        int64_t docsOverCap = 0, docsRemoved = 0;
+        if (_cappedMaxDocs != -1 && numRecords > _cappedMaxDocs) {
+            docsOverCap = numRecords - _cappedMaxDocs;
+        }
+
         try {
+            WriteUnitOfWork wuow(txn);
             auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
             boost::scoped_ptr<rocksdb::Iterator> iter(ru->NewIterator(_prefix));
             iter->SeekToFirst();
 
-            while (cappedAndNeedDelete(dataSizeDelta, numRecordsDelta) && iter->Valid()) {
-                WriteUnitOfWork wuow(txn);
-
-                invariant(_numRecords.load() > 0);
+            RecordId newestOld;
+            while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) &&
+                   (docsRemoved < 20000) && iter->Valid()) {
 
                 rocksdb::Slice slice = iter->key();
-                RecordId oldest = _makeRecordId(slice);
+                newestOld = _makeRecordId(slice);
 
-                if (oldest >= justInserted) {
+                // don't go past the record we just inserted
+                if (newestOld >= justInserted) {
                     break;
                 }
 
-                if (_cappedDeleteCallback) {
-                    uassertStatusOK(
-                        _cappedDeleteCallback->aboutToDeleteCapped(
-                            txn,
-                            oldest,
-                            RecordData(iter->value().data(), iter->value().size())));
+                if (_shuttingDown) {
+                    break;
                 }
 
-                deleteRecord(txn, oldest);
+                std::string key(_makePrefixedKey(_prefix, newestOld));
+                if (!ru->transaction()->registerWrite(key)) {
+                    log() << "got conflict truncating capped, total docs removed " << docsRemoved;
+                    break;
+                }
 
+                auto oldValue = iter->value();
+                ++docsRemoved;
+                sizeSaved += oldValue.size();
+
+                if (_cappedDeleteCallback) {
+                    uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(
+                        txn, newestOld,
+                        RecordData(static_cast<const char*>(oldValue.data()), oldValue.size())));
+                }
+
+                ru->writeBatch()->Delete(key);
                 iter->Next();
+            }
 
-                // We need to commit here to reflect updates on _numRecords and _dataSize.
-                // TODO: investigate if we should reflect changes to _numRecords and _dataSize
-                // immediately (read uncommitted).
+            if (docsRemoved > 0) {
+                _changeNumRecords(txn, -docsRemoved);
+                _increaseDataSize(txn, -sizeSaved);
                 wuow.commit();
             }
         }
-        catch (const WriteConflictException& wce) {
+        catch ( const WriteConflictException& wce ) {
             delete txn->releaseRecoveryUnit();
-            txn->setRecoveryUnit(realRecoveryUnit);
+            txn->setRecoveryUnit( realRecoveryUnit );
             log() << "got conflict truncating capped, ignoring";
-            return;
+            return 0;
         }
-        catch (...) {
+        catch ( ... ) {
             delete txn->releaseRecoveryUnit();
-            txn->setRecoveryUnit(realRecoveryUnit);
+            txn->setRecoveryUnit( realRecoveryUnit );
             throw;
         }
 
         delete txn->releaseRecoveryUnit();
-        txn->setRecoveryUnit(realRecoveryUnit);
+        txn->setRecoveryUnit( realRecoveryUnit );
+        return docsRemoved;
+
     }
 
     StatusWith<RecordId> RocksRecordStore::insertRecord( OperationContext* txn,
@@ -359,7 +429,7 @@ namespace mongo {
         // transaction can access this key before we commit
         ru->writeBatch()->Put(_makePrefixedKey(_prefix, loc), rocksdb::Slice(data, len));
 
-        _changeNumRecords( txn, true );
+        _changeNumRecords( txn, 1 );
         _increaseDataSize( txn, len );
 
         cappedDeleteAsNeeded(txn, loc);
@@ -663,17 +733,12 @@ namespace mongo {
         return RecordData(data, valueStorage.size());
     }
 
-    void RocksRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
-        if ( insert ) {
-            ru->incrementCounter(_numRecordsKey, &_numRecords, 1);
-        }
-        else {
-            ru->incrementCounter(_numRecordsKey, &_numRecords,  -1);
-        }
+    void RocksRecordStore::_changeNumRecords(OperationContext* txn, int64_t amount) {
+        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        ru->incrementCounter(_numRecordsKey, &_numRecords, amount);
     }
 
-    void RocksRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
+    void RocksRecordStore::_increaseDataSize(OperationContext* txn, int64_t amount) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
         ru->incrementCounter(_dataSizeKey, &_dataSize, amount);
     }

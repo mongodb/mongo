@@ -33,11 +33,22 @@ if has_option("rocksdb"):
     env.Library(
         target= 'storage_rocks',
         source= [
-            'rocks_init.cpp'
+            'rocks_init.cpp',
+            'rocks_record_store_mongod.cpp',
             ],
         LIBDEPS= [
             'storage_rocks_base',
             '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
+            ]
+        )
+
+    env.Library(
+        target= 'storage_rocks_mock',
+        source= [
+            'rocks_record_store_mock.cpp',
+            ],
+        LIBDEPS= [
+            'storage_rocks_base',
             ]
         )
 
@@ -47,7 +58,7 @@ if has_option("rocksdb"):
        source=['rocks_index_test.cpp'
                ],
        LIBDEPS=[
-            'storage_rocks_base',
+            'storage_rocks_mock',
             '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
             ]
        )
@@ -58,7 +69,7 @@ if has_option("rocksdb"):
        source=['rocks_record_store_test.cpp'
                ],
        LIBDEPS=[
-            'storage_rocks_base',
+            'storage_rocks_mock',
             '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
             ]
        )
@@ -68,7 +79,7 @@ if has_option("rocksdb"):
        source=['rocks_engine_test.cpp'
                ],
        LIBDEPS=[
-            'storage_rocks_base',
+            'storage_rocks_mock',
             '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness'
             ]
        )
