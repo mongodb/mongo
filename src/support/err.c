@@ -409,6 +409,20 @@ __wt_ext_msg_printf(
 }
 
 /*
+ * __wt_ext_strerror --
+ *	Extension API call to return an error as a string.
+ */
+const char *
+__wt_ext_strerror(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, int error)
+{
+	if (wt_session == NULL)
+		wt_session = (WT_SESSION *)
+		    ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
+
+	return (wt_session->strerror(wt_session, error));
+}
+
+/*
  * __wt_progress --
  *	Progress message.
  */

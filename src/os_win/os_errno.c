@@ -77,27 +77,23 @@ __wt_strerror(int error)
 }
 
 /*
- * __wt_strerror_r --
- *	Windows implementation of wiredtiger_strerror_r.
+ * __wt_session_strerror --
+ *	Windows implementation of WT_SESSION.strerror.
  */
-int
-__wt_strerror_r(int error, char *buf, size_t buflen)
+const char *
+__wt_session_strerror(WT_SESSION_IMPL *session, int error)
 {
 	DWORD lasterror;
 	const char *p;
-
-	/* Require at least 2 bytes, printable character and trailing nul. */
-	if (buflen < 2)
-		return (ENOMEM);
+	char buf[256];
 
 	/*
 	 * Check for POSIX errors, Windows errors, then fallback to something
 	 * generic.  Copy the string into the user's buffer, return success if
 	 * anything printed.
 	 */
-	p = __wt_strerror(error);
-	if (p != NULL && snprintf(buf, buflen, "%s", p) > 0)
-		return (0);
+	if ((p = __wt_strerror(error)) != NULL)
+		return (p);
 
 	if (error < 0) {
 		error = __wt_map_error_to_windows_error(error);
@@ -109,16 +105,16 @@ __wt_strerror_r(int error, char *buf, size_t buflen)
 			error,
 			0, /* let system choose the correct LANGID */
 			buf,
-			buflen,
+			sizeof(buf),
 			NULL);
 
-		if (lasterror != 0)
-			return (0);
+		if (lasterror != 0 &&
+		    __wt_buf_set(session, &session->err, buf, strlen(buf)) == 0)
+			return (session->err.data);
 
 		/* Fall through to the fallback error code */
 	}
 
-	/* Fallback to a generic message, then guess it's a memory problem. */
-	return (
-	    snprintf(buf, buflen, "error return: %d", error) > 0 ? 0 : ENOMEM);
+	/* Defeated. */
+	return ("Unable to return error string");
 }

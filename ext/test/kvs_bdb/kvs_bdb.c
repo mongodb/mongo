@@ -722,7 +722,8 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 	if ((ret =
 	    wtext->config_get(wtext, session, config, "key_format", &v)) != 0)
 		ERET(wtext, session, ret,
-		    "key_format configuration: %s", wtext->strerror(ret));
+		    "key_format configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 	type = v.len == 1 && v.str[0] == 'r' ? DB_RECNO : DB_BTREE;
 
 	/* Create the Berkeley DB table */
@@ -798,7 +799,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = wtext->config_get(
 	    wtext, session, config, "append", &v)) != 0) {
 		ESET(wtext, session, ret,
-		    "append configuration: %s", wtext->strerror(ret));
+		    "append configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 		goto err;
 	}
 	cursor->config_append = v.val != 0;
@@ -806,7 +808,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = wtext->config_get(
 	    wtext, session, config, "overwrite", &v)) != 0) {
 		ESET(wtext, session, ret,
-		    "overwrite configuration: %s", wtext->strerror(ret));
+		    "overwrite configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 		goto err;
 	}
 	cursor->config_overwrite = v.val != 0;
@@ -814,7 +817,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = wtext->config_get(
 	    wtext, session, config, "key_format", &v)) != 0) {
 		ESET(wtext, session, ret,
-		    "key_format configuration: %s", wtext->strerror(ret));
+		    "key_format configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 		goto err;
 	}
 	cursor->config_recno = v.len == 1 && v.str[0] == 'r';
@@ -822,7 +826,8 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = wtext->config_get(
 	    wtext, session, config, "value_format", &v)) != 0) {
 		ESET(wtext, session, ret,
-		    "value_format configuration: %s", wtext->strerror(ret));
+		    "value_format configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 		goto err;
 	}
 	cursor->config_bitfield =

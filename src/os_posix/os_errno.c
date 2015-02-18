@@ -43,27 +43,23 @@ __wt_strerror(int error)
 }
 
 /*
- * __wt_strerror_r --
- *	POSIX implementation of wiredtiger_strerror_r.
+ * __wt_session_strerror --
+ *	POSIX implementation of WT_SESSION.strerror.
  */
-int
-__wt_strerror_r(int error, char *buf, size_t buflen)
+const char *
+__wt_session_strerror(WT_SESSION_IMPL *session, int error)
 {
 	const char *p;
 
-	/* Require at least 2 bytes, printable character and trailing nul. */
-	if (buflen < 2)
-		return (ENOMEM);
+	/* Check for POSIX errors. */
+	if ((p = __wt_strerror(error)) != NULL)
+		return (p);
 
-	/*
-	 * Check for POSIX errors then fallback to something generic.  Copy the
-	 * string into the user's buffer, return success if anything printed.
-	 */
-	p = __wt_strerror(error);
-	if (p != NULL && snprintf(buf, buflen, "%s", p) > 0)
-		return (0);
+	/* Fallback to a generic message. */
+	if (__wt_buf_fmt(
+	    session, &session->err, "error return: %d", error) == 0)
+		return (session->err.data);
 
-	/* Fallback to a generic message, then guess it's a memory problem. */
-	return (
-	    snprintf(buf, buflen, "error return: %d", error) > 0 ? 0 : ENOMEM);
+	/* Defeated. */
+	return ("Unable to return error string");
 }

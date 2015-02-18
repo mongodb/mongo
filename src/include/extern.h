@@ -198,6 +198,7 @@ extern void __wt_conn_config_discard(WT_SESSION_IMPL *session);
 extern int __wt_ext_config_parser_open(WT_EXTENSION_API *wt_ext, WT_SESSION *wt_session, const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
 extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg, const char *key, WT_CONFIG_ITEM *cval);
 extern int __wt_config_upgrade(WT_SESSION_IMPL *session, WT_ITEM *buf);
+extern const char *__wt_wiredtiger_error(int error);
 extern int __wt_collator_config(WT_SESSION_IMPL *session, const char *uri, WT_CONFIG_ITEM *cname, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collatorp, int *ownp);
 extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
@@ -438,7 +439,7 @@ extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, i
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
 extern const char *__wt_strerror(int error);
-extern int __wt_strerror_r(int error, char *buf, size_t buflen);
+extern const char *__wt_session_strerror(WT_SESSION_IMPL *session, int error);
 extern int __wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp);
 extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
@@ -574,6 +575,7 @@ extern void __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...) WT_GCC_FUN
 extern int __wt_ext_err_printf( WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
 extern int __wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 2, 3)));
 extern int __wt_ext_msg_printf( WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
+extern const char *__wt_ext_strerror(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, int error);
 extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v);
 extern void __wt_assert(WT_SESSION_IMPL *session, int error, const char *file_name, int line_number, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 5, 6)));
 extern int __wt_panic(WT_SESSION_IMPL *session);
