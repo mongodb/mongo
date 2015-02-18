@@ -83,7 +83,7 @@ namespace mongo {
                          int64_t cappedMaxDocs = -1,
                          CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
 
-        virtual ~RocksRecordStore() { }
+        virtual ~RocksRecordStore();
 
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
@@ -184,6 +184,10 @@ namespace mongo {
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
         bool isOplog() const { return _isOplog; }
 
+        int64_t cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted);
+        int64_t cappedDeleteAsNeeded_inlock(OperationContext* txn, const RecordId& justInserted);
+        boost::timed_mutex& cappedDeleterMutex() { return _cappedDeleterMutex; }
+
         static rocksdb::Comparator* newRocksCollectionComparator();
 
     private:
@@ -234,23 +238,23 @@ namespace mongo {
 
         RecordId _nextId();
         bool cappedAndNeedDelete(long long dataSizeDelta, long long numRecordsDelta) const;
-        void cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted);
 
         // The use of this function requires that the passed in storage outlives the returned Slice
         static rocksdb::Slice _makeKey(const RecordId& loc, int64_t* storage);
         static std::string _makePrefixedKey(const std::string& prefix, const RecordId& loc);
 
-        void _changeNumRecords(OperationContext* txn, bool insert);
-        void _increaseDataSize(OperationContext* txn, int amount);
+        void _changeNumRecords(OperationContext* txn, int64_t amount);
+        void _increaseDataSize(OperationContext* txn, int64_t amount);
 
         rocksdb::DB* _db; // not owned
         std::string _prefix;
 
         const bool _isCapped;
         const int64_t _cappedMaxSize;
+        const int64_t _cappedMaxSizeSlack;  // when to start applying backpressure
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
-        boost::mutex _cappedDeleterMutex; // see commend in ::cappedDeleteAsNeeded
+        mutable boost::timed_mutex _cappedDeleterMutex;  // see comment in ::cappedDeleteAsNeeded
         int _cappedDeleteCheckCount;      // see comment in ::cappedDeleteAsNeeded
 
         const bool _isOplog;
@@ -265,5 +269,8 @@ namespace mongo {
 
         const std::string _dataSizeKey;
         const std::string _numRecordsKey;
+
+        bool _shuttingDown;
+        bool _hasBackgroundThread;
     };
 }
