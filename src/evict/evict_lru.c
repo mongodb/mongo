@@ -398,7 +398,7 @@ __evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
 	 * target or the dirty target.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	dirty_inuse = cache->bytes_dirty;
+	dirty_inuse = __wt_cache_dirty_inuse(cache);
 	bytes_max = conn->cache_size;
 
 	/* Check to see if the eviction server should run. */
@@ -435,9 +435,9 @@ __evict_pass(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_EVICT_WORKER *worker;
-	int loop;
+	uint64_t pages_evicted;
 	uint32_t flags;
-	uint64_t bytes_inuse, dirty_target_size, pages_evicted, target_size;
+	int loop;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -469,13 +469,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * Start a worker if we have capacity and we haven't reached
 		 * the eviction targets.
 		 */
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		target_size = (conn->cache_size * cache->eviction_target) / 100;
-		dirty_target_size =
-		    (conn->cache_size * cache->eviction_dirty_target) / 100;
-		if ((bytes_inuse > target_size ||
-		    cache->bytes_dirty > dirty_target_size) &&
-		    conn->evict_workers < conn->evict_workers_max) {
+		if (LF_ISSET(WT_EVICT_PASS_ALL | WT_EVICT_PASS_DIRTY)) {
 			WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 			    "Starting evict worker: %"PRIu32"\n",
 			    conn->evict_workers));
@@ -488,7 +482,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "Eviction pass with: Max: %" PRIu64
 		    " In use: %" PRIu64 " Dirty: %" PRIu64,
-		    conn->cache_size, bytes_inuse, cache->bytes_dirty));
+		    conn->cache_size, cache->bytes_inmem, cache->bytes_dirty));
 
 		WT_RET(__evict_lru_walk(session, flags));
 		WT_RET(__evict_server_work(session));

@@ -82,6 +82,8 @@ struct __wt_cache {
 	u_int eviction_target;		/* Percent to end eviction */
 	u_int eviction_dirty_target;    /* Percent to allow dirty */
 
+	u_int overhead_pct;	        /* Cache percent adjustment */
+
 	/*
 	 * LRU eviction list information.
 	 */
