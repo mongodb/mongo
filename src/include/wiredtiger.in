@@ -1546,14 +1546,14 @@ struct __wt_connection {
 	 * integer between 1 and 20; default \c 2.}
 	 * @config{ ),,}
 	 * @config{cache_overhead, assume the heap allocator overhead is the
-	 * specified percentage\, and adjust the cache size by that amount (for
-	 * example\, if the cache size is 100GB\, a percentage of 10 means
-	 * WiredTiger limits itself to allocating 90GB of memory). This value is
-	 * configurable because different heap allocators have different
-	 * overhead and different workloads will have different heap allocation
-	 * sizes and patterns\, therefore applications may need to adjust this
-	 * value based on allocator choice and behavior in measured workloads.,
-	 * an integer between 0 and 30; default \c 8.}
+	 * specified percentage\, and adjust the cache usage by that amount (for
+	 * example\, if there is 10GB of data in cache\, a percentage of 10
+	 * means WiredTiger treats this as 11GB). This value is configurable
+	 * because different heap allocators have different overhead and
+	 * different workloads will have different heap allocation sizes and
+	 * patterns\, therefore applications may need to adjust this value based
+	 * on allocator choice and behavior in measured workloads., an integer
+	 * between 0 and 30; default \c 8.}
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A
 	 * database should configure either \c cache_size or \c shared_cache but
 	 * not both., an integer between 1MB and 10TB; default \c 100MB.}
@@ -1882,13 +1882,13 @@ struct __wt_connection {
  * should be used (4KB on Linux systems\, zero elsewhere)., an integer between
  * -1 and 1MB; default \c -1.}
  * @config{cache_overhead, assume the heap allocator overhead is the specified
- * percentage\, and adjust the cache size by that amount (for example\, if the
- * cache size is 100GB\, a percentage of 10 means WiredTiger limits itself to
- * allocating 90GB of memory). This value is configurable because different heap
- * allocators have different overhead and different workloads will have
- * different heap allocation sizes and patterns\, therefore applications may
- * need to adjust this value based on allocator choice and behavior in measured
- * workloads., an integer between 0 and 30; default \c 8.}
+ * percentage\, and adjust the cache usage by that amount (for example\, if
+ * there is 10GB of data in cache\, a percentage of 10 means WiredTiger treats
+ * this as 11GB). This value is configurable because different heap allocators
+ * have different overhead and different workloads will have different heap
+ * allocation sizes and patterns\, therefore applications may need to adjust
+ * this value based on allocator choice and behavior in measured workloads., an
+ * integer between 0 and 30; default \c 8.}
  * @config{cache_size, maximum heap memory to allocate for the cache.  A
  * database should configure either \c cache_size or \c shared_cache but not
  * both., an integer between 1MB and 10TB; default \c 100MB.}
