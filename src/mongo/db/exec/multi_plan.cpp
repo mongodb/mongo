@@ -294,12 +294,30 @@ namespace mongo {
             }
         }
 
+        // If the winning plan produced no results during the ranking period (and, therefore, no
+        // plan produced results during the ranking period), then we will not create a plan cache
+        // entry.
+        if (alreadyProduced.empty() && NULL != _collection) {
+            size_t winnerIdx = ranking->candidateOrder[0];
+            LOG(1) << "Winning plan had zero results. Not caching."
+                   << " ns: " << _collection->ns()
+                   << " " << _query->toStringShort()
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: "
+                   << Explain::getPlanSummary(_candidates[winnerIdx].root);
+        }
+
         // Store the choice we just made in the cache. In order to do so,
-        //   1) the query must be of a type that is safe to cache, and
-        //   2) two or more plans cannot have tied for the win. Caching in the
-        //   case of ties can cause successive queries of the same shape to
-        //   use a bad index.
-        if (PlanCache::shouldCacheQuery(*_query) && !ranking->tieForBest) {
+        //   1) the query must be of a type that is safe to cache,
+        //   2) two or more plans cannot have tied for the win. Caching in the case of ties can
+        //   cause successive queries of the same shape to use a bad index.
+        //   3) Furthermore, the winning plan must have returned at least one result. Plans which
+        //   return zero results cannot be reliably ranked. Such query shapes are generally
+        //   existence type queries, and a winning plan should get cached once the query finds a
+        //   result.
+        if (PlanCache::shouldCacheQuery(*_query)
+            && !ranking->tieForBest
+            && !alreadyProduced.empty()) {
             // Create list of candidate solutions for the cache with
             // the best solution at the front.
             std::vector<QuerySolution*> solutions;
