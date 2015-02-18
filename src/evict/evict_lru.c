@@ -469,7 +469,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * Start a worker if we have capacity and we haven't reached
 		 * the eviction targets.
 		 */
-		if (LF_ISSET(WT_EVICT_PASS_ALL | WT_EVICT_PASS_DIRTY)) {
+		if (LF_ISSET(WT_EVICT_PASS_ALL | WT_EVICT_PASS_DIRTY) &&
+		    conn->evict_workers < conn->evict_workers_max) {
 			WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 			    "Starting evict worker: %"PRIu32"\n",
 			    conn->evict_workers));
