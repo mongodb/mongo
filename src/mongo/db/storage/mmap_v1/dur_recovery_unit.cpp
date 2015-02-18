@@ -108,14 +108,20 @@ namespace mongo {
         if (getDur().isDurable())
             pushChangesToDurSubSystem();
 
-        for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit();
-        }
+        try {
+            for (Changes::const_iterator it = _changes.begin(), end = _changes.end();
+                    it != end; ++it) {
+                (*it)->commit();
+            }
 
-        // We now reset to a "clean" state without any uncommitted changes.
-        _changes.clear();
-        _writes.clear();
-        _preimageBuffer.clear();
+            // We now reset to a "clean" state without any uncommitted changes.
+            _changes.clear();
+            _writes.clear();
+            _preimageBuffer.clear();
+        }
+        catch (...) {
+            std::terminate();
+        }
     }
 
     void DurRecoveryUnit::pushChangesToDurSubSystem() {
@@ -169,25 +175,32 @@ namespace mongo {
 
         LOG(2) << "   ***** ROLLING BACK " << (_changes.size() - changesRollbackTo)
                << " custom changes";
-        for (int i = _changes.size() - 1; i >= changesRollbackTo; i--) {
-            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*_changes[i]));
-            _changes[i]->rollback();
-        }
 
-        _writes.erase(_writes.begin() + writesRollbackTo, _writes.end());
-        _changes.erase(_changes.begin() + changesRollbackTo, _changes.end());
+        try {
+            for (int i = _changes.size() - 1; i >= changesRollbackTo; i--) {
+                LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*_changes[i]));
+                _changes[i]->rollback();
+            }
 
-        if (inOutermostUnitOfWork()) {
-            // We just rolled back so we are now "clean" and don't need to roll back anymore.
-            invariant(_changes.empty());
-            invariant(_writes.empty());
-            _preimageBuffer.clear();
-            _mustRollback = false;
+            _writes.erase(_writes.begin() + writesRollbackTo, _writes.end());
+            _changes.erase(_changes.begin() + changesRollbackTo, _changes.end());
+
+            if (inOutermostUnitOfWork()) {
+                // We just rolled back so we are now "clean" and don't need to roll back anymore.
+                invariant(_changes.empty());
+                invariant(_writes.empty());
+                _preimageBuffer.clear();
+                _mustRollback = false;
+            }
+            else {
+                // Inner UOW rolled back, so outer must not commit. We can loosen this in the
+                // future, but that would require all StorageEngines to support rollback of nested
+                // transactions.
+                _mustRollback = true;
+            }
         }
-        else {
-            // Inner UOW rolled back, so outer must not commit. We can loosen this in the future,
-            // but that would require all StorageEngines to support rollback of nested transactions.
-            _mustRollback = true;
+        catch (...) {
+            std::terminate();
         }
     }
 
