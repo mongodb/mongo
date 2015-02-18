@@ -9,7 +9,7 @@ See http://docs.mongodb.org/manual/reference/program/mongoexport/ for more infor
 // OutputFormatOptions defines the set of options to use in formatting exported data.
 type OutputFormatOptions struct {
 	// Fields is an option to directly specify comma-separated fields to export to CSV.
-	Fields string `long:"fields" short:"f" description:"comma separated list of field names, e.g. -f name,age"`
+	Fields string `long:"fields" short:"f" description:"comma separated list of field names (required for exporting CSV) e.g. -f \"name,age\" "`
 
 	// FieldFile is a filename that refers to a list of fields to export, 1 per line.
 	FieldFile string `long:"fieldFile" description:"file with field names - 1 per line"`
