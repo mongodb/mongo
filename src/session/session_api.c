@@ -910,17 +910,10 @@ static const char *
 __session_strerror(WT_SESSION *wt_session, int error)
 {
 	WT_SESSION_IMPL *session;
-	const char *p;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	/* Check for a constant string. */
-	if ((p = __wt_wiredtiger_error(error)) != NULL)
-		return (p);
-	if ((p = __wt_strerror(error)) != NULL)
-		return (p);
-
-	return (__wt_session_strerror(session, error));
+	return (__wt_strerror(session, error, NULL, 0));
 }
 
 /*

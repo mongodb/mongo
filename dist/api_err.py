@@ -94,26 +94,39 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
  * port didn't need anything more complex; Windows requires memory allocation
  * of error strings, so we added the WT_SESSION.strerror method. Because we
  * want wiredtiger_strerror to continue to be as thread-safe as possible, errors
- * are split into three categories: WiredTiger constant strings, system constant
- * strings and Everything Else, and we check constant strings before Everything
- * Else.
+ * are split into two categories: WiredTiger's or the system's constant strings
+ * and Everything Else, and we check constant strings before Everything Else.
  */
 
 /*
- * __wiredtiger_error --
- *\tReturn a constant string for the WiredTiger errors.
+ * __wt_wiredtiger_error --
+ *\tReturn a constant string for WiredTiger POSIX-standard and errors.
  */
 const char *
 __wt_wiredtiger_error(int error)
 {
+\tconst char *p;
+
+\t/*
+\t * Check for WiredTiger specific errors.
+\t */
 \tswitch (error) {
 ''')
 
 for err in errors:
     tfile.write('\tcase ' + err.name + ':\n')
     tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
-
 tfile.write('''\t}
+
+\t/*
+\t * POSIX errors are non-negative integers; check for 0 explicitly
+\t * in-case the underlying strerror doesn't handle 0, some don't.
+\t */
+\tif (error == 0)
+\t\treturn ("Successful return: 0");
+\tif (error > 0 && (p = strerror(error)) != NULL)
+\t\treturn (p);
+
 \treturn (NULL);
 }
 
@@ -125,20 +138,8 @@ const char *
 wiredtiger_strerror(int error)
 {
 \tstatic char buf[128];
-\tconst char *p;
 
-\t/* Check for a constant string. */
-\tif ((p = __wt_wiredtiger_error(error)) != NULL)
-\t\treturn (p);
-\tif ((p = __wt_strerror(error)) != NULL)
-\t\treturn (p);
-
-\t/* Else, fill in the non-thread-safe static buffer. */
-\tif (snprintf(buf, sizeof(buf), "error return: %d", error) > 0)
-\t\treturn (buf);
-
-\t/* OK, we're done. */
-\treturn ("Unable to return error string");
+\treturn (__wt_strerror(NULL, error, buf, sizeof(buf)));
 }
 ''')
 tfile.close()

@@ -58,43 +58,27 @@ __wt_errno(void)
 
 /*
  * __wt_strerror --
- *	Windows implementation of wiredtiger_strerror.
+ *	Windows implementation of WT_SESSION.strerror and wiredtiger_strerror.
  */
 const char *
-__wt_strerror(int error)
-{
-	const char *p;
-
-	/*
-	 * POSIX errors are non-negative integers; check for 0 explicitly
-	 * in-case the underlying strerror doesn't handle 0, some don't.
-	 */
-	if (error == 0)
-		return ("Successful return: 0");
-	if (error > 0 && (p = strerror(error)) != NULL)
-		return (p);
-	return (NULL);
-}
-
-/*
- * __wt_session_strerror --
- *	Windows implementation of WT_SESSION.strerror.
- */
-const char *
-__wt_session_strerror(WT_SESSION_IMPL *session, int error)
+__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
 {
 	DWORD lasterror;
 	const char *p;
-	char buf[256];
+	char buf[512];
 
 	/*
-	 * Check for POSIX errors, Windows errors, then fallback to something
-	 * generic.  Copy the string into the user's buffer, return success if
-	 * anything printed.
+	 * Check for a WiredTiger or POSIX constant string, no buffer needed.
 	 */
-	if ((p = __wt_strerror(error)) != NULL)
+	if ((p = __wt_wiredtiger_error(error)) != NULL)
 		return (p);
 
+	/*
+	 * When called from wiredtiger_strerror, write a passed-in buffer.
+	 * When called from WT_SESSION.strerror, write the session's buffer.
+	 *
+	 * Check for Windows errors.
+	 */
 	if (error < 0) {
 		error = __wt_map_error_to_windows_error(error);
 
@@ -108,12 +92,21 @@ __wt_session_strerror(WT_SESSION_IMPL *session, int error)
 			sizeof(buf),
 			NULL);
 
-		if (lasterror != 0 &&
+		if (lasterror != 0 && session == NULL &&
+		    snprintf(errbuf, errlen, "%s", buf) > 0)
+			return (errbuf);
+		if (lasterror != 0 && session != NULL &&
 		    __wt_buf_set(session, &session->err, buf, strlen(buf)) == 0)
 			return (session->err.data);
-
-		/* Fall through to the fallback error code */
 	}
+
+	/* Fallback to a generic message. */
+	if (session == NULL &&
+	    snprintf(errbuf, errlen, "error return: %d", error) > 0)
+		return (errbuf);
+	if (session != NULL && __wt_buf_fmt(
+	    session, &session->err, "error return: %d", error) == 0)
+		return (session->err.data);
 
 	/* Defeated. */
 	return ("Unable to return error string");

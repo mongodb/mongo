@@ -438,8 +438,7 @@ extern int __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp
 extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, int fail, void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
-extern const char *__wt_strerror(int error);
-extern const char *__wt_session_strerror(WT_SESSION_IMPL *session, int error);
+extern const char *__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen);
 extern int __wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp);
 extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);

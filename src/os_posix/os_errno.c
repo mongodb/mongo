@@ -24,39 +24,29 @@ __wt_errno(void)
 
 /*
  * __wt_strerror --
- *	POSIX implementation of wiredtiger_strerror.
+ *	POSIX implementation of WT_SESSION.strerror and wiredtiger_strerror.
  */
 const char *
-__wt_strerror(int error)
+__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
 {
 	const char *p;
 
 	/*
-	 * POSIX errors are non-negative integers; check for 0 explicitly
-	 * in-case the underlying strerror doesn't handle 0, some don't.
+	 * Check for a WiredTiger or POSIX constant string, no buffer needed.
 	 */
-	if (error == 0)
-		return ("Successful return: 0");
-	if (error > 0 && (p = strerror(error)) != NULL)
-		return (p);
-	return (NULL);
-}
-
-/*
- * __wt_session_strerror --
- *	POSIX implementation of WT_SESSION.strerror.
- */
-const char *
-__wt_session_strerror(WT_SESSION_IMPL *session, int error)
-{
-	const char *p;
-
-	/* Check for POSIX errors. */
-	if ((p = __wt_strerror(error)) != NULL)
+	if ((p = __wt_wiredtiger_error(error)) != NULL)
 		return (p);
 
-	/* Fallback to a generic message. */
-	if (__wt_buf_fmt(
+	/*
+	 * When called from wiredtiger_strerror, write a passed-in buffer.
+	 * When called from WT_SESSION.strerror, write the session's buffer.
+	 *
+	 * Fallback to a generic message.
+	 */
+	if (session == NULL &&
+	    snprintf(errbuf, errlen, "error return: %d", error) > 0)
+		return (errbuf);
+	if (session != NULL && __wt_buf_fmt(
 	    session, &session->err, "error return: %d", error) == 0)
 		return (session->err.data);
 
