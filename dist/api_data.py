@@ -326,12 +326,12 @@ connection_runtime_config = [
     Config('cache_overhead', '8', r'''
         assume the heap allocator overhead is the specified percentage, and
         adjust the cache usage by that amount (for example, if there is 10GB
-		of data in cache, a percentage of 10 means WiredTiger treats this as
-		11GB).  This value is configurable because different heap allocators
-		have different overhead and different workloads will have different
-		heap allocation sizes and patterns, therefore applications may need to
-		adjust this value based on allocator choice and behavior in measured
-		workloads''',
+        of data in cache, a percentage of 10 means WiredTiger treats this as
+        11GB).  This value is configurable because different heap allocators
+        have different overhead and different workloads will have different
+        heap allocation sizes and patterns, therefore applications may need to
+        adjust this value based on allocator choice and behavior in measured
+        workloads''',
         min='0', max='30'),
     Config('checkpoint', '', r'''
         periodically checkpoint the database''',
