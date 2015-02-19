@@ -191,8 +191,12 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
                 self.assertEqual(True, o in cur_logs)
         #
         # Run printlog and make sure it exits with zero status.
+        # Printlog should not run recovery nor advance the logs.  Make sure
+        # it does not.
         #
         self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
+        pr_logs = fnmatch.filter(os.listdir(self.backup_dir), "*Log*")
+        self.assertEqual(cur_logs, pr_logs)
 
     def test_ops(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)

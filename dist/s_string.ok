@@ -283,6 +283,7 @@ RNG
 ROCKSDB
 RPC
 RUNDIR
+RVv
 Radu
 Recno
 Recurse
@@ -1073,6 +1074,7 @@ treplacement
 trk
 trk's
 troot
+trun
 trunc
 trylock
 trywrlock

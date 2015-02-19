@@ -89,7 +89,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Compare the original and backed-up files using the wt dump command.
     def compare(self, uri, dir_full, dir_incr):
-        #print "Compare: full URI: " + uri_full + " with incremental URI: " + uri_incr
+        # print "Compare: full URI: " + uri + " with incremental URI " 
         if dir_full == None:
             full_name='original'
         else:
@@ -99,11 +99,15 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
             os.remove(full_name)
         if os.path.exists(incr_name):
             os.remove(incr_name)
+        #
+        # We have been copying the logs only, so we need to force 'wt' to
+        # run recovery in order to apply all the logs and check the data.
+        #
         if dir_full == None:
-            self.runWt(['dump', uri], outfilename=full_name)
+            self.runWt(['-R', 'dump', uri], outfilename=full_name)
         else:
-            self.runWt(['-h', dir_full, 'dump', uri], outfilename=full_name)
-        self.runWt(['-h', dir_incr, 'dump', uri], outfilename=incr_name)
+            self.runWt(['-R', '-h', dir_full, 'dump', uri], outfilename=full_name)
+        self.runWt(['-R', '-h', dir_incr, 'dump', uri], outfilename=incr_name)
         self.assertEqual(True,
             compare_files(self, full_name, incr_name))
 

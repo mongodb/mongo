@@ -357,12 +357,8 @@ cursor_ops(WT_SESSION *session)
 	const char *key = "non-existent key";
 	cursor->set_key(cursor, key);
 	if ((ret = cursor->remove(cursor)) != 0) {
-		char buf[128];
-
-		if (wiredtiger_strerror_r(ret, buf, sizeof(buf)) != 0)
-			(void)snprintf(
-			    buf, sizeof(buf), "error value: %d\n", ret);
-		fprintf(stderr, "cursor.remove: %s\n", buf);
+		fprintf(stderr,
+		    "cursor.remove: %s\n", session->strerror(session, ret));
 		return (ret);
 	}
 	/*! [Display an error thread safe] */

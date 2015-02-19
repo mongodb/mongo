@@ -941,6 +941,70 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_page_can_evict --
+ *	Check whether a page can be evicted.
+ */
+static inline int
+__wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
+{
+	WT_BTREE *btree;
+	WT_PAGE_MODIFY *mod;
+
+	btree = S2BT(session);
+	mod = page->modify;
+
+	/* Pages that have never been modified can always be evicted. */
+	if (mod == NULL)
+		return (1);
+
+	/*
+	 * If the tree was deepened, there's a requirement that newly created
+	 * internal pages not be evicted until all threads are known to have
+	 * exited the original page index array, because evicting an internal
+	 * page discards its WT_REF array, and a thread traversing the original
+	 * page index array might see an freed WT_REF.  During the split we set
+	 * a transaction value, once that's globally visible, we know we can
+	 * evict the created page.
+	 */
+	if (WT_PAGE_IS_INTERNAL(page) &&
+	    !__wt_txn_visible_all(session, mod->mod_split_txn))
+		return (0);
+
+	/*
+	 * If the file is being checkpointed, we can't evict dirty pages:
+	 * if we write a page and free the previous version of the page, that
+	 * previous version might be referenced by an internal page already
+	 * been written in the checkpoint, leaving the checkpoint inconsistent.
+	 */
+	if (btree->checkpointing &&
+	    (__wt_page_is_modified(page) ||
+	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
+		return (0);
+	}
+
+	/*
+	 * If we aren't (potentially) doing eviction that can restore updates
+	 * and the updates on this page are too recent, give up.
+	 */
+	if (page->read_gen != WT_READGEN_OLDEST &&
+	    !__wt_txn_visible_all(session, __wt_page_is_modified(page) ?
+	    mod->update_txn : mod->rec_max_txn))
+		return (0);
+
+	/*
+	 * If the page was recently split in-memory, don't force it out: we
+	 * hope eviction will find it first.
+	 */
+	if (check_splits &&
+	    !__wt_txn_visible_all(session, mod->inmem_split_txn))
+		return (0);
+
+	return (1);
+}
+
+/*
  * __wt_page_release_evict --
  *	Attempt to release and immediately evict a page.
  */
@@ -1010,10 +1074,9 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
 	/*
 	 * Attempt to evict pages with the special "oldest" read generation.
-	 *
 	 * This is set for pages that grow larger than the configured
-	 * memory_page_max setting, and when we are attempting to scan without
-	 * trashing the cache.
+	 * memory_page_max setting, when we see many deleted items, and when we
+	 * are attempting to scan without trashing the cache.
 	 *
 	 * Skip this if eviction is disabled for this operation or this tree,
 	 * or if there is no chance of eviction succeeding for dirty pages due
@@ -1021,12 +1084,10 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * it contains an update that isn't stable.  Also skip forced eviction
 	 * if we just did an in-memory split.
 	 */
-	if (LF_ISSET(WT_READ_NO_EVICT) ||
-	    page->read_gen != WT_READGEN_OLDEST ||
+	if (page->read_gen != WT_READGEN_OLDEST ||
+	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    (__wt_page_is_modified(page) && (btree->checkpointing ||
-	    !__wt_txn_visible_all(session, page->modify->first_dirty_txn) ||
-	    !__wt_txn_visible_all(session, page->modify->inmem_split_txn))))
+	    !__wt_page_can_evict(session, page, 1))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));

@@ -412,7 +412,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_RECOVERY r;
 	struct WT_RECOVERY_FILE *metafile;
 	char *config;
-	int was_backup;
+	int needs_rec, was_backup;
 
 	conn = S2C(session);
 	WT_CLEAR(r);
@@ -483,14 +483,25 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_verbose(session, WT_VERB_RECOVERY,
 	    "Main recovery loop: starting at %u/%" PRIuMAX,
 	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset));
+	WT_ERR(__wt_log_needs_recovery(session, &r.ckpt_lsn, &needs_rec));
+	/*
+	 * Check if the database was shut down cleanly.  If not
+	 * return an error if the user does not want automatic
+	 * recovery.
+	 */
+	if (needs_rec && FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR))
+		WT_ERR(WT_RUN_RECOVERY);
+	/*
+	 * Always run recovery even if it was a clean shutdown.
+	 * We can consider skipping it in the future.
+	 */
 	if (WT_IS_INIT_LSN(&r.ckpt_lsn))
 		WT_ERR(__wt_log_scan(session, NULL,
 		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
 		    __txn_log_recover, &r));
 	else
 		WT_ERR(__wt_log_scan(session, &r.ckpt_lsn,
-		    WT_LOGSCAN_RECOVER,
-		    __txn_log_recover, &r));
+		    WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
 
 	conn->next_file_id = r.max_fileid;
 

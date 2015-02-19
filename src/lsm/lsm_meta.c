@@ -153,10 +153,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 			lsm_tree->nold_chunks = nchunks;
-		/* Values included for backward compatibility */
-		} else if (WT_STRING_MATCH("merge_threads", ck.str, ck.len)) {
-		} else
-			WT_ERR(__wt_illegal_value(session, "LSM metadata"));
+		}
+		/*
+		 * Ignore any other values: the metadata entry might have been
+		 * created by a future release, with unknown options.
+		 */
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 

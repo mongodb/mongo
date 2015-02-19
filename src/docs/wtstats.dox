@@ -2,7 +2,7 @@
 
 The WiredTiger distribution includes the \b wtstats tool that can be
 used to examine information generated using statistics logging (see
-@ref statistics_log).
+@ref statistics_log) and wtperf monitoring output (see @ref wtperf).
 
 After running an application with statistics logging configured, the
 statistics output files will be in the database home directory. By

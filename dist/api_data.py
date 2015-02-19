@@ -325,13 +325,13 @@ connection_runtime_config = [
         min='1MB', max='10TB'),
     Config('cache_overhead', '8', r'''
         assume the heap allocator overhead is the specified percentage, and
-        adjust the cache size by that amount (for example, if the cache size is
-        100GB, a percentage of 10 means WiredTiger limits itself to allocating
-        90GB of memory).  This value is configurable because different heap
-        allocators have different overhead and different workloads will have
-        different heap allocation sizes and patterns, therefore applications
-        may need to adjust this value based on allocator choice and behavior
-        in measured workloads''',
+        adjust the cache usage by that amount (for example, if there is 10GB
+        of data in cache, a percentage of 10 means WiredTiger treats this as
+        11GB).  This value is configurable because different heap allocators
+        have different overhead and different workloads will have different
+        heap allocation sizes and patterns, therefore applications may need to
+        adjust this value based on allocator choice and behavior in measured
+        workloads''',
         min='0', max='30'),
     Config('checkpoint', '', r'''
         periodically checkpoint the database''',
@@ -550,6 +550,10 @@ common_wiredtiger_open = [
         Config('prealloc', 'true', r'''
             pre-allocate log files.''',
             type='boolean'),
+        Config('recover', 'on', r'''
+            run recovery or error if recovery needs to run after an
+            unclean shutdown.''',
+            choices=['error','on']),
         ]),
     Config('mmap', 'true', r'''
         Use memory mapping to access files when possible''',
@@ -719,24 +723,29 @@ methods = {
         files''',
         type='boolean'),
 ]),
+'session.strerror' : Method([]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
 'session.verify' : Method([
     Config('dump_address', 'false', r'''
-        Display addresses and page types as pages are verified, using
-        the application's message handler, intended for debugging''',
+        Display addresses and page types as pages are verified,
+        using the application's message handler, intended for debugging''',
         type='boolean'),
     Config('dump_blocks', 'false', r'''
-        Display the contents of on-disk blocks as they are verified, using
-        the application's message handler, intended for debugging''',
+        Display the contents of on-disk blocks as they are verified,
+        using the application's message handler, intended for debugging''',
         type='boolean'),
     Config('dump_offsets', '', r'''
-        Display the contents of specific on-disk blocks, using
-        the application's message handler, intended for debugging''',
+        Display the contents of specific on-disk blocks,
+        using the application's message handler, intended for debugging''',
         type='list'),
     Config('dump_pages', 'false', r'''
-        Display the contents of in-memory pages as they are verified, using
-        the application's message handler, intended for debugging''',
+        Display the contents of in-memory pages as they are verified,
+        using the application's message handler, intended for debugging''',
+        type='boolean'),
+    Config('dump_shape', 'false', r'''
+        Display the shape of the tree after verification,
+        using the application's message handler, intended for debugging''',
         type='boolean')
 ]),
 

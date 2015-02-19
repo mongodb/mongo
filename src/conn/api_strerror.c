@@ -5,20 +5,24 @@
 /*
  * Historically, there was only the wiredtiger_strerror call because the POSIX
  * port didn't need anything more complex; Windows requires memory allocation
- * of error strings, so we added the wiredtiger_strerror_r call. Because we
+ * of error strings, so we added the WT_SESSION.strerror method. Because we
  * want wiredtiger_strerror to continue to be as thread-safe as possible, errors
- * are split into three categories: WiredTiger constant strings, system constant
- * strings and Everything Else, and we check constant strings before Everything
- * Else.
+ * are split into two categories: WiredTiger's or the system's constant strings
+ * and Everything Else, and we check constant strings before Everything Else.
  */
 
 /*
- * __wiredtiger_error --
- *	Return a constant string for the WiredTiger errors.
+ * __wt_wiredtiger_error --
+ *	Return a constant string for WiredTiger POSIX-standard and errors.
  */
-static const char *
-__wiredtiger_error(int error)
+const char *
+__wt_wiredtiger_error(int error)
 {
+	const char *p;
+
+	/*
+	 * Check for WiredTiger specific errors.
+	 */
 	switch (error) {
 	case WT_ROLLBACK:
 		return ("WT_ROLLBACK: conflict between concurrent operations");
@@ -32,7 +36,19 @@ __wiredtiger_error(int error)
 		return ("WT_PANIC: WiredTiger library panic");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
+	case WT_RUN_RECOVERY:
+		return ("WT_RUN_RECOVERY: recovery must be run to continue");
 	}
+
+	/*
+	 * POSIX errors are non-negative integers; check for 0 explicitly
+	 * in-case the underlying strerror doesn't handle 0, some don't.
+	 */
+	if (error == 0)
+		return ("Successful return: 0");
+	if (error > 0 && (p = strerror(error)) != NULL)
+		return (p);
+
 	return (NULL);
 }
 
@@ -44,37 +60,6 @@ const char *
 wiredtiger_strerror(int error)
 {
 	static char buf[128];
-	const char *p;
 
-	/* Check for a constant string. */
-	if ((p = __wiredtiger_error(error)) != NULL ||
-	    (p = __wt_strerror(error)) != NULL)
-		return (p);
-
-	/* Else, fill in the non-thread-safe static buffer. */
-	if (wiredtiger_strerror_r(error, buf, sizeof(buf)) != 0)
-		(void)snprintf(buf, sizeof(buf), "error return: %d", error);
-
-	return (buf);
-}
-
-/*
- * wiredtiger_strerror_r --
- *	Return a string for any error value, thread-safe version.
- */
-int
-wiredtiger_strerror_r(int error, char *buf, size_t buflen)
-{
-	const char *p;
-
-	/* Require at least 2 bytes, printable character and trailing nul. */
-	if (buflen < 2)
-		return (ENOMEM);
-
-	/* Check for a constant string. */
-	if ((p = __wiredtiger_error(error)) != NULL ||
-	    (p = __wt_strerror(error)) != NULL)
-		return (snprintf(buf, buflen, "%s", p) > 0 ? 0 : ENOMEM);
-
-	return (__wt_strerror_r(error, buf, buflen));
+	return (__wt_strerror(NULL, error, buf, sizeof(buf)));
 }

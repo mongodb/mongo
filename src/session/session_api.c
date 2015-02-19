@@ -128,8 +128,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);
 
-	/* Discard scratch buffers. */
+	/* Discard scratch buffers, error memory. */
 	__wt_scr_discard(session);
+	__wt_buf_free(session, &session->err);
 
 	/* Free transaction information. */
 	__wt_txn_destroy(session);
@@ -670,7 +671,11 @@ __session_truncate(WT_SESSION *wt_session,
 
 done:
 err:	TXN_API_END_RETRY(session, ret, 0);
-	return ((ret) == WT_NOTFOUND ? ENOENT : (ret));
+
+	/*
+	 * Only map WT_NOTFOUND to ENOENT if a URI was specified.
+	 */
+	return (ret == WT_NOTFOUND && uri != NULL ? ENOENT : ret);
 }
 
 /*
@@ -898,6 +903,20 @@ err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
 }
 
 /*
+ * __session_strerror --
+ *	WT_SESSION->strerror method.
+ */
+static const char *
+__session_strerror(WT_SESSION *wt_session, int error)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	return (__wt_strerror(session, error, NULL, 0));
+}
+
+/*
  * __wt_open_internal_session --
  *	Allocate a session for WiredTiger's use.
  */
@@ -959,6 +978,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		NULL,
 		__session_close,
 		__session_reconfigure,
+		__session_strerror,
 		__session_open_cursor,
 		__session_create,
 		__session_compact,

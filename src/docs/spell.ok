@@ -71,7 +71,6 @@ Seward's
 SiH
 TXT
 URIs
-Vv
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
@@ -234,6 +233,7 @@ io
 ip
 je
 jemalloc
+jitter
 jni
 jrx
 json
@@ -325,6 +325,8 @@ oltp
 oob
 optype
 os
+outlier
+outliers
 ovfl
 pareto
 pcoll
@@ -350,6 +352,7 @@ putValue
 putValueString
 py
 qnx
+rVv
 rdbms
 rdlock
 readlock
