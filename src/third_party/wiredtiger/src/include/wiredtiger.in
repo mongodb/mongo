@@ -835,6 +835,17 @@ struct __wt_session {
 	int __F(reconfigure)(WT_SESSION *session, const char *config);
 
 	/*!
+	 * Return information about an error as a string.
+	 *
+	 * @snippet ex_all.c Display an error thread safe
+	 *
+	 * @param session the session handle
+	 * @param error a return value from a WiredTiger function
+	 * @returns a string representation of the error
+	 */
+	const char *__F(strerror)(WT_SESSION *session, int error);
+
+	/*!
 	 * @name Cursor handles
 	 * @{
 	 */
@@ -1319,6 +1330,9 @@ struct __wt_session {
 	 * @config{dump_pages, Display the contents of in-memory pages as they
 	 * are verified\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
+	 * @config{dump_shape, Display the shape of the tree after
+	 * verification\, using the application's message handler\, intended for
+	 * debugging., a boolean flag; default \c false.}
 	 * @configend
 	 * @ebusy_errors
 	 */
@@ -1543,14 +1557,14 @@ struct __wt_connection {
 	 * integer between 1 and 20; default \c 2.}
 	 * @config{ ),,}
 	 * @config{cache_overhead, assume the heap allocator overhead is the
-	 * specified percentage\, and adjust the cache size by that amount (for
-	 * example\, if the cache size is 100GB\, a percentage of 10 means
-	 * WiredTiger limits itself to allocating 90GB of memory). This value is
-	 * configurable because different heap allocators have different
-	 * overhead and different workloads will have different heap allocation
-	 * sizes and patterns\, therefore applications may need to adjust this
-	 * value based on allocator choice and behavior in measured workloads.,
-	 * an integer between 0 and 30; default \c 8.}
+	 * specified percentage\, and adjust the cache usage by that amount (for
+	 * example\, if there is 10GB of data in cache\, a percentage of 10
+	 * means WiredTiger treats this as 11GB). This value is configurable
+	 * because different heap allocators have different overhead and
+	 * different workloads will have different heap allocation sizes and
+	 * patterns\, therefore applications may need to adjust this value based
+	 * on allocator choice and behavior in measured workloads., an integer
+	 * between 0 and 30; default \c 8.}
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A
 	 * database should configure either \c cache_size or \c shared_cache but
 	 * not both., an integer between 1MB and 10TB; default \c 100MB.}
@@ -1879,13 +1893,13 @@ struct __wt_connection {
  * should be used (4KB on Linux systems\, zero elsewhere)., an integer between
  * -1 and 1MB; default \c -1.}
  * @config{cache_overhead, assume the heap allocator overhead is the specified
- * percentage\, and adjust the cache size by that amount (for example\, if the
- * cache size is 100GB\, a percentage of 10 means WiredTiger limits itself to
- * allocating 90GB of memory). This value is configurable because different heap
- * allocators have different overhead and different workloads will have
- * different heap allocation sizes and patterns\, therefore applications may
- * need to adjust this value based on allocator choice and behavior in measured
- * workloads., an integer between 0 and 30; default \c 8.}
+ * percentage\, and adjust the cache usage by that amount (for example\, if
+ * there is 10GB of data in cache\, a percentage of 10 means WiredTiger treats
+ * this as 11GB). This value is configurable because different heap allocators
+ * have different overhead and different workloads will have different heap
+ * allocation sizes and patterns\, therefore applications may need to adjust
+ * this value based on allocator choice and behavior in measured workloads., an
+ * integer between 0 and 30; default \c 8.}
  * @config{cache_size, maximum heap memory to allocate for the cache.  A
  * database should configure either \c cache_size or \c shared_cache but not
  * both., an integer between 1MB and 10TB; default \c 100MB.}
@@ -1973,6 +1987,9 @@ struct __wt_connection {
  * are created relative to the database home., a string; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean
  * flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery
+ * or error if recovery needs to run after an unclean shutdown., a string\,
+ * chosen from the following options: \c "error"\, \c "on"; default \c on.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management., a set of related configuration options defined below.}
@@ -2085,18 +2102,6 @@ int wiredtiger_open(const char *home,
  * @returns a string representation of the error
  */
 const char *wiredtiger_strerror(int error);
-
-/*!
- * Return information about a WiredTiger error as a string, thread-safe version.
- *
- * @snippet ex_all.c Display an error thread safe
- *
- * @param error a return value from a WiredTiger call
- * @param buf a buffer of at least \c buflen bytes
- * @param buflen the length of the buffer
- * @returns zero for success, non-zero to indicate an error.
- */
-int wiredtiger_strerror_r(int error, char *buf, size_t buflen);
 
 #if !defined(SWIG)
 /*!
@@ -2618,6 +2623,12 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 /*! Restart the operation (internal). */
 #define	WT_RESTART	-31805
 /*! @endcond */
+/*!
+ * Recovery must be run to continue.
+ * This error is generated when wiredtiger_open is configured to return an error
+ * if recovery is required to use the database.
+ */
+#define	WT_RUN_RECOVERY	-31806
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

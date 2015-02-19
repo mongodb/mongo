@@ -320,13 +320,11 @@ static int
 __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
     int exclusive, int top, int *inmem_splitp, int *istreep)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	uint32_t flags;
 
-	btree = S2BT(session);
 	flags = WT_EVICTING;
 
 	/*
@@ -370,19 +368,8 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 	/*
-	 * If the tree was deepened, there's a requirement that newly created
-	 * internal pages not be evicted until all threads are known to have
-	 * exited the original page index array, because evicting an internal
-	 * page discards its WT_REF array, and a thread traversing the original
-	 * page index array might see an freed WT_REF.  During the split we set
-	 * a transaction value, once that's globally visible, we know we can
-	 * evict the created page.
-	 */
-	if (!exclusive && mod != NULL && WT_PAGE_IS_INTERNAL(page) &&
-	    !__wt_txn_visible_all(session, mod->mod_split_txn))
-		return (EBUSY);
-
-	/*
+	 * Check whether the page can be evicted.
+	 *
 	 * If the file is being checkpointed, we can't evict dirty pages:
 	 * if we write a page and free the previous version of the page, that
 	 * previous version might be referenced by an internal page already
@@ -402,13 +389,8 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	if (mod != NULL && btree->checkpointing &&
-	    (__wt_page_is_modified(page) ||
-	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
+	if (!exclusive && !__wt_page_can_evict(session, page, 0))
 		return (EBUSY);
-	}
 
 	/*
 	 * Check for an append-only workload needing an in-memory split.
@@ -448,29 +430,18 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * If we have an exclusive lock (we're discarding the tree), assert
 	 * there are no updates we cannot read.
 	 *
-	 * Otherwise, if the top-level page we're evicting is a leaf page, set
-	 * the update-restore flag, so reconciliation will write blocks it can
-	 * write and create a list of skipped updates for blocks it cannot
-	 * write.  This is how forced eviction of huge pages works: we take a
-	 * big page and reconcile it into blocks, some of which we write and
-	 * discard, the rest of which we re-create as smaller in-memory pages,
-	 * (restoring the updates that stopped us from writing the block), and
-	 * inserting the whole mess into the page's parent.
+	 * Otherwise, if the top-level page we're evicting is a leaf page
+	 * marked for forced eviction, set the update-restore flag, so
+	 * reconciliation will write blocks it can write and create a list of
+	 * skipped updates for blocks it cannot write.  This is how forced
+	 * eviction of huge pages works: we take a big page and reconcile it
+	 * into blocks, some of which we write and discard, the rest of which
+	 * we re-create as smaller in-memory pages, (restoring the updates that
+	 * stopped us from writing the block), and inserting the whole mess
+	 * into the page's parent.
 	 *
 	 * Don't set the update-restore flag for internal pages, they don't
 	 * have updates that can be saved and restored.
-	 *
-	 * Don't set the update-restore flag for small pages.  (If a small
-	 * page were selected by eviction and then modified, and we configure it
-	 * for update-restore, we'll end up splitting one or two pages into the
-	 * parent, which is a waste of effort.  If we don't set update-restore,
-	 * eviction will return EBUSY, which makes more sense, the page was just
-	 * modified.)
-	 *
-	 * Don't set the update-restore flag for any page other than the
-	 * top one; only the reconciled top page goes through the split path
-	 * (and child pages are pages we expect to merge into the top page, they
-	 * they are not expected to split).
 	 */
 	if (__wt_page_is_modified(page)) {
 		if (exclusive)

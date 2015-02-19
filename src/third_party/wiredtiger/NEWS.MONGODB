@@ -1,5 +1,125 @@
-3.0-RC9, Feb 12 2015
+3.0-RC9, Feb 18 2015
 --------------------
+
+commit bf3ee2cd064b46cf0175d75950c825aa1f42c694
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Wed Feb 18 12:53:41 2015 +1100
+
+    Flip cache overhead to apply to the allocated bytes rather than the total size.  Include the overhead in stats so that tools (e.g., mongostat) report accurate cache full and dirty percentages.  This also makes eviction triggers and targets meaningful: with the default trigger of 95% and overhead 8%, eviction was previously never triggered until the cache was completely full.
+
+commit f9e6f942cf73c8a53aaadbc587c1b7efad6cc832
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Tue Feb 17 11:33:13 2015 -0500
+
+    Coverity notes the TXN_API_END_RETRY macro has an unnecessary test for "(ret == 0)" at the end of the do {} while loop.
+
+commit c34a56f357e21d134a2d9d0fefc032544069d8d7
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Tue Feb 17 21:56:34 2015 +1100
+
+    Allow the maximum number of eviction threads to be reconfigured.  This was previously permitted by the API, but the array of thread contexts was not correctly resized, leading to segfaults.
+    
+    refs SERVER-17293
+
+commit 67527fc235406469e69dbaec3dcd571469e660c0
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Tue Feb 17 21:50:53 2015 +1100
+
+    Make the eviction walk incremental: don't spend too long in any one file, fix tracking of whether we are making progress.
+
+commit 788265ed273c63183053e6325a9aa03c89c02860
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Tue Feb 17 21:48:44 2015 +1100
+
+    Combine the various checks for whether a page can be evicted into one place.
+
+commit 748e7b0c58b358b14340bacae41f9c46f3c06f7e
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Tue Feb 17 21:47:57 2015 +1100
+
+    Skip hot pages during write leaves: checkpoint will have to visit them anyway.
+
+commit a9de0f7ac8ad373d7aef6a480c69a2a7e0b55c59
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Tue Feb 17 21:18:41 2015 +1100
+
+    Run recovery after crashing test/format in the recovery test.
+
+commit 4733961a3c1fa37988178d1b1dd4eb44d83b63f6
+Author: Thomas Rueckstiess <thomas@rueckstiess.net>
+Date:   Mon Feb 16 12:50:26 2015 +1100
+
+    fixes and improvements for wtperf parsing
+    
+    - convert wtperf microsec to millisec
+    - don't skip monitor* files when parsing directory
+    - parsing code reorganization
+    - renamed wtperf stats fixture
+    - added tests
+
+commit dc396e1cd64871219b9e5a1b6558707feb70706e
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Sun Feb 15 13:44:30 2015 -0500
+
+    Clear the btree object statistics we're about to count, otherwise each cursor gets a cumulative value.
+
+commit 195b144bb37814b31cfa413029cda0b28f13f261
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Fri Feb 13 12:06:36 2015 -0500
+
+    Don't map WT_NOTFOUND to ENOENT unless a uri was specified, that's the only interesting case. Reference SERVER-17141.
+
+commit e9d7fee2c2c08985b8e2d2716e899853c5198290
+Author: Thomas Rueckstiess <thomas@rueckstiess.net>
+Date:   Fri Feb 13 17:22:05 2015 +1100
+
+    added support to parse wtperf files.
+    
+    they go into a separate stats section named "wtperf".
+
+commit 29d0d26fd1cd76392ea8225c1c4022ca54443737
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Feb 12 18:05:33 2015 -0500
+
+    Ignore unexpected information in the metadata entry, the metadata entry might have been created by a future release, with unknown options.
+
+commit 05f07753059a4fa7f0f1bab7a107a9e6d17bf4af
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Feb 12 15:42:35 2015 -0500
+
+    Remove the requirement of a HAVE_DIAGNOSTIC build for the verify commands to work (except for dump_offsets, that requires the btree debugging code and so won't work anywhere but a HAVE_DIAGNOSTIC build).
+
+commit 006ed9f17c7fc0fe65dc43717ed0239b3bac564c
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Feb 12 15:31:36 2015 -0500
+
+    Add support for a new verify debug option, "dump_shape", that reports the levels of the tree.
+    
+    __wt_config_gets() returns WT_NOTFOUND when there's no entry, don't fail every command when DIAGNOSTIC #defined and debug options aren't set.
+
+commit 46b7721215856d08ca3a37f7ffc27c57b1d4c1d7
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Thu Feb 12 13:27:32 2015 -0500
+
+    Add recover config setting and use it in the wt command. #1651
+
+commit 0305a51ffba383af13d6078d409a03b249c502c5
+Author: Don Anderson <dda@ddanderson.com>
+Date:   Wed Feb 11 10:21:04 2015 -0500
+
+    Add test to detect file ID problems in recovery.  Refs #1622.
+
+commit fc0ff5a9ea09e54512353d2275126cb54dbc5451
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Tue Feb 10 13:02:28 2015 -0500
+
+    Allow 'wt' command to run with or without recovery. #1651
+
+commit a26d87a53eb2ac2dcae9312b7979499c34c11613
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Mon Feb 2 19:20:33 2015 -0500
+
+    Replace wiredtiger_strerror_r with WT_SESSION.strerror, reference #1516.
 
 commit 33c146b51fdac86999e2eaa67f5636490eb441fb
 Author: Michael Cahill <michael.cahill@wiredtiger.com>
@@ -133,9 +253,7 @@ Date:   Mon Feb 9 12:25:10 2015 +1100
     
     Refs SERVER-17204
     
-    The bug is that we weren't doing an fsync of the file after it was
-    created. Recovery assumes that if there are records for a particular
-    file, then it will exist on disk.
+    The bug is that we weren't doing an fsync of the file after it was created. Recovery assumes that if there are records for a particular file, then it will exist on disk.
 
 commit 4d50f5878073e582567848ae03ee506bb5058227
 Author: Alex Gorrod <alexg@wiredtiger.com>

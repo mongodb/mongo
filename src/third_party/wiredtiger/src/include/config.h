@@ -73,14 +73,15 @@ struct __wt_config_parser_impl {
 #define	WT_CONFIG_ENTRY_session_rename			24
 #define	WT_CONFIG_ENTRY_session_rollback_transaction	25
 #define	WT_CONFIG_ENTRY_session_salvage			26
-#define	WT_CONFIG_ENTRY_session_truncate		27
-#define	WT_CONFIG_ENTRY_session_upgrade			28
-#define	WT_CONFIG_ENTRY_session_verify			29
-#define	WT_CONFIG_ENTRY_table_meta			30
-#define	WT_CONFIG_ENTRY_wiredtiger_open			31
-#define	WT_CONFIG_ENTRY_wiredtiger_open_all		32
-#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		33
-#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		34
+#define	WT_CONFIG_ENTRY_session_strerror		27
+#define	WT_CONFIG_ENTRY_session_truncate		28
+#define	WT_CONFIG_ENTRY_session_upgrade			29
+#define	WT_CONFIG_ENTRY_session_verify			30
+#define	WT_CONFIG_ENTRY_table_meta			31
+#define	WT_CONFIG_ENTRY_wiredtiger_open			32
+#define	WT_CONFIG_ENTRY_wiredtiger_open_all		33
+#define	WT_CONFIG_ENTRY_wiredtiger_open_basecfg		34
+#define	WT_CONFIG_ENTRY_wiredtiger_open_usercfg		35
 /*
  * configuration section: END
  * DO NOT EDIT: automatically built by dist/flags.py.
