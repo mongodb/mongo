@@ -62,7 +62,32 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
-	return (cache->bytes_inmem);
+	uint64_t bytes_inuse;
+
+	/* Adjust the cache size to take allocation overhead into account. */
+	bytes_inuse = cache->bytes_inmem;
+	if (cache->overhead_pct != 0)
+		bytes_inuse +=
+		    (bytes_inuse * (uint64_t)cache->overhead_pct) / 100;
+
+	return (bytes_inuse);
+}
+
+/*
+ * __wt_cache_dirty_inuse --
+ *	Return the number of dirty bytes in use.
+ */
+static inline uint64_t
+__wt_cache_dirty_inuse(WT_CACHE *cache)
+{
+	uint64_t dirty_inuse;
+
+	dirty_inuse = cache->bytes_dirty;
+	if (cache->overhead_pct != 0)
+		dirty_inuse +=
+		    (dirty_inuse * (uint64_t)cache->overhead_pct) / 100;
+
+	return (dirty_inuse);
 }
 
 /*
@@ -87,12 +112,8 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 	 * in a shared cache.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	dirty_inuse = cache->bytes_dirty;
+	dirty_inuse = __wt_cache_dirty_inuse(cache);
 	bytes_max = conn->cache_size + 1;
-
-	/* Adjust the cache size to take allocation overhead into account. */
-	if (conn->cache_overhead != 0)
-		bytes_max -= (bytes_max * (uint64_t)conn->cache_overhead) / 100;
 
 	/* Calculate the cache full percentage. */
 	*fullp = (int)((100 * bytes_inuse) / bytes_max);

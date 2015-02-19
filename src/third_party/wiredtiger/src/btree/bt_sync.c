@@ -56,13 +56,19 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 
 		flags |= WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
 		for (walk = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
 			if (walk == NULL)
 				break;
 
-			/* Write dirty pages if nobody beat us to it. */
+			/*
+			 * Write dirty pages if nobody beat us to it.  Don't
+			 * try to write the hottest pages: checkpoint will have
+			 * to visit them anyway.
+			 */
 			page = walk->page;
-			if (__wt_page_is_modified(page)) {
+			if (__wt_page_is_modified(page) &&
+			    __wt_txn_visible_all(
+			    session, page->modify->update_txn)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_refresh(session, 1);
 				leaf_bytes += page->memory_footprint;
@@ -102,7 +108,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;
 		for (walk = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
 			if (walk == NULL)
 				break;
 
@@ -137,7 +143,6 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			}
 		}
 		break;
-	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
@@ -168,6 +173,12 @@ err:	/* On error, clear any left-over tree walk. */
 		 */
 		btree->checkpointing = 0;
 		WT_FULL_BARRIER();
+
+		/*
+		 * If this tree was being skipped by the eviction server during
+		 * the checkpoint, clear the wait.
+		 */
+		btree->evict_walk_period = 0;
 
 		/*
 		 * Wake the eviction server, in case application threads have

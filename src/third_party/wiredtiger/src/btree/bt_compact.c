@@ -105,8 +105,8 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * writing the page modify information.
 	 *
 	 * There are three ways we call reconciliation: checkpoints, threads
-	 * writing leaf pages (usually in preparation for a checkpoint), and
-	 * eviction.
+	 * writing leaf pages (usually in preparation for a checkpoint or if
+	 * closing a file), and eviction.
 	 *
 	 * We're holding the schema lock which serializes with checkpoints.
 	 */
@@ -149,7 +149,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		 * read, set its generation to a low value so it is evicted
 		 * quickly.
 		 */
-		WT_ERR(__wt_tree_walk(session, &ref,
+		WT_ERR(__wt_tree_walk(session, &ref, NULL,
 		    WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
 		if (ref == NULL)
 			break;
@@ -171,10 +171,12 @@ err:	if (ref != NULL)
 	if (block_manager_begin)
 		WT_TRET(bm->compact_end(bm, session));
 
-	__wt_spin_unlock(session, &btree->flush_lock);
-
+	/*
+	 * Unlock will be a release barrier, use it to update the compaction
+	 * status for reconciliation.
+	 */
 	conn->compact_in_memory_pass = 0;
-	WT_FULL_BARRIER();
+	__wt_spin_unlock(session, &btree->flush_lock);
 
 	return (ret);
 }

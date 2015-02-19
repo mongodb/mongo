@@ -511,7 +511,8 @@ err:	if (locked)
 			    "Merge aborted due to close"));
 		else
 			WT_TRET(__wt_verbose(session, WT_VERB_LSM,
-			    "Merge failed with %s", wiredtiger_strerror(ret)));
+			    "Merge failed with %s",
+			   __wt_strerror(session, ret, NULL, 0)));
 	}
 	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
 	return (ret);

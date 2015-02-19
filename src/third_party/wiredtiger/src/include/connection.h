@@ -227,7 +227,6 @@ struct __wt_connection_impl {
 	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
-	int	   cache_overhead;	/* Cache percent adjustment */
 	uint64_t   cache_size;		/* Configured cache size */
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
@@ -290,6 +289,7 @@ struct __wt_connection_impl {
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */
 
+	uint32_t	 evict_workers_alloc;/* Allocated eviction workers */
 	uint32_t	 evict_workers_max;/* Max eviction workers */
 	uint32_t	 evict_workers_min;/* Min eviction workers */
 	uint32_t	 evict_workers;	/* Number of eviction workers */
@@ -310,6 +310,7 @@ struct __wt_connection_impl {
 #define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */
 #define	WT_CONN_LOG_EXISTED	0x04	/* Log files found */
 #define	WT_CONN_LOG_PREALLOC	0x08	/* Pre-allocation is enabled */
+#define	WT_CONN_LOG_RECOVER_ERR	0x10	/* Error if recovery required */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */
