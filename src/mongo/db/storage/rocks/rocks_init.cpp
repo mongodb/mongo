@@ -99,7 +99,10 @@ namespace mongo {
             // Current disk format. We bump this number when we change the disk format. MongoDB will
             // fail to start if the versions don't match. In that case a user needs to run mongodump
             // and mongorestore.
-            const int kRocksFormatVersion = 1;
+            // * Version 1 was the format with many column families -- one column family for each
+            // collection and index
+            // * Version 2 (current) keeps all collections and indexes in a single column family
+            const int kRocksFormatVersion = 2;
             const std::string kRocksFormatVersionString = "rocksFormatVersion";
         };
     } // namespace
