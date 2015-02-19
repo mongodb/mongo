@@ -582,9 +582,6 @@ namespace mongo {
             result->appendIntOrLL("max", _cappedMaxDocs);
             result->appendIntOrLL("maxSize", _cappedMaxSize / scale);
         }
-        bool valid = _db->GetProperty("rocksdb.stats", &statsString);
-        invariant( valid );
-        result->append( "stats", statsString );
     }
 
     Status RocksRecordStore::oplogDiskLocRegister(OperationContext* txn, const OpTime& opTime) {

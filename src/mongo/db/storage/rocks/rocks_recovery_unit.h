@@ -121,6 +121,8 @@ namespace mongo {
 
         static RocksRecoveryUnit* getRocksRecoveryUnit(OperationContext* opCtx);
 
+        static int getTotalLiveRecoveryUnits() { return _totalLiveRecoveryUnits.load(); }
+
     private:
         void _releaseSnapshot();
 
@@ -148,6 +150,8 @@ namespace mongo {
         uint64_t _myTransactionCount;
 
         RecordId _oplogReadTill;
+
+        static std::atomic<int> _totalLiveRecoveryUnits;
     };
 
 }

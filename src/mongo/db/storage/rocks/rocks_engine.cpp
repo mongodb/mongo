@@ -44,12 +44,14 @@
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
+#include <rocksdb/utilities/convenience.h>
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/rocks/rocks_global_options.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/db/storage/rocks/rocks_index.h"
@@ -87,15 +89,17 @@ namespace mongo {
     RocksEngine::RocksEngine(const std::string& path, bool durable)
         : _path(path), _durable(durable) {
         {  // create block cache
-            uint64_t cacheSizeGB = 0;
-            ProcessInfo pi;
-            unsigned long long memSizeMB = pi.getMemSizeMB();
-            if (memSizeMB > 0) {
-                double cacheMB = memSizeMB / 2;
-                cacheSizeGB = static_cast<uint64_t>(cacheMB / 1024);
-            }
-            if (cacheSizeGB < 1) {
-                cacheSizeGB = 1;
+            uint64_t cacheSizeGB = rocksGlobalOptions.cacheSizeGB;
+            if (cacheSizeGB == 0) {
+                ProcessInfo pi;
+                unsigned long long memSizeMB = pi.getMemSizeMB();
+                if (memSizeMB > 0) {
+                    double cacheMB = memSizeMB / 2;
+                    cacheSizeGB = static_cast<uint64_t>(cacheMB / 1024);
+                }
+                if (cacheSizeGB < 1) {
+                    cacheSizeGB = 1;
+                }
             }
             _block_cache = rocksdb::NewLRUCache(cacheSizeGB * 1024 * 1024 * 1024LL);
         }
@@ -250,6 +254,7 @@ namespace mongo {
     }
 
     rocksdb::Options RocksEngine::_options() const {
+        // default options
         rocksdb::Options options;
         rocksdb::BlockBasedTableOptions table_options;
         table_options.block_cache = _block_cache;
@@ -262,14 +267,30 @@ namespace mongo {
         options.max_background_compactions = 8;
         options.max_background_flushes = 4;
         options.target_file_size_base = 64 * 1024 * 1024; // 64MB
-        options.soft_rate_limit = 1.1;
-        options.hard_rate_limit = 1.5;
+        options.soft_rate_limit = 2;
+        options.hard_rate_limit = 3;
         options.max_bytes_for_level_base = 512 * 1024 * 1024;  // 512 MB
         options.max_open_files = 20000;
+
+        if (rocksGlobalOptions.compression == "snappy") {
+            options.compression = rocksdb::kSnappyCompression;
+        } else if (rocksGlobalOptions.compression == "zlib") {
+            options.compression = rocksdb::kZlibCompression;
+        } else if (rocksGlobalOptions.compression == "none") {
+            options.compression = rocksdb::kNoCompression;
+        } else {
+            log() << "Unknown compression, will use default (snappy)";
+        }
 
         // create the DB if it's not already present
         options.create_if_missing = true;
         options.wal_dir = _path + "/journal";
+
+        // allow override
+        if (!rocksGlobalOptions.configString.empty()) {
+            rocksdb::Options base_options(options);
+            rocksdb::GetOptionsFromString(base_options, rocksGlobalOptions.configString, &options);
+        }
 
         return options;
     }

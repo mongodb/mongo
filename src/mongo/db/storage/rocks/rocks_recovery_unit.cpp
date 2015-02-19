@@ -109,6 +109,8 @@ namespace mongo {
 
     }  // anonymous namespace
 
+    std::atomic<int> RocksRecoveryUnit::_totalLiveRecoveryUnits(0);
+
     RocksRecoveryUnit::RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db,
                                          bool durable)
         : _transactionEngine(transactionEngine),
@@ -118,10 +120,13 @@ namespace mongo {
           _writeBatch(),
           _snapshot(NULL),
           _depth(0),
-          _myTransactionCount(1) {}
+          _myTransactionCount(1) {
+        RocksRecoveryUnit::_totalLiveRecoveryUnits.fetch_add(1, std::memory_order_relaxed);
+    }
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         _abort();
+        RocksRecoveryUnit::_totalLiveRecoveryUnits.fetch_sub(1, std::memory_order_relaxed);
     }
 
     void RocksRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {

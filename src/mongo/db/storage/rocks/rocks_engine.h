@@ -128,6 +128,7 @@ namespace mongo {
 
         rocksdb::DB* getDB() { return _db.get(); }
         const rocksdb::DB* getDB() const { return _db.get(); }
+        size_t getBlockCacheUsage() const { return _block_cache->GetUsage(); }
 
     private:
         Status _createIdentPrefix(StringData ident);
