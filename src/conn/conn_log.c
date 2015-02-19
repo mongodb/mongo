@@ -347,6 +347,94 @@ err:		__wt_err(session, ret, "log close server error");
 }
 
 /*
+ * __log_wrlsn_server --
+ *	The log wrlsn server thread.
+ */
+static void *
+__log_wrlsn_server(void *arg)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	WT_SESSION_IMPL *session;
+	int i, processed, saw_later, yield;
+
+	session = arg;
+	conn = S2C(session);
+	log = conn->log;
+	yield = 0;
+	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
+		/*
+		 * No need to use the log_slot_lock because the slot pool
+		 * is statically allocated and any slot in the
+		 * WT_LOG_SLOT_WRITTEN state is exclusively ours for now.
+		 */
+		i = 0;
+		processed = 0;
+		saw_later = 0;
+		while (i < SLOT_POOL) {
+			slot = &log->slot_pool[i++];
+			if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
+				continue;
+			/*
+			 * Make note that we have seen and skipped some
+			 * slots with LOG_SLOT_WRITTEN set but they have a
+			 * later LSN so we keep looking.
+			 */
+			if (LOG_CMP(
+			    &slot->slot_release_lsn, &log->write_lsn) != 0) {
+				saw_later++;
+				continue;
+			}
+			/*
+			 * If we get here, we have a slot to process.  Move
+			 * the write_lsn forward, signal the write_cond in
+			 * case anyone is waiting on this guarantee, and then
+			 * free the slot.
+			 */
+			log->write_lsn = slot->slot_end_lsn;
+			WT_ERR(__wt_cond_signal(session, log->log_write_cond));
+			/*
+			 * Signal the close thread if needed.
+			 */
+			if (F_ISSET(slot, SLOT_CLOSEFH)) {
+				F_CLR(slot, SLOT_CLOSEFH);
+				WT_ERR(__wt_cond_signal(session,
+				    conn->log_close_cond));
+			}
+			WT_ERR(__wt_log_slot_free(session, slot));
+			/*
+			 * If we processed one, reset and look for more.
+			 */
+			processed++;
+			yield = 0;
+		}
+		/*
+		 * If we processed any, we may have found it in the middle of
+		 * the array, so we want to continue looking for more by going
+		 * back to the beginning of the array again.
+		 */
+		if (processed)
+			continue;
+		/*
+		 * If we saw a later write, we always want to yield because
+		 * we know something is in progress.
+		 */
+		if (yield++ < 1000 || saw_later)
+			__wt_yield();
+		else
+			/* Wait until the next event. */
+			WT_ERR(__wt_cond_wait(session,
+			    conn->log_wrlsn_cond, 100000));
+	}
+
+	if (0)
+err:		__wt_err(session, ret, "log wrlsn server error");
+	return (NULL);
+}
+
+/*
  * __log_server --
  *	The log server thread.
  */
@@ -479,11 +567,23 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	    "log close server", 0, &conn->log_close_cond));
 
 	/*
-	 * Start the thread.
+	 * Start the log file close thread.
 	 */
 	WT_RET(__wt_thread_create(conn->log_close_session,
 	    &conn->log_close_tid, __log_close_server, conn->log_close_session));
 	conn->log_close_tid_set = 1;
+
+	/*
+	 * Start the log write LSN thread.  It is not configurable.
+	 * If logging is enabled, this thread runs.
+	 */
+	WT_RET(__wt_open_internal_session(
+	    conn, "log-wrlsn-server", 0, 0, &conn->log_wrlsn_session));
+	WT_RET(__wt_cond_alloc(conn->log_wrlsn_session,
+	    "log write lsn server", 0, &conn->log_wrlsn_cond));
+	WT_RET(__wt_thread_create(conn->log_wrlsn_session,
+	    &conn->log_wrlsn_tid, __log_wrlsn_server, conn->log_wrlsn_session));
+	conn->log_wrlsn_tid_set = 1;
 
 	/* If no log thread services are configured, we're done. */ 
 	if (!FLD_ISSET(conn->log_flags,
@@ -556,6 +656,16 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		wt_session = &conn->log_close_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 		conn->log_close_session = NULL;
+	}
+	if (conn->log_wrlsn_tid_set) {
+		WT_TRET(__wt_cond_signal(session, conn->log_wrlsn_cond));
+		WT_TRET(__wt_thread_join(session, conn->log_wrlsn_tid));
+		conn->log_wrlsn_tid_set = 0;
+	}
+	if (conn->log_wrlsn_session != NULL) {
+		wt_session = &conn->log_wrlsn_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		conn->log_wrlsn_session = NULL;
 	}
 
 	WT_TRET(__wt_log_close(session));

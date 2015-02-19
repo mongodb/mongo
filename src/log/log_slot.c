@@ -296,10 +296,29 @@ __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size)
  *	Free a slot back into the pool.
  */
 int
-__wt_log_slot_free(WT_LOGSLOT *slot)
+__wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	WT_DECL_RET;
+
+	ret = 0;
+	/*
+	 * Grow the buffer if needed before returning it to the pool.
+	 */
+	if (F_ISSET(slot, SLOT_BUF_GROW)) {
+		WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
+		F_CLR(slot, SLOT_BUF_GROW);
+		WT_STAT_FAST_CONN_INCRV(session,
+		    log_buffer_size, slot->slot_buf.memsize);
+		WT_ERR(__wt_buf_grow(session,
+		    &slot->slot_buf, slot->slot_buf.memsize * 2));
+	}
+	/*
+	 * No matter if there is an error, we always want to free
+	 * the slot back to the pool.
+	 */
+err:
 	slot->slot_state = WT_LOG_SLOT_FREE;
-	return (0);
+	return (ret);
 }
 
 /*

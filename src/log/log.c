@@ -898,7 +898,7 @@ err:
  *	Release a log slot.
  */
 static int
-__log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
+__log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -911,6 +911,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	conn = S2C(session);
 	log = conn->log;
 	locked = yield_count = 0;
+	*freep = 1;
 
 	/* Write the buffered records */
 	if (F_ISSET(slot, SLOT_BUFFERED)) {
@@ -921,8 +922,27 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	}
 
 	/*
-	 * Wait for earlier groups to finish, otherwise there could be holes
-	 * in the log file.
+	 * If this is not a buffered write, meaning the slot we have is a
+	 * dummy constructed slot, not from the slot pool, or we have to wait
+	 * for a synchronous operation, we do not pass handling of this slot
+	 * off to the worker thread.  The caller is responsible for freeing
+	 * the slot in that case.  Otherwise the worker thread will free it.
+	 */
+	if (F_ISSET(slot, SLOT_BUFFERED) &&
+	    !F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR)) {
+		*freep = 0;
+		slot->slot_state = WT_LOG_SLOT_WRITTEN;
+		/*
+		 * After this point the worker thread owns the slot.  There
+		 * is nothing more to do but return.
+		 */
+		WT_ERR(__wt_cond_signal(session, conn->log_wrlsn_cond));
+		goto done;
+	}
+
+	/*
+	 * Wait for earlier groups to finish, otherwise there could
+	 * be holes in the log file.
 	 */
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
 		if (++yield_count < 1000)
@@ -934,8 +954,13 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	log->write_lsn = slot->slot_end_lsn;
 	WT_ERR(__wt_cond_signal(session, log->log_write_cond));
 
-	if (F_ISSET(slot, SLOT_CLOSEFH))
+	/*
+	 * Signal the close thread if needed.
+	 */
+	if (F_ISSET(slot, SLOT_CLOSEFH)) {
+		F_CLR(slot, SLOT_CLOSEFH);
 		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
+	}
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
@@ -994,20 +1019,13 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		}
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_sync_lock);
+		if (ret != 0 && slot->slot_error == 0)
+			slot->slot_error = ret;
 		break;
-	}
-	if (F_ISSET(slot, SLOT_BUF_GROW)) {
-		WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
-		F_CLR(slot, SLOT_BUF_GROW);
-		WT_STAT_FAST_CONN_INCRV(session,
-		    log_buffer_size, slot->slot_buf.memsize);
-		WT_ERR(__wt_buf_grow(session,
-		    &slot->slot_buf, slot->slot_buf.memsize * 2));
 	}
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
-	if (ret != 0 && slot->slot_error == 0)
-		slot->slot_error = ret;
+done:
 	return (ret);
 }
 
@@ -1458,12 +1476,13 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOG *log;
 	WT_LOGSLOT tmp;
 	WT_MYSLOT myslot;
-	int locked;
+	int dummy, locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	log = S2C(session)->log;
 	myslot.slot = &tmp;
 	myslot.offset = 0;
+	dummy = 0;
 	WT_CLEAR(tmp);
 
 	/* Fast path the contended case. */
@@ -1479,7 +1498,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	__wt_spin_unlock(session, &log->log_slot_lock);
 	locked = 0;
 	WT_ERR(__log_fill(session, &myslot, 1, record, lsnp));
-	WT_ERR(__log_release(session, &tmp));
+	WT_ERR(__log_release(session, &tmp, &dummy));
 
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
@@ -1607,11 +1626,11 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LSN lsn;
 	WT_MYSLOT myslot;
 	uint32_t rdup_len;
-	int locked;
+	int free_slot, locked;
 
 	conn = S2C(session);
 	log = conn->log;
-	locked = 0;
+	free_slot = locked = 0;
 	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	/*
@@ -1693,8 +1712,9 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		WT_ERR(__wt_log_slot_wait(session, myslot.slot));
 	WT_ERR(__log_fill(session, &myslot, 0, record, &lsn));
 	if (__wt_log_slot_release(myslot.slot, rdup_len) == WT_LOG_SLOT_DONE) {
-		WT_ERR(__log_release(session, myslot.slot));
-		WT_ERR(__wt_log_slot_free(myslot.slot));
+		WT_ERR(__log_release(session, myslot.slot, &free_slot));
+		if (free_slot)
+			WT_ERR(__wt_log_slot_free(session, myslot.slot));
 	} else if (LF_ISSET(WT_LOG_FSYNC)) {
 		/* Wait for our writes to reach disk */
 		while (LOG_CMP(&log->sync_lsn, &lsn) <= 0 &&

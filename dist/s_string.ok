@@ -1161,6 +1161,7 @@ wrapup
 writelock
 writeunlock
 wrlock
+wrlsn
 ws
 wti
 wtperf
