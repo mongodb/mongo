@@ -953,12 +953,9 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	btree = S2BT(session);
 	mod = page->modify;
 
-	/*
-	 * It's unlikely we'd be here with a clean page, but in that case, we're
-	 * done, it can be evicted.
-	 */
+	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
-		return (0);
+		return (1);
 
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
