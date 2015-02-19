@@ -233,6 +233,7 @@ io
 ip
 je
 jemalloc
+jitter
 jni
 jrx
 json
@@ -324,6 +325,8 @@ oltp
 oob
 optype
 os
+outlier
+outliers
 ovfl
 pareto
 pcoll
