@@ -1010,14 +1010,14 @@ retry:	while (slot < max_entries && ret == 0) {
 
 	/*
 	 * Walk the list of files a few times if we don't find enough pages.
-	 * Try two passes through all the files, then only keep going if we
-	 * are finding more candidates.  Take care not to skip files on
-	 * subsequent passes.
+	 * Try two passes through all the files, give up when we have some
+	 * candidates and we aren't finding more.  Take care not to skip files
+	 * on subsequent passes.
 	 */
 	if (!F_ISSET(cache, WT_EVICT_CLEAR_WALKS) && ret == 0 &&
 	    slot < max_entries && (retries < 2 ||
-	    (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) &&
-	    retries < 10 && slot > start_slot))) {
+	    (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) && retries < 10 &&
+	    (slot == cache->evict_entries || slot > start_slot)))) {
 		cache->evict_file_next = NULL;
 		start_slot = slot;
 		++retries;
