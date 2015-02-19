@@ -945,14 +945,20 @@ __wt_ref_info(WT_SESSION_IMPL *session,
  *	Check whether a page can be evicted.
  */
 static inline int
-__wt_page_can_evict(
-    WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
+__wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 
 	btree = S2BT(session);
 	mod = page->modify;
+
+	/*
+	 * It's unlikely we'd be here with a clean page, but in that case, we're
+	 * done, it can be evicted.
+	 */
+	if (mod == NULL)
+		return (0);
 
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
@@ -963,7 +969,7 @@ __wt_page_can_evict(
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) && mod != NULL &&
+	if (WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
 
@@ -987,7 +993,7 @@ __wt_page_can_evict(
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	if (mod != NULL && btree->checkpointing &&
+	if (btree->checkpointing &&
 	    (__wt_page_is_modified(page) ||
 	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
@@ -999,7 +1005,7 @@ __wt_page_can_evict(
 	 * If we aren't (potentially) doing eviction that can restore updates
 	 * and the updates on this page are too recent, give up.
 	 */
-	if (page->read_gen != WT_READGEN_OLDEST && mod != NULL &&
+	if (page->read_gen != WT_READGEN_OLDEST &&
 	    !__wt_txn_visible_all(session, __wt_page_is_modified(page) ?
 	    mod->update_txn : mod->rec_max_txn))
 		return (0);
@@ -1008,7 +1014,7 @@ __wt_page_can_evict(
 	 * If the page was recently split in-memory, don't force it out: we
 	 * hope eviction will find it first.
 	 */
-	if (check_splits && mod != NULL &&
+	if (check_splits &&
 	    !__wt_txn_visible_all(session, mod->inmem_split_txn))
 		return (0);
 
