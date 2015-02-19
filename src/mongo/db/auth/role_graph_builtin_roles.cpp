@@ -544,6 +544,14 @@ namespace {
                 Privilege(ResourcePattern::forExactNamespace(
                                   AuthorizationManager::versionCollectionNamespace),
                           ActionType::find));
+
+        ActionSet configSettingsActions;
+        configSettingsActions << ActionType::insert << ActionType::update << ActionType::find;
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(NamespaceString("config",
+                                                                             "settings")),
+                          configSettingsActions));
     }
 
     void addRestorePrivileges(PrivilegeVector* privileges) {
