@@ -14,7 +14,7 @@
  */
 int
 __wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_REF **refp, uint64_t *refcntp, uint32_t flags)
+    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -179,8 +179,8 @@ restart:	/*
 		else
 			++slot;
 
-		if (refcntp != NULL)
-			++*refcntp;
+		if (walkcntp != NULL)
+			++*walkcntp;
 
 		for (descending = 0;;) {
 			ref = pindex->index[slot];
