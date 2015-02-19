@@ -854,7 +854,7 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int max_entries, old_slot, retries, slot;
+	u_int max_entries, prev_slot, retries, slot, start_slot, spins;
 	int incr, dhandle_locked;
 	WT_DECL_SPINLOCK_ID(id);
 
@@ -884,7 +884,7 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	 * Set the starting slot in the queue and the maximum pages added
 	 * per walk.
 	 */
-	slot = cache->evict_entries;
+	start_slot = slot = cache->evict_entries;
 	max_entries = slot + WT_EVICT_WALK_INCR;
 
 retry:	while (slot < max_entries && ret == 0) {
@@ -900,8 +900,16 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * reference count to keep it alive while we sweep.
 		 */
 		if (!dhandle_locked) {
-			if ((ret = __wt_spin_trylock(
-			    session, &conn->dhandle_lock, &id)) != 0)
+			for (spins = 0; (ret = __wt_spin_trylock(
+			    session, &conn->dhandle_lock, &id)) == EBUSY &&
+			    !F_ISSET(cache, WT_EVICT_CLEAR_WALKS);
+			    spins++) {
+				if (spins < 1000)
+					__wt_yield();
+				else
+					__wt_sleep(0, 1000);
+			}
+			if (ret != 0)
 				break;
 			dhandle_locked = 1;
 		}
@@ -941,10 +949,10 @@ retry:	while (slot < max_entries && ret == 0) {
 			continue;
 
 		/*
-		 * Also skip files that are configured to stick in cache until
-		 * we get aggressive.
+		 * Also skip files that are checkpointing or configured to
+		 * stick in cache until we get aggressive.
 		 */
-		if (btree->evict_priority != 0 &&
+		if ((btree->checkpointing || btree->evict_priority != 0) &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
 			continue;
 
@@ -957,7 +965,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		    btree->evict_walk_skips++ < btree->evict_walk_period)
 			continue;
 		btree->evict_walk_skips = 0;
-		old_slot = slot;
+		prev_slot = slot;
 
 		(void)WT_ATOMIC_ADD4(dhandle->session_inuse, 1);
 		incr = 1;
@@ -979,15 +987,14 @@ retry:	while (slot < max_entries && ret == 0) {
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
 		/*
-		 * If we didn't find enough candidates in the file, skip it
-		 * next time.
+		 * If we didn't find any candidates in the file, skip it next
+		 * time.
 		 */
-		if (slot >= old_slot + WT_EVICT_WALK_PER_FILE ||
-		    slot >= max_entries)
-			btree->evict_walk_period = 0;
-		else
+		if (slot == prev_slot)
 			btree->evict_walk_period = WT_MIN(
-			    WT_MAX(1, 2 * btree->evict_walk_period), 1000);
+			    WT_MAX(1, 2 * btree->evict_walk_period), 100);
+		else
+			btree->evict_walk_period = 0;
 	}
 
 	if (incr) {
@@ -1010,8 +1017,9 @@ retry:	while (slot < max_entries && ret == 0) {
 	if (!F_ISSET(cache, WT_EVICT_CLEAR_WALKS) && ret == 0 &&
 	    slot < max_entries && (retries < 2 ||
 	    (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) &&
-	    retries < 10 && slot > 0))) {
+	    retries < 10 && slot > start_slot))) {
 		cache->evict_file_next = NULL;
+		start_slot = slot;
 		++retries;
 		goto retry;
 	}
@@ -1079,9 +1087,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	 * Get some more eviction candidate pages.
 	 */
 	for (evict = start, pages_walked = 0, internal_pages = restarts = 0;
-	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
-	    ret = __wt_tree_walk(session, &btree->evict_ref, walk_flags),
-	    ++pages_walked) {
+	    evict < end && pages_walked < WT_EVICT_MAX_PER_FILE &&
+	    (ret == 0 || ret == WT_NOTFOUND);
+	    ret = __wt_tree_walk(
+	    session, &btree->evict_ref, &pages_walked, walk_flags)) {
 		if (btree->evict_ref == NULL) {
 			/*
 			 * Take care with terminating this loop.
@@ -1141,12 +1150,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 		}
 
-fast:		/*
-		 * If the file is being checkpointed, there's a period of time
-		 * where we can't discard dirty pages because of possible races
-		 * with the checkpointing thread.
-		 */
-		if (modified && btree->checkpointing)
+fast:		/* If the page can't be evicted, give up. */
+		if (!__wt_page_can_evict(session, page, 0))
 			continue;
 
 		/*
@@ -1462,7 +1467,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		next_walk = NULL;
 		session->dhandle = dhandle;
 		while (__wt_tree_walk(session,
-		    &next_walk, WT_READ_CACHE | WT_READ_NO_WAIT) == 0 &&
+		    &next_walk, NULL, WT_READ_CACHE | WT_READ_NO_WAIT) == 0 &&
 		    next_walk != NULL) {
 			page = next_walk->page;
 			if (page->type == WT_PAGE_COL_INT ||
