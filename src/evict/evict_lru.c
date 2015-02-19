@@ -255,9 +255,8 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 		if (i < conn->evict_workers_min) {
 			++conn->evict_workers;
 			F_SET(&workers[i], WT_EVICT_WORKER_RUN);
-			WT_ERR(__wt_thread_create(
-			    workers[i].session, &workers[i].tid,
-			    __evict_worker, &workers[i]));
+			WT_ERR(__wt_thread_create(workers[i].session,
+			    &workers[i].tid, __evict_worker, &workers[i]));
 		}
 	}
 
@@ -330,7 +329,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		WT_TRET(__wt_thread_join(session, workers[i].tid));
 	}
-	/* Handle shutdown when cleaning up after a failed open */
+	/* Handle shutdown when cleaning up after a failed open. */
 	if (conn->evict_workctx != NULL) {
 		for (i = 0; i < conn->evict_workers_alloc; i++) {
 			wt_session = &conn->evict_workctx[i].session->iface;
