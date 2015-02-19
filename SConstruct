@@ -337,9 +337,7 @@ add_option('variables-help',
            "Print the help text for SCons variables", 0, False)
 
 if darwin:
-    osx_version_choices = ['10.7', '10.8', '10.9', '10.10']
-    add_option("osx-version-min", "minimum OS X version to support", 1, True,
-               type = 'choice', default = osx_version_choices[0], choices = osx_version_choices)
+    add_option("osx-version-min", "minimum OS X version to support", 1, True)
 
 elif windows:
     win_version_min_choices = {
