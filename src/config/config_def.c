@@ -668,6 +668,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "force=0",
 	  confchk_session_salvage
 	},
+	{ "session.strerror",
+	  "",
+	  NULL
+	},
 	{ "session.truncate",
 	  "",
 	  NULL

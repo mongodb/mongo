@@ -111,6 +111,8 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	} *scratch_track;
 #endif
 
+	WT_ITEM err;			/* Error buffer */
+
 	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
 	u_int	ncursors;		/* Count of active file cursors. */
