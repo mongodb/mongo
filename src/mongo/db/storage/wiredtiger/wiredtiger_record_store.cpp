@@ -509,9 +509,9 @@ namespace {
                 invariantWTOK(ret);
 
                 ret = session->truncate(session, NULL, start, c, NULL);
-                if (ret == ENOENT) {
+                if (ret == ENOENT || ret == WT_NOTFOUND) {
                     // TODO we should remove this case once SERVER-17141 is resolved
-                    log() << "Got ENOENT truncating capped collection. Will try again later.";
+                    log() << "Soft failure truncating capped collection. Will try again later.";
                     docsRemoved = 0;
                 }
                 else {
