@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/rocks/rocks_engine.h"
+#include "mongo/db/storage/rocks/rocks_server_status.h"
 
 #include "mongo/base/init.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -51,8 +52,11 @@ namespace mongo {
                 options.forRepair = params.repair;
                 // Mongo keeps some files in params.dbpath. To avoid collision, put out files under
                 // db/ directory
-                return new KVStorageEngine(new RocksEngine(params.dbpath + "/db", params.dur),
-                                           options);
+                auto engine = new RocksEngine(params.dbpath + "/db", params.dur);
+                // Intentionally leaked.
+                auto leaked __attribute__((unused)) = new RocksServerStatusSection(engine);
+
+                return new KVStorageEngine(engine, options);
             }
 
             virtual StringData getCanonicalName() const {
