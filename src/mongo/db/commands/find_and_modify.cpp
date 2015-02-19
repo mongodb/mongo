@@ -37,12 +37,14 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
@@ -377,17 +379,79 @@ namespace mongo {
             }
             else {
                 // update
-                if ( ! found && ! upsert ) {
-                    // didn't have it, and am not upserting
-                    _appendHelper(result, doc, found, fields, whereCallback);
+                if (!found) {
+                    if (!upsert) {
+                        // Didn't have it, and not upserting.
+                        _appendHelper(result, doc, found, fields, whereCallback);
+                    }
+                    else {
+                        // Do an insert.
+                        BSONObj newDoc;
+                        {
+                            CanonicalQuery* rawCq;
+                            uassertStatusOK(CanonicalQuery::canonicalize(ns, queryModified, &rawCq,
+                                                                         WhereCallbackNoop()));
+                            boost::scoped_ptr<CanonicalQuery> cq(rawCq);
+
+                            UpdateDriver::Options opts;
+                            UpdateDriver driver(opts);
+                            uassertStatusOK(driver.parse(update));
+
+                            mutablebson::Document doc(newDoc,
+                                                      mutablebson::Document::kInPlaceDisabled);
+
+                            const bool ignoreVersion = false;
+                            UpdateLifecycleImpl updateLifecycle(ignoreVersion, collection->ns());
+
+                            UpdateStats stats;
+                            const bool isInternalRequest = false;
+
+                            uassertStatusOK(UpdateStage::applyUpdateOpsForInsert(cq.get(),
+                                                                                 queryModified,
+                                                                                 &driver,
+                                                                                 &updateLifecycle,
+                                                                                 &doc,
+                                                                                 isInternalRequest,
+                                                                                 &stats,
+                                                                                 &newDoc));
+                        }
+
+                        const bool enforceQuota = true;
+                        uassertStatusOK(collection->insertDocument(txn, newDoc, enforceQuota)
+                                        .getStatus());
+
+                        // This is the last thing we do before the WriteUnitOfWork commits (except
+                        // for some BSON manipulation).
+                        repl::logOp(txn, "i", collection->ns().ns().c_str(), newDoc);
+
+                        if (returnNew) {
+                            // The third argument, set to true here, indicates whether or not we
+                            // have something for the 'value' field returned by a findAndModify
+                            // command.
+                            //
+                            // If we're returning the old version of the document, then the this
+                            // boolean is set based on whether or not we found something.
+                            //
+                            // Here we didn't find a document, but we inserted a document and the
+                            // user is asking for the new doc back. Therefore, we always have a
+                            // value to return, so we just pass true.
+                            _appendHelper(result, newDoc, true, fields, whereCallback);
+                        }
+
+                        BSONObjBuilder le(result.subobjStart("lastErrorObject"));
+                        le.appendBool("updatedExisting", false);
+                        le.appendNumber("n", 1);
+                        le.appendAs(newDoc["_id"], kUpsertedFieldName);
+                        le.done();
+                    }
                 }
                 else {
                     // we found it or we're updating
-                    
+
                     if ( ! returnNew ) {
                         _appendHelper(result, doc, found, fields, whereCallback);
                     }
-                    
+
                     const NamespaceString requestNs(ns);
                     UpdateRequest request(requestNs);
 
@@ -408,21 +472,10 @@ namespace mongo {
                                                      request,
                                                      &txn->getCurOp()->debug());
 
-                    if (!found && res.existing) {
-                        // No match was found during the read part of this find and modify, which
-                        // means that we're here doing an upsert. But the update also told us that
-                        // we modified an *already existing* document. This probably means that
-                        // the query reported EOF based on an out-of-date snapshot. This should be
-                        // a rare event, so we handle it by throwing a write conflict.
-                        throw WriteConflictException();
-                    }
+                    invariant(collection);
+                    invariant(res.existing);
+                    LOG(3) << "update result: "  << res;
 
-                    if ( !collection ) {
-                        // collection created by an upsert
-                        collection = ctx.db()->getCollection(ns);
-                    }
-
-                    LOG(3) << "update result: "  << res ;
                     if (returnNew) {
                         dassert(!res.newObj.isEmpty());
                         _appendHelper(result, res.newObj, true, fields, whereCallback);

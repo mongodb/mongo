@@ -115,6 +115,33 @@ namespace mongo {
          */
         static UpdateResult makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug);
 
+        /**
+         * Computes the document to insert if the upsert flag is set to true and no matching
+         * documents are found in the database. The document to upsert is computing using the
+         * query 'cq' and the update mods contained in 'driver'.
+         *
+         * If 'cq' is NULL, which can happen for the idhack update fast path, then 'query' is
+         * used to compute the doc to insert instead of 'cq'.
+         *
+         * 'doc' is the mutable BSON document which you would like the update driver to use
+         * when computing the document to insert.
+         *
+         * Set 'isInternalRequest' to true if the upsert was issued by the replication or
+         * sharding systems.
+         *
+         * Fills out whether or not this is a fastmodinsert in 'stats'.
+         *
+         * Returns the document to insert in *out.
+         */
+        static Status applyUpdateOpsForInsert(const CanonicalQuery* cq,
+                                              const BSONObj& query,
+                                              UpdateDriver* driver,
+                                              UpdateLifecycle* lifecycle,
+                                              mutablebson::Document* doc,
+                                              bool isInternalRequest,
+                                              UpdateStats* stats,
+                                              BSONObj* out);
+
     private:
         /**
          * Computes the result of applying mods to the document 'oldObj' at RecordId 'loc' in
