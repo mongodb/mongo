@@ -174,7 +174,6 @@ namespace {
           _connectionId(p ? p->connectionId() : 0),
           _god(0),
           _txn(NULL),
-          _locker(newLocker()),
           _lastOp(0),
           _shutdown(false) {
 
@@ -370,6 +369,13 @@ namespace {
         }
     }
 
+    Locker* Client::getLocker() {
+        if (!_locker) {
+            _locker.reset(newLocker());
+        }
+
+        return _locker.get();
+    }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
         // _lastOp is never set if replication is off

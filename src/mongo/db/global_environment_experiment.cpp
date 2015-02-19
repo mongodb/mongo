@@ -67,15 +67,11 @@ namespace mongo {
     }
 
     bool isMMAPV1() {
-        if (hasGlobalEnvironment()) {
-            StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            if (globalStorageEngine != NULL) {
-                return globalStorageEngine->isMmapV1();
-            }
-        }
+        invariant(hasGlobalEnvironment());
+        StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
 
-        // For the purpose of unit-tests, which were written to assume MMAP V1-like behaviour
-        return true;
+        invariant(globalStorageEngine);
+        return globalStorageEngine->isMmapV1();
     }
 
     Status validateStorageOptions(const BSONObj& storageEngineOptions,

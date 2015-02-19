@@ -437,6 +437,32 @@ namespace mongo {
     static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
 
+        // Warn if we detect configurations for multiple registered storage engines in
+        // the same configuration file/environment.
+        if (serverGlobalParams.parsedOpts.hasField("storage")) {
+            BSONElement storageElement = serverGlobalParams.parsedOpts.getField("storage");
+            invariant(storageElement.isABSONObj());
+            BSONObj storageParamsObj = storageElement.Obj();
+            BSONObjIterator i = storageParamsObj.begin();
+            while (i.more()) {
+                BSONElement e = i.next();
+                // Ignore if field name under "storage" matches current storage engine.
+                if (storageGlobalParams.engine == e.fieldName()) {
+                    continue;
+                }
+
+                // Warn if field name matches non-active registered storage engine.
+                if (getGlobalEnvironment()->isRegisteredStorageEngine(e.fieldName())) {
+                    warning() << "Detected configuration for non-active storage engine "
+                              << e.fieldName()
+                              << " when current storage engine is "
+                              << storageGlobalParams.engine;
+                }
+            }
+        }
+
+        getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
+
         const repl::ReplSettings& replSettings =
                 repl::getGlobalReplicationCoordinator()->getSettings();
 
@@ -481,26 +507,6 @@ namespace mongo {
                     boost::filesystem::exists(storageGlobalParams.repairpath));
         }
 
-        // Warn if we detect configurations for multiple registered storage engines in
-        // the same configuration file/environment.
-        if (serverGlobalParams.parsedOpts.hasField("storage")) {
-            BSONElement storageElement = serverGlobalParams.parsedOpts.getField("storage");
-            invariant(storageElement.isABSONObj());
-            BSONObj storageParamsObj = storageElement.Obj();
-            BSONObjIterator i = storageParamsObj.begin();
-            while (i.more()) {
-                BSONElement e = i.next();
-                // Ignore if field name under "storage" matches current storage engine.
-                if (storageGlobalParams.engine == e.fieldName()) continue;
-                // Warn if field name matches non-active registered storage engine.
-                if (getGlobalEnvironment()->isRegisteredStorageEngine(e.fieldName())) {
-                    warning()
-                        << "Detected configuration for non-active storage engine " << e.fieldName()
-                        << " when current storage engine is " << storageGlobalParams.engine;
-                }
-            }
-        }
-
         // Due to SERVER-15389, we must setupSockets first thing at startup in order to avoid
         // obtaining too high a file descriptor for our calls to select().
         MessageServer::Options options;
@@ -519,8 +525,6 @@ namespace mongo {
         if (snmpInit) {
             snmpInit();
         }
-
-        getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 

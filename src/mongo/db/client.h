@@ -203,7 +203,7 @@ namespace mongo {
         OpTime getLastOp() const { return _lastOp; }
 
         // Return a reference to the Locker for this client. Client retains ownership.
-        Locker* getLocker() const { return _locker.get(); }
+        Locker* getLocker();
 
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp(BSONObjBuilder& b) const;
@@ -258,9 +258,9 @@ namespace mongo {
         // Changes, based on what operation is running. Some of this should be in OperationContext.
         CurOp* _curOp;
 
-        // By having Client, rather than the OperationContext, own the Locker,  setup cost such as
+        // By having Client, rather than the OperationContext, own the Locker, setup cost such as
         // allocating OS resources can be amortized over multiple operations.
-        boost::scoped_ptr<Locker> const _locker;
+        boost::scoped_ptr<Locker> _locker;
 
         // Used by replication
         OpTime _lastOp;
