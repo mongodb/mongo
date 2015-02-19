@@ -35,7 +35,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {

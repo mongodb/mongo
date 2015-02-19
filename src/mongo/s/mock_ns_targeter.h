@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/unittest/unittest.h"

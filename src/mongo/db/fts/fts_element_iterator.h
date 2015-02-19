@@ -31,7 +31,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_spec.h"
 

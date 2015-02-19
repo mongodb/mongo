@@ -36,7 +36,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/util/assert_util.h"

@@ -39,6 +39,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
     using namespace std;
@@ -812,6 +813,46 @@ namespace mongo {
     StringBuilder& operator<<( StringBuilder &s, const BSONObj &o ) {
         o.toString( s );
         return s;
+    }
+
+    /** Compare two bson elements, provided as const char *'s, by field name. */
+    class BSONIteratorSorted::ElementFieldCmp {
+    public:
+        ElementFieldCmp( bool isArray );
+        bool operator()( const char *s1, const char *s2 ) const;
+    private:
+        LexNumCmp _cmp;
+    };
+
+    BSONIteratorSorted::ElementFieldCmp::ElementFieldCmp( bool isArray ) :
+    _cmp( !isArray ) {
+    }
+
+    bool BSONIteratorSorted::ElementFieldCmp::operator()( const char *s1, const char *s2 )
+    const {
+        // Skip the type byte and compare field names.
+        return _cmp( s1 + 1, s2 + 1 );
+    }
+
+    BSONIteratorSorted::BSONIteratorSorted( const BSONObj &o, const ElementFieldCmp &cmp )
+        : _nfields(o.nFields()), _fields(new const char*[_nfields]) {
+        int x = 0;
+        BSONObjIterator i( o );
+        while ( i.more() ) {
+            _fields[x++] = i.next().rawdata();
+            verify( _fields[x-1] );
+        }
+        verify( x == _nfields );
+        std::sort( _fields.get() , _fields.get() + _nfields , cmp );
+        _cur = 0;
+    }
+
+    BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj &object ) :
+    BSONIteratorSorted( object, ElementFieldCmp( false ) ) {
+    }
+
+    BSONArrayIteratorSorted::BSONArrayIteratorSorted( const BSONArray &array ) :
+    BSONIteratorSorted( array, ElementFieldCmp( true ) ) {
     }
 
 } // namespace mongo

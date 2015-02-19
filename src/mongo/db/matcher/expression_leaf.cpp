@@ -33,7 +33,6 @@
 #include <cmath>
 #include <pcrecpp.h>
 
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/field_ref.h"

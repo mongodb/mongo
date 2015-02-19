@@ -119,7 +119,6 @@ env.Library('bson', [
         'bson/bsonmisc.cpp',
         'bson/bsonobj.cpp',
         'bson/bsonobjbuilder.cpp',
-        'bson/bsonobjiterator.cpp',
         'bson/bsontypes.cpp',
         'db/json.cpp'
         ], LIBDEPS=[
