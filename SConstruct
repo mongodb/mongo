@@ -308,7 +308,7 @@ env = Environment( BUILD_DIR=variantDir,
                    UNITTEST_LIST='#build/unittests.txt',
                    PYSYSPLATFORM=os.sys.platform,
 
-                   PCRE_VERSION='8.30',
+                   PCRE_VERSION='8.36',
                    CONFIGUREDIR = '#' + scons_data_dir + '/sconf_temp',
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
@@ -399,6 +399,7 @@ if has_option( "cpppath" ):
 
 env.Prepend( CPPDEFINES=[ "_SCONS" , 
                           "MONGO_EXPOSE_MACROS" ,
+                          "PCRE_STATIC",  # for pcre on Windows
                           "SUPPORT_UTF8" ],  # for pcre
 
 
