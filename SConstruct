@@ -575,7 +575,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                # changes to MCI.
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
                PYSYSPLATFORM=os.sys.platform,
-               PCRE_VERSION='8.30',
+               PCRE_VERSION='8.36',
                CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
                CONFIGURELOG=sconsDataDir.File('config.log'),
                INSTALL_DIR=installDir,
@@ -773,6 +773,7 @@ if has_option( "cpppath" ):
 
 env.Prepend( CPPDEFINES=[ "_SCONS" , 
                           "MONGO_EXPOSE_MACROS" ,
+                          "PCRE_STATIC",  # for pcre on Windows
                           "SUPPORT_UTF8" ],  # for pcre
 )
 
