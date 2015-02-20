@@ -50,13 +50,17 @@ if (jsTest.options().keyFile) {
     assert.eq(numDocs, standaloneDB[testColName].count(),
               'cloneDatabase from PRIMARY to standalone failed (document counts do not match)');
     
-    /* cloning from a SECONDARY does not work (SERVER-13357)
-    jsTest.log("Clone db from replica set SECONDARY to standalone server");
+    jsTest.log("Clone db from replica set SECONDARY to standalone server (should not copy)");
     standaloneDB.dropDatabase();
     standaloneDB.cloneDatabase(secondary.host);
+    assert.eq(0, standaloneDB[testColName].count(),
+              'cloneDatabase from SECONDARY to standalone copied documents without slaveOk: true');
+
+    jsTest.log("Clone db from replica set SECONDARY to standalone server using slaveOk");
+    standaloneDB.dropDatabase();
+    standaloneDB.runCommand({clone: secondary.host, slaveOk: true});
     assert.eq(numDocs, standaloneDB[testColName].count(),
               'cloneDatabase from SECONDARY to standalone failed (document counts do not match)');
-    */
     
     jsTest.log("Switch db and insert data into standalone server");
     masterDB = master.getDB(standaloneDBName);
