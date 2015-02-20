@@ -1081,15 +1081,13 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 		 * fully instantiated when truncating row-store objects because
 		 * it's comparing page and/or skiplist positions, not keys. (Key
 		 * comparison would work, it's only that a key comparison would
-		 * be relatively expensive.  Column-store objects have record
-		 * number keys, so the key comparison is cheap.)  Cursors may
-		 * have only had their keys set, so we must ensure the cursors
-		 * are positioned in the tree.
+		 * be relatively expensive, especially with custom collators.
+		 * Column-store objects have record number keys, so the key
+		 * comparison is cheap.)  The session truncate code did cursor
+		 * searches when setting up the truncate so we're good to go: if
+		 * that ever changes, we'd need to do something here to ensure a
+		 * fully instantiated cursor.
 		 */
-		if (start != NULL)
-			WT_ERR(__wt_btcur_search(start));
-		if (stop != NULL)
-			WT_ERR(__wt_btcur_search(stop));
 		WT_ERR(__cursor_truncate(
 		    session, start, stop, __cursor_row_modify));
 		break;
