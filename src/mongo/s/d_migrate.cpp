@@ -326,6 +326,16 @@ namespace mongo {
                    const BSONObj& obj,
                    BSONObj* patt,
                    bool notInActiveChunk) {
+            const char op = opstr[0];
+
+            if (notInActiveChunk) {
+                // Ignore writes that came from the migration process like cleanup so they
+                // won't be transferred to the recipient shard. Also ignore ops from
+                // _migrateClone and _transferMods since it is impossible to move a chunk
+                // to self.
+                return;
+            }
+
             dassert(txn->lockState()->isWriteLocked()); // Must have Global IX.
 
             if (!_active)
@@ -335,29 +345,47 @@ namespace mongo {
                 return;
 
             // no need to log if this is not an insertion, an update, or an actual deletion
-            // note: opstr 'db' isn't a deletion but a mention that a database exists (for replication
-            // machinery mostly)
-            char op = opstr[0];
-            if ( op == 'n' || op =='c' || ( op == 'd' && opstr[1] == 'b' ) )
+            // note: opstr 'db' isn't a deletion but a mention that a database exists
+            // (for replication machinery mostly).
+            if (op == 'n' || op == 'c' || (op == 'd' && opstr[1] == 'b'))
                 return;
 
             BSONElement ide;
-            if ( patt )
-                ide = patt->getField( "_id" );
+            if (patt)
+                ide = patt->getField("_id");
             else
                 ide = obj["_id"];
 
-            if ( ide.eoo() ) {
-                warning() << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << migrateLog;
+            if (ide.eoo()) {
+                warning() << "logOpForSharding got mod with no _id, ignoring  obj: "
+                          << obj << migrateLog;
                 return;
             }
 
-            txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this,
-                                                                            txn,
-                                                                            ide.wrap(),
-                                                                            obj,
-                                                                            op,
-                                                                            notInActiveChunk));
+            if (op == 'i' && (!isInRange(obj, _min, _max, _shardKeyPattern))) {
+                return;
+            }
+
+            BSONObj idObj(ide.wrap());
+
+            if (op == 'u') {
+                BSONObj fullDoc;
+                Client::Context ctx(txn, _ns);
+                if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), idObj, fullDoc)) {
+                    warning() << "logOpForSharding couldn't find: " << idObj
+                              << " even though should have" << migrateLog;
+                    dassert(false); // TODO: Abort the migration.
+                    return;
+                }
+
+                if (!isInRange(fullDoc, _min, _max, _shardKeyPattern)) {
+                    return;
+                }
+            }
+
+            // Note: can't check if delete is in active chunk since the document is gone!
+
+            txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, op));
         }
 
         /**
@@ -699,89 +727,53 @@ namespace mongo {
         void _setActive( bool b ) { scoped_lock lk(_mutex); _active = b; }
 
         /**
-         * Used to commit work for LogOpForSharding.
+         * Used to commit work for LogOpForSharding. Used to keep track of changes in documents
+         * that are part of a chunk being migrated.
          */
         class LogOpForShardingHandler : public RecoveryUnit::Change {
         public:
+            /**
+             * Invariant: idObj should belong to a document that is part of the active chunk
+             * being migrated.
+             */
             LogOpForShardingHandler(MigrateFromStatus* migrateFromStatus,
-                                    OperationContext* txn,
                                     const BSONObj& idObj,
-                                    const BSONObj& obj,
-                                    const char op,
-                                    const bool notInActiveChunk):
+                                    const char op):
                 _migrateFromStatus(migrateFromStatus),
-                _txn(txn),
                 _idObj(idObj.getOwned()),
-                _obj(obj.getOwned()),
-                _op(op),
-                _notInActiveChunk(notInActiveChunk) {
-
+                _op(op) {
             }
 
             virtual void commit() {
-                dassert(_txn->lockState()->isWriteLocked()); // Must have Global IX.
-
-                BSONObj it;
-
-                switch ( _op ) {
-
+                switch (_op) {
                 case 'd': {
-
-                    if (_notInActiveChunk) {
-                        // we don't want to xfer things we're cleaning
-                        // as then they'll be deleted on TO
-                        // which is bad
-                        return;
-                    }
-
                     scoped_lock sl(_migrateFromStatus->_mutex);
-                    // can't filter deletes :(
                     _migrateFromStatus->_deleted.push_back(_idObj);
                     _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
-                    return;
+                    break;
                 }
 
                 case 'i':
-                    it = _obj;
-                    break;
-
                 case 'u':
-                    Client::Context ctx(_txn, _migrateFromStatus->_ns);
-                    if (!Helpers::findById(_txn,
-                                           ctx.db(),
-                                           _migrateFromStatus->_ns.c_str(),
-                                           _idObj,
-                                           it)) {
-                        warning() << "logOpForSharding couldn't find: "
-                                  << _idObj.firstElement()
-                                  << " even though should have" << migrateLog;
-                        return;
-                    }
+                {
+                    scoped_lock sl(_migrateFromStatus->_mutex);
+                    _migrateFromStatus->_reload.push_back(_idObj);
+                    _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
                     break;
-
                 }
 
-                if (!isInRange(it,
-                               _migrateFromStatus->_min,
-                               _migrateFromStatus->_max,
-                               _migrateFromStatus->_shardKeyPattern)) {
-                    return;
-                }
+                default:
+                    invariant(false);
 
-                scoped_lock sl(_migrateFromStatus->_mutex);
-                _migrateFromStatus->_reload.push_back(_idObj);
-                _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
+                }
             }
 
             virtual void rollback() { }
 
         private:
             MigrateFromStatus* _migrateFromStatus;
-            OperationContext* _txn;
             const BSONObj _idObj;
-            const BSONObj _obj;
             const char _op;
-            const bool _notInActiveChunk;
         };
 
         /**
