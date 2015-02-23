@@ -821,7 +821,7 @@ tasks:
         script: |
           cp mongodb*/bin/* .
           rm -rf /data/install /data/multiversion
-          ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6" "3.0.0-rc9"
+          ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6" "3.0"
           PATH=$PATH:/data/multiversion ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} multiVersion
 
 - name: noPassthrough

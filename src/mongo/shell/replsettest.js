@@ -979,7 +979,7 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     
     var lastTime = null
     var currTime = new Date().getTime()
-    var status = undefined
+    var status = undefined;
 
     var self = this;
     assert.soon(function() {
@@ -988,7 +988,6 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             if (!conn) conn = self.liveNodes.slaves[0];
             if (!conn) return false; // Try again to load connection
 
-            var status = null;
             var getStatusFunc = function() {
                 status = conn.getDB('admin').runCommand({replSetGetStatus: 1});
             };

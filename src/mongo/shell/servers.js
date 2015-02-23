@@ -112,14 +112,14 @@ MongoRunner.VersionSub = function(regex, version) {
 // version string to support the dev/stable MongoDB release cycle.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
                                new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
-                               // To-be-updated when 3.0 becomes available
-                               new MongoRunner.VersionSub(/^last-stable$/, "2.6"),
+                               // To-be-updated when 3.4 becomes available
+                               new MongoRunner.VersionSub(/^last-stable$/, "3.0"),
                                // Latest unstable and next stable are effectively the
                                // same release
-                               new MongoRunner.VersionSub(/^2\.7(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^3\.0(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, "") ];
+                               // 2.8 and 3.0 are equivalent.
+                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, "3.0"),
+                               new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.2(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
  

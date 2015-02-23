@@ -142,5 +142,5 @@ assert.allBinVersions( versionsToCheck, versionsFound );
 jsTest.log("DONE!");
    
 st.stop();
-}); // TODO: SERVER-17348 enable again after v3.0 is released.
+})();
 

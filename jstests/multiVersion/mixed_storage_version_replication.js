@@ -567,7 +567,7 @@ function doMultiThreadedWork(primary, numThreads) {
     "use strict";
     var name = "mixed_storage_and_version";
     // Create a replica set with 2 nodes of each of the types below, plus one arbiter.
-    var oldVersion = "2.6";
+    var oldVersion = "last-stable";
     var newVersion = "latest";
     var setups = [{binVersion: newVersion, storageEngine: 'mmapv1'},
                   {binVersion: newVersion, storageEngine: 'wiredTiger'},
@@ -621,7 +621,7 @@ function doMultiThreadedWork(primary, numThreads) {
         catch(e) {
             // Expected to fail, as we'll have to reconnect.
         }
-        replTest.awaitReplication();
+        replTest.awaitReplication(60000); // 2 times the election period.
         assert.soon(primaryChanged(conns, replTest, primaryIndex),
                     "waiting for higher priority primary to be elected", 100000);
         print("New primary elected, doing a bunch of work");
@@ -631,4 +631,4 @@ function doMultiThreadedWork(primary, numThreads) {
         print("Work done, checking to see all nodes match");
         assertSameData(primary, conns);
     }
-}); // TODO: SERVER-17348 enable again after v3.0 is released.
+})();

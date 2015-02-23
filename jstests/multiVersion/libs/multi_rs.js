@@ -46,8 +46,12 @@ ReplSetTest.prototype.upgradeNode = function(node, opts, user, pwd) {
         assert.eq(1, node.getDB("admin").auth(user, pwd));
     }
 
-    assert.commandWorked(node.adminCommand("replSetMaintenance"));
-    this.waitForState(node, ReplSetTest.State.RECOVERING);
+    var isMaster = node.getDB('admin').runCommand({ isMaster: 1 });
+
+    if (!isMaster.arbiterOnly) {
+        assert.commandWorked(node.adminCommand("replSetMaintenance"));
+        this.waitForState(node, ReplSetTest.State.RECOVERING);
+    }
 
     var newNode = this.restart(node, opts);
     if (user != undefined) {

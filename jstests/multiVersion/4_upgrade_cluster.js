@@ -2,8 +2,6 @@
 // Upgrades a cluster to a newer version
 //
 
-if (false) { // TODO: SERVER-17348 enable again after v3.0 is released.
-
 load( './jstests/multiVersion/libs/multi_rs.js' )
 load( './jstests/multiVersion/libs/multi_cluster.js' )
 load( './jstests/libs/test_background_ops.js' )
@@ -156,4 +154,3 @@ jsTest.log( "DONE!" )
 st.stop()
 
 } // END OUTER LOOP FOR RS CLUSTER
-}
