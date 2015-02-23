@@ -37,7 +37,7 @@ if (jsTest.options().keyFile) {
     for (var i = 0; i < numDocs; i++) {
         bulk.insert({x: i, text: str});
     }
-    assert.writeOK(bulk.execute());
+    assert.writeOK(bulk.execute({w: 3}));
     
     jsTest.log("Clone db from replica set to standalone server");
     standaloneDB.cloneDatabase(replTest.getURL());
