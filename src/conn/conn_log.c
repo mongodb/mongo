@@ -395,6 +395,7 @@ __log_wrlsn_server(void *arg)
 			 */
 			log->write_lsn = slot->slot_end_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_write_cond));
+			WT_STAT_FAST_CONN_INCR(session, log_write_lsn);
 			/*
 			 * Signal the close thread if needed.
 			 */

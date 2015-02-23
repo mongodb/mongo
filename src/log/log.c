@@ -944,6 +944,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * Wait for earlier groups to finish, otherwise there could
 	 * be holes in the log file.
 	 */
+	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
 		if (++yield_count < 1000)
 			__wt_yield();
