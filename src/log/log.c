@@ -962,10 +962,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		F_CLR(slot, SLOT_CLOSEFH);
 		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
 	}
-	if (F_ISSET(slot, SLOT_SYNC))
-		WT_STAT_FAST_CONN_INCR(session, log_release_sync);
-	if (F_ISSET(slot, SLOT_SYNC_DIR))
-		WT_STAT_FAST_CONN_INCR(session, log_release_sync_dir);
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
@@ -1006,7 +1002,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 			WT_ERR(__wt_directory_sync_fh(
 			    session, log->log_dir_fh));
 			log->sync_dir_lsn = sync_lsn;
-			F_CLR(slot, SLOT_SYNC_DIR);
 			WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
 		}
 
@@ -1019,10 +1014,13 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 			    "log_release: sync log %s", log->log_fh->name));
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
 			WT_ERR(__wt_fsync(session, log->log_fh));
-			F_CLR(slot, SLOT_SYNC);
 			log->sync_lsn = sync_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 		}
+		/*
+		 * Clear the flags before leaving the loop.
+		 */
+		F_CLR(slot, SLOT_SYNC | SLOT_SYNC_DIR);
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_sync_lock);
 		if (ret != 0 && slot->slot_error == 0)
@@ -1500,7 +1498,6 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		F_SET(&tmp, SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, SLOT_SYNC);
-	WT_STAT_FAST_CONN_INCR(session, log_direct_write);
 	WT_ERR(__log_acquire(session, record->size, &tmp));
 	__wt_spin_unlock(session, &log->log_slot_lock);
 	locked = 0;

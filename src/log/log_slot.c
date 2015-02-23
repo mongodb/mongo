@@ -312,11 +312,17 @@ __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		WT_ERR(__wt_buf_grow(session,
 		    &slot->slot_buf, slot->slot_buf.memsize * 2));
 	}
+err:
 	/*
 	 * No matter if there is an error, we always want to free
 	 * the slot back to the pool.
 	 */
-err:
+	/*
+	 * Make sure flags don't get retained between uses.
+	 * We have to reset them them here because multiple threads may
+	 * change the flags when joining the slot.
+	 */
+	F_SET(slot, SLOT_INIT_FLAGS);
 	slot->slot_state = WT_LOG_SLOT_FREE;
 	return (ret);
 }

@@ -441,7 +441,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_buffer_grow.desc = "log: log buffer size increases";
 	stats->log_bytes_payload.desc = "log: log bytes of payload data";
 	stats->log_bytes_written.desc = "log: log bytes written";
-	stats->log_direct_write.desc = "log: log direct write operations";
 	stats->log_reads.desc = "log: log read operations";
 	stats->log_compress_writes.desc = "log: log records compressed";
 	stats->log_compress_write_fails.desc =
@@ -450,9 +449,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "log: log records too small to compress";
 	stats->log_release_write_lsn.desc =
 	    "log: log release advances write LSN";
-	stats->log_release_sync.desc = "log: log release calls with sync set";
-	stats->log_release_sync_dir.desc =
-	    "log: log release calls with sync_dir set";
 	stats->log_scans.desc = "log: log scan operations";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
@@ -618,14 +614,11 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_buffer_grow.v = 0;
 	stats->log_bytes_payload.v = 0;
 	stats->log_bytes_written.v = 0;
-	stats->log_direct_write.v = 0;
 	stats->log_reads.v = 0;
 	stats->log_compress_writes.v = 0;
 	stats->log_compress_write_fails.v = 0;
 	stats->log_compress_small.v = 0;
 	stats->log_release_write_lsn.v = 0;
-	stats->log_release_sync.v = 0;
-	stats->log_release_sync_dir.v = 0;
 	stats->log_scans.v = 0;
 	stats->log_scan_rereads.v = 0;
 	stats->log_write_lsn.v = 0;

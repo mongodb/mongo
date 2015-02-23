@@ -210,14 +210,11 @@ struct __wt_connection_stats {
 	WT_STATS log_compress_small;
 	WT_STATS log_compress_write_fails;
 	WT_STATS log_compress_writes;
-	WT_STATS log_direct_write;
 	WT_STATS log_max_filesize;
 	WT_STATS log_prealloc_files;
 	WT_STATS log_prealloc_max;
 	WT_STATS log_prealloc_used;
 	WT_STATS log_reads;
-	WT_STATS log_release_sync;
-	WT_STATS log_release_sync_dir;
 	WT_STATS log_release_write_lsn;
 	WT_STATS log_scan_records;
 	WT_STATS log_scan_rereads;

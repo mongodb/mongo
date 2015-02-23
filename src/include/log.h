@@ -96,6 +96,8 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	uint32_t flags;			/* Flags */
 } WT_LOGSLOT;
 
+#define	SLOT_INIT_FLAGS	(SLOT_BUFFERED)
+
 typedef struct {
 	WT_LOGSLOT	*slot;
 	wt_off_t	 offset;
