@@ -335,7 +335,7 @@ namespace auth {
         validFieldNames.insert(command);
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "dropAllUsersFromDatabase", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, command, validFieldNames);
         if (!status.isOK()) {
             return status;
         }
