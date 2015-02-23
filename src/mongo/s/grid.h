@@ -36,9 +36,10 @@
 #include "mongo/util/concurrency/mutex.h"
 
 #include "mongo/s/config.h"  // DBConfigPtr
-#include "mongo/s/type_settings.h"
 
 namespace mongo {
+
+    class SettingsType;
 
     /**
      * stores meta-information about the grid

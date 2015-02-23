@@ -96,33 +96,29 @@ namespace mongo {
         _conns.clear();
     }
 
-    bool SyncClusterConnection::prepare( string& errmsg ) {
+    bool SyncClusterConnection::prepare(string& errmsg) {
         _lastErrors.clear();
-        return fsync( errmsg );
-    }
 
-    bool SyncClusterConnection::fsync( string& errmsg ) {
         bool ok = true;
         errmsg = "";
-        for ( size_t i=0; i<_conns.size(); i++ ) {
+
+        for (size_t i = 0; i < _conns.size(); i++) {
             string singleErr;
             try {
-                // this is fsync=true
-                // which with journalling on is a journal commit
-                // without journalling, is a full fsync
-                _conns[i]->simpleCommand( "admin", NULL, "resetError" );
-                singleErr = _conns[i]->getLastError( true );
+                _conns[i]->simpleCommand("admin", NULL, "resetError");
+                singleErr = _conns[i]->getLastError(true);
 
-                if ( singleErr.size() == 0 )
+                if (singleErr.size() == 0)
                     continue;
 
             }
-            catch ( DBException& e ) {
+            catch (DBException& e) {
                 singleErr = e.toString();
             }
             ok = false;
             errmsg += " " + _conns[i]->toString() + ":" + singleErr;
         }
+
         return ok;
     }
 

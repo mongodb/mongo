@@ -60,18 +60,13 @@ namespace mongo {
         return config.get();
     }
 
-    ChunkManagerTargeter::ChunkManagerTargeter() :
-            _needsTargetingRefresh( false ), _stats( new TargeterStats ) {
+    ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss)
+        : _nss(nss),
+          _needsTargetingRefresh(false) {
+
     }
 
-    Status ChunkManagerTargeter::init( const NamespaceString& nss ) {
-
-        _nss = nss;
-
-        //
-        // Get the latest metadata information from the cache
-        //
-
+    Status ChunkManagerTargeter::init() {
         DBConfigPtr config;
 
         string errMsg;
@@ -399,8 +394,9 @@ namespace mongo {
 
         // Track autosplit stats for sharded collections
         // Note: this is only best effort accounting and is not accurate.
-        if (estDataSize > 0)
-            _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
+        if (estDataSize > 0) {
+            _stats.chunkSizeDelta[chunk->getMin()] += estDataSize;
+        }
 
         Shard shard = chunk->getShard();
         *endpoint = new ShardEndpoint(shard.getName(),
@@ -646,7 +642,7 @@ namespace mongo {
     }
 
     const TargeterStats* ChunkManagerTargeter::getStats() const {
-        return _stats.get();
+        return &_stats;
     }
 
     Status ChunkManagerTargeter::refreshIfNeeded( bool *wasChanged ) {

@@ -688,13 +688,7 @@ namespace mongo {
                 //    Only need to call ensureIndex on primary shard, since indexes get copied to
                 //    receiving shard whenever a migrate occurs.
                 else {
-                    // call ensureIndex with cache=false, see SERVER-1691
-                    Status result = clusterCreateIndex( ns,
-                                                        proposedKey,
-                                                        careAboutUnique,
-                                                        WriteConcernOptions::Default,
-                                                        NULL );
-
+                    Status result = clusterCreateIndex(ns, proposedKey, careAboutUnique, NULL);
                     if ( !result.isOK() ) {
                         errmsg = str::stream() << "ensureIndex failed to create index on "
                                                << "primary shard: " << result.reason();
@@ -1443,7 +1437,6 @@ namespace mongo {
                                                    newStatus,
                                                    false /* do no upsert */,
                                                    false /* multi */,
-                                                   WriteConcernOptions::AllConfigs,
                                                    NULL );
 
                     if ( !status.isOK() ) {
@@ -1461,7 +1454,6 @@ namespace mongo {
                         Status status = clusterDelete( DatabaseType::ConfigNS,
                                                        BSON(DatabaseType::name("local")),
                                                        0 /* limit */,
-                                                       WriteConcernOptions::AllConfigs,
                                                        NULL );
 
                         if ( !status.isOK() ) {
@@ -1498,7 +1490,6 @@ namespace mongo {
                     Status status = clusterDelete( ShardType::ConfigNS,
                                                    searchDoc,
                                                    0, // limit
-                                                   WriteConcernOptions::AllConfigs,
                                                    NULL );
 
                     if ( !status.isOK() ) {

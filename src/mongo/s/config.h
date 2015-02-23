@@ -138,8 +138,8 @@ namespace mongo {
         ChunkManagerPtr shardCollection(const std::string& ns,
                                         const ShardKeyPattern& fieldsAndOrder,
                                         bool unique,
-                                        std::vector<BSONObj>* initPoints = 0,
-                                        std::vector<Shard>* initShards = 0);
+                                        std::vector<BSONObj>* initPoints,
+                                        std::vector<Shard>* initShards = NULL);
 
         /**
            @return true if there was sharding info to remove
@@ -214,15 +214,15 @@ namespace mongo {
         mutable mongo::mutex _hitConfigServerLock;
     };
 
+
     class ConfigServer : public DBConfig {
     public:
-
         ConfigServer();
         ~ConfigServer();
 
         bool ok( bool checkConsistency = false );
 
-        virtual std::string modelServer() {
+        std::string modelServer() {
             uassert( 10190 ,  "ConfigServer not setup" , _primary.ok() );
             return _primary.getConnString();
         }

@@ -40,7 +40,13 @@
 
 namespace mongo {
 
-    struct TargeterStats;
+    class Grid;
+
+    struct TargeterStats {
+        // Map of chunk shard minKey -> approximate delta. This is used for deciding
+        // whether a chunk might need splitting or not.
+        std::map<BSONObj, int> chunkSizeDelta;
+    };
 
     /**
      * NSTargeter based on a ChunkManager implementation.  Wraps all exception codepaths and
@@ -51,7 +57,7 @@ namespace mongo {
     class ChunkManagerTargeter : public NSTargeter {
     public:
 
-        ChunkManagerTargeter();
+        ChunkManagerTargeter(const NamespaceString& nss);
 
         /**
          * Initializes the ChunkManagerTargeter with the latest targeting information for the
@@ -59,7 +65,7 @@ namespace mongo {
          *
          * Returns !OK if the information could not be initialized.
          */
-        Status init( const NamespaceString& nss );
+        Status init();
 
         const NamespaceString& getNS() const;
 
@@ -101,7 +107,6 @@ namespace mongo {
     private:
 
         // Different ways we can refresh metadata
-        // TODO: Improve these ways.
         enum RefreshType {
             // No refresh is needed
             RefreshType_None,
@@ -110,6 +115,9 @@ namespace mongo {
             // The collection may have been dropped, so we need to reload the db
             RefreshType_ReloadDatabase
         };
+
+        typedef std::map<std::string, ChunkVersion> ShardVersionMap;
+
 
         /**
          * Performs an actual refresh from the config server.
@@ -140,7 +148,14 @@ namespace mongo {
                               long long estDataSize,
                               ShardEndpoint** endpoint) const;
 
-        NamespaceString _nss;
+        // Full namespace of the collection for this targeter
+        const NamespaceString _nss;
+
+        // Stores whether we need to check the remote server on refresh
+        bool _needsTargetingRefresh;
+
+        // Represents only the view and not really part of the targeter state.
+        mutable TargeterStats _stats;
 
         // Zero or one of these are filled at all times
         // If sharded, _manager, if unsharded, _primary, on error, neither
@@ -148,20 +163,7 @@ namespace mongo {
         ShardPtr _primary;
 
         // Map of shard->remote shard version reported from stale errors
-        typedef std::map<std::string, ChunkVersion> ShardVersionMap;
         ShardVersionMap _remoteShardVersions;
-
-        // Stores whether we need to check the remote server on refresh
-        bool _needsTargetingRefresh;
-
-        // Represents only the view and not really part of the targeter state.
-        mutable boost::scoped_ptr<TargeterStats> _stats;
-    };
-
-    struct TargeterStats {
-        // Map of chunk shard minKey -> approximate delta. This is used for deciding
-        // whether a chunk might need splitting or not.
-        std::map<BSONObj, int> chunkSizeDelta;
     };
 
 } // namespace mongo

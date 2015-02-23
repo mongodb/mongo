@@ -245,7 +245,7 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
-        return clusterInsert(collectionName, document, writeConcern, NULL);
+        return clusterInsert(collectionName, document, NULL);
     }
 
     Status AuthzManagerExternalStateMongos::update(OperationContext* txn,
@@ -262,7 +262,6 @@ namespace mongo {
                 updatePattern,
                 upsert,
                 multi,
-                writeConcern,
                 &response);
 
         if (res.isOK()) {
@@ -279,7 +278,7 @@ namespace mongo {
             const BSONObj& writeConcern,
             int* numRemoved) {
         BatchedCommandResponse response;
-        Status res = clusterDelete(collectionName, query, 0 /* limit */, writeConcern, &response);
+        Status res = clusterDelete(collectionName, query, 0 /* limit */, &response);
 
         if (res.isOK()) {
             *numRemoved = response.getN();

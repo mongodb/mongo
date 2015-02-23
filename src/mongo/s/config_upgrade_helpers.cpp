@@ -298,7 +298,6 @@ namespace mongo {
                 BSON("$set" << setUpgradeIdObj.done()),
                 false, // upsert
                 false, // multi
-                WriteConcernOptions::AllConfigs,
                 NULL);
 
         if ( !result.isOK() ) {
@@ -318,7 +317,6 @@ namespace mongo {
                 BSON("$set" << setUpgradeStateObj.done()),
                 false, // upsert
                 false, // multi
-                WriteConcernOptions::AllConfigs,
                 NULL);
 
         log() << "entered critical section for config upgrade" << endl;
@@ -359,7 +357,6 @@ namespace mongo {
                 BSON("$set" << setObj.done() << "$unset" << unsetObj.done()),
                 false, // upsert
                 false, // multi,
-                WriteConcernOptions::AllConfigs,
                 NULL);
 
         if ( !result.isOK() ) {

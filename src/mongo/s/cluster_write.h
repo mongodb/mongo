@@ -50,12 +50,8 @@ namespace mongo {
 
     private:
 
-        void configWrite( const BatchedCommandRequest& request,
-                          BatchedCommandResponse* response,
-                          bool fsyncCheck );
-
-        void shardWrite( const BatchedCommandRequest& request,
-                         BatchedCommandResponse* response );
+        void configWrite(const BatchedCommandRequest& request, BatchedCommandResponse* response);
+        void shardWrite(const BatchedCommandRequest& request, BatchedCommandResponse* response);
 
         bool _autoSplit;
         int _timeoutMillis;
@@ -81,21 +77,17 @@ namespace mongo {
     };
 
     /**
-     * Note: response can NEVER be NULL.
-     */
-    void clusterWrite( const BatchedCommandRequest& request,
-                       BatchedCommandResponse* response,
-                       bool autoSplit );
-
-    /**
+     * Used only for writes to the config server, config and admin databases.
+     *
      * Note: response can be NULL if you don't care about the write statistics.
      */
     Status clusterInsert( const std::string& ns,
                           const BSONObj& doc,
-                          const BSONObj& writeConcern,
                           BatchedCommandResponse* response );
 
     /**
+     * Used only for writes to the config server, config and admin databases.
+     *
      * Note: response can be NULL if you don't care about the write statistics.
      */
     Status clusterUpdate( const std::string& ns,
@@ -103,25 +95,26 @@ namespace mongo {
                           const BSONObj& update,
                           bool upsert,
                           bool multi,
-                          const BSONObj& writeConcern,
                           BatchedCommandResponse* response );
 
     /**
+     * Used only for writes to the config server, config and admin databases.
+     *
      * Note: response can be NULL if you don't care about the write statistics.
      */
     Status clusterDelete( const std::string& ns,
                           const BSONObj& query,
                           int limit,
-                          const BSONObj& writeConcern,
                           BatchedCommandResponse* response );
 
     /**
+     * Used only for writes to the config server, config and admin databases.
+     *
      * Note: response can be NULL if you don't care about the write statistics.
      */
     Status clusterCreateIndex( const std::string& ns,
                                BSONObj keys,
                                bool unique,
-                               const BSONObj& writeConcern,
                                BatchedCommandResponse* response );
 
 } // namespace mongo

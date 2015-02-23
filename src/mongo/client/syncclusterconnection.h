@@ -78,11 +78,6 @@ namespace mongo {
          */
         bool prepare( std::string& errmsg );
 
-        /**
-         * runs fsync on all servers
-         */
-        bool fsync( std::string& errmsg );
-
         // --- from DBClientInterface
 
         virtual BSONObj findOne(const std::string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions);

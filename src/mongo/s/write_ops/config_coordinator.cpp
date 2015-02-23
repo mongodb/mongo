@@ -26,16 +26,18 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/s/write_ops/config_coordinator.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
-
-#include "mongo/db/field_parser.h"
 
 namespace mongo {
 
@@ -48,162 +50,6 @@ namespace mongo {
     }
 
     namespace {
-
-        //
-        // Types to handle the reachability fsync checks
-        //
-
-        /**
-         * A BSON serializable object representing an fsync command request
-         */
-        class FsyncRequest : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(FsyncRequest);
-        public:
-
-            FsyncRequest() {
-            }
-
-            bool isValid( std::string* errMsg ) const {
-                return true;
-            }
-
-            /** Returns the BSON representation of the entry. */
-            BSONObj toBSON() const {
-                return BSON( "fsync" << true );
-            }
-
-            bool parseBSON( const BSONObj& source, std::string* errMsg ) {
-                // Not implemented
-                dassert( false );
-                return false;
-            }
-
-            void clear() {
-                // Not implemented
-                dassert( false );
-            }
-
-            string toString() const {
-                return toBSON().toString();
-            }
-        };
-
-        /**
-         * A BSON serializable object representing an fsync command response
-         */
-        class FsyncResponse : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(FsyncResponse);
-        public:
-
-            static const BSONField<int> ok;
-            static const BSONField<int> errCode;
-            static const BSONField<string> errMessage;
-
-            FsyncResponse() {
-                clear();
-            }
-
-            bool isValid( std::string* errMsg ) const {
-                return _isOkSet;
-            }
-
-            BSONObj toBSON() const {
-                BSONObjBuilder builder;
-
-                if ( _isOkSet ) builder << ok( _ok );
-                if ( _isErrCodeSet ) builder << errCode( _errCode );
-                if ( _isErrMessageSet ) builder << errMessage( _errMessage );
-
-                return builder.obj();
-            }
-
-            bool parseBSON( const BSONObj& source, std::string* errMsg ) {
-
-                FieldParser::FieldState result;
-
-                result = FieldParser::extractNumber( source, ok, &_ok, errMsg );
-                if ( result == FieldParser::FIELD_INVALID )
-                    return false;
-                _isOkSet = result != FieldParser::FIELD_NONE;
-
-                result = FieldParser::extract( source, errCode, &_errCode, errMsg );
-                if ( result == FieldParser::FIELD_INVALID )
-                    return false;
-                _isErrCodeSet = result != FieldParser::FIELD_NONE;
-
-                result = FieldParser::extract( source, errMessage, &_errMessage, errMsg );
-                if ( result == FieldParser::FIELD_INVALID )
-                    return false;
-                _isErrMessageSet = result != FieldParser::FIELD_NONE;
-
-                return true;
-            }
-
-            void clear() {
-                _ok = false;
-                _isOkSet = false;
-
-                _errCode = 0;
-                _isErrCodeSet = false;
-
-                _errMessage = "";
-                _isErrMessageSet = false;
-            }
-
-            string toString() const {
-                return toBSON().toString();
-            }
-
-            int getOk() {
-                dassert( _isOkSet );
-                return _ok;
-            }
-
-            void setOk( int ok ) {
-                _ok = ok;
-                _isOkSet = true;
-            }
-
-            int getErrCode() {
-                if ( _isErrCodeSet ) {
-                    return _errCode;
-                }
-                else {
-                    return errCode.getDefault();
-                }
-            }
-
-            void setErrCode( int errCode ) {
-                _errCode = errCode;
-                _isErrCodeSet = true;
-            }
-
-            const string& getErrMessage() {
-                dassert( _isErrMessageSet );
-                return _errMessage;
-            }
-
-            void setErrMessage( StringData errMsg ) {
-                _errMessage = errMsg.toString();
-                _isErrMessageSet = true;
-            }
-
-        private:
-
-            int _ok;
-            bool _isOkSet;
-
-            int _errCode;
-            bool _isErrCodeSet;
-
-            string _errMessage;
-            bool _isErrMessageSet;
-
-        };
-
-        const BSONField<int> FsyncResponse::ok( "ok" );
-        const BSONField<int> FsyncResponse::errCode( "code" );
-        const BSONField<string> FsyncResponse::errMessage( "errmsg" );
 
         /**
          * A BSON serializable object representing a setShardVersion command request.
@@ -380,10 +226,6 @@ namespace mongo {
             BatchedCommandResponse response;
         };
 
-        struct ConfigFsyncResponse {
-            ConnectionString configHost;
-            FsyncResponse response;
-        };
     }
 
     //
@@ -396,12 +238,6 @@ namespace mongo {
         response->setErrMessage( status.reason() );
 
         dassert( response->isValid( NULL ) );
-    }
-
-    static void buildFsyncErrorFrom( const Status& status, FsyncResponse* response ) {
-        response->setOk( false );
-        response->setErrCode( static_cast<int>( status.code() ) );
-        response->setErrMessage( status.reason() );
     }
 
     static bool areResponsesEqual( const BatchedCommandResponse& responseA,
@@ -469,14 +305,6 @@ namespace mongo {
                                        "config responses: " + builder.obj().toString() );
     }
 
-    static void combineFsyncErrors( const vector<ConfigFsyncResponse*>& responses,
-                                    BatchedCommandResponse* clientResponse ) {
-
-        clientResponse->setOk( false );
-        clientResponse->setErrCode( ErrorCodes::RemoteValidationError );
-        clientResponse->setErrMessage( "could not verify config servers were "
-                                       "active and reachable before write" );
-    }
 
     bool ConfigCoordinator::_checkConfigString(BatchedCommandResponse* clientResponse) {
         //
@@ -549,64 +377,56 @@ namespace mongo {
      * is probably the next step.
      */
     void ConfigCoordinator::executeBatch( const BatchedCommandRequest& clientRequest,
-                                          BatchedCommandResponse* clientResponse,
-                                          bool fsyncCheck ) {
+                                          BatchedCommandResponse* clientResponse) {
 
         NamespaceString nss( clientRequest.getNS() );
         dassert( nss.db() == "config" || nss.db() == "admin" );
-        dassert( clientRequest.sizeWriteOps() == 1u );
+        dassert(clientRequest.sizeWriteOps() == 1u);
 
-        if ( fsyncCheck ) {
+        // This is an opportunistic check that all config servers look healthy by calling
+        // getLastError on each one of them. If there was some form of write/journaling error, get
+        // last error would fail.
+        {
+            for (vector<ConnectionString>::iterator it = _configHosts.begin();
+                 it != _configHosts.end();
+                 ++it) {
 
-            //
-            // Sanity check that all configs are still reachable using fsync, preserving legacy
-            // behavior
-            //
-
-            OwnedPointerVector<ConfigFsyncResponse> fsyncResponsesOwned;
-            vector<ConfigFsyncResponse*>& fsyncResponses = fsyncResponsesOwned.mutableVector();
-
-            //
-            // Send side
-            //
-
-            for ( vector<ConnectionString>::iterator it = _configHosts.begin();
-                it != _configHosts.end(); ++it ) {
-                ConnectionString& configHost = *it;
-                FsyncRequest fsyncRequest;
-                _dispatcher->addCommand( configHost, "admin", fsyncRequest );
+                _dispatcher->addCommand(*it,
+                                        "admin",
+                                        RawBSONSerializable(BSON("getLastError" << true <<
+                                                                 "fsync" << true)));
             }
 
             _dispatcher->sendAll();
 
-            //
-            // Recv side
-            //
+            bool error = false;
+            while (_dispatcher->numPending()) {
+                ConnectionString host;
+                RawBSONSerializable response;
 
-            bool fsyncError = false;
-            while ( _dispatcher->numPending() > 0 ) {
+                Status status = _dispatcher->recvAny(&host, &response);
+                if (status.isOK()) {
+                    BSONObj obj = response.toBSON();
 
-                fsyncResponses.push_back( new ConfigFsyncResponse() );
-                ConfigFsyncResponse& fsyncResponse = *fsyncResponses.back();
-                Status dispatchStatus = _dispatcher->recvAny( &fsyncResponse.configHost,
-                                                              &fsyncResponse.response );
+                    LOG(3) << "Response " << obj.toString();
 
-                // We've got to recv everything, no matter what
-                if ( !dispatchStatus.isOK() ) {
-                    fsyncError = true;
-                    buildFsyncErrorFrom( dispatchStatus, &fsyncResponse.response );
+                    // If the ok field is anything other than 1, count it as error
+                    if (!obj["ok"].trueValue()) {
+                        error = true;
+                    }
                 }
-                else if ( !fsyncResponse.response.getOk() ) {
-                    fsyncError = true;
+                else {
+                    error = true;
                 }
             }
 
-            if ( fsyncError ) {
-                combineFsyncErrors( fsyncResponses, clientResponse );
+            // All responses should have been gathered by this point
+            if (error) {
+                clientResponse->setOk(false);
+                clientResponse->setErrCode(ErrorCodes::RemoteValidationError);
+                clientResponse->setErrMessage("Could not verify that config servers were active"
+                                              " and reachable before write");
                 return;
-            }
-            else {
-                fsyncResponsesOwned.clear();
             }
         }
 

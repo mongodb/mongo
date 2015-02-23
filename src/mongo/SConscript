@@ -827,23 +827,20 @@ env.Library('mongoscore',
                      's/upgrade',
             ])
 
-env.CppUnitTest("shard_key_pattern_test", [ "s/shard_key_pattern_test.cpp" ],
+env.CppUnitTest("mongoscore_test",
+                ["s/shard_key_pattern_test.cpp",
+                 "s/balancing_window_test.cpp",
+                 "s/balancer_policy_tests.cpp",
+                ],
                 LIBDEPS=["mongoscore",
                          "coreshard",
                          "mongocommon",
                          "coreserver",
                          "coredb"])
 
-env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
-                LIBDEPS=["mongoscore",
-                         "coreshard",
-                         "mongocommon",
-                         "coreserver",
-                         "coredb",
-                         "message_server_port"])
-
 env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
                  LIBDEPS=['clientdriver', 'mocklib'])
+
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
                     "coredb",

@@ -37,7 +37,6 @@ namespace mongo {
 
     const BSONObj WriteConcernOptions::Default = BSONObj();
     const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));
-    const BSONObj WriteConcernOptions::AllConfigs = BSONObj();
     const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 
     static const BSONField<bool> mongosSecondaryThrottleField("_secondaryThrottle", true);

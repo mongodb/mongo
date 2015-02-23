@@ -43,9 +43,7 @@ namespace mongo {
         ConfigCoordinator( MultiCommandDispatch* dispatcher,
                            const std::vector<ConnectionString>& configHosts );
 
-        void executeBatch( const BatchedCommandRequest& request,
-                           BatchedCommandResponse* response,
-                           bool fsyncCheck );
+        void executeBatch(const BatchedCommandRequest& request, BatchedCommandResponse* response);
 
     private:
 

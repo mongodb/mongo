@@ -745,7 +745,6 @@ namespace mongo {
                                        BSON("$set" << BSON(ChunkType::jumbo(true))),
                                        false, // upsert
                                        false, // multi
-                                       WriteConcernOptions::AllConfigs,
                                        NULL );
 
         if ( !result.isOK() ) {
@@ -1158,7 +1157,6 @@ namespace mongo {
                                            chunkObj,
                                            true, // upsert
                                            false, // multi
-                                           WriteConcernOptions::AllConfigs,
                                            NULL );
 
             version.incMinor();
@@ -1447,7 +1445,6 @@ namespace mongo {
         Status result = clusterDelete( ChunkType::ConfigNS,
                                        BSON(ChunkType::ns(_ns)),
                                        0 /* limit */,
-                                       WriteConcernOptions::AllConfigs,
                                        NULL );
         
         // Make sure we're dropped on the config

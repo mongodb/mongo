@@ -43,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/cluster_write.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_collection.h"
@@ -52,7 +51,6 @@
 #include "mongo/s/type_shard.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -442,7 +440,6 @@ namespace mongo {
 
         Status result = clusterInsert( ShardType::ConfigNS,
                                        shardDoc,
-                                       WriteConcernOptions::AllConfigs,
                                        NULL );
 
         if ( !result.isOK() ) {
@@ -648,69 +645,4 @@ namespace mongo {
     }
 
     Grid grid;
-
-
-    // unit tests
-
-    class BalancingWindowUnitTest : public StartupTest {
-    public:
-        void run() {
-            
-            if (!isMongos())
-                return;
-
-            // T0 < T1 < now < T2 < T3 and Error
-            const string T0 = "9:00";
-            const string T1 = "11:00";
-            boost::posix_time::ptime now( currentDate(), boost::posix_time::hours( 13 ) + boost::posix_time::minutes( 48 ) );
-            const string T2 = "17:00";
-            const string T3 = "21:30";
-            const string E = "28:35";
-
-            // closed in the past
-            BSONObj w1 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T0 <<
-                                                                         "stop" << T1 ) ) );
-            // not opened until the future
-            BSONObj w2 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T2 <<
-                                                                         "stop" << T3 ) ) );
-            // open now
-            BSONObj w3 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T1 <<
-                                                                         "stop" << T2 ) ) );
-            // open since last day
-            BSONObj w4 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T3 <<
-                                                                         "stop" << T2 ) ) );
-
-            verify( ! Grid::_inBalancingWindow( w1 , now ) );
-            verify( ! Grid::_inBalancingWindow( w2 , now ) );
-            verify( Grid::_inBalancingWindow( w3 , now ) );
-            verify( Grid::_inBalancingWindow( w4 , now ) );
-
-            // bad input should not stop the balancer
-
-            // empty window
-            BSONObj w5;
-
-            // missing stop
-            BSONObj w6 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << 1 ) ) );
-
-            // missing start
-            BSONObj w7 = BSON( SettingsType::balancerActiveWindow( BSON( "stop" << 1 ) ) );
-
-            // active window marker missing
-            BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 );
-
-            // garbage in window
-            BSONObj w9 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T3 <<
-                                                                         "stop" << E ) ) );
-
-            verify( Grid::_inBalancingWindow( w5 , now ) );
-            verify( Grid::_inBalancingWindow( w6 , now ) );
-            verify( Grid::_inBalancingWindow( w7 , now ) );
-            verify( Grid::_inBalancingWindow( w8 , now ) );
-            verify( Grid::_inBalancingWindow( w9 , now ) );
-
-            LOG(1) << "BalancingWidowObjTest passed" << endl;
-        }
-    } BalancingWindowObjTest;
-
 }

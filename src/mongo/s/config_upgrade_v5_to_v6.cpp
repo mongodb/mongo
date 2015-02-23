@@ -175,7 +175,6 @@ namespace mongo {
         result = clusterCreateIndex(LocksType::ConfigNS,
                                     BSON(LocksType::lockID() << 1),
                                     false, // unique
-                                    WriteConcernOptions::AllConfigs,
                                     NULL);
 
         if (!result.isOK()) {

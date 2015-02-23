@@ -394,7 +394,6 @@ namespace mongo {
 
         Status result = clusterInsert( ChangelogType::ConfigNS,
                                        changelog.toBSON(),
-                                       WriteConcernOptions::AllConfigs,
                                        NULL );
 
         if ( !result.isOK() ) {

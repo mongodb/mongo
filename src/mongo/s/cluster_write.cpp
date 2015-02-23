@@ -37,6 +37,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/config.h"
 #include "mongo/s/dbclient_multi_command.h"
@@ -99,6 +100,14 @@ namespace mongo {
             }
 
             return indexDoc.obj();
+        }
+
+        void clusterWrite(const BatchedCommandRequest& request,
+                          BatchedCommandResponse* response,
+                          bool autoSplit) {
+
+            ClusterWriter writer(autoSplit, 0);
+            writer.write(request, response);
         }
     }
 
@@ -195,16 +204,13 @@ namespace mongo {
 
     Status clusterInsert( const string& ns,
                           const BSONObj& doc,
-                          const BSONObj& writeConcern,
                           BatchedCommandResponse* response ) {
         auto_ptr<BatchedInsertRequest> insert( new BatchedInsertRequest() );
         insert->addToDocuments( doc );
 
         BatchedCommandRequest request( insert.release() );
         request.setNS( ns );
-        if ( !writeConcern.isEmpty() ) {
-            request.setWriteConcern( writeConcern );
-        }
+        request.setWriteConcern(WriteConcernOptions::Acknowledged);
 
         BatchedCommandResponse dummyResponse;
 
@@ -221,7 +227,6 @@ namespace mongo {
                           const BSONObj& update,
                           bool upsert,
                           bool multi,
-                          const BSONObj& writeConcern,
                           BatchedCommandResponse* response ) {
         auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument() );
         updateDoc->setQuery( query );
@@ -231,10 +236,7 @@ namespace mongo {
 
         auto_ptr<BatchedUpdateRequest> updateRequest( new BatchedUpdateRequest() );
         updateRequest->addToUpdates( updateDoc.release() );
-
-        if ( !writeConcern.isEmpty() ) {
-            updateRequest->setWriteConcern( writeConcern );
-        }
+        updateRequest->setWriteConcern(WriteConcernOptions::Acknowledged);
 
         BatchedCommandRequest request( updateRequest.release() );
         request.setNS( ns );
@@ -252,7 +254,6 @@ namespace mongo {
     Status clusterDelete( const string& ns,
                           const BSONObj& query,
                           int limit,
-                          const BSONObj& writeConcern,
                           BatchedCommandResponse* response ) {
         auto_ptr<BatchedDeleteDocument> deleteDoc( new BatchedDeleteDocument );
         deleteDoc->setQuery( query );
@@ -260,10 +261,7 @@ namespace mongo {
 
         auto_ptr<BatchedDeleteRequest> deleteRequest( new BatchedDeleteRequest() );
         deleteRequest->addToDeletes( deleteDoc.release() );
-
-        if ( !writeConcern.isEmpty() ) {
-            deleteRequest->setWriteConcern( writeConcern );
-        }
+        deleteRequest->setWriteConcern(WriteConcernOptions::Acknowledged);
 
         BatchedCommandRequest request( deleteRequest.release() );
         request.setNS( ns );
@@ -281,19 +279,10 @@ namespace mongo {
     Status clusterCreateIndex( const string& ns,
                                BSONObj keys,
                                bool unique,
-                               const BSONObj& writeConcern,
                                BatchedCommandResponse* response ) {
         return clusterInsert( NamespaceString( ns ).getSystemIndexesCollection(),
                               createIndexDoc( ns, keys, unique ),
-                              writeConcern,
                               response );
-    }
-
-    void clusterWrite( const BatchedCommandRequest& request,
-                       BatchedCommandResponse* response,
-                       bool autoSplit ) {
-        ClusterWriter writer( autoSplit, 0 );
-        writer.write( request, response );
     }
 
     bool validConfigWC( const BSONObj& writeConcern ) {
@@ -368,9 +357,6 @@ namespace mongo {
         // Config writes and shard writes are done differently
         string dbName = nss.db().toString();
         if ( dbName == "config" || dbName == "admin" ) {
-
-            bool verboseWC = request.isVerboseWC();
-
             // We only support batch sizes of one for config writes
             if ( request.sizeWriteOps() != 1 ) {
                 toBatchError( Status( ErrorCodes::InvalidOptions,
@@ -393,7 +379,7 @@ namespace mongo {
             // We need to support "best-effort" writes for pings to the config server.
             // {w:0} (!verbose) writes are interpreted as best-effort in this case - they may still
             // error, but do not do the initial fsync check.
-            configWrite( request, response, verboseWC );
+            configWrite(request, response);
         }
         else {
             shardWrite( request, response );
@@ -411,8 +397,8 @@ namespace mongo {
     void ClusterWriter::shardWrite( const BatchedCommandRequest& request,
                                     BatchedCommandResponse* response ) {
 
-        ChunkManagerTargeter targeter;
-        Status targetInitStatus = targeter.init( request.getTargetingNSS() );
+        ChunkManagerTargeter targeter(request.getTargetingNSS());
+        Status targetInitStatus = targeter.init();
 
         if ( !targetInitStatus.isOK() ) {
 
@@ -434,9 +420,8 @@ namespace mongo {
         _stats->setShardStats( exec.releaseStats() );
     }
 
-    void ClusterWriter::configWrite( const BatchedCommandRequest& request,
-                                     BatchedCommandResponse* response,
-                                     bool fsyncCheck ) {
+    void ClusterWriter::configWrite(const BatchedCommandRequest& request,
+                                    BatchedCommandResponse* response) {
 
         DBClientMultiCommand dispatcher;
         vector<ConnectionString> configHosts = getConfigHosts();
@@ -454,7 +439,7 @@ namespace mongo {
         }
 
         ConfigCoordinator exec( &dispatcher, configHosts );
-        exec.executeBatch( request, response, fsyncCheck );
+        exec.executeBatch(request, response);
     }
 
     void ClusterWriterStats::setShardStats( BatchWriteExecStats* shardStats ) {

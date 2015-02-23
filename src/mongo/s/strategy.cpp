@@ -26,8 +26,6 @@
  *    then also delete it in the license file.
  */
 
-// strategy_sharded.cpp
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
@@ -472,9 +470,9 @@ namespace mongo {
         // Note that this implementation will not handle targeting retries and does not completely
         // emulate write behavior
 
-        ChunkManagerTargeter targeter;
-        Status status =
-            targeter.init(NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
+        ChunkManagerTargeter targeter(NamespaceString(
+                                        targetingBatchItem.getRequest()->getTargetingNS()));
+        Status status = targeter.init();
         if (!status.isOK())
             return status;
 

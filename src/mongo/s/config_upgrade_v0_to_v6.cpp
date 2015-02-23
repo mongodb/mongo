@@ -85,7 +85,6 @@ namespace mongo {
                 versionInfo.toBSON(),
                 true /* upsert */,
                 false /* multi */,
-                WriteConcernOptions::AllConfigs,
                 NULL);
 
         if ( !result.isOK() ) {

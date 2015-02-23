@@ -565,38 +565,6 @@ namespace mongo {
         friend class TestableChunkManager;
     };
 
-    // like BSONObjCmp. for use as an STL comparison functor
-    // key-order in "order" argument must match key-order in shardkey
-    class ChunkCmp {
-    public:
-        ChunkCmp( const BSONObj &order = BSONObj() ) : _cmp( order ) {}
-        bool operator()( const Chunk &l, const Chunk &r ) const {
-            return _cmp(l.getMin(), r.getMin());
-        }
-        bool operator()( const ptr<Chunk> l, const ptr<Chunk> r ) const {
-            return operator()(*l, *r);
-        }
-
-        // Also support ChunkRanges
-        bool operator()( const ChunkRange &l, const ChunkRange &r ) const {
-            return _cmp(l.getMin(), r.getMin());
-        }
-        bool operator()( const boost::shared_ptr<ChunkRange> l, const boost::shared_ptr<ChunkRange> r ) const {
-            return operator()(*l, *r);
-        }
-    private:
-        BSONObjCmp _cmp;
-    };
-
-    /*
-    struct chunk_lock {
-        chunk_lock( const Chunk* c ){
-
-        }
-
-        Chunk _c;
-    };
-    */
     inline std::string Chunk::genID() const { return genID(_manager->getns(), _min); }
 
     bool setShardVersion( DBClientBase & conn,

@@ -188,7 +188,6 @@ namespace mongo {
                                              MongosType::mongoVersion(versionString) )),
                        true, // upsert
                        false, // multi
-                       WriteConcernOptions::Unacknowledged,
                        NULL );
     }
 
@@ -262,11 +261,7 @@ namespace mongo {
                 createActionlog = true;
             }
 
-            Status result = clusterInsert( ActionLogType::ConfigNS,
-                                           actionLog.toBSON(),
-                                           WriteConcernOptions::AllConfigs,
-                                           NULL );
-
+            Status result = clusterInsert(ActionLogType::ConfigNS, actionLog.toBSON(), NULL);
             if ( !result.isOK() ) {
                 log() << "Error encountered while logging action from balancer "
                       << result.reason();
@@ -446,7 +441,6 @@ namespace mongo {
 
             DistributionStatus status(shardInfo, shardToChunksMap.map());
 
-            // load tags
             cursor = conn.query(TagsType::ConfigNS,
                                 QUERY(TagsType::ns(ns)).sort(TagsType::min()));
 
