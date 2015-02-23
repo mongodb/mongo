@@ -100,6 +100,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * eviction to complete.
 		 */
 		btree->checkpointing = 1;
+		WT_FULL_BARRIER();
 
 		WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
 		if (evict_reset)
