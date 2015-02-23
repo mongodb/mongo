@@ -1,14 +1,7 @@
-function shouldFail( f ) {
-    e = assert.throws( function() {
-                      f();
-                      if( db.getLastError() ) {
-                        throw db.getLastError();
-                      }
-                      } );
-}
+// Test that certain operations fail in recovery mode.
 
-doTest = function( signal ) {
-    // Test that certain operations fail in recovery mode
+(function() {
+    "use strict";
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
@@ -36,28 +29,26 @@ doTest = function( signal ) {
     // and slaves in the set and wait until the change has replicated.
     // replTest.awaitReplication();
 
-    slaves = replTest.liveNodes.slaves;
-    assert( slaves.length == 2, "Expected 2 slaves but length was " + slaves.length );
+    var slaves = replTest.liveNodes.slaves;
+    assert.eq(2, slaves.length, "Expected 2 slaves but length was " + slaves.length);
 
     slaves.forEach(function(slave) {
         // put slave into maintenance (recovery) mode
         slave.getDB("foo").adminCommand({replSetMaintenance:1});
 
-        stats = slave.getDB("foo").adminCommand({replSetGetStatus:1});
+        var stats = slave.getDB("foo").adminCommand({replSetGetStatus:1});
         assert.eq(stats.myState, 3, "Slave should be in recovering state.");
 
         print("group should fail in recovering state...");
         slave.slaveOk = true;
-        shouldFail( function() { slave.getDB("foo").foo.group({initial: {n:0}, reduce: function(obj,out){out.n++;}}); } );
+        assert.commandFailed(slave.getDB("foo").foo.runCommand(
+                {group: {ns: "foo", initial: {n:0}, $reduce: function(obj,out){out.n++;}}}));
 
         print("count should fail in recovering state...");
         slave.slaveOk = true;
-        shouldFail( function() { slave.getDB("foo").foo.count(); } );
+        assert.commandFailed(slave.getDB("foo").runCommand({count: "foo"}));
     });
 
     // Shut down the set and finish the test.
-    replTest.stopSet( signal );
-}
-
-doTest( 15 );
-print("SUCCESS");
+    replTest.stopSet();
+}());
