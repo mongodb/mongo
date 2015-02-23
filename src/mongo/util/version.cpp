@@ -43,7 +43,7 @@ namespace mongo {
     /* Approved formats for versionString:
      *      1.2.3
      *      1.2.3-pre-
-     *      1.2.3-rc4 (up to rc9)
+     *      1.2.3-rc4 (rc0 up to rc49)
      *      1.2.3-rc4-pre-
      * If you really need to do something else you'll need to fix _versionArray()
      */
@@ -55,7 +55,7 @@ namespace mongo {
         BSONArrayBuilder b;
         string curPart;
         const char* c = version;
-        int finalPart = 0; // 0 = final release, -100 = pre, -10 to -1 = -10 + X for rcX
+        int finalPart = 0; // 0 = final release, -100 = pre, -50 to -1 = -50 + X for rcX
         do { //walks versionString including NUL byte
             if (!(*c == '.' || *c == '-' || *c == '\0')){
                 curPart += *c;
@@ -71,9 +71,11 @@ namespace mongo {
                 break;
             }
             else if (str::startsWith(curPart, "rc")){
-                num = 0;
-                verify( parseNumberFromString( curPart.substr(2), &num ).isOK() );
-                finalPart = -10 + num;
+                int rc;
+                invariantOK(parseNumberFromString( curPart.substr(2), &rc ));
+                invariant(rc >= 0);
+                invariant(rc < 50); // Need to adjust calculation if we pass this.
+                finalPart = -50 + rc;
                 break;
             }
             else if (curPart == "pre"){
