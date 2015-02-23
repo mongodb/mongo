@@ -72,7 +72,7 @@ namespace mongo {
          * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
          * Configuration string is constructed from:
          *     built-in defaults
-         *     storageEngine.wiredTiger.configString in 'options'
+         *     storage.wiredTiger.configString in 'options'
          *     'extraStrings'
          * Performs simple validation on the supplied parameters.
          * Returns error status if validation fails.

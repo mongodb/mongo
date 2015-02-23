@@ -616,7 +616,7 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        status = validateStorageOptions(collectionOptions.storageEngine,
+        status = validateStorageOptions(collectionOptions.storage,
                                         &StorageEngine::Factory::validateCollectionStorageOptions);
         if ( !status.isOK() )
             return status;

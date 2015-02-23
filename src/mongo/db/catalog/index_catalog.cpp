@@ -539,17 +539,17 @@ namespace {
             }
         }
 
-        BSONElement storageEngineElement = spec.getField("storageEngine");
+        BSONElement storageEngineElement = spec.getField("storage");
         if (storageEngineElement.eoo()) {
             return Status::OK();
         }
         if (storageEngineElement.type() != mongo::Object) {
-            return Status(ErrorCodes::BadValue, "'storageEngine' has to be a document.");
+            return Status(ErrorCodes::BadValue, "'storage' has to be a document.");
         }
         BSONObj storageEngineOptions = storageEngineElement.Obj();
         if (storageEngineOptions.isEmpty()) {
             return Status(ErrorCodes::BadValue,
-                          "Empty 'storageEngine' options are invalid. "
+                          "Empty 'storage' options are invalid. "
                           "Please remove, or include valid options.");
 
         }

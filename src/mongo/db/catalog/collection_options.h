@@ -44,8 +44,6 @@ namespace mongo {
 
         /**
          * Updates fields based on BSON document from client.
-         * If document contains a 'storageEngine' field, ensures that 'storageEngine'
-         * contains a single field of Object type.
          */
         Status parse( const BSONObj& obj );
 
@@ -86,7 +84,7 @@ namespace mongo {
         bool temp;
 
         // Storage engine collection options. Always owned or empty.
-        BSONObj storageEngine;
+        BSONObj storage;
     };
 
 }

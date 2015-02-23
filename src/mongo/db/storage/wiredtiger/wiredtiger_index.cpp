@@ -162,11 +162,11 @@ namespace {
         // Raise an error about unrecognized fields that may be introduced in newer versions of
         // this storage engine.
         // Ensure that 'configString' field is a string. Raise an error if this is not the case.
-        BSONElement storageEngineElement = desc.getInfoElement("storageEngine");
+        BSONElement storageEngineElement = desc.getInfoElement("storage");
         if (storageEngineElement.isABSONObj()) {
-            BSONObj storageEngine = storageEngineElement.Obj();
+            BSONObj storage = storageEngineElement.Obj();
             StatusWith<std::string> parseStatus =
-                parseIndexOptions(storageEngine.getObjectField(kWiredTigerEngineName));
+                parseIndexOptions(storage.getObjectField(kWiredTigerEngineName));
             if (!parseStatus.isOK()) {
                 return parseStatus;
             }
