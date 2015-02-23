@@ -1003,6 +1003,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 			    session, log->log_dir_fh));
 			log->sync_dir_lsn = sync_lsn;
 			F_CLR(slot, SLOT_SYNC_DIR);
+			WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
 		}
 
 		/*
@@ -1495,6 +1496,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		F_SET(&tmp, SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, SLOT_SYNC);
+	WT_STAT_FAST_CONN_INCR(session, log_direct_write);
 	WT_ERR(__log_acquire(session, record->size, &tmp));
 	__wt_spin_unlock(session, &log->log_slot_lock);
 	locked = 0;

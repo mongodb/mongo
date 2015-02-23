@@ -226,6 +226,8 @@ connection_stats = [
     LogStat('log_scan_rereads', 'log scan records requiring two reads'),
     LogStat('log_scans', 'log scan operations'),
     LogStat('log_sync', 'log sync operations'),
+    LogStat('log_sync_dir', 'log sync_dir operations'),
+    LogStat('log_direct_write', 'log direct write operations'),
     LogStat('log_writes', 'log write operations'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
 

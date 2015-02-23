@@ -210,6 +210,7 @@ struct __wt_connection_stats {
 	WT_STATS log_compress_small;
 	WT_STATS log_compress_write_fails;
 	WT_STATS log_compress_writes;
+	WT_STATS log_direct_write;
 	WT_STATS log_max_filesize;
 	WT_STATS log_prealloc_files;
 	WT_STATS log_prealloc_max;
@@ -228,6 +229,7 @@ struct __wt_connection_stats {
 	WT_STATS log_slot_toosmall;
 	WT_STATS log_slot_transitions;
 	WT_STATS log_sync;
+	WT_STATS log_sync_dir;
 	WT_STATS log_write_lsn;
 	WT_STATS log_writes;
 	WT_STATS lsm_checkpoint_throttle;
