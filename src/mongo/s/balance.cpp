@@ -85,11 +85,33 @@ namespace mongo {
         int movedCount = 0;
 
         for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
-            const CandidateChunk& chunkInfo = *it->get();
 
-            // Changes to metadata, borked metadata, and connectivity problems should cause us to
-            // abort this chunk move, but shouldn't cause us to abort the entire round of chunks.
+            // If the balancer was disabled since we started this round, don't start new
+            // chunks moves.
+            SettingsType balancerConfig;
+            std::string errMsg;
+
+            if (!grid.getBalancerSettings(&balancerConfig, &errMsg)) {
+                warning() << errMsg;
+                // No point in continuing the round if the config servers are unreachable.
+                return movedCount;
+            }
+
+            if ((balancerConfig.isKeySet() && // balancer config doc exists
+                    !grid.shouldBalance(balancerConfig)) ||
+                    MONGO_FAIL_POINT(skipBalanceRound)) {
+                LOG(1) << "Stopping balancing round early as balancing was disabled";
+                return movedCount;
+            }
+
+            // Changes to metadata, borked metadata, and connectivity problems between shards should
+            // cause us to abort this chunk move, but shouldn't cause us to abort the entire round
+            // of chunks.
+            // TODO(spencer): We probably *should* abort the whole round on issues communicating
+            // with the config servers, but its impossible to distinguish those types of failures
+            // at the moment.
             // TODO: Handle all these things more cleanly, since they're expected problems
+            const CandidateChunk& chunkInfo = *it->get();
             try {
 
                 DBConfigPtr cfg = grid.getDBConfig( chunkInfo.ns );
