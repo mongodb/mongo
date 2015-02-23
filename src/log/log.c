@@ -962,6 +962,10 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		F_CLR(slot, SLOT_CLOSEFH);
 		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
 	}
+	if (F_ISSET(slot, SLOT_SYNC))
+		WT_STAT_FAST_CONN_INCR(session, log_release_sync);
+	if (F_ISSET(slot, SLOT_SYNC_DIR))
+		WT_STAT_FAST_CONN_INCR(session, log_release_sync_dir);
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock

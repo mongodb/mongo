@@ -450,6 +450,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "log: log records too small to compress";
 	stats->log_release_write_lsn.desc =
 	    "log: log release advances write LSN";
+	stats->log_release_sync.desc = "log: log release calls with sync set";
+	stats->log_release_sync_dir.desc =
+	    "log: log release calls with sync_dir set";
 	stats->log_scans.desc = "log: log scan operations";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
@@ -621,6 +624,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_compress_write_fails.v = 0;
 	stats->log_compress_small.v = 0;
 	stats->log_release_write_lsn.v = 0;
+	stats->log_release_sync.v = 0;
+	stats->log_release_sync_dir.v = 0;
 	stats->log_scans.v = 0;
 	stats->log_scan_rereads.v = 0;
 	stats->log_write_lsn.v = 0;
