@@ -36,10 +36,11 @@
 #include "mongo/base/initializer_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/repl/oplog.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
@@ -233,7 +234,7 @@ namespace mongo {
             IndexBuilder::restoreIndexes(txn, indexes);
 
             if (!fromRepl) {
-                repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+                getGlobalEnvironment()->getOpObserver()->onEmptyCapped(txn, collection->ns());
             }
 
             wuow.commit();

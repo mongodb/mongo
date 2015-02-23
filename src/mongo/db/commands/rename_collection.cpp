@@ -38,12 +38,13 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/scopeguard.h"
 
@@ -245,7 +246,12 @@ namespace mongo {
                     }
 
                     if (!fromRepl) {
-                        repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+                        getGlobalEnvironment()->getOpObserver()->onRenameCollection(
+                                txn,
+                                NamespaceString(source),
+                                NamespaceString(target),
+                                cmdObj["dropTarget"].trueValue(),
+                                cmdObj["stayTemp"].trueValue());
                     }
 
                     wunit.commit();
@@ -344,7 +350,12 @@ namespace mongo {
                 indexer.commit();
 
                 if (!fromRepl) {
-                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+                    getGlobalEnvironment()->getOpObserver()->onRenameCollection(
+                            txn,
+                            NamespaceString(source),
+                            NamespaceString(target),
+                            cmdObj["dropTarget"].trueValue(),
+                            cmdObj["stayTemp"].trueValue());
                 }
 
                 wunit.commit();

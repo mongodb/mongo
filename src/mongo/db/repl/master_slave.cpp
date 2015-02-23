@@ -55,6 +55,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/handshake_args.h"
@@ -1281,7 +1283,7 @@ namespace repl {
 
                 try {
                     WriteUnitOfWork wuow(&txn);
-                    logKeepalive(&txn);
+                    getGlobalEnvironment()->getOpObserver()->onOpMessage(&txn, BSONObj());
                     wuow.commit();
                 }
                 catch (...) {
@@ -1325,8 +1327,6 @@ namespace repl {
     }
 
     void startMasterSlave(OperationContext* txn) {
-
-        oldRepl();
 
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if( !replSettings.slave && !replSettings.master )

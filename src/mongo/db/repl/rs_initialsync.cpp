@@ -39,8 +39,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/minvalid.h"
@@ -70,7 +72,7 @@ namespace {
                                BackgroundSync* bgsync) {
         AutoGetDb autoDb(txn, "local", MODE_X);
         massert(28585, "no local database found", autoDb.getDb());
-        invariant(txn->lockState()->isCollectionLockedForMode(rsoplog, MODE_X));
+        invariant(txn->lockState()->isCollectionLockedForMode(rsOplogName, MODE_X));
         // Note: the following order is important.
         // The bgsync thread uses an empty optime as a sentinel to know to wait
         // for initial sync; thus, we must
@@ -83,7 +85,7 @@ namespace {
         replCoord->clearSyncSourceBlacklist();
 
         // Truncate the oplog in case there was a prior initial sync that failed.
-        Collection* collection = autoDb.getDb()->getCollection(rsoplog);
+        Collection* collection = autoDb.getDb()->getCollection(rsOplogName);
         fassert(28565, collection);
         WriteUnitOfWork wunit(txn);
         Status status = collection->truncate(txn);
@@ -153,7 +155,7 @@ namespace {
             // A common problem is that TCP keepalives are set too infrequent, and thus
             // our connection here is terminated by a firewall due to inactivity.
             // Solution is to increase the TCP keepalive frequency.
-            lastOp = r->getLastOp(rsoplog);
+            lastOp = r->getLastOp(rsOplogName);
         } catch ( SocketException & ) {
             HostAndPort host = r->getHost();
             log() << "connection lost to " << host.toString() << 
@@ -163,7 +165,7 @@ namespace {
                 throw;
             }
             // retry
-            lastOp = r->getLastOp(rsoplog);
+            lastOp = r->getLastOp(rsOplogName);
         }
 
         if (lastOp.isEmpty()) {
@@ -292,7 +294,7 @@ namespace {
         InitialSync init(bgsync);
         init.setHostname(r.getHost().toString());
 
-        BSONObj lastOp = r.getLastOp(rsoplog);
+        BSONObj lastOp = r.getLastOp(rsOplogName);
         if ( lastOp.isEmpty() ) {
             std::string msg = "initial sync couldn't read remote oplog";
             log() << msg;

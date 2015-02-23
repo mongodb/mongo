@@ -30,7 +30,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"

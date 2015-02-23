@@ -31,6 +31,7 @@
 #include "mongo/db/global_environment_noop.h"
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/op_observer.h"
 
 namespace mongo {
 
@@ -84,4 +85,10 @@ namespace mongo {
         return new OperationContextNoop();
     }
 
+    void GlobalEnvironmentNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+    }
+
+    OpObserver* GlobalEnvironmentNoop::getOpObserver() {
+        return nullptr;
+    }
 }  // namespace mongo

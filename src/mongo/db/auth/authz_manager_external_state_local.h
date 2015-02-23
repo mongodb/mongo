@@ -69,8 +69,7 @@ namespace mongo {
                 const char* op,
                 const char* ns,
                 const BSONObj& o,
-                BSONObj* o2,
-                bool* b);
+                BSONObj* o2);
 
     protected:
         AuthzManagerExternalStateLocal();

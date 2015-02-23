@@ -75,6 +75,9 @@ namespace mongo {
 
         OperationContext* newOpCtx();
 
+        void setOpObserver(std::unique_ptr<OpObserver> opObserver);
+
+        OpObserver* getOpObserver();
 
     private:
 
@@ -89,6 +92,9 @@ namespace mongo {
 
         // logically owned here, but never deleted by anyone.
         StorageEngine* _storageEngine;
+
+        // logically owned here.
+        std::unique_ptr<OpObserver> _opObserver;
 
         // All possible storage engines are registered here through MONGO_INIT.
         FactoryMap _storageFactories;

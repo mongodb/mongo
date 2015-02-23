@@ -61,13 +61,14 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/range_deleter_service.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern.h"
@@ -2050,8 +2051,11 @@ namespace mongo {
 
                     for (size_t i = 0; i < indexSpecs.size(); i++) {
                         // make sure to create index on secondaries as well
-                        repl::logOp(txn, "i", db->getSystemIndexesName().c_str(), indexSpecs[i],
-                                       NULL, NULL, true /* fromMigrate */);
+                        getGlobalEnvironment()->getOpObserver()->onCreateIndex(
+                                txn,
+                                db->getSystemIndexesName(),
+                                indexSpecs[i],
+                                true /* fromMigrate */);
                     }
 
                     wunit.commit();

@@ -159,7 +159,6 @@ namespace {
                     "i",
                     collectionName.ns().c_str(),
                     toInsert,
-                    NULL,
                     NULL);
         }
 
@@ -200,8 +199,7 @@ namespace {
                         "u",
                         collectionName.ns().c_str(),
                         logObj,
-                        &idQuery,
-                        NULL);
+                        &idQuery);
             }
 
             return Status::OK();
@@ -256,7 +254,6 @@ namespace {
                         "d",
                         collectionName.ns().c_str(),
                         idQuery,
-                        NULL,
                         NULL);
             }
 

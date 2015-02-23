@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -57,6 +59,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
@@ -1037,10 +1040,10 @@ namespace mongo {
                                             request->getTargetingNS())));
                 return false;
             }
-            repl::logOp(txn,
-                        "c",
-                        (database->name() + ".$cmd").c_str(),
-                        BSON("create" << nsToCollectionSubstring(request->getTargetingNS())));
+            getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                    txn,
+                    NamespaceString(request->getTargetingNS()),
+                    CollectionOptions());
             wunit.commit();
         }
         return true;
@@ -1156,7 +1159,7 @@ namespace mongo {
             result->setError(toWriteError(status.getStatus()));
         }
         else {
-            repl::logOp( txn, "i", insertNS.c_str(), docToInsert );
+            getGlobalEnvironment()->getOpObserver()->onInsert(txn, insertNS, docToInsert);
             result->getStats().n = 1;
             wunit.commit();
         }

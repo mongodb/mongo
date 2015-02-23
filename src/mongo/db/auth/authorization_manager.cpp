@@ -1014,10 +1014,9 @@ namespace {
             const char* op,
             const char* ns,
             const BSONObj& o,
-            BSONObj* o2,
-            bool* b) {
+            BSONObj* o2) {
 
-        _externalState->logOp(txn, op, ns, o, o2, b);
+        _externalState->logOp(txn, op, ns, o, o2);
         if (appliesToAuthzData(op, ns, o)) {
             _invalidateRelevantCacheData(op, ns, o, o2);
         }

@@ -58,6 +58,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -73,7 +75,6 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/write_concern.h"
@@ -217,7 +218,7 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
 
                 if (!fromRepl) {
-                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+                    getGlobalEnvironment()->getOpObserver()->onDropDatabase(txn, dbname + ".$cmd");
                 }
 
                 wunit.commit();
@@ -527,7 +528,9 @@ namespace mongo {
                 }
 
                 if ( !fromRepl ) {
-                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                    getGlobalEnvironment()->getOpObserver()->onDropCollection(
+                            txn,
+                            NamespaceString(nsToDrop));
                 }
                 wunit.commit();
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", nsToDrop);
@@ -1166,7 +1169,9 @@ namespace mongo {
             }
 
             if (!fromRepl) {
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                getGlobalEnvironment()->getOpObserver()->onCollMod(txn,
+                                                                   (dbname + ".$cmd").c_str(),
+                                                                   jsobj);
             }
 
             wunit.commit();

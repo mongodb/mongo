@@ -39,12 +39,13 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/projection.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
@@ -430,7 +431,9 @@ namespace mongo {
 
                         // This is the last thing we do before the WriteUnitOfWork commits (except
                         // for some BSON manipulation).
-                        repl::logOp(txn, "i", collection->ns().ns().c_str(), newDoc);
+                        getGlobalEnvironment()->getOpObserver()->onInsert(txn,
+                                                                          collection->ns().ns(),
+                                                                          newDoc); 
 
                         // Must commit the write and logOp() before doing anything that could throw.
                         wuow.commit();

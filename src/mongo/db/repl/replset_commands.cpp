@@ -41,6 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -318,8 +319,10 @@ namespace {
 
             WriteUnitOfWork wuow(txn);
             if (status.isOK() && !parsedArgs.force) {
-                logOpInitiate(txn, BSON("msg" << "Reconfig set" <<
-                                        "version" << parsedArgs.newConfigObj["version"]));
+                getGlobalEnvironment()->getOpObserver()->onOpMessage(
+                        txn,
+                        BSON("msg" << "Reconfig set" <<
+                             "version" << parsedArgs.newConfigObj["version"]));
             }
             wuow.commit();
 
@@ -553,7 +556,7 @@ namespace {
 
             // we have a local database.  return true if oplog isn't empty
             BSONObj o;
-            if (Helpers::getSingleton(txn, repl::rsoplog, o)) {
+            if (Helpers::getSingleton(txn, repl::rsOplogName.c_str(), o)) {
                 return true;
             }
         }

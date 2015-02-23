@@ -50,11 +50,12 @@
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/isself.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
@@ -150,10 +151,10 @@ namespace mongo {
                 verify(collection);
 
                 if (logForRepl) {
-                    repl::logOp(txn,
-                                "c",
-                                (_dbName + ".$cmd").c_str(),
-                                BSON("create" << to_collection.coll()));
+                    getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                            txn,
+                            to_collection,
+                            CollectionOptions());
                 }
                 wunit.commit();
             }
@@ -232,7 +233,7 @@ namespace mongo {
                 }
                 uassertStatusOK( loc.getStatus() );
                 if (logForRepl)
-                    repl::logOp(txn, "i", to_collection.ns().c_str(), js);
+                    getGlobalEnvironment()->getOpObserver()->onInsert(txn, to_collection.ns(), js);
 
                 wunit.commit();
 
@@ -339,10 +340,9 @@ namespace mongo {
             collection = db->createCollection( txn, to_collection.ns() );
             invariant(collection);
             if (logForRepl) {
-                repl::logOp(txn,
-                            "c",
-                            (toDBName + ".$cmd").c_str(),
-                            BSON("create" << to_collection.coll()));
+                getGlobalEnvironment()->getOpObserver()->onCreateCollection(txn,
+                                                                            to_collection,
+                                                                            CollectionOptions());
             }
             wunit.commit();
         }
@@ -371,7 +371,7 @@ namespace mongo {
             const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
             for (vector<BSONObj>::const_iterator it = indexesToBuild.begin();
                     it != indexesToBuild.end(); ++it) {
-                repl::logOp(txn, "i", createIndexNs, *it);
+                getGlobalEnvironment()->getOpObserver()->onInsert(txn, createIndexNs, *it);
             }
         }
         wunit.commit();
@@ -650,7 +650,9 @@ namespace mongo {
 
                         c->deleteDocument(txn, *it, true, true, opts.logForRepl ? &id : NULL);
                         if (opts.logForRepl)
-                            repl::logOp(txn, "d", c->ns().ns().c_str(), id);
+                            getGlobalEnvironment()->getOpObserver()->onDelete(txn,
+                                                                              c->ns().ns(),
+                                                                              id);
                         wunit.commit();
                     }
 
@@ -661,10 +663,10 @@ namespace mongo {
                     WriteUnitOfWork wunit(txn);
                     indexer.commit();
                     if (opts.logForRepl) {
-                        repl::logOp(txn,
-                                    "i",
-                                    c->ns().getSystemIndexesCollection().c_str(),
-                                    c->getIndexCatalog()->getDefaultIdIndexSpec());
+                        getGlobalEnvironment()->getOpObserver()->onCreateIndex(
+                                txn,
+                                c->ns().getSystemIndexesCollection().c_str(),
+                                c->getIndexCatalog()->getDefaultIdIndexSpec());
                     }
                     wunit.commit();
                 }

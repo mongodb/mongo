@@ -44,9 +44,11 @@
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
@@ -221,7 +223,9 @@ namespace mongo {
                 while (true) {
                     try {
                         WriteUnitOfWork wunit(txn);
-                        repl::logOp(txn, "c", tempNS.c_str(), cmdRewritten);
+                        getGlobalEnvironment()->getOpObserver()->onApplyOps(txn,
+                                                                            tempNS,
+                                                                            cmdRewritten);
                         wunit.commit();
                         break;
                     }

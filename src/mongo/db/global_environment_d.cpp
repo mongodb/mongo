@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
@@ -259,6 +260,14 @@ namespace mongo {
 
     OperationContext* GlobalEnvironmentMongoD::newOpCtx() {
         return new OperationContextImpl();
+    }
+
+    void GlobalEnvironmentMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+        _opObserver.reset(opObserver.get());
+    }
+
+    OpObserver* GlobalEnvironmentMongoD::getOpObserver() {
+        return _opObserver.get();
     }
 
 }  // namespace mongo

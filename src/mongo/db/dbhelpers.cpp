@@ -41,9 +41,11 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -53,7 +55,6 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -451,7 +452,7 @@ namespace mongo {
                 BSONObj deletedId;
                 collection->deleteDocument( txn, rloc, false, false, &deletedId );
                 // The above throws on failure, and so is not logged
-                repl::logOp(txn, "d", ns.c_str(), deletedId, 0, 0, fromMigrate);
+                getGlobalEnvironment()->getOpObserver()->onDelete(txn, ns, deletedId, fromMigrate);
                 wuow.commit();
                 numDeleted++;
             }

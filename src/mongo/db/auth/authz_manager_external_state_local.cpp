@@ -375,18 +375,14 @@ namespace {
                                  const char* op,
                                  const char* ns,
                                  const BSONObj& o,
-                                 const BSONObj* o2,
-                                 const bool* b):
+                                 const BSONObj* o2):
             _externalState(externalState),
             _op(op),
             _ns(ns),
             _o(o.getOwned()),
 
             _isO2Set(o2 ? true : false),
-            _o2(_isO2Set ? o2->getOwned() : BSONObj()),
-
-            _isBSet(b ? true : false),
-            _b(_isBSet ? *b : false) {
+            _o2(_isO2Set ? o2->getOwned() : BSONObj()) {
 
         }
 
@@ -404,8 +400,6 @@ namespace {
                 oplogEntryBuilder << "op" << _op << "ns" << _ns << "o" << _o;
                 if (_isO2Set)
                     oplogEntryBuilder << "o2" << _o2;
-                if (_isBSet)
-                    oplogEntryBuilder << "b" << _b;
                 error() << "Unsupported modification to roles collection in oplog; "
                     "restart this process to reenable user-defined roles; " << status.reason() <<
                     "; Oplog entry: " << oplogEntryBuilder.done();
@@ -438,9 +432,6 @@ namespace {
 
         const bool _isO2Set;
         const BSONObj _o2;
-
-        const bool _isBSet;
-        const bool _b;
     };
 
     void AuthzManagerExternalStateLocal::logOp(
@@ -448,8 +439,7 @@ namespace {
             const char* op,
             const char* ns,
             const BSONObj& o,
-            BSONObj* o2,
-            bool* b) {
+            BSONObj* o2) {
 
         if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
             ns == AuthorizationManager::adminCommandNamespace.ns()) {
@@ -458,8 +448,7 @@ namespace {
                                                                              op,
                                                                              ns,
                                                                              o,
-                                                                             o2,
-                                                                             b));
+                                                                             o2));
         }
     }
 

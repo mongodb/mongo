@@ -53,6 +53,7 @@
 #include "mongo/db/global_optime.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/delete.h"
@@ -79,17 +80,21 @@ namespace mongo {
     using std::stringstream;
 
 namespace repl {
+    std::string rsOplogName = "local.oplog.rs";
+    std::string masterSlaveOplogName = "local.oplog.$main";
+    int OPLOG_VERSION = 2;
 
 namespace {
     // cached copies of these...so don't rename them, drop them, etc.!!!
-    Database* localDB = NULL;
-    Collection* localOplogMainCollection = 0;
-    Collection* localOplogRSCollection = 0;
+    Database* _localDB = nullptr;
+    Collection* _localOplogCollection = nullptr;
 
     // Synchronizes the section where a new OpTime is generated and when it actually
     // appears in the oplog.
     mongo::mutex newOpMutex("oplogNewOp");
     boost::condition newOptimeNotifier;
+
+    static std::string _oplogCollectionName;
 
     // so we can fail the same way
     void checkOplogInsert( StatusWith<RecordId> result ) {
@@ -97,7 +102,6 @@ namespace {
                  str::stream() << "write to oplog failed: " << result.getStatus().toString(),
                  result.isOK() );
     }
-
 
     /**
      * Allocates an optime for a new entry in the oplog, and updates the replication coordinator to
@@ -189,6 +193,18 @@ namespace {
         BSONObj _oField;
     };
 
+} // namespace
+
+    void setOplogCollectionName() {
+        if (getGlobalReplicationCoordinator()->getReplicationMode() ==
+                    ReplicationCoordinator::modeReplSet) {
+            _oplogCollectionName = rsOplogName;
+        }
+        else {
+            _oplogCollectionName = masterSlaveOplogName;
+        }
+    }
+
     /* we write to local.oplog.rs:
          { ts : ..., h: ..., v: ..., op: ..., etc }
        ts: an OpTime timestamp
@@ -208,40 +224,41 @@ namespace {
 
     */
 
-    void _logOpRS(OperationContext* txn,
-                         const char *opstr,
-                         const char *ns,
-                         const char *logNS,
-                         const BSONObj& obj,
-                         BSONObj *o2,
-                         bool *bb,
-                         bool fromMigrate ) {
+    void _logOp(OperationContext* txn,
+                const char *opstr,
+                const char *ns,
+                const BSONObj& obj,
+                BSONObj *o2,
+                bool fromMigrate) {
         if ( strncmp(ns, "local.", 6) == 0 ) {
             return;
         }
 
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
-        Lock::OplogIntentWriteLock oplogLk(txn->lockState());
-
-        DEV verify( logNS == 0 ); // check this was never a master/slave master
-
-        if ( localOplogRSCollection == 0 ) {
-            Client::Context ctx(txn, rsoplog);
-            localDB = ctx.db();
-            invariant( localDB );
-            localOplogRSCollection = localDB->getCollection( rsoplog );
-            massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", localOplogRSCollection);
-        }
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (ns[0] && !replCoord->canAcceptWritesForDatabase(nsToDatabaseSubstring(ns))) {
-            severe() << "logOp() but can't accept write to collection " << ns;
-            fassertFailed(17405);
+
+        if (ns[0] && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
+                    !replCoord->canAcceptWritesForDatabase(nsToDatabaseSubstring(ns))) {
+                severe() << "logOp() but can't accept write to collection " << ns;
+                fassertFailed(17405);
+        }
+        Lock::CollectionLock lk2(txn->lockState(), _oplogCollectionName, MODE_IX);
+
+
+        if (_localOplogCollection == nullptr) {
+            Client::Context ctx(txn, _oplogCollectionName);
+            _localDB = ctx.db();
+            invariant(_localDB);
+            _localOplogCollection = _localDB->getCollection(_oplogCollectionName);
+            massert(13347,
+                    "the oplog collection " + _oplogCollectionName +
+                            " missing. did you drop it? if so, restart the server",
+                    _localOplogCollection);
         }
 
-        oplogLk.serializeIfNeeded();
         std::pair<OpTime, long long> slot = getNextOpTime(txn,
-                                                          localOplogRSCollection,
+                                                          _localOplogCollection,
                                                           ns,
                                                           replCoord,
                                                           opstr);
@@ -258,127 +275,14 @@ namespace {
         b.append("ns", ns);
         if (fromMigrate)
             b.appendBool("fromMigrate", true);
-        if ( bb )
-            b.appendBool("b", *bb);
         if ( o2 )
             b.append("o2", *o2);
         BSONObj partial = b.done();
 
         OplogDocWriter writer( partial, obj );
-        checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
+        checkOplogInsert( _localOplogCollection->insertDocument( txn, &writer, false ) );
 
         txn->getClient()->setLastOp( slot.first );
-    }
-
-    void _logOpOld(OperationContext* txn,
-                          const char *opstr,
-                          const char *ns,
-                          const char *logNS,
-                          const BSONObj& obj,
-                          BSONObj *o2,
-                          bool *bb,
-                          bool fromMigrate ) {
-
-
-        if ( strncmp(ns, "local.", 6) == 0 ) {
-            return;
-        }
-
-        Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
-
-        if( logNS == 0 ) {
-            logNS = "local.oplog.$main";
-        }
-
-        Lock::CollectionLock lk2(txn->lockState(), logNS, MODE_IX);
-
-        if (localOplogMainCollection == 0) {
-            Client::Context ctx(txn, logNS);
-            localDB = ctx.db();
-            invariant(localDB);
-            localOplogMainCollection = localDB->getCollection(logNS);
-            invariant(localOplogMainCollection);
-        }
-
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        std::pair<OpTime,long long> slot = getNextOpTime(txn,
-                                                         localOplogMainCollection,
-                                                         ns,
-                                                         replCoord,
-                                                         opstr);
-
-        /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
-           instead we do a single copy to the destination position in the memory mapped file.
-        */
-
-        BSONObjBuilder b(256);
-        b.appendTimestamp("ts", slot.first.asDate());
-        b.append("op", opstr);
-        b.append("ns", ns);
-        if (fromMigrate) 
-            b.appendBool("fromMigrate", true);
-        if ( bb )
-            b.appendBool("b", *bb);
-        if ( o2 )
-            b.append("o2", *o2);
-        BSONObj partial = b.done(); // partial is everything except the o:... part.
-
-        OplogDocWriter writer( partial, obj );
-        checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
-
-        txn->getClient()->setLastOp(slot.first);
-    }
-
-    void (*_logOp)(OperationContext* txn,
-                          const char *opstr,
-                          const char *ns,
-                          const char *logNS,
-                          const BSONObj& obj,
-                          BSONObj *o2,
-                          bool *bb,
-                          bool fromMigrate ) = _logOpRS;
-}  // namespace
-
-    void oldRepl() { _logOp = _logOpOld; }
-
-    void logKeepalive(OperationContext* txn) {
-        _logOp(txn, "n", "", 0, BSONObj(), 0, 0, false);
-    }
-    void logOpComment(OperationContext* txn, const BSONObj& obj) {
-        _logOp(txn, "n", "", 0, obj, 0, 0, false);
-    }
-    void logOpInitiate(OperationContext* txn, const BSONObj& obj) {
-        _logOpRS(txn, "n", "", 0, obj, 0, 0, false);
-    }
-
-    /*@ @param opstr:
-          c userCreateNS
-          i insert
-          n no-op / keepalive
-          d delete / remove
-          u update
-    */
-    void logOp(OperationContext* txn,
-               const char* opstr,
-               const char* ns,
-               const BSONObj& obj,
-               BSONObj* patt,
-               bool* b,
-               bool fromMigrate) {
-
-        if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
-        }
-
-        //
-        // rollback-safe logOp listeners
-        //
-        getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
-        logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
-        logOpForDbHash(txn, ns);
-        if ( strstr( ns, ".system.js" ) ) {
-            Scope::storedFuncMod(txn);
-        }
     }
 
     OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
@@ -391,18 +295,18 @@ namespace {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), "local", MODE_X);
 
-                if ( localOplogRSCollection == 0 ) {
-                    Client::Context ctx(txn, rsoplog);
+                if ( _localOplogCollection == 0 ) {
+                    Client::Context ctx(txn, rsOplogName);
 
-                    localDB = ctx.db();
-                    verify( localDB );
-                    localOplogRSCollection = localDB->getCollection(rsoplog);
+                    _localDB = ctx.db();
+                    verify( _localDB );
+                    _localOplogCollection = _localDB->getCollection(rsOplogName);
                     massert(13389,
                             "local.oplog.rs missing. did you drop it? if so restart server",
-                            localOplogRSCollection);
+                            _localOplogCollection);
                 }
 
-                Client::Context ctx(txn, rsoplog, localDB);
+                Client::Context ctx(txn, rsOplogName, _localDB);
                 WriteUnitOfWork wunit(txn);
 
                 for (std::deque<BSONObj>::const_iterator it = ops.begin();
@@ -411,7 +315,7 @@ namespace {
                     const BSONObj& op = *it;
                     const OpTime ts = op["ts"]._opTime();
 
-                    checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
+                    checkOplogInsert(_localOplogCollection->insertDocument(txn, op, false));
 
                     if (!(lastOptime < ts)) {
                         severe() << "replication oplog stream went back in time. "
@@ -445,15 +349,11 @@ namespace {
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
 
-        const char * ns = "local.oplog.$main";
-
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         bool rs = !replSettings.replSet.empty();
-        if( rs )
-            ns = rsoplog;
 
-        Client::Context ctx(txn, ns);
-        Collection* collection = ctx.db()->getCollection( ns );
+        Client::Context ctx(txn, _oplogCollectionName);
+        Collection* collection = ctx.db()->getCollection( _oplogCollectionName );
 
         if ( collection ) {
 
@@ -472,7 +372,7 @@ namespace {
             }
 
             if ( !rs )
-                initOpTimeFromOplog(txn, ns);
+                initOpTimeFromOplog(txn, _oplogCollectionName);
             return;
         }
 
@@ -512,9 +412,9 @@ namespace {
         options.autoIndexId = CollectionOptions::NO;
 
         WriteUnitOfWork uow( txn );
-        invariant(ctx.db()->createCollection(txn, ns, options));
+        invariant(ctx.db()->createCollection(txn, _oplogCollectionName, options));
         if( !rs )
-            logOp(txn, "n", "", BSONObj() );
+            getGlobalEnvironment()->getOpObserver()->onOpMessage(txn, BSONObj());
         uow.commit();
 
         /* sync here so we don't get any surprising lag later when we try to sync */
@@ -570,7 +470,7 @@ namespace {
             }
         }
         Collection* collection = db->getCollection( ns );
-        IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
+        IndexCatalog* indexCatalog = collection == nullptr ? nullptr : collection->getIndexCatalog();
 
         // operation type -- see logOp() comments for types
         const char *opType = fieldOp.valuestrsafe();
@@ -758,8 +658,7 @@ namespace {
                 opType,
                 ns,
                 o,
-                fieldO2.isABSONObj() ? &o2 : NULL,
-                !fieldB.eoo() ? &valueB : NULL );
+                fieldO2.isABSONObj() ? &o2 : NULL);
         wuow.commit();
 
         return Status::OK();
@@ -797,9 +696,8 @@ namespace {
     void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
         invariant(txn->lockState()->isW());
 
-        localDB = NULL;
-        localOplogMainCollection = NULL;
-        localOplogRSCollection = NULL;
+        _localDB = nullptr;
+        _localOplogCollection = nullptr;
     }
 
 } // namespace repl

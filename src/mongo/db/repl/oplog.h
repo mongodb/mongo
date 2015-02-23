@@ -33,18 +33,22 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
     class BSONObj;
+    class Collection;
+    struct CollectionOptions;
     class Database;
+    class NamespaceString;
     class OperationContext;
     class OpTime;
+    class RecordId;
 
 namespace repl {
-
-    // Redefines the function for logOp() to master/slave.
-    void oldRepl();  // master-slave
-
+    class ReplicationCoordinator;
+ 
     // Create a new capped collection for the oplog if it doesn't yet exist.
     // This will be either local.oplog.rs (replica sets) or local.oplog.$main (master/slave)
     // If the collection already exists, set the 'last' OpTime if master/slave (side effect!)
@@ -56,44 +60,30 @@ namespace repl {
     // Returns the optime for the last op inserted.
     OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops);
 
-    const char rsoplog[] = "local.oplog.rs";
-    static const int OPLOG_VERSION = 2;
+    extern std::string rsOplogName;
+    extern std::string masterSlaveOplogName;
+
+    extern int OPLOG_VERSION;
 
     /** Log an operation to the local oplog 
-
-       @param opstr
-        "i" insert
-        "u" update
-        "d" delete
-        "c" db cmd
-        "n" no-op
-        "db" declares presence of a database (ns is set to the db name + '.')
-
-       For 'u' records, 'obj' captures the mutation made to the object but not
-       the object itself. In that case, we provide also 'fullObj' which is the
-       image of the object _after_ the mutation logged here was applied.
-
-       See _logOp() in oplog.cpp for more details.
-    */
-    void logOp( OperationContext* txn,
+     *
+     * @param opstr
+     *  "i" insert
+     *  "u" update
+     *  "d" delete
+     *  "c" db cmd
+     *  "n" no-op
+     *  "db" declares presence of a database (ns is set to the db name + '.')
+     *
+     * For 'u' records, 'obj' captures the mutation made to the object but not
+     * the object itself. 'o2' captures the the criteria for the object that will be modified.
+     */
+    void _logOp(OperationContext* txn,
                 const char *opstr,
                 const char *ns,
                 const BSONObj& obj,
-                BSONObj *patt = NULL,
-                bool *b = NULL,
-                bool fromMigrate = false);
-
-    // Log an empty no-op operation to the local oplog
-    void logKeepalive(OperationContext* txn);
-
-    /** puts obj in the oplog as a comment (a no-op).  Just for diags.
-        convention is
-          { msg : "text", ... }
-    */
-    void logOpComment(OperationContext* txn, const BSONObj& obj);
-    
-    // Same as logOpComment, except only works for replsets
-    void logOpInitiate(OperationContext* txn, const BSONObj& obj);
+                BSONObj *o2,
+                bool fromMigrate);
 
     // Flush out the cached pointers to the local database and oplog.
     // Used by the closeDatabase command to ensure we don't cache closed things.
@@ -126,5 +116,10 @@ namespace repl {
      * Sets the global OpTime to be 'newTime'.
      */
     void setNewOptime(const OpTime& newTime);
+
+    /**
+     * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.
+     */
+    void setOplogCollectionName();
 } // namespace repl
 } // namespace mongo

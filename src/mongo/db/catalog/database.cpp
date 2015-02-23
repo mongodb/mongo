@@ -53,6 +53,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/top.h"
@@ -129,8 +130,8 @@ namespace mongo {
     void Database::close(OperationContext* txn ) {
         // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
         invariant(txn->lockState()->isW());
-
-        repl::oplogCheckCloseDatabase(txn, this); // oplog caches some things, dirty its caches
+        // oplog caches some things, dirty its caches
+        repl::oplogCheckCloseDatabase(txn, this);
 
         if ( BackgroundOperation::inProgForDb( _name ) ) {
             log() << "warning: bg op in prog during close db? " << _name << endl;
@@ -271,11 +272,8 @@ namespace mongo {
                     continue;
                 }
 
-                string cmdNs = _name + ".$cmd";
-                repl::logOp( txn,
-                             "c",
-                             cmdNs.c_str(),
-                             BSON( "drop" << nsToCollectionSubstring( ns ) ) );
+                getGlobalEnvironment()->getOpObserver()->onDropCollection(
+                        txn, NamespaceString(ns));
                 wunit.commit();
             }
             catch (const WriteConflictException& exp) {
@@ -624,14 +622,9 @@ namespace mongo {
         invariant( db->createCollection( txn, ns, collectionOptions, true, createDefaultIndexes ) );
 
         if ( logForReplication ) {
-            if ( options.getField( "create" ).eoo() ) {
-                BSONObjBuilder b;
-                b << "create" << nsToCollectionSubstring( ns );
-                b.appendElements( options );
-                options = b.obj();
-            }
-            string logNs = nsToDatabase(ns) + ".$cmd";
-            repl::logOp(txn, "c", logNs.c_str(), options);
+            getGlobalEnvironment()->getOpObserver()->onCreateCollection(txn,
+                                                                        NamespaceString(ns),
+                                                                        collectionOptions);
         }
 
         return Status::OK();

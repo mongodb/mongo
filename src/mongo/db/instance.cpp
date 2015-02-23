@@ -67,6 +67,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
@@ -880,15 +881,15 @@ namespace mongo {
                 if ( !collection ) {
                     collection = ctx.db()->createCollection( txn, ns );
                     verify( collection );
-                    repl::logOp(txn,
-                                "c",
-                                (ctx.db()->name() + ".$cmd").c_str(),
-                                BSON("create" << nsToCollectionSubstring(ns)));
+                    getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                            txn,
+                            NamespaceString(ns),
+                            CollectionOptions());
                 }
 
                 StatusWith<RecordId> status = collection->insertDocument( txn, js, true );
                 uassertStatusOK( status.getStatus() );
-                repl::logOp(txn, "i", ns, js);
+                getGlobalEnvironment()->getOpObserver()->onInsert(txn, std::string(ns), js);
                 wunit.commit();
                 break;
             }

@@ -178,13 +178,13 @@ namespace repl {
             BSONObjBuilder result;
             result.append("latestOptime", replCoord->getMyLastOptime());
 
-            const char* oplogNS =
+            const std::string& oplogNS =
                 replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet ?
-                    rsoplog : "local.oplog.$main";
+                    rsOplogName : masterSlaveOplogName;
             BSONObj o;
             uassert(17347,
                     "Problem reading earliest entry from oplog",
-                    Helpers::getSingleton(txn, oplogNS, o));
+                    Helpers::getSingleton(txn, oplogNS.c_str(), o));
             result.append("earliestOptime", o["ts"]._opTime());
             return result.obj();
         }

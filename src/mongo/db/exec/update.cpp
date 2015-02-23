@@ -37,10 +37,10 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -590,13 +590,12 @@ namespace mongo {
             // Call logOp if requested, and we're not an explain.
             if (request->shouldCallLogOp() && !logObj.isEmpty() && !request->isExplain()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                repl::logOp(_txn,
-                            "u",
-                            request->getNamespaceString().ns().c_str(),
-                            logObj,
-                            &idQuery,
-                            NULL,
-                            request->isFromMigration());
+                getGlobalEnvironment()->getOpObserver()->onUpdate(
+                        _txn,
+                        request->getNamespaceString().ns().c_str(),
+                        logObj,
+                        idQuery,
+                        request->isFromMigration());
             }
 
             invariant(oldObj.snapshotId() == _txn->recoveryUnit()->getSnapshotId());
@@ -743,13 +742,10 @@ namespace mongo {
                                                                  !request->isGod()/*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
         if (request->shouldCallLogOp()) {
-            repl::logOp(_txn,
-                        "i",
-                        request->getNamespaceString().ns().c_str(),
-                        newObj,
-                        NULL,
-                        NULL,
-                        request->isFromMigration());
+            getGlobalEnvironment()->getOpObserver()->onInsert(_txn,
+                                                              request->getNamespaceString().ns(),
+                                                              newObj,
+                                                              request->isFromMigration());
         }
 
         // Technically, we should save/restore state here, but since we are going to return EOF

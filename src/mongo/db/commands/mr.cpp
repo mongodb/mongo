@@ -44,12 +44,13 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/namespace_string.h"
@@ -439,7 +440,10 @@ namespace mongo {
                 b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
                 b.appendElements( options.toBSON() );
                 string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                repl::logOp(_txn, "c", logNs.c_str(), b.obj());
+                getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                        _txn,
+                        NamespaceString(_config.tempNamespace),
+                        options);
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
                         it != indexesToInsert.end(); ++it ) {
@@ -453,7 +457,7 @@ namespace mongo {
                     }
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
-                    repl::logOp(_txn, "i", logNs.c_str(), *it);
+                    getGlobalEnvironment()->getOpObserver()->onInsert(_txn, logNs, *it);
                 }
                 wuow.commit();
             }
@@ -690,7 +694,7 @@ namespace mongo {
             BSONObj bo = b.obj();
 
             uassertStatusOK( coll->insertDocument( _txn, bo, true ).getStatus() );
-            repl::logOp(_txn, "i", ns.c_str(), bo);
+            getGlobalEnvironment()->getOpObserver()->onInsert(_txn, ns, bo);
             wuow.commit();
         }
 

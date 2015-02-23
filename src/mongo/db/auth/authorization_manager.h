@@ -438,8 +438,7 @@ namespace mongo {
                    const char* opstr,
                    const char* ns,
                    const BSONObj& obj,
-                   BSONObj* patt,
-                   bool* b);
+                   BSONObj* patt);
 
     private:
         /**

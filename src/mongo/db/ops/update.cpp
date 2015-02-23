@@ -40,12 +40,13 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/log.h"
@@ -90,10 +91,10 @@ namespace mongo {
             invariant(collection);
 
             if (!request.isFromReplication()) {
-                repl::logOp(txn,
-                            "c",
-                            (db->name() + ".$cmd").c_str(),
-                            BSON("create" << (nsString.coll())));
+                getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                        txn,
+                        NamespaceString(nsString),
+                        CollectionOptions());
             }
             wuow.commit();
         }

@@ -71,10 +71,12 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/network_interface_impl.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -462,6 +464,7 @@ namespace mongo {
         }
 
         getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
+        getGlobalEnvironment()->setOpObserver(std::unique_ptr<OpObserver>(new OpObserver));
 
         const repl::ReplSettings& replSettings =
                 repl::getGlobalReplicationCoordinator()->getSettings();
@@ -801,6 +804,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnviro
             new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
             static_cast<int64_t>(curTimeMillis64()));
     repl::setGlobalReplicationCoordinator(replCoord);
+    repl::setOplogCollectionName();
     getGlobalEnvironment()->registerKillOpListener(replCoord);
     return Status::OK();
 }

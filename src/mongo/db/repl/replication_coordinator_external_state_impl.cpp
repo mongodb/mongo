@@ -45,6 +45,7 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/master_slave.h"
@@ -115,7 +116,7 @@ namespace {
         Lock::GlobalWrite globalWrite(txn->lockState());
 
         WriteUnitOfWork wuow(txn);
-        logOpInitiate(txn, BSON("msg" << "initiating set"));
+        getGlobalEnvironment()->getOpObserver()->onOpMessage(txn, BSON("msg" << "initiating set"));
         wuow.commit();
     }
 
@@ -193,23 +194,23 @@ namespace {
 
         try {
             BSONObj oplogEntry;
-            if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
+            if (!Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry)) {
                 return StatusWith<OpTime>(
                         ErrorCodes::NoMatchingDocument,
-                        str::stream() << "Did not find any entries in " << rsoplog);
+                        str::stream() << "Did not find any entries in " << rsOplogName);
             }
             BSONElement tsElement = oplogEntry[tsFieldName];
             if (tsElement.eoo()) {
                 return StatusWith<OpTime>(
                         ErrorCodes::NoSuchKey,
-                        str::stream() << "Most recent entry in " << rsoplog << " missing \"" <<
+                        str::stream() << "Most recent entry in " << rsOplogName << " missing \"" <<
                         tsFieldName << "\" field");
             }
             if (tsElement.type() != Timestamp) {
                 return StatusWith<OpTime>(
                         ErrorCodes::TypeMismatch,
                         str::stream() << "Expected type of \"" << tsFieldName <<
-                        "\" in most recent " << rsoplog <<
+                        "\" in most recent " << rsOplogName <<
                         " entry to have type Timestamp, but found " << typeName(tsElement.type()));
             }
             return StatusWith<OpTime>(tsElement._opTime());

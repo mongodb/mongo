@@ -42,9 +42,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -161,8 +162,10 @@ namespace mongo {
                     collection = db->createCollection( txn, ns.ns() );
                     invariant( collection );
                     if (!fromRepl) {
-                        repl::logOp(txn, "c", (dbname + ".$cmd").c_str(),
-                                    BSON("create" << ns.coll()));
+                        getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                                txn,
+                                ns,
+                                CollectionOptions());
                     }
                     wunit.commit();
                 } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
@@ -271,7 +274,9 @@ namespace mongo {
                 if ( !fromRepl ) {
                     for ( size_t i = 0; i < specs.size(); i++ ) {
                         std::string systemIndexes = ns.getSystemIndexesCollection();
-                        repl::logOp(txn, "i", systemIndexes.c_str(), specs[i]);
+                        getGlobalEnvironment()->getOpObserver()->onCreateIndex(txn,
+                                                                               systemIndexes,
+                                                                               specs[i]);
                     }
                 }
 

@@ -259,12 +259,12 @@ namespace {
     void syncRollbackFindCommonPoint(OperationContext* txn, 
                                      DBClientConnection* them, 
                                      FixUpInfo& fixUpInfo) {
-        Client::Context ctx(txn, rsoplog);
+        Client::Context ctx(txn, rsOplogName);
 
         boost::scoped_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
-                                                rsoplog,
-                                                ctx.db()->getCollection(rsoplog),
+                                                rsOplogName,
+                                                ctx.db()->getCollection(rsOplogName),
                                                 InternalPlanner::BACKWARD));
 
         BSONObj ourObj;
@@ -277,10 +277,10 @@ namespace {
         const Query query = Query().sort(reverseNaturalObj);
         const BSONObj fields = BSON("ts" << 1 << "h" << 1);
 
-        //auto_ptr<DBClientCursor> u = us->query(rsoplog, query, 0, 0, &fields, 0, 0);
+        //auto_ptr<DBClientCursor> u = us->query(rsOplogName, query, 0, 0, &fields, 0, 0);
 
         fixUpInfo.rbid = getRBID(them);
-        auto_ptr<DBClientCursor> oplogCursor = them->query(rsoplog, query, 0, 0, &fields, 0, 0);
+        auto_ptr<DBClientCursor> oplogCursor = them->query(rsOplogName, query, 0, 0, &fields, 0, 0);
 
         if (oplogCursor.get() == NULL || !oplogCursor->more())
             throw RSFatalException("remote oplog empty or unreadable");
@@ -418,7 +418,7 @@ namespace {
                     goodVersions.push_back(pair<DocID, BSONObj>(doc,good));
                 }
             }
-            newMinValid = oplogreader->getLastOp(rsoplog);
+            newMinValid = oplogreader->getLastOp(rsOplogName);
             if (newMinValid.isEmpty()) {
                 error() << "rollback error newMinValid empty?";
                 return;
@@ -493,7 +493,7 @@ namespace {
 
             string err;
             try {
-                newMinValid = oplogreader->getLastOp(rsoplog);
+                newMinValid = oplogreader->getLastOp(rsOplogName);
                 if (newMinValid.isEmpty()) {
                     err = "can't get minvalid from sync source";
                 }
@@ -539,10 +539,10 @@ namespace {
         }
 
         log() << "rollback 4.7";
-        Client::Context ctx(txn, rsoplog);
-        Collection* oplogCollection = ctx.db()->getCollection(rsoplog);
+        Client::Context ctx(txn, rsOplogName);
+        Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
         uassert(13423,
-                str::stream() << "replSet error in rollback can't find " << rsoplog,
+                str::stream() << "replSet error in rollback can't find " << rsOplogName,
                 oplogCollection);
 
         map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;

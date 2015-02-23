@@ -37,8 +37,8 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -164,9 +164,11 @@ namespace mongo {
                             << ", not logging.";
                         }
                         else {
-                            bool replJustOne = true;
-                            repl::logOp(_txn, "d", _collection->ns().ns().c_str(), deletedDoc, 0,
-                                        &replJustOne, _params.fromMigrate);
+                            getGlobalEnvironment()->getOpObserver()->onDelete(
+                                    _txn,
+                                    _collection->ns().ns(),
+                                    deletedDoc,
+                                    _params.fromMigrate);
                         }
                     }
 

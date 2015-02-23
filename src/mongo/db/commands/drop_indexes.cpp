@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/catalog/collection.h"
@@ -49,7 +50,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/repl/oplog.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
@@ -130,7 +131,9 @@ namespace mongo {
                     return false;
                 }
                 if (!fromRepl) {
-                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                    getGlobalEnvironment()->getOpObserver()->onDropIndex(txn,
+                                                                         dbname + ".$cmd",
+                                                                         jsobj);
                 }
                 wunit.commit();
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropIndexes", dbname);
