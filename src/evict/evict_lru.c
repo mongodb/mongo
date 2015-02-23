@@ -653,7 +653,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
  *	blocks queued for eviction.
  */
 int
-__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
+__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -662,6 +662,15 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
+
+	/*
+	 * If the file isn't evictable, there's no work to do.
+	 */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+		*evict_resetp = 0;
+		return (0);
+	}
+	*evict_resetp = 1;
 
 	/*
 	 * Hold the walk lock to set the "no eviction" flag: no new pages from

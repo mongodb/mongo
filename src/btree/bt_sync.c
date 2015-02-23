@@ -25,6 +25,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
 	uint32_t flags;
+	int evict_reset;
 
 	btree = S2BT(session);
 
@@ -100,10 +101,9 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		btree->checkpointing = 1;
 
-		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-			WT_ERR(__wt_evict_file_exclusive_on(session));
+		WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
+		if (evict_reset)
 			__wt_evict_file_exclusive_off(session);
-		}
 
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;

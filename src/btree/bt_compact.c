@@ -76,7 +76,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_REF *ref;
-	int block_manager_begin, skip;
+	int block_manager_begin, evict_reset, skip;
 
 	WT_UNUSED(cfg);
 
@@ -133,8 +133,9 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * then let eviction continue;
 	 */
 	conn->compact_in_memory_pass = 1;
-	WT_ERR(__wt_evict_file_exclusive_on(session));
-	__wt_evict_file_exclusive_off(session);
+	WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
+	if (evict_reset)
+		__wt_evict_file_exclusive_off(session);
 
 	/* Start compaction. */
 	WT_ERR(bm->compact_start(bm, session));
