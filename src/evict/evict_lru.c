@@ -1072,34 +1072,37 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_PAGE_MODIFY *mod;
 	uint64_t pages_walked;
 	uint32_t walk_flags;
-	int internal_pages, modified, restarts;
+	int enough, internal_pages, modified, restarts;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	start = cache->evict + *slotp;
 	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
 	    cache->evict + cache->evict_slots);
+	enough = internal_pages = restarts = 0;
 
 	walk_flags =
 	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
 
 	/*
 	 * Get some more eviction candidate pages.
+	 *
+	 * !!! Take care terminating this loop.
+	 *
+	 * Don't make an extra call to __wt_tree_walk after we hit the end of a
+	 * tree: that will leave a page pinned, which may prevent any work from
+	 * being done.
+	 *
+	 * Once we hit the page limit, do one more step through the walk in
+	 * case we are appending and only the last page in the file is live.
 	 */
-	for (evict = start, pages_walked = 0, internal_pages = restarts = 0;
-	    evict < end && pages_walked < WT_EVICT_MAX_PER_FILE &&
-	    (ret == 0 || ret == WT_NOTFOUND);
+	for (evict = start, pages_walked = 0;
+	    evict < end && !enough && (ret == 0 || ret == WT_NOTFOUND);
 	    ret = __wt_tree_walk(
 	    session, &btree->evict_ref, &pages_walked, walk_flags)) {
+		enough = (pages_walked > WT_EVICT_MAX_PER_FILE);
 		if (btree->evict_ref == NULL) {
-			/*
-			 * Take care with terminating this loop.
-			 *
-			 * Don't make an extra call to __wt_tree_walk: that will
-			 * leave a page pinned, which may prevent any work from
-			 * being done.
-			 */
-			if (++restarts == 2)
+			if (++restarts == 2 || enough)
 				break;
 			continue;
 		}
