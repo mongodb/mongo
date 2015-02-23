@@ -118,11 +118,11 @@ namespace {
         // Warn about unrecognized fields that may be introduced in newer versions of this
         // storage engine instead of raising an error.
         // Ensure that 'configString' field is a string. Warn if this is not the case.
-        BSONForEach(elem, options.storageEngine.getObjectField(kWiredTigerEngineName)) {
+        BSONForEach(elem, options.storage.getObjectField(kWiredTigerEngineName)) {
             if (elem.fieldNameStringData() == "configString") {
                 if (elem.type() != String) {
                     return StatusWith<std::string>(ErrorCodes::TypeMismatch, str::stream()
-                                                   << "storageEngine.wiredTiger.configString "
+                                                   << "storage.wiredTiger.configString "
                                                    << "must be a string. "
                                                    << "Not adding 'configString' value "
                                                    << elem << " to collection configuration");
@@ -135,7 +135,7 @@ namespace {
                 return StatusWith<std::string>(ErrorCodes::InvalidOptions, str::stream()
                                                << '\'' << elem.fieldNameStringData() << '\''
                                                << " is not a supported option in "
-                                               << "storageEngine.wiredTiger");
+                                               << "storage.wiredTiger");
             }
         }
 

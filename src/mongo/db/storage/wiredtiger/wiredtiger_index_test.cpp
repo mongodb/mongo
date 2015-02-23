@@ -101,7 +101,7 @@ namespace mongo {
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringEmptyDocument) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {}}}");
+        BSONObj spec = fromjson("{storage: {wiredTiger: {}}}");
         IndexDescriptor desc(NULL, "", spec);
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
         const Status& status = result.getStatus();
@@ -110,7 +110,7 @@ namespace mongo {
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringUnknownField) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {unknownField: 1}}}");
+        BSONObj spec = fromjson("{storage: {wiredTiger: {unknownField: 1}}}");
         IndexDescriptor desc(NULL, "", spec);
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
         const Status& status = result.getStatus();
@@ -119,7 +119,7 @@ namespace mongo {
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringNonStringConfig) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: 12345}}}");
+        BSONObj spec = fromjson("{storage: {wiredTiger: {configString: 12345}}}");
         IndexDescriptor desc(NULL, "", spec);
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
         const Status& status = result.getStatus();
@@ -128,7 +128,7 @@ namespace mongo {
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringEmptyConfigString) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: ''}}}");
+        BSONObj spec = fromjson("{storage: {wiredTiger: {configString: ''}}}");
         IndexDescriptor desc(NULL, "", spec);
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
         const Status& status = result.getStatus();
@@ -137,7 +137,7 @@ namespace mongo {
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringValidConfigFormat) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: 'abc=def'}}}");
+        BSONObj spec = fromjson("{storage: {wiredTiger: {configString: 'abc=def'}}}");
         IndexDescriptor desc(NULL, "", spec);
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
         const Status& status = result.getStatus();
