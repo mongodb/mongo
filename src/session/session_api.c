@@ -665,17 +665,12 @@ __session_truncate(WT_SESSION *wt_session,
 	 * We always truncate in the forward direction because the underlying
 	 * data structures can move through pages faster forward than backward.
 	 * If we don't have a start cursor, create one and position it at the
-	 * start of the object. This is a layering violation (ideally, we'd do
-	 * this work closer to the data structures that require it), but here's
-	 * where it's easiest to create a new cursor.
-	 *
-	 * Duplicate the stop cursor, reset it and move to the first record.
+	 * first record.
 	 */
 	if (start == NULL) {
 		WT_ERR(__session_open_cursor(
-		    wt_session, NULL, stop, NULL, &start));
+		    wt_session, stop->uri, NULL, NULL, &start));
 		local_start = 1;
-		WT_ERR(start->reset(start));
 		WT_ERR(start->next(start));
 	}
 
