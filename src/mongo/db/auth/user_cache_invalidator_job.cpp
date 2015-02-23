@@ -113,7 +113,22 @@ namespace {
 
     UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager) :
             _authzManager(authzManager) {
-        _previousCacheGeneration = _authzManager->getCacheGeneration();
+
+        StatusWith<OID> currentGeneration = getCurrentCacheGeneration();
+        if (currentGeneration.isOK()) {
+            _previousCacheGeneration = currentGeneration.getValue();
+            return;
+        }
+
+        if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
+            warning() << "_getUserCacheGeneration command not found while fetching initial user "
+                    "cache generation from the config server(s).  This most likely means you are "
+                    "running an outdated version of mongod on the config servers";
+        } else {
+            warning() << "An error occurred while fetching initial user cache generation from "
+                    "config servers: " << currentGeneration.getStatus();
+        }
+        _previousCacheGeneration = OID();
     }
 
     void UserCacheInvalidator::run() {
@@ -152,6 +167,7 @@ namespace {
                 }
                 // When in doubt, invalidate the cache
                 _authzManager->invalidateUserCache();
+                continue;
             }
 
             if (currentGeneration.getValue() != _previousCacheGeneration) {
