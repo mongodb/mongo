@@ -8,10 +8,13 @@ var nodes = replTest.nodeList();
 
 var conns = replTest.startSet();
 var r = replTest.initiate({ "_id": "unicomplex",
-                          "members": [
-                                      { "_id": 0, "host": nodes[0], priority: 2 },
-                                      { "_id": 1, "host": nodes[1] },
-                                      { "_id": 2, "host": nodes[2], arbiterOnly: true}]
+                            "settings": {
+                                "heartbeatTimeoutSecs":30
+                            },
+                            "members": [
+                                { "_id": 0, "host": nodes[0], priority: 2 },
+                                { "_id": 1, "host": nodes[1] },
+                                { "_id": 2, "host": nodes[2], arbiterOnly: true}]
                           }, 'replSetInitiate', 600000);
 
 replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
