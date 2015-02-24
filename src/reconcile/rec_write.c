@@ -1982,14 +1982,18 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		next->start = r->first_free;
 		next->entries = 0;
 
-		/*
-		 * Set the space available to another split-size chunk, if we
-		 * have one.  If we don't have room for another split chunk,
-		 * add whatever space remains in this page.
-		 */
+		/* Set the space available to another split-size chunk. */
 		r->space_avail =
 		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
-		if (inuse + r->space_avail > r->page_size) {
+
+		/*
+		 * If there is room but not enough room for a split size chunk
+		 * try to fit the rest of the content onto the page.
+		 * We may have already gathered more than a page worth of
+		 * data if there has been a large value.
+		 */
+		if (inuse <= r->page_size &&
+		    inuse + r->space_avail > r->page_size) {
 			WT_ASSERT(session, r->page_size >= inuse);
 			r->space_avail = r->page_size - inuse;
 
