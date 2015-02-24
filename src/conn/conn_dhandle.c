@@ -580,10 +580,10 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 				    ret = func(session, cfg));
 			}
 			__wt_spin_unlock(session, &dhandle->close_lock);
-			WT_ERR(ret);
+			WT_RET(ret);
 		}
 
-err:	return (ret);
+	return (0);
 }
 
 /*
