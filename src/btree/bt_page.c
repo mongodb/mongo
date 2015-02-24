@@ -127,18 +127,17 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 */
 			if (force_attempts < 10 &&
 			    __evict_force_check(session, page, flags)) {
-				if (force_attempts++ == 0)
-					WT_STAT_FAST_CONN_INCR(session,
-					    page_forcible_evict_blocked);
-
+				++force_attempts;
 				ret = __wt_page_release_evict(session, ref);
-				WT_RET_BUSY_OK(ret);
-
 				/* If forced eviction fails, stall. */
 				if (ret == EBUSY) {
+					ret = 0;
 					wait_cnt += 1000;
+					WT_STAT_FAST_CONN_INCR(session,
+					    page_forcible_evict_blocked);
 					break;
-				}
+				} else
+					WT_RET(ret);
 
 				/*
 				 * The result of a successful forced eviction
