@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_transaction.h"
+#include "mongo/db/storage/rocks/rocks_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -63,17 +64,7 @@ namespace mongo {
 
             virtual void SeekToFirst() { _baseIterator->Seek(_prefixSlice); }
             virtual void SeekToLast() {
-                // next prefix lexicographically, assume same length
-                std::string nextPrefix(_prefix);
-                invariant(nextPrefix.size() > 0);
-                for (size_t i = nextPrefix.size() - 1; i >= 0; ++i) {
-                    nextPrefix[i]++;
-                    // if it's == 0, that means we've overflowed, so need to keep adding
-                    if (nextPrefix[i] != 0) {
-                        break;
-                    }
-                }
-
+                std::string nextPrefix = std::move(rocksGetNextPrefix(_prefix));
                 _baseIterator->Seek(nextPrefix);
                 if (!_baseIterator->Valid()) {
                     _baseIterator->SeekToLast();

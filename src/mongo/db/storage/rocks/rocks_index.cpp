@@ -50,6 +50,7 @@
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/db/storage/rocks/rocks_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -534,14 +535,7 @@ namespace mongo {
 
     long long RocksIndexBase::getSpaceUsedBytes(OperationContext* txn) const {
         uint64_t storageSize;
-        std::string nextPrefix(_prefix);
-        // first next lexicographically (assume same size)
-        for (int i = nextPrefix.size() - 1; i >= 0; --i) {
-            nextPrefix[i]++;
-            if (nextPrefix[i] != 0) {
-                break;
-            }
-        }
+        std::string nextPrefix = std::move(rocksGetNextPrefix(_prefix));
         rocksdb::Range wholeRange(_prefix, nextPrefix);
         _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
         return static_cast<long long>(storageSize);
