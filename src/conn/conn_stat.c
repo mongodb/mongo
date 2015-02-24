@@ -205,7 +205,7 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 		if (WT_PREFIX_MATCH(dhandle->name, *p)) {
 			WT_WITHOUT_DHANDLE(session,
 			    ret = __statlog_dump(session, dhandle->name, 0));
-			WT_RET(ret);
+			return (ret);
 		}
 	return (0);
 }
