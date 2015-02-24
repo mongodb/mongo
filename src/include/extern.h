@@ -297,7 +297,7 @@ extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern int __wt_evict_create(WT_SESSION_IMPL *session);
 extern int __wt_evict_destroy(WT_SESSION_IMPL *session);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref);
-extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
+extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server);
 extern int __wt_cache_wait(WT_SESSION_IMPL *session, int full);
