@@ -447,17 +447,6 @@ namespace mongo {
             DistributionStatus status(shardInfo, shardToChunksMap.map());
 
             // load tags
-            Status result = clusterCreateIndex(TagsType::ConfigNS,
-                                               BSON(TagsType::ns() << 1 << TagsType::min() << 1),
-                                               true, // unique
-                                               WriteConcernOptions::AllConfigs,
-                                               NULL);
-
-            if ( !result.isOK() ) {
-                warning() << "could not create index tags_1_min_1: " << result.reason() << endl;
-                continue;
-            }
-
             cursor = conn.query(TagsType::ConfigNS,
                                 QUERY(TagsType::ns(ns)).sort(TagsType::min()));
 
