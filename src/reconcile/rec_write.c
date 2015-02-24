@@ -1987,15 +1987,15 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
 		/*
-		 * If there is room but not enough room for a split size chunk
-		 * try to fit the rest of the content onto the page.
-		 * We may have already gathered more than a page worth of
-		 * data if there has been a large value.
+		 * Adjust the space available to handle two cases:
+		 *  - We don't have enough room for another full split-size
+		 *    chunk on the page.
+		 *  - We chose to fill past a page boundary because of a
+		 *    large item.
 		 */
-		if (inuse <= r->page_size &&
-		    inuse + r->space_avail > r->page_size) {
-			WT_ASSERT(session, r->page_size >= inuse);
-			r->space_avail = r->page_size - inuse;
+		if (inuse + r->space_avail > r->page_size) {
+			r->space_avail =
+			    r->page_size > inuse ? (r->page_size - inuse) : 0;
 
 			/* There are no further boundary points. */
 			r->bnd_state = SPLIT_MAX;
@@ -2653,7 +2653,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
 	 * information remains unchanged between the pages.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->page_size, &tmp));
+	WT_RET(__wt_scr_alloc(session, r->dsk.memsize, &tmp));
 	dsk = tmp->mem;
 	memcpy(dsk, r->dsk.mem, WT_PAGE_HEADER_SIZE);
 
