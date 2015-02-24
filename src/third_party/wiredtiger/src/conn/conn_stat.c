@@ -193,6 +193,7 @@ static int
 __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
 	char **p;
 
 	WT_UNUSED(cfg);
@@ -201,8 +202,11 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Check for a match on the set of sources. */
 	for (p = S2C(session)->stat_sources; *p != NULL; ++p)
-		if (WT_PREFIX_MATCH(dhandle->name, *p))
-			return (__statlog_dump(session, dhandle->name, 0));
+		if (WT_PREFIX_MATCH(dhandle->name, *p)) {
+			WT_WITHOUT_DHANDLE(session,
+			    ret = __statlog_dump(session, dhandle->name, 0));
+			WT_RET(ret);
+		}
 	return (0);
 }
 

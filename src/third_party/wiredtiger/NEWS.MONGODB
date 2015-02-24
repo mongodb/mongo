@@ -1,3 +1,57 @@
+3.0-RC10, Feb 24 2015
+---------------------
+
+commit 2fdfb2bbed56e42e1717e567828c68d0b2eb868d
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Tue Feb 24 14:44:48 2015 +1100
+
+    Review places that set/clear session->dhandle, replace with macros.  Change callers to save/restore if they need to release a handle after a call.
+
+commit ce89b608835561b11ce4e525a5ebdad86558f115
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Mon Feb 23 19:55:56 2015 -0500
+
+    The statistics server has open handles and may be opening underlying handles, make sure we don't overwrite them, reference #1694.
+
+commit 8827d909d7f14e9ad767d909d65598508ff0025c
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Mon Feb 23 09:39:21 2015 -0500
+
+    Add an explicit barrier after setting the checkpointing value. (I'm pretty sure it's not actually necessary to have a barrier in the current code, but the barrier we rely on is in a different function and isn't always called, depending the eviction configuration of this file, I'd just rather be safe than try and debug this some time in the future.)
+
+commit 10abb2c47cffbcc215c3507256cee3e2cae2dd5f
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Mon Feb 23 15:23:54 2015 +1100
+
+    If eviction is walking a file with only one live page (e.g., the last page), be careful to step over it, or eviction's hazard reference can make forced eviction stall.
+
+    SERVER-17344
+
+commit f72367f97357cf3e77f0d57d39992686b400ebe7
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Sun Feb 22 15:40:37 2015 -0500
+
+    Make sure we have a local copy of the start/stop cursor keys before calling into the underlying Btree range truncate function
+
+    SERVER-17141.
+
+commit 09d345951d43e7ed928980048e5c5c927406a66b
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Fri Feb 20 11:25:22 2015 -0500
+
+    If WT_SESSION.truncate isn't given a start cursor, instantiate one, it's always faster to traverse Btree objects in a forward direction.
+
+commit ce38bc5b40f1aa3ffc07cdd2cf993e32143135b5
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Fri Feb 20 08:57:57 2015 -0500
+
+    We don't need to do a search in the row-store cursor truncate setup code, the WT_SESSION.truncate API code already did one.
+
+    This does not mean WT_SESSION.truncate can't return WT_NOTFOUND in some cases, the first thing cursor truncate does is a cursor remove call in order to acquire the page's write generation information -- that remove call does the usual "discard my current reference and get a new one" work, which allows another deleting thread to race and remove one of the truncate's start/stop keys.
+
+    refs SERVER-17141
+
+
 3.0-RC9, Feb 18 2015
 --------------------
 
@@ -18,7 +72,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Feb 17 21:56:34 2015 +1100
 
     Allow the maximum number of eviction threads to be reconfigured.  This was previously permitted by the API, but the array of thread contexts was not correctly resized, leading to segfaults.
-    
+
     refs SERVER-17293
 
 commit 67527fc235406469e69dbaec3dcd571469e660c0
@@ -50,7 +104,7 @@ Author: Thomas Rueckstiess <thomas@rueckstiess.net>
 Date:   Mon Feb 16 12:50:26 2015 +1100
 
     fixes and improvements for wtperf parsing
-    
+
     - convert wtperf microsec to millisec
     - don't skip monitor* files when parsing directory
     - parsing code reorganization
@@ -74,7 +128,7 @@ Author: Thomas Rueckstiess <thomas@rueckstiess.net>
 Date:   Fri Feb 13 17:22:05 2015 +1100
 
     added support to parse wtperf files.
-    
+
     they go into a separate stats section named "wtperf".
 
 commit 29d0d26fd1cd76392ea8225c1c4022ca54443737
@@ -94,7 +148,7 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Thu Feb 12 15:31:36 2015 -0500
 
     Add support for a new verify debug option, "dump_shape", that reports the levels of the tree.
-    
+
     __wt_config_gets() returns WT_NOTFOUND when there's no entry, don't fail every command when DIAGNOSTIC #defined and debug options aren't set.
 
 commit 46b7721215856d08ca3a37f7ffc27c57b1d4c1d7
@@ -175,7 +229,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Feb 10 15:58:02 2015 +1100
 
     Re-enable the global setting to disable LSM merges.
-    
+
     refs #1657
 
 commit 8f14899ba0ce5b1a8df689e3c68db9a68bfeee66
@@ -183,7 +237,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Tue Feb 10 04:36:57 2015 +0000
 
     Fix a bug when re-opening an LSM tree.
-    
+
     We could have attempted to update the last chunk that is already on disk.
 
 commit d8263d46c1aa136d24ef194a8f62f0b02b92b9b0
@@ -197,7 +251,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Feb 10 15:01:37 2015 +1100
 
     Fix a local variable read when looking for pages evict racing with a page becoming dirty.
-    
+
     refs #1660
 
 commit da4d99e7ad57057a1b8397629d59a3c83c28de21
@@ -205,9 +259,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Tue Feb 10 02:32:25 2015 +0000
 
     Fix a bug in LSM cursor open.
-    
+
     The bug caused us to re-open more cursors than necessary in open.
-    
+
     Related to fix: 439a655e
 
 commit eec16c3052af107bbe57aaf547eb8e70d2de4966
@@ -221,7 +275,7 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Mon Feb 9 14:04:02 2015 -0500
 
     Track splits during eviction by data-source as well as by connection.
-    
+
     Don't double-count in-memory splits (we're incrementing cache_eviction_split in the underlying split-parent routine, not in the caller, so it's counting both normal and in-memory splits). Instead, cache_eviction_split is normal eviction splits, cache_inmem_split is in-memory
 splits,
 
@@ -230,11 +284,11 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Mon Feb 9 06:25:36 2015 +0000
 
     Add a mode to LSM where we can limit the size of data in the tree.
-    
+
     A feature request to allow for a high insert throughput into a table with a size limitation.
-    
+
     Adds a new configuration option to WT_SESSION::create which is lsm=(chunk_count_limit=0), default to 0 which is disabled.
-    
+
     Refs #1652
 
 commit c63ba34c915d95c156aaf6c47a04fe6d361b91ad
@@ -242,7 +296,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Feb 9 14:07:57 2015 +1100
 
     Don't double-count the on-disk header size when setting split boundaries.
-    
+
     refs #1655
 
 commit 152a0efdbd3ea66b142f52eed3c9224437143eec
@@ -250,9 +304,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Mon Feb 9 12:25:10 2015 +1100
 
     Fix a bug in table create. A crash could cause recovery to break.
-    
+
     Refs SERVER-17204
-    
+
     The bug is that we weren't doing an fsync of the file after it was created. Recovery assumes that if there are records for a particular file, then it will exist on disk.
 
 commit 4d50f5878073e582567848ae03ee506bb5058227
@@ -260,9 +314,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Mon Feb 9 00:43:27 2015 +0000
 
     Remove obsolete updates every time we add a new update.
-    
+
     We used to only do the check when the cache was full. That could lead to update chains growing immensely long, which is bad.
-    
+
     Refs: #1647, SERVER-17195
 
 commit e891a1f312850bcaaf5183f3fd2e091567044a96
@@ -276,7 +330,7 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Thu Feb 5 15:54:01 2015 -0500
 
     There's a problem that went in in #1282, the key difference is that we are setting a split boundary at the end of the first page when there is more than a page worth of data. See also #1630 and #1631. This is an alternate approach to #1631: the real change is to fallthrough into the split case if the next item won't fit, callers of the split code can't handle failure from split, it has to create enough room for the next item to be entered into the buffer.
-    
+
 commit 90a352717a45a40d047b33c9fb00e7174e1ae04f
 Author: Susan LoVerso <sue@wiredtiger.com>
 Date:   Thu Feb 5 12:59:08 2015 -0500
@@ -303,9 +357,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Wed Feb 4 06:27:07 2015 +0000
 
     Keep filling pages in reconciliation until we hit a boundary.
-    
+
     This reverts some of a change for #1282 (without reverting the functionality in that change, AFAI can tell).
-    
+
     Refs #1630
 
 
@@ -329,9 +383,9 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Feb 2 16:45:46 2015 +1100
 
     In recovery, track the maximum file ID in the metadata, regardless of whether there are any updates to roll forward.
-    
+
     Previously, we tracked the largest file ID that was updated in the logs being rolled forward.  It was usually the case that the most recently created file was also the most recently updated, so that calculation usually worked and wasn't detected until the repro in SERVER-17142 that created tables, did a clean shutdown and restart, then created more tables and did a dirty shutdown and restart, which was rolling forward updates into the wrong tables.
-    
+
     refs SERVER-17142, SERVER-17131(?)
 
 commit 71f1559c91ed119082ebe42772da15e28915e1c8
@@ -339,7 +393,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Feb 3 10:40:27 2015 +1100
 
     Start with clean trees so we can detect updates racing with sweep.
-    
+
     Use a deleted ref to a leaf page that is created on first update, which is the same state the tree should be in if an empty leaf page is evicted.  The only wrinkle is that bulk operations expect to find a leaf page in the tree: create it explicitly before the bulk insert starts.  This was probably a bug before: if we had created a tree and kept it around for long enough with cache pressure before a bulk load started, the initial leaf page could have been evicted.
 
 commit 8545c4b3b7f5ed306215c82f1ad1cbe3664f0c50
@@ -379,7 +433,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Feb 2 16:52:34 2015 +1100
 
     If discarding a tree for sweep races with an update, give up the discard gracefully.
-    
+
     refs #1618, SERVER-17048
 
 commit a2d20dc49cac870977d91213a7fe6dabf362ce70
@@ -387,9 +441,9 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Feb 2 16:45:46 2015 +1100
 
     In recovery, track the maximum file ID in the metadata, regardless of whether there are any updates to roll forward.
-    
+
     Previously, we tracked the largest file ID that was updated in the logs being rolled forward.  It was usually the case that the most recently created file was also the most recently updated, so that calculation usually worked and wasn't detected until the repro in SERVER-17142 that created tables, did a clean shutdown and restart, then created more tables and did a dirty shutdown and restart, which was rolling forward updates into the wrong tables.
-    
+
     refs SERVER-17142, SERVER-17131(?)
 
 commit b0a828b262a2d0d3cf1361eed98aa25a1168a7a6
@@ -397,7 +451,7 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Sat Jan 31 12:59:34 2015 -0500
 
     We no longer calculate allocation overhead per allocation chunk, revert the workaround the problem with page memory size calculations during splits where we forced the new parent page memory size to 5% of its current value; reference #1564, #1565. This fixes a problem where 5% of a page's memory footprint isn't large enough to accommodate the cache decrements that will be done in the page's future, leading to page underflow.
-    
+
     Minor cleanups: we no longer calculate allocation overhead per allocation chunk, the macro WT_MEMSIZE_ADD is no longer needed at all, and WT_MEMSIZE_TRANSFER is renamed to WT_MEM_TRANSFER.
 
 commit b640366c28fc66744e482c20c16973cb052aef8e
@@ -411,7 +465,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Fri Jan 30 17:38:09 2015 +1100
 
     Use reads to measure cache pressure with shared caches.  We previously tracked writes, which were skewed by checkpoints.
-    
+
     refs #1569
 
 commit a326c3ba10e0d299944a650b890f8c2d851db34a
@@ -419,9 +473,9 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Thu Jan 29 17:19:06 2015 -0500
 
     Simplify the cache calculation when a page is marked clean, use the page's dirty-byte count (which allows a race between the page being marked clean and being re-dirtied).
-    
+
     This branch is still not correct, but appears to be able to run the CONFIG from #1582 without underflow for a much longer time).
-    
+
     Reference #1605.
 
 commit 1c60c4966dd68ea2bf05ebe62e3f1d8de1a7d033
@@ -429,7 +483,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Thu Jan 29 14:33:36 2015 +1100
 
     Use a copy of the oldest transaction ID when sweeping cached overflow items.  Otherwise, we could free structures that are still hooked into the skiplist.
-    
+
     refs #1615
 
 commit 42724267278c64f5af68b281c9ee5742d1a56d72
@@ -443,7 +497,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Wed Jan 28 17:40:06 2015 +1100
 
     Cleanup accounting for update lists when restoring updates to evicted pages.  Previously, we only accounted for the first update in a list.
-    
+
     refs SERVER-16997
 
 commit 4adf9c929b1b46f273239214b4e2757fcfdb8f96
@@ -500,7 +554,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Jan 27 15:50:09 2015 +1100
 
     Revert a workaround for splits during truncate.
-    
+
     refs #1583, #1563, SERVER-16868
 
 commit c2e108e2774ae79504579bcdca33f26fcff8cb07
@@ -508,7 +562,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Jan 27 09:58:32 2015 +1100
 
     Change recovery to start from the checkpoint LSN in the metadata.  Don't assert that we see a checkpoint complete in the available log: if the application crashes in between syncing the metadata and writing the final checkpoint record, there is no need to roll anything forward but we don't have the final checkpoint.
-    
+
     refs #1529
 
 commit 2555e80d2020ba9833c436a22d1031f6c5778a64
@@ -523,11 +577,11 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Jan 26 15:56:25 2015 +1100
 
     Grab the table list lock while building the list of handles to checkpoint.
-    
+
     This avoids a potential deadlock during compact operations and/or checkpoints with a target list (and an assertion about lock ordering in diagnostic builds).
-    
+
     Note that nested locking is not ideal: the medium-term fix here is #1598.
-    
+
     refs #1589, SERVER-16967
 
 commit db3943563a87c3e4c42445ae9f3a07efacfdf4ac
@@ -535,7 +589,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Jan 26 14:54:47 2015 +1100
 
     Free WT_REFs deleted by truncate.  We were doing this when a page spontaneously became empty, but not if the "fast truncate" code kicked in.
-    
+
     refs SERVER-16921
 
 commit 2063efb22c3c29b980f86f7fee77b6d03ba63ec1
@@ -543,9 +597,9 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Fri Jan 23 16:21:06 2015 -0500
 
     Don't count pages evicted by a worker thread as an "application thread" eviction; add a new statistic to distinguish between the server itself evicting pages and the eviction worker threads evicting.
-    
+
     Don't increment the eviction counters unless we find a page to evict, __evict_lru_pages() gets called a huge number of times in any workload where eviction is happening.
-    
+
     Reference SERVER-16997, SERVER-17020.
 
 commit 3abb99d58aaa46b0b3fcd338293a668422e3fcaf
@@ -619,7 +673,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Sat Jan 17 22:25:02 2015 +0000
 
     Fix a deadlock opening statistics cursors.
-    
+
     Refs #1575 and JIRA SERVER-16738
 
 commit c5fa51a0f18e4117d9f7b841de86eb35af751264
@@ -639,9 +693,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Fri Jan 16 21:03:55 2015 +0000
 
     Fix a bug in raw compression, where we were overflowing memory.
-    
+
     We weren't growing the buffer enough when adding new items in.
-    
+
     Refs SERVER-16664
 
 commit 76addf73581c53f24462ab5fd724048aec36eaf3
@@ -661,9 +715,9 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Thu Jan 15 22:47:52 2015 +0000
 
     Don't do memory adjustments for the WT_REF's WT_ADDR structures, we don't do those adjustments in other places we set addresses.
-    
+
     Workaround the problem with page memory size calculations during splits by forcing the new parent page memory size to 5% of its current value; reference #1564.
-    
+
     Minor cleanups/renaming of the code instantiating the WT_REF structures during a tree-deepening split to clarify what's going on there.
 
 commit e0031209183c880fb1a1b99399013e7675a75e88
@@ -671,9 +725,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Fri Jan 16 09:26:34 2015 +1100
 
     Don't look at a page after it may be freed during split.
-    
+
     During the process of doing a split we switch the ref to WT_REF_MEM - after which it's no longer safe to refer to the page. Shuffle the code so that we don't.
-    
+
     SERVER-16868
 
 commit b6d7532cbf823d537b8f1733169fe4de08173c09
@@ -702,7 +756,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Thu Jan 15 07:17:21 2015 +1100
 
     Workaround a read-after-free involving eviction during truncates.  We were implicitly relying on first_dirty_txn to prevent pages being immediately force-evicted by truncate.  The bug is not fully understood, but this change restores the previous window where reads can complete before the page is evicted for real.
-    
+
     refs BF-759
 
 commit 8a1bfe3c35f0c1d90ea3e8e70c2aae8dff1fdbb3
@@ -721,7 +775,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Dec 22 15:59:46 2014 +1100
 
     Use the original page's first_dirty_txn when restoring updates to match what we do for in-memory splits.
-    
+
     refs #1475
 
 commit 4df72e8e20139ddf667e1f0d3b6b7dcf91deb006
@@ -729,7 +783,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Mon Dec 22 13:12:07 2014 +1100
 
     Avoid EBUSY returns to verify and salvage caused by checkpoints.  The "fix" involves blocking checkpoints while salvage or verify are in progress.
-    
+
     refs #1404, SERVER-16457
 
 commit 864f3495721b1311b49df19ee241bfca9adf0863
@@ -750,9 +804,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Mon Dec 22 10:43:04 2014 +1100
 
     Fix a bug where a custom extractor terminate was being called twice.
-    
+
     Resolves issue #1503.
-    
+
     Clarify the custom extractor and collator terminate documentation while I'm here.
 
 commit 16972ef63de1283d85146530c35f522b053e2c1e
@@ -767,7 +821,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Fri Dec 19 17:19:58 2014 +1100
 
     Check that handles are not being walked by eviction before discarding.
-    
+
     refs #1497
 
 commit 0d21e437917bc7cf08393852a3074957431ea30e
@@ -775,7 +829,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Fri Dec 19 15:44:15 2014 +1100
 
     Use the eviction server to write pages with READGEN_OLDEST set.
-    
+
     Even before the eviction trigger has been reached. This should mean that we clear those pages out of cache earlier, and hopefully will save application threads from doing the evictions (at least sometimes).
 
 commit e0adfba3c4011c49b73ff3e4a165a4a938f69cb3
@@ -783,9 +837,9 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Fri Dec 19 12:23:21 2014 +1100
 
     Don't try to write leaves from the sweep server.  Previously, this was done without locking the handle, and so could race with LSM discarding a handle.
-    
+
     We know the handle has been idle, so there is a good chance that a checkpoint has run since the last update and the write leaves was wasted effort.  If not, this change will keep the handle locked for longer preventing new opens, but it has been idle for a while anyway.
-    
+
     refs #1495, #1497 (maybe)
 
 commit 87328a8d5c1d4a201a1df604ba32a87863948bbb
@@ -799,7 +853,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Thu Dec 18 16:45:06 2014 +1100
 
     Don't try to set and clear session->split_gen in WT_INTL_FOREACH_BEGIN: there are too many of those loops to ensure that none of them skip clearing it.  Instead, make sure all calls are wrapped in WT_WITH_APAGE_INDEX.
-    
+
     refs SERVER-16546
 
 commit 235f747e2df80d9899497595a2b649e7d6df8601
@@ -829,7 +883,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Wed Dec 17 15:45:23 2014 +1100
 
     Detect write-write conflicts before no-overwrite cursors decide to skip an update.
-    
+
     refs SERVER-16351
 
 commit 91abf8e35d5246a653bd9615ffd9723d87999c38
@@ -837,7 +891,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Wed Dec 17 13:36:02 2014 +1100
 
     Add support for none configuration string to log compressor.
-    
+
     To be consistent with block compression configuration.
 
 commit 5438fee4942b4dbf484799dad6e12e042d253e99
@@ -845,9 +899,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Wed Dec 17 12:09:33 2014 +1100
 
     Return an error if a shared cache configuration is set, but not enabled.
-    
+
     Check for a configuration via shared_cache=(size=).
-    
+
     Refs #1487
 
 commit 390a5b71b25492dc3030e908a65a11a04401852b
@@ -855,11 +909,11 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Tue Dec 16 15:32:09 2014 -0500
 
     We documented that huffman_key and huffman_value took "none" as an argument, but they didn't.
-    
+
     Worse, if key was set but not value, we'd set value anyway, free of charge, and if value was set but not key, we'd fail. I doubt this is a problem (it's pretty surprising if anyone would set key but not also set value).
-    
+
     Use __wt_config_gets_none() to support the "none" setting, re-work the logic to ignore keys or values that are zero-length.
-    
+
     Reference #1417.
 
 commit 662e26eeb31f76f2c4aeebf6690c9056612de32e
@@ -900,7 +954,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Mon Dec 15 05:58:06 2014 +0000
 
     Allow printlog to work without recovery.
-    
+
     It now works even if compression or a custom path are setup.
 
 commit b8921272755ce66d09ab2a001745573420bd41ac
@@ -908,7 +962,7 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Wed Dec 10 15:40:06 2014 -0500
 
     We can't use the corrected page size to calculate the buffer's space available, but we don't have a page size either. We do know how much space we added, so use that to increment the space available.
-    
+
     The raw compression handler can no longer pass a page size buffer to the underlying compression function, because a single key/value object could be larger than the page size, instead, pass a buffer of the same length as the source to compress, whatever that is.
 
 commit 402041727de02931be1dd385f3c970f31a53341c
@@ -922,9 +976,9 @@ Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Tue Dec 9 16:22:20 2014 -0500
 
     Separate the btree maximum key/value sizes from the underlying page size, reference #1282.
-    
+
     Deprecate the internal_item_max and leaf_item_max configuration strings, replace with internal_key_max, leaf_key_max and leaf_value_max.
-    
+
     Remove examples/c/ex_file.c (there's no real need for a "file" URI example, and it's easy to replace the one place the documentation used it).
 
 commit e1e187e8fdfb48526f2a62e3f0f48072c30db53e
@@ -932,7 +986,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Dec 16 10:29:08 2014 +1100
 
     Update the swept handles statistic any time we close the underlying handle, regardless of whether a session still references the data handle.
-    
+
     reds #1460, #1466
 
 commit 080b34fde5de97459c383c67ba93d9fdc88090a8
@@ -958,7 +1012,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Fri Dec 12 17:07:11 2014 +1100
 
     Switch to stashing the metadata dhandle, not the btree.
-    
+
     Also update checkpoint to use the saved handle instead of
     searching for it again.
 
@@ -973,7 +1027,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Thu Dec 11 23:06:19 2014 +1100
 
     If LSM search_near finds a matching tombstone, step the whole LSM cursor next to find the closest key.  We can't step individual chunk cursors, or we could return a record that is deleted in a more recent chunk.
-    
+
     MongoDB BF-694, BF-700
 
 commit 5f6bbc898564aefb312255555abd34202cb98815
@@ -997,7 +1051,7 @@ Author: Michael Cahill <mjc@wiredtiger.com>
 Date:   Wed Dec 10 11:03:48 2014 +1100
 
     Merge pull request #1449 from wiredtiger/lsm-switch-simplify
-    
+
     Improve and simplify the LSM switch logic
 
 commit 7e0f7d7b803f9af04ad10b2bec6ef5073aa79248
@@ -1012,7 +1066,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Dec 9 15:58:28 2014 +1100
 
     Sweep old handles more aggressively:
-    
+
     1. don't have checkpoint or other periodic operations like statistics logging keep old handles alive;
     2. don't wait for all sessions to empty the file from their cache before closing;
     3. only update the time of death from the sweep thread.
@@ -1023,7 +1077,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Tue Dec 9 14:41:36 2014 +1100
 
     Merge pull request #1443 from wiredtiger/cursor-open-optimize
-    
+
     Cursor open optimize
 
 commit 993c8ede8ff64eac9e87d1adcd39f8575039222b
@@ -1031,7 +1085,7 @@ Author: Michael Cahill <michael.cahill@wiredtiger.com>
 Date:   Tue Dec 9 13:21:13 2014 +1100
 
     Improve and simplify the LSM switch logic: it is fine to keep writing into a chunk while it is being switched, until either it hits the hard chunk size limit or a switch transaction ID is chosen that is larger than the writer's.  Fixes an assertion failure introduced by #1432 that could write to an old chunk after the switch completed.
-    
+
     refs #1432, #1418
 
 commit 5551461cd5f26249e4330c9f87b4945d7ec2bb34
@@ -1039,9 +1093,9 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Mon Dec 8 18:01:31 2014 +1100
 
     If there are only two LSM worker threads, don't let the cache get full.
-    
+
     Allow the first thread to do flushes as well as switches and drops if there are only two threads.
-    
+
     Refs #1441, but this is a hang seen from that test/format configuration, not a segfault.
 
 commit 8f06d6b79dabed54ad1e05515bbdb31e23c4e991
@@ -1055,7 +1109,7 @@ Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Fri Dec 5 04:36:25 2014 +0000
 
     Avoid string comparisons when looking up tables.
-    
+
     Save a hash value in the table so we can do integer comparisons rather than string comparisons.
 
 commit 4de5e3a71bfad1c2a9ef1eccccdd45ec02fecba9

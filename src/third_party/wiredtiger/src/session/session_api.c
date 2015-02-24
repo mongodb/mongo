@@ -570,7 +570,9 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
-	int cmp;
+	int cmp, local_start;
+
+	local_start = 0;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
@@ -642,9 +644,7 @@ __session_truncate(WT_SESSION *wt_session,
 	 * what records currently appear in the object.  For this reason, do a
 	 * search-near, rather than a search.  Additionally, we have to correct
 	 * after calling search-near, to position the start/stop cursors on the
-	 * next record greater than/less than the original key.  If the cursors
-	 * hit the beginning/end of the object, or the start/stop keys cross,
-	 * we're done, the range must be empty.
+	 * next record greater than/less than the original key.
 	 */
 	if (start != NULL) {
 		WT_ERR(start->search_near(start, &cmp));
@@ -659,18 +659,40 @@ __session_truncate(WT_SESSION *wt_session,
 			WT_ERR_NOTFOUND_OK(ret);
 			goto done;
 		}
+	}
 
-		if (start != NULL) {
-			WT_ERR(start->compare(start, stop, &cmp));
-			if (cmp > 0)
-				goto done;
-		}
+	/*
+	 * We always truncate in the forward direction because the underlying
+	 * data structures can move through pages faster forward than backward.
+	 * If we don't have a start cursor, create one and position it at the
+	 * first record.
+	 */
+	if (start == NULL) {
+		WT_ERR(__session_open_cursor(
+		    wt_session, stop->uri, NULL, NULL, &start));
+		local_start = 1;
+		WT_ERR(start->next(start));
+	}
+
+	/*
+	 * If the start/stop keys cross, we're done, the range must be empty.
+	 */
+	if (stop != NULL) {
+		WT_ERR(start->compare(start, stop, &cmp));
+		if (cmp > 0)
+			goto done;
 	}
 
 	WT_ERR(__wt_schema_range_truncate(session, start, stop));
 
 done:
 err:	TXN_API_END_RETRY(session, ret, 0);
+
+	/*
+	 * Close any locally-opened start cursor.
+	 */
+	if (local_start)
+		WT_TRET(start->close(start));
 
 	/*
 	 * Only map WT_NOTFOUND to ENOENT if a URI was specified.

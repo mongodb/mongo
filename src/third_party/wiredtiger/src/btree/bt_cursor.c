@@ -936,36 +936,22 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	 * instantiated the end cursor, so we know that page is pinned in memory
 	 * and we can proceed without concern.
 	 */
-	if (start == NULL) {
-		do {
-			WT_RET(__wt_btcur_remove(stop));
-			for (;;) {
-				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
-					break;
-				stop->compare = 0;	/* Exact match */
-				if ((ret = rmfunc(session, stop, 1)) != 0)
-					break;
-			}
-		} while (ret == WT_RESTART);
-	} else {
-		do {
-			WT_RET(__wt_btcur_remove(start));
-			/*
-			 * Reset ret each time through so that we don't loop
-			 * forever in the cursor equals case.
-			 */
-			for (ret = 0;;) {
-				if (stop != NULL &&
-				    __cursor_equals(start, stop))
-					break;
-				if ((ret = __wt_btcur_next(start, 1)) != 0)
-					break;
-				start->compare = 0;	/* Exact match */
-				if ((ret = rmfunc(session, start, 1)) != 0)
-					break;
-			}
-		} while (ret == WT_RESTART);
-	}
+	do {
+		WT_RET(__wt_btcur_remove(start));
+		/*
+		 * Reset ret each time through so that we don't loop forever in
+		 * the cursor equals case.
+		 */
+		for (ret = 0;;) {
+			if (stop != NULL && __cursor_equals(start, stop))
+				break;
+			if ((ret = __wt_btcur_next(start, 1)) != 0)
+				break;
+			start->compare = 0;	/* Exact match */
+			if ((ret = rmfunc(session, start, 1)) != 0)
+				break;
+		}
+	} while (ret == WT_RESTART);
 
 	WT_RET_NOTFOUND_OK(ret);
 	return (0);
@@ -999,40 +985,24 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	 * other thread of control; in that case, repeat the full search to
 	 * refresh the page's modification information.
 	 */
-	if (start == NULL) {
-		do {
-			WT_RET(__wt_btcur_remove(stop));
-			for (;;) {
-				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
-					break;
-				stop->compare = 0;	/* Exact match */
-				value = (uint8_t *)stop->iface.value.data;
-				if (*value != 0 &&
-				    (ret = rmfunc(session, stop, 1)) != 0)
-					break;
-			}
-		} while (ret == WT_RESTART);
-	} else {
-		do {
-			WT_RET(__wt_btcur_remove(start));
-			/*
-			 * Reset ret each time through so that we don't loop
-			 * forever in the cursor equals case.
-			 */
-			for (ret = 0;;) {
-				if (stop != NULL &&
-				    __cursor_equals(start, stop))
-					break;
-				if ((ret = __wt_btcur_next(start, 1)) != 0)
-					break;
-				start->compare = 0;	/* Exact match */
-				value = (uint8_t *)start->iface.value.data;
-				if (*value != 0 &&
-				    (ret = rmfunc(session, start, 1)) != 0)
-					break;
-			}
-		} while (ret == WT_RESTART);
-	}
+	do {
+		WT_RET(__wt_btcur_remove(start));
+		/*
+		 * Reset ret each time through so that we don't loop forever in
+		 * the cursor equals case.
+		 */
+		for (ret = 0;;) {
+			if (stop != NULL && __cursor_equals(start, stop))
+				break;
+			if ((ret = __wt_btcur_next(start, 1)) != 0)
+				break;
+			start->compare = 0;	/* Exact match */
+			value = (uint8_t *)start->iface.value.data;
+			if (*value != 0 &&
+			    (ret = rmfunc(session, start, 1)) != 0)
+				break;
+		}
+	} while (ret == WT_RESTART);
 
 	WT_RET_NOTFOUND_OK(ret);
 	return (0);
@@ -1055,9 +1025,15 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 	btree = cbt->btree;
 
 	/*
-	 * For recovery, we log the start and stop keys for a truncate
-	 * operation, not the individual records removed.  On the other hand,
-	 * for rollback we need to keep track of all the in-memory operations.
+	 * We always delete in a forward direction because it's faster, assert
+	 * our caller provided us with a start cursor.
+	 */
+	WT_ASSERT(session, start != NULL);
+
+	/*
+	 * For recovery, log the start and stop keys for a truncate operation,
+	 * not the individual records removed.  On the other hand, for rollback
+	 * we need to keep track of all the in-memory operations.
 	 *
 	 * We deal with this here by logging the truncate range first, then (in
 	 * the logging code) disabling writing of the in-memory remove records
@@ -1081,15 +1057,13 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 		 * fully instantiated when truncating row-store objects because
 		 * it's comparing page and/or skiplist positions, not keys. (Key
 		 * comparison would work, it's only that a key comparison would
-		 * be relatively expensive.  Column-store objects have record
-		 * number keys, so the key comparison is cheap.)  Cursors may
-		 * have only had their keys set, so we must ensure the cursors
-		 * are positioned in the tree.
+		 * be relatively expensive, especially with custom collators.
+		 * Column-store objects have record number keys, so the key
+		 * comparison is cheap.)  The session truncate code did cursor
+		 * searches when setting up the truncate so we're good to go: if
+		 * that ever changes, we'd need to do something here to ensure a
+		 * fully instantiated cursor.
 		 */
-		if (start != NULL)
-			WT_ERR(__wt_btcur_search(start));
-		if (stop != NULL)
-			WT_ERR(__wt_btcur_search(stop));
 		WT_ERR(__cursor_truncate(
 		    session, start, stop, __cursor_row_modify));
 		break;

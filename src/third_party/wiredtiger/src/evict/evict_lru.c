@@ -284,11 +284,17 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	session = conn->evict_session;
 
 	/*
+	 * If eviction workers were configured, allocate sessions for them now.
+	 * This is done to reduce the chance that we will open new eviction
+	 * sessions after WT_CONNECTION::close is called.
+	 *
 	 * If there's only a single eviction thread, it may be called upon to
 	 * perform slow operations for the block manager.  (The flag is not
 	 * reset if reconfigured later, but I doubt that's a problem.)
 	 */
-	if (conn->evict_workers_max == 0)
+	if (conn->evict_workers_max > 0)
+		WT_RET(__evict_workers_resize(session));
+	else
 		F_SET(session, WT_SESSION_CAN_WAIT);
 
 	/*
@@ -653,7 +659,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
  *	blocks queued for eviction.
  */
 int
-__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
+__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -662,6 +668,15 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
+
+	/*
+	 * If the file isn't evictable, there's no work to do.
+	 */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+		*evict_resetp = 0;
+		return (0);
+	}
+	*evict_resetp = 1;
 
 	/*
 	 * Hold the walk lock to set the "no eviction" flag: no new pages from
@@ -979,7 +994,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * exclusive access when a handle is being closed.
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-			WT_WITH_BTREE(session, btree,
+			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __evict_walk_file(session, &slot, flags));
 			WT_ASSERT(session, session->split_gen == 0);
 		}
@@ -1072,34 +1087,37 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_PAGE_MODIFY *mod;
 	uint64_t pages_walked;
 	uint32_t walk_flags;
-	int internal_pages, modified, restarts;
+	int enough, internal_pages, modified, restarts;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	start = cache->evict + *slotp;
 	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
 	    cache->evict + cache->evict_slots);
+	enough = internal_pages = restarts = 0;
 
 	walk_flags =
 	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
 
 	/*
 	 * Get some more eviction candidate pages.
+	 *
+	 * !!! Take care terminating this loop.
+	 *
+	 * Don't make an extra call to __wt_tree_walk after we hit the end of a
+	 * tree: that will leave a page pinned, which may prevent any work from
+	 * being done.
+	 *
+	 * Once we hit the page limit, do one more step through the walk in
+	 * case we are appending and only the last page in the file is live.
 	 */
-	for (evict = start, pages_walked = 0, internal_pages = restarts = 0;
-	    evict < end && pages_walked < WT_EVICT_MAX_PER_FILE &&
-	    (ret == 0 || ret == WT_NOTFOUND);
+	for (evict = start, pages_walked = 0;
+	    evict < end && !enough && (ret == 0 || ret == WT_NOTFOUND);
 	    ret = __wt_tree_walk(
 	    session, &btree->evict_ref, &pages_walked, walk_flags)) {
+		enough = (pages_walked > WT_EVICT_MAX_PER_FILE);
 		if (btree->evict_ref == NULL) {
-			/*
-			 * Take care with terminating this loop.
-			 *
-			 * Don't make an extra call to __wt_tree_walk: that will
-			 * leave a page pinned, which may prevent any work from
-			 * being done.
-			 */
-			if (++restarts == 2)
+			if (++restarts == 2 || enough)
 				break;
 			continue;
 		}
