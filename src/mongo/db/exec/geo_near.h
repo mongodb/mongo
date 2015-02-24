@@ -87,6 +87,11 @@ namespace mongo {
         virtual PlanStage::StageState initialize(OperationContext* txn,
                                                  WorkingSet* workingSet,
                                                  Collection* collection);
+
+        virtual void finishInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type);
+
     private:
         const GeoNearParams _nearParams;
 
@@ -132,6 +137,11 @@ namespace mongo {
         virtual PlanStage::StageState initialize(OperationContext* txn,
                                                  WorkingSet* workingSet,
                                                  Collection* collection);
+
+        virtual void finishInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type);
+
     private:
         const GeoNearParams _nearParams;
 

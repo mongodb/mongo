@@ -176,6 +176,12 @@ namespace {
             return StatusWith<double>(member->obj.value()["distance"].numberDouble());
         }
 
+        virtual void finishInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type) {
+            invariant(!"MockNearStage should not receive invalidations");
+        }
+
     private:
 
         OwnedPointerVector<MockInterval> _intervals;
