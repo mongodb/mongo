@@ -3017,8 +3017,6 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 			WT_RET(
 			    __rec_split_raw(session, r, key->len + val->len));
 		else {
-			WT_RET(__rec_split(session, r, key->len + val->len));
-
 			/*
 			 * Turn off prefix compression until a full key written
 			 * to the new page, and (unless already working with an
@@ -3030,6 +3028,8 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 					WT_RET(__rec_cell_build_leaf_key(
 					    session, r, NULL, 0, &ovfl_key));
 			}
+
+			WT_RET(__rec_split(session, r, key->len + val->len));
 		}
 	}
 
@@ -4550,8 +4550,6 @@ build:
 					    WT_PAGE_ROW_LEAF, kpack, r->cur));
 					key_onpage_ovfl = 0;
 				}
-				WT_ERR(__rec_split(
-				    session, r, key->len + val->len));
 
 				/*
 				 * Turn off prefix compression until a full key
@@ -4567,6 +4565,9 @@ build:
 						    session,
 						    r, NULL, 0, &ovfl_key));
 				}
+
+				WT_ERR(__rec_split(
+				    session, r, key->len + val->len));
 			}
 		}
 
@@ -4636,9 +4637,6 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 				WT_RET(__rec_split_raw(
 				    session, r, key->len + val->len));
 			else {
-				WT_RET(__rec_split(
-				    session, r, key->len + val->len));
-
 				/*
 				 * Turn off prefix compression until a full key
 				 * written to the new page, and (unless already
@@ -4653,6 +4651,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 						    session,
 						    r, NULL, 0, &ovfl_key));
 				}
+
+				WT_RET(__rec_split(
+				    session, r, key->len + val->len));
 			}
 		}
 
