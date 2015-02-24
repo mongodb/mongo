@@ -88,6 +88,10 @@ namespace mongo {
                                                  WorkingSet* workingSet,
                                                  Collection* collection,
                                                  WorkingSetID* out);
+
+        virtual void finishInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type);
     private:
         const GeoNearParams _nearParams;
 
@@ -134,6 +138,10 @@ namespace mongo {
                                                  WorkingSet* workingSet,
                                                  Collection* collection,
                                                  WorkingSetID* out);
+
+        virtual void finishInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type);
     private:
         const GeoNearParams _nearParams;
 

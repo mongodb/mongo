@@ -354,6 +354,10 @@ namespace mongo {
             // Don't keep it around in the seen map since there's no valid RecordId anymore
             _nextIntervalSeen.erase(seenIt);
         }
+
+        // Subclass specific invalidation, e.g. passing the invalidation to the 2d or 2dsphere
+        // density estimator.
+        finishInvalidate(txn, dl, type);
     }
 
     vector<PlanStage*> NearStage::getChildren() const {

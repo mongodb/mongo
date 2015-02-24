@@ -147,6 +147,13 @@ namespace mongo {
                                       Collection* collection,
                                       WorkingSetID* out) = 0;
 
+        /**
+         * Does any invalidation work specific to the search type.
+         */
+        virtual void finishInvalidate(OperationContext* txn,
+                                      const RecordId& dl,
+                                      InvalidationType type) = 0;
+
     private:
 
         //
