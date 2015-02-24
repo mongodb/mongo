@@ -988,7 +988,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * exclusive access when a handle is being closed.
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-			WT_WITH_BTREE(session, btree,
+			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __evict_walk_file(session, &slot, flags));
 			WT_ASSERT(session, session->split_gen == 0);
 		}
