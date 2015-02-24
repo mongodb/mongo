@@ -335,17 +335,20 @@ static int
 __curstat_file_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
-	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
 
+	/* Our caller may have their own open handles, don't overwrite them. */
+	saved_dhandle = session->dhandle;
+
 	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
-	dhandle = session->dhandle;
 
 	/*
 	 * Fill in the data source statistics, and copy them to the cursor.
 	 * Optionally clear the data source statistics.
 	 */
 	if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
+		dhandle = session->dhandle;
 		cst->u.dsrc_stats = dhandle->stats;
 		if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
@@ -354,8 +357,8 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 
 	/* Release the handle, we're done with it. */
 	WT_TRET(__wt_session_release_btree(session));
-	WT_RET(ret);
 
+	session->dhandle = saved_dhandle;
 	return (ret);
 }
 
