@@ -354,7 +354,6 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 
 	/* Release the handle, we're done with it. */
 	WT_TRET(__wt_session_release_btree(session));
-	WT_RET(ret);
 
 	return (ret);
 }
