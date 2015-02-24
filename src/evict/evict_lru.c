@@ -284,11 +284,17 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	session = conn->evict_session;
 
 	/*
+	 * If eviction workers were configured, allocate sessions for them now.
+	 * This is done to reduce the chance that we will open new eviction
+	 * sessions after WT_CONNECTION::close is called.
+	 *
 	 * If there's only a single eviction thread, it may be called upon to
 	 * perform slow operations for the block manager.  (The flag is not
 	 * reset if reconfigured later, but I doubt that's a problem.)
 	 */
-	if (conn->evict_workers_max == 0)
+	if (conn->evict_workers_max > 0)
+		WT_RET(__evict_workers_resize(session));
+	else
 		F_SET(session, WT_SESSION_CAN_WAIT);
 
 	/*
