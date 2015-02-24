@@ -89,6 +89,30 @@ namespace {
 
     const long long WiredTigerRecordStore::kCollectionScanOnCreationThreshold = 10000;
 
+    StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {
+        StringBuilder ss;
+        BSONForEach(elem, options) {
+            if (elem.fieldNameStringData() == "configString") {
+                if (elem.type() != String) {
+                    return StatusWith<std::string>(ErrorCodes::TypeMismatch, str::stream()
+                                                   << "storageEngine.wiredTiger.configString "
+                                                   << "must be a string. "
+                                                   << "Not adding 'configString' value "
+                                                   << elem << " to collection configuration");
+                }
+                ss << elem.valueStringData() << ',';
+            }
+            else {
+                // Return error on first unrecognized field.
+                return StatusWith<std::string>(ErrorCodes::InvalidOptions, str::stream()
+                                               << '\'' << elem.fieldNameStringData() << '\''
+                                               << " is not a supported option in "
+                                               << "storageEngine.wiredTiger");
+            }
+        }
+        return StatusWith<std::string>(ss.str());
+    }
+
     // static
     StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
         StringData ns,
@@ -114,30 +138,12 @@ namespace {
 
         ss << extraStrings << ",";
 
-        // Validate configuration object.
-        // Warn about unrecognized fields that may be introduced in newer versions of this
-        // storage engine instead of raising an error.
-        // Ensure that 'configString' field is a string. Warn if this is not the case.
-        BSONForEach(elem, options.storageEngine.getObjectField(kWiredTigerEngineName)) {
-            if (elem.fieldNameStringData() == "configString") {
-                if (elem.type() != String) {
-                    return StatusWith<std::string>(ErrorCodes::TypeMismatch, str::stream()
-                                                   << "storageEngine.wiredTiger.configString "
-                                                   << "must be a string. "
-                                                   << "Not adding 'configString' value "
-                                                   << elem << " to collection configuration");
-                    continue;
-                }
-                ss << elem.valueStringData() << ",";
-            }
-            else {
-                // Return error on first unrecognized field.
-                return StatusWith<std::string>(ErrorCodes::InvalidOptions, str::stream()
-                                               << '\'' << elem.fieldNameStringData() << '\''
-                                               << " is not a supported option in "
-                                               << "storageEngine.wiredTiger");
-            }
-        }
+        StatusWith<std::string> customOptions =
+            parseOptionsField(options.storageEngine.getObjectField(kWiredTigerEngineName));
+        if (!customOptions.isOK())
+            return customOptions;
+
+        ss << customOptions.getValue();
 
         if ( NamespaceString::oplog(ns) ) {
             // force file for oplog

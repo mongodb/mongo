@@ -101,49 +101,42 @@ namespace mongo {
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringEmptyDocument) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {}}}");
-        IndexDescriptor desc(NULL, "", spec);
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
-        const Status& status = result.getStatus();
-        ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
+        BSONObj spec = fromjson("{}");
+        StatusWith<std::string> result = WiredTigerIndex::parseIndexOptions(spec);
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(result.getValue(), ""); // "," would also be valid.
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringUnknownField) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {unknownField: 1}}}");
-        IndexDescriptor desc(NULL, "", spec);
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        BSONObj spec = fromjson("{unknownField: 1}");
+        StatusWith<std::string> result = WiredTigerIndex::parseIndexOptions(spec);
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status);
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringNonStringConfig) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: 12345}}}");
-        IndexDescriptor desc(NULL, "", spec);
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        BSONObj spec = fromjson("{configString: 12345}");
+        StatusWith<std::string> result = WiredTigerIndex::parseIndexOptions(spec);
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status.code());
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringEmptyConfigString) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: ''}}}");
-        IndexDescriptor desc(NULL, "", spec);
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
-        const Status& status = result.getStatus();
-        ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+        BSONObj spec = fromjson("{configString: ''}");
+        StatusWith<std::string> result = WiredTigerIndex::parseIndexOptions(spec);
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(result.getValue(), ","); // "" would also be valid.
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringValidConfigFormat) {
-        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: 'abc=def'}}}");
-        IndexDescriptor desc(NULL, "", spec);
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        // TODO eventually this should fail since "abc" is not a valid WT option.
+        BSONObj spec = fromjson("{configString: 'abc=def'}");
+        StatusWith<std::string> result = WiredTigerIndex::parseIndexOptions(spec);
         const Status& status = result.getStatus();
         ASSERT_OK(status);
-        const std::string& config = result.getValue();
-        ASSERT_NOT_EQUALS(std::string::npos, config.find("abc=def"));
+        ASSERT_EQ(result.getValue(), "abc=def,");
     }
 
 }  // namespace mongo

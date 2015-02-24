@@ -150,22 +150,43 @@ namespace mongo {
         return new WiredTigerHarnessHelper();
     }
 
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyDocument) {
+        BSONObj spec = fromjson("{}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(result.getValue(), ""); // "," would also be valid.
+    }
+
     TEST(WiredTigerRecordStoreTest, GenerateCreateStringUnknownField) {
-        CollectionOptions options;
-        options.storageEngine = fromjson("{wiredTiger: {unknownField: 1}}");
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString("", options, "");
+        BSONObj spec = fromjson("{unknownField: 1}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status);
     }
 
     TEST(WiredTigerRecordStoreTest, GenerateCreateStringNonStringConfig) {
-        CollectionOptions options;
-        options.storageEngine = fromjson("{wiredTiger: {configString: 12345}}");
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString("", options, "");
+        BSONObj spec = fromjson("{configString: 12345}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status.code());
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyConfigString) {
+        BSONObj spec = fromjson("{configString: ''}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(result.getValue(), ","); // "" would also be valid.
+    }
+
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigFormat) {
+        // TODO eventually this should fail since "abc" is not a valid WT option.
+        BSONObj spec = fromjson("{configString: 'abc=def'}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+        const Status& status = result.getStatus();
+        ASSERT_OK(status);
+        ASSERT_EQ(result.getValue(), "abc=def,");
     }
 
     TEST(WiredTigerRecordStoreTest, Isolation1 ) {
