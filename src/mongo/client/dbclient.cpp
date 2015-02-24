@@ -959,6 +959,8 @@ namespace mongo {
         string ns = db + ".system.namespaces";
         auto_ptr<DBClientCursor> c = query(
                 ns.c_str(), fallbackFilter.obj(), 0, 0, 0, QueryOption_SlaveOk);
+        uassert(28611, str::stream() << "listCollections failed querying " << ns, c.get());
+
         while ( c->more() ) {
             BSONObj obj = c->nextSafe();
             string ns = obj["name"].valuestr();
@@ -1410,6 +1412,8 @@ namespace mongo {
         // TODO(spencer): Remove fallback behavior after 3.0
         auto_ptr<DBClientCursor> cursor = query(NamespaceString(ns).getSystemIndexesCollection(),
                                                 BSON("ns" << ns), 0, 0, 0, options);
+        uassert(28612, str::stream() << "listIndexes failed querying " << ns, cursor.get());
+
         while ( cursor->more() ) {
             BSONObj spec = cursor->nextSafe();
             specs.push_back( spec.getOwned() );
