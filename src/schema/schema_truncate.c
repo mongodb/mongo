@@ -170,11 +170,15 @@ __wt_schema_range_truncate(
 	cursor = (start != NULL) ? start : stop;
 	uri = cursor->internal_uri;
 
-	if (WT_PREFIX_MATCH(uri, "file:"))
+	if (WT_PREFIX_MATCH(uri, "file:")) {
+		if (start != NULL)
+			WT_CURSOR_NEEDKEY(start);
+		if (stop != NULL)
+			WT_CURSOR_NEEDKEY(stop);
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)cursor)->btree,
 		    ret = __wt_btcur_range_truncate(
 			(WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
-	else if (WT_PREFIX_MATCH(uri, "table:"))
+	} else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_table_range_truncate(
 		    (WT_CURSOR_TABLE *)start, (WT_CURSOR_TABLE *)stop);
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL &&
@@ -182,6 +186,6 @@ __wt_schema_range_truncate(
 		ret = dsrc->range_truncate(dsrc, &session->iface, start, stop);
 	else
 		ret = __wt_range_truncate(start, stop);
-
+err:
 	return (ret);
 }

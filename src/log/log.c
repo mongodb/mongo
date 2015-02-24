@@ -50,27 +50,29 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 
 	conn = S2C(session);
 	log = conn->log;
-	c = NULL;
+
 	/*
-	 * Default is to run recovery always.
+	 * Default is to run recovery always (regardless of whether this
+	 * connection has logging enabled).
 	 */
 	*rec = 1;
-
 	if (log == NULL)
 		return (0);
+
 	WT_RET(__wt_curlog_open(session, "log:", NULL, &c));
 	c->set_key(c, ckp_lsn->file, ckp_lsn->offset, 0);
 	WT_ERR(c->search(c));
+
 	/*
-	 * If the checkpoint LSN we're given is the last record,
-	 * then recovery is not needed.
+	 * If the checkpoint LSN we're given is the last record, then recovery
+	 * is not needed.
 	 */
 	if ((ret = c->next(c)) == WT_NOTFOUND) {
 		*rec = 0;
 		ret = 0;
 	}
-err:	if (c != NULL)
-		(void)c->close(c);
+
+err:	WT_TRET(c->close(c));
 	return (ret);
 }
 

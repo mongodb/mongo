@@ -203,8 +203,7 @@ retry:
 		 * churn is used to change how long we pause before closing
 		 * the slot - which leads to more consolidation and less churn.
 		 */
-		if (++switch_fails % SLOT_POOL == 0 &&
-		    switch_fails != 0 && slot->slot_churn < 5)
+		if (++switch_fails % SLOT_POOL == 0 && slot->slot_churn < 5)
 			++slot->slot_churn;
 		__wt_yield();
 		goto retry;

@@ -129,15 +129,24 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    __evict_force_check(session, page, flags)) {
 				++force_attempts;
 				ret = __wt_page_release_evict(session, ref);
+				/* If forced eviction fails, stall. */
 				if (ret == EBUSY) {
-					/* If forced eviction fails, stall. */
 					ret = 0;
 					wait_cnt += 1000;
+					WT_STAT_FAST_CONN_INCR(session,
+					    page_forcible_evict_blocked);
+					break;
 				} else
 					WT_RET(ret);
-				WT_STAT_FAST_CONN_INCR(
-				    session, page_forcible_evict_blocked);
-				break;
+
+				/*
+				 * The result of a successful forced eviction
+				 * is a page-state transition (potentially to
+				 * an in-memory page we can use, or a restart
+				 * return for our caller), continue the outer
+				 * page-acquisition loop.
+				 */
+				continue;
 			}
 
 			/* Check if we need an autocommit transaction. */

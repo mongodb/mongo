@@ -57,7 +57,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 			WT_ERR(__wt_session_get_btree_ckpt(
 			    session, uri, cfg, open_flags));
-			ret = file_func(session, cfg);
+			WT_SAVE_DHANDLE(session,
+			    ret = file_func(session, cfg));
 			WT_TRET(__wt_session_release_btree(session));
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
