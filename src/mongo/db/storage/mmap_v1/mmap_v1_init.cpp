@@ -52,15 +52,6 @@ namespace mongo {
                 return "mmapv1";
             }
 
-            virtual Status validateCollectionStorageOptions(const BSONObj& options) const
-            {
-                return Status::OK();
-            }
-
-            virtual Status validateIndexStorageOptions(const BSONObj& options) const {
-                return Status::OK();
-            }
-
             virtual Status validateMetadata(const StorageEngineMetadata& metadata,
                                             const StorageGlobalParams& params) const {
                 Status status = metadata.validateStorageEngineOption(

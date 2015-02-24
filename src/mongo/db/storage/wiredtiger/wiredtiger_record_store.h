@@ -69,6 +69,13 @@ namespace mongo {
         static const long long kCollectionScanOnCreationThreshold;
 
         /**
+         * Parses collections options for wired tiger configuration string for table creation.
+         * The document 'options' is typically obtained from the 'wiredTiger' field of
+         * CollectionOptions::storageEngine.
+         */
+        static StatusWith<std::string> parseOptionsField(const BSONObj options);
+
+        /**
          * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
          * Configuration string is constructed from:
          *     built-in defaults

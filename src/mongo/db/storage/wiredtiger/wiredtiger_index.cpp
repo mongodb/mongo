@@ -117,6 +117,7 @@ namespace {
 
     // static
     StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& options) {
+        StringBuilder ss;
         BSONForEach(elem, options) {
             if (elem.fieldNameStringData() == "configString") {
                 if (elem.type() != String) {
@@ -125,11 +126,7 @@ namespace {
                         << "Not adding 'configString' value "
                         << elem << " to index configuration");
                 }
-                if (elem.valueStringData().empty()) {
-                    return StatusWith<std::string>(ErrorCodes::InvalidOptions,
-                        "configString must be not be an empty string.");
-                }
-                return StatusWith<std::string>(elem.String());
+                ss << elem.valueStringData() << ',';
             }
             else {
                 // Return error on first unrecognized field.
@@ -138,8 +135,7 @@ namespace {
                     << " is not a supported option.");
             }
         }
-        return StatusWith<std::string>(ErrorCodes::BadValue,
-            "Storage engine options document must not be empty.");
+        return StatusWith<std::string>(ss.str());
     }
 
     // static
