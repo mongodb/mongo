@@ -261,6 +261,10 @@ static CONFIG c[] = {
 	  "maintain statistics",				/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_statistics, NULL },
 
+	{ "statistics_server",
+	  "run the statistics server thread",			/* 5% */
+	  C_BOOL, 5, 0, 0, &g.c_statistics_server, NULL },
+
 	{ "threads",
 	  "the number of threads",
 	  C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
