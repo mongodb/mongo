@@ -442,8 +442,6 @@ struct __wt_page {
 
 		/* Row-store leaf page. */
 		struct {
-			WT_ROW *d;		/* Key/value pairs */
-
 			/*
 			 * The column-store leaf page modification structures
 			 * live in the WT_PAGE_MODIFY structure to keep the
@@ -457,6 +455,7 @@ struct __wt_page {
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
 
+			WT_ROW *d;		/* Key/value pairs */
 			uint32_t entries;	/* Entries */
 		} row;
 #undef	pg_row_d
