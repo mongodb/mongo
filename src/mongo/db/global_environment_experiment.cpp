@@ -83,7 +83,7 @@ namespace mongo {
             StringData storageEngineName = storageElement.fieldNameStringData();
             if (storageElement.type() != mongo::Object) {
                 return Status(ErrorCodes::BadValue, str::stream()
-                    << "'storage." << storageElement.fieldNameStringData()
+                    << "'storageEngine." << storageElement.fieldNameStringData()
                     << "' has to be an embedded document.");
             }
 

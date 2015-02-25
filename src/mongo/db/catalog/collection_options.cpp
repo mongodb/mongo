@@ -62,7 +62,7 @@ namespace mongo {
         flags = Flag_UsePowerOf2Sizes;
         flagsSet = false;
         temp = false;
-        storage = BSONObj();
+        storageEngine = BSONObj();
     }
 
     Status CollectionOptions::parse(const BSONObj& options) {
@@ -124,14 +124,14 @@ namespace mongo {
             else if ( fieldName == "temp" ) {
                 temp = e.trueValue();
             }
-            else if (fieldName == "storage") {
+            else if (fieldName == "storageEngine") {
                 // Storage engine-specific collection options.
-                // "storage" field must be of type "document".
-                // Every field inside "storage" has to be a document.
+                // "storageEngine" field must be of type "document".
+                // Every field inside "storageEngine" has to be a document.
                 // Format:
                 // {
                 //     ...
-                //     storage: {
+                //     storageEngine: {
                 //         storageEngine1: {
                 //             ...
                 //         },
@@ -142,26 +142,26 @@ namespace mongo {
                 //     ...
                 // }
                 if (e.type() != mongo::Object) {
-                    return Status(ErrorCodes::BadValue, "'storage' has to be a document.");
+                    return Status(ErrorCodes::BadValue, "'storageEngine' has to be a document.");
                 }
                 BSONObjIterator j(e.Obj());
                 if (!j.more()) {
                     return Status(ErrorCodes::BadValue,
-                                  "Empty 'storage' options are invalid. "
+                                  "Empty 'storageEngine' options are invalid. "
                                   "Please remove, or include valid options.");
                 }
 
-                // Loop through each provided storage.
+                // Loop through each provided storageEngine.
                 while (j.more()) {
                     BSONElement storageEngineElement = j.next();
                     StringData storageEngineName = storageEngineElement.fieldNameStringData();
                     if (storageEngineElement.type() != mongo::Object) {
-                        return Status(ErrorCodes::BadValue, str::stream() << "'storage." <<
+                        return Status(ErrorCodes::BadValue, str::stream() << "'storageEngine." <<
                                       storageEngineName << "' has to be an embedded document.");
                     }
                 }
 
-                storage = e.Obj().getOwned();
+                storageEngine = e.Obj().getOwned();
             }
         }
 
@@ -192,8 +192,8 @@ namespace mongo {
         if ( temp )
             b.appendBool( "temp", true );
 
-        if (!storage.isEmpty()) {
-            b.append("storage", storage);
+        if (!storageEngine.isEmpty()) {
+            b.append("storageEngine", storageEngine);
         }
 
         return b.obj();

@@ -47,7 +47,7 @@ namespace mongo {
 
         /**
          * Parses index options for wired tiger configuration string suitable for table creation.
-         * The document 'options' is typically obtained from the 'storage.wiredTiger' field
+         * The document 'options' is typically obtained from the 'storageEngine.wiredTiger' field
          * of an IndexDescriptor's info object.
          */
         static StatusWith<std::string> parseIndexOptions(const BSONObj& options);
@@ -57,7 +57,7 @@ namespace mongo {
          * Configuration string is constructed from:
          *     built-in defaults
          *     'extraConfig'
-         *     storage.wiredTiger.configString in index descriptor's info object.
+         *     storageEngine.wiredTiger.configString in index descriptor's info object.
          * Performs simple validation on the supplied parameters.
          * Returns error status if validation fails.
          * Note that even if this function returns an OK status, WT_SESSION:create() may still
