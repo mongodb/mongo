@@ -147,14 +147,19 @@ namespace mongo {
                                       Collection* collection,
                                       WorkingSetID* out) = 0;
 
-        /**
-         * Does any invalidation work specific to the search type.
-         */
+    private:
+
+        //
+        // Save/restore/invalidate work specific to the search type.
+        //
+
+        virtual void finishSaveState() = 0;
+
+        virtual void finishRestoreState(OperationContext* txn) = 0;
+
         virtual void finishInvalidate(OperationContext* txn,
                                       const RecordId& dl,
                                       InvalidationType type) = 0;
-
-    private:
 
         //
         // Generic methods for progressive search functionality

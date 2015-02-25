@@ -322,6 +322,9 @@ namespace mongo {
         for (size_t i = 0; i < _childrenIntervals.size(); i++) {
             _childrenIntervals[i]->covering->saveState();
         }
+
+        // Subclass specific saving, e.g. saving the 2d or 2dsphere density estimator.
+        finishSaveState();
     }
 
     void NearStage::restoreState(OperationContext* opCtx) {
@@ -331,6 +334,9 @@ namespace mongo {
         for (size_t i = 0; i < _childrenIntervals.size(); i++) {
             _childrenIntervals[i]->covering->restoreState(opCtx);
         }
+
+        // Subclass specific restoring, e.g. restoring the 2d or 2dsphere density estimator.
+        finishRestoreState(opCtx);
     }
 
     void NearStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
