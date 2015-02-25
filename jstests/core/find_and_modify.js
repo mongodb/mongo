@@ -44,3 +44,29 @@ assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:tr
 assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:true, upsert:true}); });
 assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, new:true, remove:true}); });
 assert.throws(function() { t.findAndModify({query:{x:1}, upsert:true, remove:true}); });
+
+// SERVER-17372
+t.drop();
+var cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {_id: "miss"},
+    update: {$inc: {y: 1}},
+    upsert: true
+});
+assert.commandWorked(cmdRes);
+assert("value" in cmdRes);
+assert.eq(null, cmdRes.value);
+
+var cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {_id: "missagain"},
+    update: {$inc: {y: 1}},
+    upsert: true,
+    new: true
+});
+assert.commandWorked(cmdRes);
+assert("value" in cmdRes);
+assert.eq("missagain", cmdRes.value._id);
+
+// Two upserts should have happened.
+assert.eq(2, t.count());
