@@ -196,7 +196,8 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 }
 
 // RestoreCollectionToDB pipes the given BSON data into the database.
-func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string, bsonSource *db.DecodedBSONSource, fileSize int64) error {
+func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
+	bsonSource *db.DecodedBSONSource, fileSize int64) error {
 
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
@@ -237,7 +238,13 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string, bsonS
 
 	for i := 0; i < MaxInsertThreads; i++ {
 		go func() {
-			bulk := db.NewBufferedBulkInserter(collection, restore.ToolOptions.BulkBufferSize, !restore.OutputOptions.StopOnError)
+			// get a session copy for each insert worker
+			s := session.Copy()
+			defer s.Close()
+
+			coll := collection.With(s)
+			bulk := db.NewBufferedBulkInserter(
+				coll, restore.ToolOptions.BulkBufferSize, !restore.OutputOptions.StopOnError)
 			for rawDoc := range docChan {
 				if restore.objCheck {
 					err := bson.Unmarshal(rawDoc.Data, &bson.D{})
