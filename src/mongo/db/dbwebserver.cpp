@@ -110,9 +110,7 @@ namespace mongo {
                      vector<string>& headers,
                      const SockAddr &from) {
 
-            if ( from.isLocalHost() || !_webUsers->haveAdminUsers(txn) ) {
-                // TODO(spencer): should the above check use "&&" not "||"?  Currently this is much
-                // more permissive than the server's localhost auth bypass.
+            if ( from.isLocalHost() && !_webUsers->haveAdminUsers(txn) ) {
                 cc().getAuthorizationSession()->grantInternalAuthorization();
                 return true;
             }
