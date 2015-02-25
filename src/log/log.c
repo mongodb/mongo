@@ -61,16 +61,23 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 
 	WT_RET(__wt_curlog_open(session, "log:", NULL, &c));
 	c->set_key(c, ckp_lsn->file, ckp_lsn->offset, 0);
-	WT_ERR(c->search(c));
-
-	/*
-	 * If the checkpoint LSN we're given is the last record, then recovery
-	 * is not needed.
-	 */
-	if ((ret = c->next(c)) == WT_NOTFOUND) {
-		*rec = 0;
+	if ((ret = c->search(c)) == 0) {
+		/*
+		 * If the checkpoint LSN we're given is the last record,
+		 * then recovery is not needed.
+		 */
+		if ((ret = c->next(c)) == WT_NOTFOUND) {
+			*rec = 0;
+			ret = 0;
+		}
+	} else if (ret == WT_NOTFOUND)
+		/*
+		 * If we didn't find that LSN, we need to run recovery,
+		 * but not return any error.
+		 */
 		ret = 0;
-	}
+	else
+		WT_ERR(ret);
 
 err:	WT_TRET(c->close(c));
 	return (ret);
