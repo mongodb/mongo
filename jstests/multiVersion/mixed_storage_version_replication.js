@@ -631,4 +631,4 @@ function doMultiThreadedWork(primary, numThreads) {
         print("Work done, checking to see all nodes match");
         assertSameData(primary, conns);
     }
-})();
+}); // TODO: SERVER-17348 enable again after v3.0 is released.
