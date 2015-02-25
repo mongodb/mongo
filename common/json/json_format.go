@@ -17,12 +17,13 @@ func (js JavaScript) MarshalJSON() ([]byte, error) {
 	data := []byte(fmt.Sprintf(`{ "$code": %q`, js.Code))
 
 	scopeChunk := []byte{}
+	var err error
 	if js.Scope != nil {
-		scopeChunk, err := Marshal(js.Scope)
+		scopeChunk, err = Marshal(js.Scope)
 		if err != nil {
 			return nil, err
 		}
-		scopeChunk = []byte(fmt.Sprintf(`, "$scope": %v `, scopeChunk))
+		scopeChunk = []byte(fmt.Sprintf(`, "$scope": %v `, string(scopeChunk)))
 	}
 	scopeChunk = append(scopeChunk, '}')
 
