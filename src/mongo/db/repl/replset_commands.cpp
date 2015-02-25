@@ -232,9 +232,10 @@ namespace {
             }
 
             if (configObj.isEmpty()) {
-                result.append("info2", "no configuration explicitly specified -- making one");
-                log() << "initiate : no configuration specified.  "
+                string noConfigMessage = "no configuration specified. "
                     "Using a default configuration for the set";
+                result.append("info2", noConfigMessage);
+                log() << "initiate : " << noConfigMessage;
 
                 ReplicationCoordinatorExternalStateImpl externalState;
                 std::string name;
