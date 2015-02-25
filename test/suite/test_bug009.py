@@ -26,8 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_split.py
-#       check that splits work as expected
+# test_bug009.py
+#       check that reconciliation takes into account prefix compression
+#       when figuring out how to split pages
 #
 
 import wiredtiger, wttest
@@ -37,21 +38,20 @@ from helper import confirm_empty,\
     complex_populate, complex_value_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
-# Test splits
 class test_bug009(wttest.WiredTigerTestCase):
     name = 'test_bug009'
     uri = 'file:' + name
 
-    def test_split_prefix(self):
+    def test_reconciliation_prefix_compression(self):
         # Configure 4KB pages with prefix compression enabled and support for
         # large data items.
-        self.session.create(uri,
+        self.session.create(self.uri,
                 'prefix_compression=1,' +
                 'key_format=S,value_format=S,' +
                 'internal_page_max=4KB,leaf_page_max=4KB,' +
                 'leaf_value_max=3096')
 
-        cursor = self.session.open_cursor(uri, None)
+        cursor = self.session.open_cursor(self.uri, None)
         # Insert two items with keys that will be prefix compressed and data
         # items sized so that the compression size difference tips the
         # size over a page boundary.
