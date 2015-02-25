@@ -347,6 +347,28 @@ err:		__wt_err(session, ret, "log close server error");
 }
 
 /*
+ * Simple structure for sorting written slots.
+ */
+typedef struct {
+	WT_LSN	lsn;
+	uint32_t slot_index;
+} WT_LOG_WRLSN_ENTRY;
+
+/*
+ * __log_wrlsn_cmp --
+ *	The log wrlsn comparison function for qsort.
+ */
+static int
+__log_wrlsn_cmp(const void *a, const void *b)
+{
+	WT_LOG_WRLSN_ENTRY *ae, *be;
+
+	ae = (WT_LOG_WRLSN_ENTRY *)a;
+	be = (WT_LOG_WRLSN_ENTRY *)b;
+	return (LOG_CMP(&ae->lsn, &be->lsn));
+}
+
+/*
  * __log_wrlsn_server --
  *	The log wrlsn server thread.
  */
@@ -356,9 +378,10 @@ __log_wrlsn_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
+	WT_LOG_WRLSN_ENTRY written[SLOT_POOL];
 	WT_LOGSLOT *slot;
 	WT_SESSION_IMPL *session;
-	int i, processed, saw_later, yield;
+	int i, save_i, written_i, yield;
 
 	session = arg;
 	conn = S2C(session);
@@ -371,58 +394,62 @@ __log_wrlsn_server(void *arg)
 		 * WT_LOG_SLOT_WRITTEN state is exclusively ours for now.
 		 */
 		i = 0;
-		processed = 0;
-		saw_later = 0;
+		written_i = 0;
+		/*
+		 * Walk the array once saving any slots that are in the
+		 * WT_LOG_SLOT_WRITTEN state.
+		 */
 		while (i < SLOT_POOL) {
+			save_i = i;
 			slot = &log->slot_pool[i++];
 			if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 				continue;
-			/*
-			 * Make note that we have seen and skipped some
-			 * slots with LOG_SLOT_WRITTEN set but they have a
-			 * later LSN so we keep looking.
-			 */
-			if (LOG_CMP(
-			    &slot->slot_release_lsn, &log->write_lsn) != 0) {
-				saw_later++;
-				continue;
-			}
-			/*
-			 * If we get here, we have a slot to process.  Move
-			 * the write_lsn forward, signal the write_cond in
-			 * case anyone is waiting on this guarantee, and then
-			 * free the slot.
-			 */
-			log->write_lsn = slot->slot_end_lsn;
-			WT_ERR(__wt_cond_signal(session, log->log_write_cond));
-			WT_STAT_FAST_CONN_INCR(session, log_write_lsn);
-			/*
-			 * Signal the close thread if needed.
-			 */
-			if (F_ISSET(slot, SLOT_CLOSEFH)) {
-				F_CLR(slot, SLOT_CLOSEFH);
-				WT_ERR(__wt_cond_signal(session,
-				    conn->log_close_cond));
-			}
-			WT_ERR(__wt_log_slot_free(session, slot));
-			/*
-			 * If we processed one, reset and look for more.
-			 */
-			processed++;
-			yield = 0;
+			written[written_i].slot_index = save_i;
+			written[written_i++].lsn = slot->slot_release_lsn;
 		}
 		/*
-		 * If we processed any, we may have found it in the middle of
-		 * the array, so we want to continue looking for more by going
-		 * back to the beginning of the array again.
+		 * If we found any written slots process them.  We sort them
+		 * based on the release LSN, and then look for them in order.
 		 */
-		if (processed)
-			continue;
+		if (written_i > 0) {
+			yield = 0;
+			qsort(written, written_i, sizeof(WT_LOG_WRLSN_ENTRY),
+			    __log_wrlsn_cmp);
+			/*
+			 * We know the written array is sorted by LSN.  Go
+			 * through them either advancing write_lsn or stop
+			 * as soon as one is not in order.
+			 */
+			for (i = 0; i < written_i; i++) {
+				if (LOG_CMP(&log->write_lsn,
+				    &written[i].lsn) != 0)
+					break;
+				/*
+				 * If we get here we have a slot to process.
+				 * Advance the LSN and process the slot.
+				 */
+				slot = &log->slot_pool[written[i].slot_index];
+				WT_ASSERT(session, LOG_CMP(&written[i].lsn,
+				    &slot->slot_release_lsn) == 0);
+				log->write_lsn = slot->slot_end_lsn;
+				WT_ERR(__wt_cond_signal(session,
+				    log->log_write_cond));
+				WT_STAT_FAST_CONN_INCR(session, log_write_lsn);
+
+				/*
+				 * Signal the close thread if needed.
+				 */
+				if (F_ISSET(slot, SLOT_CLOSEFH))
+					WT_ERR(__wt_cond_signal(session,
+					    conn->log_close_cond));
+				WT_ERR(__wt_log_slot_free(session, slot));
+			}
+		}
 		/*
 		 * If we saw a later write, we always want to yield because
 		 * we know something is in progress.
 		 */
-		if (yield++ < 1000 || saw_later)
+		if (yield++ < 1000)
 			__wt_yield();
 		else
 			/* Wait until the next event. */
