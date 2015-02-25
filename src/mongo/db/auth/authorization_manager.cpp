@@ -254,6 +254,7 @@ namespace mongo {
 
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
             _authEnabled(false),
+            _privilegeDocsExist(false),
             _externalState(externalState),
             _version(schemaVersionInvalid),
             _isFetchPhaseBusy(false) {
@@ -305,8 +306,22 @@ namespace mongo {
         return _authEnabled;
     }
 
-    bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) const {
-        return _externalState->hasAnyPrivilegeDocuments(txn);
+    bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) {
+        boost::unique_lock<boost::mutex> lk(_privilegeDocsExistMutex);
+        if (_privilegeDocsExist) {
+            // If we know that a user exists, don't re-check.
+            return true;
+        }
+
+        lk.unlock();
+        bool privDocsExist = _externalState->hasAnyPrivilegeDocuments(txn);
+        lk.lock();
+
+        if (privDocsExist) {
+            _privilegeDocsExist = true;
+        }
+
+        return _privilegeDocsExist;
     }
 
     Status AuthorizationManager::writeAuthSchemaVersionIfNeeded(OperationContext* txn,

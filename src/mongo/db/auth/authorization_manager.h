@@ -179,8 +179,15 @@ namespace mongo {
          */
         OID getCacheGeneration();
 
-        // Returns true if there exists at least one privilege document in the system.
-        bool hasAnyPrivilegeDocuments(OperationContext* txn) const;
+        /**
+         * Returns true if there exists at least one privilege document in the system.
+         * Used by the AuthorizationSession to determine whether localhost connections should be
+         * granted special access to bootstrap the system.
+         * NOTE: If this method ever returns true, the result is cached in _privilegeDocsExist,
+         * meaning that once this method returns true it will continue to return true for the
+         * lifetime of this process, even if all users are subsequently dropped from the system.
+         */
+        bool hasAnyPrivilegeDocuments(OperationContext* txn);
 
         /**
          * Updates the auth schema version document to reflect the current state of the system.
@@ -477,6 +484,14 @@ namespace mongo {
          * at initalization-time.
          */
         bool _authEnabled;
+
+        /**
+         * A cache of whether there are any users set up for the cluster.
+         */
+        bool _privilegeDocsExist;
+
+        // Protects _privilegeDocsExist
+        mutable boost::mutex _privilegeDocsExistMutex;
 
         boost::scoped_ptr<AuthzManagerExternalState> _externalState;
 
