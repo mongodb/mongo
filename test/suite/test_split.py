@@ -91,27 +91,5 @@ class test_split(wttest.WiredTigerTestCase):
         self.assertEqual(2, stat_cursor[stat.dsrc.btree_row_leaf][2])
         stat_cursor.close()
 
-    def test_split_prefix(self):
-        this_uri = self.uri + 'prefix'
-        # Configure 4KB pages with prefix compression enabled and support for
-        # large data items.
-        self.session.create(this_uri,
-                'prefix_compression=1,' +
-                'key_format=S,value_format=S,' +
-                'internal_page_max=4KB,leaf_page_max=4KB,' +
-                'leaf_value_max=3096')
-
-        cursor = self.session.open_cursor(this_uri, None)
-        # Insert two items with keys that will be prefix compressed and data
-        # items sized so that the compression size difference tips the
-        # size over a page boundary.
-        cursor.set_key('fill_2__b_27')
-        cursor.set_value(2294 * '0')
-        cursor.insert()
-
-        cursor.set_key('fill_2__b_28')
-        cursor.set_value(3022 * '0')
-        cursor.insert()
-
 if __name__ == '__main__':
     wttest.run()
