@@ -68,14 +68,10 @@ namespace repl {
             // conLock releases...
         }
         void reconnect() {
-            connInfo->cc.reset(new DBClientConnection(true, 0, connInfo->getTimeout()));
+            connInfo->cc.reset(new DBClientConnection(true));
             connInfo->cc->_logLevel = logger::LogSeverity::Debug(2);
             connInfo->connected = false;
             connect();
-        }
-
-        void setTimeout(time_t timeout) {
-            connInfo->setTimeout(timeout);
         }
 
         /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
@@ -105,18 +101,6 @@ namespace repl {
                 MessagingPort& mp = cc->port();
                 mp.tag |= ScopedConn::keepOpen;
             }
-
-            void setTimeout(time_t timeout) {
-                _timeout = timeout;
-                cc->setSoTimeout(_timeout);
-            }
-
-            int getTimeout() {
-                return _timeout;
-            }
-
-        private:
-            int _timeout;
         } *connInfo;
         typedef std::map<std::string,ScopedConn::ConnectionInfo*> M;
         static M& _map;
