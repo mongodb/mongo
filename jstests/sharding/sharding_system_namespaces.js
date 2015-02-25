@@ -27,12 +27,12 @@ if (db.serverBuildInfo().bits != 32) {
       var info = collectionsInfos.filter(function(c) {
         return c.name == "sharding_system_namespaces";
       })[0];
-      assert.eq(info.options.storage.wiredTiger.configString, "block_compressor=zlib");
+      assert.eq(info.options.storageEngine.wiredTiger.configString, "block_compressor=zlib");
     }
 
     db.createCollection("sharding_system_namespaces",
     {
-      storage: {
+      storageEngine: {
         wiredTiger: { configString: "block_compressor=zlib" }
       }
     });

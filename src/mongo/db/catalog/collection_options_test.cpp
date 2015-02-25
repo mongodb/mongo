@@ -86,41 +86,41 @@ namespace mongo {
     }
 
     TEST(CollectionOptions, InvalidStorageEngineField) {
-        // "storage" field has to be an object if present.
-        ASSERT_NOT_OK( CollectionOptions().parse(fromjson("{storage: 1}")));
+        // "storageEngine" field has to be an object if present.
+        ASSERT_NOT_OK( CollectionOptions().parse(fromjson("{storageEngine: 1}")));
 
-        // Every field under "storage" has to be an object.
+        // Every field under "storageEngine" has to be an object.
         ASSERT_NOT_OK( CollectionOptions().parse(fromjson(
-            "{storage: {storageEngine1: 1}}")));
+            "{storageEngine: {storageEngine1: 1}}")));
 
-        // Empty "storage" not allowed
+        // Empty "storageEngine" not allowed
         ASSERT_NOT_OK( CollectionOptions().parse(fromjson(
-            "{storage: {}}")));
+            "{storageEngine: {}}")));
     }
 
     TEST(CollectionOptions, ParseEngineField) {
         CollectionOptions opts;
         ASSERT_OK(opts.parse(fromjson("{unknownField: 1, "
-            "storage: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
+            "storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
         checkRoundTrip(opts);
 
         // Unrecognized field should not be present in BSON representation.
         BSONObj obj = opts.toBSON();
         ASSERT_FALSE(obj.hasField("unknownField"));
 
-        // Check "storage" field.
-        ASSERT_TRUE(obj.hasField("storage"));
-        ASSERT_TRUE(obj.getField("storage").isABSONObj());
-        BSONObj storage = obj.getObjectField("storage");
+        // Check "storageEngine" field.
+        ASSERT_TRUE(obj.hasField("storageEngine"));
+        ASSERT_TRUE(obj.getField("storageEngine").isABSONObj());
+        BSONObj storageEngine = obj.getObjectField("storageEngine");
 
-        // Check individual storage fields.
-        ASSERT_TRUE(storage.getField("storageEngine1").isABSONObj());
-        BSONObj storageEngine1 = storage.getObjectField("storageEngine1");
+        // Check individual storage storageEngine fields.
+        ASSERT_TRUE(storageEngine.getField("storageEngine1").isABSONObj());
+        BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
         ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
         ASSERT_EQUALS(2, storageEngine1.getIntField("y"));
 
-        ASSERT_TRUE(storage.getField("storageEngine2").isABSONObj());
-        BSONObj storageEngine2 = storage.getObjectField("storageEngine2");
+        ASSERT_TRUE(storageEngine.getField("storageEngine2").isABSONObj());
+        BSONObj storageEngine2 = storageEngine.getObjectField("storageEngine2");
         ASSERT_EQUALS(1, storageEngine2.getIntField("a"));
         ASSERT_EQUALS(2, storageEngine2.getIntField("b"));
 
@@ -129,32 +129,32 @@ namespace mongo {
     TEST(CollectionOptions, ResetStorageEngineField) {
         CollectionOptions opts;
         ASSERT_OK(opts.parse(fromjson(
-            "{storage: {storageEngine1: {x: 1}}}")));
+            "{storageEngine: {storageEngine1: {x: 1}}}")));
         checkRoundTrip(opts);
 
         opts.reset();
 
-        ASSERT_TRUE(opts.storage.isEmpty());
+        ASSERT_TRUE(opts.storageEngine.isEmpty());
     }
 
     TEST(CollectionOptions, ModifyStorageEngineField) {
         CollectionOptions opts;
 
-        // Directly modify storage field in collection options.
-        opts.storage = fromjson("{storageEngine1: {x: 1}}");
+        // Directly modify storageEngine field in collection options.
+        opts.storageEngine = fromjson("{storageEngine1: {x: 1}}");
 
         // Unrecognized field should not be present in BSON representation.
         BSONObj obj = opts.toBSON();
         ASSERT_FALSE(obj.hasField("unknownField"));
 
-        // Check "storage" field.
-        ASSERT_TRUE(obj.hasField("storage"));
-        ASSERT_TRUE(obj.getField("storage").isABSONObj());
-        BSONObj storage = obj.getObjectField("storage");
+        // Check "storageEngine" field.
+        ASSERT_TRUE(obj.hasField("storageEngine"));
+        ASSERT_TRUE(obj.getField("storageEngine").isABSONObj());
+        BSONObj storageEngine = obj.getObjectField("storageEngine");
 
-        // Check individual storage fields.
-        ASSERT_TRUE(storage.getField("storageEngine1").isABSONObj());
-        BSONObj storageEngine1 = storage.getObjectField("storageEngine1");
+        // Check individual storage storageEngine fields.
+        ASSERT_TRUE(storageEngine.getField("storageEngine1").isABSONObj());
+        BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
         ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
     }
 }

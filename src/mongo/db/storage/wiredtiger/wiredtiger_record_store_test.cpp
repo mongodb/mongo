@@ -152,7 +152,7 @@ namespace mongo {
 
     TEST(WiredTigerRecordStoreTest, GenerateCreateStringUnknownField) {
         CollectionOptions options;
-        options.storage = fromjson("{wiredTiger: {unknownField: 1}}");
+        options.storageEngine = fromjson("{wiredTiger: {unknownField: 1}}");
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString("", options, "");
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);
@@ -161,7 +161,7 @@ namespace mongo {
 
     TEST(WiredTigerRecordStoreTest, GenerateCreateStringNonStringConfig) {
         CollectionOptions options;
-        options.storage = fromjson("{wiredTiger: {configString: 12345}}");
+        options.storageEngine = fromjson("{wiredTiger: {configString: 12345}}");
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString("", options, "");
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);

@@ -38,23 +38,23 @@ var found = false;
 db.getCollectionNames().forEach( function(x) { if (x == "test") found = true; });
 assert(found, "found test.test in collection infos");
 
-// 'storage' in collection options must:
+// storageEngine in collection options must:
 // - be a document
 // - contain at least one field of document type with the name of a registered storage engine.
 db.getCollection('test').drop();
 var storageEngineName = db.serverStatus().storageEngine.name;
-assert.commandFailed(db.createCollection('test', {storage: {}}));
-assert.commandFailed(db.createCollection('test', {storage: {unknownStorageEngine: {}}}));
+assert.commandFailed(db.createCollection('test', {storageEngine: {}}));
+assert.commandFailed(db.createCollection('test', {storageEngine: {unknownStorageEngine: {}}}));
 var invalidStorageEngineOptions = {}
 invalidStorageEngineOptions[storageEngineName] = 12345;
-assert.commandFailed(db.createCollection('test', {storage: invalidStorageEngineOptions}));
+assert.commandFailed(db.createCollection('test', {storageEngine: invalidStorageEngineOptions}));
 
-// Test round trip of 'storage' in collection options.
+// Test round trip of storageEngine in collection options.
 // Assume that empty document for storageEngine-specific options is acceptable.
 var validStorageEngineOptions = {}
 validStorageEngineOptions[storageEngineName] = {};
 db.getCollection('test').drop();
-assert.commandWorked(db.createCollection('test', {storage: validStorageEngineOptions}));
+assert.commandWorked(db.createCollection('test', {storageEngine: validStorageEngineOptions}));
 var collections = db.getCollectionInfos();
 found  = false;
 for (var i = 0; i < collections.length; ++i) {
@@ -63,7 +63,7 @@ for (var i = 0; i < collections.length; ++i) {
         continue;
     }
     found = true;
-    assert.docEq(validStorageEngineOptions, collection.options.storage,
+    assert.docEq(validStorageEngineOptions, collection.options.storageEngine,
                  'storage engine options not found in listCommands result');
 }
 assert(found, "'test' collection not created");
