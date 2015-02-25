@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/filesystem/path.hpp>
 #include <boost/noncopyable.hpp>
 
 #include "mongo/db/client.h"

@@ -57,6 +57,7 @@
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h" // getelapsedtimemillis
+#include "mongo/util/paths.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
 

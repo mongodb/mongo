@@ -35,6 +35,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

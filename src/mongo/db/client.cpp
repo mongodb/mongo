@@ -32,8 +32,6 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
@@ -57,7 +55,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
@@ -67,7 +64,6 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -77,45 +73,6 @@ namespace mongo {
     using logger::LogComponent;
 
 namespace {
-
-    class HandshakeCmd : public Command {
-    public:
-        void help(stringstream& h) const { h << "internal"; }
-        HandshakeCmd() : Command("handshake") {}
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return false; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-            const BSONObj& cmdObj,
-            std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-
-        virtual bool run(OperationContext* txn,
-                         const string& ns,
-                         BSONObj& cmdObj,
-                         int options,
-                         string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-
-            repl::HandshakeArgs handshake;
-            Status status = handshake.initialize(cmdObj);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            // TODO(dannenberg) move this into actual processing for both version
-            txn->getClient()->setRemoteID(handshake.getRid());
-
-            status = repl::getGlobalReplicationCoordinator()->processHandshake(txn, handshake);
-            return appendCommandStatus(result, status);
-        }
-
-    } handshakeCmd;
-
 
     /**
      * Create an appropriate new locker for the storage engine in use. Caller owns the return.
@@ -581,7 +538,7 @@ namespace {
                 }
             }
         }
-    }
+    } // namespace
 
 #define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.appendNumber( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
@@ -649,4 +606,4 @@ namespace {
         // This can be called in mongod, which is unfortunate.  To fix this,
         // we can redesign how connection pooling works on mongod for sharded operations.
     }
-}
+} // namespace mongo

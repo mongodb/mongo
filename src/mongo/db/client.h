@@ -39,6 +39,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
+#include "mongo/bson/optime.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -46,10 +47,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/unordered_set.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/threadlocal.h"
-#include "mongo/util/paths.h"
 
 namespace mongo {
 

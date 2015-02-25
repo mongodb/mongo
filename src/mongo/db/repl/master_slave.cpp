@@ -42,7 +42,6 @@
 
 #include "mongo/db/repl/master_slave.h"
 
-#include <iostream>
 #include <pcrecpp.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
@@ -58,6 +57,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/sync.h"
@@ -348,6 +348,43 @@ namespace repl {
         }
         replAllDead = 0;
     }
+
+    class HandshakeCmd : public Command {
+    public:
+        void help(stringstream& h) const { h << "internal"; }
+        HandshakeCmd() : Command("handshake") {}
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+            const BSONObj& cmdObj,
+            std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::internal);
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        }
+
+        virtual bool run(OperationContext* txn,
+                         const string& ns,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            HandshakeArgs handshake;
+            Status status = handshake.initialize(cmdObj);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            txn->getClient()->setRemoteID(handshake.getRid());
+
+            status = getGlobalReplicationCoordinator()->processHandshake(txn, handshake);
+            return appendCommandStatus(result, status);
+        }
+
+    } handshakeCmd;
 
     bool replHandshake(DBClientConnection *conn, const OID& myRID) {
         string myname = getHostName();
