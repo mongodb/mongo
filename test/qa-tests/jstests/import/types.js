@@ -20,7 +20,8 @@
       j : false,
       k : NumberLong(10000),
       l : MinKey(),
-      k : MaxKey(),
+      m : MaxKey(),
+      n : ISODate("2015-02-25T16:42:11Z"),
     }
 
 

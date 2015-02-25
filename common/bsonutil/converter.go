@@ -202,7 +202,15 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		}, nil
 
 	case bson.JavaScript: // JavaScript
-		return json.JavaScript{v.Code, v.Scope}, nil
+		var scope interface{}
+		var err error
+		if v.Scope != nil {
+			scope, err = ConvertBSONValueToJSON(v.Scope)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return json.JavaScript{v.Code, scope}, nil
 
 	default:
 		switch x {
