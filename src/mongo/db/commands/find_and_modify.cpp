@@ -424,19 +424,13 @@ namespace mongo {
                         // for some BSON manipulation).
                         repl::logOp(txn, "i", collection->ns().ns().c_str(), newDoc);
 
-                        if (returnNew) {
-                            // The third argument, set to true here, indicates whether or not we
-                            // have something for the 'value' field returned by a findAndModify
-                            // command.
-                            //
-                            // If we're returning the old version of the document, then the this
-                            // boolean is set based on whether or not we found something.
-                            //
-                            // Here we didn't find a document, but we inserted a document and the
-                            // user is asking for the new doc back. Therefore, we always have a
-                            // value to return, so we just pass true.
-                            _appendHelper(result, newDoc, true, fields, whereCallback);
-                        }
+                        // The third argument indicates whether or not we have something for the
+                        // 'value' field returned by a findAndModify command.
+                        //
+                        // Since we did an insert, we have a doc only if the user asked us to
+                        // return the new copy. We return a value of 'null' if we inserted and
+                        // the user asked for the old copy.
+                        _appendHelper(result, newDoc, returnNew, fields, whereCallback);
 
                         BSONObjBuilder le(result.subobjStart("lastErrorObject"));
                         le.appendBool("updatedExisting", false);
