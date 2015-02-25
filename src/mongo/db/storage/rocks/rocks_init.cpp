@@ -40,6 +40,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+    const std::string kRocksDBEngineName = "RocksDB";
 
     namespace {
         class RocksFactory : public StorageEngine::Factory {
@@ -60,7 +61,7 @@ namespace mongo {
             }
 
             virtual StringData getCanonicalName() const {
-                return "rocksExperiment";
+                return kRocksDBEngineName;
             }
 
             virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
@@ -115,7 +116,7 @@ namespace mongo {
                                          ("SetGlobalEnvironment"))
                                          (InitializerContext* context) {
 
-        getGlobalEnvironment()->registerStorageEngine("rocksExperiment", new RocksFactory());
+        getGlobalEnvironment()->registerStorageEngine(kRocksDBEngineName, new RocksFactory());
         return Status::OK();
     }
 
