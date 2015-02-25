@@ -88,11 +88,16 @@ namespace mongo {
                                                  WorkingSet* workingSet,
                                                  Collection* collection);
 
+    private:
+
+        virtual void finishSaveState();
+
+        virtual void finishRestoreState(OperationContext* txn);
+
         virtual void finishInvalidate(OperationContext* txn,
                                       const RecordId& dl,
                                       InvalidationType type);
 
-    private:
         const GeoNearParams _nearParams;
 
         // The 2D index we're searching over
@@ -138,11 +143,16 @@ namespace mongo {
                                                  WorkingSet* workingSet,
                                                  Collection* collection);
 
+    private:
+
+        virtual void finishSaveState();
+
+        virtual void finishRestoreState(OperationContext* txn);
+
         virtual void finishInvalidate(OperationContext* txn,
                                       const RecordId& dl,
                                       InvalidationType type);
 
-    private:
         const GeoNearParams _nearParams;
 
         // The 2D index we're searching over

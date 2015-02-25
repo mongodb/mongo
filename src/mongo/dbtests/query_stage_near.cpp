@@ -176,11 +176,13 @@ namespace {
             return StatusWith<double>(member->obj.value()["distance"].numberDouble());
         }
 
+        virtual void finishSaveState() { }
+
+        virtual void finishRestoreState(OperationContext* txn) { }
+
         virtual void finishInvalidate(OperationContext* txn,
                                       const RecordId& dl,
-                                      InvalidationType type) {
-            invariant(!"MockNearStage should not receive invalidations");
-        }
+                                      InvalidationType type) { }
 
     private:
 
