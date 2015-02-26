@@ -49,6 +49,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		return err
 	}
 	defer session.Close()
+	session.SetSocketTimeout(0)
 	collection := session.DB(dbName).C(c)
 
 	collectionInfo, err := db.GetCollectionOptions(collection)
