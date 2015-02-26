@@ -2579,7 +2579,7 @@ namespace mongo {
             while (_active) {
                 if ( ! isActiveCV.timed_wait( lock.boost(), xt ) ){
                     // TIMEOUT
-                    setState(FAIL);
+                    _state = FAIL;
                     log() << "startCommit never finished!" << migrateLog;
                     return false;
                 }
