@@ -45,9 +45,71 @@ assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, remove:tr
 assert.throws(function() { t.findAndModify({query:{x:1}, update:{y:2}, new:true, remove:true}); });
 assert.throws(function() { t.findAndModify({query:{x:1}, upsert:true, remove:true}); });
 
-// SERVER-17372
+//
+// SERVER-17387: Find and modify should throw in the case of invalid projection.
+//
+
 t.drop();
+
+// Insert case.
 var cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {_id: "miss"},
+    update: {$inc: {y: 1}},
+    fields: {foo: {$pop: ["bar"]}},
+    upsert: true,
+    new: true
+});
+assert.commandFailed(cmdRes);
+
+t.insert({_id: "found"});
+
+// Update with upsert + new.
+cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {_id: "found"},
+    update: {$inc: {y: 1}},
+    fields: {foo: {$pop: ["bar"]}},
+    upsert: true,
+    new: true
+});
+assert.commandFailed(cmdRes);
+
+// Update with just new: true.
+cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {_id: "found"},
+    update: {$inc: {y: 1}},
+    fields: {foo: {$pop: ["bar"]}},
+    new: true
+});
+assert.commandFailed(cmdRes);
+
+// Update with just upsert: true.
+cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {_id: "found"},
+    update: {$inc: {y: 1}},
+    fields: {foo: {$pop: ["bar"]}},
+    upsert: true
+});
+assert.commandFailed(cmdRes);
+
+// Update with neither upsert nor new flags.
+cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {_id: "found"},
+    update: {$inc: {y: 1}},
+    fields: {foo: {$pop: ["bar"]}},
+});
+assert.commandFailed(cmdRes);
+
+//
+// SERVER-17372
+//
+
+t.drop();
+cmdRes = db.runCommand({
     findAndModify: t.getName(),
     query: {_id: "miss"},
     update: {$inc: {y: 1}},
@@ -57,7 +119,7 @@ assert.commandWorked(cmdRes);
 assert("value" in cmdRes);
 assert.eq(null, cmdRes.value);
 
-var cmdRes = db.runCommand({
+cmdRes = db.runCommand({
     findAndModify: t.getName(),
     query: {_id: "missagain"},
     update: {$inc: {y: 1}},
