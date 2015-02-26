@@ -1110,8 +1110,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	    cache->evict + cache->evict_slots);
 	enough = internal_pages = restarts = 0;
 
-	walk_flags =
-	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
+	walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT |
+	    WT_READ_NO_GEN | WT_READ_NO_WAIT | WT_READ_PREV;
 
 	/*
 	 * Get some more eviction candidate pages.
