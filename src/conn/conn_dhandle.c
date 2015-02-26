@@ -542,11 +542,6 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
  * __wt_conn_btree_apply_single_ckpt --
  *	Decode any checkpoint information from the configuration string then
  *	call btree apply single.
- *	TODO: This is based on __wt_session_get_btree_ckpt, which has retry
- *	      logic around ebusy returns. I don't think we want that here -
- *	      since the primary use case is when applying a function to a
- *	      list of handles provided to a checkpoint (in fact, I think we'd
- *	      end up stuck in a loop).
  */
 int
 __wt_conn_btree_apply_single_ckpt(WT_SESSION_IMPL *session,
