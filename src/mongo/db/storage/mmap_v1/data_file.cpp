@@ -173,12 +173,14 @@ namespace {
         }
 
         {
-            verify( _mb == 0 );
+            invariant(_mb == 0);
             unsigned long long sz = size;
-            if( mmf.create(filename, sz, false) )
+            if (mmf.create(filename, sz, false)) {
                 _mb = mmf.getView();
-            verify( sz <= 0x7fffffff );
-            size = (int) sz;
+            }
+
+            invariant(sz <= 0x7fffffff);
+            size = (int)sz;
         }
 
         data_file_check(_mb);

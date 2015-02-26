@@ -247,6 +247,8 @@ namespace mongo {
 
     bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {
         LOG(3) << "mmf open " << fname;
+        invariant(!_view_write);
+
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
@@ -254,6 +256,8 @@ namespace mongo {
 
     bool DurableMappedFile::create(const std::string& fname, unsigned long long& len, bool sequentialHint) {
         LOG(3) << "mmf create " << fname;
+        invariant(!_view_write);
+
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
@@ -284,15 +288,19 @@ namespace mongo {
     }
 
     DurableMappedFile::~DurableMappedFile() {
-        try { 
+        try {
             LOG(3) << "mmf close " << filename();
 
-            // Notify the durability system that we are closing a file.
-            getDur().closingFileNotification();
+            // If _view_private was not set, this means file open failed
+            if (_view_private) {
+                // Notify the durability system that we are closing a file so it can ensure we
+                // will not have journaled operations with no corresponding file.
+                getDur().closingFileNotification();
+            }
 
             LockMongoFilesExclusive lk;
             privateViews.remove(_view_private, length());
-            _view_write = _view_private = 0;
+
             MemoryMappedFile::close();
         }
         catch (...) {
