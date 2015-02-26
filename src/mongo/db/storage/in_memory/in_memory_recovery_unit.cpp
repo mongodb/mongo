@@ -28,9 +28,12 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
 
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
     InMemoryRecoveryUnit::~InMemoryRecoveryUnit() {
@@ -64,7 +67,9 @@ namespace mongo {
          try {
              for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
                      it != end; ++it) {
-                 (*it)->rollback();
+                 ChangePtr change = *it;
+                 LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
+                 change->rollback();
              }
              _changes.clear();
         }
