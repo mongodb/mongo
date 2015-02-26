@@ -194,6 +194,11 @@ __evict_server(void *arg)
 				ret = 0;
 			}
 		}
+		/*
+		 * Clear the walks so we don't pin pages while asleep,
+		 * otherwise we can block applications evicting large pages.
+		 */
+		WT_ERR(__evict_clear_walks(session));
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
 		/* Don't rely on signals: check periodically. */
 		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
@@ -493,7 +498,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * Start a worker if we have capacity and we haven't reached
 		 * the eviction targets.
 		 */
-		if (LF_ISSET(WT_EVICT_PASS_ALL | WT_EVICT_PASS_DIRTY) &&
+		if (LF_ISSET(WT_EVICT_PASS_ALL |
+		    WT_EVICT_PASS_DIRTY | WT_EVICT_PASS_WOULD_BLOCK) &&
 		    conn->evict_workers < conn->evict_workers_max) {
 			WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 			    "Starting evict worker: %"PRIu32"\n",
@@ -792,21 +798,29 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 
 	WT_ASSERT(session, cache->evict[0].ref != NULL);
 
-	/* Find the bottom 25% of read generations. */
-	cutoff = (3 * __evict_read_gen(&cache->evict[0]) +
-	    __evict_read_gen(&cache->evict[entries - 1])) / 4;
-
-	/*
-	 * Don't take less than 10% or more than 50% of entries, regardless.
-	 * That said, if there is only one entry, which is normal when
-	 * populating an empty file, don't exclude it.
-	 */
-	for (candidates = 1 + entries / 10;
-	    candidates < entries / 2;
-	    candidates++)
-		if (__evict_read_gen(&cache->evict[candidates]) > cutoff)
-			break;
-	cache->evict_candidates = candidates;
+	if (LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK))
+		/*
+		 * Take all candidates if we only gathered pages with an oldest
+		 * read generation set.
+		 */
+		cache->evict_candidates = entries;
+	else {
+		/* Find the bottom 25% of read generations. */
+		cutoff = (3 * __evict_read_gen(&cache->evict[0]) +
+		    __evict_read_gen(&cache->evict[entries - 1])) / 4;
+		/*
+		 * Don't take less than 10% or more than 50% of entries,
+		 * regardless.  That said, if there is only one entry, which is
+		 * normal when populating an empty file, don't exclude it.
+		 */
+		for (candidates = 1 + entries / 10;
+		    candidates < entries / 2;
+		    candidates++)
+			if (__evict_read_gen(
+			    &cache->evict[candidates]) > cutoff)
+				break;
+		cache->evict_candidates = candidates;
+	}
 
 	/* If we have more than the minimum number of entries, clear them. */
 	if (cache->evict_entries > WT_EVICT_WALK_BASE) {
@@ -1181,7 +1195,7 @@ fast:		/* If the page can't be evicted, give up. */
 		 */
 		mod = page->modify;
 		if (!modified && mod != NULL && !LF_ISSET(
-		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_WOULD_BLOCK) &&
+		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK) &&
 		    !__wt_txn_visible_all(session, mod->rec_max_txn))
 			continue;
 
