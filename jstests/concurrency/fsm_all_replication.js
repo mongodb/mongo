@@ -28,6 +28,6 @@ var blacklist = [
 ].map(function(file) { return dir + '/' + file; });
 
 // SERVER-16196 re-enable executing workloads against replica sets
-runWorkloadsSerially(ls(dir).filter(function(file) {
-    return !Array.contains(blacklist, file);
-}), { replication: true });
+// runWorkloadsSerially(ls(dir).filter(function(file) {
+//     return !Array.contains(blacklist, file);
+// }), { replication: true });

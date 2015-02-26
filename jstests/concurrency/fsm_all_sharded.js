@@ -7,24 +7,6 @@ var dir = 'jstests/concurrency/fsm_workloads';
 var blacklist = [
     // Disabled due to known bugs
     'agg_match.js', // SERVER-3645 .count() can be wrong on sharded collections
-    'explain.js',
-    'explain_aggregate.js',
-    'explain_count.js',
-    'explain_find.js',
-    'explain_group.js',
-    'explain_remove.js',
-    'explain_update.js',
-    'rename_capped_collection_chain.js',
-    'rename_capped_collection_dbname_chain.js',
-    'rename_capped_collection_dbname_droptarget.js',
-    'rename_capped_collection_droptarget.js',
-    'rename_collection_chain.js',
-    'rename_collection_dbname_chain.js',
-    'rename_collection_dbname_droptarget.js',
-    'rename_collection_droptarget.js',
-    'update_upsert_multi.js',
-    'update_upsert_multi_noindex.js',
-    'upsert_where.js',
     'count.js', // SERVER-3645 .count() can be wrong on sharded collections
     'count_limit_skip.js', // SERVER-3645 .count() can be wrong on sharded collections
     'count_noindex.js', // SERVER-3645 .count() can be wrong on sharded collections
@@ -74,6 +56,6 @@ var blacklist = [
 ].map(function(file) { return dir + '/' + file; });
 
 // SERVER-16196 re-enable executing workloads against sharded clusters
-runWorkloadsSerially(ls(dir).filter(function(file) {
-    return !Array.contains(blacklist, file);
-}), { sharded: true });
+// runWorkloadsSerially(ls(dir).filter(function(file) {
+//     return !Array.contains(blacklist, file);
+// }), { sharded: true });
