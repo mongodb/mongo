@@ -372,6 +372,14 @@ namespace mongo {
                 if ( found ) {
                     deleteObjects(txn, ctx.db(), ns, queryModified, PlanExecutor::YIELD_MANUAL,
                                   true, true);
+
+                    // Committing the WUOW can close the current snapshot. Until this happens, the
+                    // snapshot id should not have changed.
+                    invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
+
+                    // Must commit the write before doing anything that could throw.
+                    wuow.commit();
+
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
@@ -424,6 +432,9 @@ namespace mongo {
                         // for some BSON manipulation).
                         repl::logOp(txn, "i", collection->ns().ns().c_str(), newDoc);
 
+                        // Must commit the write and logOp() before doing anything that could throw.
+                        wuow.commit();
+
                         // The third argument indicates whether or not we have something for the
                         // 'value' field returned by a findAndModify command.
                         //
@@ -470,6 +481,13 @@ namespace mongo {
                     invariant(res.existing);
                     LOG(3) << "update result: "  << res;
 
+                    // Committing the WUOW can close the current snapshot. Until this happens, the
+                    // snapshot id should not have changed.
+                    invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
+
+                    // Must commit the write before doing anything that could throw.
+                    wuow.commit();
+
                     if (returnNew) {
                         dassert(!res.newObj.isEmpty());
                         _appendHelper(result, res.newObj, true, fields, whereCallback);
@@ -484,13 +502,6 @@ namespace mongo {
                     le.done();
                 }
             }
-
-            // Committing the WUOW can close the current snapshot. Until this happens, the
-            // snapshot id should not have changed.
-            if (found) {
-                invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
-            }
-            wuow.commit();
 
             return true;
         }
