@@ -281,8 +281,9 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 	if (parent->type == WT_PAGE_ROW_INT) {
 		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL) {
 			__wt_ref_key(parent, ref, &key, &size);
-			WT_RET(__wt_row_ikey(session, 0, key, size, &ikey));
-			ref->key.ikey = ikey;
+			WT_RET(__wt_row_ikey(
+			    session, 0, key, size, &ref->key.ikey));
+			ikey = ref->key.ikey;
 		} else {
 			WT_RET(__split_ovfl_key_cleanup(session, parent, ref));
 			*parent_decrp += sizeof(WT_IKEY) + ikey->size;

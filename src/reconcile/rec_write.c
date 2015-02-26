@@ -1173,7 +1173,7 @@ in_memory:
 		CHILD_RELEASE(session, *hazardp, ref);
 	}
 
-done:	WT_HAVE_DIAGNOSTIC_YIELD;
+done:	WT_DIAGNOSTIC_YIELD;
 	return (ret);
 }
 

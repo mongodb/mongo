@@ -483,9 +483,12 @@ __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page,
  */
 int
 __wt_row_ikey(WT_SESSION_IMPL *session,
-    uint32_t cell_offset, const void *key, size_t size, void *ikeyp)
+    uint32_t cell_offset, const void *key, size_t size, void *dest)
 {
-	WT_IKEY *ikey;
+	WT_IKEY *ikey, **ikeyp;
+	uintptr_t oldv;
+
+	ikeyp = dest;
 
 	/*
 	 * Allocate memory for the WT_IKEY structure and the key, then copy
@@ -496,6 +499,12 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 	ikey->cell_offset = cell_offset;
 	memcpy(WT_IKEY_DATA(ikey), key, size);
 
-	*(WT_IKEY **)ikeyp = ikey;
+	oldv = (uintptr_t)*ikeyp;
+	WT_DIAGNOSTIC_YIELD;
+
+	WT_ASSERT(session, oldv == 0 || (oldv & WT_IK_FLAG) != 0);
+
+	if (!WT_ATOMIC_CAS8(*ikeyp, (WT_IKEY *)oldv, ikey))
+		__wt_panic(session);
 	return (0);
 }
