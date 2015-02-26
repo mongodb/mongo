@@ -1140,15 +1140,23 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/*
-	 * The first page in the split is the current page, but we still need to
-	 * create a replacement WT_REF and make a copy of the key (the original
-	 * WT_REF is set to split-status and eventually freed).
-	 *
-	 * The new reference is visible to readers once the split completes.
+	 * The first page in the split is the current page, but we still have to
+	 * create a replacement WT_REF, the original WT_REF wil be set to split-
+	 * status and eventually freed.
 	 */
 	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
 	child = split_ref[0];
 	*child = *ref;
+
+	/*
+	 * The new WT_REF is not quite identical: we have to instantiate a key,
+	 * and the new reference is visible to readers once the split completes.
+	 *
+	 * The key-instantiation code checks for races, clear the key fields so
+	 * we don't trigger them.
+	 */
+	child->key.recno = 0;
+	child->key.ikey = NULL;
 	child->state = WT_REF_MEM;
 
 	/*
