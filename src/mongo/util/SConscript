@@ -1,0 +1,11 @@
+Import("env")
+
+env.Library(
+    target= 'intrusive_counter',
+    source= [
+        'intrusive_counter.cpp',
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/foundation',
+        ]
+    )
