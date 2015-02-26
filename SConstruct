@@ -564,6 +564,14 @@ v8suffix = '' if v8version == '3.12' else '-' + v8version
 if not serverJs and not usev8:
     print("Warning: --server-js=off is not needed with --js-engine=none")
 
+def getMongoCodeVersion():
+    with open("version.txt") as version_txt:
+        content = version_txt.readlines()
+        if len(content) != 1:
+            print("Malformed version file")
+            Exit(1)
+        return content[0].strip()
+
 # We defer building the env until we have determined whether we want certain values. Some values
 # in the env actually have semantics for 'None' that differ from being absent, so it is better
 # to build it up via a dict, and then construct the Environment in one shot with kwargs.
@@ -591,6 +599,8 @@ envDict = dict(BUILD_ROOT=buildDir,
                CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
                CONFIGURELOG=sconsDataDir.File('config.log'),
                INSTALL_DIR=installDir,
+               MONGO_GIT_VERSION=utils.getGitVersion(),
+               MONGO_CODE_VERSION=getMongoCodeVersion(),
                )
 
 env = Environment(variables=env_vars, **envDict)
@@ -865,8 +875,7 @@ if has_option( "libpath" ):
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
-env.Prepend( CPPDEFINES=[ "_SCONS" , 
-                          "MONGO_EXPOSE_MACROS" ,
+env.Prepend( CPPDEFINES=[ "MONGO_EXPOSE_MACROS" ,
                           "PCRE_STATIC",  # for pcre on Windows
                           "SUPPORT_UTF8" ],  # for pcre
 )
@@ -2019,14 +2028,6 @@ def checkErrorCodes():
 
 checkErrorCodes()
 
-#  ---- Docs ----
-def build_docs(env, target, source):
-    from buildscripts import docs
-    docs.main()
-
-env.Alias("docs", [], [build_docs])
-env.AlwaysBuild("docs")
-
 #  ---- astyle ----
 
 def doStyling( env , target , source ):
@@ -2092,15 +2093,7 @@ def getSystemInstallName():
 
     return n
 
-def getCodeVersion():
-    fullSource = open( "src/mongo/util/version.cpp" , "r" ).read()
-    allMatches = re.findall( r"versionString.. = \"(.*?)\"" , fullSource );
-    if len(allMatches) != 1:
-        print( "can't find version # in code" )
-        return None
-    return allMatches[0]
-
-mongoCodeVersion = getCodeVersion()
+mongoCodeVersion = env['MONGO_CODE_VERSION']
 if mongoCodeVersion == None:
     Exit(-1)
 
@@ -2210,7 +2203,6 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 Export("env")
 Export("get_option")
 Export("has_option use_system_version_of_library")
-Export("mongoCodeVersion")
 Export("serverJs")
 Export("usev8")
 Export("v8version v8suffix")
@@ -2226,7 +2218,7 @@ def injectMongoIncludePaths(thisEnv):
 env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
-env.SConscript(['SConscript.buildinfo', 'SConscript.smoke'])
+env.SConscript('SConscript.smoke')
 
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)

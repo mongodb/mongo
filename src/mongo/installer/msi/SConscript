@@ -4,7 +4,6 @@ import os
 
 Import("env")
 Import("windows")
-Import("mongoCodeVersion")
 Import("s3push")
 Import("has_option")
 
@@ -83,7 +82,7 @@ else:
 sources = ["wxs/" + file for file in sourcesList]
 objects = ["$BUILD_DIR/msi/" + file.replace(".wxs", ".wixobj") for file in sourcesList]
 
-full_version = mongoCodeVersion.partition('-')[0]
+full_version = env['MONGO_CODE_VERSION'].partition('-')[0]
 
 # major version is the x.y, not the x.y.z
 major_version = full_version

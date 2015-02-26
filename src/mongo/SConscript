@@ -4,6 +4,7 @@
 
 import os
 import itertools
+import sys
 from buildscripts import utils
 
 Import("env")
@@ -327,6 +328,30 @@ env.Library('lasterror', [
             LIBDEPS=['network',
                      'foundation',
             ])
+
+def getSysInfo():
+    if windows:
+        return "windows " + str( sys.getwindowsversion() )
+    else:
+        return " ".join( os.uname() )
+
+buildInfo = env.Substfile(
+    'buildinfo.cpp.in',
+    SUBST_DICT=[
+        ('@buildinfo_git_version@', env['MONGO_GIT_VERSION']),
+        ('@buildinfo_js_engine@', "V8" if usev8 else "Unknown"),
+        ('@buildinfo_allocator@', GetOption('allocator')),
+        ('@buildinfo_loader_flags@', env.subst('$LINKFLAGS $LDFLAGS')),
+        ('@buildinfo_compiler_flags@', env.subst('$CXXFLAGS $CCFLAGS $CFLAGS')),
+        ('@buildinfo_sysinfo@', getSysInfo()),
+    ])
+env.NoCache(buildInfo)
+
+versionFile = env.Substfile(
+    'util/version.cpp.in',
+    SUBST_DICT=[
+        ('@mongo_code_version@', env['MONGO_CODE_VERSION'])
+    ])
 
 env.Library('version',
             [

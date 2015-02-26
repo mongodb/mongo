@@ -83,25 +83,6 @@ namespace mongo {
         return engineArrayBuilder.arr();
     }
 
-#ifndef _SCONS
-#if defined(_WIN32)
-    string sysInfo() {
-        stringstream ss;
-        ss << "not-scons win";
-        ss << " mscver:" << _MSC_FULL_VER << " built:" << __DATE__;
-        ss << " boostver:" << BOOST_VERSION;
-#if( !defined(_MT) )
-#error _MT is not defined
-#endif
-        ss << (sizeof(char *) == 8 ? " 64bit" : " 32bit");
-        return ss.str();
-    }
-#else
-    string sysInfo() { return ""; }
-
-#endif
-#endif
-
 #if defined(_WIN32)
     std::string targetMinOS() {
         stringstream ss;
