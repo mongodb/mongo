@@ -539,6 +539,53 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_conn_btree_apply_single_ckpt --
+ *	Decode any checkpoint information from the configuration string then
+ *	call btree apply single.
+ *	TODO: This is based on __wt_session_get_btree_ckpt, which has retry
+ *	      logic around ebusy returns. I don't think we want that here -
+ *	      since the primary use case is when applying a function to a
+ *	      list of handles provided to a checkpoint (in fact, I think we'd
+ *	      end up stuck in a loop).
+ */
+int
+__wt_conn_btree_apply_single_ckpt(WT_SESSION_IMPL *session,
+    const char *uri,
+    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	const char *checkpoint;
+
+	checkpoint = NULL;
+
+	/*
+	 * This function exists to handle checkpoint configuration.  Callers
+	 * that never open a checkpoint call the underlying function directly.
+	 */
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
+	if (cval.len != 0) {
+		/*
+		 * The internal checkpoint name is special, find the last
+		 * unnamed checkpoint of the object.
+		 */
+		if (WT_STRING_MATCH(WT_CHECKPOINT, cval.str, cval.len)) {
+			WT_RET(__wt_meta_checkpoint_last_name(
+			    session, uri, &checkpoint));
+		} else
+			WT_RET(__wt_strndup(
+			    session, cval.str, cval.len, &checkpoint));
+	}
+
+	ret = __wt_conn_btree_apply_single(session, uri, checkpoint, func, cfg);
+
+	__wt_free(session, checkpoint);
+
+	return (ret);
+}
+
+/*
  * __wt_conn_btree_apply_single --
  *	Apply a function to a single btree handle that couldn't be locked
  * (attempting to get the handle returned EBUSY).
