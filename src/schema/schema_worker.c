@@ -55,11 +55,17 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 				WT_ERR(ret);
 			}
 
-			WT_ERR(__wt_session_get_btree_ckpt(
-			    session, uri, cfg, open_flags));
-			WT_SAVE_DHANDLE(session,
-			    ret = file_func(session, cfg));
-			WT_TRET(__wt_session_release_btree(session));
+			if ((ret = __wt_session_get_btree_ckpt(
+			    session, uri, cfg, open_flags)) == 0) {
+				WT_SAVE_DHANDLE(session,
+				    ret = file_func(session, cfg));
+				WT_TRET(__wt_session_release_btree(session));
+			} else if (ret == EBUSY)
+				/* TODO: Decode checkpoint from cfg. */
+				WT_WITH_DHANDLE_LOCK(session,
+				    ret = __wt_conn_btree_apply_single_ckpt(
+				    session, uri, file_func, cfg));
+			WT_ERR(ret);
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 		WT_ERR(__wt_schema_get_colgroup(
