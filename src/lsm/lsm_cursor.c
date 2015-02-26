@@ -1267,7 +1267,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 			clsm->nupdates = i;
 			break;
 		}
- 
+
 		c = clsm->cursors[slot];
 		c->set_key(c, key);
 		c->set_value(c, value);
