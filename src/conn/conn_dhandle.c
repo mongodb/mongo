@@ -375,6 +375,8 @@ __conn_btree_open(
 	    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
 	    !LF_ISSET(WT_DHANDLE_LOCK_ONLY));
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_CLOSING));
+
 	/*
 	 * If the handle is already open, it has to be closed so it can be
 	 * reopened with a new configuration.  We don't need to check again:

@@ -88,6 +88,7 @@ flags = {
     'conn' : [
         'CONN_CACHE_POOL',
         'CONN_CKPT_SYNC',
+        'CONN_CLOSING',
         'CONN_EVICTION_RUN',
         'CONN_LEAK_MEMORY',
         'CONN_LOG_SERVER_RUN',
