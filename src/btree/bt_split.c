@@ -284,10 +284,8 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 			WT_RET(__wt_row_ikey(
 			    session, 0, key, size, &ref->key.ikey));
 			ikey = ref->key.ikey;
-		} else {
+		} else
 			WT_RET(__split_ovfl_key_cleanup(session, parent, ref));
-			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
-		}
 		*child_incrp += sizeof(WT_IKEY) + ikey->size;
 	}
 
@@ -377,6 +375,7 @@ static int
 __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 {
 	WT_DECL_RET;
+	WT_IKEY *ikey;
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex;
 	WT_REF **alloc_refp;
@@ -587,6 +586,16 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	 * fails, we don't roll back that change, because threads may already
 	 * be using the new index.
 	 */
+	for (parent_refp = pindex->index, i = 0;
+	    i < pindex->entries;
+	    parent_refp++, i++)
+		if ((ikey = __wt_ref_key_instantiated(*parent_refp)) != NULL) {
+			size = sizeof(WT_IKEY) + ikey->size;
+			WT_ERR(__split_safe_free(
+			    session, split_gen, 0, ikey, size));
+			parent_decr += size;
+		}
+
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_ERR(__split_safe_free(session, split_gen, 0, pindex, size));
 	parent_decr += size;
@@ -1140,9 +1149,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/*
-	 * The first page in the split is the current page, but we still have to
-	 * create a replacement WT_REF, the original WT_REF wil be set to split-
-	 * status and eventually freed.
+	 * The first page in the split is the current page, but we still have
+	 * to create a replacement WT_REF, the original WT_REF will be set to
+	 * split status and eventually freed.
 	 */
 	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
 	child = split_ref[0];
