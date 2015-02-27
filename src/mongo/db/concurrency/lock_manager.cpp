@@ -118,6 +118,22 @@ namespace {
     BOOST_STATIC_ASSERT(
         (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
 
+
+    /**
+     * Maps the LockRequest status to a human-readable string.
+     */
+    static const char* LockRequestStatusNames[] = {
+        "new",
+        "granted",
+        "waiting",
+        "converting",
+    };
+
+    // Ensure we do not add new status types without updating the names array
+    BOOST_STATIC_ASSERT(
+        (sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0]))
+                                                                == LockRequest::StatusCount);
+
 } // namespace
 
 
@@ -1130,6 +1146,10 @@ namespace {
 
     const char* resourceTypeName(ResourceType resourceType) {
         return ResourceTypeNames[resourceType];
+    }
+
+    const char* lockRequestStatusName(LockRequest::Status status) {
+        return LockRequestStatusNames[status];
     }
 
 } // namespace mongo

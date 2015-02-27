@@ -205,22 +205,14 @@ namespace {
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::dump() const {
         StringBuilder ss;
-        ss << "lock status: ";
-
-        //  isLocked() must be called without holding _lock
-        if (!isLocked()) {
-            ss << "unlocked";
-        }
-        else {
-            // SERVER-14978: Dump lock stats information
-        }
-
-        ss << " requests:";
+        ss << "Locker id " << _id << " status: ";
 
         _lock.lock();
         LockRequestsMap::ConstIterator it = _requests.begin();
         while (!it.finished()) {
-            ss << " " << it.key().toString() << " held in " << modeName(it->mode);
+            ss << it.key().toString() << " "
+               << lockRequestStatusName(it->status) << " in "
+               << modeName(it->mode) << "; ";
             it.next();
         }
         _lock.unlock();
@@ -392,15 +384,7 @@ namespace {
         // For MMAP V1, we need to yield the flush lock so that the flush thread can run
         if (IsForMMAPV1) {
             invariant(unlock(resourceIdMMAPV1Flush));
-
-            while (true) {
-                LockResult result =
-                    lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), UINT_MAX, true);
-
-                if (result == LOCK_OK) break;
-
-                invariant(result == LOCK_DEADLOCK);
-            }
+            invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
         }
     }
 
@@ -835,11 +819,38 @@ namespace {
         : _locker(locker),
           _released(false) {
 
-        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_S));
+        // The journal thread acquiring the journal lock in S-mode opens opportunity for deadlock
+        // involving operations which do not acquire and release the Oplog collection's X lock
+        // inside a WUOW (see SERVER-17416 for the sequence of events), therefore acquire it with
+        // check for deadlock and back-off if one is encountered.
+        // 
+        // This exposes theoretical chance that we might starve the journaling system, but given
+        // that these deadlocks happen extremely rarely and are usually due to incorrect locking
+        // policy, and we have the deadlock counters as part of the locking statistics, this is a
+        // reasonable handling.
+        //
+        // In the worst case, if we are to starve the journaling system, the server will shut down
+        // due to too much uncommitted in-memory journal, but won't have corruption.
+
+        while (true) {
+            LockResult result = _locker->lock(resourceIdMMAPV1Flush, MODE_S, UINT_MAX, true);
+            if (result == LOCK_OK) {
+                break;
+            }
+
+            invariant(result == LOCK_DEADLOCK);
+
+            warning() << "Delayed journaling in order to avoid deadlock during MMAP V1 journal " <<
+                         "lock acquisition. See the previous messages for information on the " <<
+                         "involved threads.";
+        }
     }
 
     void AutoAcquireFlushLockForMMAPV1Commit::upgradeFlushLockToExclusive() {
-        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X));
+        // This should not be able to deadlock, since we already hold the S journal lock, which
+        // means all writers are kicked out. Readers always yield the journal lock if they block
+        // waiting on any other lock.
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX, true));
 
         // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
         // complain.

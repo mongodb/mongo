@@ -312,10 +312,17 @@ namespace {
             status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
                                                                                parsedArgs,
                                                                                &result);
+
+            ScopedTransaction scopedXact(txn, MODE_X);
+            Lock::GlobalWrite globalWrite(txn->lockState());
+
+            WriteUnitOfWork wuow(txn);
             if (status.isOK() && !parsedArgs.force) {
-                logOpInitiate(txn, BSON("msg" << "Reconfig set" << 
+                logOpInitiate(txn, BSON("msg" << "Reconfig set" <<
                                         "version" << parsedArgs.newConfigObj["version"]));
             }
+            wuow.commit();
+
             return appendCommandStatus(result, status);
         }
     } cmdReplSetReconfig;

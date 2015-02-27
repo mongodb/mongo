@@ -110,7 +110,13 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* txn) {
         createOplog(txn);
+
+        ScopedTransaction scopedXact(txn, MODE_X);
+        Lock::GlobalWrite globalWrite(txn->lockState());
+
+        WriteUnitOfWork wuow(txn);
         logOpInitiate(txn, BSON("msg" << "initiating set"));
+        wuow.commit();
     }
 
     void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
