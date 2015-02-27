@@ -643,7 +643,7 @@ namespace mongo {
         std::set<std::string>* paths;
 
         {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             sockets = _sockets;
             _sockets = new std::set<int>();
             paths = _socketPaths;

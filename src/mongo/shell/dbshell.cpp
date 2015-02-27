@@ -185,7 +185,7 @@ namespace mongo {
 
     void exitCleanly(ExitCode code) {
         {
-            mongo::mutex::scoped_lock lk(mongo::shell_utils::mongoProgramOutputMutex);
+            boost::lock_guard<boost::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
             mongo::dbexitCalled = true;
         }
 
@@ -896,7 +896,7 @@ int _main( int argc, char* argv[], char **envp ) {
     }
 
     {
-        mongo::mutex::scoped_lock lk(mongo::shell_utils::mongoProgramOutputMutex);
+        boost::lock_guard<boost::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
         mongo::dbexitCalled = true;
     }
     return 0;

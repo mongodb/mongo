@@ -75,45 +75,7 @@ namespace mongo {
         ~StaticObserver() { _destroyingStatics = true; }
     };
 
-    /** On pthread systems, it is an error to destroy a mutex while held (boost mutex 
-     *    may use pthread).  Static global mutexes may be held upon shutdown in our 
-     *    implementation, and this way we avoid destroying them.
-     *  NOT recursive.
-     */
-    class mutex : boost::noncopyable {
-    public:
-        const char * const _name;
-        // NOINLINE so that 'mutex::mutex' is always in the frame, this makes
-        // it easier for us to suppress the leaks caused by the static observer.
-        NOINLINE_DECL mutex(const char *name) : _name(name)
-        {
-            _m = new boost::timed_mutex();
-            IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
-        }
-        ~mutex() {
-            if( !StaticObserver::_destroyingStatics ) {
-                UNIGNORE_OBJECT( _m );
-                delete _m;
-            }
-        }
-
-        class scoped_lock : boost::noncopyable {
-        public:
-            scoped_lock( mongo::mutex &m ) : 
-            _l( m.boost() ) {
-            }
-            ~scoped_lock() {
-            }
-            boost::unique_lock<boost::timed_mutex>& boost() { return _l; }
-        private:
-            boost::unique_lock<boost::timed_mutex> _l;
-        };
-    private:
-        boost::timed_mutex &boost() { return *_m; }
-        boost::timed_mutex *_m;
-    };
-
-    typedef mongo::mutex::scoped_lock scoped_lock;
+    using mutex = boost::mutex;
 
     /** The concept with SimpleMutex is that it is a basic lock/unlock with no 
           special functionality (such as try and try timeout).  Thus it can be 

@@ -142,26 +142,25 @@ namespace mongo {
     class ListeningSockets {
     public:
         ListeningSockets()
-            : _mutex("ListeningSockets")
-            , _sockets( new std::set<int>() )
+            : _sockets( new std::set<int>() )
             , _socketPaths( new std::set<std::string>() )
         { }
         void add( int sock ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _sockets->insert( sock );
         }
         void addPath( const std::string& path ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _socketPaths->insert( path );
         }
         void remove( int sock ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _sockets->erase( sock );
         }
         void closeAll();
         static ListeningSockets* get();
     private:
-        mongo::mutex _mutex;
+        boost::mutex _mutex;
         std::set<int>* _sockets;
         std::set<std::string>* _socketPaths; // for unix domain sockets
         static ListeningSockets* _instance;

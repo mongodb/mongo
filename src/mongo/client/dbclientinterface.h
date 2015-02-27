@@ -313,12 +313,12 @@ namespace mongo {
         };
 
         static void setConnectionHook( ConnectionHook* hook ){
-            scoped_lock lk( _connectHookMutex );
+            boost::lock_guard<boost::mutex> lk( _connectHookMutex );
             _connectHook = hook;
         }
 
         static ConnectionHook* getConnectionHook() {
-            scoped_lock lk( _connectHookMutex );
+            boost::lock_guard<boost::mutex> lk( _connectHookMutex );
             return _connectHook;
         }
 

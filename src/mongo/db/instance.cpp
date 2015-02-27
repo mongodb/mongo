@@ -1186,8 +1186,7 @@ namespace mongo {
     }
 
     // ----- BEGIN Diaglog -----
-    DiagLog::DiagLog() : f(0) , level(0), mutex("DiagLog") { 
-    }
+    DiagLog::DiagLog() : f(0), level(0) {}
 
     void DiagLog::openFile() {
         verify( f == 0 );
@@ -1206,7 +1205,7 @@ namespace mongo {
     }
 
     int DiagLog::setLevel( int newLevel ) {
-        scoped_lock lk(mutex);
+        boost::lock_guard<boost::mutex> lk(mutex);
         int old = level;
         log() << "diagLogging level=" << newLevel << endl;
         if( f == 0 ) { 
@@ -1219,14 +1218,14 @@ namespace mongo {
     void DiagLog::flush() {
         if ( level ) {
             log() << "flushing diag log" << endl;
-            scoped_lock lk(mutex);
+            boost::lock_guard<boost::mutex> lk(mutex);
             f->flush();
         }
     }
     
     void DiagLog::writeop(char *data,int len) {
         if ( level & 1 ) {
-            scoped_lock lk(mutex);
+            boost::lock_guard<boost::mutex> lk(mutex);
             f->write(data,len);
         }
     }
@@ -1236,7 +1235,7 @@ namespace mongo {
             bool log = (level & 4) == 0;
             OCCASIONALLY log = true;
             if ( log ) {
-                scoped_lock lk(mutex);
+                boost::lock_guard<boost::mutex> lk(mutex);
                 verify( f );
                 f->write(data,len);
             }

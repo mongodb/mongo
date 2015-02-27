@@ -226,9 +226,8 @@ namespace mongo {
     }
 
     CursorCache::CursorCache()
-        :_mutex( "CursorCache" ),
-         _random( getCCRandomSeed() ),
-         _shardedTotal(0) {
+        : _random( getCCRandomSeed() ),
+          _shardedTotal(0) {
     }
 
     CursorCache::~CursorCache() {
@@ -247,7 +246,7 @@ namespace mongo {
 
     ShardedClientCursorPtr CursorCache::get( long long id ) const {
         LOG(_myLogLevel) << "CursorCache::get id: " << id << endl;
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         MapSharded::const_iterator i = _cursors.find( id );
         if ( i == _cursors.end() ) {
             return ShardedClientCursorPtr();
@@ -258,7 +257,7 @@ namespace mongo {
 
     int CursorCache::getMaxTimeMS( long long id ) const {
         verify( id );
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         MapShardedInt::const_iterator i = _cursorsMaxTimeMS.find( id );
         return ( i != _cursorsMaxTimeMS.end() ) ? i->second : 0;
     }
@@ -272,7 +271,7 @@ namespace mongo {
         verify( maxTimeMS == kMaxTimeCursorTimeLimitExpired
                 || maxTimeMS == kMaxTimeCursorNoTimeLimit
                 || maxTimeMS > 0 );
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         _cursorsMaxTimeMS[cursor->getId()] = maxTimeMS;
         _cursors[cursor->getId()] = cursor;
         _shardedTotal++;
@@ -283,20 +282,20 @@ namespace mongo {
         verify( maxTimeMS == kMaxTimeCursorTimeLimitExpired
                 || maxTimeMS == kMaxTimeCursorNoTimeLimit
                 || maxTimeMS > 0 );
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         _cursorsMaxTimeMS[id] = maxTimeMS;
     }
 
     void CursorCache::remove( long long id ) {
         verify( id );
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         _cursorsMaxTimeMS.erase( id );
         _cursors.erase( id );
     }
     
     void CursorCache::removeRef( long long id ) {
         verify( id );
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         _refs.erase( id );
         _refsNS.erase( id );
         cursorStatsSingleTarget.decrement();
@@ -305,7 +304,7 @@ namespace mongo {
     void CursorCache::storeRef(const std::string& server, long long id, const std::string& ns) {
         LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
         verify( id );
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         _refs[id] = server;
         _refsNS[id] = ns;
         cursorStatsSingleTarget.increment();
@@ -313,7 +312,7 @@ namespace mongo {
 
     string CursorCache::getRef( long long id ) const {
         verify( id );
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         MapNormal::const_iterator i = _refs.find( id );
 
         LOG(_myLogLevel) << "CursorCache::getRef id: " << id << " out: " << ( i == _refs.end() ? " NONE " : i->second ) << endl;
@@ -325,7 +324,7 @@ namespace mongo {
 
     std::string CursorCache::getRefNS(long long id) const {
         verify(id);
-        scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         MapNormal::const_iterator i = _refsNS.find(id);
 
         LOG(_myLogLevel) << "CursorCache::getRefNs id: " << id
@@ -339,7 +338,7 @@ namespace mongo {
 
     long long CursorCache::genId() {
         while ( true ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
 
             long long x = Listener::getElapsedTimeMillis() << 32;
             x |= _random.nextInt32();
@@ -391,7 +390,7 @@ namespace mongo {
 
             string server;
             {
-                scoped_lock lk( _mutex );
+                boost::lock_guard<boost::mutex> lk( _mutex );
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
@@ -442,7 +441,7 @@ namespace mongo {
     }
 
     void CursorCache::appendInfo( BSONObjBuilder& result ) const {
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         result.append( "sharded", static_cast<int>(cursorStatsMultiTarget.get()));
         result.appendNumber( "shardedEver" , _shardedTotal );
         result.append( "refs", static_cast<int>(cursorStatsSingleTarget.get()));
@@ -451,7 +450,7 @@ namespace mongo {
 
     void CursorCache::doTimeouts() {
         long long now = Listener::getElapsedTimeMillis();
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         for ( MapSharded::iterator i=_cursors.begin(); i!=_cursors.end(); ++i ) {
             // Note: cursors with no timeout will always have an idleTime of 0
             long long idleFor = i->second->idleTime( now );

@@ -69,7 +69,7 @@ namespace mongo {
     //   2. Prevents calls to VirtualProtect while we remapping files.
     // Lock Ordering:
     //  - If taken, must be after previewViews._m to prevent deadlocks
-    mutex mapViewMutex("mapView");
+    mutex mapViewMutex;
 
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
@@ -165,7 +165,7 @@ namespace mongo {
         boost::lock_guard<boost::mutex> lk(_flushMutex);
 
         {
-            scoped_lock lk(mapViewMutex);
+            boost::lock_guard<boost::mutex> lk(mapViewMutex);
 
             for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
                 UnmapViewOfFile(*i);
@@ -187,7 +187,7 @@ namespace mongo {
     void* MemoryMappedFile::createReadOnlyMap() {
         verify( maphandle );
 
-        scoped_lock lk(mapViewMutex);
+        boost::lock_guard<boost::mutex> lk(mapViewMutex);
 
         void* readOnlyMapAddress = NULL;
         int current_retry = 0;
@@ -299,7 +299,7 @@ namespace mongo {
 
         void *view = 0;
         {
-            scoped_lock lk(mapViewMutex);
+            boost::lock_guard<boost::mutex> lk(mapViewMutex);
             DWORD access = ( options & READONLY ) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
 
             int current_retry = 0;
@@ -364,7 +364,7 @@ namespace mongo {
     void* MemoryMappedFile::createPrivateMap() {
         verify( maphandle );
 
-        scoped_lock lk(mapViewMutex);
+        boost::lock_guard<boost::mutex> lk(mapViewMutex);
 
         LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
 
@@ -412,7 +412,7 @@ namespace mongo {
 
         privateViews.clearWritableBits(oldPrivateAddr, len);
 
-        scoped_lock lk(mapViewMutex);
+        boost::lock_guard<boost::mutex> lk(mapViewMutex);
 
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
             DWORD dosError = GetLastError();

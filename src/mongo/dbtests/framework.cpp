@@ -63,7 +63,7 @@ namespace mongo {
 
     namespace dbtests {
 
-        mutex globalCurrentTestNameMutex("globalCurrentTestNameMutex");
+        mutex globalCurrentTestNameMutex;
         std::string globalCurrentTestName;
 
         class TestWatchDog : public BackgroundJob {
@@ -75,7 +75,7 @@ namespace mongo {
                 std::string lastRunningTestName, currentTestName;
 
                 {
-                    scoped_lock lk( globalCurrentTestNameMutex );
+                    boost::lock_guard<boost::mutex> lk( globalCurrentTestNameMutex );
                     lastRunningTestName = globalCurrentTestName;
                 }
 
@@ -84,7 +84,7 @@ namespace mongo {
                     minutesRunning++;
 
                     {
-                        scoped_lock lk( globalCurrentTestNameMutex );
+                        boost::lock_guard<boost::mutex> lk( globalCurrentTestNameMutex );
                         currentTestName = globalCurrentTestName;
                     }
 
@@ -138,6 +138,6 @@ namespace mongo {
 }  // namespace mongo
 
 void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {
-    scoped_lock lk( mongo::dbtests::globalCurrentTestNameMutex );
+    boost::lock_guard<boost::mutex> lk( mongo::dbtests::globalCurrentTestNameMutex );
     mongo::dbtests::globalCurrentTestName = testName;
 }

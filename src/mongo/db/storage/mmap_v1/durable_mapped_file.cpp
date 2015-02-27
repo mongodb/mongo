@@ -85,7 +85,7 @@ namespace mongo {
     /** de-register view. threadsafe */
     void PointerToDurableMappedFile::remove(void *view, size_t len) {
         if( view ) {
-            mutex::scoped_lock lk(_m);
+            boost::lock_guard<boost::mutex> lk(_m);
             clearWritableBits_inlock(view, len);
             _views.erase(view);
         }
@@ -93,7 +93,7 @@ namespace mongo {
 
 #ifdef _WIN32
     void PointerToDurableMappedFile::clearWritableBits(void *privateView, size_t len) {
-        mutex::scoped_lock lk(_m);
+        boost::lock_guard<boost::mutex> lk(_m);
         clearWritableBits_inlock(privateView, len);
     }
 
@@ -110,7 +110,7 @@ namespace mongo {
     extern mutex mapViewMutex;
 
     __declspec(noinline) void PointerToDurableMappedFile::makeChunkWritable(size_t chunkno) {
-        mutex::scoped_lock lkPrivateViews(_m);
+        boost::lock_guard<boost::mutex> lkPrivateViews(_m);
 
         if (writable.get(chunkno)) // double check lock
             return;
@@ -120,7 +120,7 @@ namespace mongo {
         size_t chunkStart = chunkno * MemoryMappedCOWBitset::ChunkSize;
         size_t chunkNext = chunkStart + MemoryMappedCOWBitset::ChunkSize;
 
-        scoped_lock lkMapView(mapViewMutex);
+        boost::lock_guard<boost::mutex> lkMapView(mapViewMutex);
 
         map<void*, DurableMappedFile*>::iterator i = _views.upper_bound((void*)(chunkNext - 1));
         while (1) {
@@ -182,7 +182,7 @@ namespace mongo {
     }
 #endif
 
-    PointerToDurableMappedFile::PointerToDurableMappedFile() : _m("PointerToDurableMappedFile") {
+    PointerToDurableMappedFile::PointerToDurableMappedFile() {
 #if defined(SIZE_MAX)
         size_t max = SIZE_MAX;
 #else
@@ -225,7 +225,7 @@ namespace mongo {
         @return the DurableMappedFile to which this pointer belongs. null if not found.
     */
     DurableMappedFile* PointerToDurableMappedFile::find(void *p, /*out*/ size_t& ofs) {
-        mutex::scoped_lock lk(_m);
+        boost::lock_guard<boost::mutex> lk(_m);
         return find_inlock(p, ofs);
     }
 
@@ -267,7 +267,7 @@ namespace mongo {
         LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length();
         if( _view_write ) {
             if (storageGlobalParams.dur) {
-                scoped_lock lk2(privateViews._mutex());
+                boost::lock_guard<boost::mutex> lk2(privateViews._mutex());
 
                 _view_private = createPrivateMap();
                 if( _view_private == 0 ) {

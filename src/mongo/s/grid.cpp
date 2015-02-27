@@ -67,15 +67,7 @@ namespace mongo {
 
     MONGO_FP_DECLARE(neverBalance);
 
-    Grid::Grid()
-        : _lock("Grid"),
-          _allowLocalShard(true) {
-
-    }
-
-    Grid::~Grid() {
-
-    }
+    Grid::Grid() : _allowLocalShard(true) {}
 
     DBConfigPtr Grid::getDBConfig( StringData ns , bool create , const string& shardNameHint ) {
         string database = nsToDatabase( ns );
@@ -87,7 +79,7 @@ namespace mongo {
                  str::stream() << "invalid database name: " << database,
                  NamespaceString::validDBName( database ) );
 
-        scoped_lock l( _lock );
+        boost::lock_guard<boost::mutex> l( _lock );
 
         DBConfigPtr& dbConfig = _databases[database];
         if( ! dbConfig ){
@@ -197,14 +189,14 @@ namespace mongo {
 
     void Grid::removeDB( const std::string& database ) {
         uassert( 10186 ,  "removeDB expects db name" , database.find( '.' ) == string::npos );
-        scoped_lock l( _lock );
+        boost::lock_guard<boost::mutex> l( _lock );
         _databases.erase( database );
 
     }
 
     void Grid::removeDBIfExists( const DBConfig& database ) {
 
-        scoped_lock l( _lock );
+        boost::lock_guard<boost::mutex> l( _lock );
 
         map<string,DBConfigPtr>::iterator it = _databases.find( database.getName() );
         if( it != _databases.end() && it->second.get() == &database ){
@@ -650,7 +642,7 @@ namespace mongo {
     }
 
     void Grid::flushConfig() {
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
         _databases.clear();
     }
 

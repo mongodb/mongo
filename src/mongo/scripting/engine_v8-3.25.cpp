@@ -394,7 +394,7 @@ namespace mongo {
      }
 
      void V8ScriptEngine::interrupt(unsigned opId) {
-         mongo::mutex::scoped_lock intLock(_globalInterruptLock);
+         boost::lock_guard<boost::mutex> intLock(_globalInterruptLock);
          OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
          if (iScope == _opToScopeMap.end()) {
              // got interrupt request for a scope that no longer exists
@@ -407,7 +407,7 @@ namespace mongo {
      }
 
      void V8ScriptEngine::interruptAll() {
-         mongo::mutex::scoped_lock interruptLock(_globalInterruptLock);
+         boost::lock_guard<boost::mutex> interruptLock(_globalInterruptLock);
          for (OpIdToScopeMap::iterator iScope = _opToScopeMap.begin();
               iScope != _opToScopeMap.end(); ++iScope) {
              iScope->second->kill();
@@ -415,7 +415,7 @@ namespace mongo {
      }
 
      void V8Scope::registerOperation(OperationContext* txn) {
-         scoped_lock giLock(_engine->_globalInterruptLock);
+         boost::lock_guard<boost::mutex> giLock(_engine->_globalInterruptLock);
          invariant(_opId == 0);
          _opId = txn->getOpID();
          _engine->_opToScopeMap[_opId] = this;
@@ -427,7 +427,7 @@ namespace mongo {
      }
 
      void V8Scope::unregisterOperation() {
-         scoped_lock giLock(_engine->_globalInterruptLock);
+         boost::lock_guard<boost::mutex> giLock(_engine->_globalInterruptLock);
          LOG(2) << "V8Scope " << static_cast<const void*>(this) << " unregistered for op "
                 << _opId << endl;
         if (_opId != 0) {
@@ -441,7 +441,7 @@ namespace mongo {
 
     bool V8Scope::nativePrologue() {
         v8::Locker l(_isolate);
-        mongo::mutex::scoped_lock cbEnterLock(_interruptLock);
+        boost::lock_guard<boost::mutex> cbEnterLock(_interruptLock);
         if (v8::V8::IsExecutionTerminating(_isolate)) {
             LOG(2) << "v8 execution interrupted.  isolate: "
                    << static_cast<const void*>(_isolate) << endl;
@@ -460,7 +460,7 @@ namespace mongo {
 
     bool V8Scope::nativeEpilogue() {
         v8::Locker l(_isolate);
-        mongo::mutex::scoped_lock cbLeaveLock(_interruptLock);
+        boost::lock_guard<boost::mutex> cbLeaveLock(_interruptLock);
         _inNativeExecution = false;
         if (v8::V8::IsExecutionTerminating(_isolate)) {
             LOG(2) << "v8 execution interrupted.  isolate: "
@@ -477,7 +477,7 @@ namespace mongo {
     }
 
     void V8Scope::kill() {
-        mongo::mutex::scoped_lock interruptLock(_interruptLock);
+        boost::lock_guard<boost::mutex> interruptLock(_interruptLock);
         if (!_inNativeExecution) {
             // Set the TERMINATE flag on the stack guard for this isolate.
             // This won't happen between calls to nativePrologue and nativeEpilogue().

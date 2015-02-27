@@ -108,11 +108,6 @@ namespace mongo {
 
     class DistributedLockPinger {
     public:
-
-        DistributedLockPinger()
-            : _mutex( "DistributedLockPinger" ) {
-        }
-
         void _distLockPingThread( ConnectionString addr,
                                   const std::string& process,
                                   unsigned long long sleepTime ) {
@@ -213,7 +208,7 @@ namespace mongo {
 
                     // Remove old locks, if possible
                     // Make sure no one else is adding to this list at the same time
-                    scoped_lock lk( _mutex );
+                    boost::lock_guard<boost::mutex> lk( _mutex );
 
                     int numOldLocks = _oldLockOIDs.size();
                     if( numOldLocks > 0 ) {
@@ -294,7 +289,7 @@ namespace mongo {
             if (!lockPingerEnabled) return "";
 
             // Make sure we don't start multiple threads for a process id
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
 
             const ConnectionString& conn = lock.getRemoteConnection();
             const string& processId = lock.getProcessId();
@@ -320,18 +315,18 @@ namespace mongo {
 
         void addUnlockOID( const OID& oid ) {
             // Modifying the lock from some other thread
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _oldLockOIDs.push_back( oid );
         }
 
         bool willUnlockOID( const OID& oid ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             return find( _oldLockOIDs.begin(), _oldLockOIDs.end(), oid ) != _oldLockOIDs.end();
         }
 
         void kill( const ConnectionString& conn, const string& processId ) {
             // Make sure we're in a consistent state before other threads can see us
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
 
             string pingId = pingThreadId( conn, processId );
 
@@ -341,13 +336,13 @@ namespace mongo {
         }
 
         bool shouldKill( const ConnectionString& conn, const string& processId ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             return _kill.count( pingThreadId( conn, processId ) ) > 0;
         }
 
         void finishKill( const ConnectionString& conn, const string& processId ) {
             // Make sure we're in a consistent state before other threads can see us
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
 
             string pingId = pingThreadId( conn, processId );
 
@@ -374,7 +369,7 @@ namespace mongo {
           _processId( asProcess ? getDistLockId() : getDistLockProcess() ),
           _lockTimeout( lockTimeout == 0 ? LOCK_TIMEOUT : lockTimeout ),
           _maxClockSkew( _lockTimeout / LOCK_SKEW_FACTOR ), _maxNetSkew( _maxClockSkew ),
-          _lockPing( _maxClockSkew ), _mutex( "DistributedLock" )
+          _lockPing( _maxClockSkew )
     {
         LOG( logLvl ) << "created new distributed lock for " << name << " on " << conn
                       << " ( lock timeout : " << _lockTimeout
@@ -384,12 +379,12 @@ namespace mongo {
     }
 
     DistributedLock::PingData DistributedLock::LastPings::getLastPing( const ConnectionString& conn, const string& lockName ){
-        scoped_lock lock( _mutex );
+        boost::lock_guard<boost::mutex> lock( _mutex );
         return _lastPings[ std::pair< string, string >( conn.toString(), lockName ) ];
     }
 
     void DistributedLock::LastPings::setLastPing( const ConnectionString& conn, const string& lockName, const PingData& pd ){
-        scoped_lock lock( _mutex );
+        boost::lock_guard<boost::mutex> lock( _mutex );
         _lastPings[ std::pair< string, string >( conn.toString(), lockName ) ] = pd;
     }
 
@@ -613,7 +608,7 @@ namespace mongo {
         // TODO:  Start pinging only when we actually get the lock?
         // If we don't have a thread pinger, make sure we shouldn't have one
         if( _threadId == "" ){
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _threadId = distLockPinger.got( *this, _lockPing );
         }
 

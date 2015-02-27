@@ -537,7 +537,6 @@ namespace PerfTests {
 
     RWLock lk("testrw");
     SimpleMutex m("simptst");
-    mongo::mutex mtest("mtest");
     boost::mutex mboost;
     boost::timed_mutex mboost_timed;
     std::mutex mstd;
@@ -552,15 +551,6 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
         void timed() {
             c.notify_one();
-        }
-    };
-    class mutexspeed : public B {
-    public:
-        string name() { return "mutex"; }
-        virtual int howLongMillis() { return 500; }
-        virtual bool showDurStats() { return false; }
-        void timed() {
-            mongo::mutex::scoped_lock lk(mtest);
         }
     };
     class boostmutexspeed : public B {
@@ -1474,7 +1464,6 @@ namespace PerfTests {
                 add< locker_contestedS >();
                 add< locker_uncontestedS >();
                 add< NotifyOne >();
-                add< mutexspeed >();
                 add< simplemutexspeed >();
                 add< boostmutexspeed >();
                 add< boosttimed_mutexspeed >();

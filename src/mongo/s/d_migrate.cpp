@@ -253,11 +253,9 @@ namespace mongo {
     class MigrateFromStatus {
     public:
         MigrateFromStatus():
-            _mutex("MigrateFromStatus"),
             _inCriticalSection(false),
             _memoryUsed(0),
-            _active(false),
-            _cloneLocsMutex("MigrateFromTrackerMutex") {
+            _active(false) {
         }
 
         /**
@@ -276,7 +274,7 @@ namespace mongo {
             // Get global shared to synchronize with logOp. Also see comments in the class
             // members declaration for more details.
             Lock::GlobalRead globalShared(txn->lockState());
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             if (_active) {
                 return false;
@@ -293,7 +291,7 @@ namespace mongo {
 
             _active = true;
 
-            scoped_lock tLock(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> tLock(_cloneLocsMutex);
             verify(_cloneLocs.size() == 0);
 
             return true;
@@ -306,7 +304,7 @@ namespace mongo {
             // Get global shared to synchronize with logOp. Also see comments in the class
             // members declaration for more details.
             Lock::GlobalRead globalShared(txn->lockState());
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             _active = false;
             _deleteNotifyExec.reset( NULL );
@@ -317,7 +315,7 @@ namespace mongo {
             _reload.clear();
             _memoryUsed = 0;
 
-            scoped_lock cloneLock(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> cloneLock(_cloneLocsMutex);
             _cloneLocs.clear();
         }
 
@@ -443,7 +441,7 @@ namespace mongo {
             {
                 AutoGetCollectionForRead ctx(txn, getNS());
 
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 if (!_active) {
                     errmsg = "no active migration!";
                     return false;
@@ -502,7 +500,7 @@ namespace mongo {
                 // It's alright not to lock _mutex all the way through based on the assumption
                 // that this is only called by the main thread that drives the migration and
                 // only it can start and stop the current migration.
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
 
                 invariant( _deleteNotifyExec.get() == NULL );
                 WorkingSet* ws = new WorkingSet();
@@ -552,7 +550,7 @@ namespace mongo {
             RecordId dl;
             while (PlanExecutor::ADVANCED == exec->getNext(NULL, &dl)) {
                 if ( ! isLargeChunk ) {
-                    scoped_lock lk(_cloneLocsMutex);
+                    boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
                     _cloneLocs.insert( dl );
                 }
 
@@ -565,7 +563,7 @@ namespace mongo {
             exec.reset();
 
             if ( isLargeChunk ) {
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 warning() << "cannot move chunk: the maximum number of documents for a chunk is "
                           << maxRecsWhenFull << " , the maximum chunk size is " << maxChunkSize
                           << " , average document size is " << avgRecSize
@@ -593,7 +591,7 @@ namespace mongo {
             {
                 AutoGetCollectionForRead ctx(txn, getNS());
 
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 if (!_active) {
                     errmsg = "not active";
                     return false;
@@ -616,7 +614,7 @@ namespace mongo {
             while (!isBufferFilled) {
                 AutoGetCollectionForRead ctx(txn, getNS());
 
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 if (!_active) {
                     errmsg = "not active";
                     return false;
@@ -631,7 +629,7 @@ namespace mongo {
                     return false;
                 }
 
-                scoped_lock lk(_cloneLocsMutex);
+                boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
                 set<RecordId>::iterator cloneLocsIter = _cloneLocs.begin();
                 for ( ; cloneLocsIter != _cloneLocs.end(); ++cloneLocsIter) {
                     if (tracker.intervalHasElapsed()) // should I yield?
@@ -674,33 +672,33 @@ namespace mongo {
             // that check only works for non-mmapv1 engines, and this is needed
             // for mmapv1.
 
-            scoped_lock lk(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
             _cloneLocs.erase( dl );
         }
 
         std::size_t cloneLocsRemaining() {
-            scoped_lock lk(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
             return _cloneLocs.size();
         }
 
         long long mbUsed() const {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             return _memoryUsed / ( 1024 * 1024 );
         }
 
         bool getInCriticalSection() const {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             return _inCriticalSection;
         }
 
         void setInCriticalSection( bool b ) {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             _inCriticalSection = b;
             _inCriticalSectionCV.notify_all();
         }
 
         std::string getNS() const {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             return _ns;
         }
 
@@ -712,9 +710,9 @@ namespace mongo {
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += maxSecondsToWait;
 
-            scoped_lock lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             while (_inCriticalSection) {
-                if (!_inCriticalSectionCV.timed_wait(lk.boost(), xt))
+                if (!_inCriticalSectionCV.timed_wait(lk, xt))
                     return false;
             }
 
@@ -724,8 +722,8 @@ namespace mongo {
         bool isActive() const { return _getActive(); }
 
     private:
-        bool _getActive() const { scoped_lock lk(_mutex); return _active; }
-        void _setActive( bool b ) { scoped_lock lk(_mutex); _active = b; }
+        bool _getActive() const { boost::lock_guard<boost::mutex> lk(_mutex); return _active; }
+        void _setActive( bool b ) { boost::lock_guard<boost::mutex> lk(_mutex); _active = b; }
 
         /**
          * Used to commit work for LogOpForSharding. Used to keep track of changes in documents
@@ -748,7 +746,7 @@ namespace mongo {
             virtual void commit() {
                 switch (_op) {
                 case 'd': {
-                    scoped_lock sl(_migrateFromStatus->_mutex);
+                    boost::lock_guard<boost::mutex> sl(_migrateFromStatus->_mutex);
                     _migrateFromStatus->_deleted.push_back(_idObj);
                     _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
                     break;
@@ -757,7 +755,7 @@ namespace mongo {
                 case 'i':
                 case 'u':
                 {
-                    scoped_lock sl(_migrateFromStatus->_mutex);
+                    boost::lock_guard<boost::mutex> sl(_migrateFromStatus->_mutex);
                     _migrateFromStatus->_reload.push_back(_idObj);
                     _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
                     break;
@@ -1818,7 +1816,6 @@ namespace mongo {
         };
 
         MigrateStatus():
-            _mutex("MigrateStatus"),
             _active(false),
             _numCloned(0),
             _clonedBytes(0),
@@ -1828,12 +1825,12 @@ namespace mongo {
         }
 
         void setState(State newState) {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             _state = newState;
         }
 
         State getState() const {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             return _state;
         }
 
@@ -1845,7 +1842,7 @@ namespace mongo {
                        const BSONObj& min,
                        const BSONObj& max,
                        const BSONObj& shardKeyPattern) {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             if (_active) {
                 return Status(ErrorCodes::ConflictingOperationInProgress,
@@ -1888,7 +1885,7 @@ namespace mongo {
             }
             catch ( std::exception& e ) {
                 {
-                    scoped_lock sl(_mutex);
+                    boost::lock_guard<boost::mutex> sl(_mutex);
                     _state = FAIL;
                     _errmsg = e.what();
                 }
@@ -1897,7 +1894,7 @@ namespace mongo {
             }
             catch ( ... ) {
                 {
-                    scoped_lock sl(_mutex);
+                    boost::lock_guard<boost::mutex> sl(_mutex);
                     _state = FAIL;
                     _errmsg = "UNKNOWN ERROR";
                 }
@@ -2182,7 +2179,7 @@ namespace mongo {
                         thisTime++;
 
                         {
-                            scoped_lock statsLock(_mutex);
+                            boost::lock_guard<boost::mutex> statsLock(_mutex);
                             _numCloned++;
                             _clonedBytes += docToClone.objsize();
                         }
@@ -2354,7 +2351,7 @@ namespace mongo {
         }
 
         void status(BSONObjBuilder& b) {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
 
             b.appendBool("active", _active);
 
@@ -2569,7 +2566,7 @@ namespace mongo {
         }
 
         bool startCommit() {
-            scoped_lock lock(_mutex);
+            boost::unique_lock<boost::mutex> lock(_mutex);
 
             if (_state != STEADY) {
                 return false;
@@ -2581,7 +2578,7 @@ namespace mongo {
 
             _state = COMMIT_START;
             while (_active) {
-                if ( ! isActiveCV.timed_wait( lock.boost(), xt ) ){
+                if ( ! isActiveCV.timed_wait( lock, xt ) ){
                     // TIMEOUT
                     _state = FAIL;
                     log() << "startCommit never finished!" << migrateLog;
@@ -2598,14 +2595,14 @@ namespace mongo {
         }
 
         void abort() {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             _state = ABORT;
             _errmsg = "aborted";
         }
 
-        bool getActive() const { scoped_lock lk(_mutex); return _active; }
+        bool getActive() const { boost::lock_guard<boost::mutex> lk(_mutex); return _active; }
         void setActive( bool b ) { 
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             _active = b;
             isActiveCV.notify_all(); 
         }

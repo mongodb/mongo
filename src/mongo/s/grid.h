@@ -48,7 +48,6 @@ namespace mongo {
     class Grid {
     public:
         Grid();
-        ~Grid();
 
         /**
          * gets the config the db.

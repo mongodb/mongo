@@ -33,7 +33,7 @@
 #include "mongo/util/log.h"
 
 namespace {
-    mongo::mutex globalOptimeMutex("globalOptime");
+    mongo::mutex globalOptimeMutex;
     mongo::OpTime globalOpTime(0, 0);
 
     bool skewed(const mongo::OpTime& val) {
@@ -49,17 +49,17 @@ namespace {
 
 namespace mongo {
     void setGlobalOptime(const OpTime& newTime) {
-        mutex::scoped_lock lk(globalOptimeMutex);
+        boost::lock_guard<boost::mutex> lk(globalOptimeMutex);
         globalOpTime = newTime;
     }
 
     OpTime getLastSetOptime() {
-        mutex::scoped_lock lk(globalOptimeMutex);
+        boost::lock_guard<boost::mutex> lk(globalOptimeMutex);
         return globalOpTime;
     }
 
     OpTime getNextGlobalOptime() {
-        mutex::scoped_lock lk(globalOptimeMutex);
+        boost::lock_guard<boost::mutex> lk(globalOptimeMutex);
 
         const unsigned now = (unsigned) time(0);
         const unsigned globalSecs = globalOpTime.getSecs();

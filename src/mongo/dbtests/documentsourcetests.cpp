@@ -284,19 +284,16 @@ namespace DocumentSourceTests {
         /** Set a value or await an expected value. */
         class PendingValue {
         public:
-            PendingValue( int initialValue ) :
-            _value( initialValue ),
-            _mutex( "DocumentSourceTests::PendingValue::_mutex" ) {
-            }
+            PendingValue( int initialValue ) : _value( initialValue ) {}
             void set( int newValue ) {
-                scoped_lock lk( _mutex );
+                boost::lock_guard<boost::mutex> lk( _mutex );
                 _value = newValue;
                 _condition.notify_all();
             }
             void await( int expectedValue ) const {
-                scoped_lock lk( _mutex );
+                boost::unique_lock<boost::mutex> lk( _mutex );
                 while( _value != expectedValue ) {
-                    _condition.wait( lk.boost() );
+                    _condition.wait( lk );
                 }
             }
         private:

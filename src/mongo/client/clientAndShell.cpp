@@ -55,12 +55,12 @@ namespace mongo {
     // to avoid deadlocks at shutdown.  So it also protects
     // the global dbexitCalled.
     namespace shell_utils {
-        mongo::mutex &mongoProgramOutputMutex(*(new mongo::mutex("mongoProgramOutputMutex")));
+        mongo::mutex &mongoProgramOutputMutex(*(new boost::mutex()));
     }
 
     void dbexit( ExitCode returnCode, const char *whyMsg ) {
         {
-            mongo::mutex::scoped_lock lk( shell_utils::mongoProgramOutputMutex );
+            boost::lock_guard<boost::mutex> lk( shell_utils::mongoProgramOutputMutex );
             dbexitCalled = true;
         }
         log() << "dbexit called" << endl;

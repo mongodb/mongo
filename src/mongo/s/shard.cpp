@@ -89,7 +89,6 @@ namespace mongo {
 
     class StaticShardInfo {
     public:
-        StaticShardInfo() : _mutex("StaticShardInfo"), _rsMutex("RSNameMap") { }
         void reload() {
 
             list<BSONObj> all;
@@ -110,7 +109,7 @@ namespace mongo {
                 conn.done();
             }
 
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
 
             // We use the _lookup table for all shards and for the primary config DB. The config DB info,
             // however, does not come from the ShardNS::shard. So when cleaning the _lookup table we leave
@@ -152,7 +151,7 @@ namespace mongo {
         }
 
         ShardPtr findIfExists( const string& shardName ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             ShardMap::iterator i = _lookup.find( shardName );
             if ( i != _lookup.end() ) return i->second;
             return ShardPtr();
@@ -166,7 +165,7 @@ namespace mongo {
                     errmsg.empty());
 
             if (connStr.type() == ConnectionString::SET) {
-                scoped_lock lk(_rsMutex);
+                boost::lock_guard<boost::mutex> lk(_rsMutex);
                 ShardMap::iterator iter = _rsLookup.find(connStr.getSetName());
 
                 if (iter == _rsLookup.end()) {
@@ -176,7 +175,7 @@ namespace mongo {
                 return iter->second;
             }
             else {
-                scoped_lock lk(_mutex);
+                boost::lock_guard<boost::mutex> lk(_mutex);
                 ShardMap::iterator iter = _lookup.find(ident);
 
                 if (iter == _lookup.end()) {
@@ -206,7 +205,7 @@ namespace mongo {
         // Note: this doesn't refresh the table if the name isn't found, so it's possible that
         // a newly added shard/Replica Set may not be found.
         Shard lookupRSName( const string& name) {
-            scoped_lock lk( _rsMutex );
+            boost::lock_guard<boost::mutex> lk( _rsMutex );
             ShardMap::iterator i = _rsLookup.find( name );
 
             return (i == _rsLookup.end()) ? Shard::EMPTY : *(i->second.get());
@@ -215,13 +214,13 @@ namespace mongo {
         // Useful for ensuring our shard data will not be modified while we use it
         Shard findCopy( const string& ident ){
             ShardPtr found = findWithRetry(ident);
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             massert( 13128 , (string)"can't find shard for: " + ident , found.get() );
             return *found.get();
         }
 
         void set( const string& name , const Shard& s , bool setName = true , bool setAddr = true ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             ShardPtr ss( new Shard( s ) );
             if ( setName )
                 _lookup[name] = ss;
@@ -235,7 +234,7 @@ namespace mongo {
             const ConnectionString& cs = s->getAddress();
             if ( cs.type() == ConnectionString::SET ) {
                 if ( cs.getSetName().size() ) {
-                    scoped_lock lk( _rsMutex);
+                    boost::lock_guard<boost::mutex> lk( _rsMutex);
                     _rsLookup[ cs.getSetName() ] = s;
                 }
                 vector<HostAndPort> servers = cs.getServers();
@@ -246,7 +245,7 @@ namespace mongo {
         }
 
         void remove( const string& name ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             for ( ShardMap::iterator i = _lookup.begin(); i!=_lookup.end(); ) {
                 ShardPtr s = i->second;
                 if ( s->getName() == name ) {
@@ -268,7 +267,7 @@ namespace mongo {
         }
 
         void getAllShards( vector<ShardPtr>& all ) const {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             std::set<string> seen;
             for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
                 const ShardPtr& s = i->second;
@@ -282,7 +281,7 @@ namespace mongo {
         }
 
         void getAllShards( vector<Shard>& all ) const {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             std::set<string> seen;
             for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
                 const ShardPtr& s = i->second;
@@ -297,7 +296,7 @@ namespace mongo {
 
 
         bool isAShardNode( const string& addr ) const {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
 
             // check direct nods or set names
             ShardMap::const_iterator i = _lookup.find( addr );
@@ -317,7 +316,7 @@ namespace mongo {
         }
 
         bool getShardMap( BSONObjBuilder& result , string& errmsg ) const {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
 
             BSONObjBuilder b( _lookup.size() + 50 );
 

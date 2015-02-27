@@ -28,10 +28,11 @@
 
 #pragma once
 
+#include <boost/thread/mutex.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
     /**
@@ -157,7 +158,7 @@ namespace mongo {
         BSONObj _data;
 
         // protects _mode, _timesOrPeriod, _data
-        mutable mutex _modMutex;
+        mutable boost::mutex _modMutex;
 
         /**
          * Enables this fail point.

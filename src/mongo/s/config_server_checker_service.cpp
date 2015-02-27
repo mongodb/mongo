@@ -45,7 +45,7 @@ namespace mongo {
         boost::scoped_ptr<boost::thread> _checkerThread;
 
         // Protects _isConsistentFromLastCheck.
-        mutex _isConsistentMutex( "ConfigServerConsistent" );
+        mutex _isConsistentMutex;
         bool _isConsistentFromLastCheck = true;
 
         void checkConfigConsistency() {
@@ -53,7 +53,7 @@ namespace mongo {
                 bool isConsistent = configServer.ok( true );
 
                 {
-                    scoped_lock sl( _isConsistentMutex );
+                    boost::lock_guard<boost::mutex> sl( _isConsistentMutex );
                     _isConsistentFromLastCheck = isConsistent;
                 }
 
@@ -63,7 +63,7 @@ namespace mongo {
     }
 
     bool isConfigServerConsistent() {
-        scoped_lock sl( _isConsistentMutex );
+        boost::lock_guard<boost::mutex> sl( _isConsistentMutex );
         return _isConsistentFromLastCheck;
     }
 

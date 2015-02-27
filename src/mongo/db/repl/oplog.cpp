@@ -91,7 +91,7 @@ namespace {
 
     // Synchronizes the section where a new OpTime is generated and when it actually
     // appears in the oplog.
-    mongo::mutex newOpMutex("oplogNewOp");
+    mongo::mutex newOpMutex;
     boost::condition newOptimeNotifier;
 
     static std::string _oplogCollectionName;
@@ -118,7 +118,7 @@ namespace {
                                                const char* ns,
                                                ReplicationCoordinator* replCoord,
                                                const char* opstr) {
-        mutex::scoped_lock lk(newOpMutex);
+        boost::lock_guard<boost::mutex> lk(newOpMutex);
         OpTime ts = getNextGlobalOptime();
         newOptimeNotifier.notify_all();
 
@@ -665,17 +665,17 @@ namespace {
     }
 
     void waitUpToOneSecondForOptimeChange(const OpTime& referenceTime) {
-        mutex::scoped_lock lk(newOpMutex);
+        boost::unique_lock<boost::mutex> lk(newOpMutex);
 
         while (referenceTime == getLastSetOptime()) {
-            if (!newOptimeNotifier.timed_wait(lk.boost(),
+            if (!newOptimeNotifier.timed_wait(lk,
                                               boost::posix_time::seconds(1)))
                 return;
         }
     }
 
     void setNewOptime(const OpTime& newTime) {
-        mutex::scoped_lock lk(newOpMutex);
+        boost::lock_guard<boost::mutex> lk(newOpMutex);
         setGlobalOptime(newTime);
         newOptimeNotifier.notify_all();
     }

@@ -127,9 +127,6 @@ namespace mongo {
 
         class LastPings {
         public:
-            LastPings() : _mutex( "DistributedLock::LastPings" ) {}
-            ~LastPings(){}
-
             PingData getLastPing( const ConnectionString& conn, const std::string& lockName );
             void setLastPing( const ConnectionString& conn, const std::string& lockName, const PingData& pd );
 
@@ -137,7 +134,7 @@ namespace mongo {
             std::map< std::pair<std::string, std::string>, PingData > _lastPings;
         };
 
-    	static LastPings lastPings;
+        static LastPings lastPings;
 
         /**
          * The constructor does not connect to the configdb yet and constructing does not mean the lock was acquired.

@@ -122,38 +122,33 @@ namespace mongo {
 
 #else
 
-    TicketHolder::TicketHolder( int num )
-        : _outof(num),
-          _num(num),
-          _mutex("TicketHolder") {
-    }
+    TicketHolder::TicketHolder( int num ) : _outof(num), _num(num) {}
 
-    TicketHolder::~TicketHolder(){
-    }
+    TicketHolder::~TicketHolder() = default;
 
     bool TicketHolder::tryAcquire() {
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
         return _tryAcquire();
     }
 
     void TicketHolder::waitForTicket() {
-        scoped_lock lk( _mutex );
+        boost::unique_lock<boost::mutex> lk( _mutex );
 
         while( ! _tryAcquire() ) {
-            _newTicket.wait( lk.boost() );
+            _newTicket.wait( lk );
         }
     }
 
     void TicketHolder::release() {
         {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _num++;
         }
         _newTicket.notify_one();
     }
 
     Status TicketHolder::resize( int newSize ) {
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk( _mutex );
 
         int used = _outof.load() - _num;
         if ( used > newSize ) {

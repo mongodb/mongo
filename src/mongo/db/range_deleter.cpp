@@ -158,11 +158,8 @@ namespace mongo {
 
     RangeDeleter::RangeDeleter(RangeDeleterEnv* env):
         _env(env), // ownership xfer
-        _stopMutex("stopRangeDeleter"),
         _stopRequested(false),
-        _queueMutex("RangeDeleter"),
-        _deletesInProgress(0),
-        _statsHistoryMutex("RangeDeleterStatsHistory") {
+        _deletesInProgress(0) {
     }
 
     RangeDeleter::~RangeDeleter() {
@@ -200,7 +197,7 @@ namespace mongo {
 
     void RangeDeleter::stopWorkers() {
         {
-            scoped_lock sl(_stopMutex);
+            boost::lock_guard<boost::mutex> sl(_stopMutex);
             _stopRequested = true;
         }
 
@@ -208,9 +205,9 @@ namespace mongo {
             _worker->join();
         }
 
-        scoped_lock sl(_queueMutex);
+        boost::unique_lock<boost::mutex> sl(_queueMutex);
         while (_deletesInProgress > 0) {
-            _nothingInProgressCV.wait(sl.boost());
+            _nothingInProgressCV.wait(sl);
         }
     }
 
@@ -230,7 +227,7 @@ namespace mongo {
         toDelete->notifyDone = notifyDone;
 
         {
-            scoped_lock sl(_queueMutex);
+            boost::lock_guard<boost::mutex> sl(_queueMutex);
             if (_stopRequested) {
                 *errMsg = "deleter is already stopped.";
                 return false;
@@ -253,7 +250,7 @@ namespace mongo {
             logCursorsWaiting(toDelete.get());
 
         {
-            scoped_lock sl(_queueMutex);
+            boost::lock_guard<boost::mutex> sl(_queueMutex);
 
             if (toDelete->cursorsToWait.empty()) {
                 toDelete->stats.queueEndTS = jsTime();
@@ -320,7 +317,7 @@ namespace {
 
         NSMinMax deleteRange(ns, min, max);
         {
-            scoped_lock sl(_queueMutex);
+            boost::lock_guard<boost::mutex> sl(_queueMutex);
             if (!canEnqueue_inlock(ns, min, max, errMsg)) {
                 return false;
             }
@@ -362,7 +359,7 @@ namespace {
             if (stopRequested()) {
                 *errMsg = "deleter was stopped.";
 
-                scoped_lock sl(_queueMutex);
+                boost::lock_guard<boost::mutex> sl(_queueMutex);
                 _deleteSet.erase(&deleteRange);
 
                 _deletesInProgress--;
@@ -395,7 +392,7 @@ namespace {
         }
 
         {
-            scoped_lock sl(_queueMutex);
+            boost::lock_guard<boost::mutex> sl(_queueMutex);
             _deleteSet.erase(&deleteRange);
 
             _deletesInProgress--;
@@ -413,7 +410,7 @@ namespace {
         stats->clear();
         stats->reserve(kDeleteJobsHistory);
 
-        scoped_lock sl(_statsHistoryMutex);
+        boost::lock_guard<boost::mutex> sl(_statsHistoryMutex);
         for (std::deque<DeleteJobStats*>::const_iterator it = _statsHistory.begin();
                 it != _statsHistory.end(); ++it) {
             stats->push_back(new DeleteJobStats(**it));
@@ -421,7 +418,7 @@ namespace {
     }
 
     BSONObj RangeDeleter::toBSON() const {
-        scoped_lock sl(_queueMutex);
+        boost::lock_guard<boost::mutex> sl(_queueMutex);
 
         BSONObjBuilder builder;
 
@@ -453,10 +450,10 @@ namespace {
             RangeDeleteEntry* nextTask = NULL;
 
             {
-                scoped_lock sl(_queueMutex);
+                boost::unique_lock<boost::mutex> sl(_queueMutex);
                 while (_taskQueue.empty()) {
                     _taskQueueNotEmptyCV.timed_wait(
-                        sl.boost(), duration::milliseconds(kNotEmptyTimeoutMillis));
+                        sl, duration::milliseconds(kNotEmptyTimeoutMillis));
 
                     if (stopRequested()) {
                         log() << "stopping range deleter worker" << endl;
@@ -539,7 +536,7 @@ namespace {
             }
 
             {
-                scoped_lock sl(_queueMutex);
+                boost::lock_guard<boost::mutex> sl(_queueMutex);
 
                 NSMinMax setEntry(nextTask->options.range.ns,
                                   nextTask->options.range.minKey,
@@ -574,27 +571,27 @@ namespace {
     }
 
     bool RangeDeleter::stopRequested() const {
-        scoped_lock sl(_stopMutex);
+        boost::lock_guard<boost::mutex> sl(_stopMutex);
         return _stopRequested;
     }
 
     size_t RangeDeleter::getTotalDeletes() const {
-        scoped_lock sl(_queueMutex);
+        boost::lock_guard<boost::mutex> sl(_queueMutex);
         return _deleteSet.size();
     }
 
     size_t RangeDeleter::getPendingDeletes() const {
-        scoped_lock sl(_queueMutex);
+        boost::lock_guard<boost::mutex> sl(_queueMutex);
         return _notReadyQueue.size() + _taskQueue.size();
     }
 
     size_t RangeDeleter::getDeletesInProgress() const {
-        scoped_lock sl(_queueMutex);
+        boost::lock_guard<boost::mutex> sl(_queueMutex);
         return _deletesInProgress;
     }
 
     void RangeDeleter::recordDelStats(DeleteJobStats* newStat) {
-        scoped_lock sl(_statsHistoryMutex);
+        boost::lock_guard<boost::mutex> sl(_statsHistoryMutex);
         if (_statsHistory.size() == kDeleteJobsHistory) {
             delete _statsHistory.front();
             _statsHistory.pop_front();

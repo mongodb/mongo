@@ -159,9 +159,9 @@ namespace mongo {
 
         namespace {
             SecureRandom* mySecureRandom = NULL;
-            mongo::mutex mySecureRandomMutex( "JHeader-SecureRandom" );
+            mongo::mutex mySecureRandomMutex;
             int64_t getMySecureRandomNumber() {
-                scoped_lock lk( mySecureRandomMutex );
+                boost::lock_guard<boost::mutex> lk( mySecureRandomMutex );
                 if ( ! mySecureRandom )
                     mySecureRandom = SecureRandom::create();
                 return mySecureRandom->nextInt64();

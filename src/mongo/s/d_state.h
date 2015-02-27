@@ -60,7 +60,7 @@ namespace mongo {
 
         void gotShardName( const std::string& name );
         bool setShardName( const std::string& name ); // Same as above, does not throw
-        std::string getShardName() { scoped_lock lk(_mutex); return _shardName; }
+        std::string getShardName() { boost::lock_guard<boost::mutex> lk(_mutex); return _shardName; }
 
         // Helpers for SetShardVersion which report the host name sent to this shard when the shard
         // name does not match.  Do not use in other places.

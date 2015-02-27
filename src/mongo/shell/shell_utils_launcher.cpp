@@ -169,12 +169,12 @@ namespace mongo {
         ProgramRegistry &registry = *( new ProgramRegistry() );
 
         void goingAwaySoon() {
-            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            boost::lock_guard<boost::mutex> lk( mongoProgramOutputMutex );
             mongo::dbexitCalled = true;
         }
 
         void ProgramOutputMultiplexer::appendLine( int port, ProcessId pid, const char *line ) {
-            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            boost::lock_guard<boost::mutex> lk( mongoProgramOutputMutex );
             if( mongo::dbexitCalled ) throw "program is terminating";
             stringstream buf;
             if ( port > 0 )
@@ -187,7 +187,7 @@ namespace mongo {
         }
 
         string ProgramOutputMultiplexer::str() const {
-            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            boost::lock_guard<boost::mutex> lk( mongoProgramOutputMutex );
             string ret = _buffer.str();
             size_t len = ret.length();
             if ( len > 100000 ) {
@@ -197,7 +197,7 @@ namespace mongo {
         }
         
         void ProgramOutputMultiplexer::clear() {
-            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            boost::lock_guard<boost::mutex> lk( mongoProgramOutputMutex );
             _buffer.str( "" );            
         }
         

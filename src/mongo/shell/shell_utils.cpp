@@ -286,22 +286,20 @@ namespace mongo {
             return _confirmed = matchedY;
         }
 
-        ConnectionRegistry::ConnectionRegistry() :
-            _mutex( "connectionRegistryMutex" ) {
-        }
-        
+        ConnectionRegistry::ConnectionRegistry() = default;
+
         void ConnectionRegistry::registerConnection( DBClientWithCommands &client ) {
             BSONObj info;
             if ( client.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
                 string connstr = dynamic_cast<DBClientBase&>( client ).getServerAddress();
-                mongo::mutex::scoped_lock lk( _mutex );
+                boost::lock_guard<boost::mutex> lk( _mutex );
                 _connectionUris[ connstr ].insert( info[ "you" ].str() );
             }            
         }
 
         void ConnectionRegistry::killOperationsOnAllConnections( bool withPrompt ) const {
             Prompter prompter( "do you want to kill the current op(s) on the server?" );
-            mongo::mutex::scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             for( map<string,set<string> >::const_iterator i = _connectionUris.begin();
                 i != _connectionUris.end(); ++i ) {
                 string errmsg;

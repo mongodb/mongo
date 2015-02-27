@@ -27,12 +27,10 @@
 
 #pragma once
 
-#include "mongo/client/export_macros.h"
+#include <boost/thread/mutex.hpp>
 
 namespace mongo {
-    class mutex;
-
     namespace shell_utils {
-        extern MONGO_CLIENT_API mongo::mutex &mongoProgramOutputMutex;
+        extern boost::mutex &mongoProgramOutputMutex;
     }
 }

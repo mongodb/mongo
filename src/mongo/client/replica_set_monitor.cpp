@@ -99,7 +99,7 @@ namespace {
      *          SetState::mutex without holder setsLock, but then you can't grab setsLock until you
      *          release the SetState::mutex.
      */
-    mongo::mutex setsLock("ReplicaSetMonitor");
+    mongo::mutex setsLock;
     StringMap<set<HostAndPort> > seedServers;
     StringMap<ReplicaSetMonitorPtr> sets;
 
@@ -107,7 +107,6 @@ namespace {
     class ReplicaSetMonitorWatcher : public BackgroundJob {
     public:
         ReplicaSetMonitorWatcher():
-            _monitorMutex("ReplicaSetMonitorWatcher::_safego"),
             _started(false),
             _stopRequested(false) {
         }
@@ -126,7 +125,7 @@ namespace {
         virtual string name() const { return "ReplicaSetMonitorWatcher"; }
 
         void safeGo() {
-            scoped_lock lk( _monitorMutex );
+            boost::lock_guard<boost::mutex> lk( _monitorMutex );
             if ( _started )
                 return;
 
@@ -140,7 +139,7 @@ namespace {
          * Stops monitoring the sets and wait for the monitoring thread to terminate.
          */
         void stop() {
-            scoped_lock sl( _monitorMutex );
+            boost::lock_guard<boost::mutex> sl( _monitorMutex );
             _stopRequested = true;
             _stopRequestedCV.notify_one();
         }
@@ -154,14 +153,14 @@ namespace {
             // Should not be needed after SERVER-7533 gets implemented and tests start
             // using it.
             if (!inShutdown() && !StaticObserver::_destroyingStatics) {
-                scoped_lock sl( _monitorMutex );
-                _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
+                boost::unique_lock<boost::mutex> sl( _monitorMutex );
+                _stopRequestedCV.timed_wait(sl, boost::posix_time::seconds(10));
             }
 
             while ( !inShutdown() &&
                     !StaticObserver::_destroyingStatics ) {
                 {
-                    scoped_lock sl( _monitorMutex );
+                    boost::lock_guard<boost::mutex> sl( _monitorMutex );
                     if (_stopRequested) {
                         break;
                     }
@@ -177,12 +176,12 @@ namespace {
                     error() << "unknown error";
                 }
 
-                scoped_lock sl( _monitorMutex );
+                boost::unique_lock<boost::mutex> sl( _monitorMutex );
                 if (_stopRequested) {
                     break;
                 }
 
-                _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
+                _stopRequestedCV.timed_wait(sl, boost::posix_time::seconds(10));
             }
         }
 
@@ -190,7 +189,7 @@ namespace {
             // make a copy so we can quickly unlock setsLock
             StringMap<ReplicaSetMonitorPtr> setsCopy;
             {
-                scoped_lock lk( setsLock );
+                boost::lock_guard<boost::mutex> lk( setsLock );
                 setsCopy = sets;
             }
 
@@ -362,7 +361,7 @@ namespace {
 
     void ReplicaSetMonitor::createIfNeeded(const string& name, const set<HostAndPort>& servers) {
         LOG(3) << "ReplicaSetMonitor::createIfNeeded " << name;
-        scoped_lock lk(setsLock);
+        boost::lock_guard<boost::mutex> lk(setsLock);
         ReplicaSetMonitorPtr& m = sets[name];
         if ( ! m )
             m = boost::make_shared<ReplicaSetMonitor>( name , servers );
@@ -373,7 +372,7 @@ namespace {
     ReplicaSetMonitorPtr ReplicaSetMonitor::get(const std::string& name,
                                                 const bool createFromSeed) {
         LOG(3) << "ReplicaSetMonitor::get " << name;
-        scoped_lock lk( setsLock );
+        boost::lock_guard<boost::mutex> lk( setsLock );
         StringMap<ReplicaSetMonitorPtr>::const_iterator i = sets.find( name );
         if ( i != sets.end() ) {
             return i->second;
@@ -394,7 +393,7 @@ namespace {
 
     set<string> ReplicaSetMonitor::getAllTrackedSets() {
         set<string> activeSets;
-        scoped_lock lk( setsLock );
+        boost::lock_guard<boost::mutex> lk( setsLock );
         for (StringMap<ReplicaSetMonitorPtr>::const_iterator it = sets.begin();
              it != sets.end(); ++it)
         {
@@ -407,7 +406,7 @@ namespace {
         LOG(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table"
                << (clearSeedCache ? " and the seed cache" : "");
 
-        scoped_lock lk( setsLock );
+        boost::lock_guard<boost::mutex> lk( setsLock );
         const StringMap<ReplicaSetMonitorPtr>::const_iterator setIt = sets.find(name);
         if (setIt != sets.end()) {
             if (!clearSeedCache) {
@@ -474,7 +473,7 @@ namespace {
         replicaSetMonitorWatcher.cancel();
         replicaSetMonitorWatcher.stop();
         replicaSetMonitorWatcher.wait();
-        scoped_lock lock(setsLock);
+        boost::lock_guard<boost::mutex> lock(setsLock);
         sets = StringMap<ReplicaSetMonitorPtr>();
         seedServers = StringMap<set<HostAndPort> >();
     }

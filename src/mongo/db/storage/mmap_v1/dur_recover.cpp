@@ -253,8 +253,7 @@ namespace mongo {
 
 
         RecoveryJob::RecoveryJob()
-            : _mx("recovery"),
-              _recovering(false),
+            : _recovering(false),
               _lastDataSyncedFromLastRun(0),
               _lastSeqMentionedInConsoleLog(1) {
 
@@ -268,7 +267,7 @@ namespace mongo {
         }
 
         void RecoveryJob::close() {
-            scoped_lock lk(_mx);
+            boost::lock_guard<boost::mutex> lk(_mx);
             _close();
         }
 
@@ -388,7 +387,7 @@ namespace mongo {
 
         void RecoveryJob::processSection(const JSectHeader *h, const void *p, unsigned len, const JSectFooter *f) {
             LockMongoFilesShared lkFiles; // for RecoveryJob::Last
-            scoped_lock lk(_mx);
+            boost::lock_guard<boost::mutex> lk(_mx);
 
             // Check the footer checksum before doing anything else.
             if (_recovering) {

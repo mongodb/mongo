@@ -52,7 +52,9 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
-    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L, double socketTimeout) : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
+    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L, double socketTimeout)
+        : _socketTimeout(socketTimeout) {
+
         {
             stringstream s;
             int n=0;
@@ -66,7 +68,9 @@ namespace mongo {
             _connect( i->toString() );
     }
 
-    SyncClusterConnection::SyncClusterConnection( string commaSeparated, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
+    SyncClusterConnection::SyncClusterConnection( string commaSeparated, double socketTimeout) :
+        _socketTimeout( socketTimeout ) {
+
         _address = commaSeparated;
         string::size_type idx;
         while ( ( idx = commaSeparated.find( ',' ) ) != string::npos ) {
@@ -78,7 +82,12 @@ namespace mongo {
         uassert( 8004 ,  "SyncClusterConnection needs 3 servers" , _conns.size() == 3 );
     }
 
-    SyncClusterConnection::SyncClusterConnection( const std::string& a , const std::string& b , const std::string& c, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
+    SyncClusterConnection::SyncClusterConnection(
+            const std::string& a,
+            const std::string& b,
+            const std::string& c,
+            double socketTimeout) : _socketTimeout( socketTimeout ) {
+
         _address = a + "," + b + "," + c;
         // connect to all even if not working
         _connect( a );
@@ -86,7 +95,8 @@ namespace mongo {
         _connect( c );
     }
 
-    SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout) : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
+    SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout)
+        : _socketTimeout(socketTimeout) {
         verify(0);
     }
 
@@ -530,7 +540,7 @@ namespace mongo {
 
     int SyncClusterConnection::_lockType( const string& name ) {
         {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             map<string,int>::iterator i = _lockTypes.find( name );
             if ( i != _lockTypes.end() )
                 return i->second;
@@ -541,7 +551,7 @@ namespace mongo {
 
         int lockType = info["lockType"].numberInt();
 
-        scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         _lockTypes[name] = lockType;
         return lockType;
     }

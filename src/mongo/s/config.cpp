@@ -164,10 +164,7 @@ namespace mongo {
     DBConfig::DBConfig(std::string name)
         : _name(name),
           _primary("config", "", 0 /* maxSize */, false /* draining */),
-          _shardingEnabled(false),
-          _lock("DBConfig"),
-          _hitConfigServerLock("DBConfig::_hitConfigServerLock") {
-
+          _shardingEnabled(false) {
         invariant(!_name.empty());
     }
 
@@ -178,7 +175,7 @@ namespace mongo {
     bool DBConfig::isSharded( const string& ns ) {
         if ( ! _shardingEnabled )
             return false;
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
         return _isSharded( ns );
     }
 
@@ -221,7 +218,7 @@ namespace mongo {
         
         verify( _name != "config" );
 
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
         _shardingEnabled = true;
         if( save ) _save();
     }
@@ -241,7 +238,7 @@ namespace mongo {
         ChunkManagerPtr manager;
         
         {
-            scoped_lock lk( _lock );
+            boost::lock_guard<boost::mutex> lk( _lock );
 
             CollectionInfo& ci = _collections[ns];
             uassert( 8043 , "collection already sharded" , ! ci.isSharded() );
@@ -321,7 +318,7 @@ namespace mongo {
             return false;
         }
 
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
 
         CollectionInfoMap::iterator i = _collections.find( ns );
 
@@ -352,7 +349,7 @@ namespace mongo {
         primary.reset();
 
         {
-            scoped_lock lk( _lock );
+            boost::lock_guard<boost::mutex> lk( _lock );
 
             CollectionInfoMap::iterator i = _collections.find( ns );
 
@@ -403,7 +400,7 @@ namespace mongo {
         ChunkManagerPtr oldManager;
 
         {
-            scoped_lock lk( _lock );
+            boost::lock_guard<boost::mutex> lk( _lock );
             
             bool earlyReload = ! _collections[ns].isSharded() && ( shouldReload || forceReload );
             if ( earlyReload ) {
@@ -441,7 +438,7 @@ namespace mongo {
             if ( ! newest.isEmpty() ) {
                 ChunkVersion v = ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
                 if ( v.equals( oldVersion ) ) {
-                    scoped_lock lk( _lock );
+                    boost::lock_guard<boost::mutex> lk( _lock );
                     CollectionInfo& ci = _collections[ns];
                     uassert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
                     return ci.getCM();
@@ -459,13 +456,13 @@ namespace mongo {
         auto_ptr<ChunkManager> temp;
 
         {
-            scoped_lock lll ( _hitConfigServerLock );
+            boost::lock_guard<boost::mutex> lll ( _hitConfigServerLock );
             
             if ( ! newest.isEmpty() && ! forceReload ) {
                 // if we have a target we're going for
                 // see if we've hit already
                 
-                scoped_lock lk( _lock );
+                boost::lock_guard<boost::mutex> lk( _lock );
                 CollectionInfo& ci = _collections[ns];
                 if ( ci.isSharded() && ci.getCM() ) {
 
@@ -495,7 +492,7 @@ namespace mongo {
             }
         }
 
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
         
         CollectionInfo& ci = _collections[ns];
         uassert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
@@ -535,7 +532,7 @@ namespace mongo {
     }
 
     void DBConfig::setPrimary( const std::string& s ) {
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
         _primary.reset( s );
         _save();
     }
@@ -562,7 +559,7 @@ namespace mongo {
     }
 
     bool DBConfig::load() {
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
         return _load();
     }
 
@@ -660,7 +657,7 @@ namespace mongo {
         bool successful = false;
 
         {
-            scoped_lock lk( _lock );
+            boost::lock_guard<boost::mutex> lk( _lock );
             successful = _reload();
         }
 
@@ -798,7 +795,7 @@ namespace mongo {
     }
 
     void DBConfig::getAllShards(set<Shard>& shards) const {
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
         shards.insert(getPrimary());
         for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it) {
             if (it->second.isSharded()) {
@@ -809,7 +806,7 @@ namespace mongo {
 
     void DBConfig::getAllShardedCollections( set<string>& namespaces ) const {
 
-        scoped_lock lk( _lock );
+        boost::lock_guard<boost::mutex> lk( _lock );
 
         for( CollectionInfoMap::const_iterator i = _collections.begin(); i != _collections.end(); i++ ) {
             log() << "Coll : " << i->first << " sharded? " << i->second.isSharded() << endl;

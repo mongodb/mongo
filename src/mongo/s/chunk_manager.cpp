@@ -116,7 +116,6 @@ namespace {
         _keyPattern( pattern.getKeyPattern() ),
         _unique( unique ),
         _chunkRanges(),
-        _mutex("ChunkManager"),
         _sequenceNumber(NextSequenceNumber.addAndFetch(1))
     {
         //
@@ -135,7 +134,6 @@ namespace {
                                                         BSONObj()),
         _unique(collDoc[CollectionType::unique()].trueValue()),
         _chunkRanges(),
-        _mutex("ChunkManager"),
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
         // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
         // the most up to date value.
@@ -663,7 +661,7 @@ namespace {
     }
 
     void ChunkManager::drop() const {
-        scoped_lock lk( _mutex );
+        boost::lock_guard<boost::mutex> lk(_mutex);
 
         configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
 
