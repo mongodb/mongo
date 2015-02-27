@@ -100,7 +100,7 @@ namespace mongo {
         // We have a parsed query. Time to get the execution plan for it.
         PlanExecutor* rawExec;
         Status execStatus = Status::OK();
-        if (cq->getParsed().getOptions().oplogReplay) {
+        if (cq->getParsed().isOplogReplay()) {
             execStatus = getOplogStartHack(txn, collection, cq.release(), &rawExec);
         }
         else {

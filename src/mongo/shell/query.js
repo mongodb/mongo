@@ -87,75 +87,6 @@ DBQuery.prototype._exec = function(){
 }
 
 /**
- * Helper for _convertToCommand() which constructs the "options" part of the find command.
- */
-DBQuery.prototype._buildCmdOptions = function() {
-    var options = {};
-
-    if (this._query.$comment) {
-        options["comment"] = this._query.$comment;
-    }
-
-    if (this._query.$maxScan) {
-        options["maxScan"] = this._query.$maxScan;
-    }
-
-    if (this._query.$maxTimeMS) {
-        options["maxTimeMS"] = this._query.$maxTimeMS;
-    }
-
-    if (this._query.$max) {
-        options["max"] = this._query.$max;
-    }
-
-    if (this._query.$min) {
-        options["min"] = this._query.$min;
-    }
-
-    if (this._query.$returnKey) {
-        options["returnKey"] = this._query.$returnKey;
-    }
-
-    if (this._query.$showDiskLoc) {
-        options["showDiskLoc"] = this._query.$showDiskLoc;
-    }
-
-    if (this._query.$snapshot) {
-        options["snapshot"] = this._query.$snapshot;
-    }
-
-    if ((this._options & DBQuery.Option.tailable) != 0) {
-        options["tailable"] = true;
-    }
-
-    if ((this._options & DBQuery.Option.slaveOk) != 0) {
-        options["slaveOk"] = true;
-    }
-
-    if ((this._options & DBQuery.Option.oplogReplay) != 0) {
-        options["oplogReplay"] = true;
-    }
-
-    if ((this._options & DBQuery.Option.noTimeout) != 0) {
-        options["noCursorTimeout"] = true;
-    }
-
-    if ((this._options & DBQuery.Option.awaitData) != 0) {
-        options["awaitData"] = true;
-    }
-
-    if ((this._options & DBQuery.Option.exhaust) != 0) {
-        options["exhaust"] = true;
-    }
-
-    if ((this._options & DBQuery.Option.partial) != 0) {
-        options["partial"] = true;
-    }
-
-    return options;
-}
-
-/**
  * Internal helper used to convert this cursor into the format required by the find command.
  */
 DBQuery.prototype._convertToCommand = function() {
@@ -177,7 +108,7 @@ DBQuery.prototype._convertToCommand = function() {
     }
 
     if (this._batchSize) {
-        cmd["batchSize"] = this._batchSize || 101;
+        cmd["batchSize"] = this._batchSize;
     }
 
     if (this._limit) {
@@ -207,7 +138,65 @@ DBQuery.prototype._convertToCommand = function() {
        cmd["$readPreference"] = this._query.$readPreference;
     }
 
-    cmd["options"] = this._buildCmdOptions();
+    if (this._query.$comment) {
+        cmd["comment"] = this._query.$comment;
+    }
+
+    if (this._query.$maxScan) {
+        cmd["maxScan"] = this._query.$maxScan;
+    }
+
+    if (this._query.$maxTimeMS) {
+        cmd["maxTimeMS"] = this._query.$maxTimeMS;
+    }
+
+    if (this._query.$max) {
+        cmd["max"] = this._query.$max;
+    }
+
+    if (this._query.$min) {
+        cmd["min"] = this._query.$min;
+    }
+
+    if (this._query.$returnKey) {
+        cmd["returnKey"] = this._query.$returnKey;
+    }
+
+    if (this._query.$showDiskLoc) {
+        cmd["showDiskLoc"] = this._query.$showDiskLoc;
+    }
+
+    if (this._query.$snapshot) {
+        cmd["snapshot"] = this._query.$snapshot;
+    }
+
+    if ((this._options & DBQuery.Option.tailable) != 0) {
+        cmd["tailable"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.slaveOk) != 0) {
+        cmd["slaveOk"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.oplogReplay) != 0) {
+        cmd["oplogReplay"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.noTimeout) != 0) {
+        cmd["noCursorTimeout"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.awaitData) != 0) {
+        cmd["awaitData"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.exhaust) != 0) {
+        cmd["exhaust"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.partial) != 0) {
+        cmd["partial"] = true;
+    }
 
     return cmd;
 }

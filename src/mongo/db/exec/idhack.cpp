@@ -229,7 +229,7 @@ namespace mongo {
             && query.getParsed().getHint().isEmpty()
             && 0 == query.getParsed().getSkip()
             && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
-            && !query.getParsed().getOptions().tailable;
+            && !query.getParsed().isTailable();
     }
 
     vector<PlanStage*> IDHackStage::getChildren() const {

@@ -564,7 +564,7 @@ namespace mongo {
         params.collection = collection;
         params.start = *startLoc;
         params.direction = CollectionScanParams::FORWARD;
-        params.tailable = cq->getParsed().getOptions().tailable;
+        params.tailable = cq->getParsed().isTailable();
 
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
@@ -663,7 +663,7 @@ namespace mongo {
         // Otherwise we go through the selection of which executor is most suited to the
         // query + run-time context at hand.
         Status status = Status::OK();
-        if (NULL != collection && cq->getParsed().getOptions().oplogReplay) {
+        if (NULL != collection && cq->getParsed().isOplogReplay()) {
             status = getOplogStartHack(txn, collection, cq.release(), &rawExec);
         }
         else {
@@ -723,7 +723,7 @@ namespace mongo {
         txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-        bool slaveOK = pq.getOptions().slaveOk || pq.hasReadPref();
+        bool slaveOK = pq.isSlaveOk() || pq.hasReadPref();
         status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
                 txn,
                 nss,
@@ -773,7 +773,7 @@ namespace mongo {
             ++numResults;
 
             // Possibly note slave's position in the oplog.
-            if (pq.getOptions().oplogReplay) {
+            if (pq.isOplogReplay()) {
                 BSONElement e = obj["ts"];
                 if (Date == e.type() || Timestamp == e.type()) {
                     slaveReadTill = e._opTime();
@@ -814,7 +814,7 @@ namespace mongo {
         if (PlanExecutor::DEAD == state) {
             saveClientCursor = false;
         }
-        else if (pq.getOptions().tailable) {
+        else if (pq.isTailable()) {
             // If we're tailing a capped collection, we don't bother saving the cursor if the
             // collection is empty. Otherwise, the semantics of the tailable cursor is that the
             // client will keep trying to read from it. So we'll keep it around.
@@ -873,14 +873,14 @@ namespace mongo {
             ClientCursor* cc = new ClientCursor(collection->getCursorManager(),
                                                 exec.release(),
                                                 nss.ns(),
-                                                pq.getOptions().toInt(),
+                                                pq.getOptions(),
                                                 pq.getFilter());
             ccId = cc->cursorid();
 
             if (txn->getClient()->isInDirectClient()) {
                 cc->setUnownedRecoveryUnit(txn->recoveryUnit());
             }
-            else if (state == PlanExecutor::IS_EOF && pq.getOptions().tailable) {
+            else if (state == PlanExecutor::IS_EOF && pq.isTailable()) {
                 // Don't stash the RU for tailable cursors at EOF, let them get a new RU on their
                 // next getMore.
             }
@@ -897,12 +897,12 @@ namespace mongo {
                    << " after returning " << numResults << " results" << endl;
 
             // TODO document
-            if (pq.getOptions().oplogReplay && !slaveReadTill.isNull()) {
+            if (pq.isOplogReplay() && !slaveReadTill.isNull()) {
                 cc->slaveReadTill(slaveReadTill);
             }
 
             // TODO document
-            if (pq.getOptions().exhaust) {
+            if (pq.isExhaust()) {
                 curop.debug().exhaust = true;
             }
 

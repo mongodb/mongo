@@ -24,10 +24,8 @@ assert.eq(3, explain.executionStats.nReturned);
 explain = db.runCommand({
     explain: {
         find: collName,
-        options: {
-            min: {a: 4},
-            max: {a: 6}
-        }
+        min: {a: 4},
+        max: {a: 6}
     },
     verbosity: "executionStats"
 });

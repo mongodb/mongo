@@ -477,7 +477,7 @@ namespace mongo {
         // tailable set on the collscan.  TODO: This is a policy departure.  Previously I think you
         // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we
         // can't provide one.  Is this what we want?
-        if (query.getParsed().getOptions().tailable) {
+        if (query.getParsed().isTailable()) {
             if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
                 && canTableScan) {
                 QuerySolution* soln = buildCollscanSoln(query, true, params);

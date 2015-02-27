@@ -92,7 +92,7 @@ namespace mongo {
         }
 
         // Tailable cursors won't get cached, just turn into collscans.
-        if (query.getParsed().getOptions().tailable) {
+        if (query.getParsed().isTailable()) {
             return false;
         }
 
