@@ -784,11 +784,13 @@ namespace {
         BSONElement mongoCRElement = credentialsObj["MONGODB-CR"];
         BSONElement scramElement = credentialsObj["SCRAM-SHA-1"];
 
-        // Ignore any user documents that already have SCRAM credentials. This should only
-        // occur if a previous authSchemaUpgrade was interrupted halfway.
-        if (!scramElement.eoo()) {
-            return;
-        }
+        // Ignore any user documents that already have SCRAM credentials.
+        uassert(28613,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
+                        "with existing SCRAM credentials :"
+                        << userDoc.toString(),
+                scramElement.eoo());
 
         uassert(18744,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "

@@ -10,7 +10,6 @@
 "applicationMessage",
 "auditLogRotate",  # Not used for permissions checks, but to id the event in logs.
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
-"authSchemaUpgrade",
 "authenticate",  # Not used for permission checks, but to id authentication events in logs.
 "changeCustomData",
 "changePassword",

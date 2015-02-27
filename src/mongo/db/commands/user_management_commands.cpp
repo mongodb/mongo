@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/user_management_commands.h"
-
 #include <string>
 #include <vector>
 
@@ -2970,27 +2968,4 @@ namespace mongo {
 
     } cmdMergeAuthzCollections;
 
-    CmdAuthSchemaUpgrade::CmdAuthSchemaUpgrade() : Command("authSchemaUpgrade") {}
-    CmdAuthSchemaUpgrade::~CmdAuthSchemaUpgrade() {}
-
-    bool CmdAuthSchemaUpgrade::slaveOk() const { return false; }
-    bool CmdAuthSchemaUpgrade::adminOnly() const { return true; }
-    bool CmdAuthSchemaUpgrade::isWriteCommandForConfigServer() const { return false; }
-
-    void CmdAuthSchemaUpgrade::help(stringstream& ss) const {
-        ss << "Upgrades the auth data storage schema";
-    }
-
-    Status CmdAuthSchemaUpgrade::checkAuthForCommand(ClientBasic* client,
-                                                         const std::string& dbname,
-                                                         const BSONObj& cmdObj) {
-
-        AuthorizationSession* authzSession = client->getAuthorizationSession();
-        if (!authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade)) {
-            return Status(ErrorCodes::Unauthorized,
-                          "Not authorized to run authSchemaUpgrade command.");
-        }
-        return Status::OK();
-    }
-}
+} // namespace mongo
