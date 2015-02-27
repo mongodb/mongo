@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -94,18 +95,16 @@ namespace mongo {
     public:
         StageDebugCmd() : Command("stageDebug") { }
 
-        // Boilerplate for commands
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        bool slaveOk() const { return true; }
-        bool slaveOverrideOk() const { return true; }
+        bool slaveOk() const { return false; }
+        bool slaveOverrideOk() const { return false; }
         void help(std::stringstream& h) const { }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+            // Command is testing-only, and can only be enabled at command line.  Hence, no auth
+            // check needed.
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result,
@@ -448,6 +447,14 @@ namespace mongo {
                 return NULL;
             }
         }
-    } stageDebugCmd;
+    };
+
+    MONGO_INITIALIZER(RegisterStageDebugCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new StageDebugCmd();
+        }
+        return Status::OK();
+    }
 
 }  // namespace mongo
