@@ -845,6 +845,9 @@ namespace mongo {
             dassert(newChunks.size() > 1);
 
             {
+                // Select chunk to move out for "top chunk optimization".
+                KeyPattern shardKeyPattern(collMetadata->getKeyPattern());
+
                 AutoGetCollectionForRead ctx(txn, ns);
                 Collection* collection = ctx.getCollection();
                 if (!collection) {
@@ -866,16 +869,17 @@ namespace mongo {
                 const ChunkType* backChunk = newChunks.vector().back();
                 const ChunkType* frontChunk = newChunks.vector().front();
 
-                if (checkIfSingleDoc(txn, collection, idx, backChunk)) {
+                if (shardKeyPattern.globalMax().woCompare(backChunk->getMax()) == 0 &&
+                    checkIfSingleDoc(txn, collection, idx, backChunk)) {
                     result.append("shouldMigrate",
                                   BSON("min" << backChunk->getMin()
                                        << "max" << backChunk->getMax()));
                 }
-                else if (checkIfSingleDoc(txn, collection, idx, frontChunk)) {
+                else if (shardKeyPattern.globalMin().woCompare(frontChunk->getMin()) == 0 &&
+                    checkIfSingleDoc(txn, collection, idx, frontChunk)) {
                     result.append("shouldMigrate",
                                   BSON("min" << frontChunk->getMin()
                                        << "max" << frontChunk->getMax()));
-
                 }
             }
 
