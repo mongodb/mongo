@@ -281,7 +281,6 @@ namespace {
     } cmdReplSetInitiate;
 
     class CmdReplSetReconfig : public ReplSetCommand {
-        RWLock mutex; /* we don't need rw but we wanted try capability. :-( */
     public:
         virtual void help( stringstream &help ) const {
             help << "Adjust configuration of a replica set\n";
@@ -295,18 +294,8 @@ namespace {
             actions.addAction(ActionType::replSetConfigure);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
-        virtual bool run(OperationContext* txn, const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
-            try {
-                rwlock_try_write lk(mutex);
-                return _run(txn, a,b,e,errmsg,c,d);
-            }
-            catch(rwlock_try_write::exception&) { }
-            errmsg = "a replSetReconfig is already in progress";
-            return false;
-        }
-    private:
-        bool _run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") { }
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
