@@ -67,6 +67,31 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = number_scenarios(
         multiply_scenarios('.', types, keyfmt, dumpfmt))
 
+    # Extract the values lines from the dump output.
+    def value_lines(self, fname):
+        # mode:
+        #   0 == we are in the header
+        #   1 == next line is key
+        #   2 == next line is value
+        mode = 0
+        lines = []
+        for line in open(fname).readlines():
+            if mode == 0:
+                if line == 'Data\n':
+                    mode = 1
+            elif mode == 1:
+                mode = 2
+            else:
+                # This is a value line, keep it.
+                lines.append(line)
+                mode = 1
+        return sorted(lines)
+
+    def compare_dump_values(self, f1, f2):
+        l1 = self.value_lines(f1)
+        l2 = self.value_lines(f2)
+        self.assertEqual(l1, l2)
+
     # Dump, re-load and do a content comparison.
     def test_dump(self):
         # Create the object.
@@ -104,6 +129,15 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['-h', self.dir,
             'load', '-n', '-f', 'dump.out'], errfilename='errfile.out')
         self.check_non_empty_file('errfile.out')
+
+        # If there is are indices, dump one of them and check the output.
+        if self.populate == complex_populate:
+            indexuri = 'index:' + self.name + ':indx1'
+            hexopt = ['-x'] if self.hex == 1 else []
+            self.runWt(['-h', self.dir, 'dump'] + hexopt + [indexuri],
+                       outfilename='dumpidx.out')
+            self.check_non_empty_file('dumpidx.out')
+            self.compare_dump_values('dump.out', 'dumpidx.out')
 
 if __name__ == '__main__':
     wttest.run()
