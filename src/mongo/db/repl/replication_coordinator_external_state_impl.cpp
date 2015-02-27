@@ -49,8 +49,8 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs_sync.h"
-#include "mongo/db/repl/scoped_conn.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_state.h"
 #include "mongo/stdx/functional.h"
@@ -224,7 +224,8 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::closeConnections() {
-        MessagingPort::closeAllSockets(ScopedConn::keepOpen);
+        MessagingPort::closeAllSockets(
+            ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen);
     }
 
     void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* txn) {

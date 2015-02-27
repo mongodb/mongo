@@ -47,7 +47,7 @@
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
-#include "mongo/db/repl/scoped_conn.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/fail_point_service.h"
@@ -600,7 +600,7 @@ namespace {
             {
                 AbstractMessagingPort *mp = txn->getClient()->port();
                 if( mp )
-                    mp->tag |= ScopedConn::keepOpen;
+                    mp->tag |= ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen;
             }
 
             ReplSetHeartbeatArgs args;

@@ -41,9 +41,6 @@ namespace repl {
 
     static const int DEFAULT_HEARTBEAT_TIMEOUT_SECS = 10;
 
-    // This is a bitmask with the first bit set. It's used to mark connections that should be kept
-    // open during stepdowns
-    const unsigned ScopedConn::keepOpen = 1;
     ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
 

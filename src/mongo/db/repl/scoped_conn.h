@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/security_key.h"
+#include "mongo/db/repl/replication_executor.h"
 
 namespace mongo {
 namespace repl {
@@ -59,8 +60,6 @@ namespace repl {
     */
     class ScopedConn {
     public:
-        // A flag to keep ScopedConns open when all other sockets are disconnected
-        static const unsigned keepOpen;
 
         /** throws assertions if connect failure etc. */
         ScopedConn(const std::string& hostport);
@@ -99,7 +98,7 @@ namespace repl {
 
             void tagPort() {
                 MessagingPort& mp = cc->port();
-                mp.tag |= ScopedConn::keepOpen;
+                mp.tag |= ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen;
             }
         } *connInfo;
         typedef std::map<std::string,ScopedConn::ConnectionInfo*> M;

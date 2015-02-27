@@ -38,11 +38,11 @@
 #include <sstream>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/scoped_conn.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
@@ -319,7 +319,7 @@ namespace {
                 str::stream() << "Failed attempt to connect to " << target.toString() << "; " <<
                 errmsg,
                 conn->connect(target, errmsg));
-        conn->port().tag |= ScopedConn::keepOpen;
+        conn->port().tag |= ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen;
         if (getGlobalAuthorizationManager()->isAuthEnabled()) {
             uassert(ErrorCodes::AuthenticationFailed,
                     "Missing credentials for authenticating as internal user",

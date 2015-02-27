@@ -535,6 +535,12 @@ namespace {
         isSignaledCondition(new boost::condition_variable) {
     }
 
+    // This is a bitmask with the first bit set. It's used to mark connections that should be kept
+    // open during stepdowns.
+#ifndef _MSC_EXTENSIONS
+    const unsigned int ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen;
+#endif // _MSC_EXTENSIONS
+
     ReplicationExecutor::NetworkInterface::NetworkInterface() {}
     ReplicationExecutor::NetworkInterface::~NetworkInterface() {}
 
