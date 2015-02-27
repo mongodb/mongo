@@ -22,3 +22,6 @@ resp = db.adminCommand({getLog:"global"})
 assert( resp.ok == 1, "error executing getLog command" );
 assert( resp.log, "no log field" );
 assert( resp.log.length > 0 , "no log lines" );
+
+// getLog value must be a string
+assert.commandFailed(db.adminCommand({ getLog: 21 }));
