@@ -561,7 +561,6 @@ struct __wt_cursor {
 	 * user on open.
 	 */
 	const char *internal_uri;
-					/* Saved modification methods. */
 
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_BULK		0x0002
