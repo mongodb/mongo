@@ -218,7 +218,6 @@ namespace {
             return;
         }
 
-        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
         Lock::OplogIntentWriteLock oplogLk(txn->lockState());
 
@@ -237,9 +236,6 @@ namespace {
             severe() << "replSet error : logOp() but can't accept write to collection " << ns;
             fassertFailed(17405);
         }
-
-        Client::Context ctx(txn, rsoplog, localDB);
-        WriteUnitOfWork wunit(txn);
 
         oplogLk.serializeIfNeeded();
         std::pair<OpTime, long long> slot = getNextOpTime(txn,
@@ -269,10 +265,7 @@ namespace {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
-        ctx.getClient()->setLastOp( slot.first );
-
-        wunit.commit();
-
+        txn->getClient()->setLastOp(slot.first);
     }
 
     void _logOpOld(OperationContext* txn,
@@ -289,7 +282,6 @@ namespace {
             return;
         }
 
-        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
 
         if( logNS == 0 ) {
@@ -305,9 +297,6 @@ namespace {
             localOplogMainCollection = localDB->getCollection(logNS);
             invariant(localOplogMainCollection);
         }
-
-        Client::Context ctx(txn, logNS, localDB);
-        WriteUnitOfWork wunit(txn);
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         std::pair<OpTime,long long> slot = getNextOpTime(txn,
@@ -335,9 +324,7 @@ namespace {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
 
-        ctx.getClient()->setLastOp( slot.first );
-
-        wunit.commit();
+        txn->getClient()->setLastOp(slot.first);
     }
 
     void (*_logOp)(OperationContext* txn,

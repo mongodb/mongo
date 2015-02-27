@@ -276,6 +276,9 @@ namespace mongo {
             STATUS_GRANTED,
             STATUS_WAITING,
             STATUS_CONVERTING,
+
+            // Counts the rest. Always insert new status types above this entry.
+            StatusCount
         };
 
         /**
@@ -356,6 +359,11 @@ namespace mongo {
         // that conversion cannot be immediately granted.
         LockMode convertMode;
     };
+
+    /**
+     * Returns a human readable status name for the specified LockRequest status.
+     */
+    const char* lockRequestStatusName(LockRequest::Status status);
 
 } // namespace mongo
 

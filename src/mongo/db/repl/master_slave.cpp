@@ -1243,7 +1243,9 @@ namespace repl {
                 toSleep = 10;
 
                 try {
+                    WriteUnitOfWork wuow(&txn);
                     logKeepalive(&txn);
+                    wuow.commit();
                 }
                 catch (...) {
                     log() << "caught exception in replMasterThread()" << endl;
