@@ -249,9 +249,8 @@ restart:	/*
 			WT_ERR(ret);
 
 			/*
-			 * Entering a new page: configure for traversal of any
-			 * internal page's children, else return (or optionally
-			 * skip), the leaf page.
+			 * A new page: configure for traversal of any internal
+			 * page's children, else return the leaf page.
 			 */
 descend:		couple = ref;
 			page = ref->page;
