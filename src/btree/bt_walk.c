@@ -198,7 +198,8 @@ restart:	/*
 				 * Avoid pulling a deleted page back in to try
 				 * to delete it again.
 				 */
-				if (__wt_delete_page_skip(session, ref))
+				if (ref->state == WT_REF_DELETED &&
+				    __wt_delete_page_skip(session, ref))
 					break;
 				/*
 				 * If deleting a range, try to delete the page
@@ -232,10 +233,10 @@ restart:	/*
 				}
 			} else {
 				/*
-				 * If iterating a cursor, try to skip deleted
-				 * pages that are visible to us.
+				 * Try to skip deleted pages visible to us.
 				 */
-				if (__wt_delete_page_skip(session, ref))
+				if (ref->state == WT_REF_DELETED &&
+				    __wt_delete_page_skip(session, ref))
 					break;
 			}
 
