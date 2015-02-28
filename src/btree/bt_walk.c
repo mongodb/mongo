@@ -261,9 +261,7 @@ descend:		couple = ref;
 				pindex = WT_INTL_INDEX_COPY(page);
 				slot = prev ? pindex->entries - 1 : 0;
 				descending = 1;
-			} else if (LF_ISSET(WT_READ_SKIP_LEAF))
-				goto ascend;
-			else {
+			} else {
 				*refp = ref;
 				goto done;
 			}
