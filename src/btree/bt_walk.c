@@ -115,7 +115,6 @@ restart:	/*
 		 */
 		ref = couple;
 		if (ref == &btree->root) {
-			ref = &btree->root;
 			if (ref->page == NULL)
 				goto done;
 			goto descend;
