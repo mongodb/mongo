@@ -6,6 +6,10 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * Helpers for calling a function with a data handle in session->dhandle
+ * then restoring afterwards.
+ */
 #define	WT_WITH_DHANDLE(s, d, e) do {					\
 	WT_DATA_HANDLE *__saved_dhandle = (s)->dhandle;			\
 	(s)->dhandle = (d);						\
@@ -14,6 +18,15 @@
 } while (0)
 
 #define	WT_WITH_BTREE(s, b, e)	WT_WITH_DHANDLE(s, (b)->dhandle, e)
+
+/* Call a function without the caller's data handle, restore afterwards. */
+#define	WT_WITHOUT_DHANDLE(s, e) WT_WITH_DHANDLE(s, NULL, e)
+
+/*
+ * Call a function with the caller's data handle, restore it afterwards in case
+ * it is overwritten.
+ */
+#define	WT_SAVE_DHANDLE(s, e) WT_WITH_DHANDLE(s, (s)->dhandle, e)
 
 /*
  * WT_DATA_HANDLE --

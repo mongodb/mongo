@@ -121,8 +121,22 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (g.c_data_extend)
 		p += snprintf(p, REMAIN(p, end), ",file_extend=(data=8MB)");
 
-	p += snprintf(p, REMAIN(p, end),
-	    ",statistics=(%s)", g.c_statistics ? "fast" : "none");
+	/*
+	 * Run the statistics server and/or maintain statistics in the engine.
+	 * Sometimes specify a set of sources just to exercise that code.
+	 */
+	if (g.c_statistics_server) {
+		if (MMRAND(0, 5) == 1 &&
+		    memcmp(g.uri, "file:", strlen("file:")) == 0)
+			p += snprintf(p, REMAIN(p, end),
+			    ",statistics=(fast)"
+			    ",statistics_log=(wait=5,sources=(\"file:\"))");
+		else
+			p += snprintf(p, REMAIN(p, end),
+			    ",statistics=(fast),statistics_log=(wait=5)");
+	} else
+		p += snprintf(p, REMAIN(p, end),
+		    ",statistics=(%s)", g.c_statistics ? "fast" : "none");
 
 	/* Extensions. */
 	p += snprintf(p, REMAIN(p, end),

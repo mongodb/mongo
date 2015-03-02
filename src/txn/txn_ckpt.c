@@ -237,7 +237,6 @@ __checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	const char *name;
 
@@ -253,7 +252,6 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Not strictly necessary, but cleaner to clear the current handle. */
 	name = session->dhandle->name;
-	saved_dhandle = session->dhandle;
 	session->dhandle = NULL;
 
 	/* Record busy file names, we'll deal with them in the checkpoint. */
@@ -261,10 +259,9 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 		session->ckpt_handle[session->ckpt_handle_next++].dhandle =
 		    session->dhandle;
 	else if (ret == EBUSY)
-		WT_ERR(__wt_strdup(session, name,
-		    &session->ckpt_handle[session->ckpt_handle_next++].name));
+		ret = __wt_strdup(session, name,
+		    &session->ckpt_handle[session->ckpt_handle_next++].name);
 
-err:	session->dhandle = saved_dhandle;
 	return (ret);
 }
 

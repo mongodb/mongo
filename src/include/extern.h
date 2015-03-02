@@ -221,6 +221,7 @@ extern int __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *name, co
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int force);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session, const char *name, const char *ckpt, const char *cfg[], uint32_t flags);
 extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session, int apply_checkpoints, const char *uri, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
+extern int __wt_conn_btree_apply_single_ckpt(WT_SESSION_IMPL *session, const char *uri, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_dhandle_close_all( WT_SESSION_IMPL *session, const char *name, int force);
 extern int __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final);
@@ -297,7 +298,7 @@ extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern int __wt_evict_create(WT_SESSION_IMPL *session);
 extern int __wt_evict_destroy(WT_SESSION_IMPL *session);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref);
-extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
+extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server);
 extern int __wt_cache_wait(WT_SESSION_IMPL *session, int full);

@@ -37,12 +37,16 @@ while true; do
 	# Save a copy of the database directory exactly as it was at the crash.
 	cp -rp RUNDIR $rundir2
 
-	# We aborted, so recovery is required
-	if `$wtcmd -R -h RUNDIR list | egrep table > /dev/null`; then
-		uri='table:wt'
+	#
+	# Everything is a table unless explicitly a file.
+	#
+	isfile=`grep data_source RUNDIR/CONFIG | grep -c file || exit 0`
+	if test "$isfile" -ne 0; then
+		uri="file:wt"
 	else
-		uri='file:wt'
+		uri="table:wt"
 	fi
-	# Force recovery to run.
+
+	# We know we aborted, so force recovery to run.
 	$wtcmd -R -h RUNDIR verify $uri || exit 1
 done

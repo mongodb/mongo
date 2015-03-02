@@ -442,8 +442,6 @@ struct __wt_page {
 
 		/* Row-store leaf page. */
 		struct {
-			WT_ROW *d;		/* Key/value pairs */
-
 			/*
 			 * The column-store leaf page modification structures
 			 * live in the WT_PAGE_MODIFY structure to keep the
@@ -457,6 +455,7 @@ struct __wt_page {
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
 
+			WT_ROW *d;		/* Key/value pairs */
 			uint32_t entries;	/* Entries */
 		} row;
 #undef	pg_row_d
@@ -510,11 +509,31 @@ struct __wt_page {
 #define	pg_var_entries	u.col_var.entries
 	} u;
 
-	/* Page's on-disk representation: NULL for pages created in memory. */
-	const WT_PAGE_HEADER *dsk;
+	/*
+	 * The page's type and flags are positioned at the end of the WT_PAGE
+	 * union, it reduces cache misses in the row-store search function.
+	 */
+#define	WT_PAGE_IS_INTERNAL(page)					\
+	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
+#define	WT_PAGE_INVALID		0	/* Invalid page */
+#define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
+#define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */
+#define	WT_PAGE_COL_INT		3	/* Col-store internal page */
+#define	WT_PAGE_COL_VAR		4	/* Col-store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Overflow page */
+#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
+	uint8_t type;			/* Page type */
 
-	/* If/when the page is modified, we need lots more information. */
-	WT_PAGE_MODIFY *modify;
+#define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
+#define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
+#define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
+#define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
+#define	WT_PAGE_REFUSE_DEEPEN	0x10	/* Don't deepen the tree at this page */
+#define	WT_PAGE_SCANNING	0x20	/* Obsolete updates are being scanned */
+#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
+#define	WT_PAGE_SPLITTING	0x80	/* An internal page is growing */
+	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
 	 * The page's read generation acts as an LRU value for each page in the
@@ -539,27 +558,11 @@ struct __wt_page {
 
 	size_t memory_footprint;	/* Memory attached to the page */
 
-#define	WT_PAGE_IS_INTERNAL(page)					\
-	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
-#define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
-#define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */
-#define	WT_PAGE_COL_INT		3	/* Col-store internal page */
-#define	WT_PAGE_COL_VAR		4	/* Col-store var-length leaf page */
-#define	WT_PAGE_OVFL		5	/* Overflow page */
-#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
-	uint8_t type;			/* Page type */
+	/* Page's on-disk representation: NULL for pages created in memory. */
+	const WT_PAGE_HEADER *dsk;
 
-#define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
-#define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
-#define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_REFUSE_DEEPEN	0x10	/* Don't deepen the tree at this page */
-#define	WT_PAGE_SCANNING	0x20	/* Obsolete updates are being scanned */
-#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
-#define	WT_PAGE_SPLITTING	0x80	/* An internal page is growing */
-	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
+	/* If/when the page is modified, we need lots more information. */
+	WT_PAGE_MODIFY *modify;
 };
 
 /*

@@ -117,8 +117,9 @@ wts_ops(void)
 		die(ret, "pthread_create: compaction");
 
 	/* Spin on the threads, calculating the totals. */
-	memset(&total, 0, sizeof(total));
 	for (;;) {
+		/* Clear out the totals each pass. */
+		memset(&total, 0, sizeof(total));
 		for (i = 0, running = 0; i < g.c_threads; ++i) {
 			total.commit += tinfo[i].commit;
 			total.deadlock += tinfo[i].deadlock;

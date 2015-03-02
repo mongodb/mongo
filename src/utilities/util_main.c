@@ -169,25 +169,21 @@ main(int argc, char *argv[])
 	if (func == NULL)
 		return (usage());
 
-	/* Build the configuration string, as necessary. */
-	if (cmd_config != NULL || rec_config != NULL) {
-		len = 10;		/* some slop */
-		if (config != NULL)
-			len += strlen(config);
-		if (cmd_config != NULL)
-			len += strlen(cmd_config);
-		if (rec_config != NULL)
-			len += strlen(rec_config);
-		if ((p = malloc(len)) == NULL) {
-			ret = util_err(errno, NULL);
-			goto err;
-		}
-		(void)snprintf(p, len, "%s,%s,%s",
-		    config == NULL ? "" : config,
-		    cmd_config == NULL ? "" : cmd_config,
-		    rec_config == NULL ? "" : rec_config);
-		config = p;
+	/* Build the configuration string. */
+	len = 10;					/* some slop */
+	if (config != NULL)
+		len += strlen(config);
+	if (cmd_config != NULL)
+		len += strlen(cmd_config);
+	len += strlen(rec_config);
+	if ((p = malloc(len)) == NULL) {
+		ret = util_err(errno, NULL);
+		goto err;
 	}
+	(void)snprintf(p, len, "%s,%s,%s",
+	    config == NULL ? "" : config,
+	    cmd_config == NULL ? "" : cmd_config, rec_config);
+	config = p;
 
 	/* Open the database and a session. */
 	if ((ret = wiredtiger_open(home,

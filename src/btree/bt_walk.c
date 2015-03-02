@@ -115,7 +115,6 @@ restart:	/*
 		 */
 		ref = couple;
 		if (ref == &btree->root) {
-			ref = &btree->root;
 			if (ref->page == NULL)
 				goto done;
 			goto descend;
@@ -198,7 +197,8 @@ restart:	/*
 				 * Avoid pulling a deleted page back in to try
 				 * to delete it again.
 				 */
-				if (__wt_delete_page_skip(session, ref))
+				if (ref->state == WT_REF_DELETED &&
+				    __wt_delete_page_skip(session, ref))
 					break;
 				/*
 				 * If deleting a range, try to delete the page
@@ -232,10 +232,10 @@ restart:	/*
 				}
 			} else {
 				/*
-				 * If iterating a cursor, try to skip deleted
-				 * pages that are visible to us.
+				 * Try to skip deleted pages visible to us.
 				 */
-				if (__wt_delete_page_skip(session, ref))
+				if (ref->state == WT_REF_DELETED &&
+				    __wt_delete_page_skip(session, ref))
 					break;
 			}
 
@@ -249,9 +249,8 @@ restart:	/*
 			WT_ERR(ret);
 
 			/*
-			 * Entering a new page: configure for traversal of any
-			 * internal page's children, else return (or optionally
-			 * skip), the leaf page.
+			 * A new page: configure for traversal of any internal
+			 * page's children, else return the leaf page.
 			 */
 descend:		couple = ref;
 			page = ref->page;
@@ -260,9 +259,7 @@ descend:		couple = ref;
 				pindex = WT_INTL_INDEX_COPY(page);
 				slot = prev ? pindex->entries - 1 : 0;
 				descending = 1;
-			} else if (LF_ISSET(WT_READ_SKIP_LEAF))
-				goto ascend;
-			else {
+			} else {
 				*refp = ref;
 				goto done;
 			}

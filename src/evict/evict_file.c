@@ -15,21 +15,16 @@
 int
 __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	int eviction_enabled;
-
-	btree = S2BT(session);
-	eviction_enabled = !F_ISSET(btree, WT_BTREE_NO_EVICTION);
+	int evict_reset;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
 	 * and drain any blocks already queued.
 	 */
-	if (eviction_enabled)
-		WT_RET(__wt_evict_file_exclusive_on(session));
+	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
 	__wt_txn_update_oldest(session);
@@ -140,7 +135,7 @@ err:		/* On error, clear any left-over tree walk. */
 			    session, next_ref, WT_READ_NO_EVICT));
 	}
 
-	if (eviction_enabled)
+	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
 
 	return (ret);
