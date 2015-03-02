@@ -9,8 +9,9 @@
 #include "wt_internal.h"
 
 static int  __stat_page(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS *);
-static int  __stat_page_col_var(WT_PAGE *, WT_DSRC_STATS *);
-static int  __stat_page_row_leaf(WT_PAGE *, WT_DSRC_STATS *);
+static void __stat_page_col_var(WT_PAGE *, WT_DSRC_STATS *);
+static void __stat_page_row_int(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS *);
+static void __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS *);
 
 /*
  * __wt_btree_stat_init --
@@ -89,18 +90,13 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 		WT_STAT_INCRV(stats, btree_entries, pindex->entries);
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__stat_page_col_var(page, stats));
-		break;
-	case WT_PAGE_OVFL:
-		WT_STAT_INCR(stats, btree_overflow);
+		__stat_page_col_var(page, stats);
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_STAT_INCR(stats, btree_row_internal);
-		pindex = WT_INTL_INDEX_COPY(page);
-		WT_STAT_INCRV(stats, btree_entries, pindex->entries);
+		__stat_page_row_int(session, page, stats);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__stat_page_row_leaf(page, stats));
+		__stat_page_row_leaf(session, page, stats);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -111,7 +107,7 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
  * __stat_page_col_var --
  *	Stat a WT_PAGE_COL_VAR page.
  */
-static int
+static void
 __stat_page_col_var(WT_PAGE *page, WT_DSRC_STATS *stats)
 {
 	WT_CELL *cell;
@@ -119,29 +115,33 @@ __stat_page_col_var(WT_PAGE *page, WT_DSRC_STATS *stats)
 	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
+	uint64_t deleted_cnt, entry_cnt, ovfl_cnt;
 	uint32_t i;
 	int orig_deleted;
 
 	unpack = &_unpack;
+	deleted_cnt = entry_cnt = ovfl_cnt = 0;
 
 	WT_STAT_INCR(stats, btree_column_variable);
 
 	/*
-	 * Walk the page, counting regular and overflow data items, and checking
-	 * to be sure any updates weren't deletions.  If the item was updated,
-	 * assume it was updated by an item of the same size (it's expensive to
-	 * figure out if it will require the same space or not, especially if
-	 * there's Huffman encoding).
+	 * Walk the page counting regular items, adjusting if the item has been
+	 * subsequently deleted or not. This is a mess because 10-item RLE might
+	 * have 3 of the items subsequently deleted. Overflow items are harder,
+	 * we can't know if an updated item will be an overflow item or not; do
+	 * our best, and simply count every overflow item (or RLE set of items)
+	 * we see.
 	 */
 	WT_COL_FOREACH(page, cip, i) {
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
 			orig_deleted = 1;
-			WT_STAT_INCR(stats, btree_column_deleted);
+			++deleted_cnt;
 		} else {
 			orig_deleted = 0;
 			__wt_cell_unpack(cell, unpack);
-			WT_STAT_INCRV(
-			    stats, btree_entries, __wt_cell_rle(unpack));
+			entry_cnt += __wt_cell_rle(unpack);
+			if (unpack->ovfl)
+				++ovfl_cnt;
 		}
 
 		/*
@@ -151,57 +151,128 @@ __stat_page_col_var(WT_PAGE *page, WT_DSRC_STATS *stats)
 		WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip)) {
 			upd = ins->upd;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				if (orig_deleted)
-					continue;
-				WT_STAT_INCR(stats, btree_column_deleted);
-				WT_STAT_DECR(stats, btree_entries);
-			} else {
-				if (!orig_deleted)
-					continue;
-				WT_STAT_DECR(stats, btree_column_deleted);
-				WT_STAT_INCR(stats, btree_entries);
-			}
+				if (!orig_deleted) {
+					++deleted_cnt;
+					--entry_cnt;
+				}
+			} else
+				if (orig_deleted) {
+					--deleted_cnt;
+					++entry_cnt;
+				}
 		}
 	}
-	return (0);
+
+	/* Walk any append list. */
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
+		++entry_cnt;
+
+	WT_STAT_INCRV(stats, btree_column_deleted, deleted_cnt);
+	WT_STAT_INCRV(stats, btree_entries, entry_cnt);
+	WT_STAT_INCRV(stats, btree_overflow, ovfl_cnt);
+}
+
+/*
+ * __stat_page_row_int --
+ *	Stat a WT_PAGE_ROW_INT page.
+ */
+static void
+__stat_page_row_int(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
+{
+	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
+	WT_PAGE_INDEX *pindex;
+	uint32_t i, ovfl_cnt;
+
+	btree = S2BT(session);
+	ovfl_cnt = 0;
+
+	WT_STAT_INCR(stats, btree_row_internal);
+
+	/*
+	 * The number of entries tells us the number of items on row-store
+	 * internal page.
+	 */
+	pindex = WT_INTL_INDEX_COPY(page);
+	WT_STAT_INCRV(stats, btree_entries, pindex->entries);
+
+	/*
+	 * Overflow keys are hard: we have to walk the disk image to count them,
+	 * the in-memory representation of the page doesn't necessarily contain
+	 * a reference to the original cell.
+	 */
+	if (page->dsk != NULL)
+		WT_CELL_FOREACH(btree, page->dsk, cell, &unpack, i) {
+			__wt_cell_unpack(cell, &unpack);
+			if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL)
+				++ovfl_cnt;
+		}
+
+	WT_STAT_INCRV(stats, btree_overflow, ovfl_cnt);
 }
 
 /*
  * __stat_page_row_leaf --
  *	Stat a WT_PAGE_ROW_LEAF page.
  */
-static int
-__stat_page_row_leaf(WT_PAGE *page, WT_DSRC_STATS *stats)
+static void
+__stat_page_row_leaf(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 {
+	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
 	WT_INSERT *ins;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
-	uint32_t cnt, i;
+	uint32_t entry_cnt, i, ovfl_cnt;
+
+	btree = S2BT(session);
+	entry_cnt = ovfl_cnt = 0;
 
 	WT_STAT_INCR(stats, btree_row_leaf);
 
 	/*
-	 * Stat any K/V pairs inserted into the page before the first from-disk
+	 * Walk any K/V pairs inserted into the page before the first from-disk
 	 * key on the page.
 	 */
-	cnt = 0;
 	WT_SKIP_FOREACH(ins, WT_ROW_INSERT_SMALLEST(page))
 		if (!WT_UPDATE_DELETED_ISSET(ins->upd))
-			++cnt;
+			++entry_cnt;
 
-	/* Stat the page's K/V pairs. */
+	/*
+	 * Walk the page's K/V pairs. Count overflow values, where an overflow
+	 * item is any on-disk overflow item that hasn't been updated.
+	 */
 	WT_ROW_FOREACH(page, rip, i) {
 		upd = WT_ROW_UPDATE(page, rip);
 		if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
-			++cnt;
+			++entry_cnt;
+		if (upd == NULL && (cell =
+		    __wt_row_leaf_value_cell(page, rip, NULL)) != NULL &&
+		    __wt_cell_type(cell) == WT_CELL_VALUE_OVFL)
+				++ovfl_cnt;
 
-		/* Stat inserted K/V pairs. */
+		/* Walk K/V pairs inserted after the on-page K/V pair. */
 		WT_SKIP_FOREACH(ins, WT_ROW_INSERT(page, rip))
 			if (!WT_UPDATE_DELETED_ISSET(ins->upd))
-				++cnt;
+				++entry_cnt;
 	}
 
-	WT_STAT_INCRV(stats, btree_entries, cnt);
+	/*
+	 * Overflow keys are hard: we have to walk the disk image to count them,
+	 * the in-memory representation of the page doesn't necessarily contain
+	 * a reference to the original cell.
+	 */
+	if (page->dsk != NULL)
+		WT_CELL_FOREACH(btree, page->dsk, cell, &unpack, i) {
+			__wt_cell_unpack(cell, &unpack);
+			if (__wt_cell_type(cell) == WT_CELL_KEY_OVFL)
+				++ovfl_cnt;
+		}
 
-	return (0);
+	WT_STAT_INCRV(stats, btree_entries, entry_cnt);
+	WT_STAT_INCRV(stats, btree_overflow, ovfl_cnt);
 }
