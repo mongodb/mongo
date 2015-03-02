@@ -487,6 +487,7 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 {
 	WT_IKEY *ikey, **ikeyp;
 	uintptr_t oldv;
+	int success;
 
 	ikeyp = dest;
 
@@ -501,10 +502,8 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 
 	oldv = (uintptr_t)*ikeyp;
 	WT_DIAGNOSTIC_YIELD;
-
 	WT_ASSERT(session, oldv == 0 || (oldv & WT_IK_FLAG) != 0);
-
-	if (!WT_ATOMIC_CAS8(*ikeyp, (WT_IKEY *)oldv, ikey))
-		__wt_panic(session);
+	success = WT_ATOMIC_CAS8(*ikeyp, (WT_IKEY *)oldv, ikey);
+	WT_ASSERT(session, success);
 	return (0);
 }

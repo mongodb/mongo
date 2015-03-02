@@ -727,16 +727,18 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	int tret;
 
 	dhandle = session->dhandle;
 
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-		ret = __wt_conn_btree_sync_and_close(session, 0);
-		if (final && ret != 0)
-			__wt_err(session, ret,
+		tret = __wt_conn_btree_sync_and_close(session, 0);
+		if (final && tret != 0) {
+			__wt_err(session, tret,
 			    "Final close of %s failed", dhandle->name);
-		else
-			WT_RET(ret);
+			WT_TRET(tret);
+		} else
+			WT_RET(tret);
 	}
 
 	/*
