@@ -991,6 +991,11 @@ rs.add = function (hostport, arb) {
         if (arb)
             cfg.arbiterOnly = true;
     }
+    else if (arb == true) {
+        throw Error("Expected first parameter to be a host-and-port string of arbiter, but got " +
+                    tojson(hostport));
+    }
+
     if (cfg._id == null){
         cfg._id = max+1;
     }
