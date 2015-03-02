@@ -782,14 +782,7 @@ namespace mongo {
                 }
             }
 
-            // TODO: only one type of 2d search doesn't support this.  We need a way to pull it out
-            // of CanonicalQuery. :(
-            const bool supportsGetMore = true;
-            if (!supportsGetMore && (enough(pq, numResults)
-                                     || bb.len() >= MaxBytesToReturnToClientAtOnce)) {
-                break;
-            }
-            else if (enoughForFirstBatch(pq, numResults, bb.len())) {
+            if (enoughForFirstBatch(pq, numResults, bb.len())) {
                 QLOG() << "Enough for first batch, wantMore=" << pq.wantMore()
                        << " numToReturn=" << pq.getNumToReturn()
                        << " numResults=" << numResults
