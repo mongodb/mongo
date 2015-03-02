@@ -295,9 +295,9 @@ add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 add_option( "use-system-wiredtiger", "use system version of wiredtiger library", 0, True)
 
 # library choices
-boost_choices = ['1.49', '1.56']
+boost_choices = ['1.56']
 add_option( "internal-boost", "Specify internal boost version to use", 1, True,
-           type='choice', default=boost_choices[1], choices=boost_choices)
+           type='choice', default=boost_choices[0], choices=boost_choices)
 
 add_option( "system-boost-lib-search-suffixes",
             "Comma delimited sequence of boost library suffixes to search",
@@ -1131,8 +1131,9 @@ if get_option("system-boost-lib-search-suffixes") is not None:
 # of boost is in play.
 boostSuffix = "";
 if not use_system_version_of_library("boost"):
-    if get_option( "internal-boost") != "1.49":
-        boostSuffix = "-1.56.0"
+    # Boost release numbers are x.y.z, where z is usually 0 which we do not include in
+    # the internal-boost option
+    boostSuffix = "-%s.0" % get_option( "internal-boost")
     env.Prepend(CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
