@@ -51,9 +51,8 @@ namespace mongo {
         return _cmp( s1 + 1, s2 + 1 );
     }        
     
-    BSONIteratorSorted::BSONIteratorSorted( const BSONObj &o, const ElementFieldCmp &cmp ) {
-        _nfields = o.nFields();
-        _fields = new const char*[_nfields];
+    BSONIteratorSorted::BSONIteratorSorted( const BSONObj &o, const ElementFieldCmp &cmp )
+        : _nfields(o.nFields()), _fields(new const char*[_nfields]) {
         int x = 0;
         BSONObjIterator i( o );
         while ( i.more() ) {
@@ -61,7 +60,7 @@ namespace mongo {
             verify( _fields[x-1] );
         }
         verify( x == _nfields );
-        std::sort( _fields , _fields + _nfields , cmp );
+        std::sort( _fields.get() , _fields.get() + _nfields , cmp );
         _cur = 0;
     }
     

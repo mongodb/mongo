@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
+#include <boost/scoped_array.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/base/disallow_copying.h"
@@ -113,8 +114,6 @@ namespace mongo {
     public:
         ~BSONIteratorSorted() {
             verify( _fields );
-            delete[] _fields;
-            _fields = 0;
         }
 
         bool more() {
@@ -133,8 +132,8 @@ namespace mongo {
         BSONIteratorSorted( const BSONObj &o, const ElementFieldCmp &cmp );
         
     private:
-        const char ** _fields;
-        int _nfields;
+        const int _nfields;
+        const boost::scoped_array<const char *> _fields;
         int _cur;
     };
 
