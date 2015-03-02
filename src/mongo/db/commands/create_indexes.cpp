@@ -215,6 +215,7 @@ namespace mongo {
                         << "Not primary while creating background indexes in " << ns.ns()));
                 }
             }
+
             try {
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 uassertStatusOK(indexer.insertAllDocumentsInCollection());

@@ -292,6 +292,12 @@ namespace mongo {
         }
 
         if (state != PlanExecutor::IS_EOF) {
+            // If the plan executor was killed, this means the DB/collection was dropped and so it
+            // is not safe to cleanup the in-progress indexes.
+            if (state == PlanExecutor::DEAD) {
+                abortWithoutCleanup();
+            }
+
             uasserted(28550, 
                       "Unable to complete index build as the collection is no longer readable");
         }
