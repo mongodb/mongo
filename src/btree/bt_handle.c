@@ -634,7 +634,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	    WT_MAX((uint64_t)cval.val, 50 * (uint64_t)btree->maxleafpage);
 	cache_size = S2C(session)->cache_size;
 	if (cache_size > 0)
-		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 2);
+		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 4);
 
 	/*
 	 * Get the split percentage (reconciliation splits pages into smaller
