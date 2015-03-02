@@ -735,7 +735,7 @@ namespace replset {
                 log() << "changing sync target because current sync target's most recent OpTime is "
                       << targetOpTime.toStringPretty() << " which is more than "
                       << maxSyncSourceLagSecs << " seconds behind member " << m->fullName()
-                      << " whose most recent OpTime is " << m->hbinfo().opTime.getSecs();
+                      << " whose most recent OpTime is " << m->hbinfo().opTime.toStringPretty();
                 return true;
             }
         }
