@@ -278,7 +278,7 @@ namespace mongo {
         void decouple(); // not allowed. not implemented.
     };
 
-#if defined(_WIN32)
+#if defined(_WIN32) && _MSC_VER < 1900
 #pragma push_macro("snprintf")
 #define snprintf _snprintf
 #endif

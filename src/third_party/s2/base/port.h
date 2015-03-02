@@ -709,15 +709,10 @@ inline double drem(double x, double y) {
 #define strtoll  _strtoi64
 #define strtoull _strtoui64
 #define safe_vsnprintf _vsnprintf
+#if _MSC_VER < 1900
 #define snprintf _snprintf
-
-#if _MSC_VER < 1800
-inline void va_copy(va_list& a, va_list& b) {
-  a = b;
-}
 #endif
 
-#define snprintf _snprintf
 #endif
 
 #ifdef COMPILER_MSVC     /* if Visual C++ */

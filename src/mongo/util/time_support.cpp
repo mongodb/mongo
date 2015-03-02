@@ -50,7 +50,9 @@
 // NOTE(schwerin): MSVC's _snprintf is not a drop-in replacement for C99's snprintf().  In
 // particular, when the target buffer is too small, behaviors differ.  Consult the documentation
 // from MSDN and form the BSD or Linux man pages before using.
+#if _MSC_VER < 1900
 #define snprintf _snprintf
+#endif
 #endif
 
 #ifdef __sunos__
