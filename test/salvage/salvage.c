@@ -447,14 +447,14 @@ run(int r)
 }
 
 /*
- * fexists --
+ * file_exists --
  *	Return if the file exists.
  */
 static int
-fexists(const char *path)
+file_exists(const char *path)
 {
 	struct stat sb;
-	
+
 	return (stat(path, &sb) == 0);
 }
 
@@ -545,7 +545,7 @@ build(int ikey, int ivalue, int cnt)
 	 * then remove it (all we want is the appropriate schema entry, we're
 	 * creating the salvage file itself by hand).
 	 */
-	new_slvg = !fexists(SLVG);
+	new_slvg = !file_exists(SLVG);
 	if (new_slvg) {
 		assert(session->drop(session, "file:" SLVG, "force") == 0);
 		assert(session->create(session, "file:" SLVG, config) == 0);
@@ -574,7 +574,7 @@ copy(u_int gen, u_int recno)
 	 * copy the first sector (the file description).
 	 * Otherwise, we are appending to an existing file.
 	 */
-	if (fexists(SLVG))
+	if (file_exists(SLVG))
 		assert((ofp = fopen(SLVG, "a")) != NULL);
 	else {
 		assert((ofp = fopen(SLVG, "w")) != NULL);
