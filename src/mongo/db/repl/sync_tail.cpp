@@ -197,9 +197,10 @@ namespace repl {
 
                 // For non-initial-sync, we convert updates to upserts
                 // to suppress errors when replaying oplog entries.
-                bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
+                Status status =
+                    applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
                 opsAppliedStats.increment();
-                return ok;
+                return status.isOK();
             }
             catch (const WriteConflictException&) {
                 log() << "WriteConflictException while doing oplog application on: " << ns

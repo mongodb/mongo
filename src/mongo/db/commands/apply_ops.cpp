@@ -163,16 +163,13 @@ namespace mongo {
 
                 Client::Context ctx(txn, ns);
 
-                bool failed;
+                Status status(ErrorCodes::InternalError, "");
                 while (true) {
                     try {
                         // We assume that in the WriteConflict retry case, either the op rolls back
                         // any changes it makes or is otherwise safe to rerun.
-                        failed = repl::applyOperation_inlock(txn,
-                                                             ctx.db(),
-                                                             temp,
-                                                             false,
-                                                             alwaysUpsert);
+                        status =
+                            repl::applyOperation_inlock(txn, ctx.db(), temp, false, alwaysUpsert);
                         break;
                     }
                     catch (const WriteConflictException& wce) {
@@ -182,9 +179,10 @@ namespace mongo {
                     }
                 }
 
-                ab.append(!failed);
-                if ( failed )
+                ab.append(status.isOK());
+                if (!status.isOK()) {
                     errors++;
+                }
 
                 num++;
 

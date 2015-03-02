@@ -32,6 +32,8 @@
 #include <deque>
 #include <string>
 
+#include "mongo/base/status.h"
+
 namespace mongo {
     class BSONObj;
     class Database;
@@ -102,13 +104,13 @@ namespace repl {
      * used for applying from an oplog
      * @param fromRepl really from replication or for testing/internal/command/etc...
      * @param convertUpdateToUpsert convert some updates to upserts for idempotency reasons
-     * Returns if the op was an update that could not be applied (true on failure)
+     * Returns failure status if the op was an update that could not be applied.
      */
-    bool applyOperation_inlock(OperationContext* txn,
-                               Database* db,
-                               const BSONObj& op,
-                               bool fromRepl = true,
-                               bool convertUpdateToUpsert = false);
+    Status applyOperation_inlock(OperationContext* txn,
+                                 Database* db,
+                                 const BSONObj& op,
+                                 bool fromRepl = true,
+                                 bool convertUpdateToUpsert = false);
 
     /**
      * Waits one second for the OpTime from the oplog to change.

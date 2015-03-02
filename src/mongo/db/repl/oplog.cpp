@@ -68,12 +68,14 @@
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
 
     using std::endl;
+    using std::string;
     using std::stringstream;
 
 namespace repl {
@@ -523,16 +525,15 @@ namespace {
 
     // -------------------------------------
 
-    /** @param fromRepl false if from ApplyOpsCmd
-        @return true if was and update should have happened and the document DNE.  see replset initial sync code.
-     */
-    bool applyOperation_inlock(OperationContext* txn,
+    // @param fromRepl false if from ApplyOpsCmd
+    // @return failure status if an update should have happened and the document DNE.
+    // See replset initial sync code.
+    Status applyOperation_inlock(OperationContext* txn,
                                Database* db,
                                const BSONObj& op,
                                bool fromRepl,
                                bool convertUpdateToUpsert) {
         LOG(3) << "applying op: " << op << endl;
-        bool failedUpdate = false;
 
         OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
 
@@ -661,34 +662,38 @@ namespace {
                 if( ur.modifiers ) {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria
-                        failedUpdate = true;
-                        error() << "failed to apply update: " << op.toString() << endl;
+                        string msg = str::stream() << "failed to apply update: " << op.toString();
+                        error() << msg;
+                        return Status(ErrorCodes::OperationFailed, msg);
                     }
-                    // need to check to see if it isn't present so we can set failedUpdate correctly.
-                    // note that adds some overhead for this extra check in some cases, such as an updateCriteria
+                    // Need to check to see if it isn't present so we can exit early with a
+                    // failure. Note that adds some overhead for this extra check in some cases,
+                    // such as an updateCriteria
                     // of the form
                     //   { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
-                    else {
-                        if (collection == NULL ||
-                            (indexCatalog->haveIdIndex(txn) && Helpers::findById(txn, collection, updateCriteria).isNull()) ||
-                            // capped collections won't have an _id index
-                            (!indexCatalog->haveIdIndex(txn) && Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
-                            failedUpdate = true;
-                            error() << "couldn't find doc: " << op.toString() << endl;
-                        }
-
-                        // Otherwise, it's present; zero objects were updated because of additional specifiers
-                        // in the query for idempotence
+                    if (collection == NULL ||
+                        (indexCatalog->haveIdIndex(txn) &&
+                         Helpers::findById(txn, collection, updateCriteria).isNull()) ||
+                        // capped collections won't have an _id index
+                        (!indexCatalog->haveIdIndex(txn) &&
+                         Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
+                        string msg = str::stream() << "couldn't find doc: " << op.toString();
+                        error() << msg;
+                        return Status(ErrorCodes::OperationFailed, msg);
                     }
+
+                    // Otherwise, it's present; zero objects were updated because of additional specifiers
+                    // in the query for idempotence
                 }
                 else { 
                     // this could happen benignly on an oplog duplicate replay of an upsert
                     // (because we are idempotent), 
                     // if an regular non-mod update fails the item is (presumably) missing.
                     if( !upsert ) {
-                        failedUpdate = true;
-                        error() << "update of non-mod failed: " << op.toString() << endl;
+                        string msg = str::stream() << "update of non-mod failed: " << op.toString();
+                        error() << msg;
+                        return Status(ErrorCodes::OperationFailed, msg);
                     }
                 }
             }
@@ -763,7 +768,7 @@ namespace {
                 !fieldB.eoo() ? &valueB : NULL );
         wuow.commit();
 
-        return failedUpdate;
+        return Status::OK();
     }
 
     void waitUpToOneSecondForOptimeChange(const OpTime& referenceTime) {

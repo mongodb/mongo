@@ -617,13 +617,13 @@ namespace repl {
 
     void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONObj& op) {
         try {
-            bool failedUpdate = applyOperation_inlock( txn, db, op );
-            if (failedUpdate) {
+            Status status = applyOperation_inlock( txn, db, op );
+            if (!status.isOK()) {
                 Sync sync(hostName);
                 if (sync.shouldRetry(txn, op)) {
                     uassert(15914,
                             "Failure retrying initial sync update",
-                            !applyOperation_inlock(txn, db, op));
+                            applyOperation_inlock(txn, db, op).isOK());
                 }
             }
         }
