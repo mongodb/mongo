@@ -486,8 +486,6 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
     uint32_t cell_offset, const void *key, size_t size, void *dest)
 {
 	WT_IKEY *ikey, **ikeyp;
-	uintptr_t oldv;
-	int success;
 
 	ikeyp = dest;
 
@@ -500,10 +498,20 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 	ikey->cell_offset = cell_offset;
 	memcpy(WT_IKEY_DATA(ikey), key, size);
 
+#ifdef HAVE_DIAGNOSTIC
+	{
+	uintptr_t oldv;
+
 	oldv = (uintptr_t)*ikeyp;
 	WT_DIAGNOSTIC_YIELD;
+
+	/* We should never overwrite an instantiated key. */
 	WT_ASSERT(session, oldv == 0 || (oldv & WT_IK_FLAG) != 0);
-	success = WT_ATOMIC_CAS8(*ikeyp, (WT_IKEY *)oldv, ikey);
-	WT_ASSERT(session, success);
+	WT_ASSERT(session,
+	    WT_ATOMIC_CAS8(*ikeyp, (WT_IKEY *)oldv, ikey));
+	}
+#else
+	*(WT_IKEY **)dest = ikey;
+#endif
 	return (0);
 }
