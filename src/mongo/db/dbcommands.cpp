@@ -1469,7 +1469,12 @@ namespace mongo {
 
         if ( ! canRunHere ) {
             result.append( "note" , "from execCommand" );
-            appendCommandStatus(result, false, "not master");
+            if ( c->slaveOverrideOk() ) {
+                appendCommandStatus(result, false, "not master and slaveOk=false");
+            }
+            else {
+                appendCommandStatus(result, false, "not master");
+            }
             return;
         }
 
