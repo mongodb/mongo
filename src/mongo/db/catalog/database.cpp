@@ -515,26 +515,18 @@ namespace mongo {
         audit::logRenameCollection( currentClient.get(), fromNS, toNS );
 
         // move index namespaces
-        BSONObj indexSpec;
-        while (Helpers::findOne(_indexesName, BSON("ns" << fromNS), indexSpec)) {
-            const BSONObj oldIndexSpec = indexSpec.getOwned();
-            int indexI = details->_catalogFindIndexByName(oldIndexSpec.getStringField("name"));
-
-            // Return value of -1 means the index was not found. That can only happen if it is an
-            // in-progress index. We skip those, because the restart call after rename will kick
-            // them off again on the new namespace.
-            if (indexI == -1) {
-                continue;
-            }
+        BSONObj oldIndexSpec;
+        while( Helpers::findOne( _indexesName, BSON( "ns" << fromNS ), oldIndexSpec ) ) {
+            oldIndexSpec = oldIndexSpec.getOwned();
 
             BSONObj newIndexSpec;
             {
                 BSONObjBuilder b;
-                BSONObjIterator i(oldIndexSpec);
-                while (i.more()) {
+                BSONObjIterator i( oldIndexSpec );
+                while( i.more() ) {
                     BSONElement e = i.next();
-                    if (strcmp(e.fieldName(), "ns") != 0)
-                        b.append(e);
+                    if ( strcmp( e.fieldName(), "ns" ) != 0 )
+                        b.append( e );
                     else
                         b << "ns" << toNS;
                 }
@@ -546,6 +538,7 @@ namespace mongo {
             if ( !newIndexSpecLoc.isOK() )
                 return newIndexSpecLoc.getStatus();
 
+            int indexI = details->_catalogFindIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();
             indexDetails.info = newIndexSpecLoc.getValue();
