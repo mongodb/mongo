@@ -737,7 +737,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 			__wt_err(session, tret,
 			    "Final close of %s failed", dhandle->name);
 			WT_TRET(tret);
-		} else
+		} else if (!final)
 			WT_RET(tret);
 	}
 
