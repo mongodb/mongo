@@ -485,9 +485,7 @@ int
 __wt_row_ikey(WT_SESSION_IMPL *session,
     uint32_t cell_offset, const void *key, size_t size, void *dest)
 {
-	WT_IKEY *ikey, **ikeyp;
-
-	ikeyp = dest;
+	WT_IKEY *ikey;
 
 	/*
 	 * Allocate memory for the WT_IKEY structure and the key, then copy
@@ -500,8 +498,11 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 
 #ifdef HAVE_DIAGNOSTIC
 	{
+	WT_IKEY **ikeyp;
+
 	uintptr_t oldv;
 
+	ikeyp = dest;
 	oldv = (uintptr_t)*ikeyp;
 	WT_DIAGNOSTIC_YIELD;
 
