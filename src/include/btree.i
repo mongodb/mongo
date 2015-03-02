@@ -949,7 +949,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
-        WT_REF *bt_evict_ref;
 
 	btree = S2BT(session);
 	mod = page->modify;
@@ -959,8 +958,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 		return (1);
 
         /* Skip pages that are already being evicted. */
-        if ((bt_evict_ref = btree->evict_ref) != NULL &&
-            bt_evict_ref->page == page)
+        if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
                 return (0);
 
 	/*
