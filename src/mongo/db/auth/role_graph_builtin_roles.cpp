@@ -410,6 +410,8 @@ namespace {
                 Privilege(ResourcePattern::forCollectionName("system.namespaces"),
                           readRoleActions));
         ActionSet profileActions = readRoleActions;
+        profileActions.addAction(ActionType::convertToCapped);
+        profileActions.addAction(ActionType::createCollection);
         profileActions.addAction(ActionType::dropCollection);
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
