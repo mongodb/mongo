@@ -18,6 +18,7 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	uint32_t evict_workers_max, evict_workers_min;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -51,16 +52,18 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	conn->evict_workers_max = (u_int)cval.val - 1;
+	evict_workers_max = (u_int)cval.val - 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_min", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	conn->evict_workers_min = (u_int)cval.val - 1;
+	evict_workers_min = (u_int)cval.val - 1;
 
-	if (conn->evict_workers_min > conn->evict_workers_max)
+	if (evict_workers_min > evict_workers_max)
 		WT_RET_MSG(session, EINVAL,
 		    "eviction=(threads_min) cannot be greater than "
 		    "eviction=(threads_max)");
+	conn->evict_workers_max = evict_workers_max;
+	conn->evict_workers_min = evict_workers_min;
 
 	return (0);
 }
