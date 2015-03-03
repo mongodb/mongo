@@ -416,9 +416,8 @@ namespace mongo {
             if (NULL != mandatoryPred) {
                 // We must have at least one index which can be used to answer 'mandatoryPred'.
                 invariant(!mandatoryIndices.empty());
-                enumerateMandatoryIndex(idxToFirst, idxToNotFirst, mandatoryPred,
-                                        mandatoryIndices, andAssignment);
-                return true;
+                return enumerateMandatoryIndex(idxToFirst, idxToNotFirst, mandatoryPred,
+                                               mandatoryIndices, andAssignment);
             }
 
             enumerateOneIndex(idxToFirst, idxToNotFirst, subnodes, andAssignment);
@@ -434,7 +433,7 @@ namespace mongo {
         return false;
     }
 
-    void PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
+    bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                                                  const IndexToPredMap& idxToNotFirst,
                                                  MatchExpression* mandatoryPred,
                                                  const set<IndexID>& mandatoryIndices,
@@ -461,6 +460,13 @@ namespace mongo {
             indexAssign.index = *indexIt;
 
             IndexToPredMap::const_iterator it = idxToFirst.find(*indexIt);
+            if (idxToFirst.end() == it) {
+                // We don't have any predicate to assign to the leading field of this index.
+                // This means that we cannot generate a solution using this index, so we
+                // just move on to the next index.
+                continue;
+            }
+
             const vector<MatchExpression*>& predsOverLeadingField = it->second;
 
             if (thisIndex.multikey) {
@@ -548,6 +554,8 @@ namespace mongo {
             state.assignments.push_back(indexAssign);
             andAssignment->choices.push_back(state);
         }
+
+        return andAssignment->choices.size() > 0;
     }
 
     void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
