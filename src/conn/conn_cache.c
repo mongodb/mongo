@@ -48,11 +48,12 @@ __wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
 }
 
 /*
- * __wt_cache_config --
+ * __wt_cache_config_local --
  *	Configure the underlying cache.
  */
 int
-__wt_cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
+__wt_cache_config_local(
+    WT_SESSION_IMPL *session, int shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
@@ -63,7 +64,7 @@ __wt_cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 
 	/*
 	 * If not using a shared cache configure the cache size, otherwise
-	 * check for a reserved size. All other settings are independant of
+	 * check for a reserved size. All other settings are independent of
 	 * whether we are using a shared cache or not.
 	 */
 	if (!shared) {
