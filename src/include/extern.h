@@ -163,8 +163,9 @@ extern int __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *lea
 extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_leaf_key_copy( WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_ITEM *key);
 extern int __wt_row_leaf_key_work(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *keyb, int instantiate);
-extern int __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset, const void *key, size_t size, void *ikeyp);
-extern int __wt_row_ikey(WT_SESSION_IMPL *session, uint32_t cell_offset, const void *key, size_t size, void *ikeyp);
+extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session, uint32_t cell_offset, const void *key, size_t size, WT_IKEY **ikeyp);
+extern int __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t cell_offset, const void *key, size_t size, WT_REF *ref);
+extern int __wt_row_ikey(WT_SESSION_IMPL *session, uint32_t cell_offset, const void *key, size_t size, WT_REF *ref);
 extern int __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, WT_ITEM *value, WT_UPDATE *upd, int is_remove);
 extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session, WT_ITEM *key, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep);

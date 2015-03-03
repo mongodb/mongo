@@ -375,6 +375,8 @@ __conn_btree_open(
 	    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
 	    !LF_ISSET(WT_DHANDLE_LOCK_ONLY));
 
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_CLOSING));
+
 	/*
 	 * If the handle is already open, it has to be closed so it can be
 	 * reopened with a new configuration.  We don't need to check again:
@@ -725,13 +727,18 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	int tret;
 
 	dhandle = session->dhandle;
 
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-		ret = __wt_conn_btree_sync_and_close(session, 0);
-		if (!final)
-			WT_RET(ret);
+		tret = __wt_conn_btree_sync_and_close(session, 0);
+		if (final && tret != 0) {
+			__wt_err(session, tret,
+			    "Final close of %s failed", dhandle->name);
+			WT_TRET(tret);
+		} else if (!final)
+			WT_RET(tret);
 	}
 
 	/*

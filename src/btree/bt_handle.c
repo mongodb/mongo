@@ -453,8 +453,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		ref->page = NULL;
 		ref->addr = NULL;
 		ref->state = WT_REF_DELETED;
-		WT_ERR(__wt_row_ikey_incr(
-		    session, root, 0, "", 1, &ref->key.ikey));
+		WT_ERR(__wt_row_ikey_incr(session, root, 0, "", 1, ref));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
