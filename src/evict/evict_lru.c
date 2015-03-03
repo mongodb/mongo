@@ -248,7 +248,7 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_EVICT_WORKER *workers;
 	size_t alloc;
-	u_int i;
+	uint32_t i;
 
 	conn = S2C(session);
 
@@ -332,7 +332,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_EVICT_WORKER *workers;
 	WT_SESSION *wt_session;
-	u_int i;
+	uint32_t i;
 
 	conn = S2C(session);
 	cache = conn->cache;
