@@ -922,14 +922,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	locked = yield_count = 0;
 	*freep = 1;
 
-	/* Write the buffered records */
-	if (F_ISSET(slot, SLOT_BUFFERED)) {
-		write_size = (size_t)
-		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
-		WT_ERR(__wt_write(session, slot->slot_fh,
-		    slot->slot_start_offset, write_size, slot->slot_buf.mem));
-	}
-
 	/*
 	 * If this is not a buffered write, meaning the slot we have is a
 	 * dummy constructed slot, not from the slot pool, or we have to wait
@@ -940,13 +932,24 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	if (F_ISSET(slot, SLOT_BUFFERED) &&
 	    !F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR)) {
 		*freep = 0;
-		slot->slot_state = WT_LOG_SLOT_WRITTEN;
+		slot->slot_state = WT_LOG_SLOT_WRITE_READY;
 		/*
 		 * After this point the worker thread owns the slot.  There
 		 * is nothing more to do but return.
 		 */
 		WT_ERR(__wt_cond_signal(session, conn->log_wrlsn_cond));
 		goto done;
+	}
+
+	/*
+	 * Write the buffered records if we're synchronous.
+	 */
+	if (F_ISSET(slot, SLOT_BUFFERED) &&
+	    F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR)) {
+		write_size = (size_t)
+		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
+		WT_ERR(__wt_write(session, slot->slot_fh,
+		    slot->slot_start_offset, write_size, slot->slot_buf.mem));
 	}
 
 	/*
