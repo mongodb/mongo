@@ -10,10 +10,49 @@
 
 /*
  * __wt_cache_config --
+ *	Configure or reconfigure the current cache and shared cache.
+ */
+int
+__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	int now_shared, was_shared;
+
+	conn = S2C(session);
+
+	WT_ASSERT(session, conn->cache != NULL);
+
+	WT_RET(__wt_config_gets_none(
+	    session, cfg, "shared_cache.name", &cval));
+	now_shared = cval.len != 0;
+	was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
+
+	/* Cleanup if reconfiguring and switching from a shared cache */
+	if (reconfigure && was_shared && !now_shared)
+		WT_RET(__wt_conn_cache_pool_destroy(session));
+
+	/*
+	 * Always setup the local cache - it's used even if we are
+	 * participating in a shared cache.
+	 */
+	WT_RET(__wt_cache_config_local(session, now_shared, cfg));
+	if (now_shared) {
+		WT_RET(__wt_cache_pool_config(session, cfg));
+		WT_ASSERT(session, F_ISSET(conn, WT_CONN_CACHE_POOL));
+		if (!was_shared)
+			WT_RET(__wt_conn_cache_pool_open(session));
+	}
+
+	return (0);
+}
+
+/*
+ * __wt_cache_config --
  *	Configure the underlying cache.
  */
 int
-__wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
@@ -24,18 +63,12 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * If not using a shared cache configure the cache size, otherwise
-	 * check for a reserved size.
+	 * check for a reserved size. All other settings are independant of
+	 * whether we are using a shared cache or not.
 	 */
-	if (!F_ISSET(conn, WT_CONN_CACHE_POOL)) {
+	if (!shared) {
 		WT_RET(__wt_config_gets(session, cfg, "cache_size", &cval));
 		conn->cache_size = (uint64_t)cval.val;
-	} else {
-		WT_RET(__wt_config_gets(
-		    session, cfg, "shared_cache.reserve", &cval));
-		if (cval.val == 0)
-			WT_RET(__wt_config_gets(
-			    session, cfg, "shared_cache.chunk", &cval));
-		cache->cp_reserved = (uint64_t)cval.val;
 	}
 
 	WT_RET(__wt_config_gets(session, cfg, "cache_overhead", &cval));
@@ -92,11 +125,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(session, cfg));
-
-	/* Add the configured cache to the cache pool. */
-	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		WT_RET(__wt_conn_cache_pool_open(session));
+	WT_RET(__wt_cache_config(session, 0, cfg));
 
 	/*
 	 * The target size must be lower than the trigger size or we will never

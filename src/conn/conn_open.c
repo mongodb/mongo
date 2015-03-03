@@ -55,9 +55,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_WRITE_BARRIER();
 
-	/* Connect to a cache pool. */
-	WT_RET(__wt_cache_pool_config(session, cfg));
-
 	/* Create the cache. */
 	WT_RET(__wt_cache_create(session, cfg));
 
