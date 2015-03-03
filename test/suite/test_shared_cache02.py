@@ -145,5 +145,25 @@ class test_shared_cache02(wttest.WiredTigerTestCase):
 
         self.closeConnections()
 
+    # Test reconfigure that switches to using a shared cache
+    # previous reserve size isn't taken into account
+    def test_shared_cache_reconfig03(self):
+        nops = 1000
+        self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts = ',')
+
+        for sess in self.sessions:
+            sess.create(self.uri, "key_format=S,value_format=S")
+            self.add_records(sess, 0, nops)
+
+        self.conns[0].reconfigure("shared_cache=(name=pool,reserve=20M)"),
+        self.conns[1].reconfigure("shared_cache=(name=pool,reserve=20M)"),
+
+        # TODO: Ensure that the reserve size was updated.
+        # cursor = self.sessions[0].open_cursor('config:', None, None)
+        # value = cursor['connection']
+        # self.assertTrue(value.find('reserve') != -1)
+
+        self.closeConnections()
+
 if __name__ == '__main__':
     wttest.run()
