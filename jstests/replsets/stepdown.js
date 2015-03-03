@@ -163,7 +163,8 @@ print("\nrunning shutdown without force on master: "+master);
 // secondary is down)
 var now = new Date();
 assert.commandFailed(master.getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3}));
-assert.gte((new Date()) - now, 3000);
+// on windows, javascript and the server perceive time differently, to compensate here we use 2750ms
+assert.gte((new Date()) - now, 2750);
 
 print("\nsend shutdown command");
 
