@@ -5090,7 +5090,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
-		WT_RET(__wt_row_ikey(session, 0,
+		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
 		if (bnd->skip == NULL) {

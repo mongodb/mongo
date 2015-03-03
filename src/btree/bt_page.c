@@ -611,7 +611,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
 			WT_ERR(__wt_row_ikey_incr(session, page,
 			    WT_PAGE_DISK_OFFSET(page, cell),
-			    current->data, current->size, &ref->key.ikey));
+			    current->data, current->size, ref));
 
 			*sizep += sizeof(WT_IKEY) + current->size;
 			break;
