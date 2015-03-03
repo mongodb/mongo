@@ -389,8 +389,11 @@ namespace mongo {
          * Generate single-index assignments for queries which contain mandatory
          * predicates (TEXT and GEO_NEAR, which are required to use a compatible index).
          * Outputs these assignments into 'andAssignment'.
+         *
+         * Returns true if it generated at least one assignment, and false if no assignment
+         * of 'mandatoryPred' is possible.
          */
-        void enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
+        bool enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                                      const IndexToPredMap& idxToNotFirst,
                                      MatchExpression* mandatoryPred,
                                      const std::set<IndexID>& mandatoryIndices,
