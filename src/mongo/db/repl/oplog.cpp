@@ -597,46 +597,31 @@ namespace {
             else {
                 // do upserts for inserts as we might get replayed more than once
                 OpDebug debug;
-                BSONElement _id;
-                if( !o.getObjectID(_id) ) {
-                    /* No _id.  This will be very slow. */
-                    Timer t;
 
-                    const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs);
+                // No _id.
+                // This indicates an issue with the upstream server:
+                //     The oplog entry is corrupted; or
+                //     The version of the upstream server is obsolete.
+                uassert(ErrorCodes::NoSuchKey, str::stream() <<
+                        "Failed to apply insert due to missing _id: " << op.toString(),
+                        o.hasField("_id"));
 
-                    request.setQuery(o);
-                    request.setUpdates(o);
-                    request.setUpsert();
-                    request.setFromReplication();
-                    UpdateLifecycleImpl updateLifecycle(true, requestNs);
-                    request.setLifecycle(&updateLifecycle);
+                // TODO: It may be better to do an insert here, and then catch the duplicate
+                // key exception and do update then. Very few upserts will not be inserts...
+                BSONObjBuilder b;
+                b.append(o.getField("_id"));
 
-                    update(txn, db, request, &debug);
+                const NamespaceString requestNs(ns);
+                UpdateRequest request(requestNs);
 
-                    if( t.millis() >= 2 ) {
-                        RARELY OCCASIONALLY warning() << "slow updates (no _id field) for " << ns << endl;
-                    }
-                }
-                else {
-                    /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
-                              then.  very few upserts will not be inserts...
-                              */
-                    BSONObjBuilder b;
-                    b.append(_id);
+                request.setQuery(b.done());
+                request.setUpdates(o);
+                request.setUpsert();
+                request.setFromReplication();
+                UpdateLifecycleImpl updateLifecycle(true, requestNs);
+                request.setLifecycle(&updateLifecycle);
 
-                    const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs);
-
-                    request.setQuery(b.done());
-                    request.setUpdates(o);
-                    request.setUpsert();
-                    request.setFromReplication();
-                    UpdateLifecycleImpl updateLifecycle(true, requestNs);
-                    request.setLifecycle(&updateLifecycle);
-
-                    update(txn, db, request, &debug);
-                }
+                update(txn, db, request, &debug);
             }
         }
         else if ( *opType == 'u' ) {
@@ -645,6 +630,10 @@ namespace {
             OpDebug debug;
             BSONObj updateCriteria = o2;
             const bool upsert = valueB || convertUpdateToUpsert;
+
+            uassert(ErrorCodes::NoSuchKey, str::stream() <<
+                    "Failed to apply update due to missing _id: " << op.toString(),
+                    updateCriteria.hasField("_id"));
 
             const NamespaceString requestNs(ns);
             UpdateRequest request(requestNs);
@@ -700,6 +689,11 @@ namespace {
         }
         else if ( *opType == 'd' ) {
             opCounters->gotDelete();
+
+            uassert(ErrorCodes::NoSuchKey, str::stream() <<
+                    "Failed to apply delete due to missing _id: " << op.toString(),
+                    o.hasField("_id"));
+
             if ( opType[1] == 0 )
                 deleteObjects(txn, db, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
             else
