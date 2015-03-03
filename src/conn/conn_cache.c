@@ -52,11 +52,11 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	evict_workers_max = (u_int)cval.val - 1;
+	evict_workers_max = (uint32_t)cval.val - 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_min", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	evict_workers_min = (u_int)cval.val - 1;
+	evict_workers_min = (uint32_t)cval.val - 1;
 
 	if (evict_workers_min > evict_workers_max)
 		WT_RET_MSG(session, EINVAL,
@@ -83,8 +83,7 @@ __wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
 
 	WT_ASSERT(session, conn->cache != NULL);
 
-	WT_RET(__wt_config_gets_none(
-	    session, cfg, "shared_cache.name", &cval));
+	WT_RET(__wt_config_gets_none(session, cfg, "shared_cache.name", &cval));
 	now_shared = cval.len != 0;
 	was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
 
