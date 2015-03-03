@@ -346,6 +346,8 @@ static int do_x509_check(X509 *x, const unsigned char *chk, size_t chklen,
 	return 0;
 	}
 
+#if OPENSSL_VERSION_NUMBER < 0x1000200fL
+
 int X509_check_host(X509 *x, const unsigned char *chk, size_t chklen,
 					unsigned int flags)
 	{
@@ -363,5 +365,7 @@ int X509_check_ip(X509 *x, const unsigned char *chk, size_t chklen,
 	{
 	return do_x509_check(x, chk, chklen, flags, GEN_IPADD);
 	}
+
+#endif /* OPENSSL_VERSION_NUMBER < 0x1000200fL */
 
 #endif
