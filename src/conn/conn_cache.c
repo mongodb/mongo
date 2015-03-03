@@ -9,59 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_cache_config --
- *	Configure or reconfigure the current cache and shared cache.
- */
-int
-__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
-{
-	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
-	int now_shared, was_shared;
-
-	conn = S2C(session);
-
-	WT_ASSERT(session, conn->cache != NULL);
-
-	WT_RET(__wt_config_gets_none(
-	    session, cfg, "shared_cache.name", &cval));
-	now_shared = cval.len != 0;
-	was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
-
-	/* Cleanup if reconfiguring */
-	if (reconfigure && was_shared && !now_shared)
-		/* Remove ourselves from the pool if necessary */
-		WT_RET(__wt_conn_cache_pool_destroy(session));
-	else if (reconfigure && !was_shared && now_shared)
-		/*
-		 * Cache size will now be managed by the cache pool - the
-		 * start size always needs to be zero to allow the pool to
-		 * manage how much memory is in-use.
-		 */
-		conn->cache_size = 0;
-
-	/*
-	 * Always setup the local cache - it's used even if we are
-	 * participating in a shared cache.
-	 */
-	WT_RET(__wt_cache_config_local(session, now_shared, cfg));
-	if (now_shared) {
-		WT_RET(__wt_cache_pool_config(session, cfg));
-		WT_ASSERT(session, F_ISSET(conn, WT_CONN_CACHE_POOL));
-		if (!was_shared)
-			WT_RET(__wt_conn_cache_pool_open(session));
-	}
-
-	return (0);
-}
-
-/*
- * __wt_cache_config_local --
+ * __cache_config_local --
  *	Configure the underlying cache.
  */
-int
-__wt_cache_config_local(
-    WT_SESSION_IMPL *session, int shared, const char *cfg[])
+static int
+__cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
@@ -109,6 +61,53 @@ __wt_cache_config_local(
 		WT_RET_MSG(session, EINVAL,
 		    "eviction=(threads_min) cannot be greater than "
 		    "eviction=(threads_max)");
+
+	return (0);
+}
+
+/*
+ * __wt_cache_config --
+ *	Configure or reconfigure the current cache and shared cache.
+ */
+int
+__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	int now_shared, was_shared;
+
+	conn = S2C(session);
+
+	WT_ASSERT(session, conn->cache != NULL);
+
+	WT_RET(__wt_config_gets_none(
+	    session, cfg, "shared_cache.name", &cval));
+	now_shared = cval.len != 0;
+	was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
+
+	/* Cleanup if reconfiguring */
+	if (reconfigure && was_shared && !now_shared)
+		/* Remove ourselves from the pool if necessary */
+		WT_RET(__wt_conn_cache_pool_destroy(session));
+	else if (reconfigure && !was_shared && now_shared)
+		/*
+		 * Cache size will now be managed by the cache pool - the
+		 * start size always needs to be zero to allow the pool to
+		 * manage how much memory is in-use.
+		 */
+		conn->cache_size = 0;
+
+	/*
+	 * Always setup the local cache - it's used even if we are
+	 * participating in a shared cache.
+	 */
+	WT_RET(__cache_config_local(session, now_shared, cfg));
+	if (now_shared) {
+		WT_RET(__wt_cache_pool_config(session, cfg));
+		WT_ASSERT(session, F_ISSET(conn, WT_CONN_CACHE_POOL));
+		if (!was_shared)
+			WT_RET(__wt_conn_cache_pool_open(session));
+	}
 
 	return (0);
 }

@@ -207,7 +207,6 @@ extern int __wt_extractor_config(WT_SESSION_IMPL *session, const char *config, W
 extern int __wt_conn_remove_extractor(WT_SESSION_IMPL *session);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[]);
-extern int __wt_cache_config_local( WT_SESSION_IMPL *session, int shared, const char *cfg[]);
 extern int __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_SESSION_IMPL *session);
 extern int __wt_cache_destroy(WT_SESSION_IMPL *session);
