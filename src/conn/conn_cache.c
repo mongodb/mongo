@@ -28,9 +28,17 @@ __wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
 	now_shared = cval.len != 0;
 	was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
 
-	/* Cleanup if reconfiguring and switching from a shared cache */
+	/* Cleanup if reconfiguring */
 	if (reconfigure && was_shared && !now_shared)
+		/* Remove ourselves from the pool if necessary */
 		WT_RET(__wt_conn_cache_pool_destroy(session));
+	else if (reconfigure && !was_shared && now_shared)
+		/*
+		 * Cache size will now be managed by the cache pool - the
+		 * start size always needs to be zero to allow the pool to
+		 * manage how much memory is in-use.
+		 */
+		conn->cache_size = 0;
 
 	/*
 	 * Always setup the local cache - it's used even if we are
@@ -118,8 +126,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
-	WT_ASSERT(session, conn->cache == NULL ||
-	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
+	WT_ASSERT(session, conn->cache == NULL);
 
 	WT_RET(__wt_calloc_one(session, &conn->cache));
 
