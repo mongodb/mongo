@@ -42,3 +42,9 @@ env.Library('boost_program_options', [
         'libs/program_options/src/variables_map.cpp',
         'libs/program_options/src/winmain.cpp',
         ])
+
+env.Library('boost_chrono', [
+        'libs/chrono/src/chrono.cpp',
+        'libs/chrono/src/process_cpu_clocks.cpp',
+        'libs/chrono/src/thread_clock.cpp',
+        ])

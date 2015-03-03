@@ -104,6 +104,7 @@ if use_system_version_of_library("boost"):
                 env['LIBDEPS_BOOST_FILESYSTEM_SYSLIBDEP'],
                 env['LIBDEPS_BOOST_THREAD_SYSLIBDEP'],
                 env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP'],
+                env['LIBDEPS_BOOST_CHRONO_SYSLIBDEP'],
             ])
 else:
     boostDirectory = 'boost' + boostSuffix
@@ -116,6 +117,7 @@ else:
             boostDirectory + '/boost_filesystem',
             boostDirectory + '/boost_thread',
             boostDirectory + '/boost_system',
+            boostDirectory + '/boost_chrono',
         ])
 
 boostEnv.Library(
