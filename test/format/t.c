@@ -40,9 +40,9 @@ extern char *__wt_optarg;
 int
 main(int argc, char *argv[])
 {
+	time_t start;
 	int ch, reps, ret;
 	const char *config, *home;
-	time_t start;
 
 	config = NULL;
 
@@ -186,33 +186,35 @@ main(int argc, char *argv[])
 		wts_load();			/* Load initial records */
 		wts_verify("post-bulk verify");	/* Verify */
 
-						/* Loop reading & operations */
-		for (reps = 0; reps < FORMAT_OPERATION_REPS; ++reps) {
-			wts_read_scan();	/* Read scan */
+		/*
+		 * If we're not doing any operations, scan the bulk-load, copy
+		 * the statistics and we're done. Otherwise, loop reading and
+		 * operations, with a verify after each set.
+		 */
+		if (g.c_timer == 0 && g.c_ops == 0) {
+			wts_read_scan();		/* Read scan */
+			wts_stats();			/* Statistics */
+		} else
+			for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps) {
+				wts_read_scan();	/* Read scan */
 
-						/* Operations */
-			if (g.c_timer != 0 || g.c_ops != 0)
-				wts_ops();
+							/* Operations */
+				wts_ops(reps == FORMAT_OPERATION_REPS);
 
-			/*
-			 * Statistics.
-			 *
-			 * XXX
-			 * Verify closes the underlying handle and discards the
-			 * statistics, read them first.
-			 */
-			if (g.c_ops == 0 || reps == 2)
-				wts_stats();
+				/*
+				 * Copy out the run's statistics after the last
+				 * set of operations.
+				 *
+				 * XXX
+				 * Verify closes the underlying handle and
+				 * discards the statistics, read them first.
+				 */
+				if (reps == FORMAT_OPERATION_REPS)
+					wts_stats();
 
-						/* Verify */
-			wts_verify("post-ops verify");
-
-			/*
-			 * If no operations, quit.
-			 */
-			if (g.c_timer == 0 && g.c_ops == 0)
-				break;
-		}
+							/* Verify */
+				wts_verify("post-ops verify");
+			}
 
 		track("shutting down", 0ULL, NULL);
 		if (SINGLETHREADED)

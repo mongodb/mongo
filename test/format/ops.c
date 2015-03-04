@@ -46,7 +46,7 @@ static void  table_append_init(void);
  *	Perform a number of operations in a set of threads.
  */
 void
-wts_ops(void)
+wts_ops(int lastrun)
 {
 	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
@@ -144,18 +144,23 @@ wts_ops(void)
 				break;
 			}
 
-			/* Notify ops threads if we've finished the run */
-			if (fourths == 0) {
-				/* Optionally drop core for recovery testing */
-				if (g.c_abort) {
+			/*
+			 * If the timer has expired or this thread has completed
+			 * its operations, notify the thread it should quit.
+			 */
+			if (fourths == 0 ||
+			    (thread_ops != -1 &&
+			    tinfo[i].ops >= (uint64_t)thread_ops)) {
+				/*
+				 * On the last execution, optionally drop core
+				 * for recovery testing.
+				 */
+				if (lastrun && g.c_abort) {
 					static char *core = NULL;
 					*core = 0;
 				}
 				tinfo[i].quit = 1;
 			}
-			if (thread_ops != -1)
-				if (tinfo[i].ops >= (uint64_t)thread_ops)
-					tinfo[i].quit = 1;
 		}
 		track("ops", 0ULL, &total);
 		if (!running)
