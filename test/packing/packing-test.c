@@ -27,26 +27,24 @@
  */
 
 #include <assert.h>
-#include <stdlib.h>
-#include <time.h>
 
-#include <wiredtiger.h>
-#include <stdarg.h>
+#include "wt_internal.h"
 
-void check(const char *fmt, ...)
+static void
+check(const char *fmt, ...)
 {
 	char buf[200], *end, *p;
 	va_list ap;
 	size_t len;
 
 	va_start(ap, fmt);
-	len = wiredtiger_struct_sizev(fmt, ap);
+	assert(__wt_struct_sizev(NULL, &len, fmt, ap) == 0);
 	va_end(ap);
 
-	assert(len < sizeof buf);
+	assert(len < sizeof(buf));
 
 	va_start(ap, fmt);
-	assert(wiredtiger_struct_packv(buf, sizeof buf, fmt, ap) == 0);
+	assert(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap) == 0);
 	va_end(ap);
 
 	printf("%s ", fmt);
@@ -55,7 +53,9 @@ void check(const char *fmt, ...)
 	printf("\n");
 }
 
-int main() {
+int
+main()
+{
 	check("iii", 0, 101, -99);
 	check("3i", 0, 101, -99);
 	check("iS", 42, "forty two");
