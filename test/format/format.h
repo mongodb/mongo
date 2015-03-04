@@ -218,7 +218,6 @@ typedef struct {
 	uint32_t c_statistics_server;
 	uint32_t c_threads;
 	uint32_t c_timer;
-	uint32_t c_timeout;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
 	uint32_t c_write_pct;
@@ -308,7 +307,7 @@ void	 wts_create(void);
 void	 wts_dump(const char *, int);
 void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
-void	 wts_ops(void);
+void	 wts_ops(int);
 void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
