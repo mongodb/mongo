@@ -173,7 +173,7 @@ if usev8:
     if use_system_version_of_library("v8"):
         v8Env = env.Clone(
             SYSLIBDEPS=[
-                env['LIBDEPS_v8_SYSLIBDEP'],
+                env['LIBDEPS_V8_SYSLIBDEP'],
             ])
     else:
         v8Env = env.Clone()
