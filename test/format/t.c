@@ -42,6 +42,7 @@ main(int argc, char *argv[])
 {
 	int ch, reps, ret;
 	const char *config, *home;
+	u_int tm;
 
 	config = NULL;
 
@@ -175,6 +176,8 @@ main(int argc, char *argv[])
 		key_len_setup();		/* Setup keys */
 
 		track("starting up", 0ULL, NULL);
+		tm = (u_int)time(NULL);
+
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
 		wts_open(g.home, 1, &g.wts_conn);
@@ -233,8 +236,9 @@ main(int argc, char *argv[])
 		/* Overwrite the progress line with a completion line. */
 		if (g.track)
 			printf("\r%78s\r", " ");
-		printf("%4d: %s, %s\n",
-		    g.run_cnt, g.c_data_source, g.c_file_type);
+		tm = (u_int)time(NULL) - tm;
+		printf("%4d: %s, %s, seconds %d\n",
+		    g.run_cnt, g.c_data_source, g.c_file_type, tm);
 	}
 
 	/* Flush/close any logging information. */
