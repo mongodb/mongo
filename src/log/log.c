@@ -462,6 +462,10 @@ __log_file_header(
 		WT_ERR(__log_acquire(session, logrec->len, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, 1, buf, NULL));
+	/*
+	 * Make sure the header gets to disk.
+	 */
+	WT_ERR(__wt_fsync(session, tmp.slot_fh));
 	if (end_lsn != NULL)
 		*end_lsn = tmp.slot_end_lsn;
 
@@ -580,6 +584,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_ftruncate(session, log_fh, lsn->offset));
 	tmp_fh = log_fh;
 	log_fh = NULL;
+	WT_ERR(__wt_fsync(session, tmp_fh));
 	WT_ERR(__wt_close(session, tmp_fh));
 
 	/*
@@ -603,6 +608,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 			    log_fh, LOG_FIRST_RECORD));
 			tmp_fh = log_fh;
 			log_fh = NULL;
+			WT_ERR(__wt_fsync(session, tmp_fh));
 			WT_ERR(__wt_close(session, tmp_fh));
 		}
 	}
@@ -653,6 +659,7 @@ __wt_log_allocfile(
 		WT_ERR(__log_prealloc(session, log_fh));
 	tmp_fh = log_fh;
 	log_fh = NULL;
+	WT_ERR(__wt_fsync(session, tmp_fh));
 	WT_ERR(__wt_close(session, tmp_fh));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_prealloc: rename %s to %s",
@@ -797,17 +804,20 @@ __wt_log_close(WT_SESSION_IMPL *session)
 	if (log->log_close_fh != NULL && log->log_close_fh != log->log_fh) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing old log %s", log->log_close_fh->name));
+		WT_RET(__wt_fsync(session, log->log_close_fh));
 		WT_RET(__wt_close(session, log->log_close_fh));
 	}
 	if (log->log_fh != NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log %s", log->log_fh->name));
+		WT_RET(__wt_fsync(session, log->log_fh));
 		WT_RET(__wt_close(session, log->log_fh));
 		log->log_fh = NULL;
 	}
 	if (log->log_dir_fh != NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log directory %s", log->log_dir_fh->name));
+		WT_RET(__wt_fsync(session, log->log_dir_fh));
 		WT_RET(__wt_close(session, log->log_dir_fh));
 		log->log_dir_fh = NULL;
 	}
