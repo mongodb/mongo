@@ -454,7 +454,7 @@ if buildDir[0] not in ['$', '#']:
 
 cacheDir = get_option('cache-dir').rstrip('/')
 if cacheDir[0] not in ['$', '#']:
-    if not os.path.isabs(cachdDIr):
+    if not os.path.isabs(cacheDir):
         print("Do not use relative paths with --cache-dir")
         Exit(1)
 
