@@ -52,9 +52,9 @@ wts_ops(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	pthread_t backup_tid, compact_tid;
-	uint64_t thread_ops;
-	uint32_t i, fourths;
-	int ret, running, timing;
+	int64_t fourths, thread_ops;
+	uint32_t i;
+	int ret, running;
 
 	conn = g.wts_conn;
 
@@ -71,28 +71,23 @@ wts_ops(void)
 
 	/*
 	 * There are two mechanisms to specify the length of the run, a number
-	 * of operations or a timer.  If the former, each thread does an equal
-	 * share of the total operations (and make sure that it's not 0).  If
-	 * the latter, calculate how many fourth-of-a-second sleeps until this
-	 * part of the run finishes.
+	 * of operations and a timer, when either expire the run terminates.
+	 * Each thread does an equal share of the total operations (and make
+	 * sure that it's not 0).
+	 *
+	 * Calculate how many fourth-of-a-second sleeps until any timer expires.
 	 */
-	if (g.c_timer == 0) {
+	if (g.c_ops == 0)
+		thread_ops = -1;
+	else {
 		if (g.c_ops < g.c_threads)
 			g.c_ops = g.c_threads;
 		thread_ops = g.c_ops / g.c_threads;
-		/*
-		 * Setup the timeout interval, a zero timeout disables
-		 * the functionality by setting fourths to zero.
-		 */
-		fourths = (g.c_timeout * 4 * 60) / FORMAT_OPERATION_REPS;
-	} else {
-		fourths = (g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
-		thread_ops = 0;
 	}
-
-	timing = fourths != 0;
-	/* Ensure we have an ops count if we aren't time limiting the run */
-	assert(timing || g.c_ops != 0);
+	if (g.c_timer == 0)
+		fourths = -1;
+	else
+		fourths = (g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
 
 	/* Initialize the table extension code. */
 	table_append_init();
@@ -150,7 +145,7 @@ wts_ops(void)
 			}
 
 			/* Notify ops threads if we've finished the run */
-			if (timing && fourths == 0) {
+			if (fourths == 0) {
 				/* Optionally drop core for recovery testing */
 				if (g.c_abort) {
 					static char *core = NULL;
@@ -158,15 +153,15 @@ wts_ops(void)
 				}
 				tinfo[i].quit = 1;
 			}
-			if (thread_ops != 0)
-				if (tinfo[i].ops >= thread_ops)
+			if (thread_ops != -1)
+				if (tinfo[i].ops >= (uint64_t)thread_ops)
 					tinfo[i].quit = 1;
 		}
 		track("ops", 0ULL, &total);
 		if (!running)
 			break;
 		(void)usleep(250000);		/* 1/4th of a second */
-		if (fourths != 0)
+		if (fourths != -1)
 			--fourths;
 	}
 	free(tinfo);
