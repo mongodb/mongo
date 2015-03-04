@@ -42,7 +42,7 @@ main(int argc, char *argv[])
 {
 	int ch, reps, ret;
 	const char *config, *home;
-	u_int tm;
+	time_t start;
 
 	config = NULL;
 
@@ -175,8 +175,8 @@ main(int argc, char *argv[])
 		config_print(0);		/* Dump run configuration */
 		key_len_setup();		/* Setup keys */
 
+		start = time(NULL);
 		track("starting up", 0ULL, NULL);
-		tm = (u_int)time(NULL);
 
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
@@ -236,9 +236,9 @@ main(int argc, char *argv[])
 		/* Overwrite the progress line with a completion line. */
 		if (g.track)
 			printf("\r%78s\r", " ");
-		tm = (u_int)time(NULL) - tm;
-		printf("%4d: %s, %s, seconds %d\n",
-		    g.run_cnt, g.c_data_source, g.c_file_type, tm);
+		printf("%4d: %s, %s (%.0f seconds)\n",
+		    g.run_cnt, g.c_data_source,
+		    g.c_file_type, difftime(time(NULL), start));
 	}
 
 	/* Flush/close any logging information. */
