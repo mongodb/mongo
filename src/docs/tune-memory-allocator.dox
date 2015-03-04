@@ -12,7 +12,7 @@ can dramatically improve throughput.
 
 As different memory allocators have different overhead and different
 workloads will have different heap allocation sizes and patterns,
-applications may need to set tieh allocator overhead using the
+applications may need to set their allocator overhead using the
 \c cache_overhead configuration to the wiredtiger_open:: call.
 
  */
