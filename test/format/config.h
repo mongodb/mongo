@@ -270,7 +270,7 @@ static CONFIG c[] = {
 	  C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
 
 	{ "timer",
-	  "time to run in minutes",
+	  "maximum time to run in minutes (default 20 minutes)",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_timer, NULL },
 
 	{ "value_max",
