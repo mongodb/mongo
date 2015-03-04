@@ -124,7 +124,7 @@ namespace mongo {
 
         // load ident to prefix map
         {
-            boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+            boost::lock_guard<boost::mutex> lk(_identPrefixMapMutex);
             for (_iter->Seek(kMetadataPrefix);
                  _iter->Valid() && _iter->key().starts_with(kMetadataPrefix); _iter->Next()) {
                 rocksdb::Slice ident(_iter->key());
@@ -202,7 +202,7 @@ namespace mongo {
         }
 
         {
-            boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+            boost::lock_guard<boost::mutex> lk(_identPrefixMapMutex);
             _identPrefixMap.erase(ident);
         }
 
@@ -210,7 +210,7 @@ namespace mongo {
     }
 
     bool RocksEngine::hasIdent(OperationContext* opCtx, StringData ident) const {
-        boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+        boost::lock_guard<boost::mutex> lk(_identPrefixMapMutex);
         return _identPrefixMap.find(ident) != _identPrefixMap.end();
     }
 
@@ -226,7 +226,7 @@ namespace mongo {
     Status RocksEngine::_createIdentPrefix(StringData ident) {
         uint32_t prefix = 0;
         {
-            boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+            boost::lock_guard<boost::mutex> lk(_identPrefixMapMutex);
             if (_identPrefixMap.find(ident) != _identPrefixMap.end()) {
                 // already exists
                 return Status::OK();
@@ -247,7 +247,7 @@ namespace mongo {
     }
 
     std::string RocksEngine::_getIdentPrefix(StringData ident) {
-        boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+        boost::lock_guard<boost::mutex> lk(_identPrefixMapMutex);
         auto prefixIter = _identPrefixMap.find(ident);
         invariant(prefixIter != _identPrefixMap.end());
         return encodePrefix(prefixIter->second);

@@ -64,7 +64,7 @@ namespace {
 
         virtual void commit() {}
         virtual void rollback() {
-            boost::mutex::scoped_lock lk(_catalog->_identsLock);
+            boost::lock_guard<boost::mutex> lk(_catalog->_identsLock);
             _catalog->_idents.erase(_ident);
         }
 
@@ -80,7 +80,7 @@ namespace {
 
         virtual void commit() {}
         virtual void rollback() {
-            boost::mutex::scoped_lock lk(_catalog->_identsLock);
+            boost::lock_guard<boost::mutex> lk(_catalog->_identsLock);
             _catalog->_idents[_ident] = _entry;
         }
 
@@ -152,7 +152,7 @@ namespace {
     }
 
     void KVCatalog::getAllCollections( std::vector<std::string>* out ) const {
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         for ( NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it ) {
             out->push_back( it->first );
         }
@@ -173,7 +173,7 @@ namespace {
 
         const string ident = _newUniqueIdent(ns, "collection");
 
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         Entry& old = _idents[ns.toString()];
         if ( !old.ident.empty() ) {
             return Status( ErrorCodes::NamespaceExists, "collection already exists" );
@@ -203,7 +203,7 @@ namespace {
     }
 
     std::string KVCatalog::getCollectionIdent( StringData ns ) const {
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
         invariant( it != _idents.end() );
         return it->second.ident;
@@ -230,7 +230,7 @@ namespace {
 
         RecordId dl;
         {
-            boost::mutex::scoped_lock lk( _identsLock );
+            boost::lock_guard<boost::mutex> lk( _identsLock );
             NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
             invariant( it != _idents.end() );
             dl = it->second.storedLoc;
@@ -356,7 +356,7 @@ namespace {
             invariant( status.getValue() == loc );
         }
 
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         const NSToIdentMap::iterator fromIt = _idents.find(fromNS.toString());
         invariant(fromIt != _idents.end());
 
@@ -380,7 +380,7 @@ namespace {
                                              MODE_X));
         }
 
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         const NSToIdentMap::iterator it = _idents.find(ns.toString());
         if (it == _idents.end()) {
             return Status( ErrorCodes::NamespaceNotFound, "collection not found" );
@@ -399,7 +399,7 @@ namespace {
         std::vector<std::string> v;
 
         {
-            boost::mutex::scoped_lock lk( _identsLock );
+            boost::lock_guard<boost::mutex> lk( _identsLock );
             for ( NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it ) {
                 NamespaceString ns( it->first );
                 if ( ns.db() != db )

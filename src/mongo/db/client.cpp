@@ -120,7 +120,7 @@ namespace {
         currentClient.reset(client);
 
         // This makes the client visible to maintenance threads
-        boost::mutex::scoped_lock clientLock(clientsMutex);
+        boost::lock_guard<boost::mutex> clientLock(clientsMutex);
         clients.insert(client);
     }
 
@@ -143,7 +143,7 @@ namespace {
         if ( ! inShutdown() ) {
             // we can't clean up safely once we're in shutdown
             {
-                boost::mutex::scoped_lock clientLock(clientsMutex);
+                boost::lock_guard<boost::mutex> clientLock(clientsMutex);
                 if ( ! _shutdown )
                     clients.erase(this);
             }
@@ -162,7 +162,7 @@ namespace {
         if ( inShutdown() )
             return false;
         {
-            boost::mutex::scoped_lock clientLock(clientsMutex);
+            boost::lock_guard<boost::mutex> clientLock(clientsMutex);
             clients.erase(this);
         }
 

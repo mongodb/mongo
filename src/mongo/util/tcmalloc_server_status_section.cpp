@@ -72,7 +72,7 @@ namespace {
 
         // We synchronize as the tcmalloc central list uses a spinlock, and we can cause a really
         // terrible runaway if we're not careful.
-        boost::mutex::scoped_lock lk(tcmallocCleanupLock);
+        boost::lock_guard<boost::mutex> lk(tcmallocCleanupLock);
         MallocExtension::instance()->MarkThreadIdle();
         MallocExtension::instance()->MarkThreadBusy();
     }

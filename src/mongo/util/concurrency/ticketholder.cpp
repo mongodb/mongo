@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     Status TicketHolder::resize(int newSize) {
-        boost::mutex::scoped_lock lk(_resizeMutex);
+        boost::lock_guard<boost::mutex> lk(_resizeMutex);
 
         if (newSize < 5)
             return Status(ErrorCodes::BadValue,

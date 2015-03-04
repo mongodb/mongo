@@ -162,11 +162,11 @@ namespace mongo {
             BSONObj _args;
             BSONObj _returnData;
             void setErrored(bool value) {
-                boost::mutex::scoped_lock lck(_erroredMutex);
+                boost::lock_guard<boost::mutex> lck(_erroredMutex);
                 _errored = value;
             }
             bool getErrored() {
-                boost::mutex::scoped_lock lck(_erroredMutex);
+                boost::lock_guard<boost::mutex> lck(_erroredMutex);
                 return _errored;
             }
         private:

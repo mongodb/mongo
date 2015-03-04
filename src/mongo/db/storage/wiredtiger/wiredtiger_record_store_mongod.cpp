@@ -100,7 +100,7 @@ namespace mongo {
                     WiredTigerRecordStore* rs =
                         checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
                     WriteUnitOfWork wuow(&txn);
-                    boost::timed_mutex::scoped_lock lock(rs->cappedDeleterMutex());
+                    boost::lock_guard<boost::timed_mutex> lock(rs->cappedDeleterMutex());
                     int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
                     wuow.commit();
                     return removed;
@@ -156,7 +156,7 @@ namespace mongo {
             return false;
         }
 
-        boost::mutex::scoped_lock lock(_backgroundThreadMutex);
+        boost::lock_guard<boost::mutex> lock(_backgroundThreadMutex);
         NamespaceString nss(ns);
         if (_backgroundThreadNamespaces.count(nss)) {
             log() << "WiredTigerRecordStoreThread " << ns << " already started";

@@ -32,7 +32,7 @@
 
 #include "mongo/util/signal_handlers_synchronous.h"
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread.hpp>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -129,7 +129,7 @@ namespace {
     // this will be called in certain c++ error cases, for example if there are two active
     // exceptions
     void myTerminate() {
-        boost::mutex::scoped_lock lk(streamMutex);
+        boost::lock_guard<boost::mutex> lk(streamMutex);
 
         // In c++11 we can recover the current exception to print it.
         if (std::exception_ptr eptr = std::current_exception()) {
@@ -183,7 +183,7 @@ namespace {
     }
 
     void abruptQuit(int signalNum) {
-        boost::mutex::scoped_lock lk(streamMutex);
+        boost::lock_guard<boost::mutex> lk(streamMutex);
         printSignalAndBacktrace(signalNum);
 
         // Don't go through normal shutdown procedure. It may make things worse.
@@ -222,7 +222,7 @@ namespace {
 #else
 
     void abruptQuitWithAddrSignal( int signalNum, siginfo_t *siginfo, void * ) {
-        boost::mutex::scoped_lock lk(streamMutex);
+        boost::lock_guard<boost::mutex> lk(streamMutex);
 
         const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
         mallocFreeOStream << "Invalid " << action << " at address: " << siginfo->si_addr;
@@ -275,7 +275,7 @@ namespace {
     }
 
     void reportOutOfMemoryErrorAndExit() {
-        boost::mutex::scoped_lock lk(streamMutex);
+        boost::lock_guard<boost::mutex> lk(streamMutex);
         printStackTrace(mallocFreeOStream << "out of memory.\n");
         writeMallocFreeStreamToLog();
         quickExit(EXIT_ABRUPT);

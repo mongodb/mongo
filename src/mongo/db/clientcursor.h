@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
+    typedef boost::lock_guard<boost::recursive_mutex> recursive_scoped_lock;
     class ClientCursor;
     class Collection;
     class CurOp;

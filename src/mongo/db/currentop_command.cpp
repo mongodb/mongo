@@ -92,7 +92,7 @@ namespace mongo {
 
         BSONArrayBuilder inprogBuilder(retVal.subarrayStart("inprog"));
 
-        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
 
         ClientSet::const_iterator it = Client::clients.begin();
         for ( ; it != Client::clients.end(); it++) {

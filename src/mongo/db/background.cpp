@@ -119,12 +119,12 @@ namespace {
 
 }  // namespace
     bool BackgroundOperation::inProgForDb(StringData db) {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         return dbsInProg.find(db) != dbsInProg.end();
     }
 
     bool BackgroundOperation::inProgForNs(StringData ns) {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         return nsInProg.find(ns) != nsInProg.end();
     }
 
@@ -153,19 +153,19 @@ namespace {
     }
 
     BackgroundOperation::BackgroundOperation(StringData ns) : _ns(ns) {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         recordBeginAndInsert(&dbsInProg, _ns.db());
         recordBeginAndInsert(&nsInProg, _ns.ns());
     }
 
     BackgroundOperation::~BackgroundOperation() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         recordEndAndRemove(&dbsInProg, _ns.db());
         recordEndAndRemove(&nsInProg, _ns.ns());
     }
 
     void BackgroundOperation::dump(std::ostream& ss) {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         if( nsInProg.size() ) {
             ss << "\n<b>Background Jobs in Progress</b>\n";
             for( BgInfoMapIterator i = nsInProg.begin(); i != nsInProg.end(); ++i )

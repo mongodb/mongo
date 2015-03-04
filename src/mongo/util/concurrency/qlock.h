@@ -180,7 +180,7 @@ namespace mongo {
     // "i will be reading. i promise to coordinate my activities with w's as i go with more 
     //  granular locks."
     inline void QLock::lock_r() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         while( !r_legal() ) {
             r.c.wait(m);
         }
@@ -190,7 +190,7 @@ namespace mongo {
     // "i will be writing. i promise to coordinate my activities with w's and r's as i go with more 
     //  granular locks."
     inline void QLock::lock_w() { 
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         while( !w_legal() ) {
             w.c.wait(m);
         }
@@ -200,7 +200,7 @@ namespace mongo {
     // "i will be reading. i will coordinate with no one. you better stop them if they
     // are writing."
     inline void QLock::lock_R() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         while( ! R_legal() ) {
             R.c.wait(m);
         }
@@ -209,7 +209,7 @@ namespace mongo {
 
     inline bool QLock::lock_R_try(int millis) {
         unsigned long long end = curTimeMillis64() + millis;
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         while( !R_legal() && curTimeMillis64() < end ) {
             R.c.timed_wait(m, boost::posix_time::milliseconds(millis));
         }
@@ -222,7 +222,7 @@ namespace mongo {
 
     inline bool QLock::lock_W_try(int millis) {
         unsigned long long end = curTimeMillis64() + millis;
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
 
         ++numPendingGlobalWrites;
         while (!W_legal() && curTimeMillis64() < end) {
@@ -242,7 +242,7 @@ namespace mongo {
 
     // downgrade from W state to R state
     inline void QLock::W_to_R() { 
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         fassert(16203, W.n == 1);
         fassert(16204, R.n == 0);
         fassert(16205, U.n == 0);
@@ -262,7 +262,7 @@ namespace mongo {
     // NOTE: ONLY CALL THIS FUNCTION ON A THREAD THAT GOT TO R BY CALLING W_to_R(), OR
     // YOU MAY DEADLOCK WITH THREADS LEAVING THE X STATE.
     inline void QLock::R_to_W() { 
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         fassert(16206, R.n > 0);
         fassert(16207, W.n == 0);
         fassert(16208, U.n == 0);
@@ -286,7 +286,7 @@ namespace mongo {
     }
 
     inline bool QLock::w_to_X() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
 
         fassert( 16212, w.n > 0 );
 
@@ -315,7 +315,7 @@ namespace mongo {
     }
 
     inline void QLock::X_to_w() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
 
         fassert( 16219, W.n == 0 );
         fassert( 16220, R.n == 0 );
@@ -338,25 +338,25 @@ namespace mongo {
         W.n++;
     }
     inline void QLock::lock_W() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         _lock_W();
     }
 
     inline void QLock::unlock_r() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         fassert(16137, r.n > 0);
         --r.n;
         notifyWeUnlocked('r');
     }
     inline void QLock::unlock_w() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         fassert(16138, w.n > 0);
         --w.n;
         notifyWeUnlocked('w');
     }
 
     inline void QLock::unlock_R() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         _unlock_R();
     }
 
@@ -367,7 +367,7 @@ namespace mongo {
     }
 
     inline void QLock::unlock_W() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         fassert(16140, W.n == 1);
         --W.n;
         notifyWeUnlocked('W');

@@ -59,7 +59,7 @@ namespace {
     boost::condition_variable _bgIndexStartingCondVar;
 
     void _setBgIndexStarting() {
-        boost::mutex::scoped_lock lk(_bgIndexStartingMutex);
+        boost::lock_guard<boost::mutex> lk(_bgIndexStartingMutex);
         invariant(_bgIndexStarting == false);
         _bgIndexStarting = true;
         _bgIndexStartingCondVar.notify_one();

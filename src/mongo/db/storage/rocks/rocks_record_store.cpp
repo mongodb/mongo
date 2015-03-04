@@ -83,7 +83,7 @@ namespace mongo {
 
     void CappedVisibilityManager::addUncommittedRecord(OperationContext* txn,
                                                        const RecordId& record) {
-        boost::mutex::scoped_lock lk(_lock);
+        boost::lock_guard<boost::mutex> lk(_lock);
         _addUncommittedRecord_inlock(txn, record);
     }
 
@@ -98,14 +98,14 @@ namespace mongo {
 
     RecordId CappedVisibilityManager::getNextAndAddUncommittedRecord(
         OperationContext* txn, std::function<RecordId()> nextId) {
-        boost::mutex::scoped_lock lk(_lock);
+        boost::lock_guard<boost::mutex> lk(_lock);
         RecordId record = nextId();
         _addUncommittedRecord_inlock(txn, record);
         return record;
     }
 
     void CappedVisibilityManager::dealtWithCappedRecord(const RecordId& record) {
-        boost::mutex::scoped_lock lk(_lock);
+        boost::lock_guard<boost::mutex> lk(_lock);
         std::vector<RecordId>::iterator it =
             std::find(_uncommittedRecords.begin(), _uncommittedRecords.end(), record);
         invariant(it != _uncommittedRecords.end());
@@ -113,7 +113,7 @@ namespace mongo {
     }
 
     bool CappedVisibilityManager::isCappedHidden(const RecordId& record) const {
-        boost::mutex::scoped_lock lk(_lock);
+        boost::lock_guard<boost::mutex> lk(_lock);
         if (_uncommittedRecords.empty()) {
             return false;
         }
@@ -122,7 +122,7 @@ namespace mongo {
 
     void CappedVisibilityManager::updateHighestSeen(const RecordId& record) {
         if (record > _oplog_highestSeen) {
-            boost::mutex::scoped_lock lk(_lock);
+            boost::lock_guard<boost::mutex> lk(_lock);
             if (record > _oplog_highestSeen) {
                 _oplog_highestSeen = record;
             }
@@ -130,7 +130,7 @@ namespace mongo {
     }
 
     RecordId CappedVisibilityManager::oplogStartHack() const {
-        boost::mutex::scoped_lock lk(_lock);
+        boost::lock_guard<boost::mutex> lk(_lock);
         if (_uncommittedRecords.empty()) {
             return _oplog_highestSeen;
         } else {
@@ -197,7 +197,7 @@ namespace mongo {
 
     RocksRecordStore::~RocksRecordStore() {
         {
-            boost::timed_mutex::scoped_lock lk(_cappedDeleterMutex);
+            boost::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);
             _shuttingDown = true;
         }
     }
@@ -276,7 +276,7 @@ namespace mongo {
         }
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-        boost::timed_mutex::scoped_lock lock(_cappedDeleterMutex, boost::defer_lock);
+        boost::lock_guard<boost::timed_mutex> lock(_cappedDeleterMutex, boost::defer_lock);
 
         if (_cappedMaxDocs != -1) {
             lock.lock(); // Max docs has to be exact, so have to check every time.

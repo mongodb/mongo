@@ -709,7 +709,7 @@ namespace {
             }
 
             try {
-                boost::mutex::scoped_lock lock(flushMutex);
+                boost::unique_lock<boost::mutex> lock(flushMutex);
 
                 for (unsigned i = 0; i <= 2; i++) {
                     if (flushRequested.timed_wait(lock, Milliseconds(oneThird))) {

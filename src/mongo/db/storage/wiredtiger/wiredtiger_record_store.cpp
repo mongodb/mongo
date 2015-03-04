@@ -250,7 +250,7 @@ namespace {
 
     WiredTigerRecordStore::~WiredTigerRecordStore() {
         {
-            boost::timed_mutex::scoped_lock lk(_cappedDeleterMutex);
+            boost::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);
             _shuttingDown = true;
         }
 
@@ -265,7 +265,7 @@ namespace {
     }
 
     bool WiredTigerRecordStore::inShutdown() const {
-        boost::timed_mutex::scoped_lock lk(_cappedDeleterMutex);
+        boost::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);
         return _shuttingDown;
     }
 
@@ -392,7 +392,7 @@ namespace {
             return 0;
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-        boost::timed_mutex::scoped_lock lock(_cappedDeleterMutex, boost::defer_lock);
+        boost::unique_lock<boost::timed_mutex> lock(_cappedDeleterMutex, boost::defer_lock);
 
         if (_cappedMaxDocs != -1) {
             lock.lock(); // Max docs has to be exact, so have to check every time.
@@ -560,14 +560,14 @@ namespace {
                 return status;
             loc = status.getValue();
             if ( loc > _oplog_highestSeen ) {
-                boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+                boost::lock_guard<boost::mutex> lk( _uncommittedDiskLocsMutex );
                 if ( loc > _oplog_highestSeen ) {
                     _oplog_highestSeen = loc;
                 }
             }
         }
         else if ( _isCapped ) {
-            boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+            boost::lock_guard<boost::mutex> lk( _uncommittedDiskLocsMutex );
             loc = _nextId();
             _addUncommitedDiskLoc_inlock( txn, loc );
         }
@@ -597,7 +597,7 @@ namespace {
     }
 
     void WiredTigerRecordStore::dealtWithCappedLoc( const RecordId& loc ) {
-        boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+        boost::lock_guard<boost::mutex> lk( _uncommittedDiskLocsMutex );
         SortedDiskLocs::iterator it = std::find(_uncommittedDiskLocs.begin(),
                                                 _uncommittedDiskLocs.end(),
                                                 loc);
@@ -606,7 +606,7 @@ namespace {
     }
 
     bool WiredTigerRecordStore::isCappedHidden( const RecordId& loc ) const {
-        boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+        boost::lock_guard<boost::mutex> lk( _uncommittedDiskLocsMutex );
         if (_uncommittedDiskLocs.empty()) {
             return false;
         }
@@ -670,7 +670,7 @@ namespace {
     }
 
     void WiredTigerRecordStore::_oplogSetStartHack( WiredTigerRecoveryUnit* wru ) const {
-        boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+        boost::lock_guard<boost::mutex> lk( _uncommittedDiskLocsMutex );
         if ( _uncommittedDiskLocs.empty() ) {
             wru->setOplogReadTill( _oplog_highestSeen );
         }
@@ -853,7 +853,7 @@ namespace {
         if ( !loc.isOK() )
             return loc.getStatus();
 
-        boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+        boost::lock_guard<boost::mutex> lk( _uncommittedDiskLocsMutex );
         _addUncommitedDiskLoc_inlock( txn, loc.getValue() );
         return Status::OK();
     }

@@ -89,7 +89,7 @@ namespace mongo {
         }
         uint64_t newSnapshotId = 0;
         {
-            boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+            boost::lock_guard<boost::mutex> lk(_transactionEngine->_lock);
             for (const auto& key : _writtenKeys) {
                 invariant(
                     !_transactionEngine->_isKeyCommittedAfterSnapshot_inlock(key, _snapshotId));
@@ -108,7 +108,7 @@ namespace mongo {
     }
 
     bool RocksTransaction::registerWrite(const std::string& key) {
-        boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+        boost::lock_guard<boost::mutex> lk(_transactionEngine->_lock);
         if (_transactionEngine->_isKeyCommittedAfterSnapshot_inlock(key, _snapshotId)) {
             // write-committed write conflict
             return false;
@@ -129,7 +129,7 @@ namespace mongo {
             return;
         }
         {
-            boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+            boost::lock_guard<boost::mutex> lk(_transactionEngine->_lock);
             for (const auto& key : _writtenKeys) {
                 _transactionEngine->_uncommittedTransactionId.erase(key);
             }
@@ -140,7 +140,7 @@ namespace mongo {
 
     void RocksTransaction::recordSnapshotId() {
         {
-            boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+            boost::lock_guard<boost::mutex> lk(_transactionEngine->_lock);
             _cleanup_inlock();
             _activeSnapshotsIter = _transactionEngine->_getLatestSnapshotId_inlock();
         }

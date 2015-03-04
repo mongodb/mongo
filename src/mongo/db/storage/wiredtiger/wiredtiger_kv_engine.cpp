@@ -382,7 +382,7 @@ namespace mongo {
         if ( ret == EBUSY ) {
             // this is expected, queue it up
             {
-                boost::mutex::scoped_lock lk( _identToDropMutex );
+                boost::lock_guard<boost::mutex> lk( _identToDropMutex );
                 _identToDrop.insert( uri );
             }
             _sessionCache->closeAll();
@@ -398,14 +398,14 @@ namespace mongo {
             _sizeStorerSyncTracker.resetLastTime();
             syncSizeInfo(false);
         }
-        boost::mutex::scoped_lock lk( _identToDropMutex );
+        boost::lock_guard<boost::mutex> lk( _identToDropMutex );
         return !_identToDrop.empty();
     }
 
     void WiredTigerKVEngine::dropAllQueued() {
         set<string> mine;
         {
-            boost::mutex::scoped_lock lk( _identToDropMutex );
+            boost::lock_guard<boost::mutex> lk( _identToDropMutex );
             mine = _identToDrop;
         }
 
@@ -433,7 +433,7 @@ namespace mongo {
         }
 
         {
-            boost::mutex::scoped_lock lk( _identToDropMutex );
+            boost::lock_guard<boost::mutex> lk( _identToDropMutex );
             for ( set<string>::const_iterator it = deleted.begin(); it != deleted.end(); ++it ) {
                 _identToDrop.erase( *it );
             }

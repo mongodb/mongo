@@ -284,7 +284,7 @@ namespace {
 
     HostAndPort ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria) {
         {
-            boost::mutex::scoped_lock lk(_state->mutex);
+            boost::lock_guard<boost::mutex> lk(_state->mutex);
             HostAndPort out = _state->getMatchingHost(criteria);
             if (!out.empty())
                 return out;
@@ -313,7 +313,7 @@ namespace {
     }
 
     Refresher ReplicaSetMonitor::startOrContinueRefresh() {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
 
         Refresher out(_state);
         DEV _state->checkInvariants();
@@ -321,7 +321,7 @@ namespace {
     }
 
     void ReplicaSetMonitor::failedHost(const HostAndPort& host) {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
         Node* node = _state->findNode(host);
         if (node)
             node->markFailed();
@@ -329,19 +329,19 @@ namespace {
     }
 
     bool ReplicaSetMonitor::isPrimary(const HostAndPort& host) const {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
         Node* node = _state->findNode(host);
         return node ? node->isMaster : false;
     }
 
     bool ReplicaSetMonitor::isHostUp(const HostAndPort& host) const {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
         Node* node = _state->findNode(host);
         return node ? node->isUp : false;
     }
 
     int ReplicaSetMonitor::getConsecutiveFailedScans() const {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
         return _state->consecutiveFailedScans;
     }
 
@@ -351,12 +351,12 @@ namespace {
     }
 
     std::string ReplicaSetMonitor::getServerAddress() const {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
         return _state->getServerAddress();
     }
 
     bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
         return _state->seedNodes.count(host);
     }
 
@@ -413,7 +413,7 @@ namespace {
             if (!clearSeedCache) {
                 // Save list of current set members so that the monitor can be rebuilt if needed.
                 const ReplicaSetMonitorPtr& rsm = setIt->second;
-                boost::mutex::scoped_lock lk(rsm->_state->mutex);
+                boost::lock_guard<boost::mutex> lk(rsm->_state->mutex);
                 seedServers[name] = rsm->_state->seedNodes;
             }
             sets.erase(setIt);
@@ -436,7 +436,7 @@ namespace {
 
     // TODO move to correct order with non-statics before pushing
     void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
-        boost::mutex::scoped_lock lk(_state->mutex);
+        boost::lock_guard<boost::mutex> lk(_state->mutex);
 
         // NOTE: the format here must be consistent for backwards compatibility
         BSONArrayBuilder hosts(bsonObjBuilder.subarrayStart("hosts"));
@@ -746,7 +746,7 @@ namespace {
     }
 
     HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteria) {
-        boost::mutex::scoped_lock lk(_set->mutex);
+        boost::unique_lock<boost::mutex> lk(_set->mutex);
         while (true) {
             if (criteria) {
                 HostAndPort out = _set->getMatchingHost(*criteria);

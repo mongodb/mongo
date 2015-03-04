@@ -97,18 +97,6 @@ namespace mongo {
             }
         }
 
-        class try_lock : boost::noncopyable {
-        public:
-            try_lock( mongo::mutex &m , int millis = 0 )
-                : _l( m.boost() , incxtimemillis( millis ) ) ,
-                  ok( _l.owns_lock() )
-            { }
-        private:
-            boost::timed_mutex::scoped_timed_lock _l;
-        public:
-            const bool ok;
-        };
-
         class scoped_lock : boost::noncopyable {
         public:
             scoped_lock( mongo::mutex &m ) : 
@@ -116,9 +104,9 @@ namespace mongo {
             }
             ~scoped_lock() {
             }
-            boost::timed_mutex::scoped_lock &boost() { return _l; }
+            boost::unique_lock<boost::timed_mutex>& boost() { return _l; }
         private:
-            boost::timed_mutex::scoped_lock _l;
+            boost::unique_lock<boost::timed_mutex> _l;
         };
     private:
         boost::timed_mutex &boost() { return *_m; }

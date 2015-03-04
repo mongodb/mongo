@@ -569,7 +569,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
-            boost::mutex::scoped_lock lk(mboost);
+            boost::lock_guard<boost::mutex> lk(mboost);
         }
     };
     class boosttimed_mutexspeed : public B {
@@ -578,7 +578,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
-            boost::timed_mutex::scoped_lock lk(mboost_timed);
+            boost::lock_guard<boost::timed_mutex> lk(mboost_timed);
         }
     };
     class simplemutexspeed : public B {

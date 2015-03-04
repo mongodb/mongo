@@ -56,14 +56,14 @@ namespace mongo {
             }
 
             void syncHappend() {
-                boost::mutex::scoped_lock lk( mutex );
+                boost::lock_guard<boost::mutex> lk( mutex );
                 lastSyncTime++;
                 condvar.notify_all();
             }
 
             // return true if happened
             bool awaitCommit() {
-                boost::mutex::scoped_lock lk( mutex );
+                boost::unique_lock<boost::mutex> lk( mutex );
                 long long start = lastSyncTime;
                 numWaitingForSync.fetchAndAdd(1);
                 condvar.timed_wait(lk,boost::posix_time::milliseconds(50));
