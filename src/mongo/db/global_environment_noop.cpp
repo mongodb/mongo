@@ -55,7 +55,12 @@ namespace mongo {
     }
 
     StorageFactoriesIterator* GlobalEnvironmentNoop::makeStorageFactoriesIterator() {
-        return NULL;
+        class EmptySFI : public StorageFactoriesIterator {
+        public:
+            virtual bool more() const { return false; }
+            virtual const StorageEngine::Factory* next() { invariant(false); }
+        };
+        return new EmptySFI();
     }
 
     void GlobalEnvironmentNoop::setKillAllOperations() { }

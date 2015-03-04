@@ -101,10 +101,8 @@ namespace mongo {
         StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin,
                                        const FactoryMapIterator& end);
 
-        virtual ~StorageFactoriesIteratorMongoD();
         virtual bool more() const;
-        virtual const StorageEngine::Factory* const & next();
-        virtual const StorageEngine::Factory* const & get() const;
+        virtual const StorageEngine::Factory* next();
 
     private:
         FactoryMapIterator _curr;

@@ -157,20 +157,12 @@ namespace mongo {
         _curr(begin), _end(end) {
     }
 
-
-    StorageFactoriesIteratorMongoD::~StorageFactoriesIteratorMongoD() {
-    }
-
     bool StorageFactoriesIteratorMongoD::more() const {
         return _curr != _end;
     }
 
-    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::next() {
+    const StorageEngine::Factory* StorageFactoriesIteratorMongoD::next() {
         return _curr++->second;
-    }
-
-    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::get() const {
-        return _curr->second;
     }
 
     void GlobalEnvironmentMongoD::setKillAllOperations() {

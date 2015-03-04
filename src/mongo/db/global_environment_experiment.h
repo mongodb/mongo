@@ -61,8 +61,7 @@ namespace mongo {
     public:
         virtual ~StorageFactoriesIterator() { }
         virtual bool more() const = 0;
-        virtual const StorageEngine::Factory* const & next() = 0;
-        virtual const StorageEngine::Factory* const & get() const = 0;
+        virtual const StorageEngine::Factory* next() = 0;
     protected:
         StorageFactoriesIterator() { }
     };
@@ -92,6 +91,8 @@ namespace mongo {
         /**
          * Produce an iterator over all registered storage engine factories.
          * Caller owns the returned object and is responsible for deleting when finished.
+         *
+         * Never returns nullptr.
          */
         virtual StorageFactoriesIterator* makeStorageFactoriesIterator() = 0;
 
