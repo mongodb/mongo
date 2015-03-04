@@ -234,7 +234,10 @@ void GlobalEnvironmentMongoD::killAllUserOperations(const OperationContext* txn)
 
         bool found =
             _killOperationsAssociatedWithClientAndOpId_inlock(client, client->curop()->opNum());
-        invariant(found);
+        if (!found) {
+            warning() << "Attempted to kill operation " << client->curop()->opNum()
+                      << " but the opId changed";
+        }
     }
 }
 
