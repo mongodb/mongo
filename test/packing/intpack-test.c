@@ -35,15 +35,15 @@ main()
 {
 	const uint8_t *cp;
 	uint8_t buf[10], *p;
-	uint64_t r, r2, ncalls;
-	int i, s;
+	uint64_t ncalls, r, r2, s;
+	int i;
 
 	ncalls = 0;
 
 	for (i = 0; i < 10000000; i++) {
 		for (s = 0; s < 50; s += 5) {
 			++ncalls;
-			r = 1 << s;
+			r = 1ULL << s;
 
 #if 1
 			p = buf;

@@ -38,7 +38,7 @@ main()
 
 	for (i = 1; i < 1LL << 60; i <<= 1) {
 		end = buf;
-		assert(__wt_vpack_uint(&end, sizeof(buf), i) == 0);
+		assert(__wt_vpack_uint(&end, sizeof(buf), (uint64_t)i) == 0);
 		printf("%" PRId64 " ", i);
 		for (p = buf; p < end; p++)
 			printf("%02x", *p);
