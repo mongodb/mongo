@@ -27,13 +27,13 @@
  */
 
 #include <assert.h>
-#include <stdlib.h>
-#include <time.h>
 
-#include <wt_internal.h>
-#include "intpack.i"
+#include "wt_internal.h"
 
-int main() {
+int
+main()
+{
+	const uint8_t *cp;
 	uint8_t buf[10], *p;
 	uint64_t r, r2, ncalls;
 	int i, s;
@@ -47,9 +47,9 @@ int main() {
 
 #if 1
 			p = buf;
-			__wt_vpack_uint(NULL, &p, sizeof buf, r);
-			p = buf;
-			__wt_vunpack_uint(NULL, &p, sizeof buf, &r2);
+			assert(__wt_vpack_uint(&p, sizeof(buf), r) == 0);
+			cp = buf;
+			assert(__wt_vunpack_uint(&cp, sizeof(buf), &r2) == 0);
 #else
 			/*
 			 * Note: use memmove for comparison because GCC does
@@ -57,9 +57,9 @@ int main() {
 			 * to measure anything.
 			 */
 			p = buf;
-			memmove(p, &r, sizeof r);
-			p = buf;
-			memmove(&r2, p, sizeof r2);
+			memmove(p, &r, sizeof(r));
+			cp = buf;
+			memmove(&r2, cp, sizeof(r2));
 #endif
 			if (r != r2) {
 				fprintf(stderr, "mismatch!\n");
