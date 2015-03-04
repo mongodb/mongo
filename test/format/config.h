@@ -273,6 +273,10 @@ static CONFIG c[] = {
 	  "time to run in minutes",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_timer, NULL },
 
+	{ "timeout",
+	  "Maximum time to run in minutes",
+	  C_IGNORE, 0, 20, UINT_MAX, &g.c_timeout, NULL },
+
 	{ "value_max",
 	  "maximum size of values",
 	  0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },

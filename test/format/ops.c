@@ -54,7 +54,7 @@ wts_ops(void)
 	pthread_t backup_tid, compact_tid;
 	uint64_t thread_ops;
 	uint32_t i, fourths;
-	int ret, running;
+	int ret, running, timing;
 
 	conn = g.wts_conn;
 
@@ -77,14 +77,22 @@ wts_ops(void)
 	 * part of the run finishes.
 	 */
 	if (g.c_timer == 0) {
-		fourths = 0;
 		if (g.c_ops < g.c_threads)
 			g.c_ops = g.c_threads;
 		thread_ops = g.c_ops / g.c_threads;
+		/*
+		 * Setup the timeout interval, a zero timeout disables
+		 * the functionality by setting fourths to zero.
+		 */
+		fourths = (g.c_timeout * 4 * 60) / FORMAT_OPERATION_REPS;
 	} else {
 		fourths = (g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
 		thread_ops = 0;
 	}
+
+	timing = fourths != 0;
+	/* Ensure we have an ops count if we aren't time limiting the run */
+	assert(timing || g.c_ops != 0);
 
 	/* Initialize the table extension code. */
 	table_append_init();
@@ -141,19 +149,16 @@ wts_ops(void)
 				break;
 			}
 
-			if (thread_ops == 0) {
-				/*
-				 * Optionally drop core (for testing recovery),
-				 * otherwise tell the thread it's done.
-				 */
-				if (fourths == 0) {
-					if (g.c_abort) {
-						static char *core = NULL;
-						*core = 0;
-					}
-					tinfo[i].quit = 1;
+			/* Notify ops threads if we've finished the run */
+			if (timing && fourths == 0) {
+				/* Optionally drop core for recovery testing */
+				if (g.c_abort) {
+					static char *core = NULL;
+					*core = 0;
 				}
-			} else
+				tinfo[i].quit = 1;
+			}
+			if (thread_ops != 0)
 				if (tinfo[i].ops >= thread_ops)
 					tinfo[i].quit = 1;
 		}

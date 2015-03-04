@@ -174,6 +174,11 @@ config_setup(void)
 			g.c_insert_pct = MMRAND(50, 85);
 	}
 
+	/* Make the default timeout 20 minutes */
+	cp = config_find("timeout", strlen("timeout"));
+	if (!(cp->flags & C_PERM))
+		g.c_timeout = 20;
+
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
 	 * the configuration.
