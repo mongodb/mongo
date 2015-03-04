@@ -208,11 +208,9 @@ main(int argc, char *argv[])
 			wts_verify("post-ops verify");
 
 			/*
-			 * If no operation count, quit after a single read pass.
-			 * (A timer configuration ran out the timer on the first
-			 * set of operations.)
+			 * If no operations, quit.
 			 */
-			if (g.c_ops == 0)
+			if (g.c_timer == 0 && g.c_ops == 0)
 				break;
 		}
 
