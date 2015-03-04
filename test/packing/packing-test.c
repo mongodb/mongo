@@ -37,6 +37,8 @@ check(const char *fmt, ...)
 	va_list ap;
 	size_t len;
 
+	len = 0;			/* -Werror=maybe-uninitialized */
+
 	va_start(ap, fmt);
 	assert(__wt_struct_sizev(NULL, &len, fmt, ap) == 0);
 	va_end(ap);
