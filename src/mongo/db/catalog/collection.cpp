@@ -599,6 +599,14 @@ namespace mongo {
                     iam->validate(txn, full, &keys, bob.get());
                     indexes.appendNumber(descriptor->indexNamespace(),
                                          static_cast<long long>(keys));
+
+                    if (bob) {
+                        BSONObj obj = bob->done();
+                        BSONElement valid = obj["valid"];
+                        if (valid.ok() && !valid.trueValue()) {
+                            results->valid = false;
+                        }
+                    }
                     idxn++;
                 }
 

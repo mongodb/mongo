@@ -164,8 +164,26 @@ namespace mongo {
                                                            int statisticsKey,
                                                            ResultType maximumResultType);
 
-        static int64_t getIdentSize(WT_SESSION* s,
-                                    const std::string& uri );
+        static int64_t getIdentSize(WT_SESSION* s, const std::string& uri );
+
+        /**
+         * Returns a WT_EVENT_HANDER with MongoDB's default handlers.
+         * The default handlers just log so it is recommended that you consider calling them even if
+         * you are capturing the output.
+         *
+         * There is no default "close" handler. You only need to provide one if you need to call a
+         * destructor.
+         */
+        static WT_EVENT_HANDLER defaultEventHandlers();
+
+        /**
+         * Calls WT_SESSION::validate() on a side-session to ensure that your current transaction
+         * isn't left in an invalid state.
+         *
+         * If errors is non-NULL, all error messages will be appended to the array.
+         */
+        static int verifyTable(OperationContext* txn, const std::string& uri,
+                               std::vector<std::string>* errors = NULL);
 
     private:
         /**
