@@ -81,9 +81,9 @@ namespace mongo {
                 LOG(0) << "CMD: validate " << ns << endl;
             }
 
-            AutoGetCollectionForRead ctx(txn, ns_string.ns());
-
-            Collection* collection = ctx.getCollection();
+            AutoGetDb ctx(txn, ns_string.db(), MODE_IX);
+            Lock::CollectionLock collLk(txn->lockState(), ns_string.ns(), MODE_X);
+            Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(ns_string) : NULL;
             if ( !collection ) {
                 errmsg = "ns not found";
                 return false;

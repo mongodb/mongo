@@ -251,6 +251,36 @@ namespace {
 
     void WiredTigerIndex::fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
                                        BSONObjBuilder* output) const {
+        {
+            std::vector<std::string> errors;
+            int err = WiredTigerUtil::verifyTable(txn, _uri, output ? &errors : NULL);
+            if (err == EBUSY) {
+                const char* msg = "verify() returned EBUSY. Not treating as invalid.";
+                warning() << msg;
+                if (output) {
+                    if (!errors.empty()) {
+                        *output << "errors" << errors;
+                    }
+                    *output << "warning" << msg;
+                }
+            }
+            else if (err) {
+                std::string msg = str::stream()
+                    << "verify() returned " << wiredtiger_strerror(err) << ". "
+                    << "This indicates structural damage. "
+                    << "Not examining individual index entries.";
+                error() << msg;
+                if (output) {
+                    errors.push_back(msg);
+                    *output << "errors" << errors;
+                    *output << "valid" << false;
+                }
+                return;
+            }
+        }
+
+        if (output) *output << "valid" << true;
+
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor(newCursor(txn, 1));
         cursor->locate( minKey, RecordId::min() );
         long long count = 0;
@@ -270,7 +300,6 @@ namespace {
         }
 
         invariant(output);
-        appendCustomStats(txn, output, 1);
     }
 
     bool WiredTigerIndex::appendCustomStats(OperationContext* txn,

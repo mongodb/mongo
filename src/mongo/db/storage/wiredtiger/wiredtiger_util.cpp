@@ -289,6 +289,98 @@ namespace mongo {
         return result.getValue();
     }
 
+namespace {
+    int mdb_handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session,
+                         int errorCode, const char *message) {
+        try {
+            error() << "WiredTiger (" << errorCode << ") " << message;
+            fassert( 28558, errorCode != WT_PANIC );
+        }
+        catch (...) {
+            std::terminate();
+        }
+        return 0;
+    }
+
+    int mdb_handle_message( WT_EVENT_HANDLER *handler, WT_SESSION *session,
+                            const char *message) {
+        try {
+            log() << "WiredTiger " << message;
+        }
+        catch (...) {
+            std::terminate();
+        }
+        return 0;
+    }
+
+    int mdb_handle_progress( WT_EVENT_HANDLER *handler, WT_SESSION *session,
+                             const char *operation, uint64_t progress) {
+        try {
+            log() << "WiredTiger progress " << operation << " " << progress;
+        }
+        catch (...) {
+            std::terminate();
+        }
+
+        return 0;
+    }
+
+}
+
+    WT_EVENT_HANDLER WiredTigerUtil::defaultEventHandlers() {
+        WT_EVENT_HANDLER handlers = {};
+        handlers.handle_error = mdb_handle_error;
+        handlers.handle_message = mdb_handle_message;
+        handlers.handle_progress = mdb_handle_progress;
+        return handlers;
+    }
+
+    int WiredTigerUtil::verifyTable(OperationContext* txn, const std::string& uri,
+                                    std::vector<std::string>* errors) {
+
+        class MyEventHandlers : public WT_EVENT_HANDLER {
+        public:
+            MyEventHandlers(std::vector<std::string>* errors)
+                : WT_EVENT_HANDLER(defaultEventHandlers())
+                , _errors(errors)
+                , _defaultErrorHandler(handle_error)
+            {
+                handle_error = onError;
+            }
+
+        private:
+            static int onError(WT_EVENT_HANDLER* handler, WT_SESSION* session, int error,
+                               const char* message) {
+                try {
+                    MyEventHandlers* self = static_cast<MyEventHandlers*>(handler);
+                    self->_errors->push_back(message);
+                    return self->_defaultErrorHandler(handler, session, error, message);
+                }
+                catch (...) {
+                    std::terminate();
+                }
+            }
+
+            typedef int(*ErrorHandler)(WT_EVENT_HANDLER*, WT_SESSION*, int, const char*);
+
+            std::vector<std::string>* const _errors;
+            const ErrorHandler _defaultErrorHandler;
+        } eventHandler(errors);
+
+        // Try to close as much as possible to avoid EBUSY errors.
+        WiredTigerRecoveryUnit::get(txn)->getSession(txn)->closeAllCursors();
+        WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
+        sessionCache->closeAll();
+
+        // Open a new session with custom error handlers.
+        WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(txn)->getSessionCache()->conn();
+        WT_SESSION* session;
+        invariantWTOK(conn->open_session(conn, errors ? &eventHandler : NULL, NULL, &session));
+        ON_BLOCK_EXIT(session->close, session, "");
+
+        // Do the verify. Weird parens prevent treating "verify" as a macro.
+        return (session->verify)(session, uri.c_str(), NULL);
+    }
 
     Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                              const std::string& uri, const std::string& config,
