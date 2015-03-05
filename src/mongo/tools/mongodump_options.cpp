@@ -116,11 +116,6 @@ namespace mongo {
         }
         mongoDumpGlobalParams.query = getParam("query");
         mongoDumpGlobalParams.useOplog = hasParam("oplog");
-        if (mongoDumpGlobalParams.useOplog) {
-            if (hasParam("query") || hasParam("db") || hasParam("collection")) {
-                return Status(ErrorCodes::BadValue, "oplog mode is only supported on full dumps");
-            }
-        }
         mongoDumpGlobalParams.outputDirectory = getParam("out");
         mongoDumpGlobalParams.snapShotQuery = false;
         if (!hasParam("query") && !hasParam("dbpath") && !hasParam("forceTableScan")) {
