@@ -66,10 +66,7 @@ bdb_open(void)
 	assert(dbenv->mutex_set_max(dbenv, 10000) == 0);
 	assert(dbenv->set_cachesize(dbenv, 0, 50 * 1024 * 1024, 1) == 0);
 	assert(dbenv->open(dbenv, NULL,
-	    DB_CREATE |
-	    (g.c_delete_pct == 0 && g.c_insert_pct == 0 && g.c_write_pct == 0 ?
-	    0 : DB_INIT_LOCK) |
-	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
+	    DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
 
 	if (g.type == ROW && g.c_reverse)
