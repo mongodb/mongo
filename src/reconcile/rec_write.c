@@ -522,6 +522,12 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	mod->mod_root_split = next;
 
+	/*
+	 * Mark the page dirty.
+	 * Don't mark the tree dirty: if this reconciliation is in service of a
+	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
+	 * set it again as part of that walk.
+	 */
 	WT_ERR(__wt_page_modify_init(session, next));
 	__wt_page_only_modify_set(session, next);
 
@@ -2982,7 +2988,7 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	WT_RET(__rec_split_finish(session, r));
 	WT_RET(__rec_write_wrapup(session, r, r->page));
 
-	/* Mark the page's parent dirty. */
+	/* Mark the page's parent and the tree dirty. */
 	parent = r->ref->home;
 	WT_RET(__wt_page_modify_init(session, parent));
 	__wt_page_modify_set(session, parent);

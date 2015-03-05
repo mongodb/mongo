@@ -404,7 +404,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_page_parent_modify_set --
- *	Mark the parent page and tree dirty.
+ *	Mark the parent page and (optionally the tree), dirty.
  */
 static inline int
 __wt_page_parent_modify_set(
