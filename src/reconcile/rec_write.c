@@ -1113,12 +1113,13 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * process will have completed before we walk any pages
 			 * for checkpoint.
 			 */
-			if ((ret = __wt_page_in(session, ref,
-			    WT_READ_CACHE | WT_READ_NO_EVICT |
-			    WT_READ_NO_GEN | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
+			ret = __wt_page_in(session, ref,
+			    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN);
+			if (ret == WT_NOTFOUND) {
 				ret = 0;
 				break;
 			}
+			WT_RET(ret);
 			*hazardp = 1;
 			goto in_memory;
 
