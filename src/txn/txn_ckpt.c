@@ -988,12 +988,17 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint_close(WT_SESSION_IMPL *session, int force)
 {
+	WT_DECL_RET;
+
 	/* If closing an unmodified file, try to evict its pages. */
 	/* Deal with forced discards. */
 	if (force)
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
-	else if (!S2BT(session)->modified)
-		return (__wt_cache_op(session, NULL, WT_SYNC_CLOSE));
+	else if (!S2BT(session)->modified) {
+		ret = __wt_cache_op(session, NULL, WT_SYNC_DISCARD);
+		if (ret != EBUSY)
+			return (ret);
+	}
 
 	/*
 	 * Else, checkpoint the file and optionally flush the writes (the

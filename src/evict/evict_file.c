@@ -72,6 +72,17 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		    WT_READ_CACHE | WT_READ_NO_EVICT));
 
 		switch (syncop) {
+		case WT_SYNC_DISCARD:
+			/*
+			 * Check that the page is clean: if we see a dirty page
+			 * (including a dirty parent page after evicting a
+			 * child), give up.  The higher level can try to
+			 * checkpoint, but during discard we aren't set up to
+			 * manage checkpoints.
+			 */
+			if (__wt_page_is_modified(page))
+				WT_ERR(EBUSY);
+			/* FALLTHROUGH */
 		case WT_SYNC_CLOSE:
 			/*
 			 * Evict the page.
