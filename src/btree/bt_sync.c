@@ -235,7 +235,6 @@ __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 		WT_ERR(__sync_file(session, op));
 		break;
 	case WT_SYNC_CLOSE:
-	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_FORCE:
 		WT_ERR(__wt_evict_file(session, op));
 		break;

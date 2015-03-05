@@ -438,7 +438,7 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	 * files, since changes to the underlying file are visible to the in
 	 * memory pages.
 	 */
-	WT_ERR(__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
+	WT_ERR(__wt_cache_op(session, NULL, WT_SYNC_CLOSE));
 
 	/*
 	 * We lock checkpoint handles that we are overwriting, so the handle

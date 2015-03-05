@@ -993,7 +993,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int force)
 	if (force)
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
 	else if (!S2BT(session)->modified)
-		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
+		return (__wt_cache_op(session, NULL, WT_SYNC_CLOSE));
 
 	/*
 	 * Else, checkpoint the file and optionally flush the writes (the
