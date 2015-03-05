@@ -467,7 +467,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 
 		/* Mark it dirty. */
 		WT_ERR(__wt_page_modify_init(session, child));
-		__wt_page_only_modify_set(session, child);
+		__wt_page_modify_set(session, child);
 
 		/*
 		 * Once the split goes live, the newly created internal pages
@@ -1210,7 +1210,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 	/* The new page is dirty by definition. */
 	WT_ERR(__wt_page_modify_init(session, right));
-	__wt_page_only_modify_set(session, right);
+	__wt_page_modify_set(session, right);
 
 	/*
 	 * We modified the page above, which will have set the first dirty
