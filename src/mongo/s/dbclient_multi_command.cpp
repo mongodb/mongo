@@ -35,6 +35,7 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/db/server_parameters.h"

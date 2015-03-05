@@ -55,7 +55,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
@@ -289,9 +288,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
         boost::thread web( stdx::bind(&webServerThread,
                                        new NoAdminAccess())); // takes ownership
 
-    OperationContextNoop txn;
-
-    Status status = getGlobalAuthorizationManager()->initialize(&txn);
+    Status status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {
         mongo::log(LogComponent::kDefault) << "Initializing authorization data failed: " << status;
         return EXIT_SHARDING_ERROR;

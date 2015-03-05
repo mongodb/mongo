@@ -49,6 +49,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
@@ -357,26 +358,36 @@ namespace mongo {
         }
     } cmdGetShardMap;
 
+    Shard::Shard()
+        : _name(""),
+          _addr(""),
+          _maxSizeMB(0),
+          _isDraining(false) {
+
+    }
+
     Shard::Shard(const std::string& name,
-            const std::string& addr,
-            long long maxSizeMB,
-            bool isDraining):
-                _name(name),
-                _addr(addr),
-                _maxSizeMB(maxSizeMB),
-                _isDraining(isDraining) {
+                 const std::string& addr,
+                 long long maxSizeMB,
+                 bool isDraining)
+        : _name(name),
+          _addr(addr),
+          _maxSizeMB(maxSizeMB),
+          _isDraining(isDraining) {
+
         _setAddr(addr);
     }
 
     Shard::Shard(const std::string& name,
-            const ConnectionString& connStr,
-            long long maxSizeMB,
-            bool isDraining):
-                _name(name),
-                _addr(connStr.toString()),
-                _cs(connStr),
-                _maxSizeMB(maxSizeMB),
-                _isDraining(isDraining) {
+                 const ConnectionString& connStr,
+                 long long maxSizeMB,
+                 bool isDraining)
+        : _name(name),
+          _addr(connStr.toString()),
+          _cs(connStr),
+          _maxSizeMB(maxSizeMB),
+          _isDraining(isDraining) {
+
     }
 
     Shard Shard::findIfExists( const string& shardName ) {

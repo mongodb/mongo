@@ -711,6 +711,10 @@ namespace mongo {
         to << ChunkType::shard(_shard.getName());
     }
 
+    string Chunk::genID() const {
+        return genID(_manager->getns(), _min);
+    }
+
     string Chunk::genID( const string& ns , const BSONObj& o ) {
         StringBuilder buf;
         buf << ns << "-";
@@ -1463,13 +1467,15 @@ namespace mongo {
             // we need a special command for dropping on the d side
             // this hack works for the moment
 
-            if ( ! setShardVersion( conn.conn(),
-                                    _ns,
-                                    ChunkVersion( 0, 0, OID() ),
-                                    ChunkManagerPtr(),
-                                    true, res ) )
-            {
-                throw UserException( 8071 , str::stream() << "cleaning up after drop failed: " << res );
+            if (!setShardVersion(conn.conn(),
+                                 _ns,
+                                 configServer.modelServer(),
+                                 ChunkVersion(0, 0, OID()),
+                                 NULL,
+                                 true,
+                                 res)) {
+
+                uasserted(8071, str::stream() << "cleaning up after drop failed: " << res);
             }
 
             conn->simpleCommand( "admin", 0, "unsetSharding" );
@@ -1605,44 +1611,6 @@ namespace mongo {
         }
 
         return splitThreshold;
-    }
-
-    // NOTE (careful when deprecating)
-    //   currently the sharding is enabled because of a write or read (as opposed to a split or migrate), the shard learns
-    //   its name and through the 'setShardVersion' command call
-    bool setShardVersion( DBClientBase & conn,
-                          const string& ns,
-                          ChunkVersion version,
-                          ChunkManagerPtr manager, // Used only for reporting!
-                          bool authoritative ,
-                          BSONObj& result )
-    {
-        BSONObjBuilder cmdBuilder;
-        cmdBuilder.append( "setShardVersion" , ns.c_str() );
-        cmdBuilder.append( "configdb" , configServer.modelServer() );
-
-        Shard s = Shard::make(conn.getServerAddress());
-        cmdBuilder.append("shard", s.getName());
-        cmdBuilder.append("shardHost", s.getConnString());
-
-        if (ns.size() > 0) {
-            version.addToBSON(cmdBuilder);
-        }
-        else {
-            cmdBuilder.append("init", true);
-        }
-
-        if (authoritative)
-            cmdBuilder.appendBool("authoritative", 1);
-
-        BSONObj cmd = cmdBuilder.obj();
-
-        LOG(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress()
-               << "  " << ns << "  " << cmd
-               << (manager.get() ?
-                   string(str::stream() << " " << manager->getSequenceNumber()) : "");
-
-        return conn.runCommand("admin", cmd, result, 0);
     }
 
 } // namespace mongo

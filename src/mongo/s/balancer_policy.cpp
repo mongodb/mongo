@@ -33,6 +33,7 @@
 
 #include <algorithm>
 
+#include "mongo/client/connpool.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"

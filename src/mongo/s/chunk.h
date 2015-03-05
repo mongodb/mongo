@@ -31,7 +31,6 @@
 #pragma once
 
 #include <boost/next_prior.hpp>
-#include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/base/string_data.h"
@@ -60,7 +59,7 @@ namespace mongo {
     typedef std::map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
     typedef std::map<BSONObj,boost::shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
 
-    typedef boost::shared_ptr<const ChunkManager> ChunkManagerPtr;
+    typedef boost::shared_ptr<ChunkManager> ChunkManagerPtr;
 
     /**
        config.chunks
@@ -69,7 +68,8 @@ namespace mongo {
        x is in a shard iff
        min <= x < max
      */
-    class Chunk : boost::noncopyable {
+    class Chunk {
+        MONGO_DISALLOW_COPYING(Chunk);
     public:
         enum SplitPointMode {
             // Determines the split points that will make the current chunk smaller than
@@ -564,14 +564,5 @@ namespace mongo {
 
         friend class TestableChunkManager;
     };
-
-    inline std::string Chunk::genID() const { return genID(_manager->getns(), _min); }
-
-    bool setShardVersion( DBClientBase & conn,
-                          const std::string& ns,
-                          ChunkVersion version,
-                          ChunkManagerPtr manager,
-                          bool authoritative,
-                          BSONObj& result );
 
 } // namespace mongo

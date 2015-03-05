@@ -36,9 +36,9 @@
 
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/util/log.h"
 
@@ -187,7 +187,13 @@ namespace mongo {
 
             LOG(1) << "initializing shard connection to " << shard.toString() << endl;
 
-            ok = setShardVersion(*conn, "", ChunkVersion(), ChunkManagerPtr(), true, result);
+            ok = setShardVersion(*conn,
+                                 "",
+                                 configServer.modelServer(),
+                                 ChunkVersion(),
+                                 NULL,
+                                 true,
+                                 result);
         }
         catch( const DBException& ) {
 
@@ -341,9 +347,15 @@ namespace mongo {
                << ", current chunk manager iteration is " << officialSequenceNumber;
 
         BSONObj result;
-        if ( setShardVersion( *conn , ns , version , manager , authoritative , result ) ) {
-            // success!
-            LOG(1) << "      setShardVersion success: " << result << endl;
+        if (setShardVersion(*conn,
+                            ns,
+                            configServer.modelServer(),
+                            version,
+                            manager.get(),
+                            authoritative,
+                            result)) {
+
+            LOG(1) << "      setShardVersion success: " << result;
             connectionShardStatus.setSequence( conn , ns , officialSequenceNumber );
             return true;
         }

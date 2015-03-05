@@ -30,52 +30,41 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
-#include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
-
 #include "mongo/db/dbmessage.h"
-#include "mongo/s/config.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
-
-    class OpCounters;
     class ClientInfo;
-    class OperationContext;
 
-
-    class Request : boost::noncopyable {
+    class Request {
+        MONGO_DISALLOW_COPYING(Request);
     public:
-        Request( Message& m, AbstractMessagingPort* p );
+        Request(Message& m, AbstractMessagingPort* p);
 
-        // ---- message info -----
-
-
-        const char * getns() const {
+        const char* getns() const {
             return _d.getns();
         }
+
         int op() const {
             return _m.operation();
         }
+
         bool expectResponse() const {
             return op() == dbQuery || op() == dbGetMore;
         }
+
         bool isCommand() const;
 
         MSGID id() const {
             return _id;
         }
 
-        ClientInfo * getClientInfo() const {
+        ClientInfo* getClientInfo() const {
             return _clientInfo;
         }
 
-        // ---- low level access ----
-
-        void reply( Message & response , const std::string& fromServer );
+        void reply(Message & response, const std::string& fromServer);
 
         Message& m() { return _m; }
         DbMessage& d() { return _d; }
@@ -88,21 +77,15 @@ namespace mongo {
         void reset();
 
     private:
+        ClientInfo* const _clientInfo;
+
         Message& _m;
         DbMessage _d;
-        AbstractMessagingPort* _p;
+        AbstractMessagingPort* const _p;
 
         MSGID _id;
-
-        ClientInfo * _clientInfo;
-
-        OpCounters* _counter;
-
-        boost::scoped_ptr<OperationContext> _txn;
 
         bool _didInit;
     };
 
 }
-
-#include "strategy.h"

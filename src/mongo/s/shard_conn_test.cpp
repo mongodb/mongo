@@ -34,7 +34,7 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/platform/cstdint.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/unittest/unittest.h"
 
 #include <vector>

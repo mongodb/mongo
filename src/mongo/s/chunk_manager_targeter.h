@@ -40,8 +40,6 @@
 
 namespace mongo {
 
-    class Grid;
-
     struct TargeterStats {
         // Map of chunk shard minKey -> approximate delta. This is used for deciding
         // whether a chunk might need splitting or not.

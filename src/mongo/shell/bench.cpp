@@ -42,7 +42,6 @@
 #include <iostream>
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
@@ -377,8 +376,7 @@ namespace mongo {
                 bool check = ! e["check"].eoo();
                 if( check ){
                     if ( e["check"].type() == CodeWScope || e["check"].type() == Code || e["check"].type() == String ) {
-                        OperationContextNoop txn;
-                        scope = globalScriptEngine->getPooledScope(&txn, ns, "benchrun");
+                        scope = globalScriptEngine->getPooledScope(NULL, ns, "benchrun");
                         verify( scope.get() );
 
                         if ( e.type() == CodeWScope ) {

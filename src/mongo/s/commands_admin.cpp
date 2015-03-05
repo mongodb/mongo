@@ -57,6 +57,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/dbclient_multi_command.h"

@@ -509,7 +509,7 @@ coredbEnv.Library("coredb", [
         "db/pipeline/expression.cpp",
         "db/projection.cpp",
         "db/stats/timer_stats.cpp",
-        "s/shardconnection.cpp",
+        "s/client/shard_connection.cpp",
         ],
                   LIBDEPS=['db/auth/serverauth',
                            'db/commands/server_status_core',

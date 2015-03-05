@@ -26,12 +26,14 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/conn_pool_options.h"
 
 #include "mongo/base/init.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/client/connpool.h"
-#include "mongo/s/shard.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/s/client/shard_connection.h"
 
 namespace mongo {
 

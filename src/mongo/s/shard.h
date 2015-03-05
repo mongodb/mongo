@@ -30,15 +30,14 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/client/connpool.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-    class ShardConnection;
     class ShardStatus;
 
     /*
@@ -47,9 +46,7 @@ namespace mongo {
 
     class Shard {
     public:
-        Shard()
-            : _name("") , _addr("") , _maxSizeMB(0) , _isDraining(false) {
-        }
+        Shard();
 
         Shard(const std::string& name,
               const std::string& addr,
@@ -196,6 +193,7 @@ namespace mongo {
         long long _maxSizeMB;    // in MBytes, 0 is unlimited
         bool      _isDraining; // shard is currently being removed
     };
+
     typedef boost::shared_ptr<Shard> ShardPtr;
 
     class ShardStatus {
@@ -238,121 +236,4 @@ namespace mongo {
         std::string _mongoVersion;
     };
 
-    class ChunkManager;
-    typedef boost::shared_ptr<const ChunkManager> ChunkManagerPtr;
-
-    class ShardConnection : public AScopedConnection {
-    public:
-        ShardConnection( const Shard * s , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-        ShardConnection( const Shard& s , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-        ShardConnection( const std::string& addr , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-
-        ~ShardConnection();
-
-        void done();
-        void kill();
-
-        DBClientBase& conn() {
-            _finishInit();
-            verify( _conn );
-            return *_conn;
-        }
-
-        DBClientBase* operator->() {
-            _finishInit();
-            verify( _conn );
-            return _conn;
-        }
-
-        DBClientBase* get() {
-            _finishInit();
-            verify( _conn );
-            return _conn;
-        }
-
-        /**
-         * @return the connection object underneath without setting the shard version.
-         * @throws AssertionException if _conn is uninitialized.
-         */
-        DBClientBase* getRawConn() const {
-            verify( _conn );
-            return _conn;
-        }
-
-        std::string getHost() const {
-            return _addr;
-        }
-
-        std::string getNS() const {
-            return _ns;
-        }
-
-        ChunkManagerPtr getManager() const {
-            return _manager;
-        }
-
-        bool setVersion() {
-            _finishInit();
-            return _setVersion;
-        }
-
-        static void sync();
-
-        void donotCheckVersion() {
-            _setVersion = false;
-            _finishedInit = true;
-        }
-        
-        bool ok() const { return _conn != NULL; }
-
-        /** checks all of my thread local connections for the version of this ns */
-        static void checkMyConnectionVersions( const std::string & ns );
-
-        /**
-         * Returns all the current sharded connections to the pool.
-         * Note: This is *dangerous* if we have GLE state.
-         */
-        static void releaseMyConnections();
-
-        /**
-         * Clears all connections in the sharded pool, including connections in the
-         * thread local storage pool of the current thread.
-         */
-        static void clearPool();
-
-        /**
-         * Forgets a namespace to prevent future versioning.
-         */
-        static void forgetNS( const std::string& ns );
-
-    private:
-        void _init();
-        void _finishInit();
-
-        bool _finishedInit;
-
-        std::string _addr;
-        std::string _ns;
-        ChunkManagerPtr _manager;
-
-        DBClientBase* _conn;
-        bool _setVersion;
-    };
-
-
-    extern DBConnectionPool shardConnectionPool;
-
-    class ShardingConnectionHook : public DBConnectionHook {
-    public:
-
-        ShardingConnectionHook( bool shardedConnections )
-            : _shardedConnections( shardedConnections ) {
-        }
-
-        virtual void onCreate( DBClientBase * conn );
-        virtual void onDestroy( DBClientBase * conn );
-        virtual void onRelease(DBClientBase* conn);
-
-        bool _shardedConnections;
-    };
 }

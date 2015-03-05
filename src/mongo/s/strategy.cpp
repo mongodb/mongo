@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/strategy.h"
+
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"

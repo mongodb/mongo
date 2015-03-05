@@ -34,35 +34,31 @@
 
 #include "mongo/s/request.h"
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/server.h"
+#include "mongo/s/strategy.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
     using std::endl;
     using std::string;
 
-    Request::Request( Message& m, AbstractMessagingPort* p ) :
-        _m(m) , _d( m ) , _p(p) , _didInit(false) {
+    Request::Request(Message& m, AbstractMessagingPort* p)
+        : _clientInfo(ClientInfo::get()),
+          _m(m),
+          _d(m),
+          _p(p),
+          _id(_m.header().getId()),
+          _didInit(false) {
 
-        _id = _m.header().getId();
-
-        _txn.reset(new OperationContextNoop());
-
-        _clientInfo = ClientInfo::get();
-        if ( p ) {
-            _clientInfo->newPeerRequest( p->remote() );
+        if (p) {
+            _clientInfo->newPeerRequest(p->remote());
         }
         else {
             _clientInfo->newRequest();
@@ -74,7 +70,7 @@ namespace mongo {
             return;
         _didInit = true;
         reset();
-        _clientInfo->getAuthorizationSession()->startRequest(_txn.get());
+        _clientInfo->getAuthorizationSession()->startRequest(NULL);
     }
 
     // Deprecated, will move to the strategy itself

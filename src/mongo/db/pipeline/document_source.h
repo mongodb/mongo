@@ -37,6 +37,7 @@
 #include <boost/unordered_map.hpp>
 #include <deque>
 
+#include "mongo/client/connpool.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
