@@ -726,7 +726,7 @@ namespace {
         WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
         WiredTigerSession* session = cache->getSession();
         WT_SESSION *s = session->getSession();
-        int ret = s->compact(s, getURI().c_str(), NULL);
+        int ret = s->compact(s, getURI().c_str(), "timeout=0");
         invariantWTOK(ret);
         cache->releaseSession(session);
         return Status::OK();
