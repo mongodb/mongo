@@ -59,7 +59,7 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef HAVE_BITS_TYPE_TRAITS_H */
 
 /* Define to 1 if you have the <bzlib.h> header file. */
-/* #undef HAVE_BZLIB_H */
+#define HAVE_BZLIB_H 1
 
 /* Define to 1 if you have the <dirent.h> header file. */
 #define HAVE_DIRENT_H 1
@@ -171,7 +171,7 @@ sure both macros are undefined; an emulation function will then be used. */
    The limit exists in order to catch runaway regular expressions that take
    for ever to determine that they do not match. The default is set very large
    so that it does not accidentally catch legitimate cases. */
-#define MATCH_LIMIT 10000000
+#define MATCH_LIMIT 200000
 
 /* The above limit applies to all calls of match(), whether or not they
    increase the recursion depth. In some environments it is desirable to limit
@@ -181,7 +181,7 @@ sure both macros are undefined; an emulation function will then be used. */
    match(). To have any useful effect, it must be less than the value of
    MATCH_LIMIT. The default is to use the same value as MATCH_LIMIT. There is
    a runtime method for setting a different limit. */
-#define MATCH_LIMIT_RECURSION MATCH_LIMIT
+#define MATCH_LIMIT_RECURSION 4000
 
 /* This limit is parameterized just in case anybody ever wants to change it.
    Care must be taken if it is increased, because it guards against integer
@@ -210,7 +210,7 @@ sure both macros are undefined; an emulation function will then be used. */
    steam using pcre_recurse_malloc() to obtain memory from the heap. For more
    detail, see the comments and other stuff just above the match() function.
    */
-/* #undef NO_RECURSE */
+#define NO_RECURSE /**/
 
 /* Name of package */
 #define PACKAGE "pcre"
@@ -276,7 +276,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define PCRE_EXP_DEFN __attribute__ ((visibility ("default")))
 
 /* Define to any value if linking statically (TODO: make nice with Libtool) */
-/* #undef PCRE_STATIC */
+#define PCRE_STATIC 1
 
 /* When calling PCRE via the POSIX interface, additional working storage is
    required for holding the pointers to capturing substrings because PCRE
@@ -324,13 +324,13 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef SUPPORT_PCREGREP_JIT */
 
 /* Define to any value to enable support for Unicode properties. */
-/* #undef SUPPORT_UCP */
+#define SUPPORT_UCP /**/
 
 /* Define to any value to enable support for the UTF-8/16/32 Unicode encoding.
    This will work even in an EBCDIC environment, but it is incompatible with
    the EBCDIC macro. That is, PCRE can support *either* EBCDIC code *or*
    ASCII/UTF-8/16/32, but not both at once. */
-/* #undef SUPPORT_UTF */
+#define SUPPORT_UTF /**/
 
 /* Define to any value for valgrind support to find invalid memory reads. */
 /* #undef SUPPORT_VALGRIND */
