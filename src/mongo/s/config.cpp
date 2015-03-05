@@ -32,19 +32,21 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/config.h"
+
 #include <boost/scoped_ptr.hpp>
-#include "pcrecpp.h"
+#include <pcrecpp.h>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_write.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/type_changelog.h"
@@ -74,21 +76,30 @@ namespace mongo {
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
 
-    /* --- DBConfig --- */
 
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
         _dropped = in[CollectionType::dropped()].trueValue();
 
-        if ( in[CollectionType::keyPattern()].isABSONObj() ) {
-            shard( new ChunkManager( in ) );
+        if (in[CollectionType::keyPattern()].isABSONObj()) {
+            shard(new ChunkManager(in));
         }
 
         _dirty = false;
     }
-    
-    void DBConfig::CollectionInfo::shard( ChunkManager* manager ){
 
+    DBConfig::CollectionInfo::~CollectionInfo() {
+
+    }
+
+    void DBConfig::CollectionInfo::resetCM(ChunkManager* cm) {
+        invariant(cm);
+        invariant(_cm);
+
+        _cm.reset(cm);
+    }
+    
+    void DBConfig::CollectionInfo::shard(ChunkManager* manager){
         // Do this *first* so we're invisible to everyone else
         manager->loadExistingRanges(configServer.getPrimary().getConnString(), NULL);
 
@@ -97,8 +108,8 @@ namespace mongo {
         // This helps prevent errors when dropping in a different process
         //
 
-        if( manager->numChunks() != 0 ){
-            _cm = ChunkManagerPtr( manager );
+        if (manager->numChunks() != 0){
+            _cm = ChunkManagerPtr(manager);
             _key = manager->getShardKeyPattern().toBSON().getOwned();
             _unqiue = manager->isUnique();
             _dirty = true;
@@ -106,7 +117,7 @@ namespace mongo {
         }
         else{
             warning() << "no chunks found for collection " << manager->getns()
-                      << ", assuming unsharded" << endl;
+                      << ", assuming unsharded";
             unshard();
         }
     }
@@ -149,6 +160,21 @@ namespace mongo {
         _dirty = false;
     }
 
+
+    DBConfig::DBConfig(std::string name)
+        : _name(name),
+          _primary("config", "", 0 /* maxSize */, false /* draining */),
+          _shardingEnabled(false),
+          _lock("DBConfig"),
+          _hitConfigServerLock("DBConfig::_hitConfigServerLock") {
+
+        invariant(!_name.empty());
+    }
+
+    DBConfig::~DBConfig() {
+
+    }
+
     bool DBConfig::isSharded( const string& ns ) {
         if ( ! _shardingEnabled )
             return false;
@@ -157,11 +183,15 @@ namespace mongo {
     }
 
     bool DBConfig::_isSharded( const string& ns ) {
-        if ( ! _shardingEnabled )
+        if (!_shardingEnabled) {
             return false;
-        Collections::iterator i = _collections.find( ns );
-        if ( i == _collections.end() )
+        }
+
+        CollectionInfoMap::iterator i = _collections.find( ns );
+        if (i == _collections.end()) {
             return false;
+        }
+
         return i->second.isSharded();
     }
 
@@ -290,7 +320,7 @@ namespace mongo {
 
         scoped_lock lk( _lock );
 
-        Collections::iterator i = _collections.find( ns );
+        CollectionInfoMap::iterator i = _collections.find( ns );
 
         if ( i == _collections.end() )
             return false;
@@ -321,7 +351,7 @@ namespace mongo {
         {
             scoped_lock lk( _lock );
 
-            Collections::iterator i = _collections.find( ns );
+            CollectionInfoMap::iterator i = _collections.find( ns );
 
             // No namespace
             if( i == _collections.end() ){
@@ -612,7 +642,7 @@ namespace mongo {
 
         if( coll ){
 
-            for ( Collections::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
+            for ( CollectionInfoMap::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
                 if ( ! i->second.isDirty() )
                     continue;
                 i->second.save( i->first );
@@ -725,7 +755,7 @@ namespace mongo {
         num = 0;
         set<string> seen;
         while ( true ) {
-            Collections::iterator i = _collections.begin();
+            CollectionInfoMap::iterator i = _collections.begin();
             for ( ; i != _collections.end(); ++i ) {
                 // log() << "coll : " << i->first << " and " << i->second.isSharded() << endl;
                 if ( i->second.isSharded() )
@@ -744,7 +774,7 @@ namespace mongo {
             LOG(1) << "\t dropping sharded collection: " << i->first << endl;
 
             i->second.getCM()->getAllShards( allServers );
-            i->second.getCM()->drop( i->second.getCM() );
+            i->second.getCM()->drop();
 
             // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
             // unsharded in the meantime
@@ -765,7 +795,7 @@ namespace mongo {
     void DBConfig::getAllShards(set<Shard>& shards) const {
         scoped_lock lk( _lock );
         shards.insert(getPrimary());
-        for (Collections::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it) {
+        for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it) {
             if (it->second.isSharded()) {
                 it->second.getCM()->getAllShards(shards);
             } // TODO: handle collections on non-primary shard
@@ -776,7 +806,7 @@ namespace mongo {
 
         scoped_lock lk( _lock );
 
-        for( Collections::const_iterator i = _collections.begin(); i != _collections.end(); i++ ) {
+        for( CollectionInfoMap::const_iterator i = _collections.begin(); i != _collections.end(); i++ ) {
             log() << "Coll : " << i->first << " sharded? " << i->second.isSharded() << endl;
             if( i->second.isSharded() ) namespaces.insert( i->first );
         }

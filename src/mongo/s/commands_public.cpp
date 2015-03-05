@@ -58,7 +58,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_explain.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/distlock.h"
@@ -742,7 +742,7 @@ namespace mongo {
                     return passthrough( conf , cmdObj , result );
                 }
 
-                cm->drop( cm );
+                cm->drop();
 
                 if( ! conf->removeSharding( fullns ) ){
                     warning() << "collection " << fullns

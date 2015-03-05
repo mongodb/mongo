@@ -38,15 +38,15 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclient_rs.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
+    class ChunkManager;
     class ConfigServer;
-
     class DBConfig;
+
     typedef boost::shared_ptr<DBConfig> DBConfigPtr;
 
     extern DBConfigPtr configServerPtr;
@@ -56,65 +56,9 @@ namespace mongo {
      * top level configuration for a database
      */
     class DBConfig  {
-
-        struct CollectionInfo {
-            CollectionInfo() {
-                _dirty = false;
-                _dropped = false;
-            }
-
-            CollectionInfo( const BSONObj& in );
-
-            bool isSharded() const {
-                return _cm.get();
-            }
-
-            ChunkManagerPtr getCM() const {
-                return _cm;
-            }
-
-            void resetCM( ChunkManager * cm ) {
-                verify(cm);
-                verify(_cm); // this has to be already sharded
-                _cm.reset( cm );
-            }
-
-            void shard( ChunkManager* cm );
-            void unshard();
-
-            bool isDirty() const { return _dirty; }
-            bool wasDropped() const { return _dropped; }
-            
-            void save( const std::string& ns );
-            
-            bool unique() const { return _unqiue; }
-            BSONObj key() const { return _key; } 
-
-
-        private:
-            BSONObj _key;
-            bool _unqiue;
-            ChunkManagerPtr _cm;
-            bool _dirty;
-            bool _dropped;
-        };
-
-        typedef std::map<std::string,CollectionInfo> Collections;
-
     public:
-
-        DBConfig( std::string name )
-            : _name( name ) ,
-              _primary("config",
-                       "",
-                       0 /* maxSize */,
-                       false /* draining */),
-              _shardingEnabled(false),
-              _lock("DBConfig") ,
-              _hitConfigServerLock( "DBConfig::_hitConfigServerLock" ) {
-            verify( name.size() );
-        }
-        virtual ~DBConfig() {}
+        DBConfig(std::string name);
+        virtual ~DBConfig();
 
         std::string getName() const { return _name; };
 
@@ -135,11 +79,11 @@ namespace mongo {
          * WARNING: It's not safe to place initial chunks onto non-primary shards using this method.
          * The initShards parameter allows legacy behavior expected by map-reduce.
          */
-        ChunkManagerPtr shardCollection(const std::string& ns,
-                                        const ShardKeyPattern& fieldsAndOrder,
-                                        bool unique,
-                                        std::vector<BSONObj>* initPoints,
-                                        std::vector<Shard>* initShards = NULL);
+        boost::shared_ptr<ChunkManager> shardCollection(const std::string& ns,
+                                                        const ShardKeyPattern& fieldsAndOrder,
+                                                        bool unique,
+                                                        std::vector<BSONObj>* initPoints,
+                                                        std::vector<Shard>* initShards = NULL);
 
         /**
            @return true if there was sharding info to remove
@@ -153,10 +97,10 @@ namespace mongo {
 
         // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
         // neither if the collection doesn't exist.
-        void getChunkManagerOrPrimary( const std::string& ns, ChunkManagerPtr& manager, ShardPtr& primary );
+        void getChunkManagerOrPrimary(const std::string& ns, boost::shared_ptr<ChunkManager>& manager, ShardPtr& primary);
 
-        ChunkManagerPtr getChunkManager( const std::string& ns , bool reload = false, bool forceReload = false );
-        ChunkManagerPtr getChunkManagerIfExists( const std::string& ns , bool reload = false, bool forceReload = false );
+        boost::shared_ptr<ChunkManager> getChunkManager(const std::string& ns, bool reload = false, bool forceReload = false);
+        boost::shared_ptr<ChunkManager> getChunkManagerIfExists(const std::string& ns, bool reload = false, bool forceReload = false);
 
         const Shard& getShard( const std::string& ns );
         /**
@@ -189,6 +133,47 @@ namespace mongo {
         void getAllShardedCollections(std::set<std::string>& namespaces) const;
 
     protected:
+        struct CollectionInfo {
+            CollectionInfo() {
+                _dirty = false;
+                _dropped = false;
+            }
+
+            CollectionInfo(const BSONObj& in);
+            ~CollectionInfo();
+
+            bool isSharded() const {
+                return _cm.get();
+            }
+
+            boost::shared_ptr<ChunkManager> getCM() const {
+                return _cm;
+            }
+
+            void resetCM(ChunkManager * cm);
+
+            void shard(ChunkManager* cm);
+            void unshard();
+
+            bool isDirty() const { return _dirty; }
+            bool wasDropped() const { return _dropped; }
+
+            void save(const std::string& ns);
+
+            bool unique() const { return _unqiue; }
+            BSONObj key() const { return _key; }
+
+
+        private:
+            BSONObj _key;
+            bool _unqiue;
+            boost::shared_ptr<ChunkManager> _cm;
+            bool _dirty;
+            bool _dropped;
+        };
+
+        typedef std::map<std::string, CollectionInfo> CollectionInfoMap;
+
 
         /**
             lockless
@@ -201,14 +186,13 @@ namespace mongo {
         bool _reload();
         void _save( bool db = true, bool coll = true );
 
-        std::string _name; // e.g. "alleyinsider"
+
+        const std::string _name; // e.g. "alleyinsider"
+
         Shard _primary; // e.g. localhost , mongo.foo.com:9999
         bool _shardingEnabled;
 
-        //map<std::string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
-        //map<std::string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
-
-        Collections _collections;
+        CollectionInfoMap _collections;
 
         mutable mongo::mutex _lock; // TODO: change to r/w lock ??
         mutable mongo::mutex _hitConfigServerLock;

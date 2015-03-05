@@ -28,17 +28,18 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include <map>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/chunk.h"
-#include "mongo/s/shard.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/ns_targeter.h"
 
 namespace mongo {
+
+    class ChunkManager;
+    struct ChunkVersion;
+    class Shard;
 
     struct TargeterStats {
         // Map of chunk shard minKey -> approximate delta. This is used for deciding
@@ -54,7 +55,6 @@ namespace mongo {
      */
     class ChunkManagerTargeter : public NSTargeter {
     public:
-
         ChunkManagerTargeter(const NamespaceString& nss);
 
         /**
@@ -103,7 +103,6 @@ namespace mongo {
         const TargeterStats* getStats() const;
 
     private:
-
         // Different ways we can refresh metadata
         enum RefreshType {
             // No refresh is needed
@@ -157,8 +156,8 @@ namespace mongo {
 
         // Zero or one of these are filled at all times
         // If sharded, _manager, if unsharded, _primary, on error, neither
-        ChunkManagerPtr _manager;
-        ShardPtr _primary;
+        boost::shared_ptr<ChunkManager> _manager;
+        boost::shared_ptr<Shard> _primary;
 
         // Map of shard->remote shard version reported from stale errors
         ShardVersionMap _remoteShardVersions;

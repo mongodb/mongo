@@ -792,6 +792,7 @@ env.Library('coreshard', [# This is only here temporarily for auto-split logic i
                           's/config.cpp',
                           's/grid.cpp',
                           's/chunk.cpp',
+                          's/chunk_manager.cpp',
                           # No good reason to be here other than chunk.cpp needs this.
                           's/config_server_checker_service.cpp',
                           's/shard.cpp',

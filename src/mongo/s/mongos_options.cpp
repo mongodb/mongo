@@ -1,4 +1,4 @@
-/*
+/**
  *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify

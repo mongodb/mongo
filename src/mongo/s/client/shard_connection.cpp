@@ -36,7 +36,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"

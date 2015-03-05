@@ -28,10 +28,12 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/interval.h"
-#include "mongo/s/chunk.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -42,6 +44,7 @@ namespace {
 
     using std::auto_ptr;
     using std::make_pair;
+
     /**
      * ChunkManager targeting test
      *
@@ -529,4 +532,4 @@ namespace {
         CheckBoundList(list, expectedList);
     }
 
-} // end namespace
+} // namespace

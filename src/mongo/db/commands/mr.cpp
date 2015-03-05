@@ -1,5 +1,3 @@
-// mr.cpp
-
 /**
  *    Copyright (C) 2012 10gen Inc.
  *
@@ -58,6 +56,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"

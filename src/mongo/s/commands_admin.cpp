@@ -55,7 +55,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_write.h"

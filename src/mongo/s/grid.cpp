@@ -34,8 +34,8 @@
 
 #include "mongo/s/grid.h"
 
-#include "pcrecpp.h"
 #include <iomanip>
+#include <pcrecpp.h>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -66,6 +66,16 @@ namespace mongo {
     using std::vector;
 
     MONGO_FP_DECLARE(neverBalance);
+
+    Grid::Grid()
+        : _lock("Grid"),
+          _allowLocalShard(true) {
+
+    }
+
+    Grid::~Grid() {
+
+    }
 
     DBConfigPtr Grid::getDBConfig( StringData ns , bool create , const string& shardNameHint ) {
         string database = nsToDatabase( ns );
@@ -474,8 +484,8 @@ namespace mongo {
         return ! shard.isEmpty();
     }
 
-    bool Grid::_getNewShardName( string* name ) const {
-        DEV verify( name );
+    bool Grid::_getNewShardName(string* name) const {
+        invariant(name);
 
         bool ok = false;
         int count = 0;
@@ -484,18 +494,20 @@ namespace mongo {
         BSONObj o = conn->findOne(ShardType::ConfigNS,
                                   Query(fromjson("{" + ShardType::name() + ": /^shard/}"))
                                       .sort(BSON(ShardType::name() << -1 )));
-        if ( ! o.isEmpty() ) {
+        if (!o.isEmpty()) {
             string last = o[ShardType::name()].String();
-            istringstream is( last.substr( 5 ) );
+            istringstream is(last.substr(5));
             is >> count;
             count++;
         }
+
         if (count < 9999) {
             stringstream ss;
             ss << "shard" << setfill('0') << setw(4) << count;
             *name = ss.str();
             ok = true;
         }
+
         conn.done();
 
         return ok;

@@ -52,7 +52,7 @@
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/dbclient_shard_resolver.h"

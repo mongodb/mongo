@@ -35,7 +35,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/concurrency/mutex.h"
 
-#include "mongo/s/config.h"  // DBConfigPtr
+#include "mongo/s/config.h"
 
 namespace mongo {
 
@@ -47,7 +47,8 @@ namespace mongo {
      */
     class Grid {
     public:
-        Grid() : _lock( "Grid" ) , _allowLocalShard( true ) { }
+        Grid();
+        ~Grid();
 
         /**
          * gets the config the db.
@@ -156,10 +157,6 @@ namespace mongo {
         static bool _inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now );
 
     private:
-        mongo::mutex              _lock;            // protects _databases; TODO: change to r/w lock ??
-        std::map<std::string, DBConfigPtr > _databases;       // maps ns to DBConfig's
-        bool                      _allowLocalShard; // can 'localhost' be used in shard addresses?
-
         /**
          * @param name is the chose name for the shard. Parameter is mandatory.
          * @return true if it managed to generate a shard name. May return false if (currently)
@@ -171,6 +168,14 @@ namespace mongo {
          * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
          */
         static bool _isSpecialLocalDB( const std::string& dbName );
+
+
+        // Databases catalog map and mutex to protect it
+        mongo::mutex _lock;
+        std::map<std::string, DBConfigPtr> _databases;
+
+        // can 'localhost' be used in shard addresses?
+        bool _allowLocalShard;
     };
 
     extern Grid grid;

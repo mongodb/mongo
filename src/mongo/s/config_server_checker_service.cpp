@@ -26,11 +26,14 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/config_server_checker_service.h"
+
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/s/config.h"
-#include "mongo/s/config_server_checker_service.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/exit.h"
 
@@ -72,4 +75,3 @@ namespace mongo {
         return _checkerThread != NULL;
     }
 }
-

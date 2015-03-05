@@ -28,8 +28,11 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/chunk_manager_targeter.h"
 
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -37,7 +40,6 @@
 
 namespace mongo {
 
-    using std::endl;
     using std::map;
     using std::set;
     using std::string;
@@ -45,20 +47,248 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
+namespace {
+
+    enum UpdateType {
+        UpdateType_Replacement, UpdateType_OpStyle, UpdateType_Unknown
+    };
+
+    enum CompareResult {
+        CompareResult_Unknown, CompareResult_GTE, CompareResult_LT
+    };
+
+    const ShardKeyPattern virtualIdShardKey(BSON("_id" << 1));
+
+    // To match legacy reload behavior, we have to backoff on config reload per-thread
+    // TODO: Centralize this behavior better by refactoring config reload in mongos
+    boost::thread_specific_ptr<Backoff> perThreadBackoff;
+    const int maxWaitMillis = 500;
+
     /**
      * Helper to get the DBConfigPtr object in an exception-safe way.
      */
-    static bool getDBConfigSafe( StringData db, DBConfigPtr& config, string* errMsg ) {
+    bool getDBConfigSafe(StringData db, DBConfigPtr& config, string* errMsg) {
         try {
-            config = grid.getDBConfig( db, true );
-            if ( !config ) *errMsg = stream() << "could not load or create database " << db;
+            config = grid.getDBConfig(db, true);
+            if (config) {
+                return true;
+            }
+
+            *errMsg = stream() << "could not load or create database " << db;
         }
-        catch ( const DBException& ex ) {
+        catch (const DBException& ex) {
             *errMsg = ex.toString();
         }
 
-        return config.get();
+        return false;
     }
+
+    /**
+     * There are two styles of update expressions:
+     *
+     * Replacement style: coll.update({ x : 1 }, { y : 2 })
+     * OpStyle: coll.update({ x : 1 }, { $set : { y : 2 } })
+     */
+    UpdateType getUpdateExprType(const BSONObj& updateExpr) {
+        // Empty update is replacement-style, by default
+        if (updateExpr.isEmpty()) {
+            return UpdateType_Replacement;
+        }
+
+        UpdateType updateType = UpdateType_Unknown;
+
+        BSONObjIterator it(updateExpr);
+        while (it.more()) {
+            BSONElement next = it.next();
+
+            if (next.fieldName()[0] == '$') {
+                if (updateType == UpdateType_Unknown) {
+                    updateType = UpdateType_OpStyle;
+                }
+                else if (updateType == UpdateType_Replacement) {
+                    return UpdateType_Unknown;
+                }
+            }
+            else {
+                if (updateType == UpdateType_Unknown) {
+                    updateType = UpdateType_Replacement;
+                }
+                else if (updateType == UpdateType_OpStyle) {
+                    return UpdateType_Unknown;
+                }
+            }
+        }
+
+        return updateType;
+    }
+
+    /**
+     * This returns "does the query have an _id field" and "is the _id field querying for a direct
+     * value like _id : 3 and not _id : { $gt : 3 }"
+     *
+     * Ex: { _id : 1 } => true
+     *     { foo : <anything>, _id : 1 } => true
+     *     { _id : { $lt : 30 } } => false
+     *     { foo : <anything> } => false
+     */
+    bool isExactIdQuery(const BSONObj& query) {
+        StatusWith<BSONObj> status = virtualIdShardKey.extractShardKeyFromQuery(query);
+        if (!status.isOK()) {
+            return false;
+        }
+
+        return !status.getValue()["_id"].eoo();
+    }
+
+    void refreshBackoff() {
+        if (!perThreadBackoff.get()) {
+            perThreadBackoff.reset(new Backoff(maxWaitMillis, maxWaitMillis * 2));
+        }
+
+        perThreadBackoff.get()->nextSleepMillis();
+    }
+
+
+    //
+    // Utilities to compare shard versions
+    //
+
+    /**
+     * Returns the relationship of two shard versions. Shard versions of a collection that has not
+     * been dropped and recreated and where there is at least one chunk on a shard are comparable,
+     * otherwise the result is ambiguous.
+     */
+    CompareResult compareShardVersions(const ChunkVersion& shardVersionA,
+                                       const ChunkVersion& shardVersionB) {
+
+        // Collection may have been dropped
+        if (!shardVersionA.hasEqualEpoch(shardVersionB)) {
+            return CompareResult_Unknown;
+        }
+
+        // Zero shard versions are only comparable to themselves
+        if (!shardVersionA.isSet() || !shardVersionB.isSet()) {
+            // If both are zero...
+            if (!shardVersionA.isSet() && !shardVersionB.isSet()) {
+                return CompareResult_GTE;
+            }
+
+            return CompareResult_Unknown;
+        }
+
+        if (shardVersionA < shardVersionB) {
+            return CompareResult_LT;
+        }
+
+        else return CompareResult_GTE;
+    }
+
+    ChunkVersion getShardVersion(StringData shardName,
+                                 const ChunkManager* manager,
+                                 const Shard* primary) {
+
+        dassert(!(manager && primary));
+        dassert(manager || primary);
+
+        if (primary) {
+            return ChunkVersion::UNSHARDED();
+        }
+
+        return manager->getVersion(shardName.toString());
+    }
+
+    /**
+     * Returns the relationship between two maps of shard versions. As above, these maps are often
+     * comparable when the collection has not been dropped and there is at least one chunk on the
+     * shards. If any versions in the maps are not comparable, the result is _Unknown.
+     *
+     * If any versions in the first map (cached) are _LT the versions in the second map (remote),
+     * the first (cached) versions are _LT the second (remote) versions.
+     *
+     * Note that the signature here is weird since our cached map of chunk versions is stored in a
+     * ChunkManager or is implicit in the primary shard of the collection.
+     */
+    CompareResult compareAllShardVersions(const ChunkManager* cachedChunkManager,
+                                          const Shard* cachedPrimary,
+                                          const map<string, ChunkVersion>& remoteShardVersions) {
+
+        CompareResult finalResult = CompareResult_GTE;
+
+        for (map<string, ChunkVersion>::const_iterator it = remoteShardVersions.begin();
+             it != remoteShardVersions.end();
+             ++it) {
+
+            // Get the remote and cached version for the next shard
+            const string& shardName = it->first;
+            const ChunkVersion& remoteShardVersion = it->second;
+
+            ChunkVersion cachedShardVersion;
+
+            try {
+                // Throws b/c shard constructor throws
+                cachedShardVersion = getShardVersion(shardName,
+                                                     cachedChunkManager,
+                                                     cachedPrimary);
+            }
+            catch (const DBException& ex) {
+                warning() << "could not lookup shard " << shardName
+                          << " in local cache, shard metadata may have changed"
+                          << " or be unavailable" << causedBy(ex);
+
+                return CompareResult_Unknown;
+            }
+
+            // Compare the remote and cached versions
+            CompareResult result = compareShardVersions(cachedShardVersion, remoteShardVersion);
+
+            if (result == CompareResult_Unknown) return result;
+            if (result == CompareResult_LT) finalResult = CompareResult_LT;
+
+            // Note that we keep going after _LT b/c there could be more _Unknowns.
+        }
+
+        return finalResult;
+    }
+
+    /**
+     * Whether or not the manager/primary pair is different from the other manager/primary pair.
+     */
+    bool isMetadataDifferent(const ChunkManagerPtr& managerA,
+                             const ShardPtr& primaryA,
+                             const ChunkManagerPtr& managerB,
+                             const ShardPtr& primaryB) {
+
+        if ((managerA && !managerB) || (!managerA && managerB) || (primaryA && !primaryB) || (!primaryA && primaryB)) return true;
+
+        if (managerA) {
+            return !managerA->getVersion().isStrictlyEqualTo(managerB->getVersion());
+        }
+
+        dassert(NULL != primaryA.get());
+        return primaryA->getName() != primaryB->getName();
+    }
+
+    /**
+    * Whether or not the manager/primary pair was changed or refreshed from a previous version
+    * of the metadata.
+    */
+    bool wasMetadataRefreshed(const ChunkManagerPtr& managerA,
+        const ShardPtr& primaryA,
+        const ChunkManagerPtr& managerB,
+        const ShardPtr& primaryB) {
+
+        if (isMetadataDifferent(managerA, primaryA, managerB, primaryB))
+            return true;
+
+        if (managerA) {
+            dassert(managerB.get()); // otherwise metadata would be different
+            return managerA->getSequenceNumber() != managerB->getSequenceNumber();
+        }
+
+        return false;
+    }
+
+} // namespace
 
     ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss)
         : _nss(nss),
@@ -70,12 +300,12 @@ namespace mongo {
         DBConfigPtr config;
 
         string errMsg;
-        if ( !getDBConfigSafe( _nss.db(), config, &errMsg ) ) {
-            return Status( ErrorCodes::DatabaseNotFound, errMsg );
+        if (!getDBConfigSafe(_nss.db(), config, &errMsg)) {
+            return Status(ErrorCodes::DatabaseNotFound, errMsg);
         }
 
         // Get either the chunk manager or primary shard
-        config->getChunkManagerOrPrimary( _nss.ns(), _manager, _primary );
+        config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
 
         return Status::OK();
     }
@@ -127,69 +357,6 @@ namespace mongo {
 
             *endpoint = new ShardEndpoint(_primary->getName(), ChunkVersion::UNSHARDED());
             return Status::OK();
-        }
-    }
-
-    namespace {
-
-        // TODO: Expose these for unit testing via dbtests
-
-        enum UpdateType {
-            UpdateType_Replacement, UpdateType_OpStyle, UpdateType_Unknown
-        };
-
-        /**
-         * There are two styles of update expressions:
-         * coll.update({ x : 1 }, { y : 2 }) // Replacement style
-         * coll.update({ x : 1 }, { $set : { y : 2 } }) // OpStyle
-         */
-        UpdateType getUpdateExprType( const BSONObj& updateExpr ) {
-
-            UpdateType updateType = UpdateType_Unknown;
-
-            // Empty update is replacement-style, by default
-            if ( updateExpr.isEmpty() ) return UpdateType_Replacement;
-
-            BSONObjIterator it( updateExpr );
-            while ( it.more() ) {
-                BSONElement next = it.next();
-
-                if ( next.fieldName()[0] == '$' ) {
-                    if ( updateType == UpdateType_Unknown ) {
-                        updateType = UpdateType_OpStyle;
-                    }
-                    else if ( updateType == UpdateType_Replacement ) {
-                        return UpdateType_Unknown;
-                    }
-                }
-                else {
-                    if ( updateType == UpdateType_Unknown ) {
-                        updateType = UpdateType_Replacement;
-                    }
-                    else if ( updateType == UpdateType_OpStyle ) {
-                        return UpdateType_Unknown;
-                    }
-                }
-            }
-
-            return updateType;
-        }
-
-        /**
-         * This returns "does the query have an _id field" and "is the _id field
-         * querying for a direct value like _id : 3 and not _id : { $gt : 3 }"
-         *
-         * Ex: { _id : 1 } => true
-         *     { foo : <anything>, _id : 1 } => true
-         *     { _id : { $lt : 30 } } => false
-         *     { foo : <anything> } => false
-         */
-        bool isExactIdQuery(const BSONObj& query) {
-            static const ShardKeyPattern virtualIdShardKey(BSON("_id" << 1));
-            StatusWith<BSONObj> status = virtualIdShardKey.extractShardKeyFromQuery(query);
-            if (!status.isOK())
-                return false;
-            return !status.getValue()["_id"].eoo();
         }
     }
 
@@ -357,10 +524,9 @@ namespace mongo {
                                               vector<ShardEndpoint*>* endpoints ) const {
 
         if ( !_primary && !_manager ) {
-            return Status( ErrorCodes::NamespaceNotFound,
-                           str::stream() << "could not target query in "
-                                         << getNS().ns()
-                                         << "; no metadata found" );
+            return Status(ErrorCodes::NamespaceNotFound,
+                          stream() << "could not target query in "
+                                   << getNS().ns() << "; no metadata found");
         }
 
         set<Shard> shards;
@@ -454,153 +620,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    namespace {
-
-        //
-        // Utilities to compare shard versions
-        //
-
-        enum CompareResult {
-            CompareResult_Unknown, CompareResult_GTE, CompareResult_LT
-        };
-
-        /**
-         * Returns the relationship of two shard versions.  Shard versions of a collection that has
-         * not been dropped and recreated and where there is at least one chunk on a shard are
-         * comparable, otherwise the result is ambiguous.
-         */
-        CompareResult compareShardVersions( const ChunkVersion& shardVersionA,
-                                            const ChunkVersion& shardVersionB ) {
-
-            // Collection may have been dropped
-            if ( !shardVersionA.hasEqualEpoch( shardVersionB ) ) return CompareResult_Unknown;
-
-            // Zero shard versions are only comparable to themselves
-            if ( !shardVersionA.isSet() || !shardVersionB.isSet() ) {
-                // If both are zero...
-                if ( !shardVersionA.isSet() && !shardVersionB.isSet() ) return CompareResult_GTE;
-                // Otherwise...
-                return CompareResult_Unknown;
-            }
-
-            if ( shardVersionA < shardVersionB ) return CompareResult_LT;
-            else return CompareResult_GTE;
-        }
-
-        ChunkVersion getShardVersion( StringData shardName,
-                                      const ChunkManagerPtr& manager,
-                                      const ShardPtr& primary ) {
-
-            dassert( !( manager && primary ) );
-            dassert( manager || primary );
-
-            if ( primary ) return ChunkVersion::UNSHARDED();
-
-            return manager->getVersion(shardName.toString());
-        }
-
-        /**
-         * Returns the relationship between two maps of shard versions.  As above, these maps are
-         * often comparable when the collection has not been dropped and there is at least one
-         * chunk on the shards.
-         *
-         * If any versions in the maps are not comparable, the result is _Unknown.
-         *
-         * If any versions in the first map (cached) are _LT the versions in the second map
-         * (remote), the first (cached) versions are _LT the second (remote) versions.
-         *
-         * Note that the signature here is weird since our cached map of chunk versions is
-         * stored in a ChunkManager or is implicit in the primary shard of the collection.
-         */
-        CompareResult //
-        compareAllShardVersions( const ChunkManagerPtr& cachedShardVersions,
-                                 const ShardPtr& cachedPrimary,
-                                 const map<string, ChunkVersion>& remoteShardVersions ) {
-
-            CompareResult finalResult = CompareResult_GTE;
-
-            for ( map<string, ChunkVersion>::const_iterator it = remoteShardVersions.begin();
-                it != remoteShardVersions.end(); ++it ) {
-
-                //
-                // Get the remote and cached version for the next shard
-                //
-
-                const string& shardName = it->first;
-                const ChunkVersion& remoteShardVersion = it->second;
-                ChunkVersion cachedShardVersion;
-
-                try {
-                    // Throws b/c shard constructor throws
-                    cachedShardVersion = getShardVersion( shardName,
-                                                          cachedShardVersions,
-                                                          cachedPrimary );
-                }
-                catch ( const DBException& ex ) {
-
-                    warning() << "could not lookup shard " << shardName
-                              << " in local cache, shard metadata may have changed"
-                              << " or be unavailable" << causedBy( ex ) << endl;
-
-                    return CompareResult_Unknown;
-                }
-
-                //
-                // Compare the remote and cached versions
-                //
-
-                CompareResult result = compareShardVersions( cachedShardVersion,
-                                                             remoteShardVersion );
-
-                if ( result == CompareResult_Unknown ) return result;
-                if ( result == CompareResult_LT ) finalResult = CompareResult_LT;
-
-                // Note that we keep going after _LT b/c there could be more _Unknowns.
-            }
-
-            return finalResult;
-        }
-
-        /**
-         * Whether or not the manager/primary pair is different from the other manager/primary pair
-         */
-        bool isMetadataDifferent( const ChunkManagerPtr& managerA,
-                                  const ShardPtr& primaryA,
-                                  const ChunkManagerPtr& managerB,
-                                  const ShardPtr& primaryB ) {
-
-            if ( ( managerA && !managerB ) || ( !managerA && managerB ) || ( primaryA && !primaryB )
-                 || ( !primaryA && primaryB ) ) return true;
-
-            if ( managerA ) {
-                return !managerA->getVersion().isStrictlyEqualTo( managerB->getVersion() );
-            }
-
-            dassert( NULL != primaryA.get() );
-            return primaryA->getName() != primaryB->getName();
-        }
-
-        /**
-         * Whether or not the manager/primary pair was changed or refreshed from a previous version
-         * of the metadata.
-         */
-        bool wasMetadataRefreshed( const ChunkManagerPtr& managerA,
-                                   const ShardPtr& primaryA,
-                                   const ChunkManagerPtr& managerB,
-                                   const ShardPtr& primaryB ) {
-
-            if ( isMetadataDifferent( managerA, primaryA, managerB, primaryB ) )
-                return true;
-
-            if ( managerA ) {
-                dassert( managerB.get() ); // otherwise metadata would be different
-                return managerA->getSequenceNumber() != managerB->getSequenceNumber();
-            }
-
-            return false;
-        }
-    }
-
     void ChunkManagerTargeter::noteStaleResponse( const ShardEndpoint& endpoint,
                                                   const BSONObj& staleInfo ) {
         dassert( !_needsTargetingRefresh );
@@ -609,7 +628,8 @@ namespace mongo {
         if ( staleInfo["vWanted"].eoo() ) {
             // If we don't have a vWanted sent, assume the version is higher than our current
             // version.
-            remoteShardVersion = getShardVersion( endpoint.shardName, _manager, _primary );
+            remoteShardVersion =
+                    getShardVersion(endpoint.shardName, _manager.get(), _primary.get());
             remoteShardVersion.incMajor();
         }
         else {
@@ -712,9 +732,9 @@ namespace mongo {
             // If we got stale shard versions from remote shards, we may need to refresh
             // NOTE: Not sure yet if this can happen simultaneously with targeting issues
 
-            CompareResult result = compareAllShardVersions( _manager,
-                                                            _primary,
-                                                            _remoteShardVersions );
+            CompareResult result = compareAllShardVersions(_manager.get(),
+                                                           _primary.get(),
+                                                           _remoteShardVersions);
             // Reset the versions
             _remoteShardVersions.clear();
 
@@ -736,19 +756,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    // To match legacy reload behavior, we have to backoff on config reload per-thread
-    // TODO: Centralize this behavior better by refactoring config reload in mongos
-    static const int maxWaitMillis = 500;
-    static boost::thread_specific_ptr<Backoff> perThreadBackoff;
-
-    static void refreshBackoff() {
-        if ( !perThreadBackoff.get() )
-            perThreadBackoff.reset( new Backoff( maxWaitMillis, maxWaitMillis * 2 ) );
-        perThreadBackoff.get()->nextSleepMillis();
-    }
-
     Status ChunkManagerTargeter::refreshNow( RefreshType refreshType ) {
-
         DBConfigPtr config;
 
         string errMsg;
@@ -781,6 +789,7 @@ namespace mongo {
             catch ( const DBException& ex ) {
                 return Status( ErrorCodes::UnknownError, ex.toString() );
             }
+
             config->getChunkManagerOrPrimary( _nss.ns(), _manager, _primary );
         }
 

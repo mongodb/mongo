@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 

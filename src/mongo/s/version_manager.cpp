@@ -34,7 +34,7 @@
 
 #include "mongo/s/version_manager.h"
 
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
