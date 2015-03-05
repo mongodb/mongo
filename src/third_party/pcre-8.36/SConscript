@@ -29,11 +29,11 @@ for to_remove in ['-Werror', '-Wall', '-W']:
 #  -DPCRE_SUPPORT_UTF:BOOL="1"
 #
 if windows:
-    env.Append(CPPPATH=["build_windows"])
+    env.Prepend(CPPPATH=["build_windows"])
 elif solaris:
-    env.Append(CPPPATH=["build_solaris"])
+    env.Prepend(CPPPATH=["build_solaris"])
 else:
-    env.Append(CPPPATH=["build_posix"])
+    env.Prepend(CPPPATH=["build_posix"])
 
 env.Library( "pcrecpp", [
         # pcre

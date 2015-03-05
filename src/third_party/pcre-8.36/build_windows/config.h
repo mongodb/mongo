@@ -14,7 +14,7 @@
 /* #undef HAVE_BCOPY */
 #define HAVE_MEMMOVE 1
 #define HAVE_STRERROR 1
-#define HAVE_STRTOLL 1
+/* #undef HAVE_STRTOLL */
 /* #undef HAVE_STRTOQ */
 #define HAVE__STRTOI64 1
 
