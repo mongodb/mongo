@@ -35,6 +35,7 @@
 
 #include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/thread/locks.hpp>
 #include <memory>
 #include <algorithm>
 #include <utility>
@@ -276,7 +277,7 @@ namespace mongo {
         }
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-        boost::lock_guard<boost::timed_mutex> lock(_cappedDeleterMutex, boost::defer_lock);
+        boost::unique_lock<boost::timed_mutex> lock(_cappedDeleterMutex, boost::defer_lock);
 
         if (_cappedMaxDocs != -1) {
             lock.lock(); // Max docs has to be exact, so have to check every time.

@@ -35,6 +35,8 @@
 #include <memory>
 #include <string>
 
+#include <boost/thread/locks.hpp>
+
 // for invariant()
 #include "mongo/util/assert_util.h"
 

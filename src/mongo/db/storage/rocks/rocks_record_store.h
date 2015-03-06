@@ -32,6 +32,7 @@
 #include <atomic>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 #include <string>
 #include <memory>
 #include <vector>
