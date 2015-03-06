@@ -3237,10 +3237,17 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
 		addr = NULL;
 		child = ref->page;
+
+		/* Deleted child we don't have to write. */
 		if (state == WT_CHILD_IGNORE) {
 			CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
 		}
+
+		/*
+		 * Modified child.  Empty pages are merged into the parent and
+		 * discarded.
+		 */
 		if (state == WT_CHILD_MODIFIED) {
 			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
