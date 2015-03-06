@@ -3261,7 +3261,9 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
-		}
+		} else
+			/* No other states are expected for column stores. */
+			WT_ASSERT(session, state == 0);
 
 		/*
 		 * Build the value cell.  The child page address is in one of 3
