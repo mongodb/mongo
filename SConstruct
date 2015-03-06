@@ -1720,17 +1720,19 @@ def doConfigure(myenv):
             print( 'sanitize is only supported with clang or gcc')
             Exit(1)
 
+        if get_option('allocator') == 'tcmalloc':
+            # There are multiply defined symbols between the sanitizer and
+            # our vendorized tcmalloc.
+            print("Cannot use --sanitize with tcmalloc")
+            Exit(1)
+
         sanitizer_list = get_option('sanitize').split(',')
 
         using_lsan = 'leak' in sanitizer_list
         using_asan = 'address' in sanitizer_list or using_lsan
+        using_tsan = 'thread' in sanitizer_list
 
-        if using_asan:
-            if get_option('allocator') == 'tcmalloc':
-                print("Cannot use address or leak sanitizer with tcmalloc")
-                Exit(1)
-
-        # If the user asked for leak sanitizer turn on the detect_leaks
+        # If the user asked for leak sanitizer, turn on the detect_leaks
         # ASAN_OPTION. If they asked for address sanitizer as well, drop
         # 'leak', because -fsanitize=leak means no address.
         #
@@ -1779,9 +1781,14 @@ def doConfigure(myenv):
         if llvm_symbolizer:
             myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
             myenv['ENV']['LSAN_SYMBOLIZER_PATH'] = llvm_symbolizer
+            tsan_options = "external_symbolizer_path=\"%s\" " % llvm_symbolizer
         elif using_lsan:
             print("Using the leak sanitizer requires a valid symbolizer")
             Exit(1)
+
+        if using_tsan:
+            tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
+            myenv['ENV']['TSAN_OPTIONS'] = tsan_options
 
     if using_msvc() and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
