@@ -991,6 +991,20 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	/*
 	 * If we aren't (potentially) doing eviction that can restore updates
 	 * and the updates on this page are too recent, give up.
+	 *
+	 * Don't rely on new updates being skipped by the transaction used
+	 * for transaction reads: (1) there are paths that dirty pages for
+	 * artificial reasons; (2) internal pages aren't transactional; and
+	 * (3) if an update was skipped during the checkpoint (leaving the page
+	 * dirty), then rolled back, we could still successfully overwrite a
+	 * page and corrupt the checkpoint.
+	 *
+	 * Further, we can't race with the checkpoint's reconciliation of
+	 * an internal page as we evict a clean child from the page's subtree.
+	 * This works in the usual way: eviction locks the page and then checks
+	 * for existing hazard pointers, the checkpoint thread reconciling an
+	 * internal page acquires hazard pointers on child pages it reads, and
+	 * is blocked by the exclusive lock.
 	 */
 	if (page->read_gen != WT_READGEN_OLDEST &&
 	    !__wt_txn_visible_all(session, __wt_page_is_modified(page) ?

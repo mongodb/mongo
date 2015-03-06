@@ -86,14 +86,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		case WT_SYNC_CLOSE:
 			/*
 			 * Evict the page.
-			 * Do not attempt to evict pages expected to be merged
-			 * into their parents, with the exception that the root
-			 * page can't be merged, it must be written.
 			 */
-			if (__wt_ref_is_root(ref) ||
-			    page->modify == NULL ||
-			    !F_ISSET(page->modify, WT_PM_REC_EMPTY))
-				WT_ERR(__wt_evict(session, ref, 1));
+			WT_ERR(__wt_evict(session, ref, 1));
 			break;
 		case WT_SYNC_DISCARD_FORCE:
 			/*

@@ -144,9 +144,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	if (session->reconcile_cleanup != NULL)
 		WT_TRET(session->reconcile_cleanup(session));
 
-	/* Free the eviction exclusive-lock information. */
-	__wt_free(session, session->excl);
-
 	/* Destroy the thread's mutex. */
 	WT_TRET(__wt_cond_destroy(session, &session->cond));
 
