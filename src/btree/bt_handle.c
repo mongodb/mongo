@@ -464,7 +464,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		ref->page = leaf;
 		ref->state = WT_REF_MEM;
 		WT_ERR(__wt_page_modify_init(session, leaf));
-		__wt_page_modify_set(session, leaf);
+		__wt_page_only_modify_set(session, leaf);
 	}
 
 	/* Finish initializing the root, root reference links. */
