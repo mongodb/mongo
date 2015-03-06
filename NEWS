@@ -6,14 +6,17 @@ bug fixes.
 
 New features and API changes:
 
+* Windows platform support (requires SCons and the Microsoft Visual C++
+  compiler in Microsoft Visual Studio).
+
 * Add a new option to wiredtiger_open which is log=(recover=true). The default
   value is true, if false recovery won't be run on startup. An error will be
-  returned if recovery is needed but disabled. This option is mainly to
-  support the WiredTiger command line utility.
+  returned if recovery is needed but disabled. This option is mainly to support
+  the WiredTiger command line utility.
   Refs: #1651
 
-* Replace the wiredtiger_strerror_r API with a WT_SESSION.strerror method.
-  Refs: #1516
+* Add a new WT_CURSOR::equals method that returns when the cursors are equal,
+  intended as a fast-path for cursor comparison.
 
 * Change how statistics work when there are checkpoints for an object. We
   used to aggregate statistics for all open checkpoints and the current
@@ -36,16 +39,17 @@ New features and API changes:
   cache_overhead=8) the value is a percentage. The default is 8.
   Refs: #1564 #1565
 
-* Change the WT_CURSOR::equals method to return one when the cursors are equal,
-  zero when not.
-
 * Major enhancements to the wtstats.py tool that translates WiredTiger
   statistics into an HTML graph. The tool now generates interactive graphs
   and no longer requires third party Python libraries to be installed.
 
-* Add a new WT_CURSOR::reconfigure method. See API documentation for more
-  information.
+* Add a new WT_CURSOR::reconfigure method intended for cursor configuration.
+  See API documentation for more information.
   Refs: #1381
+
+* Add a new WT_SESSION.strerror method, intended as a thread-safe alternative
+  to wiredtiger_strerror().
+  Refs: #1516
 
 Bug fixes for bugs that could cause data inconsistency:
 
@@ -56,11 +60,11 @@ Bug fixes for bugs that could cause data inconsistency:
 * Fix several bugs in data consistency that could cause corruption when
   restarting after a hard crash, including:
   - A bug in table create that could cause recovery to fail. Refs: SERVER-17204
-  - Someone should probably identify more of these and move them from the following section.
 
 Other significant changes:
 
-* Many enhancements to maintaining the WiredTiger cache, including:
+* Significant tuning enhancements for the WiredTiger cache, including:
+
  - Avoiding stalls due to evicting large pages
  - Better algorithms for getting application threads to help with cache
    management without interfering with operation latencies.
@@ -73,15 +77,16 @@ Other significant changes:
    multiple smaller pages and attempted to evict the page at the same time.
    Refs: #1583 #1563 SERVER-16868
 
-* Significant improvements to the truncate implementation - especially for
-workloads that periodically truncate from the start of the file.
+* Significant improvements to the cursor truncate implementation,
+  especially for workloads that periodically truncate from the start of
+  the file.
   refs: SERVER-17141
 
 * Fix a bug in eviction where reconfiguring the number of eviction threads
   could result in a segfault.
   refs: SERVER-17293
 
-* Several bug fixes and performance enhancements to the logging subsystem
+* Significant bug fixes and performance enhancements to the logging subsystem
   including:
   - Avoid yielding excessively to avoid CPU overhead when there are many
     active sessions. Refs: #1610
@@ -99,8 +104,7 @@ workloads that periodically truncate from the start of the file.
   detect some write-write conflicts in no-overwrite cursors.
   Refs: SERVER-16351
 
-* Several bug fixes and enhancements when writing pages to disk
- (reconciliation), including:
+* Significant bug fixes when writing pages to disk, including:
   - Stop double count the on-disk header when choosing split points. Refs #1655
   - Fill the first and second pages as much as possible when splitting.
     Refs: #1282
@@ -121,18 +125,16 @@ workloads that periodically truncate from the start of the file.
   could lead to a deadlock.
   Refs: #1575 SERVER-16738
 
-* Enhance how we share the memory when using shared cache to use cache read
-  pressure rather than write pressure. Since checkpoints skew write pressure
-  as a metric.
+* Change the shared cache implementation to use cache read pressure rather
+  than write pressure to determine how best to share memory (as checkpoints
+  skew write pressure as a metric).
   Refs: #1569
 
-* Bug fixes, documentation, feature enhancements and performance improvements
-  for the Windows build.
-
 * Fix a bug where a deadlock could occur if a checkpoint starts in parallel to
-  compact operations. #1589 SERVER-16967
+  compact operations.
+  Refs: #1589 SERVER-16967
 
-* Fix a bug in how we parse huffman configuration settings on
+* Fix a bug in how we parse Huffman-encoding configuration settings during
   WT_SESSION::create.
   Refs: #1417 #1536
 
