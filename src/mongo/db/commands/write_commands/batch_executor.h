@@ -86,6 +86,7 @@ namespace mongo {
          * Dispatches to one of the three functions below for DBLock, CurOp, and stats management.
          */
         void bulkExecute( const BatchedCommandRequest& request,
+                          const WriteConcernOptions& writeConcern,
                           std::vector<BatchedUpsertDetail*>* upsertedIds,
                           std::vector<WriteErrorDetail*>* errors );
 
@@ -97,6 +98,7 @@ namespace mongo {
          * times.
          */
         void execInserts( const BatchedCommandRequest& request,
+                          const WriteConcernOptions& writeConcern,
                           std::vector<WriteErrorDetail*>* errors );
 
         /**
