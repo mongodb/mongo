@@ -179,6 +179,7 @@ namespace {
         doMinidump();
 #endif
 
+        breakpoint();
         quickExit(EXIT_ABRUPT);
     }
 
@@ -233,6 +234,7 @@ namespace {
         writeMallocFreeStreamToLog();
 
         printSignalAndBacktrace(signalNum);
+        breakpoint();
         quickExit(EXIT_ABRUPT);
     }
 
