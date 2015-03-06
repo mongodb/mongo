@@ -3237,15 +3237,11 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
 		addr = NULL;
 		child = ref->page;
-		if (state != 0) {
-			/*
-			 * Currently the only non-zero returned stated possible
-			 * for a column-store page is child-modified (all other
-			 * states are part of the fast-truncate support, which
-			 * is row-store only).
-			 */
-			WT_ASSERT(session, state == WT_CHILD_MODIFIED);
-
+		if (state == WT_CHILD_IGNORE) {
+			CHILD_RELEASE_ERR(session, hazard, ref);
+			continue;
+		}
+		if (state == WT_CHILD_MODIFIED) {
 			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
