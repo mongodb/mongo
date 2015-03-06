@@ -52,6 +52,7 @@ func (sp *SessionProvider) DatabaseNames() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 	return session.DatabaseNames()
 }
@@ -63,6 +64,7 @@ func (sp *SessionProvider) CollectionNames(dbName string) ([]string, error) {
 		return nil, err
 	}
 	defer session.Close()
+	session.SetSocketTimeout(0)
 	return session.DB(dbName).CollectionNames()
 }
 
@@ -73,6 +75,7 @@ func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 	masterDoc := bson.M{}
 	err = session.Run("isMaster", &masterDoc)
@@ -90,6 +93,7 @@ func (sp *SessionProvider) IsMongos() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 	masterDoc := struct {
 		Msg string `bson:"msg"`
@@ -110,6 +114,7 @@ func (sp *SessionProvider) SupportsRepairCursor(db, collection string) (bool, er
 	if err != nil {
 		return false, err
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	// This check is slightly hacky, but necessary to allow users to run repair without
@@ -142,6 +147,7 @@ func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 	masterDoc := struct {
 		Ok      int `bson:"ok"`

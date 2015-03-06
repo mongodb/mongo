@@ -82,7 +82,7 @@ func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 
 	cols, err := dump.sessionProvider.CollectionNames(dbName)
 	if err != nil {
-		return fmt.Errorf("error getting collection names for database `%v`: %v", dump.ToolOptions.DB, err)
+		return fmt.Errorf("error getting collection names for database `%v`: %v", dbName, err)
 	}
 
 	log.Logf(log.DebugHigh, "found collections: %v", strings.Join(cols, ", "))
