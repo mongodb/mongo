@@ -216,7 +216,7 @@ ascend:	/*
 			ret = __wt_page_swap(session, couple, ref, flags);
 
 			/*
-			 * Notfound is an expected return when only walking
+			 * Not-found is an expected return when only walking
 			 * in-cache pages.
 			 */
 			if (ret == WT_NOTFOUND) {
