@@ -817,7 +817,7 @@ __wt_log_close(WT_SESSION_IMPL *session)
 	if (log->log_dir_fh != NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log directory %s", log->log_dir_fh->name));
-		WT_RET(__wt_fsync(session, log->log_dir_fh));
+		WT_RET(__wt_directory_sync_fh(session, log->log_dir_fh));
 		WT_RET(__wt_close(session, log->log_dir_fh));
 		log->log_dir_fh = NULL;
 	}

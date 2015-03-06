@@ -381,8 +381,9 @@ __log_wrlsn_server(void *arg)
 	WT_LOG_WRLSN_ENTRY written[SLOT_POOL];
 	WT_LOGSLOT *slot;
 	WT_SESSION_IMPL *session;
-	size_t write_size;
-	int i, save_i, written_i, yield;
+	size_t write_size, written_i;
+	uint32_t i, save_i;
+	int yield;
 
 	session = arg;
 	conn = S2C(session);
@@ -692,6 +693,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		WT_TRET(wt_session->close(wt_session, NULL));
 		conn->log_close_session = NULL;
 	}
+	WT_TRET(__wt_cond_destroy(session, &conn->log_wrlsn_cond));
 	if (conn->log_wrlsn_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_wrlsn_cond));
 		WT_TRET(__wt_thread_join(session, conn->log_wrlsn_tid));

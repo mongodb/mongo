@@ -551,6 +551,7 @@ dest
 dev
 dhandle
 dhandles
+dir
 dirlist
 dl
 dlclose
