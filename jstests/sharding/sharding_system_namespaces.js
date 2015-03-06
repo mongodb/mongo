@@ -17,9 +17,13 @@ var db = st.s.getDB("test");
 var coll = db.sharding_system_namespaces;
 
 // This test relies on the wiredTiger storage engine being compiled
-// into the server. This assumption does not hold on 32-bit platforms.
-// See SERVER-16660.
-if (db.serverBuildInfo().bits != 32) {
+// into the server. Must check shard member for WT as it is not built into mongos.
+
+var storageEngines = st.shard0.getDB("local").serverBuildInfo().storageEngines;
+
+print("Supported storage engines: " + storageEngines);
+
+if (storageEngines.indexOf("wiredTiger") >= 0) {
 
     function checkCollectionOptions(database) {
       var collectionsInfos = database.getCollectionInfos();
@@ -60,4 +64,7 @@ if (db.serverBuildInfo().bits != 32) {
     printShardingStatus();
 
     checkCollectionOptions(anotherShard.getDB("test"));
+}
+else {
+    print("Skipping test. wiredTiger engine not supported by mongod binary.")
 }
