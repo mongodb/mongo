@@ -142,12 +142,6 @@ config_setup(void)
 	config_compression();
 	config_isolation();
 
-	/* Clear operations values if the whole run is read-only. */
-	if (g.c_ops == 0)
-		for (cp = c; cp->name != NULL; ++cp)
-			if (cp->flags & C_OPS)
-				*cp->v = 0;
-
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
 	 * as long as the delete percentage isn't nailed down.
@@ -173,6 +167,11 @@ config_setup(void)
 		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
 			g.c_insert_pct = MMRAND(50, 85);
 	}
+
+	/* Make the default maximum-run length 20 minutes. */
+	cp = config_find("timer", strlen("timer"));
+	if (!(cp->flags & C_PERM))
+		g.c_timer = 20;
 
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
@@ -238,8 +237,9 @@ config_compression(void)
 	/*
 	 * Compression: choose something if compression wasn't specified,
 	 * otherwise confirm the appropriate shared library is available.
-	 * We don't include LZO in the test compression choices, we don't
-	 * yet have an LZO module of our own.
+	 * We used to verify that the libraries existed but that's no longer
+	 * robust, since it's possible to build compression libraries into
+	 * the WiredTiger library.
 	 */
 	cp = config_find("compression", strlen("compression"));
 	if (!(cp->flags & C_PERM)) {
@@ -249,49 +249,23 @@ config_compression(void)
 		case 4: case 5: case 6:
 			break;
 		case 7: case 8: case 9: case 10:	/* 20% bzip */
-			if (access(BZIP_PATH, R_OK) == 0)
-				cstr = "compression=bzip";
+			cstr = "compression=bzip";
 			break;
 		case 11:				/* 5% bzip-raw */
-			if (access(BZIP_PATH, R_OK) == 0)
-				cstr = "compression=bzip-raw";
+			cstr = "compression=bzip-raw";
 			break;
 		case 12: case 13: case 14: case 15:	/* 20% snappy */
-			if (access(SNAPPY_PATH, R_OK) == 0)
-				cstr = "compression=snappy";
+			cstr = "compression=snappy";
 			break;
 		case 16: case 17: case 18: case 19:	/* 20% zlib */
-			if (access(ZLIB_PATH, R_OK) == 0)
-				cstr = "compression=zlib";
+			cstr = "compression=zlib";
 			break;
 		case 20:				/* 5% zlib-no-raw */
-			if (access(ZLIB_PATH, R_OK) == 0)
-				cstr = "compression=zlib-noraw";
+			cstr = "compression=zlib-noraw";
 			break;
 		}
 
 		config_single(cstr, 0);
-	}
-
-	switch (g.c_compression_flag) {
-	case COMPRESS_BZIP:
-	case COMPRESS_BZIP_RAW:
-		if (access(BZIP_PATH, R_OK) != 0)
-			die(0, "bzip library not found or not readable");
-		break;
-	case COMPRESS_LZO:
-		if (access(LZO_PATH, R_OK) != 0)
-			die(0, "LZO library not found or not readable");
-		break;
-	case COMPRESS_SNAPPY:
-		if (access(SNAPPY_PATH, R_OK) != 0)
-			die(0, "snappy library not found or not readable");
-		break;
-	case COMPRESS_ZLIB:
-	case COMPRESS_ZLIB_NO_RAW:
-		if (access(ZLIB_PATH, R_OK) != 0)
-			die(0, "zlib library not found or not readable");
-		break;
 	}
 }
 

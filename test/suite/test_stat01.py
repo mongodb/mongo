@@ -28,6 +28,8 @@
 
 import helper, wiredtiger, wttest
 from wiredtiger import stat
+from helper import key_populate, simple_populate
+from wtscenario import multiply_scenarios, number_scenarios
 
 # test_stat01.py
 #    Statistics operations
@@ -37,16 +39,24 @@ class test_stat01(wttest.WiredTigerTestCase):
     """
 
     tablename = 'test_stat01.wt'
-    uri = 'file:' + tablename
-    config = 'key_format=S,' +\
-        'allocation_size=512,internal_page_max=16K,leaf_page_max=128K'
+    uri = 'table:' + tablename
+    config = 'internal_page_max=4K,leaf_page_max=8K'
     nentries = 25
+
+    types = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
+    keyfmt = [
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt))
 
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open(dir,
-            'create,statistics=(fast),' +
-            'error_prefix="%s: "' % self.shortid())
+            'create,statistics=(all),' + 'error_prefix="%s: "' % self.shortid())
         return conn
 
     def statstr_to_int(self, str):
@@ -57,17 +67,17 @@ class test_stat01(wttest.WiredTigerTestCase):
         parts = str.rpartition('(')
         return int(parts[2].rstrip(')'))
 
-    def check_stats(self, statcursor, mincount, lookfor):
-        """
-        Do a quick check of the entries in the the stats cursor,
-        There should be at least 'mincount' entries,
-        and the 'lookfor' string should appear
-        """
+    # Do a quick check of the entries in the the stats cursor, the "lookfor"
+    # string should appear with a minimum value of least "min".
+    def check_stats(self, statcursor, min, lookfor):
         stringclass = ''.__class__
         intclass = (0).__class__
-        # make sure statistics basically look right
-        count = 0
+
+        # Reset the cursor, we're called multiple times.
+        statcursor.reset()
+
         found = False
+        foundval = 0
         for id, desc, valstr, val in statcursor:
             self.assertEqual(type(desc), stringclass)
             self.assertEqual(type(valstr), stringclass)
@@ -75,68 +85,76 @@ class test_stat01(wttest.WiredTigerTestCase):
             self.assertEqual(val, self.statstr_to_int(valstr))
             self.printVerbose(2, '  stat: \'' + desc + '\', \'' +
                               valstr + '\', ' + str(val))
-            count += 1
             if desc == lookfor:
                 found = True
-        self.assertTrue(count > mincount)
-        self.assertTrue(found, 'in stats, did not see: ' + lookfor)
+                foundval = val
 
+        self.assertTrue(found, 'in stats, did not see: ' + lookfor)
+        self.assertTrue(foundval >= min)
+
+    # Test simple connection statistics.
     def test_basic_conn_stats(self):
-        self.printVerbose(2, 'overall database stats:')
+        # Build an object and force some writes.
+        config = self.config + ',key_format=' + self.keyfmt
+        simple_populate(self, self.uri, config, 1000)
+        self.session.checkpoint(None)
+
+        # See that we can get a specific stat value by its key and verify its
+        # entry is self-consistent.
         allstat_cursor = self.session.open_cursor('statistics:', None, None)
         self.check_stats(allstat_cursor, 10, 'block-manager: blocks written')
 
-        # See that we can get a specific stat value by its key,
-        # and verify that its entry is self-consistent
         values = allstat_cursor[stat.conn.block_write]
         self.assertEqual(values[0], 'block-manager: blocks written')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
         allstat_cursor.close()
 
+    # Test simple object statistics.
     def test_basic_data_source_stats(self):
-        self.session.create(self.uri, self.config)
+        # Build an object.
+        config = self.config + ',key_format=' + self.keyfmt
+        self.session.create(self.uri, config)
         cursor = self.session.open_cursor(self.uri, None, None)
         value = ""
-        for i in range(0, self.nentries):
-            key = str(i)
-            value = value + key + value # size grows exponentially
-            cursor.set_key(key)
+        for i in range(1, self.nentries):
+            value = value + 1000 * "a"
+            cursor.set_key(key_populate(cursor, i))
             cursor.set_value(value)
             cursor.insert()
         cursor.close()
 
-        self.printVerbose(2, 'data source specific stats:')
-        cursor = self.session.open_cursor(
-            'statistics:' + self.uri, None, None)
+        # Force the object to disk, otherwise we can't check the overflow count.
+        self.reopen_conn()
+
+        # See that we can get a specific stat value by its key and verify its
+        # entry is self-consistent.
+        cursor = self.session.open_cursor('statistics:' + self.uri, None, None)
+        self.check_stats(cursor, 8192, 'btree: maximum leaf page size')
+        self.check_stats(cursor, 4096, 'btree: maximum internal page size')
         self.check_stats(cursor, 10, 'btree: overflow pages')
 
-        # See that we can get a specific stat value by its key,
-        # and verify that its entry is self-consistent
         values = cursor[stat.dsrc.btree_overflow]
         self.assertEqual(values[0], 'btree: overflow pages')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
         cursor.close()
 
-    def test_missing_file_stats(self):
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            self.session.open_cursor('statistics:file:DoesNotExist'))
-
+    # Test simple per-checkpoint statistics.
     def test_checkpoint_stats(self):
-        nentries = 0
-        last_size = 0
         for name in ('first', 'second', 'third'):
-            helper.simple_populate(self, self.uri, self.config, nentries)
-            nentries += self.nentries
+            config = self.config + ',key_format=' + self.keyfmt
+            helper.simple_populate(self, self.uri, config, self.nentries)
             self.session.checkpoint('name=' + name)
             cursor = self.session.open_cursor(
                 'statistics:' + self.uri, None, 'checkpoint=' + name)
-            size = cursor[stat.dsrc.btree_overflow][1]
-            self.assertTrue(size >= last_size)
-            last_size = size
+            self.assertEqual(
+                cursor[stat.dsrc.btree_entries][2], self.nentries + 1)
             cursor.close()
-            self.session.truncate(self.uri, None, None)
+
+    def test_missing_file_stats(self):
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
+            self.session.open_cursor('statistics:file:DoesNotExist'))
 
 if __name__ == '__main__':
     wttest.run()

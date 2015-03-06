@@ -40,14 +40,11 @@ typedef struct {
 	/* Not a simple randomization, handle outside the main loop. */ 
 #define	C_IGNORE	0x002
 
-	/* Operation, only set if doing operations. */
-#define	C_OPS		0x004
-
 	/* Value was set from command-line or file, ignore for all runs. */
-#define	C_PERM		0x008
+#define	C_PERM		0x004
 
 	/* Value isn't random for this run, ignore just for this run. */
-#define	C_TEMP		0x010
+#define	C_TEMP		0x008
 
 	/* Value is a string. */
 #define	C_STRING	0x020
@@ -134,7 +131,7 @@ static CONFIG c[] = {
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
-	  C_OPS, 0, 45, 90, &g.c_delete_pct, NULL },
+	  0x0, 0, 45, 90, &g.c_delete_pct, NULL },
 
 	{ "dictionary",
 	  "if values are dictionary compressed",		/* 20% */
@@ -162,7 +159,7 @@ static CONFIG c[] = {
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
-	  C_OPS, 0, 45, 90, &g.c_insert_pct, NULL },
+	  0x0, 0, 45, 90, &g.c_insert_pct, NULL },
 
 	{ "internal_key_truncation",
 	  "if internal keys are truncated",			/* 95% */
@@ -270,7 +267,7 @@ static CONFIG c[] = {
 	  C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
 
 	{ "timer",
-	  "time to run in minutes",
+	  "maximum time to run in minutes (default 20 minutes)",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_timer, NULL },
 
 	{ "value_max",
@@ -287,7 +284,7 @@ static CONFIG c[] = {
 
 	{ "write_pct",
 	  "percent operations that are writes",
-	  C_OPS, 0, 90, 90, &g.c_write_pct, NULL },
+	  0x0, 0, 90, 90, &g.c_write_pct, NULL },
 
 	{ NULL, NULL, 0x0, 0, 0, 0, NULL, NULL }
 };

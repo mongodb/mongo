@@ -447,6 +447,18 @@ run(int r)
 }
 
 /*
+ * file_exists --
+ *	Return if the file exists.
+ */
+static int
+file_exists(const char *path)
+{
+	struct stat sb;
+
+	return (stat(path, &sb) == 0);
+}
+
+/*
  * build --
  *	Build a row- or column-store page in a file.
  */
@@ -529,21 +541,16 @@ build(int ikey, int ivalue, int cnt)
 	}
 
 	/*
-	 * The first time through this routine we put a matching configuration
-	 * in for the salvage file.
+	 * The first time through this routine we create the salvage file and
+	 * then remove it (all we want is the appropriate schema entry, we're
+	 * creating the salvage file itself by hand).
 	 */
-	new_slvg = (access(SLVG, F_OK) != 0);
+	new_slvg = !file_exists(SLVG);
 	if (new_slvg) {
 		assert(session->drop(session, "file:" SLVG, "force") == 0);
 		assert(session->create(session, "file:" SLVG, config) == 0);
 	}
-
 	assert(conn->close(conn, 0) == 0);
-
-	/*
-	 * We created the salvage file above, but all we want is the schema,
-	 * we're creating the salvage file by hand.
-	 */
 	if (new_slvg)
 		(void)remove(SLVG);
 }
@@ -567,12 +574,13 @@ copy(u_int gen, u_int recno)
 	 * copy the first sector (the file description).
 	 * Otherwise, we are appending to an existing file.
 	 */
-	if (access(SLVG, F_OK)) {
+	if (file_exists(SLVG))
+		assert((ofp = fopen(SLVG, "a")) != NULL);
+	else {
 		assert((ofp = fopen(SLVG, "w")) != NULL);
 		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
 		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
-	} else
-		assert((ofp = fopen(SLVG, "a")) != NULL);
+	}
 
 	/*
 	 * If there's data, copy/update the first formatted page.

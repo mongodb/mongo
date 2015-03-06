@@ -404,7 +404,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_page_parent_modify_set --
- *	Mark the parent page and tree dirty.
+ *	Mark the parent page, and optionally the tree, dirty.
  */
 static inline int
 __wt_page_parent_modify_set(
@@ -957,6 +957,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	if (mod == NULL)
 		return (1);
 
+	/* Skip pages that are already being evicted. */
+	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+		return (0);
+
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
 	 * internal pages not be evicted until all threads are known to have
@@ -978,7 +982,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	 */
 	if (btree->checkpointing &&
 	    (__wt_page_is_modified(page) ||
-	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
+            F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (0);
