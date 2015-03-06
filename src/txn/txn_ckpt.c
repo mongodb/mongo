@@ -990,25 +990,21 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int force)
 {
 	WT_DECL_RET;
 
-	/* Deal with forced discards. */
+	/* Handle forced discard (when dropping a file). */
 	if (force)
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
 
-	/* If closing an unmodified file, try to simply discard its blocks. */
+	/* If closing an unmodified file, try to evict its pages. */
 	if (!S2BT(session)->modified) {
-		ret = __wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE);
-
-		/*
-		 * If we hit a dirty page, we will see EBUSY here.
-		 * Try to checkpoint instead.
-		 */
+		ret = __wt_cache_op(session, NULL, WT_SYNC_DISCARD);
 		if (ret != EBUSY)
 			return (ret);
 	}
 
 	/*
-	 * Else, checkpoint the file and optionally flush the writes (the
-	 * checkpoint call will discard the blocks, there's no additional
+	 * If closing a modified file, or closing an unmodified file was blocked
+	 * for any reason, checkpoint the file and optionally flush the writes
+	 * (the checkpoint call will discard the blocks, there's no additional
 	 * step needed).
 	 */
 	WT_RET(__checkpoint_worker(session, NULL, 0));
