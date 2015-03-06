@@ -415,7 +415,7 @@ namespace mongo {
     typedef StringBuilderImpl<TrivialAllocator> StringBuilder;
     typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
 
-#if defined(_WIN32)
+#if defined(_WIN32) && _MSC_VER < 1900
 #undef snprintf
 #pragma pop_macro("snprintf")
 #endif
