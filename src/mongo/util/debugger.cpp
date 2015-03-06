@@ -31,18 +31,12 @@
 
 #include "mongo/util/debugger.h"
 
-#include <iostream>
-
 #include "mongo/db/server_options.h"
 #include "mongo/util/debug_util.h"
 
 #ifndef _WIN32
 #include <signal.h>
 #endif
-
-#if defined(USE_GDBSERVER)
-#include "mongo/db/jsobj.h"
-#endif  // defined(USE_GDBSERVER)
 
 namespace mongo {
     void breakpoint() {
@@ -77,15 +71,27 @@ namespace mongo {
         // Don't come back here
         signal(SIGTRAP, SIG_IGN);
 
-        int newPort = serverGlobalParams.port + 2000;
-        string newPortStr = "localhost:" + BSONObjBuilder::numStr(newPort);
-        string pidToDebug = BSONObjBuilder::numStr(getpid());
+        const int newPort = serverGlobalParams.port + 2000;
 
-        cout << "\n\n\t**** Launching gdbserver on " << newPortStr << " ****" << endl << endl;
+        char pidToDebug[16];
+        int pidRet = snprintf(pidToDebug, sizeof(pidToDebug), "%d", getpid());
+        invariant(pidRet >= 0 && size_t(pidRet) < sizeof(pidToDebug));
+
+        char hostPort[32];
+        int hostRet = snprintf(hostPort, sizeof(hostPort), "localhost:%d", newPort);
+        invariant(hostRet >= 0 && size_t(hostRet) < sizeof(hostPort));
+
+        char msg[128];
+        int msgRet = snprintf(msg, sizeof(msg),
+                              "\n\n\t**** Launching gdbserver on %s ****\n\n", hostPort);
+        invariant(msgRet >= 0 && size_t(msgRet) < sizeof(msg));
+        invariant(write(STDERR_FILENO, msg, msgRet) == msgRet);
+
         if (fork() == 0) {
             //child
-            execlp("gdbserver", "gdbserver", "--attach", newPortStr.c_str(), pidToDebug.c_str(), NULL);
+            execlp("gdbserver", "gdbserver", "--attach", hostPort, pidToDebug, NULL);
             perror(NULL);
+            _exit(1);
         }
         else {
             //parent
