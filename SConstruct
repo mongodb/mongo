@@ -1148,9 +1148,6 @@ if nix:
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
         env.Append( CPPDEFINES=["_DEBUG"] );
 
-    if has_option( "gdbserver" ):
-        env.Append( CPPDEFINES=["USE_GDBSERVER"] )
-
 if has_option( "ssl" ):
     env.Append( CPPDEFINES=["MONGO_SSL"] )
     env.Append( MONGO_CRYPTO=["openssl"] )
