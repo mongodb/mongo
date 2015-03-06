@@ -128,7 +128,7 @@ namespace mongo {
 /*TODO: add this back once the module system is in place -- maybe once we do something like serverstatus with callbacks*/
 //              << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
               << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
-       result.appendBool( "debug" , debug );
+       result.appendBool( "debug" , kDebugBuild );
        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
     }
 }

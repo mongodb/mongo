@@ -820,7 +820,7 @@ namespace mongo {
                     }
                 }
                 pass++;
-                if (debug)
+                if (kDebugBuild)
                     sleepmillis(20);
                 else
                     sleepmillis(2);

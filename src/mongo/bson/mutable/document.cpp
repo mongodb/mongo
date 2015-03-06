@@ -414,11 +414,7 @@ namespace mutablebson {
         // How many reps do we cache before we spill to heap. Use a power of two. For debug
         // builds we make this very small so it is less likely to mask vector invalidation
         // logic errors. We don't make it zero so that we do execute the fastRep code paths.
-#if defined(_DEBUG)
-        const size_t kFastReps = 2;
-#else
-        const size_t kFastReps = 128;
-#endif
+        const size_t kFastReps = kDebugBuild ? 2 : 128;
 
         // An ElementRep contains the information necessary to locate the data for an Element,
         // and the topology information for how the Element is related to other Elements in the
@@ -647,7 +643,7 @@ namespace mutablebson {
             else {
                 verify(id <= Element::kMaxRepIdx);
 
-                if (debug && paranoid) {
+                if (kDebugBuild && paranoid) {
                     // Force all reps to new addresses to help catch invalid rep usage.
                     std::vector<ElementRep> newSlowElements(_slowElements);
                     _slowElements.swap(newSlowElements);
@@ -696,7 +692,7 @@ namespace mutablebson {
             const size_t objIdx = _objects.size();
             verify(objIdx <= kMaxObjIdx);
             _objects.push_back(newObj);
-            if (debug && paranoid) {
+            if (kDebugBuild && paranoid) {
                 // Force reallocation to catch use after invalidation.
                 std::vector<BSONObj> new_objects(_objects);
                 _objects.swap(new_objects);
@@ -1013,7 +1009,7 @@ namespace mutablebson {
             _damages.back().targetOffset = targetOffset;
             _damages.back().sourceOffset = sourceOffset;
             _damages.back().size = size;
-            if (debug && paranoid) {
+            if (kDebugBuild && paranoid) {
                 // Force damage events to new addresses to catch invalidation errors.
                 DamageVector new_damages(_damages);
                 _damages.swap(new_damages);
@@ -1072,7 +1068,7 @@ namespace mutablebson {
                     fieldName.rawData(),
                     fieldName.rawData() + fieldName.size());
             _fieldNames.push_back('\0');
-            if (debug && paranoid) {
+            if (kDebugBuild && paranoid) {
                 // Force names to new addresses to catch invalidation errors.
                 std::vector<char> new_fieldNames(_fieldNames);
                 _fieldNames.swap(new_fieldNames);

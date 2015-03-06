@@ -72,9 +72,6 @@
 #pragma push_macro("DEV")
 #undef DEV
 #define DEV MONGO_DEV
-#pragma push_macro("DEBUGGING")
-#undef DEBUGGING
-#define DEBUGGING MONGO_DEBUGGING
 #pragma push_macro("SOMETIMES")
 #undef SOMETIMES
 #define SOMETIMES MONGO_SOMETIMES

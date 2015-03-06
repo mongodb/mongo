@@ -39,6 +39,7 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
@@ -295,11 +296,7 @@ namespace mongo {
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
     */
-#if defined(_DEBUG)
-# define MONGO_dassert(x) invariant(x)
-#else
-# define MONGO_dassert(x)
-#endif
+#define MONGO_dassert(x) if (kDebugBuild) invariant(x)
 
 #ifdef MONGO_EXPOSE_MACROS
 # define dassert MONGO_dassert

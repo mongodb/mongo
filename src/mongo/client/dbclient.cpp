@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -1534,15 +1535,11 @@ namespace mongo {
     }
 
     /* -- DBClientCursor ---------------------------------------------- */
-
-#ifdef _DEBUG
-#define CHECK_OBJECT( o , msg ) massert( 10337 ,  (string)"object not valid" + (msg) , (o).isValid() )
-#else
-#define CHECK_OBJECT( o , msg )
-#endif
-
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
-        CHECK_OBJECT( query , "assembleRequest query" );
+        if (kDebugBuild) {
+            massert( 10337 ,  (string)"object not valid assembleRequest query" , query.isValid() );
+        }
+
         // see query.h for the protocol we are using here.
         BufBuilder b;
         int opts = queryOptions;

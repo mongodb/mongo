@@ -195,10 +195,9 @@ namespace mongo {
             if (!pPipeline.get())
                 return false;
 
-#if _DEBUG
             // This is outside of the if block to keep the object alive until the pipeline is finished.
             BSONObj parsed;
-            if (!pPipeline->isExplain() && !pCtx->inShard) {
+            if (kDebugBuild && !pPipeline->isExplain() && !pCtx->inShard) {
                 // Make sure all operations round-trip through Pipeline::toBson()
                 // correctly by reparsing every command on DEBUG builds. This is
                 // important because sharded aggregations rely on this ability.
@@ -208,7 +207,6 @@ namespace mongo {
                 pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
                 verify(pPipeline);
             }
-#endif
 
             PlanExecutor* exec = NULL;
             scoped_ptr<ClientCursorPin> pin; // either this OR the execHolder will be non-null

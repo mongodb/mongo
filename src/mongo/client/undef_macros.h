@@ -60,8 +60,6 @@
 // util/debug_util.h
 #undef DEV
 #pragma pop_macro("DEV")
-#undef DEBUGGING
-#pragma pop_macro("DEBUGGING")
 #undef SOMETIMES
 #pragma pop_macro("SOMETIMES")
 #undef OCCASIONALLY

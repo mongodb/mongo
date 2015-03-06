@@ -323,7 +323,7 @@ namespace mongo {
 
     void PeriodicTaskRunner::run() {
         // Use a shorter cycle time in debug mode to help catch race conditions.
-        const size_t waitMillis = (debug ? 5 : 60) * 1000;
+        const size_t waitMillis = (kDebugBuild ? 5 : 60) * 1000;
 
         const stdx::function<bool()> predicate =
             stdx::bind( &PeriodicTaskRunner::_isShutdownRequested, this );

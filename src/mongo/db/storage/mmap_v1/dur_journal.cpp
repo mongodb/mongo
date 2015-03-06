@@ -392,7 +392,7 @@ namespace mongo {
                 boost::filesystem::path filepath = preallocPath(i);
 
                 unsigned long long limit = DataLimitPerJournalFile;
-                if( debug && i == 1 ) { 
+                if( kDebugBuild && i == 1 ) { 
                     // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
                     // case, so we force exercising here when _DEBUG is set by arbitrarily stopping prealloc at a low 
                     // limit for a file.  also we want to be able to change in the future the constant without a lot of

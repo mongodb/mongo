@@ -232,8 +232,6 @@ namespace mongo {
     void SimpleRecordStoreV1::addDeletedRec( OperationContext* txn, const DiskLoc& dloc ) {
         DeletedRecord* d = drec( dloc );
 
-        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << std::hex << d->extentOfs() << endl;
-
         int b = bucket(d->lengthWithHeaders());
         *txn->recoveryUnit()->writing(&d->nextDeleted()) = _details->deletedListEntry(b);
         _details->setDeletedListEntry(txn, b, dloc);

@@ -486,8 +486,8 @@ namespace mongo {
                     JSectHeader h;
                     br.peek(h);
                     if( h.fileId != fileId ) {
-                        if (debug || (mmapv1GlobalOptions.journalOptions &
-                                      MMAPV1Options::JournalDumpJournal)) {
+                        if (kDebugBuild || (mmapv1GlobalOptions.journalOptions &
+                                            MMAPV1Options::JournalDumpJournal)) {
                             log() << "Ending processFileBuffer at differing fileId want:" << fileId << " got:" << h.fileId << endl;
                             log() << "  sect len:" << h.sectionLen() << " seqnum:" << h.seqNumber << endl;
                         }

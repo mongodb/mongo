@@ -129,7 +129,7 @@ namespace {
                 if (limits.rlim_cur > STACK_SIZE) {
                     size_t stackSizeToSet = STACK_SIZE;
 #if !__has_feature(address_sanitizer)
-                    if (DEBUG_BUILD)
+                    if (kDebugBuild)
                         stackSizeToSet /= 2;
 #endif
                     pthread_attr_setstacksize(&attrs, stackSizeToSet);

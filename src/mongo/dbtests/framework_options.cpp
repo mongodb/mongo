@@ -229,8 +229,8 @@ namespace mongo {
             frameworkGlobalParams.filter = params["filter"].as<string>();
         }
 
-        if (debug && storageGlobalParams.dur) {
-            log() << "_DEBUG: automatically enabling mmapv1GlobalOptions.journalOptions=8 "
+        if (kDebugBuild && storageGlobalParams.dur) {
+            log() << "Debug Build: automatically enabling mmapv1GlobalOptions.journalOptions=8 "
                   << "(JournalParanoid)" << endl;
             // this was commented out.  why too slow or something?
             mmapv1GlobalOptions.journalOptions |= MMAPV1Options::JournalParanoid;

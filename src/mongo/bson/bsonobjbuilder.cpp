@@ -197,13 +197,12 @@ namespace mongo {
 
     BSONObjBuilder& BSONObjBuilder::appendDate(StringData fieldName, Date_t dt) {
         /* easy to pass a time_t to this and get a bad result.  thus this warning. */
-#if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
-        if( dt > 0 && dt <= 0xffffffff ) {
+        if ( kDebugBuild && dt > 0 && dt <= 0xffffffff ) {
             static int n;
             if( n++ == 0 )
                 log() << "DEV WARNING appendDate() called with a tiny (but nonzero) date" << std::endl;
         }
-#endif
+
         _b.appendNum((char) Date);
         _b.appendStr(fieldName);
         _b.appendNum(dt);
