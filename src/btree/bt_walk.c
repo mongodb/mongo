@@ -226,29 +226,39 @@ ascend:	/*
 
 			/*
 			 * The page we're moving to might have split, in which
-			 * case move to the last position we held. If coupling
-			 * from our starting position, repeat the increment or
-			 * decrement we made at that point, otherwise couple is
-			 * an internal page we've acquired after moving from
-			 * that starting position and we can treat it as a new
-			 * page. This works because we never acquire a hazard
-			 * reference on a leaf page we're not going to return
-			 * to our caller: should that ever change, this quits
-			 * working.
+			 * case move to the last position we held.
 			 */
 			if (ret == WT_RESTART) {
+				ret = 0;
+
+				/*
+				 * If a new walk that never coupled from the
+				 * root to a new saved position in the tree,
+				 * restart the walk.
+				 */
+				if (couple == &btree->root) {
+					ref = &btree->root;
+					if (ref->page == NULL)
+						goto done;
+					goto descend;
+				}
+
+				/*
+				 * If restarting from some original position,
+				 * repeat the increment or decrement we made at
+				 * that time. Otherwise, couple is an internal
+				 * page we've acquired after moving from that
+				 * starting position and we can treat it as a
+				 * new page. This works because we never acquire
+				 * a hazard pointer on a leaf page we're not
+				 * going to return to our caller, this will quit
+				 * work if that ever changes.
+				 */
 				WT_ASSERT(session,
 				    couple == couple_orig ||
 				    WT_PAGE_IS_INTERNAL(couple->page));
-
-				ret = 0;
 				ref = couple;
-				if (ref == &btree->root) {
-					if (ref->page == NULL)
-						goto done;
-				} else
-					__wt_page_refp(
-					    session, ref, &pindex, &slot);
+				__wt_page_refp(session, ref, &pindex, &slot);
 				if (couple == couple_orig)
 					break;
 			}
