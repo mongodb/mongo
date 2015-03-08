@@ -38,14 +38,12 @@ class test_stat01(wttest.WiredTigerTestCase):
     Test statistics
     """
 
-    tablename = 'test_stat01.wt'
-    uri = 'table:' + tablename
     config = 'internal_page_max=4K,leaf_page_max=8K'
     nentries = 25
 
     types = [
-        ('file', dict(type='file:')),
-        ('table', dict(type='table:'))
+        ('file', dict(uri='file:test_stat01.wt')),
+        ('table', dict(uri='table:test_stat01.wt'))
     ]
     keyfmt = [
         ('recno', dict(keyfmt='r')),
