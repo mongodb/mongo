@@ -185,6 +185,13 @@ __curstat_next(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
+	/* Initialize on demand. */
+	if (cst->notinitialized) {
+		WT_ERR(__wt_curstat_init(
+		    session, cursor->internal_uri, cst->cfg, cst));
+		cst->notinitialized = 0;
+	}
+
 	/* Move to the next item. */
 	if (cst->notpositioned) {
 		cst->notpositioned = 0;
@@ -215,6 +222,13 @@ __curstat_prev(WT_CURSOR *cursor)
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, NULL);
+
+	/* Initialize on demand. */
+	if (cst->notinitialized) {
+		WT_ERR(__wt_curstat_init(
+		    session, cursor->internal_uri, cst->cfg, cst));
+		cst->notinitialized = 0;
+	}
 
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
@@ -248,7 +262,7 @@ __curstat_reset(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	cst->notpositioned = 1;
+	cst->notinitialized = cst->notpositioned = 1;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END_RET(session, ret);
@@ -274,6 +288,13 @@ __curstat_search(WT_CURSOR *cursor)
 	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
 		WT_ERR(WT_NOTFOUND);
 
+	/* Initialize on demand. */
+	if (cst->notinitialized) {
+		WT_ERR(__wt_curstat_init(
+		    session, cursor->internal_uri, cst->cfg, cst));
+		cst->notinitialized = 0;
+	}
+
 	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
@@ -291,9 +312,16 @@ __curstat_close(WT_CURSOR *cursor)
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	size_t i;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
+
+	if (cst->cfg != NULL) {
+		for (i = 0; cst->cfg[i] != NULL; ++i)
+			__wt_free(session, cst->cfg[i]);
+		__wt_free(session, cst->cfg);
+	}
 
 	__wt_buf_free(session, &cst->pv);
 
@@ -381,8 +409,6 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
 {
 	const char *dsrc_uri;
 
-	cst->notpositioned = 1;
-
 	if (strcmp(uri, "statistics:") == 0) {
 		__curstat_conn_init(session, cst);
 		return (0);
@@ -439,6 +465,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
+	size_t i;
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 
@@ -497,7 +524,23 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 */
 	cursor->key_format = "i";
 	cursor->value_format = "SSq";
-	WT_ERR(__wt_curstat_init(session, uri, cfg, cst));
+
+	/*
+	 * WT_CURSOR.reset on a statistics cursor refreshes the cursor, save
+	 * the cursor's configuration for that.
+	 */
+	for (i = 0; cfg[i] != NULL; ++i)
+		;
+	WT_ERR(__wt_calloc_def(session, i + 1, &cst->cfg));
+	for (i = 0; cfg[i] != NULL; ++i)
+		WT_ERR(__wt_strdup(session, cfg[i], &cst->cfg[i]));
+
+	/*
+	 * The cursor isn't yet initialized or positioned, initialize it now.
+	 */
+	cst->notinitialized = cst->notpositioned = 1;
+	WT_ERR(__wt_curstat_init(session, uri, cst->cfg, cst));
+	cst->notinitialized = 0;
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));

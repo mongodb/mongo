@@ -8,7 +8,7 @@
 # NOTE: All statistics descriptions must have a prefix string followed by ':'.
 #
 # Optional configuration flags:
-#       no_clear        Value ignored by the statistics refresh function
+#       no_clear        Value not cleared when statistics cleared
 #       no_aggregate    Ignore the value when aggregating statistics
 #       max_aggregate   Take the maximum value when aggregating statistics
 #       no_scale        Don't scale value per second in the logging tool script
