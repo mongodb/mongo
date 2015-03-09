@@ -25,8 +25,8 @@ type OutputOptions struct {
 	Repair                     bool     `long:"repair" description:"try to recover documents from damaged data files (not supported by all storage engines)"`
 	Oplog                      bool     `long:"oplog" description:"use oplog for taking a point-in-time snapshot"`
 	DumpDBUsersAndRoles        bool     `long:"dumpDbUsersAndRoles" description:"dump user and role definitions for the specified database"`
-	ExcludedCollections        []string `long:"excludeCollection" description:"collections to exclude from the dump"`
-	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" description:"exclude all collections from the dump that have the given prefix"`
+	ExcludedCollections        []string `long:"excludeCollection" description:"collection to exclude from the dump (may be specified multiple times to exclude additional collections)"`
+	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" description:"exclude all collections from the dump that have the given prefix (may be specified multiple times to exclude additional prefixes)"`
 }
 
 // Name returns a human-readable group name for output options.
