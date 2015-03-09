@@ -2278,7 +2278,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: i686
-    compile_flags: --release --distarch=i686 -j$(grep -c ^processor /proc/cpuinfo) --32 --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    compile_flags: --release --distarch=i686 -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release" --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
     test_flags: --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2317,7 +2317,7 @@ buildvariants:
     push_arch: i686
     test_flags: --continue-on-failure
     has_debugsymbols: true
-    compile_flags: --dbg=on --distarch=i686 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --32 --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/debug"
+    compile_flags: --dbg=on --distarch=i686 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/debug" --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
   tasks:
   - name: compile
     distros:
@@ -2354,7 +2354,7 @@ buildvariants:
     push_arch: x86_64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --64 -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --continue-on-failure
     ext: zip
   tasks:
@@ -2426,7 +2426,7 @@ buildvariants:
     push_arch: x86_64-2008plus
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --64 --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
+    compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
     test_flags: --continue-on-failure
     ext: zip
   tasks:
@@ -2494,7 +2494,7 @@ buildvariants:
     push_arch: x86_64-2008plus
     content_type: application/zip
     test_flags: --continue-on-failure
-    compile_flags: --dbg=on --opt=on --64 --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
+    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
     ext: zip
   tasks:
   - name: compile
@@ -2557,7 +2557,7 @@ buildvariants:
     push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --64 --ssl --ssl-fips-capability --distmod=windows-64 --extrapath="c:\openssl,c:\sasl,c:\snmp" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 --variant-dir=win32
+    compile_flags: --release --ssl --ssl-fips-capability --distmod=windows-64 --extrapath="c:\openssl,c:\sasl,c:\snmp" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 --variant-dir=win32
     test_flags: --continue-on-failure
     ext: zip
   tasks:
@@ -2594,7 +2594,7 @@ buildvariants:
     push_arch: x86_64-2008plus-ssl
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --64 --ssl --distmod=2008plus-ssl --extrapath="c:\openssl" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl --distmod=2008plus-ssl --extrapath="c:\openssl" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2
     test_flags: --continue-on-failure
     ext: zip
   tasks:
@@ -2665,7 +2665,7 @@ buildvariants:
     push_arch: i386
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --32 -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386
     test_flags: --continue-on-failure
     ext: zip
   tasks:
@@ -3360,7 +3360,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: sunos5
     push_arch: x86_64
-    compile_flags: --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --static-libstdc++ --64 -j$(kstat cpu | sort -u | grep -c "^module") --release
+    compile_flags: --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --static-libstdc++ -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64"
     test_flags: --continue-on-failure
     has_debugsymbols: true
   tasks:

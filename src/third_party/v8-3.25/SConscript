@@ -351,14 +351,10 @@ def get_flags(flag, toolchain, options):
     return ret
 
 def get_options():
-    processor = env['PROCESSOR_ARCHITECTURE']
+    processor = env['TARGET_ARCH']
     if processor == 'i386':
         arch_string = 'arch:ia32'
-    elif processor == 'i686':
-        arch_string = 'arch:ia32'
     elif processor == 'x86_64':
-        arch_string = 'arch:x64'
-    elif processor == 'amd64':
         arch_string = 'arch:x64'
     elif processor == 'aarch64':
         arch_string = 'arch:arm64'

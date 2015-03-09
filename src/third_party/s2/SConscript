@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env windows linux darwin solaris use_clang")
+Import("env windows linux darwin solaris")
 
 env = env.Clone()
 
@@ -17,7 +17,7 @@ env.Append(CCFLAGS=['-DDEBUG_MODE=false'])
 # not a problem on Windows, these mismatches can be ignored
 # http://stackoverflow.com/questions/4866425/mixing-class-and-struct. W
 # warning so it doesn't become an error.
-if use_clang:
+if env.ToolchainIs('clang'):
     env.Append(CCFLAGS=['-Wno-mismatched-tags'])
 
 env.Library( "s2",

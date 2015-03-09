@@ -54,7 +54,7 @@ else:
     msi_edition = 'SSL'
   else:
     msi_edition = 'Standard'
-  if env['PROCESSOR_ARCHITECTURE'] == 'i386':
+  if env['TARGET_ARCH'] == 'i386':
     msi_platform = 'x86'
     msi_flavor = ''
     upgrade_code = 'B2E70C13-483E-4E16-B6AA-FCCA7983B767'
