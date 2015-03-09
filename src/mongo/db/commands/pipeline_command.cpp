@@ -129,12 +129,17 @@ namespace mongo {
             // cursor (for use by future getmore ops).
             cursor->setLeftoverMaxTimeMicros( txn->getCurOp()->getRemainingMaxTimeMicros() );
 
-            // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
-            // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
-            txn->recoveryUnit()->commitAndRestart();
-            cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
+            if (txn->getClient()->isInDirectClient()) {
+                cursor->setUnownedRecoveryUnit(txn->recoveryUnit());
+            }
+            else {
+                // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
+                // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
+                txn->recoveryUnit()->commitAndRestart();
+                cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
+            }
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State
             // will be restored in getMore().
@@ -261,7 +266,6 @@ namespace mongo {
                 }
 
                 if (collection) {
-                    // XXX
                     const bool isAggCursor = true; // enable special locking behavior
                     ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
                                                             execHolder.release(),
