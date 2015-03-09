@@ -68,7 +68,7 @@ namespace mongo {
         ClientBasic(p),
         _desc(desc),
         _connectionId(),
-        _god(0),
+        _inDirectClient(false),
         _lastOp(0),
         _shutdown(false) {
     }

@@ -188,8 +188,7 @@ namespace mongo {
                               CurOp& curop,
                               int pass,
                               bool& exhaust,
-                              bool* isCursorAuthorized,
-                              bool fromDBDirectClient) {
+                              bool* isCursorAuthorized) {
 
         // For testing, we may want to fail if we receive a getmore.
         if (MONGO_FAIL_POINT(failReceivedGetmore)) {
@@ -285,7 +284,7 @@ namespace mongo {
             *isCursorAuthorized = true;
 
             // Restore the RecoveryUnit if we need to.
-            if (fromDBDirectClient) {
+            if (txn->getClient()->isInDirectClient()) {
                 if (cc->hasRecoveryUnit())
                     invariant(txn->recoveryUnit() == cc->getUnownedRecoveryUnit());
             }
@@ -436,7 +435,7 @@ namespace mongo {
                        << endl;
 
                 if (PlanExecutor::IS_EOF == state && (queryOptions & QueryOption_CursorTailable)) {
-                    if (!fromDBDirectClient) {
+                    if (!txn->getClient()->isInDirectClient()) {
                         // Don't stash the RU. Get a new one on the next getMore.
                         ruSwapper.reset();
                         delete cc->releaseOwnedRecoveryUnit();
@@ -579,8 +578,7 @@ namespace mongo {
                          QueryMessage& q,
                          const NamespaceString& nss,
                          CurOp& curop,
-                         Message &result,
-                         bool fromDBDirectClient) {
+                         Message &result) {
         // Validate the namespace.
         uassert(16256, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
 
@@ -879,7 +877,7 @@ namespace mongo {
                                                 pq.getFilter());
             ccId = cc->cursorid();
 
-            if (fromDBDirectClient) {
+            if (txn->getClient()->isInDirectClient()) {
                 cc->setUnownedRecoveryUnit(txn->recoveryUnit());
             }
             else if (state == PlanExecutor::IS_EOF && pq.getOptions().tailable) {

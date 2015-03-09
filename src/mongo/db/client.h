@@ -220,8 +220,8 @@ namespace mongo {
         const OperationContext* getOperationContext() const { return _txn; }
 
         // TODO(spencer): SERVER-10228 SERVER-14779 Remove this/move it fully into OperationContext.
-        bool isGod() const { return _god; } /* this is for map/reduce writes */
-        bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
+        bool isInDirectClient() const { return _inDirectClient; }
+        void setInDirectClient(bool newVal) { _inDirectClient = newVal; }
 
         // Only used for master/slave
         void setRemoteID(const OID& rid) { _remoteId = rid; }
@@ -249,7 +249,7 @@ namespace mongo {
         mutable SpinLock _lock;
 
         // Whether this client is running as DBDirectClient
-        bool _god;
+        bool _inDirectClient;
 
         // If != NULL, then contains the currently active OperationContext
         OperationContext* _txn;

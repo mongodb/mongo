@@ -129,7 +129,7 @@ namespace {
           _desc(desc),
           _threadId(boost::this_thread::get_id()),
           _connectionId(p ? p->connectionId() : 0),
-          _god(0),
+          _inDirectClient(false),
           _txn(NULL),
           _lastOp(0),
           _shutdown(false) {
@@ -138,8 +138,6 @@ namespace {
     }
 
     Client::~Client() {
-        _god = 0;
-
         if ( ! inShutdown() ) {
             // we can't clean up safely once we're in shutdown
             {

@@ -65,8 +65,7 @@ namespace mongo {
                               CurOp& curop,
                               int pass,
                               bool& exhaust,
-                              bool* isCursorAuthorized,
-                              bool fromDBDirectClient);
+                              bool* isCursorAuthorized);
 
     /**
      * Run the query 'q' and place the result in 'result'.
@@ -76,7 +75,6 @@ namespace mongo {
                          QueryMessage& q,
                          const NamespaceString& ns,
                          CurOp& curop,
-                         Message &result,
-                         bool fromDBDirectClient);
+                         Message &result);
 
 }  // namespace mongo

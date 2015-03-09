@@ -1508,7 +1508,7 @@ namespace QueryTests {
             QueryMessage queryMessage( dbMessage );
             Message result;
             string exhaust = runQuery( &_txn, message, queryMessage, NamespaceString(ns()),
-                                       *cc().curop(), result, false );
+                                       *cc().curop(), result );
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );
         }

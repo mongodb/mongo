@@ -49,20 +49,21 @@ namespace mongo {
 
     namespace {
 
-        class GodScope {
-            MONGO_DISALLOW_COPYING(GodScope);
+        class DirectClientScope {
+            MONGO_DISALLOW_COPYING(DirectClientScope);
         public:
-            GodScope(OperationContext* txn) : _txn(txn) {
-                _prev = _txn->getClient()->setGod(true);
+            explicit DirectClientScope(OperationContext* txn)
+                : _txn(txn), _prev(_txn->getClient()->isInDirectClient()) {
+                _txn->getClient()->setInDirectClient(true);
             }
 
-            ~GodScope() {
-                _txn->getClient()->setGod(_prev);
+            ~DirectClientScope() {
+                _txn->getClient()->setInDirectClient(_prev);
             }
 
         private:
-            bool _prev;
-            OperationContext* _txn;
+            OperationContext* const _txn;
+            const bool _prev;
         };
 
     }  // namespace
@@ -120,14 +121,13 @@ namespace mongo {
                               Message& response,
                               bool assertOk,
                               string* actualServer) {
-
-        GodScope gs(_txn);
+        DirectClientScope directClientScope(_txn);
         if (lastError._get()) {
             lastError.startRequest(toSend, lastError._get());
         }
 
         DbResponse dbResponse;
-        assembleResponse(_txn, toSend, dbResponse, dummyHost, true);
+        assembleResponse(_txn, toSend, dbResponse, dummyHost);
         verify(dbResponse.response);
 
         // can get rid of this if we make response handling smarter
@@ -138,13 +138,13 @@ namespace mongo {
     }
 
     void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
-        GodScope gs(_txn);
+        DirectClientScope directClientScope(_txn);
         if (lastError._get()) {
             lastError.startRequest(toSend, lastError._get());
         }
 
         DbResponse dbResponse;
-        assembleResponse(_txn, toSend, dbResponse, dummyHost, true);
+        assembleResponse(_txn, toSend, dbResponse, dummyHost);
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
