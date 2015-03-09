@@ -281,8 +281,8 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 	if (parent->type == WT_PAGE_ROW_INT) {
 		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL) {
 			__wt_ref_key(parent, ref, &key, &size);
-			WT_RET(__wt_row_ikey(session, 0, key, size, &ikey));
-			ref->key.ikey = ikey;
+			WT_RET(__wt_row_ikey(session, 0, key, size, ref));
+			ikey = ref->key.ikey;
 		} else {
 			WT_RET(__split_ovfl_key_cleanup(session, parent, ref));
 			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
@@ -454,8 +454,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 		ref->addr = NULL;
 		if (parent->type == WT_PAGE_ROW_INT) {
 			__wt_ref_key(parent, *parent_refp, &p, &size);
-			WT_ERR(
-			    __wt_row_ikey(session, 0, p, size, &ref->key.ikey));
+			WT_ERR(__wt_row_ikey(session, 0, p, size, ref));
 			parent_incr += sizeof(WT_IKEY) + size;
 		} else
 			ref->key.recno = (*parent_refp)->key.recno;
@@ -468,7 +467,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 
 		/* Mark it dirty. */
 		WT_ERR(__wt_page_modify_init(session, child));
-		__wt_page_only_modify_set(session, child);
+		__wt_page_modify_set(session, child);
 
 		/*
 		 * Once the split goes live, the newly created internal pages
@@ -761,8 +760,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		ikey = multi->key.ikey;
-		WT_RET(__wt_row_ikey(session, 0,
-		    WT_IKEY_DATA(ikey), ikey->size, &ref->key.ikey));
+		WT_RET(__wt_row_ikey(
+		    session, 0, WT_IKEY_DATA(ikey), ikey->size, ref));
 		incr += sizeof(WT_IKEY) + ikey->size;
 		break;
 	default:
@@ -855,7 +854,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	for (i = 0, deleted_entries = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
-		if (__wt_delete_page_skip(session, next_ref) &&
+		if (next_ref->state == WT_REF_DELETED &&
+		    __wt_delete_page_skip(session, next_ref) &&
 		    WT_ATOMIC_CAS4(next_ref->state,
 		    WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
@@ -1139,15 +1139,23 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/*
-	 * The first page in the split is the current page, but we still need to
-	 * create a replacement WT_REF and make a copy of the key (the original
-	 * WT_REF is set to split-status and eventually freed).
-	 *
-	 * The new reference is visible to readers once the split completes.
+	 * The first page in the split is the current page, but we still have
+	 * to create a replacement WT_REF, the original WT_REF will be set to
+	 * split status and eventually freed.
 	 */
 	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
 	child = split_ref[0];
 	*child = *ref;
+
+	/*
+	 * The new WT_REF is not quite identical: we have to instantiate a key,
+	 * and the new reference is visible to readers once the split completes.
+	 *
+	 * The key-instantiation code checks for races, clear the key fields so
+	 * we don't trigger them.
+	 */
+	child->key.recno = 0;
+	child->key.ikey = NULL;
 	child->state = WT_REF_MEM;
 
 	/*
@@ -1167,8 +1175,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	} else
 		WT_ERR(__wt_row_leaf_key(
 		    session, page, &page->pg_row_d[0], key, 1));
-	WT_ERR(__wt_row_ikey(
-	    session, 0, key->data, key->size, &child->key.ikey));
+	WT_ERR(__wt_row_ikey(session, 0, key->data, key->size, child));
 	parent_incr += sizeof(WT_REF) + sizeof(WT_IKEY) + key->size;
 	__wt_scr_free(session, &key);
 
@@ -1187,7 +1194,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	child->state = WT_REF_MEM;
 	WT_ERR(__wt_row_ikey(session, 0,
 	    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
-	    &child->key.ikey));
+	    child));
 	parent_incr +=
 	    sizeof(WT_REF) + sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins);
 
@@ -1203,7 +1210,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 	/* The new page is dirty by definition. */
 	WT_ERR(__wt_page_modify_init(session, right));
-	__wt_page_only_modify_set(session, right);
+	__wt_page_modify_set(session, right);
 
 	/*
 	 * We modified the page above, which will have set the first dirty

@@ -522,6 +522,12 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	mod->mod_root_split = next;
 
+	/*
+	 * Mark the page dirty.
+	 * Don't mark the tree dirty: if this reconciliation is in service of a
+	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
+	 * set it again as part of that walk.
+	 */
 	WT_ERR(__wt_page_modify_init(session, next));
 	__wt_page_only_modify_set(session, next);
 
@@ -1113,12 +1119,14 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * process will have completed before we walk any pages
 			 * for checkpoint.
 			 */
-			if ((ret = __wt_page_in(session, ref,
+			ret = __wt_page_in(session, ref,
 			    WT_READ_CACHE | WT_READ_NO_EVICT |
-			    WT_READ_NO_GEN | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
+			    WT_READ_NO_GEN | WT_READ_NO_WAIT);
+			if (ret == WT_NOTFOUND) {
 				ret = 0;
 				break;
 			}
+			WT_RET(ret);
 			*hazardp = 1;
 			goto in_memory;
 
@@ -1173,7 +1181,7 @@ in_memory:
 		CHILD_RELEASE(session, *hazardp, ref);
 	}
 
-done:	WT_HAVE_DIAGNOSTIC_YIELD;
+done:	WT_DIAGNOSTIC_YIELD;
 	return (ret);
 }
 
@@ -1982,16 +1990,20 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		next->start = r->first_free;
 		next->entries = 0;
 
-		/*
-		 * Set the space available to another split-size chunk, if we
-		 * have one.  If we don't have room for another split chunk,
-		 * add whatever space remains in this page.
-		 */
+		/* Set the space available to another split-size chunk. */
 		r->space_avail =
 		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
+
+		/*
+		 * Adjust the space available to handle two cases:
+		 *  - We don't have enough room for another full split-size
+		 *    chunk on the page.
+		 *  - We chose to fill past a page boundary because of a
+		 *    large item.
+		 */
 		if (inuse + r->space_avail > r->page_size) {
-			WT_ASSERT(session, r->page_size >= inuse);
-			r->space_avail = r->page_size - inuse;
+			r->space_avail =
+			    r->page_size > inuse ? (r->page_size - inuse) : 0;
 
 			/* There are no further boundary points. */
 			r->bnd_state = SPLIT_MAX;
@@ -2649,7 +2661,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
 	 * information remains unchanged between the pages.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->page_size, &tmp));
+	WT_RET(__wt_scr_alloc(session, r->dsk.memsize, &tmp));
 	dsk = tmp->mem;
 	memcpy(dsk, r->dsk.mem, WT_PAGE_HEADER_SIZE);
 
@@ -2977,7 +2989,7 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	WT_RET(__rec_split_finish(session, r));
 	WT_RET(__rec_write_wrapup(session, r, r->page));
 
-	/* Mark the page's parent dirty. */
+	/* Mark the page's parent and the tree dirty. */
 	parent = r->ref->home;
 	WT_RET(__wt_page_modify_init(session, parent));
 	__wt_page_modify_set(session, parent);
@@ -3017,8 +3029,6 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 			WT_RET(
 			    __rec_split_raw(session, r, key->len + val->len));
 		else {
-			WT_RET(__rec_split(session, r, key->len + val->len));
-
 			/*
 			 * Turn off prefix compression until a full key written
 			 * to the new page, and (unless already working with an
@@ -3030,6 +3040,8 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 					WT_RET(__rec_cell_build_leaf_key(
 					    session, r, NULL, 0, &ovfl_key));
 			}
+
+			WT_RET(__rec_split(session, r, key->len + val->len));
 		}
 	}
 
@@ -3225,15 +3237,18 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
 		addr = NULL;
 		child = ref->page;
-		if (state != 0) {
-			/*
-			 * Currently the only non-zero returned stated possible
-			 * for a column-store page is child-modified (all other
-			 * states are part of the fast-truncate support, which
-			 * is row-store only).
-			 */
-			WT_ASSERT(session, state == WT_CHILD_MODIFIED);
 
+		/* Deleted child we don't have to write. */
+		if (state == WT_CHILD_IGNORE) {
+			CHILD_RELEASE_ERR(session, hazard, ref);
+			continue;
+		}
+
+		/*
+		 * Modified child.  Empty pages are merged into the parent and
+		 * discarded.
+		 */
+		if (state == WT_CHILD_MODIFIED) {
 			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -3253,7 +3268,9 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
-		}
+		} else
+			/* No other states are expected for column stores. */
+			WT_ASSERT(session, state == 0);
 
 		/*
 		 * Build the value cell.  The child page address is in one of 3
@@ -4550,8 +4567,6 @@ build:
 					    WT_PAGE_ROW_LEAF, kpack, r->cur));
 					key_onpage_ovfl = 0;
 				}
-				WT_ERR(__rec_split(
-				    session, r, key->len + val->len));
 
 				/*
 				 * Turn off prefix compression until a full key
@@ -4567,6 +4582,9 @@ build:
 						    session,
 						    r, NULL, 0, &ovfl_key));
 				}
+
+				WT_ERR(__rec_split(
+				    session, r, key->len + val->len));
 			}
 		}
 
@@ -4636,9 +4654,6 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 				WT_RET(__rec_split_raw(
 				    session, r, key->len + val->len));
 			else {
-				WT_RET(__rec_split(
-				    session, r, key->len + val->len));
-
 				/*
 				 * Turn off prefix compression until a full key
 				 * written to the new page, and (unless already
@@ -4653,6 +4668,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 						    session,
 						    r, NULL, 0, &ovfl_key));
 				}
+
+				WT_RET(__rec_split(
+				    session, r, key->len + val->len));
 			}
 		}
 
@@ -5085,7 +5103,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
-		WT_RET(__wt_row_ikey(session, 0,
+		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
 		if (bnd->skip == NULL) {

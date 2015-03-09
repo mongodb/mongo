@@ -1,3 +1,244 @@
+3.0.1RC1, Mar 9 2015
+---------------------
+
+commit d654795bb763b95d14604b9b65d09ae79b8ee5b6
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Mon Mar 9 05:35:33 2015 +0000
+
+    Add a test case for checkpoint consistency.
+    
+    We recently fixed a bug where updating a page after the write leaves phase of a checkpoint had completed, then either checkpointed again or closed the database. We would end up with inconsistent data. That was the case because we weren't marking trees dirty all the time.
+    
+    This test case reproduces the scenario so we don't reintroduce the failure.
+    
+    refs #1735 SUPPORT-1248, SERVER-17506
+
+commit 0315ee75f712ed0ccddca0616339de93b17835a3
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Mon Mar 9 11:21:06 2015 +1100
+
+    Bump release version to 2.5.2
+
+commit 4235c69d37474fb4e14673e0ea99337659db948d
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Mon Mar 9 08:32:50 2015 +1100
+
+    When skipping a dirty page during a checkpoint, make sure the tree is marked dirty.
+    
+    refs SUPPORT-1248, SERVER-17506
+
+commit 8382d14f32efc53b19aecd596cab3ba0d682b22d
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Fri Mar 6 16:10:37 2015 -0500
+
+    Only increment/decrement from the current position on the first position set by our caller, that is, the position passed-in from our caller is the only position the caller has already seen.
+
+    refs SERVER-17345.
+
+commit ed9c48c7b8fa5dd3362e417fda8337f1690585ed
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Fri Mar 6 22:48:45 2015 +1100
+
+    Ignore empty child pages in column stores.
+
+commit 553a351ca6a81179c7f1db9c04d6f96aef0545ac
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Mar 5 05:46:15 2015 +0000
+
+    Don't allow LSM bloom create to block waiting for space in the cache.
+    
+    We are only accessing one page at a time, and allowing the bloom create to block can lead to LSM not making progress.
+    
+    Refs: #1720
+
+commit 5285b768de3237b4379f1526176efdeb55860971
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Thu Mar 5 16:15:08 2015 +1100
+
+    Remove the special "discard" path for trees marked clean: always go through eviction, which checks page modify flags.  This may mean additional writes to internal pages when discarding a tree, but means that if a discard stops part-way through, the remaining in-memory tree has not lost any context.
+    
+    refs SUPPORT-1248, SERVER-17510
+
+commit 00edf7a47115923bc9f3eaa7eee84c9f7d6b0d77
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Thu Mar 5 16:15:07 2015 +1100
+
+    If a page is split by eviction, mark the tree dirty to avoid having dirty pages in a tree marked clean.
+    
+    refs SUPPORT-1248
+
+commit 57d3eba53fb91a0287374b9642b7cd4ef644854a
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Wed Mar 4 10:00:59 2015 -0500
+
+    Add fsync before closing log files and after header. #1717
+
+    refs SERVER-17451
+
+commit d970bfe6b1bed7d1919b800bf2d65a3789b74d6f
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Tue Mar 3 09:38:59 2015 -0500
+
+    Don't set eviction_workers_min/eviction_workers_max in the connection structure before checking the values are OK.
+
+commit 90f3f34a97440b6788a1a558e560a33fd116f166
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Tue Mar 3 09:26:38 2015 -0500
+
+    Move writing into log worker thread. #1683
+
+commit 1266bbb1143b22fec6b1c255b3aade5d0506477e
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Tue Mar 3 03:37:18 2015 +0000
+
+    Fix a bug in the reconfigure API related to shared cache quotas.
+    
+    While fixing the bug simplify the code flow for reconfigure and caches/shared caches.
+
+    refs #1712
+
+commit 1ebd617e6dfcf542983d62d9666c5a328dd41bb8
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Mon Mar 2 15:31:05 2015 -0500
+
+    Add overflow key/value counts to the statistics code
+
+    refs #1520, #1703
+
+commit a2166ead528ef61da478db67e3c0209a6bef5ac6
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Mon Mar 2 14:18:37 2015 +1100
+
+    Allow memory_page_max to be at most 1/4 of the cache size not 1/2.
+    
+    If we let a single page grow to half the cache size, it's too easy for the cache to get pinned full if it is tiny to start with.
+
+commit b036921625e415bb66ac458922b81a9fae07740b
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Mon Mar 2 14:17:12 2015 +1100
+
+    Take all eviction candidates if we are aggressive.
+
+commit 0ddd3face0b99f5653001825bf3df0662ffcdc10
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Mon Mar 2 13:07:08 2015 +1100
+
+    Reverse the direction of the LRU walk each time the eviction server goes to sleep.  Keep looking for candidates if eviction is stuck.  Don't give up our walk position if eviction is stuck.
+
+commit cff10ba30f2eac379197e5d7dea49da2b8159890
+Author: Don Anderson <dda@ddanderson.com>
+Date:   Fri Feb 27 15:05:24 2015 -0500
+
+    Added test for wt dump on an index.
+
+    refs #1709
+
+commit a9f0e3ac769a060a8c3b06bac71fbed0e5f46cc6
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Fri Feb 27 16:59:35 2015 +1100
+
+    If we encounter a dirty page when closing a clean tree, switch to checkpointing.
+    
+    refs SERVER-17319, #1643?, #1404?
+
+commit bfcf5987b2b6f08d931d620330aed46837e3a8c2
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Thu Feb 26 16:32:09 2015 +1100
+
+    Add some paranoia to LSM around transaction checks: make sure we have allocated an ID before using it for anything.
+    
+    Recheck switch transactions before doing update checks in old chunks.
+    
+    refs #1641, #1701, #1702
+
+commit da0bc67c821282e9fd0da725279811b59b25a675
+Author: Michael Cahill <michael.cahill@wiredtiger.com>
+Date:   Thu Feb 26 16:32:09 2015 +1100
+
+    Add some paranoia around setting row-store internal keys.
+    
+    refs #1582
+
+commit 5ea91f6ed0e0677530c5ab8215f81eb48ea307b8
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Feb 26 04:51:25 2015 +0000
+
+    Several optimizations to large page eviction:
+    
+    * Don't update the read generation on page in if it's set to oldest.
+    * Clear the walk positions before the eviction server sleeps.
+    * If only looking for pages that would block add them all to the queue.
+    * If evicting dirty pages use the worker threads, not the server.
+
+commit 0eecd0a2d97771380ecbd7fd27bd44988db1148c
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Feb 26 02:08:36 2015 +0000
+
+    Fix a bug in checkpoint, where it could get an EBUSY return.
+    
+    The case that could return EBUSY was when checkpointing with a specific target, while that target was open exclusively or for a bulk load.
+    
+    Refs #1404 #1589
+
+commit 392a540deec817c5d6738b8e848a68882df3ac8a
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Wed Feb 25 15:03:50 2015 -0500
+
+    If the LSN given doesn't exist, don't return an error, but do force recovery.  Fix recover.sh to grep the CONFIG.  #1700
+
+commit 59b699b7085868d1b12a41ae4cd7a01f25f6e865
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Tue Feb 24 23:55:20 2015 +0000
+
+    Handle the case where a large record pushes us over a page boundary and we spill across two pages correctly.  The previous fix could let us span additional space.
+    
+    Fix another bug in the fixup code - ensure there is enough space in the temporary buffer when fixing up after the fist page is full.
+
+    refs #1697
+
+commit ad8b58188961943e74c57b85e3b976aa03b79617
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Tue Feb 24 18:54:18 2015 -0500
+
+    Set flags to SLOT_INIT_FLAGS on free.  refs #1683
+
+commit 45e4c049044efc96c682f390466a35d22dac555f
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Tue Feb 24 16:17:32 2015 -0500
+
+    Move WT_PAGE.u.row.d next to WT_PAGE.u.row.entries, it reduces cache misses inside of row-search.
+
+    refs #1665
+
+commit 3c6d7adf422f432ae117e2292dcce00cc3b531a3
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Tue Feb 24 16:07:16 2015 -0500
+
+    Turn off key prefix-compression and rebuild the key before doing the boundary split. The size of the key is likely to increase by a few bytes, and if the value is large enough to consume almost all of the buffer, we overflow the space available.
+
+    refs #1697
+
+commit ca9ab16c320f6f154ff1fd3d0b65316f87e8bddc
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Tue Feb 24 06:51:14 2015 +0000
+
+    Fix a bug in reconciliation.  In cases where we decide to squeeze one more large entry onto a page, we could have attempted to decrement space available negative.
+
+commit 777c35b074fce3656c14ca5770b424a65c719134
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Thu Feb 19 12:32:16 2015 -0500
+
+    Add log worker thread to advance write_lsn.
+
+    refs #1683
+
+commit ae686a225a011bac07119e2d66e837e08d5a3a0e
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Tue Feb 10 12:46:04 2015 -0500
+
+    Sasha says (my paraphrasing): I simply rearranged the fields in the WT_PAGE struct, so that u.row.d and u.row.entries are close together at the very end of the definition of union u, and the "uint8_t type;" immediately follows that.
+
+
 3.0-RC10, Feb 24 2015
 ---------------------
 

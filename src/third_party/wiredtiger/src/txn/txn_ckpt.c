@@ -259,10 +259,10 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 		session->ckpt_handle[session->ckpt_handle_next++].dhandle =
 		    session->dhandle;
 	else if (ret == EBUSY)
-		WT_ERR(__wt_strdup(session, name,
-		    &session->ckpt_handle[session->ckpt_handle_next++].name));
+		ret = __wt_strdup(session, name,
+		    &session->ckpt_handle[session->ckpt_handle_next++].name);
 
-err:	return (ret);
+	return (ret);
 }
 
 /*
@@ -988,14 +988,23 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint_close(WT_SESSION_IMPL *session, int force)
 {
-	/* If closing an unmodified file, simply discard its blocks. */
-	if (!S2BT(session)->modified || force)
-		return (__wt_cache_op(session, NULL,
-		    force ? WT_SYNC_DISCARD_FORCE : WT_SYNC_DISCARD));
+	WT_DECL_RET;
+
+	/* Handle forced discard (when dropping a file). */
+	if (force)
+		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
+
+	/* If closing an unmodified file, try to evict its pages. */
+	if (!S2BT(session)->modified) {
+		ret = __wt_cache_op(session, NULL, WT_SYNC_DISCARD);
+		if (ret != EBUSY)
+			return (ret);
+	}
 
 	/*
-	 * Else, checkpoint the file and optionally flush the writes (the
-	 * checkpoint call will discard the blocks, there's no additional
+	 * If closing a modified file, or closing an unmodified file was blocked
+	 * for any reason, checkpoint the file and optionally flush the writes
+	 * (the checkpoint call will discard the blocks, there's no additional
 	 * step needed).
 	 */
 	WT_RET(__checkpoint_worker(session, NULL, 0));
