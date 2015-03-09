@@ -99,6 +99,5 @@ class test_bug010(wttest.WiredTigerTestCase):
                                         ' for table ' + str(i))
                 c.close()
 
-
 if __name__ == '__main__':
     wttest.run()
