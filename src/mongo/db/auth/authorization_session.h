@@ -156,7 +156,10 @@ namespace mongo {
         // Utility function for isAuthorizedForActionsOnResource(
         //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
         bool isAuthorizedToRevokeRole(const RoleName& role);
-
+        
+        // Utility function for isAuthorizedToChangeOwnPasswordAsUser and isAuthorizedToChangeOwnCustomDataAsUser
+        bool isAuthorizedToChangeAsUser(const UserName& userName, ActionType actionType;) 
+        
         // Returns true if the current session is authenticated as the given user and that user
         // is allowed to change his/her own password
         bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName);
