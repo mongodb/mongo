@@ -639,6 +639,8 @@ namespace mongo {
                     uassertStatusOK(indexer.init(c->getIndexCatalog()->getDefaultIdIndexSpec()));
                     uassertStatusOK(indexer.insertAllDocumentsInCollection(&dups));
 
+                    // This must be done before we commit the indexer. See the comment about
+                    // dupsAllowed in IndexCatalog::_unindexRecord and SERVER-17487.
                     for (set<RecordId>::const_iterator it = dups.begin(); it != dups.end(); ++it) {
                         WriteUnitOfWork wunit(txn);
                         BSONObj id;
