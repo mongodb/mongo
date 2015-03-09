@@ -155,6 +155,8 @@ namespace {
         StatusWith<bool> status = _saslConversation->step(inputData, outputData);
         if (status.isOK()) {
             _done = status.getValue();
+        } else {
+            _done = true;
         }
         return status.getStatus();
     }
