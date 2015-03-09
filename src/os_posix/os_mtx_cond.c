@@ -52,7 +52,6 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 	int locked;
 
 	locked = 0;
-	WT_ASSERT(session, usecs >= 0);
 
 	/* Fast path if already signalled. */
 	if (WT_ATOMIC_ADD4(cond->waiters, 1) == 0)
