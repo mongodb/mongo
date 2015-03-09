@@ -95,10 +95,6 @@ namespace mongo {
             return true;
         }
 
-        virtual bool isGod() const {
-            return false;
-        }
-
         virtual std::string getNS() const {
             return std::string();
         };

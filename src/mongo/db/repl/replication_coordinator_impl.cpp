@@ -1241,7 +1241,7 @@ namespace {
     Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                              const NamespaceString& ns,
                                                              bool slaveOk) {
-        if (txn->isGod()) {
+        if (txn->getClient()->isInDirectClient()) {
             return Status::OK();
         }
         if (canAcceptWritesForDatabase(ns.db())) {

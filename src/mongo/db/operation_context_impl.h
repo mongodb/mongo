@@ -54,8 +54,6 @@ namespace mongo {
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween);
 
-        virtual bool isGod() const;
-
         virtual std::string getNS() const;
 
         virtual Client* getClient() const;

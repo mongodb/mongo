@@ -110,12 +110,6 @@ namespace mongo {
         virtual std::string getNS() const = 0;
 
         /**
-         * Returns true if this operation is under a GodScope.  Only used by DBDirectClient.
-         * TODO(spencer): SERVER-10228 Remove this
-         */
-        virtual bool isGod() const = 0;
-
-        /**
          * Returns the client under which this context runs.
          */
         virtual Client* getClient() const = 0;
