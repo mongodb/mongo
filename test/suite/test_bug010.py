@@ -49,7 +49,7 @@ class test_bug010(wttest.WiredTigerTestCase):
         return conn
 
     def test_checkpoint_dirty(self):
-        # Create a lot of tables 
+        # Create a lot of tables
         # insert the same item in each
         # Start a checkpoint with some of the updates
         # Create another checkpoint that should contain all data consistently
@@ -96,8 +96,9 @@ class test_bug010(wttest.WiredTigerTestCase):
                 c.next()
                 self.assertEquals(c.get_value(), expected_val,
                     msg='Mismatch on iteration ' + str(its) +\
-					' for table ' + str(i))
+                                        ' for table ' + str(i))
                 c.close()
+
 
 if __name__ == '__main__':
     wttest.run()
