@@ -30,7 +30,7 @@
 
 #include <cmath>
 
-#include "mongo/db/fts/fts_index_format.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"

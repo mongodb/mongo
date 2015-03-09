@@ -34,6 +34,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/fts/fts_index_format.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
 

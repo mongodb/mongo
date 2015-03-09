@@ -30,11 +30,16 @@
 
 #pragma once
 
-#include "mongo/db/fts/fts_spec.h"
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_util.h"
 
 namespace mongo {
 
     namespace fts {
+
+        class FTSSpec;
 
         class FTSIndexFormat {
         public:
