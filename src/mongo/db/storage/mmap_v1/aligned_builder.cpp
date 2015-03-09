@@ -91,26 +91,38 @@ namespace mongo {
 
     /* "slow"/infrequent portion of 'grow()'  */
     void NOINLINE_DECL AlignedBuilder::growReallocate(unsigned oldLen) {
-        dassert( _len > _p._size );
-        unsigned a = _p._size;
-        verify( a );
-        while( 1 ) {
-            if( a < 128 * 1024 * 1024 )
-                a *= 2;
-            else if( sizeof(int*) == 4 )
-                a += 32 * 1024 * 1024;
-            else 
-                a += 64 * 1024 * 1024;
-            DEV if( a > 256*1024*1024 ) { 
-                log() << "dur AlignedBuilder too big, aborting in _DEBUG build";
-                abort();
-            }
-            wassert( a <= 256*1024*1024 );
-            verify( a <= 512*1024*1024 );
-            if( _len < a )
-                break;
+        const unsigned MB = 1024*1024;
+        const unsigned kMaxSize = (sizeof(int*) == 4) ? 512*MB : 2000*MB;
+        const unsigned kWarnSize = (sizeof(int*) == 4) ? 256*MB : 512*MB;
+
+        const unsigned oldSize = _p._size;
+
+        // Warn for unexpectedly large buffer
+        wassert(_len <= kWarnSize);
+
+        // Check validity of requested size
+        invariant(_len > oldSize);
+        if (_len > kMaxSize) {
+            log() << "error writing journal: too much uncommitted data (" << _len << " bytes)";
+            log() << "shutting down immediately to avoid corruption";
+            fassert(28614, _len <= kMaxSize);
         }
-        _realloc(a, oldLen);
+
+        // Use smaller maximum for debug builds, as we should never be close the the maximum
+        dassert(_len <= 256*MB);
+
+        // Compute newSize by doubling the existing maximum size until the maximum is reached
+        invariant(oldSize > 0);
+        uint64_t newSize = oldSize; // use 64 bits to defend against accidental overflow
+        while (newSize < _len) {
+            newSize *= 2;
+        }
+
+        if (newSize > kMaxSize) {
+            newSize = kMaxSize;
+        }
+
+        _realloc(newSize, oldLen);
     }
 
     void AlignedBuilder::_malloc(unsigned sz) {
