@@ -45,7 +45,7 @@ err:	__wt_free(session, cond);
  *	Wait on a mutex, optionally timing out.
  */
 int
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
+__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 {
 	struct timespec ts;
 	WT_DECL_RET;
