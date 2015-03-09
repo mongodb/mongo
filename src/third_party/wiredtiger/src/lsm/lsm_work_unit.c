@@ -401,7 +401,13 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	F_SET(src, WT_CURSTD_RAW);
 	WT_ERR(__wt_clsm_init_merge(src, chunk_off, chunk->id, 1));
 
-	F_SET(session, WT_SESSION_NO_CACHE);
+	/*
+	 * Setup so that we don't hold pages we read into cache, and so
+	 * that we don't get stuck if the cache is full. If we allow
+	 * ourselves to get stuck creating bloom filters, the entire tree
+	 * can stall since there may be no worker threads available to flush.
+	 */
+	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
 		WT_ERR(__wt_bloom_insert(bloom, &key));
@@ -414,15 +420,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 	F_CLR(session, WT_SESSION_NO_CACHE);
 
-	/*
-	 * Load the new Bloom filter into cache.
-	 *
-	 * We're doing advisory reads to fault the new trees into cache.
-	 * Don't block if the cache is full: our next unit of work may be to
-	 * discard some trees to free space.
-	 */
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
-
+	/* Load the new Bloom filter into cache. */
 	WT_CLEAR(key);
 	WT_ERR_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
 

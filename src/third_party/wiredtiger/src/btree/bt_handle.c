@@ -453,8 +453,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		ref->page = NULL;
 		ref->addr = NULL;
 		ref->state = WT_REF_DELETED;
-		WT_ERR(__wt_row_ikey_incr(
-		    session, root, 0, "", 1, &ref->key.ikey));
+		WT_ERR(__wt_row_ikey_incr(session, root, 0, "", 1, ref));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
@@ -634,7 +633,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	    WT_MAX((uint64_t)cval.val, 50 * (uint64_t)btree->maxleafpage);
 	cache_size = S2C(session)->cache_size;
 	if (cache_size > 0)
-		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 2);
+		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 4);
 
 	/*
 	 * Get the split percentage (reconciliation splits pages into smaller

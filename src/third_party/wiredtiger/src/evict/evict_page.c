@@ -130,8 +130,8 @@ done:	session->excl_next = 0;
 		txn_state->snap_min = WT_TXN_NONE;
 
 	if ((inmem_split || (forced_eviction && ret == EBUSY)) &&
-	    !F_ISSET(conn->cache, WT_EVICT_WOULD_BLOCK)) {
-		F_SET(conn->cache, WT_EVICT_WOULD_BLOCK);
+	    !F_ISSET(conn->cache, WT_CACHE_WOULD_BLOCK)) {
+		F_SET(conn->cache, WT_CACHE_WOULD_BLOCK);
 		WT_TRET(__wt_evict_server_wake(session));
 	}
 

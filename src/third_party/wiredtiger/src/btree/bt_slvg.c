@@ -1858,8 +1858,7 @@ __slvg_row_build_internal(
 			WT_ERR(__slvg_row_build_leaf(session, trk, ref, ss));
 		} else {
 			WT_ERR(__wt_row_ikey_incr(session, page, 0,
-			    trk->row_start.data, trk->row_start.size,
-			    &ref->key.ikey));
+			    trk->row_start.data, trk->row_start.size, ref));
 
 			WT_ERR(__slvg_ovfl_ref_all(session, trk));
 		}
@@ -1981,8 +1980,8 @@ __slvg_row_build_leaf(
 	 */
 	rip = page->pg_row_d + skip_start;
 	WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
-	WT_ERR(__wt_row_ikey_incr(session,
-	    ref->home, 0, key->data, key->size, &ref->key.ikey));
+	WT_ERR(__wt_row_ikey_incr(
+	    session, ref->home, 0, key->data, key->size, ref));
 
 	/* Set the referenced flag on overflow pages we're using. */
 	if (trk->trk_ovfl_cnt != 0)

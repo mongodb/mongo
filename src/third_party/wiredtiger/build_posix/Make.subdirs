@@ -24,5 +24,6 @@ test/checkpoint
 test/fops
 test/format HAVE_BERKELEY_DB
 test/huge
+test/packing
 test/salvage
 test/thread
