@@ -584,7 +584,8 @@ namespace {
                     removeSaver->goingToDelete(obj);
                 }
                 else {
-                    error() << "rollback cannot find object by id";
+                    error() << "rollback cannot find object: " << pattern
+                            << " in namespace " << doc.ns;
                 }
 
                 if (it->second.isEmpty()) {
