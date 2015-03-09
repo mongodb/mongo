@@ -1040,12 +1040,12 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		F_CLR(slot, SLOT_SYNC | SLOT_SYNC_DIR);
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_sync_lock);
-		if (ret != 0 && slot->slot_error == 0)
-			slot->slot_error = ret;
 		break;
 	}
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
+	if (ret != 0 && slot->slot_error == 0)
+		slot->slot_error = ret;
 done:
 	return (ret);
 }
