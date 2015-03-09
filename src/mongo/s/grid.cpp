@@ -360,6 +360,13 @@ namespace mongo {
             if ( name->empty() && ! setName.empty() )
                 *name = setName;
 
+            // disallow adding shard replica set with name 'config'
+            if (*name == "config") {
+                errMsg = "use of shard replica set with name 'config' is not allowed";
+                newShardConn.done();
+                return false;
+            }
+
             // In order to be accepted as a new shard, that mongod must not have any database name that exists already
             // in any other shards. If that test passes, the new shard's databases are going to be entered as
             // non-sharded db's whose primary is the newly added shard.
