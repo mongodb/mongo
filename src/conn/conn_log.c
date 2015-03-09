@@ -381,7 +381,7 @@ __log_wrlsn_server(void *arg)
 	WT_LOG_WRLSN_ENTRY written[SLOT_POOL];
 	WT_LOGSLOT *slot;
 	WT_SESSION_IMPL *session;
-	size_t write_size, written_i;
+	size_t written_i;
 	uint32_t i, save_i;
 	int yield;
 
@@ -393,18 +393,18 @@ __log_wrlsn_server(void *arg)
 		/*
 		 * No need to use the log_slot_lock because the slot pool
 		 * is statically allocated and any slot in the
-		 * WT_LOG_SLOT_WRITE_READY state is exclusively ours for now.
+		 * WT_LOG_SLOT_WRITTEN state is exclusively ours for now.
 		 */
 		i = 0;
 		written_i = 0;
 		/*
 		 * Walk the array once saving any slots that are in the
-		 * WT_LOG_SLOT_WRITE_READY state.
+		 * WT_LOG_SLOT_WRITTEN state.
 		 */
 		while (i < SLOT_POOL) {
 			save_i = i;
 			slot = &log->slot_pool[i++];
-			if (slot->slot_state != WT_LOG_SLOT_WRITE_READY)
+			if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 				continue;
 			written[written_i].slot_index = save_i;
 			written[written_i++].lsn = slot->slot_release_lsn;
@@ -428,15 +428,9 @@ __log_wrlsn_server(void *arg)
 					break;
 				/*
 				 * If we get here we have a slot to process.
-				 * Write, advance the LSN and process the slot.
+				 * Advance the LSN and process the slot.
 				 */
 				slot = &log->slot_pool[written[i].slot_index];
-				write_size =
-				    (size_t)(slot->slot_end_lsn.offset -
-				    slot->slot_start_offset);
-				WT_ERR(__wt_write(session, slot->slot_fh,
-				    slot->slot_start_offset, write_size,
-				    slot->slot_buf.mem));
 				WT_ASSERT(session, LOG_CMP(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
 				log->write_lsn = slot->slot_end_lsn;

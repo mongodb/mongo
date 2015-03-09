@@ -65,14 +65,14 @@
  * WT_LOG_SLOT_DONE - all activity on this slot is complete.
  * WT_LOG_SLOT_FREE - slot is available for allocation.
  * WT_LOG_SLOT_PENDING - slot is transitioning from ready to active.
- * WT_LOG_SLOT_WRITE_READY - slot should be written by worker.
+ * WT_LOG_SLOT_WRITTEN - slot is written and should be processed by worker.
  * WT_LOG_SLOT_READY - slot is ready for threads to join.
  * > WT_LOG_SLOT_READY - threads are actively consolidating on this slot.
  */
 #define	WT_LOG_SLOT_DONE	0
 #define	WT_LOG_SLOT_FREE	1
 #define	WT_LOG_SLOT_PENDING	2
-#define	WT_LOG_SLOT_WRITE_READY	3
+#define	WT_LOG_SLOT_WRITTEN	3
 #define	WT_LOG_SLOT_READY	4
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	int64_t	 slot_state;		/* Slot state */
