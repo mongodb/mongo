@@ -2461,10 +2461,10 @@ struct __wt_config_item {
  * This API is outside the scope of a WiredTiger connection handle, since
  * applications may need to generate configuration strings prior to calling
  * ::wiredtiger_open.
- * @param session the session handle to be used for error reporting. If NULL
- *        error messages will be written to stdout.
+ * @param session the session handle to be used for error reporting (if NULL,
+ *	error messages will be written to stderr).
  * @param config the configuration string being parsed. The string must
- *        remain valid for the lifetime of the parser handle.
+ *	remain valid for the lifetime of the parser handle.
  * @param len the number of valid bytes in \c config
  * @param[out] config_parserp A pointer to the newly opened handle
  * @errors
