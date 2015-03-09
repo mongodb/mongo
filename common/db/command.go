@@ -14,6 +14,15 @@ const (
 	Prefetch
 )
 
+type NodeType string
+
+const (
+	Mongos     NodeType = "mongos"
+	Standalone          = "standalone"
+	ReplSet             = "replset"
+	Unknown             = "unknown"
+)
+
 // CommandRunner exposes functions that can be run against a server
 type CommandRunner interface {
 	Run(command interface{}, out interface{}, database string) error
@@ -68,42 +77,52 @@ func (sp *SessionProvider) CollectionNames(dbName string) ([]string, error) {
 	return session.DB(dbName).CollectionNames()
 }
 
-// IsReplicaSet returns a boolean which is true if the connected server is part
-// of a replica set. Returns false otherwise.
-func (sp *SessionProvider) IsReplicaSet() (bool, error) {
+// GetNodeType checks if the connected SessionProvider is a mongos, standalone, or replset,
+// by looking at the result of calling isMaster.
+func (sp *SessionProvider) GetNodeType() (NodeType, error) {
 	session, err := sp.GetSession()
 	if err != nil {
-		return false, err
-	}
-	session.SetSocketTimeout(0)
-	defer session.Close()
-	masterDoc := bson.M{}
-	err = session.Run("isMaster", &masterDoc)
-	if err != nil {
-		return false, err
-	}
-	_, hasSetName := masterDoc["setName"]
-	_, hasHosts := masterDoc["hosts"]
-	return hasSetName || hasHosts, nil
-}
-
-// IsMongos returns a true if the connected server is a mongos and false otherwise.
-func (sp *SessionProvider) IsMongos() (bool, error) {
-	session, err := sp.GetSession()
-	if err != nil {
-		return false, err
+		return Unknown, err
 	}
 	session.SetSocketTimeout(0)
 	defer session.Close()
 	masterDoc := struct {
-		Msg string `bson:"msg"`
+		SetName interface{} `bson:"setName"`
+		Hosts   interface{} `bson:"hosts"`
+		Msg     string      `bson:"msg"`
 	}{}
-	if err = session.Run("isMaster", &masterDoc); err != nil {
+	err = session.Run("isMaster", &masterDoc)
+	if err != nil {
+		return Unknown, err
+	}
+
+	if masterDoc.SetName != nil || masterDoc.Hosts != nil {
+		return ReplSet, nil
+	} else if masterDoc.Msg == "isdbgrid" {
+		// isdbgrid is always the msg value when calling isMaster on a mongos
+		// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/
+		return Mongos, nil
+	}
+	return Standalone, nil
+}
+
+// IsReplicaSet returns a boolean which is true if the connected server is part
+// of a replica set.
+func (sp *SessionProvider) IsReplicaSet() (bool, error) {
+	nodeType, err := sp.GetNodeType()
+	if err != nil {
 		return false, err
 	}
-	// isdbgrid is always the msg value when calling isMaster on a mongos
-	// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/
-	return masterDoc.Msg == "isdbgrid", nil
+	return nodeType == ReplSet, nil
+}
+
+// IsMongos returns true if the connected server is a mongos.
+func (sp *SessionProvider) IsMongos() (bool, error) {
+	nodeType, err := sp.GetNodeType()
+	if err != nil {
+		return false, err
+	}
+	return nodeType == Mongos, nil
 }
 
 // SupportsRepairCursor takes in an example db and collection name and

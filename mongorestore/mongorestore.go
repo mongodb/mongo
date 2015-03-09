@@ -103,11 +103,13 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	}
 
 	// check if we are using a replica set and fall back to w=1 if we aren't (for <= 2.4)
-	isRepl, err := restore.SessionProvider.IsReplicaSet()
+	nodeType, err := restore.SessionProvider.GetNodeType()
 	if err != nil {
-		return fmt.Errorf("error determining if connected to replica set: %v", err)
+		return fmt.Errorf("error determining type of connected node: %v", err)
 	}
-	restore.safety, err = db.BuildWriteConcern(restore.OutputOptions.WriteConcern, isRepl)
+
+	log.Logf(log.DebugLow, "connected to node type: %v", nodeType)
+	restore.safety, err = db.BuildWriteConcern(restore.OutputOptions.WriteConcern, nodeType)
 	if err != nil {
 		return fmt.Errorf("error parsing write concern: %v", err)
 	}
