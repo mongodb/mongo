@@ -226,16 +226,14 @@ namespace mongo {
         if( save ) _save();
     }
 
-    /**
-     *
-     */
-    ChunkManagerPtr DBConfig::shardCollection(const string& ns,
-                                              const ShardKeyPattern& fieldsAndOrder,
-                                              bool unique,
-                                              vector<BSONObj>* initPoints,
-                                              vector<Shard>* initShards) {
+    boost::shared_ptr<ChunkManager> DBConfig::shardCollection(
+                                                const string& ns,
+                                                const ShardKeyPattern& fieldsAndOrder,
+                                                bool unique,
+                                                vector<BSONObj>* initPoints,
+                                                vector<Shard>* initShards) {
 
-        uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
+        uassert(8042, "db doesn't have sharding enabled", _shardingEnabled);
         uassert(13648,
                 str::stream() << "can't shard collection because not all config servers are up",
                 configServer.allUp(false));
@@ -255,24 +253,29 @@ namespace mongo {
             collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
             collectionDetail.append("collection", ns);
             collectionDetail.append("primary", getPrimary().toString());
-            BSONArray a;
+
+            BSONArray initialShards;
             if (initShards == NULL)
-                a = BSONArray();
+                initialShards = BSONArray();
             else {
                 BSONArrayBuilder b;
                 for (unsigned i = 0; i < initShards->size(); i++) {
                     b.append((*initShards)[i].getName());
                 }
-                a = b.arr();
+                initialShards = b.arr();
             }
-            collectionDetail.append("initShards", a);
+
+            collectionDetail.append("initShards", initialShards);
             collectionDetail.append("numChunks", (int)(initPoints->size() + 1));
+
             configServer.logChange("shardCollection.start", ns, collectionDetail.obj());
 
             ChunkManager* cm = new ChunkManager( ns, fieldsAndOrder, unique );
-            cm->createFirstChunks( configServer.getPrimary().getConnString(),
-                                   getPrimary(), initPoints, initShards );
-            ci.shard( cm );
+            cm->createFirstChunks(configServer.getPrimary().getConnString(),
+                                  getPrimary(),
+                                  initPoints,
+                                  initShards);
+            ci.shard(cm);
 
             _save();
 
@@ -617,8 +620,7 @@ namespace mongo {
     }
 
     void DBConfig::_save( bool db, bool coll ) {
-        if( db ){
-
+        if (db) {
             BSONObj n;
             {
                 BSONObjBuilder b;
@@ -634,20 +636,23 @@ namespace mongo {
                                            false, // multi
                                            &response );
 
-            if ( !result.isOK() ) {
-                uasserted( 13396, str::stream() << "DBConfig save failed: "
-                                                << response.toBSON() );
+            if (!result.isOK()) {
+                uasserted(13396,
+                          str::stream() << "DBConfig save failed: " << response.toBSON());
             }
         }
 
-        if( coll ){
+        if (coll) {
+            for (CollectionInfoMap::iterator i = _collections.begin();
+                 i != _collections.end();
+                 ++i) {
 
-            for ( CollectionInfoMap::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
-                if ( ! i->second.isDirty() )
+                if (!i->second.isDirty()) {
                     continue;
-                i->second.save( i->first );
-            }
+                }
 
+                i->second.save(i->first);
+            }
         }
     }
 

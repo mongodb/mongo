@@ -48,6 +48,7 @@ env.SConscript(['base/SConscript',
                 'installer/msi/SConscript',
                 'logger/SConscript',
                 'platform/SConscript',
+                's/commands/SConscript',
                 's/SConscript',
                 'unittest/SConscript',
                 'util/SConscript',
@@ -811,45 +812,46 @@ env.Library(target='quick_exit',
                 'util/quick_exit.cpp',
             ])
 
-env.Library('coreshard', [# This is only here temporarily for auto-split logic in chunk.cpp.
-                          's/balancer_policy.cpp',
-                          's/distlock.cpp',
-                          's/config.cpp',
-                          's/grid.cpp',
-                          's/chunk.cpp',
-                          's/chunk_manager.cpp',
-                          # No good reason to be here other than chunk.cpp needs this.
-                          's/config_server_checker_service.cpp',
-                          's/shard.cpp',
-                          's/shard_key_pattern.cpp'],
-            LIBDEPS=['s/base',
-                     's/cluster_ops_impl']);
+env.Library('coreshard',
+            [
+                # This is only here temporarily for auto-split logic in chunk.cpp.
+                's/balancer_policy.cpp',
+                's/distlock.cpp',
+                's/config.cpp',
+                's/grid.cpp',
+                's/chunk.cpp',
+                's/chunk_manager.cpp',
+                's/config_server_checker_service.cpp',
+                's/shard.cpp',
+                's/shard_key_pattern.cpp'
+            ],
+            LIBDEPS=[
+                's/base',
+                's/cluster_ops_impl'
+            ])
 
 env.Library('mongoscore',
-            ['s/strategy.cpp',
-             's/commands_admin.cpp',
-             's/commands_public.cpp',
-             's/commands/cluster_explain_cmd.cpp',
-             's/commands/cluster_find_cmd.cpp',
-             's/commands/cluster_index_filter_cmd.cpp',
-             's/commands/cluster_merge_chunks_cmd.cpp',
-             's/commands/cluster_plan_cache_cmd.cpp',
-             's/commands/cluster_write_cmd.cpp',
-             's/request.cpp',
-             's/client_info.cpp',
-             's/cursors.cpp',
-             's/s_only.cpp',
-             's/balance.cpp',
-             's/version_manager.cpp',
-             's/version_mongos.cpp',
+            [
+                's/strategy.cpp',
+                's/commands_admin.cpp',
+                's/commands_public.cpp',
+                's/request.cpp',
+                's/client_info.cpp',
+                's/cursors.cpp',
+                's/s_only.cpp',
+                's/balance.cpp',
+                's/version_manager.cpp',
+                's/version_mongos.cpp',
             ],
-            LIBDEPS=['db/auth/authmongos',
-                     'db/fts/ftsmongos',
-                     'db/query/explain_common',
-                     'db/query/lite_parsed_query',
-                     's/cluster_ops',
-                     's/cluster_write_op_conversion',
-                     's/upgrade',
+            LIBDEPS=[
+                'db/auth/authmongos',
+                'db/fts/ftsmongos',
+                'db/query/explain_common',
+                'db/query/lite_parsed_query',
+                's/cluster_ops',
+                's/cluster_write_op_conversion',
+                's/commands/cluster_commands',
+                's/upgrade',
             ])
 
 env.CppUnitTest("mongoscore_test",
@@ -1087,56 +1089,75 @@ env.Library("mongod_options", ["db/mongod_options.cpp"],
 
 # main db target
 mongod = env.Install(
-    '#/', env.Program( "mongod", mongodOnlyFiles,
-                       LIBDEPS=["coredb",
-                                "coreserver",
-                                "mongodandmongos",
-                                "mongodwebserver",
-                                "ntservice",
-                                "serveronly",
-                                "mongod_options",
-                                ] ) )
+    '#/',
+    env.Program(
+        "mongod",
+        mongodOnlyFiles,
+        LIBDEPS=[
+            "coredb",
+            "coreserver",
+            "mongodandmongos",
+            "mongodwebserver",
+            "ntservice",
+            "serveronly",
+            "mongod_options",
+        ]))
 Default( mongod )
 
 # tools
 rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles", "mongooplog" ]
 
-#some special tools
-env.Library("mongobridge_options", ["tools/mongobridge_options.cpp"],
-            LIBDEPS = [
-                'serveronly',
-                'coreserver',
-                'coredb',
-                'signal_handlers_synchronous',
-                '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
-            ])
-
-env.Install( '#/', [
-        env.Program( "mongobridge", ["tools/bridge.cpp", "tools/mongobridge_options_init.cpp"],
-                     LIBDEPS=["serveronly", "coredb", "mongobridge_options"] ),
-        env.Program( "mongoperf", "client/examples/mongoperf.cpp",
-                     LIBDEPS = [
-                         "serveronly",
-                         "coreserver",
-                         "coredb",
-                         "signal_handlers_synchronous",
-                     ] ),
-        ] )
-
-# mongos options
-env.Library("mongos_options", ["s/mongos_options.cpp"],
-            LIBDEPS=['mongoscore',
-                     'coreshard',
-                     'mongocommon',
-                     'coredb',
-                     '$BUILD_DIR/mongo/util/options_parser/options_parser_init'])
+# mongobridge and mongoperf
+env.Install(
+    '#/',
+    [
+        env.Program("mongobridge",
+                    [
+                        "tools/bridge.cpp",
+                        "tools/mongobridge_options.cpp",
+                        "tools/mongobridge_options_init.cpp"
+                    ],
+                    LIBDEPS=[
+                        "serveronly",
+                        "coreserver",
+                        "coredb",
+                        "signal_handlers_synchronous",
+                        "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
+                    ]),
+        env.Program("mongoperf",
+                    [
+                        "client/examples/mongoperf.cpp",
+                    ],
+                    LIBDEPS=[
+                        "serveronly",
+                        "coreserver",
+                        "coredb",
+                        "signal_handlers_synchronous",
+                    ]),
+    ])
 
 # mongos
-mongos = env.Program(
-    "mongos", [ "s/server.cpp", "s/mongos_options_init.cpp" ] ,
-    LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "ntservice",
-             "mongodandmongos", "s/upgrade", "mongos_options" ])
-env.Install( '#/', mongos )
+env.Install(
+    '#/',
+    env.Program(
+        "mongos",
+        [
+            "s/server.cpp",
+            "s/mongos_options.cpp",
+            "s/mongos_options_init.cpp"
+        ],
+        LIBDEPS=[
+            "mongoscore",
+            "coreserver",
+            "coredb",
+            "mongocommon",
+            "coreshard",
+            "ntservice",
+            "mongodandmongos",
+            "s/upgrade",
+            "mongos_options",
+            '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+        ]))
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
                               LIBDEPS=["mongocommon",

@@ -41,7 +41,6 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/random.h"
@@ -49,14 +48,12 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
-#include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/print.h"
 
 namespace mongo {
 
