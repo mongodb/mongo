@@ -1,5 +1,8 @@
 (function() {
 
+if (TestData && TestData.storageEngine === 'wiredTiger')
+    return;
+
 load("jstests/libs/mongostat.js");
 
 var mmap_options = {storageEngine: "mmapv1"};
