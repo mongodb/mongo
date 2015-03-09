@@ -320,6 +320,10 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL *log_close_session;/* Log close thread session */
 	wt_thread_t	 log_close_tid;	/* Log close thread thread */
 	int		 log_close_tid_set;/* Log close thread set */
+	WT_CONDVAR	*log_wrlsn_cond;/* Log write lsn thread wait mutex */
+	WT_SESSION_IMPL *log_wrlsn_session;/* Log write lsn thread session */
+	wt_thread_t	 log_wrlsn_tid;	/* Log write lsn thread thread */
+	int		 log_wrlsn_tid_set;/* Log write lsn thread set */
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
 	wt_off_t	 log_file_max;	/* Log file max size */
