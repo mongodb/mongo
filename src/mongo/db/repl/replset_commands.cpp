@@ -45,7 +45,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -203,6 +202,57 @@ namespace {
         verify(h != "localhost");
         return HostAndPort(h, serverGlobalParams.port);
     }
+
+    void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
+                              const std::string& replSetString,
+                              std::string* setname,
+                              std::vector<HostAndPort>* seeds) {
+        const char *p = replSetString.c_str();
+        const char *slash = strchr(p, '/');
+        std::set<HostAndPort> seedSet;
+        if (slash) {
+            *setname = string(p, slash-p);
+        }
+        else {
+            *setname = p;
+        }
+
+        if (slash == 0) {
+            return;
+        }
+
+        p = slash + 1;
+        while (1) {
+            const char *comma = strchr(p, ',');
+            if (comma == 0) {
+                comma = strchr(p,0);
+            }
+            if (p == comma) {
+                break;
+            }
+            HostAndPort m;
+            try {
+                m = HostAndPort( string(p, comma-p) );
+            }
+            catch (...) {
+                uassert(13114, "bad --replSet seed hostname", false);
+            }
+            uassert(13096, "bad --replSet command line config string - dups?",
+                    seedSet.count(m) == 0);
+            seedSet.insert(m);
+            //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
+            if (externalState->isSelf(m)) {
+                LOG(1) << "ignoring seed " << m.toString() << " (=self)";
+            }
+            else {
+                seeds->push_back(m);
+            }
+            if (*comma == 0) {
+                break;
+            }
+            p = comma + 1;
+        }
+    }
 } // namespace
 
     class CmdReplSetInitiate : public ReplSetCommand {
@@ -232,6 +282,14 @@ namespace {
                 configObj = cmdObj["replSetInitiate"].Obj();
             }
 
+            std::string replSetString = getGlobalReplicationCoordinator()->getSettings().replSet;
+            if (replSetString.empty()) {
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::NoReplicationEnabled,
+                                                  "This node was not started with the replSet "
+                                                  "option"));
+            }
+
             if (configObj.isEmpty()) {
                 string noConfigMessage = "no configuration specified. "
                     "Using a default configuration for the set";
@@ -241,13 +299,11 @@ namespace {
                 ReplicationCoordinatorExternalStateImpl externalState;
                 std::string name;
                 std::vector<HostAndPort> seeds;
-                std::set<HostAndPort> seedSet;
                 parseReplSetSeedList(
                         &externalState,
-                        getGlobalReplicationCoordinator()->getSettings().replSet,
-                        name,
-                        seeds,
-                        seedSet); // may throw...
+                        replSetString,
+                        &name,
+                        &seeds); // may throw...
 
                 BSONObjBuilder b;
                 b.append("_id", name);
