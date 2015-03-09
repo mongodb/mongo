@@ -173,10 +173,12 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 * example, we can end up here without a session.)
 	 */
 	if (session == NULL)
-		return (fprintf(stderr, "WiredTiger Error%s%s\n",
+		return (fprintf(stderr, "WiredTiger Error%s%s: ",
 		    error == 0 ? "" : ": ",
-		    error == 0 ? "" : wiredtiger_strerror(error)) >= 0 &&
-		    fflush(stderr) == 0 ? 0 : __wt_errno());
+		    error == 0 ? "" : wiredtiger_strerror(error)) < 0 ||
+		    vfprintf(stderr, fmt, ap) < 0 ||
+		    fprintf(stderr, "\n") < 0 ||
+		    fflush(stderr) != 0 ? __wt_errno() : 0);
 
 	p = s;
 	end = s + sizeof(s);
