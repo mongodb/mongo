@@ -7,6 +7,8 @@ env.Library('platform', [
         'posix_fadvise.cpp',
         'process_id.cpp',
         'random.cpp',
+        "shared_library.cpp",
+        "shared_library_${TARGET_OS_FAMILY}.cpp",
         'strcasestr.cpp',
         ])
 
