@@ -346,6 +346,11 @@ namespace auth {
         }
 
         return Status::OK();
+    }	
+    Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
+                                                           const std::string& dbname,
+                                                           BSONObj* parsedWriteConcern) {
+        return parseFromDatabaseCommand(cmdObj, dbname, parsedWriteConcern, "dropAllUsersFromDatabase");
     }
     Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
                                                            const std::string& dbname,
