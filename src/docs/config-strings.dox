@@ -19,6 +19,9 @@ expression do not require quotes:
     [-_0-9A-Za-z./][^\\t\\r\\n :=,\\])}]*
 </pre>
 
+Configuration strings are case-sensitive (for example, "true" is a
+valid boolean value, but "True" is not).
+
 More complex keys and values can be specified by quoting them with double
 quotes.
 

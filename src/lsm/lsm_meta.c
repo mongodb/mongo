@@ -41,7 +41,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    cv.str, cv.len, &lsm_tree->value_format));
 		} else if (WT_STRING_MATCH("collator", ck.str, ck.len)) {
 			if (cv.len == 0 ||
-			    WT_STRING_CASE_MATCH("none", cv.str, cv.len))
+			    WT_STRING_MATCH("none", cv.str, cv.len))
 				continue;
 			/*
 			 * Extract the application-supplied metadata (if any)

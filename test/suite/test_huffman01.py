@@ -43,14 +43,12 @@ class test_huffman01(wttest.WiredTigerTestCase, suite_subprocess):
     huffkey = [
         ('none', dict(huffkey='huffman_key=none',kfile=None)),
         ('english', dict(huffkey='huffman_key=english',kfile=None)),
-        ('English', dict(huffkey='huffman_key=English',kfile=None)),
         ('utf8', dict(huffkey='huffman_key=utf8t8file',kfile='t8file')),
         ('utf16', dict(huffkey='huffman_key=utf16t16file',kfile='t16file')),
     ]
     huffval = [
         ('none', dict(huffval=',huffman_value=none',vfile=None)),
         ('english', dict(huffval=',huffman_value=english',vfile=None)),
-        ('English', dict(huffval=',huffman_value=English',vfile=None)),
         ('utf8', dict(huffval=',huffman_value=utf8t8file',vfile='t8file')),
         ('utf16', dict(huffval=',huffman_value=utf16t16file',vfile='t16file')),
     ]

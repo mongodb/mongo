@@ -500,11 +500,10 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		return (0);
 
 	if (value->type == WT_CONFIG_ITEM_ID) {
-		if (WT_STRING_CASE_MATCH("false", value->str, value->len)) {
+		if (WT_STRING_MATCH("false", value->str, value->len)) {
 			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 0;
-		} else if (
-		    WT_STRING_CASE_MATCH("true", value->str, value->len)) {
+		} else if (WT_STRING_MATCH("true", value->str, value->len)) {
 			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 1;
 		}
@@ -593,12 +592,11 @@ __config_getraw(
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)
 			continue;
-		if (k.len == key->len &&
-		    strncasecmp(key->str, k.str, k.len) == 0) {
+		if (k.len == key->len && strncmp(key->str, k.str, k.len) == 0) {
 			*value = v;
 			found = 1;
 		} else if (k.len < key->len && key->str[k.len] == '.' &&
-		    strncasecmp(key->str, k.str, k.len) == 0) {
+		    strncmp(key->str, k.str, k.len) == 0) {
 			subk.str = key->str + k.len + 1;
 			subk.len = (key->len - k.len) - 1;
 			WT_RET(__wt_config_initn(
@@ -665,7 +663,7 @@ __wt_config_gets_none(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
 	WT_RET(__wt_config_gets(session, cfg, key, value));
-	if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+	if (WT_STRING_MATCH("none", value->str, value->len))
 		value->len = 0;
 	return (0);
 }
@@ -710,7 +708,7 @@ __wt_config_getones_none(WT_SESSION_IMPL *session,
     const char *config, const char *key, WT_CONFIG_ITEM *value)
 {
 	WT_RET(__wt_config_getones(session, config, key, value));
-	if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+	if (WT_STRING_MATCH("none", value->str, value->len))
 		value->len = 0;
 	return (0);
 }
