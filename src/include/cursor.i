@@ -177,22 +177,14 @@ static inline int
 __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 {
 	WT_SESSION_IMPL *session;
-	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	txn = &session->txn;
 
 	if (reenter)
 		WT_RET(__curfile_leave(cbt));
 
-	/*
-	 * If there is no transaction active in this thread and we haven't
-	 * checked if the cache is full, do it now.  If we have to block for
-	 * eviction, this is the best time to do it.
-	 */
-	if (F_ISSET(txn, TXN_RUNNING) &&
-	    !F_ISSET(txn, TXN_HAS_ID) && !F_ISSET(txn, TXN_HAS_SNAPSHOT))
-		WT_RET(__wt_cache_full_check(session));
+	/* If the transaction is idle, check that the cache isn't full. */
+	WT_RET(__wt_txn_idle_cache_check(session));
 
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
 		WT_RET(__curfile_enter(cbt));
