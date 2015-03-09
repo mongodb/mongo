@@ -83,6 +83,3 @@ env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
 
 env.CppUnitTest( "fts_element_iterator_test", "fts_element_iterator_test.cpp",
                  LIBDEPS=["base"] )
-
-env.CppUnitTest( "fts_util_test", "fts_util_test.cpp",
-                 LIBDEPS=["base","$BUILD_DIR/mongo/mongohasher"] )

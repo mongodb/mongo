@@ -49,7 +49,6 @@ namespace mongo {
 
         Status FTSQuery::parse(const string& query, StringData language,
                                TextIndexVersion textIndexVersion) {
-            _search = query;
             StatusWithFTSLanguage swl = FTSLanguage::make( language, textIndexVersion );
             if ( !swl.getStatus().isOK() ) {
                 return swl.getStatus();

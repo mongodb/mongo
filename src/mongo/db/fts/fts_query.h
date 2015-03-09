@@ -69,7 +69,6 @@ namespace mongo {
                     _negatedPhrases.size() > 0;
             }
 
-            std::string getSearch() const { return _search; }
             const FTSLanguage& getLanguage() const { return *_language; }
 
             std::string toString() const;
@@ -79,7 +78,6 @@ namespace mongo {
             BSONObj toBSON() const;
 
         protected:
-            std::string _search;
             const FTSLanguage* _language;
             std::vector<std::string> _terms;
             std::set<std::string> _negatedTerms;
