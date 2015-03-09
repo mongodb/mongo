@@ -311,6 +311,21 @@ __wt_conn_config_discard(WT_SESSION_IMPL *session)
 
 \t__wt_free(session, conn->config_entries);
 }
+
+/*        
+ * __wt_conn_config_match --
+ *      Return the static configuration entry for a method.
+ */
+const WT_CONFIG_ENTRY *
+__wt_conn_config_match(const char *method)
+{
+\tconst WT_CONFIG_ENTRY *ep;
+
+\tfor (ep = config_entries; ep->method != NULL; ++ep)
+\t\tif (strcmp(method, ep->method) == 0)
+\t\t\treturn (ep);
+\treturn (NULL);
+}
 ''')
 
 tfile.close()

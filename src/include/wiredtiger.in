@@ -2399,7 +2399,7 @@ int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 /*! @} */
 
 /*!
- * @name Configuration string parsing
+ * @name Configuration strings
  * @{
  */
 
@@ -2456,6 +2456,22 @@ struct __wt_config_item {
 };
 
 /*!
+ * Validate a configuration string for a WiredTiger API.
+ * This API is outside the scope of a WiredTiger connection handle, since
+ * applications may need to validate configuration strings prior to calling
+ * ::wiredtiger_open.
+ * @param session the session handle to be used for error reporting (if NULL,
+ * error messages will be written to stderr).
+ * @param method the WiredTiger function or method to check.
+ * @param config the configuration string being parsed.
+ * @returns zero for success, non-zero to indicate an error.
+ *
+ * @snippet ex_all.c Validate a configuration string
+ */
+int wiredtiger_config_validate(
+    WT_SESSION *session, const char *method, const char *config);
+
+/*!
  * Create a handle that can be used to parse or create configuration strings
  * compatible with WiredTiger APIs.
  * This API is outside the scope of a WiredTiger connection handle, since
@@ -2468,6 +2484,8 @@ struct __wt_config_item {
  * @param len the number of valid bytes in \c config
  * @param[out] config_parserp A pointer to the newly opened handle
  * @errors
+ *
+ * @snippet ex_config_parse.c Create a configuration parser
  */
 int wiredtiger_config_parser_open(WT_SESSION *session,
     const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);

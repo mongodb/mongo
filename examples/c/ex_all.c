@@ -885,6 +885,11 @@ connection_ops(WT_CONNECTION *conn)
 	}
 	/*! [Check if the database is newly created] */
 
+	/*! [Validate a configuration string] */
+	ret = wiredtiger_config_validate(
+	    NULL, "session.create", "allocation_size=32KB");
+	/*! [Validate a configuration string] */
+
 	{
 	/*! [Open a session] */
 	WT_SESSION *session;

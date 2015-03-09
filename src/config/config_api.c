@@ -94,8 +94,7 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	 * structure for iterations through the configuration string.
 	 */
 	memcpy(&config_parser->config_item, &config_item, sizeof(config_item));
-	WT_ERR(__wt_config_initn(
-	    session, &config_parser->config, config, len));
+	WT_ERR(__wt_config_initn(session, &config_parser->config, config, len));
 
 	if (ret == 0)
 		*config_parserp = (WT_CONFIG_PARSER *)config_parser;
@@ -103,4 +102,45 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 err:		__wt_free(session, config_parser);
 
 	return (ret);
+}
+
+/*
+ * wiredtiger_config_validate --
+ *	Validate a configuration string.
+ */
+int
+wiredtiger_config_validate(
+    WT_SESSION *wt_session, const char *method, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+	const WT_CONFIG_ENTRY *ep, **epp;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	if (method == NULL)
+		WT_RET_MSG(session, EINVAL, "no method specified");
+	if (config == NULL)
+		WT_RET_MSG(session, EINVAL, "no configuration specified");
+
+	/*
+	 * If we don't yet have a connection, look for a matching method in
+	 * the static list, otherwise look in the configuration list (which
+	 * has any configuration information the application has added).
+	 */
+	if (session == NULL)
+		ep = __wt_conn_config_match(method);
+	else {
+		conn = S2C(session);
+
+		for (epp = conn->config_entries; (*epp)->method != NULL; ++epp)
+			if (strcmp((*epp)->method, method) == 0)
+				break;
+		ep = *epp;
+	}
+	if (ep == NULL || ep->method == NULL)
+		WT_RET_MSG(session,
+		    WT_NOTFOUND, "no method matching %s found", method);
+
+	return (__wt_config_check(session, ep, config, 0));
 }
