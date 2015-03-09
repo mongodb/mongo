@@ -48,9 +48,6 @@ type MongoImport struct {
 	// SessionProvider is used for connecting to the database
 	SessionProvider *db.SessionProvider
 
-	// indicates whether the connected server is part of a replica set
-	isReplicaSet bool
-
 	// insertionLock is used to prevent race conditions in incrementing
 	// the insertion count
 	insertionLock sync.Mutex
@@ -65,6 +62,9 @@ type MongoImport struct {
 
 	// fields to use for upsert operations
 	upsertFields []string
+
+	// type of node the SessionProvider is connected to
+	nodeType db.NodeType
 }
 
 type InputReader interface {
@@ -310,12 +310,12 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 		imp.ToolOptions.Namespace.DB,
 		imp.ToolOptions.Namespace.Collection)
 
-	// check if the server is a replica set
-	imp.isReplicaSet, err = imp.SessionProvider.IsReplicaSet()
+	// check if the server is a replica set, mongos, or standalone
+	imp.nodeType, err = imp.SessionProvider.GetNodeType()
 	if err != nil {
-		return 0, fmt.Errorf("error checking if server is part of a replicaset: %v", err)
+		return 0, fmt.Errorf("error checking connected node type: %v", err)
 	}
-	log.Logf(log.Info, "is replica set: %v", imp.isReplicaSet)
+	log.Logf(log.Info, "connected to node type: %v", imp.nodeType)
 
 	if err = imp.configureSession(session); err != nil {
 		return 0, fmt.Errorf("error configuring session: %v", err)
@@ -399,10 +399,7 @@ func (imp *MongoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
 func (imp *MongoImport) configureSession(session *mgo.Session) error {
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
-	sessionSafety, err := db.BuildWriteConcern(
-		imp.IngestOptions.WriteConcern,
-		imp.isReplicaSet,
-	)
+	sessionSafety, err := db.BuildWriteConcern(imp.IngestOptions.WriteConcern, imp.nodeType)
 	if err != nil {
 		return fmt.Errorf("write concern error: %v", err)
 	}

@@ -267,13 +267,15 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 	}
 	defer session.Close()
 
-	// check if we are using a replica set and fall back to w=1 if we aren't (for <= 2.4)
-	isRepl, err := mf.SessionProvider.IsReplicaSet()
+	// check type of node we're connected to, and fall back to w=1 if standalone (for <= 2.4)
+	nodeType, err := mf.SessionProvider.GetNodeType()
 	if err != nil {
-		return "", fmt.Errorf("error determining if connected to replica set: %v", err)
+		return "", fmt.Errorf("error determining type of node connected: %v", err)
 	}
 
-	safety, err := db.BuildWriteConcern(mf.StorageOptions.WriteConcern, isRepl)
+	log.Logf(log.DebugLow, "connected to node type: %v", nodeType)
+
+	safety, err := db.BuildWriteConcern(mf.StorageOptions.WriteConcern, nodeType)
 	if err != nil {
 		return "", fmt.Errorf("error parsing write concern: %v", err)
 	}

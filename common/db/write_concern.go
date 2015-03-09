@@ -85,12 +85,10 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 	return sessionSafety, nil
 }
 
-// BuildWriteConcern takes a string and a boolean indicating whether the requested
-// write concern is to be used against a replica set. It then converts the write
-// concern string argument into an mgo.Safe object which can safely be used to
-// set the write concern on a cluster session connection. Returns the safety
-// object and any error encountered.
-func BuildWriteConcern(writeConcern string, isReplicaSet bool) (*mgo.Safe, error) {
+// BuildWriteConcern takes a string and a NodeType indicating the type of node the write concern
+// is intended to be used against, and converts the write concern string argument into an
+// mgo.Safe object that's usable on sessions for that node type.
+func BuildWriteConcern(writeConcern string, nodeType NodeType) (*mgo.Safe, error) {
 	sessionSafety, err := constructWCObject(writeConcern)
 	if err != nil {
 		return nil, err
@@ -101,9 +99,8 @@ func BuildWriteConcern(writeConcern string, isReplicaSet bool) (*mgo.Safe, error
 		return nil, nil
 	}
 
-	// for standalone mongods, only a write concern of 0/1 is needed. This update
-	// is only here for compatibility with versions of mongod < 2.6
-	if !isReplicaSet {
+	// for standalone mongods, set the default write concern to 1
+	if nodeType == Standalone {
 		log.Logf(log.DebugLow, "standalone server: setting write concern %v to 1", w)
 		sessionSafety.W = 1
 		sessionSafety.WMode = ""
