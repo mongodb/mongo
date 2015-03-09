@@ -181,6 +181,7 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	session.SetSocketTimeout(0)
 
 	if exp.InputOpts.SlaveOk {
 		session.SetMode(mgo.Monotonic, true)
