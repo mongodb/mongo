@@ -34,7 +34,11 @@ load('jstests/files/util/mongofiles_common.js');
     assert.eq(actual, expected, 'mismatched md5 sum - expected ' + expected + ' got ' + actual);
 
     // ensure tool runs get_id without error
-    assert.eq(runMongoProgram.apply(this, ['mongofiles', '--port', conn.port, '--local', getFile , 'get_id', fileId.tojson()].concat(passthrough.args)), 0, 'put 2 failed');
+    var idAsJSON = fileId.tojson();
+    if (_isWindows()) {
+        idAsJSON = '"' + idAsJSON.replace(/\"/g, '\\"') + '"';
+    }
+    assert.eq(runMongoProgram.apply(this, ['mongofiles', '--port', conn.port, '--local', getFile , 'get_id', idAsJSON].concat(passthrough.args)), 0, 'put 2 failed');
     expected = md5sumFile(getFile);
     assert.eq(actual, expected, 'mismatched md5 sum on _id - expected ' + expected + ' got ' + actual);
 
