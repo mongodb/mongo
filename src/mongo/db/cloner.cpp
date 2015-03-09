@@ -366,9 +366,12 @@ namespace mongo {
         WriteUnitOfWork wunit(txn);
         indexer.commit();
         if (logForRepl) {
+            const string targetSystemIndexesCollectionName =
+                to_collection.getSystemIndexesCollection();
+            const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
             for (vector<BSONObj>::const_iterator it = indexesToBuild.begin();
                     it != indexesToBuild.end(); ++it) {
-                repl::logOp(txn, "i", to_collection.ns().c_str(), *it);
+                repl::logOp(txn, "i", createIndexNs, *it);
             }
         }
         wunit.commit();
