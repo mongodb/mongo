@@ -26,7 +26,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/s/range_arithmetic.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/range_arithmetic.h"
 
 namespace mongo {
 

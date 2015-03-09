@@ -250,6 +250,26 @@ env.Library( 'mongohasher', [ "db/hasher.cpp" ] )
 
 env.Library('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 
+# Range arithmetic library, used by both mongod and mongos
+env.Library(
+    'range_arithmetic',
+    [
+        'db/range_arithmetic.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/foundation',
+    ])
+
+env.CppUnitTest(
+    'range_arithmetic_test',
+    [
+        'db/range_arithmetic_test.cpp',
+    ],
+    LIBDEPS=[
+        'range_arithmetic'
+    ])
+
 env.Library('auth_helpers', ['client/auth_helpers.cpp'],
             LIBDEPS=['clientdriver'])
 
@@ -963,10 +983,10 @@ env.Library('range_deleter',
             ],
             LIBDEPS = [
                 '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
-                '$BUILD_DIR/mongo/s/base', # range_arithmetic.cpp
                 'base/base',
                 'bson',
                 'global_environment_experiment',
+                'range_arithmetic',
                 'synchronization'
             ])
 
@@ -1155,7 +1175,6 @@ env.Install(
             "ntservice",
             "mongodandmongos",
             "s/upgrade",
-            "mongos_options",
             '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         ]))
 

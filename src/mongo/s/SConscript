@@ -7,7 +7,6 @@ Import("env")
 #
 
 env.Library('base', ['mongo_version_range.cpp',
-                     'range_arithmetic.cpp',
                      'type_actionlog.cpp',
                      'type_changelog.cpp',
                      'type_chunk.cpp',
@@ -28,11 +27,6 @@ env.CppUnitTest('chunk_version_test', 'chunk_version_test.cpp',
                          '$BUILD_DIR/mongo/db/common'])
 
 env.CppUnitTest('mongo_version_range_test', 'mongo_version_range_test.cpp', 
-                LIBDEPS=['base',
-                         '$BUILD_DIR/mongo/bson',
-                         '$BUILD_DIR/mongo/db/common'])
-
-env.CppUnitTest('range_arithmetic_test', 'range_arithmetic_test.cpp',
                 LIBDEPS=['base',
                          '$BUILD_DIR/mongo/bson',
                          '$BUILD_DIR/mongo/db/common'])
@@ -100,13 +94,18 @@ env.Library('upgrade', ['cluster_client_internal.cpp',
 # Support for maintaining persistent sharding state and data.
 #
 
-env.Library('metadata', ['collection_metadata.cpp',
-                         'metadata_loader.cpp'],
-            LIBDEPS=['base',
-                     '$BUILD_DIR/mongo/bson',
-                     '$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/mongo/clientdriver',
-                    ])
+env.Library('metadata',
+            [
+                'collection_metadata.cpp',
+                'metadata_loader.cpp'
+            ],
+            LIBDEPS=[
+                'base',
+                '$BUILD_DIR/mongo/bson',
+                '$BUILD_DIR/mongo/base/base',
+                '$BUILD_DIR/mongo/clientdriver',
+                '$BUILD_DIR/mongo/range_arithmetic'
+            ])
 
 env.CppUnitTest('chunk_diff_test',
                 'chunk_diff_test.cpp',
@@ -198,10 +197,9 @@ env.CppUnitTest(
         'write_ops/batch_write_exec_test.cpp',
     ],
     LIBDEPS=[
-        'base',
         'cluster_ops',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/clientdriver',
+        '$BUILD_DIR/mongo/range_arithmetic',
     ]
 )
 

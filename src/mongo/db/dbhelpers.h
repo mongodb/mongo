@@ -29,13 +29,11 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
-#include <boost/noncopyable.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/s/range_arithmetic.h"
 
 namespace mongo {
 
@@ -44,6 +42,7 @@ namespace mongo {
     class Collection;
     class Cursor;
     class OperationContext;
+    struct KeyRange;
     struct WriteConcernOptions;
 
     /**
