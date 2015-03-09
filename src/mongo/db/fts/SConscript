@@ -33,6 +33,7 @@ baseEnv.Library('base', [
         'fts_spec.cpp',
         'fts_spec_legacy.cpp',
         'fts_language.cpp',
+        'fts_basic_tokenizer.cpp',
         'fts_util.cpp',
         'fts_element_iterator.cpp',
         'stemmer.cpp',
