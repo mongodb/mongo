@@ -39,6 +39,7 @@ namespace mongo {
     namespace fts {
 
         class FTSMatcher {
+            MONGO_DISALLOW_COPYING( FTSMatcher );
         public:
             FTSMatcher( const FTSQuery& query, const FTSSpec& spec );
 

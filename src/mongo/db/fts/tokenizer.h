@@ -59,6 +59,7 @@ namespace mongo {
         };
 
         class Tokenizer {
+            MONGO_DISALLOW_COPYING( Tokenizer );
         public:
 
             Tokenizer( const FTSLanguage& language, StringData str );

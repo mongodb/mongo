@@ -63,7 +63,7 @@ namespace mongo {
 
             if ( sb_sym == NULL ) {
                 // out of memory
-                abort();
+                invariant( false );
             }
 
             return string( (const char*)(sb_sym), sb_stemmer_length( _stemmer ) );

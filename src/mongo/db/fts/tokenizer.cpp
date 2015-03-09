@@ -55,7 +55,7 @@ namespace mongo {
 
             unsigned start = _pos++;
             Token::Type type = _type( _raw[start] );
-            if ( type == Token::WHITESPACE ) abort();
+            if ( type == Token::WHITESPACE ) invariant( false );
 
             if ( type == Token::TEXT )
                 while ( _pos < _raw.size() && _type( _raw[_pos] ) == type )
