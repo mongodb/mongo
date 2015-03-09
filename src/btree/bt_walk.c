@@ -252,7 +252,7 @@ ascend:	/*
 				 * new page. This works because we never acquire
 				 * a hazard pointer on a leaf page we're not
 				 * going to return to our caller, this will quit
-				 * work if that ever changes.
+				 * working if that ever changes.
 				 */
 				WT_ASSERT(session,
 				    couple == couple_orig ||
