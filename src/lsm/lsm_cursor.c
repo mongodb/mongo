@@ -77,6 +77,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	} else {
 		primary = clsm->cursors[clsm->nchunks - 1];
 		primary_chunk = clsm->primary_chunk;
+		WT_ASSERT(session, F_ISSET(&session->txn, TXN_HAS_ID));
 		have_primary = (primary != NULL && primary_chunk != NULL &&
 		    (primary_chunk->switch_txn == WT_TXN_NONE ||
 		    TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
@@ -177,14 +178,15 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 
 		/* Update the maximum transaction ID in the primary chunk. */
 		if (update) {
-			WT_RET(__clsm_enter_update(clsm));
-			if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
-				goto open;
-
 			/*
 			 * Ensure that there is a transaction snapshot active.
 			 */
 			WT_RET(__wt_txn_autocommit_check(session));
+			WT_RET(__wt_txn_id_check(session));
+
+			WT_RET(__clsm_enter_update(clsm));
+			if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+				goto open;
 
 			if (session->txn.isolation == TXN_ISO_SNAPSHOT)
 				__wt_txn_cursor_op(session);
@@ -1237,11 +1239,12 @@ __clsm_put(WT_SESSION_IMPL *session,
 {
 	WT_CURSOR *c, *primary;
 	WT_LSM_TREE *lsm_tree;
-	u_int i;
+	u_int i, slot;
 
 	lsm_tree = clsm->lsm_tree;
 
 	WT_ASSERT(session,
+	    F_ISSET(&session->txn, TXN_HAS_ID) &&
 	    clsm->primary_chunk != NULL &&
 	    (clsm->primary_chunk->switch_txn == WT_TXN_NONE ||
 	    TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));
@@ -1257,8 +1260,15 @@ __clsm_put(WT_SESSION_IMPL *session,
 	if (position)
 		clsm->current = primary;
 
-	for (i = 0; i < clsm->nupdates; i++) {
-		c = clsm->cursors[(clsm->nchunks - i) - 1];
+	for (i = 0, slot = clsm->nchunks - 1; i < clsm->nupdates; i++, slot--) {
+		/* Check if we need to keep updating old chunks. */
+		if (i > 0 &&
+		    __wt_txn_visible(session, clsm->switch_txn[slot])) {
+			clsm->nupdates = i;
+			break;
+		}
+
+		c = clsm->cursors[slot];
 		c->set_key(c, key);
 		c->set_value(c, value);
 		WT_RET((position && i == 0) ? c->update(c) : c->insert(c));

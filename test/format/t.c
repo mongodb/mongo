@@ -40,6 +40,7 @@ extern char *__wt_optarg;
 int
 main(int argc, char *argv[])
 {
+	time_t start;
 	int ch, reps, ret;
 	const char *config, *home;
 
@@ -174,7 +175,9 @@ main(int argc, char *argv[])
 		config_print(0);		/* Dump run configuration */
 		key_len_setup();		/* Setup keys */
 
+		start = time(NULL);
 		track("starting up", 0ULL, NULL);
+
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
 		wts_open(g.home, 1, &g.wts_conn);
@@ -183,35 +186,35 @@ main(int argc, char *argv[])
 		wts_load();			/* Load initial records */
 		wts_verify("post-bulk verify");	/* Verify */
 
-						/* Loop reading & operations */
-		for (reps = 0; reps < FORMAT_OPERATION_REPS; ++reps) {
-			wts_read_scan();	/* Read scan */
+		/*
+		 * If we're not doing any operations, scan the bulk-load, copy
+		 * the statistics and we're done. Otherwise, loop reading and
+		 * operations, with a verify after each set.
+		 */
+		if (g.c_timer == 0 && g.c_ops == 0) {
+			wts_read_scan();		/* Read scan */
+			wts_stats();			/* Statistics */
+		} else
+			for (reps = 1; reps <= FORMAT_OPERATION_REPS; ++reps) {
+				wts_read_scan();	/* Read scan */
 
-						/* Operations */
-			if (g.c_timer != 0 || g.c_ops != 0)
-				wts_ops();
+							/* Operations */
+				wts_ops(reps == FORMAT_OPERATION_REPS);
 
-			/*
-			 * Statistics.
-			 *
-			 * XXX
-			 * Verify closes the underlying handle and discards the
-			 * statistics, read them first.
-			 */
-			if (g.c_ops == 0 || reps == 2)
-				wts_stats();
+				/*
+				 * Copy out the run's statistics after the last
+				 * set of operations.
+				 *
+				 * XXX
+				 * Verify closes the underlying handle and
+				 * discards the statistics, read them first.
+				 */
+				if (reps == FORMAT_OPERATION_REPS)
+					wts_stats();
 
-						/* Verify */
-			wts_verify("post-ops verify");
-
-			/*
-			 * If no operation count, quit after a single read pass.
-			 * (A timer configuration ran out the timer on the first
-			 * set of operations.)
-			 */
-			if (g.c_ops == 0)
-				break;
-		}
+							/* Verify */
+				wts_verify("post-ops verify");
+			}
 
 		track("shutting down", 0ULL, NULL);
 		if (SINGLETHREADED)
@@ -233,8 +236,9 @@ main(int argc, char *argv[])
 		/* Overwrite the progress line with a completion line. */
 		if (g.track)
 			printf("\r%78s\r", " ");
-		printf("%4d: %s, %s\n",
-		    g.run_cnt, g.c_data_source, g.c_file_type);
+		printf("%4d: %s, %s (%.0f seconds)\n",
+		    g.run_cnt, g.c_data_source,
+		    g.c_file_type, difftime(time(NULL), start));
 	}
 
 	/* Flush/close any logging information. */

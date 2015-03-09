@@ -57,7 +57,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	for (i = 0; i < SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
-		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
+		F_SET(&log->slot_pool[i], SLOT_INIT_FLAGS);
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_buffer_size, WT_LOG_SLOT_BUF_INIT_SIZE * SLOT_POOL);
@@ -295,10 +295,34 @@ __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size)
  *	Free a slot back into the pool.
  */
 int
-__wt_log_slot_free(WT_LOGSLOT *slot)
+__wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	WT_DECL_RET;
+
+	ret = 0;
+	/*
+	 * Grow the buffer if needed before returning it to the pool.
+	 */
+	if (F_ISSET(slot, SLOT_BUF_GROW)) {
+		WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
+		WT_STAT_FAST_CONN_INCRV(session,
+		    log_buffer_size, slot->slot_buf.memsize);
+		WT_ERR(__wt_buf_grow(session,
+		    &slot->slot_buf, slot->slot_buf.memsize * 2));
+	}
+err:
+	/*
+	 * No matter if there is an error, we always want to free
+	 * the slot back to the pool.
+	 */
+	/*
+	 * Make sure flags don't get retained between uses.
+	 * We have to reset them them here because multiple threads may
+	 * change the flags when joining the slot.
+	 */
+	slot->flags = SLOT_INIT_FLAGS;
 	slot->slot_state = WT_LOG_SLOT_FREE;
-	return (0);
+	return (ret);
 }
 
 /*

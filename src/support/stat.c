@@ -447,10 +447,15 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "log: log records not compressed";
 	stats->log_compress_small.desc =
 	    "log: log records too small to compress";
+	stats->log_release_write_lsn.desc =
+	    "log: log release advances write LSN";
 	stats->log_scans.desc = "log: log scan operations";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
+	stats->log_write_lsn.desc =
+	    "log: log server thread advances write LSN";
 	stats->log_sync.desc = "log: log sync operations";
+	stats->log_sync_dir.desc = "log: log sync_dir operations";
 	stats->log_writes.desc = "log: log write operations";
 	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
 	stats->log_max_filesize.desc = "log: maximum log file size";
@@ -613,9 +618,12 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_compress_writes.v = 0;
 	stats->log_compress_write_fails.v = 0;
 	stats->log_compress_small.v = 0;
+	stats->log_release_write_lsn.v = 0;
 	stats->log_scans.v = 0;
 	stats->log_scan_rereads.v = 0;
+	stats->log_write_lsn.v = 0;
 	stats->log_sync.v = 0;
+	stats->log_sync_dir.v = 0;
 	stats->log_writes.v = 0;
 	stats->log_slot_consolidated.v = 0;
 	stats->log_prealloc_max.v = 0;

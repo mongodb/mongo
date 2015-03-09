@@ -221,9 +221,6 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	int skip;
 
-	if (ref->state != WT_REF_DELETED)
-		return (0);
-
 	/*
 	 * Deleted pages come from two sources: either it's a fast-delete as
 	 * described above, or the page has been emptied by other operations

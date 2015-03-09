@@ -28,8 +28,6 @@
 
 #include "wt_internal.h"
 
-#include <signal.h>
-
 static struct {
 	char *progname;				/* Program name */
 
@@ -38,8 +36,7 @@ static struct {
 
 	char *config_open;			/* Command-line configuration */
 
-	uint32_t c_bitcnt;			/* Config values */
-	uint32_t c_cache;
+	uint32_t c_cache;			/* Config values */
 	uint32_t c_key_max;
 	uint32_t c_ops;
 	uint32_t c_k;				/* Number of hash iterations */
@@ -49,12 +46,12 @@ static struct {
 	uint8_t **entries;
 } g;
 
-static int cleanup(void);
+void cleanup(void);
 void die(int e, const char *fmt, ...);
-static int populate_entries(void);
-static int run(void);
-static int setup(void);
-static void usage(void);
+void populate_entries(void);
+void run(void);
+void setup(void);
+void usage(void);
 
 extern char *__wt_optarg;
 extern int __wt_optind;
@@ -109,7 +106,7 @@ main(int argc, char *argv[])
 	return (EXIT_SUCCESS);
 }
 
-int
+void
 setup(void)
 {
 	WT_CONNECTION *conn;
@@ -141,13 +138,10 @@ setup(void)
 
 	g.wt_conn = conn;
 	g.wt_session = session;
-	if ((ret = populate_entries()) != 0)
-		die(ret, "populate_entries");
-
-	return (0);
+	populate_entries();
 }
 
-int
+void
 run(void)
 {
 	WT_BLOOM *bloomp;
@@ -184,7 +178,8 @@ run(void)
 	if ((ret = __wt_bloom_close(bloomp)) != 0)
 		die(ret, "__wt_bloom_close");
 
-	g.wt_session->checkpoint(g.wt_session, NULL);
+	if ((ret = g.wt_session->checkpoint(g.wt_session, NULL)) != 0)
+		die(ret, "WT_SESSION.checkpoint");
 	if ((ret = __wt_bloom_open(
 	    sess, uri, g.c_factor, g.c_k, NULL, &bloomp)) != 0)
 		die(ret, "__wt_bloom_open");
@@ -212,28 +207,28 @@ run(void)
 	    g.c_ops, fp, 100.0 * fp/g.c_ops);
 	if ((ret = __wt_bloom_drop(bloomp, NULL)) != 0)
 		die(ret, "__wt_bloom_drop");
-
-	return (0);
 }
 
-int
+void
 cleanup(void)
 {
 	uint32_t i;
+	int ret;
 
 	for (i = 0; i < g.c_ops; i++)
 		free(g.entries[i]);
 	free(g.entries);
-	g.wt_session->close(g.wt_session, NULL);
-	g.wt_conn->close(g.wt_conn, NULL);
-	return (0);
+	if ((ret = g.wt_session->close(g.wt_session, NULL)) != 0)
+		die(ret, "WT_SESSION.close");
+	if ((g.wt_conn->close(g.wt_conn, NULL)) != 0)
+		die(ret, "WT_CONNECTION.close");
 }
 
 /*
  * Create and keep all the strings used to populate the bloom filter, so that
  * we can do validation with the same set of entries.
  */
-static int
+void
 populate_entries(void)
 {
 	uint32_t i, j;
@@ -254,7 +249,6 @@ populate_entries(void)
 	}
 
 	g.entries = entries;
-	return (0);
 }
 
 /*
@@ -283,7 +277,7 @@ die(int e, const char *fmt, ...)
  * usage --
  *	Display usage statement and exit failure.
  */
-static void
+void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-cfkos]\n", g.progname);

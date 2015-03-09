@@ -36,17 +36,17 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	char *pool_name;
-	int created, reconfiguring;
+	int created, updating;
 	uint64_t chunk, reserve, size, used_cache;
 
 	conn = S2C(session);
-	created = reconfiguring = 0;
+	created = updating = 0;
 	pool_name = NULL;
 	cp = NULL;
 	size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		reconfiguring = 1;
+		updating = 1;
 	else {
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "shared_cache.name", &cval));
@@ -81,7 +81,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	__wt_spin_lock(session, &__wt_process.spinlock);
 	if (__wt_process.cache_pool == NULL) {
-		WT_ASSERT(session, !reconfiguring);
+		WT_ASSERT(session, !updating);
 		/* Create a cache pool. */
 		WT_ERR(__wt_calloc_one(session, &cp));
 		created = 1;
@@ -96,7 +96,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		__wt_process.cache_pool = cp;
 		WT_ERR(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Created cache pool %s", cp->name));
-	} else if (!reconfiguring && !WT_STRING_MATCH(
+	} else if (!updating && !WT_STRING_MATCH(
 	    __wt_process.cache_pool->name, pool_name, strlen(pool_name)))
 		/* Only a single cache pool is supported. */
 		WT_ERR_MSG(session, WT_ERROR,
@@ -109,7 +109,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	 * The cache pool requires a reference count to avoid a race between
 	 * configuration/open and destroy.
 	 */
-	if (!reconfiguring)
+	if (!updating)
 		++cp->refs;
 
 	/*
@@ -157,7 +157,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (__wt_config_gets(session, &cfg[1],
 	    "shared_cache.reserve", &cval) == 0 && cval.val != 0)
 		reserve = (uint64_t)cval.val;
-	else if (reconfiguring)
+	else if (updating)
 		reserve = conn->cache->cp_reserved;
 	else
 		reserve = chunk;
@@ -171,18 +171,23 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
 			used_cache += entry->cache->cp_reserved;
 	}
+	/* Ignore our old allocation if reconfiguring */
+	if (updating)
+		used_cache -= conn->cache->cp_reserved;
 	if (used_cache + reserve > size)
 		WT_ERR_MSG(session, EINVAL,
 		    "Shared cache unable to accommodate this configuration. "
-		    "Shared cache size: %" PRIu64 ", reserved: %" PRIu64,
+		    "Shared cache size: %" PRIu64 ", requested min: %" PRIu64,
 		    size, used_cache + reserve);
 
 	/* The configuration is verified - it's safe to update the pool. */
 	cp->size = size;
 	cp->chunk = chunk;
 
+	conn->cache->cp_reserved = reserve;
+
 	/* Wake up the cache pool server so any changes are noticed. */
-	if (reconfiguring)
+	if (updating)
 		WT_ERR(__wt_cond_signal(
 		    session, __wt_process.cache_pool->cache_pool_cond));
 
@@ -192,7 +197,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	F_SET(conn, WT_CONN_CACHE_POOL);
 err:	__wt_spin_unlock(session, &__wt_process.spinlock);
-	if (!reconfiguring)
+	if (!updating)
 		__wt_free(session, pool_name);
 	if (ret != 0 && created) {
 		__wt_free(session, cp->name);

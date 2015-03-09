@@ -26,7 +26,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
 		ret = __wt_schema_project_merge(session,
 		    cindex->cg_cursors, cindex->value_plan,
 		    cursor->value_format, &cursor->value);

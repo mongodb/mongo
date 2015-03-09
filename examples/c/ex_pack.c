@@ -42,8 +42,6 @@ main(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	char buf[50];
-	size_t size;
 	int i, j, k, ret;
 
 	/*
@@ -66,7 +64,11 @@ main(void)
 		fprintf(stderr, "Error opening a session on %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 
+	{
 	/*! [packing] */
+	size_t size;
+	char buf[50];
+
 	ret = wiredtiger_struct_size(session, &size, "iii", 42, 1000, -9);
 	if (size > sizeof(buf)) {
 		/* Allocate a bigger buffer. */
@@ -76,6 +78,7 @@ main(void)
 
 	ret = wiredtiger_struct_unpack(session, buf, size, "iii", &i, &j, &k);
 	/*! [packing] */
+	}
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)
