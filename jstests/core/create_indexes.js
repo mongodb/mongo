@@ -104,6 +104,12 @@
 
     assert.eq( 6, t.getIndexes().length );
 
+    res = t.runCommand( "createIndexes",
+                        { indexes : [ { key : { "x" : 1 }, name : "" } ] } );
+    assert( !res.ok )
+
+    assert.eq( 6, t.getIndexes().length );
+
     //
     // Test that v0 indexes can only be created with mmapv1
     //
