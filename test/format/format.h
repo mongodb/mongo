@@ -97,6 +97,10 @@ extern WT_EXTENSION_API *wt_api;
 #undef	GIGABYTE
 #define	GIGABYTE(v)	((v) * 1073741824ULL)
 
+#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
+#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
+#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
+
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(rng() % (((max) + 1) - (min)) + (min))
 
