@@ -108,11 +108,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    static Status parseGeoJSONCoodinate(const BSONElement& elem, S2Point* out) {
+    static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
         if (Array != elem.type()) { return BAD_VALUE("GeoJSON coordinates must be an array"); }
         Point p;
-        // Check the object has and only has 2 numbers.
-        Status status = parseFlatPoint(elem, &p);
+        // GeoJSON allows extra elements, e.g. altitude.
+        Status status = parseFlatPoint(elem, &p, true);
         if (!status.isOK()) return status;
 
         status = coordToPoint(p.x, p.y, out);
@@ -120,13 +120,13 @@ namespace mongo {
     }
 
     // "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
-    static Status parseArrayOfCoodinates(const BSONElement& elem, vector<S2Point>* out) {
+    static Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* out) {
         if (Array != elem.type()) { return BAD_VALUE("GeoJSON coordinates must be an array of coordinates"); }
         BSONObjIterator it(elem.Obj());
         // Iterate all coordinates in array
         while (it.more()) {
             S2Point p;
-            Status status = parseGeoJSONCoodinate(it.next(), &p);
+            Status status = parseGeoJSONCoordinate(it.next(), &p);
             if (!status.isOK()) return status;
             out->push_back(p);
         }
@@ -168,7 +168,7 @@ namespace mongo {
             // Parse the array of vertices of a loop.
             BSONElement coordinateElt = it.next();
             vector<S2Point> points;
-            status = parseArrayOfCoodinates(coordinateElt, &points);
+            status = parseArrayOfCoordinates(coordinateElt, &points);
             if (!status.isOK()) return status;
 
             // Check if the loop is closed.
@@ -269,7 +269,7 @@ namespace mongo {
         Status status = Status::OK();
         string err;
 
-        status = parseArrayOfCoodinates(coordinates.front(), &exteriorVertices);
+        status = parseArrayOfCoordinates(coordinates.front(), &exteriorVertices);
         if (!status.isOK()) return status;
 
         status = isLoopClosed(exteriorVertices, coordinates.front());
@@ -346,7 +346,7 @@ namespace mongo {
     // Or a line in "coordinates" field of GeoJSON MultiLineString
     static Status parseGeoJSONLineCoordinates(const BSONElement& elem, S2Polyline* out) {
         vector<S2Point> vertices;
-        Status status = parseArrayOfCoodinates(elem, &vertices);
+        Status status = parseArrayOfCoordinates(elem, &vertices);
         if (!status.isOK()) return status;
 
         eraseDuplicatePoints(&vertices);
@@ -425,7 +425,7 @@ namespace mongo {
         if (!status.isOK()) return status;
 
         // "coordinates"
-        status = parseFlatPoint(obj[GEOJSON_COORDINATES], &out->oldPoint);
+        status = parseFlatPoint(obj[GEOJSON_COORDINATES], &out->oldPoint, true);
         if (!status.isOK()) return status;
 
         // Projection
@@ -478,7 +478,7 @@ namespace mongo {
 
         out->points.clear();
         BSONElement coordElt = obj.getFieldDotted(GEOJSON_COORDINATES);
-        status = parseArrayOfCoodinates(coordElt, &out->points);
+        status = parseArrayOfCoordinates(coordElt, &out->points);
         if (!status.isOK()) return status;
 
         if (0 == out->points.size())
