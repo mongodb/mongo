@@ -70,7 +70,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
         }
 
-        CmdListCollections() : Command( "listCollections", true ) {}
+        CmdListCollections() : Command( "listCollections" ) {}
 
         bool run(OperationContext* txn,
                  const string& dbname,

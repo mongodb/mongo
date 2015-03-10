@@ -259,10 +259,8 @@ namespace mongo {
                 dbname = z.str();
             }
             ss << start(dbname) << h2(dbname);
-            ss << "<p><a href=\"/_commands\">List all commands</a> | \n";
-            ss << "<a href=\"/_replSet\">Replica set status</a></p>\n";
+            ss << "<p><a href=\"/_commands\">List all commands</a></p>\n";
 
-            //ss << "<a href=\"/_status\">_status</a>";
             {
                 const Command::CommandMap* m = Command::webCommands();
                 if( m ) {
