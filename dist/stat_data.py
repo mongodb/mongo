@@ -145,7 +145,7 @@ connection_stats = [
     # Cache and eviction statistics
     ##########################################
     CacheStat('cache_bytes_dirty',
-        'tracked dirty bytes in the cache', 'no_scale'),
+        'tracked dirty bytes in the cache', 'no_clear,no_scale'),
     CacheStat('cache_bytes_inuse',
         'bytes currently in the cache', 'no_clear,no_scale'),
     CacheStat('cache_bytes_max',
@@ -187,7 +187,7 @@ connection_stats = [
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty',
-        'tracked dirty pages in the cache', 'no_scale'),
+        'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse',
         'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_read', 'pages read into cache'),
@@ -218,7 +218,8 @@ connection_stats = [
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
-    LogStat('log_prealloc_max', 'number of pre-allocated log files to create'),
+    LogStat('log_prealloc_max',
+        'number of pre-allocated log files to create', 'no_clear,no_scale'),
     LogStat('log_prealloc_used', 'pre-allocated log files used'),
     LogStat('log_reads', 'log read operations'),
     LogStat('log_release_write_lsn', 'log release advances write LSN'),
