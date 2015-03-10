@@ -144,9 +144,15 @@ namespace mongo {
     }
 
     static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopElt) {
-        if (loop.empty() || loop[0] != loop[loop.size() - 1])
-            return BAD_VALUE("Loop is not closed: " << loopElt.toString(false));
-        return Status::OK();
+      if (loop.empty()) {
+        return BAD_VALUE("Loop has no vertices: " << loopElt.toString(false));
+      }
+
+      if (loop[0] != loop[loop.size() - 1]) {
+        return BAD_VALUE("Loop is not closed: " << loopElt.toString(false));
+      }
+
+      return Status::OK();
     }
 
     static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem, S2Polygon *out) {
@@ -172,6 +178,12 @@ namespace mongo {
             eraseDuplicatePoints(&points);
             // Drop the duplicated last point.
             points.resize(points.size() - 1);
+
+            // At least 3 vertices.
+            if (points.size() < 3) {
+                return BAD_VALUE("Loop must have at least 3 different vertices: " <<
+                                 coordinateElt.toString(false));
+            }
 
             S2Loop* loop = new S2Loop(points);
             loops.push_back(loop);
@@ -268,6 +280,12 @@ namespace mongo {
         // The last point is duplicated.  We drop it, since S2Loop expects no
         // duplicate points
         exteriorVertices.resize(exteriorVertices.size() - 1);
+
+        // At least 3 vertices.
+        if (exteriorVertices.size() < 3) {
+            return BAD_VALUE("Loop must have at least 3 different vertices: " <<
+                             elem.toString(false));
+        }
 
         auto_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
         // Check whether this loop is valid.
