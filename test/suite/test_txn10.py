@@ -55,7 +55,8 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
         os.mkdir(newdir)
         for fname in os.listdir(olddir):
             fullname = os.path.join(olddir, fname)
-            if os.path.isfile(fullname):
+            # Skip lock file on Windows since it is locked
+            if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
                 shutil.copy(fullname, newdir)
         # close the original connection and open to new directory
         self.close_conn()
