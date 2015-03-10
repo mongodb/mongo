@@ -395,7 +395,7 @@ namespace repl {
         BSONObj res;
         bool ok = conn->runCommand( "admin" , cmd.obj() , res );
         // ignoring for now on purpose for older versions
-        LOG( ok ? 1 : 0 ) << "replHandshake res not: " << ok << " res: " << res << endl;
+        LOG( ok ? 1 : 0 ) << "replHandshake result: " << res << endl;
         return true;
     }
 
