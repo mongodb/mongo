@@ -13,7 +13,7 @@
  *	Pause the thread of control.
  */
 void
-__wt_sleep(long seconds, long micro_seconds)
+__wt_sleep(uint64_t seconds, uint64_t micro_seconds)
 {
 	struct timeval t;
 

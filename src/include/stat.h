@@ -215,6 +215,7 @@ struct __wt_connection_stats {
 	WT_STATS log_prealloc_max;
 	WT_STATS log_prealloc_used;
 	WT_STATS log_reads;
+	WT_STATS log_release_write_lsn;
 	WT_STATS log_scan_records;
 	WT_STATS log_scan_rereads;
 	WT_STATS log_scans;
@@ -227,6 +228,8 @@ struct __wt_connection_stats {
 	WT_STATS log_slot_toosmall;
 	WT_STATS log_slot_transitions;
 	WT_STATS log_sync;
+	WT_STATS log_sync_dir;
+	WT_STATS log_write_lsn;
 	WT_STATS log_writes;
 	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_merge_throttle;

@@ -117,10 +117,6 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	WT_TXN	txn;			/* Transaction state */
 	u_int	ncursors;		/* Count of active file cursors. */
 
-	WT_REF **excl;			/* Eviction exclusive list */
-	u_int	 excl_next;		/* Next empty slot */
-	size_t	 excl_allocated;	/* Bytes allocated */
-
 	void	*block_manager;		/* Block-manager support */
 	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
 

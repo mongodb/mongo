@@ -67,7 +67,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	/* Only start the server if wait time is non-zero */
 	*runp = (cval.val == 0) ? 0 : 1;
-	conn->stat_usecs = (long)cval.val * 1000000;
+	conn->stat_usecs = (uint64_t)cval.val * 1000000;
 
 	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.on_close", &cval));

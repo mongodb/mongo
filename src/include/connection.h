@@ -242,7 +242,7 @@ struct __wt_connection_impl {
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
-	long		 ckpt_usecs;	/* Checkpoint period */
+	uint64_t	 ckpt_usecs;	/* Checkpoint period */
 
 	int compact_in_memory_pass;	/* Compaction serialization */
 
@@ -304,7 +304,7 @@ struct __wt_connection_impl {
 	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
-	long		 stat_usecs;	/* Statistics log period */
+	uint64_t	 stat_usecs;	/* Statistics log period */
 
 #define	WT_CONN_LOG_ARCHIVE	0x01	/* Archive is enabled */
 #define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */
@@ -320,6 +320,10 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL *log_close_session;/* Log close thread session */
 	wt_thread_t	 log_close_tid;	/* Log close thread thread */
 	int		 log_close_tid_set;/* Log close thread set */
+	WT_CONDVAR	*log_wrlsn_cond;/* Log write lsn thread wait mutex */
+	WT_SESSION_IMPL *log_wrlsn_session;/* Log write lsn thread session */
+	wt_thread_t	 log_wrlsn_tid;	/* Log write lsn thread thread */
+	int		 log_wrlsn_tid_set;/* Log write lsn thread set */
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
 	wt_off_t	 log_file_max;	/* Log file max size */

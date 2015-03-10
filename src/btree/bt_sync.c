@@ -113,6 +113,13 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (walk == NULL)
 				break;
 
+			page = walk->page;
+			mod = page->modify;
+
+			/* Skip clean pages. */
+			if (!__wt_page_is_modified(page))
+				continue;
+
 			/*
 			 * Write dirty pages, unless we can be sure they only
 			 * became dirty after the checkpoint started.
@@ -125,23 +132,27 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 * (3) the first dirty update on the page is
 			 *     sufficiently recent that the checkpoint
 			 *     transaction would skip them.
+			 *
+			 * Mark the tree dirty: the checkpoint marked it clean
+			 * and we can't skip future checkpoints until this page
+			 * is written.
 			 */
-			page = walk->page;
-			mod = page->modify;
-			if (__wt_page_is_modified(page) &&
-			    (WT_PAGE_IS_INTERNAL(page) ||
-			    !F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
-			    TXNID_LE(mod->first_dirty_txn, txn->snap_max))) {
-				if (WT_PAGE_IS_INTERNAL(page)) {
-					internal_bytes +=
-					    page->memory_footprint;
-					++internal_pages;
-				} else {
-					leaf_bytes += page->memory_footprint;
-					++leaf_pages;
-				}
-				WT_ERR(__wt_reconcile(session, walk, NULL, 0));
+			if (!WT_PAGE_IS_INTERNAL(page) &&
+			    F_ISSET(txn, TXN_HAS_SNAPSHOT) &&
+			    TXNID_LT(txn->snap_max, mod->first_dirty_txn)) {
+				__wt_page_modify_set(session, page);
+				continue;
 			}
+
+			if (WT_PAGE_IS_INTERNAL(page)) {
+				internal_bytes +=
+				    page->memory_footprint;
+				++internal_pages;
+			} else {
+				leaf_bytes += page->memory_footprint;
+				++leaf_pages;
+			}
+			WT_ERR(__wt_reconcile(session, walk, NULL, 0));
 		}
 		break;
 	}
