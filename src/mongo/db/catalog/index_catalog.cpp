@@ -510,6 +510,9 @@ namespace {
         if (name.find('\0') != std::string::npos)
             return Status(ErrorCodes::CannotCreateIndex, "index names cannot contain NUL bytes");
 
+        if (name.empty())
+            return Status(ErrorCodes::CannotCreateIndex, "index names cannot be empty");
+
         const std::string indexNamespace = IndexDescriptor::makeIndexNamespace( nss.ns(), name );
         if ( indexNamespace.length() > NamespaceString::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
