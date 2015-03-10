@@ -43,11 +43,11 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 int
 __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 {
+	DWORD milliseconds;
 	WT_DECL_RET;
 	uint64_t milliseconds64;
-	int locked;
-	int lasterror;
-	DWORD milliseconds;
+	int lasterror, locked;
+
 	locked = 0;
 
 	/* Fast path if already signalled. */
