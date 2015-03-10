@@ -285,15 +285,15 @@ __curstat_search(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_SET);
 
-	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
-		WT_ERR(WT_NOTFOUND);
-
 	/* Initialize on demand. */
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
 		    session, cursor->internal_uri, cst->cfg, cst));
 		cst->notinitialized = 0;
 	}
+
+	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
+		WT_ERR(WT_NOTFOUND);
 
 	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
