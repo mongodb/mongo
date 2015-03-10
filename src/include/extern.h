@@ -460,7 +460,7 @@ extern int __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t siz
 extern int __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size);
 extern int __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len, void **mappingcookie);
 extern int __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, int is_signalled, WT_CONDVAR **condp);
-extern int __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs);
+extern int __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs);
 extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp, const char *name);
@@ -481,7 +481,7 @@ extern int __wt_remove(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to);
 extern int __wt_read( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf);
 extern int __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, const void *buf);
-extern void __wt_sleep(long seconds, long micro_seconds);
+extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, void *(*func)(void *), void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid);
