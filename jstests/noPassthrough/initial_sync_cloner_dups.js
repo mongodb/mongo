@@ -47,13 +47,11 @@ replTest.awaitReplication();
 
 jsTestLog("Start remove/insert on primary");
 var insertAndRemove = function(host) {
+    jsTestLog("starting bg writes on " + host);
     var m = new Mongo(host);
     var db = m.getDB('test');
     var coll = db.cloner;
     var numDocs = coll.count();
-
-    jsTestLog("starting bg writes on " + host);
-
     for (var i=0; !db.stop.findOne(); i++) {
             var id = Random.randInt(numDocs);
             coll.remove({_id: id});
@@ -76,12 +74,15 @@ replTest.reInitiate();
 secondary.setSlaveOk();
 
 // NOTE: This is here to prevent false negatives, but it is racy and dependent on magic numbers.
-// If this fails, consider retying or removing.
+// Removed the assertion because it was too flaky.  Printing a warning instead (dan)
 jsTestLog("making sure we dropped some dups");
 var res = secondary.adminCommand({getLog:"global"});
-assert(contains(res.log, function(v) {
+var droppedDups = (contains(res.log, function(v) {
     return v.indexOf("index build dropped"/* NNN dups*/) != -1;
 }));
+if (!droppedDups) {
+    jsTestLog("Warning: Test did not trigger duplicate documents, this run will be a false negative");
+}
 
 jsTestLog("stoping writes and waiting for replica set to coalesce")
 primary.getDB('test').stop.insert({});
