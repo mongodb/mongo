@@ -259,8 +259,8 @@ static CONFIG c[] = {
 	  C_BOOL, 5, 0, 0, &g.c_statistics_server, NULL },
 
 	{ "threads",
-	  "the number of threads",
-	  C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
+	  "the number of worker threads",
+	  0x0, 1, 32, 128, &g.c_threads, NULL },
 
 	{ "timer",
 	  "maximum time to run in minutes (default 20 minutes)",

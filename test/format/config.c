@@ -107,11 +107,6 @@ config_setup(void)
 		strcat(g.uri, "dev1/");
 	strcat(g.uri, WT_NAME);
 
-	/* Default single-threaded 10% of the time. */
-	cp = config_find("threads", strlen("threads"));
-	if (!(cp->flags & C_PERM))
-		*cp->v = MMRAND(1, 100) < 10 ? 1: CONF_RAND(cp);
-
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp) {
 		if (cp->flags & (C_IGNORE | C_PERM | C_TEMP))
@@ -127,6 +122,14 @@ config_setup(void)
 		else
 			*cp->v = CONF_RAND(cp);
 	}
+
+	/*
+	 * If worker threads not configured, default to single-threaded 5%
+	 * of the time.
+	 */
+	cp = config_find("threads", strlen("threads"));
+	if (!(cp->flags & C_PERM) && MMRAND(1, 100) <= 5)
+		*cp->v = 1;
 
 	/* Required shared libraries. */
 	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
