@@ -20,6 +20,11 @@ var rs3 = new ReplSetTest({ 'name': 'config', nodes: 3, startPort: 31206 });
 rs3.startSet();
 rs3.initiate();
 
+// replica set with set name = 'admin'
+var rs4 = new ReplSetTest({ 'name': 'admin', nodes: 3, startPort: 31209 });
+rs4.startSet();
+rs4.initiate();
+
 // step 1. name given
 assert(s.admin.runCommand({"addshard" : getHostName()+":30001", "name" : "bar"}).ok, "failed to add shard in step 1");
 var shard = s.getDB("config").shards.findOne({"_id" : {"$nin" : ["shard0000"]}});
@@ -66,7 +71,17 @@ assert(s.admin.runCommand({ 'addshard': configReplURI, name: 'not_config' }).ok,
 shard = s.getDB('config').shards.findOne({ '_id': 'not_config' });
 assert(shard, 'shard with name "not_config" not found');
 
+//
+// SERVER-17232 Try inserting into shard with name 'admin'
+//
+assert(s.admin.runCommand({ 'addshard': 'admin/' + getHostName() + ':31209' }).ok,
+       'adding replica set with name "admin" should work');
+var wRes = s.getDB('test').foo.insert({ x: 1 });
+assert(!wRes.hasWriteError() && wRes.nInserted === 1,
+       'failed to insert document into "test.foo" unsharded collection');
+
 s.stop();
 rs1.stopSet();
 rs2.stopSet();
 rs3.stopSet();
+rs4.stopSet();
