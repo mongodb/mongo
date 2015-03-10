@@ -1717,8 +1717,8 @@ modules:
   prefix: src/mongo/db/modules
   branch: master
 
-- name: bdb
-  repo: git@github.com:10gen/bdb-module.git
+- name: rocksdb
+  repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
   branch: master
 
@@ -3511,6 +3511,54 @@ buildvariants:
   - name: push
     distros:
     - rhel55-test
+
+##############################################
+# mongo-partner storage engine buildvariants #
+##############################################
+
+- name: ubuntu1404-rocksdb
+  display_name: Ubuntu 14.04 64-bit (RocksDB)
+  modules:
+  - rocksdb
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    build_rocksdb: true
+    compile_flags: --c++11 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --cpppath=$(readlink -f ../rocksdb/include/) --libpath=$(readlink -f ../rocksdb/) --extralib=rocksdb --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir=release
+    test_flags: --continue-on-failure --storageEngine=RocksDB
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1404-build
+  # - name: lint
+  - name: aggregation
+  - name: aggregation_auth
+  - name: auth
+  - name: dbtest
+  # - name: disk
+  # - name: durability
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_write_cmd
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_small_oplog
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: parallel
+  - name: parallel_compatibility
+  - name: concurrency
+  - name: concurrency_compatibility
+  - name: replicasets
+  - name: replicasets_auth
+  - name: replication
+  - name: replication_auth
+  - name: sharding
+  - name: sharding_auth
+  - name: slow1
+  - name: slow2
 
 ###########################################
 #     Experimental buildvariants          #

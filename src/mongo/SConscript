@@ -42,7 +42,6 @@ env.SConscript(['base/SConscript',
                 'db/storage/in_memory/SConscript',
                 'db/storage/kv/SConscript',
                 'db/storage/mmap_v1/SConscript',
-                'db/storage/rocks/SConscript',
                 'db/storage/wiredtiger/SConscript',
                 'db/SConscript',
                 'installer/msi/SConscript',
@@ -1027,9 +1026,6 @@ serveronlyLibdeps = ["coreshard",
                      'mmap',
                      'elapsed_tracker',
                      '$BUILD_DIR/third_party/shim_snappy']
-
-if has_option("rocksdb" ):
-    serveronlyLibdeps.append( 'db/storage/rocks/storage_rocks' )
 
 if wiredtiger:
     serveronlyLibdeps.append( 'db/storage/wiredtiger/storage_wiredtiger' )
