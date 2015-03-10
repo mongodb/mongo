@@ -536,11 +536,16 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_strdup(session, cfg[i], &cst->cfg[i]));
 
 	/*
-	 * The cursor isn't yet initialized or positioned, initialize it now.
+	 * Do the initial statistics snapshot: there won't be cursor operations
+	 * to trigger initialization when aggregating statistics for upper-level
+	 * objects like tables, we need to a valid set of statistics when before
+	 * the open returns.
 	 */
-	cst->notinitialized = cst->notpositioned = 1;
 	WT_ERR(__wt_curstat_init(session, uri, cst->cfg, cst));
 	cst->notinitialized = 0;
+
+	/* The cursor isn't yet positioned. */
+	cst->notpositioned = 1;
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
