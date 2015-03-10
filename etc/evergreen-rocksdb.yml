@@ -221,7 +221,6 @@ tasks:
           set -o verbose
           rm -rf ${install_directory|/data/mongo-install-directory}
           ${scons|scons} ${compile_flags|} --use-new-tools all dist ${msi_target|}
-          ${grep|grep} -E 'versionString.. = ' src/mongo/util/version.cpp | ${grep|grep} -oE '"(.+)"' | sed 's/"//g' > version.txt
           ${python|python} -c "ver = open('version.txt','r').read().strip(); print 'suffix: latest' if ver[-1] == '-' else 'suffix: ' + ver; print 'version: ' + ver"  > compile_expansions.yml
           if [ "${has_debugsymbols|}" = "true" ]; then ${scons|scons} ${compile_flags|} --nostrip --use-new-tools dist; original_filename=$(ls | grep debugsymbols); mv $original_filename $(echo $original_filename | sed 's/debugsymbols-//' | sed 's/mongodb/debugsymbols-mongodb/'); fi
           ${python|python} buildscripts/smoke.py --with-cleanbb --mode files --from-file build/unittests.txt --dont-start-mongod  --report-file report.json --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} core
