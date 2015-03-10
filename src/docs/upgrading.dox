@@ -1,5 +1,19 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_252 Upgrading to Version 2.5.2
+
+<dl>
+<dt>Statistics cursor refresh</dt>
+<dd>
+In previous releases of WiredTiger, a statistics cursor made a snapshot
+of the relevant statistics before the first statistics value was read,
+and those values remained unchanged from that point on, no matter how
+the cursor was used. In the WiredTiger 2.5.2 release, calling the
+WT_CURSOR::reset method to reset the cursor refreshes the statistics
+returned by the cursor.
+</dd>
+</dl>
+
 @section version_251 Upgrading to Version 2.5.1
 
 <dl>
