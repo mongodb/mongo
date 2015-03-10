@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/query/runner.h"
+#include "mongo/s/d_logic.h"
 
 namespace mongo {
 
@@ -123,6 +124,12 @@ namespace mongo {
 
         // Number of objects scanned: should be either 0 or 1.
         int _nscannedObjects;
+
+        // Used to drop documents that don't belong to this shard. Must be initialized at the time
+        // of construction of the IDHackRunner. Since it is possible for IDHackRunner::getNext() to
+        // be called inside a getMore (e.g. aggregation will do this), we need to establish
+        // metadata information up front, not at the time that the IDHackRunner is actually used.
+        const CollectionMetadataPtr _metadata;
     };
 
 }  // namespace mongo

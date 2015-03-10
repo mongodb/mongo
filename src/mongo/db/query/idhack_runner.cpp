@@ -41,9 +41,21 @@
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/s/d_logic.h"
 
 namespace mongo {
+
+namespace {
+
+    CollectionMetadataPtr getMetadata(const std::string& ns) {
+        if (shardingState.needCollectionMetadata(ns)) {
+            return shardingState.getCollectionMetadata(ns);
+        }
+        else {
+            return CollectionMetadataPtr();
+        }
+    }
+
+} // namespace
 
     IDHackRunner::IDHackRunner(const Collection* collection, CanonicalQuery* query)
         : _collection(collection),
@@ -52,7 +64,9 @@ namespace mongo {
           _killed(false),
           _done(false),
           _nscanned(0),
-          _nscannedObjects(0) { }
+          _nscannedObjects(0),
+          _metadata(getMetadata(collection->ns())) {
+    }
 
     IDHackRunner::IDHackRunner(Collection* collection, const BSONObj& key)
         : _collection(collection),
@@ -61,7 +75,9 @@ namespace mongo {
           _killed(false),
           _done(false),
           _nscanned(0),
-          _nscannedObjects(0) { }
+          _nscannedObjects(0),
+          _metadata(getMetadata(collection->ns())) {
+    }
 
     IDHackRunner::~IDHackRunner() { }
 
@@ -99,25 +115,9 @@ namespace mongo {
             // No object requested - nothing to do.
         }
         else {
-            // If we're sharded, get the config metadata for this collection.  This will be used
-            // later to see if we own the document to be returned.
-            //
-            // Query execution machinery should generally delegate to ShardFilterStage in order to
-            // accomplish this task.  It is only safe to rely on the state of the config metadata
-            // here because it is not possible for the config metadata to change during the lifetime
-            // of the IDHackRunner (since the IDHackRunner returns only a single document, the
-            // config metadata must be the same as it was when the query started).  The one
-            // exception to this is if the query yields when fetching the document, but that case is
-            // currently handled by newRunQuery() (which contains logic to detect this and to throw
-            // SendStaleConfigException if it occurs).
-            CollectionMetadataPtr collectionMetadata;
-            if (shardingState.needCollectionMetadata(_collection->ns().ns())) {
-                collectionMetadata = shardingState.getCollectionMetadata(_collection->ns().ns());
-            }
-
             // If we're not sharded, consider a covered projection (we can't if we're sharded, since
             // we require a fetch in order to apply the sharding filter).
-            if (!collectionMetadata && hasCoveredProjection()) {
+            if (!_metadata && hasCoveredProjection()) {
                 // Covered query on _id field only.  Set object to search key.  Search key is
                 // retrieved from the canonical query at construction and always contains the _id
                 // field name.  It is possible to construct the ID hack runner with just the
@@ -153,9 +153,9 @@ namespace mongo {
                 *objOut = loc.obj();
 
                 // If we're sharded, make sure the key belongs to us.
-                if (collectionMetadata) {
-                    KeyPattern kp(collectionMetadata->getKeyPattern());
-                    if (!collectionMetadata->keyBelongsToMe(kp.extractSingleKey(*objOut))) {
+                if (_metadata) {
+                    KeyPattern kp(_metadata->getKeyPattern());
+                    if (!_metadata->keyBelongsToMe(kp.extractSingleKey(*objOut))) {
                         // We have something with a matching _id but it doesn't belong to me.
                         _done = true;
                         return Runner::RUNNER_EOF;
