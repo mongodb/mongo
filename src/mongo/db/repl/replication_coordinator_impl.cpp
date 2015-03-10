@@ -1148,7 +1148,8 @@ namespace {
         if (now >= waitUntil) {
             *result = Status(ErrorCodes::ExceededTimeLimit, str::stream() <<
                              "No electable secondaries caught up as of " <<
-                             dateToISOStringLocal(now));
+                             dateToISOStringLocal(now) <<
+                             ". Please use {force: true} to force node to step down.");
             return;
         }
 
