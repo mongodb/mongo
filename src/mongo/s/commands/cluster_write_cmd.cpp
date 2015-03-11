@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
  
-#include "mongo/base/init.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
@@ -50,6 +49,8 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
+namespace {
+
     /**
      * Base class for mongos write commands.  Cluster write commands support batch writes and write
      * concern, and return per-item error information.  All cluster write commands use the entry
@@ -58,31 +59,32 @@ namespace mongo {
      * Batch execution (targeting and dispatching) is performed by the BatchWriteExec class.
      */
     class ClusterWriteCmd : public Command {
-    MONGO_DISALLOW_COPYING(ClusterWriteCmd);
     public:
-
         virtual ~ClusterWriteCmd() {
+
         }
 
-        bool slaveOk() const {
+        virtual bool slaveOk() const {
             return false;
         }
 
-        bool isWriteCommandForConfigServer() const { return false; }
+        virtual bool isWriteCommandForConfigServer() const {
+            return false;
+        }
 
-        Status checkAuthForCommand( ClientBasic* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj ) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
 
-            Status status = auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
-                                                            _writeType,
-                                                            NamespaceString( parseNs( dbname,
-                                                                                      cmdObj ) ),
-                                                            cmdObj );
+            Status status = auth::checkAuthForWriteCommand(client->getAuthorizationSession(),
+                                                           _writeType,
+                                                           NamespaceString(parseNs(dbname,
+                                                                                   cmdObj)),
+                                                           cmdObj);
 
             // TODO: Remove this when we standardize GLE reporting from commands
-            if ( !status.isOK() ) {
-                setLastError( status.code(), status.reason().c_str() );
+            if (!status.isOK()) {
+                setLastError(status.code(), status.reason().c_str());
             }
 
             return status;
@@ -92,215 +94,189 @@ namespace mongo {
                                const std::string& dbname,
                                const BSONObj& cmdObj,
                                ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const;
+                               BSONObjBuilder* out) const {
 
-        // Cluster write command entry point.
-        bool run(OperationContext* txn, const string& dbname,
-                  BSONObj& cmdObj,
-                  int options,
-                  string& errmsg,
-                  BSONObjBuilder& result,
-                  bool fromRepl );
+            BatchedCommandRequest request(_writeType);
+
+            string errMsg;
+            if (!request.parseBSON(cmdObj, &errMsg) || !request.isValid(&errMsg)) {
+                return Status(ErrorCodes::FailedToParse, errMsg);
+            }
+
+            // Fixup the namespace to be a full ns internally
+            const NamespaceString nss(dbname, request.getNS());
+            request.setNS(nss.ns());
+
+            // We can only explain write batches of size 1.
+            if (request.sizeWriteOps() != 1U) {
+                return Status(ErrorCodes::InvalidLength,
+                              "explained write batches must be of size 1");
+            }
+
+            BSONObjBuilder explainCmdBob;
+            ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+
+            // We will time how long it takes to run the commands on the shards.
+            Timer timer;
+
+            // Target the command to the shards based on the singleton batch item.
+            BatchItemRef targetingBatchItem(&request, 0);
+            vector<Strategy::CommandResult> shardResults;
+            Status status = STRATEGY->commandOpWrite(dbname,
+                                                     explainCmdBob.obj(),
+                                                     targetingBatchItem,
+                                                     &shardResults);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return ClusterExplain::buildExplainResult(shardResults,
+                                                      ClusterExplain::kWriteOnShards,
+                                                      timer.millis(),
+                                                      out);
+        }
+
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            BatchedCommandRequest request(_writeType);
+            BatchedCommandResponse response;
+
+            ClusterWriter writer(true, 0);
+
+            // NOTE: Sometimes this command is invoked with LE disabled for legacy writes
+            LastError* cmdLastError = lastError.get(false);
+
+            {
+                // Disable the last error object for the duration of the write
+                LastError::Disabled disableLastError(cmdLastError);
+
+                // TODO: if we do namespace parsing, push this to the type
+                if (!request.parseBSON(cmdObj, &errmsg) || !request.isValid(&errmsg)) {
+                    // Batch parse failure
+                    response.setOk(false);
+                    response.setErrCode(ErrorCodes::FailedToParse);
+                    response.setErrMessage(errmsg);
+                }
+                else {
+                    // Fixup the namespace to be a full ns internally
+                    const NamespaceString nss(dbname, request.getNS());
+                    request.setNSS(nss);
+
+                    writer.write(request, &response);
+                }
+
+                dassert(response.isValid(NULL));
+            }
+
+            if (cmdLastError) {
+                // Populate the lastError object based on the write response
+                cmdLastError->reset();
+                batchErrorToLastError(request, response, cmdLastError);
+            }
+
+            size_t numAttempts;
+
+            if (!response.getOk()) {
+                numAttempts = 0;
+            }
+            else if (request.getOrdered() && response.isErrDetailsSet()) {
+                // Add one failed attempt
+                numAttempts = response.getErrDetailsAt(0)->getIndex() + 1;
+            }
+            else {
+                numAttempts = request.sizeWriteOps();
+            }
+
+            // TODO: increase opcounters by more than one
+            if (_writeType == BatchedCommandRequest::BatchType_Insert) {
+                for (size_t i = 0; i < numAttempts; ++i) {
+                    globalOpCounters.gotInsert();
+                }
+            }
+            else if (_writeType == BatchedCommandRequest::BatchType_Update) {
+                for (size_t i = 0; i < numAttempts; ++i) {
+                    globalOpCounters.gotUpdate();
+                }
+            }
+            else if (_writeType == BatchedCommandRequest::BatchType_Delete) {
+                for (size_t i = 0; i < numAttempts; ++i) {
+                    globalOpCounters.gotDelete();
+                }
+            }
+
+            // Save the last opTimes written on each shard for this client, to allow GLE to work
+            if (ClientInfo::exists() && writer.getStats().hasShardStats()) {
+                ClientInfo* clientInfo = ClientInfo::get(NULL);
+                clientInfo->addHostOpTimes(writer.getStats().getShardStats().getWriteOpTimes());
+            }
+
+            // TODO
+            // There's a pending issue about how to report response here. If we use
+            // the command infra-structure, we should reuse the 'errmsg' field. But
+            // we have already filed that message inside the BatchCommandResponse.
+            // return response.getOk();
+            result.appendElements(response.toBSON());
+            return true;
+        }
 
     protected:
-
         /**
          * Instantiates a command that can be invoked by "name", which will be capable of issuing
          * write batches of type "writeType", and will require privilege "action" to run.
          */
-        ClusterWriteCmd( StringData name, BatchedCommandRequest::BatchType writeType ) :
-            Command( name ), _writeType( writeType ) {
+        ClusterWriteCmd(StringData name, BatchedCommandRequest::BatchType writeType)
+            : Command(name),
+              _writeType(writeType) {
+
         }
 
     private:
-
-        // Type of batch (e.g. insert).
-        BatchedCommandRequest::BatchType _writeType;
+        // Type of batch (e.g. insert, update).
+        const BatchedCommandRequest::BatchType _writeType;
     };
+
 
     class ClusterCmdInsert : public ClusterWriteCmd {
-    MONGO_DISALLOW_COPYING(ClusterCmdInsert);
     public:
-        ClusterCmdInsert() :
-            ClusterWriteCmd( "insert", BatchedCommandRequest::BatchType_Insert ) {
+        ClusterCmdInsert() : ClusterWriteCmd("insert", BatchedCommandRequest::BatchType_Insert) {
+
         }
 
-        void help( stringstream& help ) const {
+        void help(stringstream& help) const {
             help << "insert documents";
         }
-    };
+
+    } clusterInsertCmd;
 
     class ClusterCmdUpdate : public ClusterWriteCmd {
-    MONGO_DISALLOW_COPYING(ClusterCmdUpdate);
     public:
-        ClusterCmdUpdate() :
-            ClusterWriteCmd( "update", BatchedCommandRequest::BatchType_Update ) {
+        ClusterCmdUpdate() : ClusterWriteCmd("update", BatchedCommandRequest::BatchType_Update) {
+
         }
 
         void help( stringstream& help ) const {
             help << "update documents";
         }
-    };
+
+    } clusterUpdateCmd;
 
     class ClusterCmdDelete : public ClusterWriteCmd {
-    MONGO_DISALLOW_COPYING(ClusterCmdDelete);
     public:
-        ClusterCmdDelete() :
-            ClusterWriteCmd( "delete", BatchedCommandRequest::BatchType_Delete ) {
+        ClusterCmdDelete() : ClusterWriteCmd("delete", BatchedCommandRequest::BatchType_Delete) {
+
         }
 
-        void help( stringstream& help ) const {
+        void help(stringstream& help) const {
             help << "delete documents";
         }
-    };
 
-    //
-    // Cluster write command implementation(s) below
-    //
+    } clusterDeleteCmd;
 
-    bool ClusterWriteCmd::run(OperationContext* txn, const string& dbName,
-                               BSONObj& cmdObj,
-                               int options,
-                               string& errMsg,
-                               BSONObjBuilder& result,
-                               bool ) {
-
-        BatchedCommandRequest request( _writeType );
-        BatchedCommandResponse response;
-        ClusterWriter writer( true /* autosplit */, 0 /* timeout */ );
-
-        // NOTE: Sometimes this command is invoked with LE disabled for legacy writes
-        LastError* cmdLastError = lastError.get( false );
-
-        {
-            // Disable the last error object for the duration of the write
-            LastError::Disabled disableLastError( cmdLastError );
-
-            // TODO: if we do namespace parsing, push this to the type
-            if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
-
-                // Batch parse failure
-                response.setOk( false );
-                response.setErrCode( ErrorCodes::FailedToParse );
-                response.setErrMessage( errMsg );
-            }
-            else {
-
-                // Fixup the namespace to be a full ns internally
-                NamespaceString nss( dbName, request.getNS() );
-                request.setNSS( nss );
-
-                writer.write( request, &response );
-            }
-
-            dassert( response.isValid( NULL ) );
-        }
-
-        if ( cmdLastError ) {
-            // Populate the lastError object based on the write response
-            cmdLastError->reset();
-            batchErrorToLastError( request, response, cmdLastError );
-        }
-
-        size_t numAttempts;
-        if ( !response.getOk() ) {
-            numAttempts = 0;
-        } else if ( request.getOrdered() && response.isErrDetailsSet() ) {
-            numAttempts = response.getErrDetailsAt(0)->getIndex() + 1; // Add one failed attempt
-        } else {
-            numAttempts = request.sizeWriteOps();
-        }
-
-        // TODO: increase opcounters by more than one
-        if ( _writeType == BatchedCommandRequest::BatchType_Insert ) {
-            for( size_t i = 0; i < numAttempts; ++i ) {
-                globalOpCounters.gotInsert();
-            }
-        } else if ( _writeType == BatchedCommandRequest::BatchType_Update ) {
-            for( size_t i = 0; i < numAttempts; ++i ) {
-                globalOpCounters.gotUpdate();
-            }
-        } else if ( _writeType == BatchedCommandRequest::BatchType_Delete ) {
-            for( size_t i = 0; i < numAttempts; ++i ) {
-                globalOpCounters.gotDelete();
-            }
-        }
-
-        // Save the last opTimes written on each shard for this client, to allow GLE to work
-        if ( ClientInfo::exists() && writer.getStats().hasShardStats() ) {
-            ClientInfo* clientInfo = ClientInfo::get( NULL );
-            clientInfo->addHostOpTimes( writer.getStats().getShardStats().getWriteOpTimes() );
-        }
-
-        // TODO
-        // There's a pending issue about how to report response here. If we use
-        // the command infra-structure, we should reuse the 'errmsg' field. But
-        // we have already filed that message inside the BatchCommandResponse.
-        // return response.getOk();
-        result.appendElements( response.toBSON() );
-        return true;
-    }
-
-    Status ClusterWriteCmd::explain(OperationContext* txn,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj,
-                                    ExplainCommon::Verbosity verbosity,
-                                    BSONObjBuilder* out) const {
-
-        BatchedCommandRequest request(_writeType);
-
-        string errMsg;
-        if (!request.parseBSON(cmdObj, &errMsg) || !request.isValid(&errMsg)) {
-            return Status(ErrorCodes::FailedToParse, errMsg);
-        }
-
-        // Fixup the namespace to be a full ns internally
-        NamespaceString nss(dbname, request.getNS());
-        request.setNS(nss.ns());
-
-        // We can only explain write batches of size 1.
-        if (request.sizeWriteOps() != 1U) {
-            return Status(ErrorCodes::InvalidLength, "explained write batches must be of size 1");
-        }
-
-        BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
-
-        // We will time how long it takes to run the commands on the shards.
-        Timer timer;
-
-        // Target the command to the shards based on the singleton batch item.
-        BatchItemRef targetingBatchItem(&request, 0);
-        vector<Strategy::CommandResult> shardResults;
-        Status status = STRATEGY->commandOpWrite(dbname,
-                                                 explainCmdBob.obj(),
-                                                 targetingBatchItem,
-                                                 &shardResults);
-        if (!status.isOK())
-            return status;
-
-        long long millisElapsed = timer.millis();
-
-        return ClusterExplain::buildExplainResult(shardResults,
-                                                  ClusterExplain::kWriteOnShards,
-                                                  millisElapsed,
-                                                  out);
-    }
-
-    //
-    // Register write commands at startup
-    //
-
-    namespace {
-
-        MONGO_INITIALIZER(RegisterWriteCommands)(InitializerContext* context) {
-            // Leaked intentionally: a Command registers itself when constructed.
-            new ClusterCmdInsert();
-            new ClusterCmdUpdate();
-            new ClusterCmdDelete();
-            return Status::OK();
-        }
-
-    } // namespace
-
+} // namespace
 } // namespace mongo

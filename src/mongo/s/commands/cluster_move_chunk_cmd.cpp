@@ -176,7 +176,7 @@ namespace {
 
                 // Bounds
                 if (!info->getShardKeyPattern().isShardKey(bounds[0].Obj())
-                    || !info->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
+                        || !info->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
                     errmsg = str::stream() << "shard key bounds " << "[" << bounds[0].Obj() << ","
                                            << bounds[1].Obj() << ")"
                                            << " are not valid for shard key pattern "
@@ -251,7 +251,7 @@ namespace {
             return true;
         }
 
-    } moveChunkCmd;
+    } moveChunk;
 
 } // namespace
 } // namespace mongo
