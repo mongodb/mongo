@@ -195,7 +195,6 @@ add_option( "variant-dir", "override variant subdirectory", 1, False )
 
 # linking options
 add_option( "release" , "release build" , 0 , True )
-add_option( "static" , "fully static build" , 0 , False )
 add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
 add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
 add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
@@ -208,22 +207,10 @@ add_option( "cxx", "compiler to use" , 1 , True )
 add_option( "cc", "compiler to use for c" , 1 , True )
 add_option( "cc-use-shell-environment", "use $CC from shell for C compiler" , 0 , False )
 add_option( "cxx-use-shell-environment", "use $CXX from shell for C++ compiler" , 0 , False )
-add_option( "ld", "linker to use" , 1 , True )
-add_option( "c++11", "enable c++11 support", "?", True,
-            type="choice", choices=["on", "off", "auto"], const="on", default="on" )
 add_option( "disable-minimum-compiler-version-enforcement",
             "allow use of unsupported older compilers (NEVER for production builds)",
             0, False )
 
-add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , False )
-add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , False )
-
-add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" , 1 , False )
-add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , False )
-add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , False )
-
-# experimental features
-add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
 add_option( "ssl-fips-capability", "Enable the ability to activate FIPS 140-2 mode", 0, True );
 add_option( "wiredtiger", "Enable wiredtiger", "?", True, "wiredtiger",
@@ -243,13 +230,6 @@ add_option( "use-glibcxx-debug",
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
-add_option( "win2008plus",
-            "use newer operating system API features (deprecated, use win-version-min instead)" ,
-            0 , False )
-
-# dev options
-add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
-add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , True , "debugBuildAndLogging" )
 
 # new style debug and optimize flags
 add_option( "dbg", "Enable runtime debugging checks", "?", True, "dbg",
@@ -263,8 +243,6 @@ add_option( "llvm-symbolizer", "name of (or path to) the LLVM symbolizer", 1, Fa
 
 add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
 add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
-
-add_option( "distcc" , "use distcc for distributing builds" , 0 , False )
 
 # debugging/profiling help
 if os.sys.platform.startswith("linux"):
@@ -483,10 +461,6 @@ if GetOption('help'):
 
 # --- environment setup ---
 
-if get_option("c++11") != "on":
-    print("MongoDB requires C++11 to build")
-    Exit(1)
-
 # If the user isn't using the # to indicate top-of-tree or $ to expand a variable, forbid
 # relative paths. Relative paths don't really work as expected, because they end up relative to
 # the top level SConstruct, not the invokers CWD. We could in theory fix this with
@@ -525,10 +499,6 @@ onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) =
 
 releaseBuild = has_option("release")
 
-if has_option("debugBuild") or has_option("debugBuildAndLogging"):
-    print("Error: the --d and --dd flags are no longer permitted; use --dbg and --opt instead")
-    Exit(1)
-
 dbg_opt_mapping = {
     # --dbg, --opt   :   dbg    opt
     ( None,  None  ) : ( False, True ),
@@ -546,8 +516,6 @@ debugBuild, optBuild = dbg_opt_mapping[(get_option('dbg'), get_option('opt'))]
 if releaseBuild and (debugBuild or not optBuild):
     print("Error: A --release build may not have debugging, and must have optimization")
     Exit(1)
-
-static = has_option( "static" )
 
 noshell = has_option( "noshell" ) 
 
@@ -583,7 +551,6 @@ def getMongoCodeVersion():
 envDict = dict(BUILD_ROOT=buildDir,
                BUILD_DIR=get_variant_dir(),
                DIST_ARCHIVE_SUFFIX='.tgz',
-               EXTRAPATH=get_option("extrapath"),
                MODULE_BANNERS=[],
                ARCHIVE_ADDITION_DIR_MAP={},
                ARCHIVE_ADDITIONS=[],
@@ -614,26 +581,6 @@ if unknown_vars:
     print "Unknown variables specified: {0}".format(", ".join(unknown_vars.keys()))
     Exit(1)
 
-
-# Add any scons options that conflict with scons variables here.
-# The first item in each tuple is the option name and the second
-# is the variable name
-variable_conflicts = [
-    ('libpath', 'LIBPATH'),
-    ('cpppath', 'CPPPATH'),
-    ('extrapath', 'CPPPATH'),
-    ('extrapathdyn', 'CPPPATH'),
-    ('extrapath', 'LIBPATH'),
-    ('extrapathdyn', 'LIBPATH'),
-    ('extralib', 'LIBS')
-]
-
-for (opt_name, var_name) in variable_conflicts:
-    if has_option(opt_name) and var_name in env:
-        print("Both option \"--{0}\" and variable {1} were specified".
-            format(opt_name, var_name))
-        Exit(1)
-
 if has_option( "cc-use-shell-environment" ) and has_option( "cc" ):
     print("Cannot specify both --cc-use-shell-environment and --cc")
     Exit(1)
@@ -656,9 +603,6 @@ if has_option( "cc" ):
         print "Must specify C++ compiler when specifying C compiler"
         Exit(1)
     env["CC"] = get_option( "cc" )
-
-if has_option( "ld" ):
-    env["LINK"] = get_option( "ld" )
 
 detectEnv = env.Clone()
 # Identify the toolchain in use. We currently support the following:
@@ -868,12 +812,6 @@ elif env['PYSYSPLATFORM'].startswith('sunos'):
     env['LINK_LIBGROUP_START'] = '-z rescan'
     env['LINK_LIBGROUP_END'] = ''
 
-if has_option( "libpath" ):
-    env["LIBPATH"] = [get_option( "libpath" )]
-
-if has_option( "cpppath" ):
-    env["CPPPATH"] = [get_option( "cpppath" )]
-
 env.Prepend( CPPDEFINES=[ "MONGO_EXPOSE_MACROS" ,
                           "PCRE_STATIC",  # for pcre on Windows
                           "SUPPORT_UTF8" ],  # for pcre
@@ -888,30 +826,6 @@ if has_option( "durableDefaultOn" ):
 if has_option( "durableDefaultOff" ):
     env.Append( CPPDEFINES=[ "_DURABLEDEFAULTOFF" ] )
 
-extraLibPlaces = []
-
-env['EXTRACPPPATH'] = []
-env['EXTRALIBPATH'] = []
-env['EXTRABINPATH'] = []
-
-def addExtraLibs( s ):
-    for x in s.split(","):
-        env.Append( EXTRABINPATH=[ x + "/bin" ] )
-        env.Append( EXTRACPPPATH=[ x + "/include" ] )
-        env.Append( EXTRALIBPATH=[ x + "/lib" ] )
-        env.Append( EXTRALIBPATH=[ x + "/lib64" ] )
-        extraLibPlaces.append( x + "/lib" )
-
-if has_option( "extrapath" ):
-    addExtraLibs( GetOption( "extrapath" ) )
-
-if has_option( "extrapathdyn" ):
-    addExtraLibs( GetOption( "extrapathdyn" ) )
-
-if has_option( "extralib" ):
-    for x in GetOption( "extralib" ).split( "," ):
-        env.Append( LIBS=[ x ] )
-
 # ---- other build setup -----
 dontReplacePackage = False
 isBuildingLatest = False
@@ -923,31 +837,21 @@ if darwin:
     pass
 elif linux:
     env.Append( LIBS=['m'] )
-    if static:
-        env.Append( LINKFLAGS=" -static " )
 
 elif solaris:
      env.Append( LIBS=["socket","resolv","lgrp"] )
 
 elif freebsd:
     env.Append( LIBS=[ "kvm" ] )
-    env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
-    env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CCFLAGS=[ "-fno-omit-frame-pointer" ] )
 
 elif openbsd:
-    env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
-    env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( LIBS=[ "kvm" ] )
 
 elif windows:
     dynamicCRT = has_option("dynamic-windows")
 
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
-
-    if has_option('win-version-min') and has_option('win2008plus'):
-        print("Can't specify both 'win-version-min' and 'win2008plus'")
-        Exit(1)
 
     # If tools configuration fails to set up 'cl' in the path, fall back to importing the whole
     # shell environment and hope for the best. This will work, for instance, if you have loaded
@@ -1071,17 +975,11 @@ elif windows:
     if usev8:
         env.Append(LIBS=['winmm.lib'])
 
-    env.Append( EXTRACPPPATH=["#/../winpcap/Include"] )
-    env.Append( EXTRALIBPATH=["#/../winpcap/Lib"] )
-
 env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 if nix:
 
     if has_option( "static-libstdc++" ):
         env.Append( LINKFLAGS=["-static-libstdc++", "-static-libgcc"] )
-
-    if has_option( "distcc" ):
-        env["CXX"] = "distcc " + env["CXX"]
 
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fPIC",
@@ -1216,9 +1114,6 @@ if not use_system_version_of_library("boost"):
     boostSuffix = "-%s.0" % get_option( "internal-boost")
     env.Prepend(CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
-env.Append( CPPPATH=['$EXTRACPPPATH'],
-            LIBPATH=['$EXTRALIBPATH'] )
-
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules')
 env['MONGO_MODULES'] = [m.name for m in mongo_modules]
@@ -1328,8 +1223,6 @@ def doConfigure(myenv):
         win_version_min = None
         if has_option('win-version-min'):
             win_version_min = get_option('win-version-min')
-        elif has_option('win2008plus'):
-            win_version_min = 'win7'
         # If no minimum version has beeen specified, use our defaults for 32-bit/64-bit windows.
         elif env['TARGET_ARCH'] == 'x86_64':
             win_version_min = 'ws03sp2'
@@ -2062,8 +1955,6 @@ def getSystemInstallName():
     dist_arch = GetOption("distarch")
     arch_name = env['TARGET_ARCH'] if not dist_arch else dist_arch
     n = platform + "-" + arch_name
-    if static:
-        n += "-static"
     if has_option("nostrip"):
         n += "-debugsymbols"
     if nix and os.uname()[2].startswith("8."):
