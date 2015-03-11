@@ -920,7 +920,7 @@ rs.help = function () {
     print("\trs.add(hostportstr)                        add a new member to the set with default attributes (disconnects)");
     print("\trs.add(membercfgobj)                       add a new member to the set with extra attributes (disconnects)");
     print("\trs.addArb(hostportstr)                     add a new member which is arbiterOnly:true (disconnects)");
-    print("\trs.stepDown([stepdownSecs, catchupSecs])   step down as primary (disconnects)");
+    print("\trs.stepDown([stepdownSecs, catchUpSecs])   step down as primary (disconnects)");
     print("\trs.syncFrom(hostportstr)                   make a secondary sync from the given member");
     print("\trs.freeze(secs)                            make a node ineligible to become primary for the time specified");
     print("\trs.remove(hostportstr)                     remove a host from the replica set (disconnects)");
@@ -1003,10 +1003,10 @@ rs.add = function (hostport, arb) {
     return this._runCmd({ replSetReconfig: c });
 }
 rs.syncFrom = function (host) { return db._adminCommand({replSetSyncFrom : host}); };
-rs.stepDown = function (stepdownSecs, catchupSecs) {
+rs.stepDown = function (stepdownSecs, catchUpSecs) {
     var cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
-    if (catchupSecs !== undefined) {
-        cmdObj['secondaryCatchUpPeriodSecs'] = catchupSecs;
+    if (catchUpSecs !== undefined) {
+        cmdObj['secondaryCatchUpPeriodSecs'] = catchUpSecs;
     }
     return db._adminCommand(cmdObj);
 };
