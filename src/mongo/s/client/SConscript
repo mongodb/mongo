@@ -1,0 +1,29 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='sharding_client',
+    source=[
+        'shard_connection.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/clientdriver',
+    ]
+)
+
+env.CppUnitTest(
+    target='sharding_client_test',
+    source=[
+        'shard_connection_test.cpp'
+    ],
+    LIBDEPS=[
+        'sharding_client',
+        '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/coreserver',
+        '$BUILD_DIR/mongo/coreshard',
+        '$BUILD_DIR/mongo/mongoscore',
+        '$BUILD_DIR/mongo/mongocommon',
+        '$BUILD_DIR/mongo/mocklib',
+    ]
+)

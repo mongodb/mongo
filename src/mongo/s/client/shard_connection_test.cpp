@@ -54,7 +54,7 @@ using mongo::ShardConnection;
 using std::string;
 using std::vector;
 
-namespace mongo_test {
+namespace {
     const string TARGET_HOST = "$dummy:27017";
 
     /**
@@ -311,4 +311,5 @@ namespace mongo_test {
         checkNewConns(assertNotEqual, conn2CreationTime, 10);
         conn1Again.done();
     }
-}
+
+} // namespace

@@ -48,6 +48,7 @@ env.SConscript(['base/SConscript',
                 'installer/msi/SConscript',
                 'logger/SConscript',
                 'platform/SConscript',
+                's/client/SConscript',
                 's/commands/SConscript',
                 's/SConscript',
                 'unittest/SConscript',
@@ -555,7 +556,6 @@ coredbEnv.Library("coredb", [
         "db/pipeline/expression.cpp",
         "db/projection.cpp",
         "db/stats/timer_stats.cpp",
-        "s/client/shard_connection.cpp",
         ],
                   LIBDEPS=['db/auth/serverauth',
                            'db/commands/server_status_core',
@@ -848,7 +848,8 @@ env.Library('coreshard',
             ],
             LIBDEPS=[
                 's/base',
-                's/cluster_ops_impl'
+                's/client/sharding_client',
+                's/cluster_ops_impl',
             ])
 
 env.Library('mongoscore',
@@ -897,17 +898,6 @@ env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                     "message_server_port",
                     "mongoscore"],
                  NO_CRUTCH=True)
-
-env.CppUnitTest("shard_conn_test", [ "s/shard_conn_test.cpp" ],
-                 LIBDEPS=[
-                    "mongoscore",
-                    "coreshard",
-                    "mongocommon",
-                    "coreserver",
-                    "coredb",
-                    "message_server_port",
-                    "mocklib",
-                    "$BUILD_DIR/mongo/db/auth/authmocks"])
 
 env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
                 LIBDEPS=[ "mongoscore",
