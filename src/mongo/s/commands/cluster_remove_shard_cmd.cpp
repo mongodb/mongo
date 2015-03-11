@@ -100,9 +100,11 @@ namespace {
 
             const string target = cmdObj.firstElement().valuestrsafe();
 
-            Shard s = Shard::make(target);
-            if (!grid.knowAboutShard(s.getConnString())) {
-                errmsg = "unknown shard";
+            Shard s = Shard::findIfExists(target);
+            if (s == Shard::EMPTY) {
+                errmsg = str::stream() << "shard '" << target << "'"
+                                       << " does not exist";
+                log() << errmsg;
                 return false;
             }
 
