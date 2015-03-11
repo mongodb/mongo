@@ -433,19 +433,61 @@ sh.getRecentFailedRounds = function() {
 sh.getRecentMigrations = function() {
     var configDB = db.getSiblingDB('config');
     var yesterday = new Date( new Date() - 24 * 60 * 60 * 1000 );
-    var result = []
-    result = result.concat(configDB.changelog.aggregate( [
-        { $match : { time : { $gt : yesterday }, what : "moveChunk.from", "details.errmsg" : {
-            "$exists" : false } } },
-        { $group : { _id: { msg: "$details.errmsg" }, count : { "$sum":1 } } },
-        { $project : { _id : { $ifNull: [ "$_id.msg", "Success" ] }, count : "$count" } }
-    ] ).toArray());
-    result = result.concat(configDB.changelog.aggregate( [
-        { $match : { time : { $gt : yesterday }, what : "moveChunk.from", "details.errmsg" : {
-            "$exists" : true } } },
-        { $group : { _id: { msg: "$details.errmsg", from : "$details.from", to: "$details.to" },
-            count : { "$sum":1 } } },
-        { $project : { _id : "$_id.msg" , from : "$_id.from", to : "$_id.to" , count : "$count" } }
-    ] ).toArray());
+    var result = configDB.changelog.aggregate([
+        {
+            $match: {
+                time: { $gt: yesterday },
+                what: "moveChunk.from",
+                'details.errmsg': { $exists: false },
+                'details.note': 'success'
+            }
+        },
+        {
+            $group: {
+                _id: {
+                    msg: "$details.errmsg"
+                },
+                count : { $sum: 1 }
+            }
+        },
+        {
+            $project: {
+                _id: { $ifNull: [ "$_id.msg", "Success" ] },
+                count: "$count"
+            }
+        }
+    ]).toArray();
+
+    result = result.concat(configDB.changelog.aggregate([
+        {
+            $match: {
+                time: { $gt: yesterday },
+                what : "moveChunk.from",
+                $or: [
+                    { 'details.errmsg': { $exists: true }},
+                    { 'details.note': { $ne: 'success' }}
+                ]
+            }
+        },
+        {
+            $group: {
+                _id: {
+                    msg: "$details.errmsg",
+                    from : "$details.from",
+                    to: "$details.to"
+                },
+                count: { $sum: 1 }
+            }
+        },
+        {
+            $project: {
+                _id: { $ifNull: [ '$_id.msg', 'aborted' ]},
+                from: "$_id.from",
+                to: "$_id.to",
+                count: "$count"
+            }
+        }
+    ]).toArray());
+
     return result;
-}
+};
