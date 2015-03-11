@@ -531,6 +531,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "transaction: transaction failures due to cache overflow";
 	stats->txn_pinned_range.desc =
 	    "transaction: transaction range of IDs currently pinned";
+	stats->txn_not_visible_checkpoint.desc =
+	    "transaction: Transaction visibility checks where checkpoint ID was not used";
+	stats->txn_visible_checkpoint.desc =
+	    "transaction: Transaction visibility checks where checkpoint ID was used";
 	stats->txn_commit.desc = "transaction: transactions committed";
 	stats->txn_rollback.desc = "transaction: transactions rolled back";
 }
@@ -654,6 +658,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->txn_begin.v = 0;
 	stats->txn_checkpoint.v = 0;
 	stats->txn_fail_cache.v = 0;
+	stats->txn_not_visible_checkpoint.v = 0;
+	stats->txn_visible_checkpoint.v = 0;
 	stats->txn_commit.v = 0;
 	stats->txn_rollback.v = 0;
 }

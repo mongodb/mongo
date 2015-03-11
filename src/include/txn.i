@@ -112,7 +112,7 @@ static inline int
 __wt_txn_visible_checkpoint(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t checkpoint_id;
+	uint64_t checkpoint_id, oldest_id;
 
 	txn_global = &S2C(session)->txn_global;
 
@@ -136,9 +136,14 @@ __wt_txn_visible_checkpoint(WT_SESSION_IMPL *session, uint64_t id)
 	 * If the checkpoint ID is the oldest ID in the system - use it for the
 	 * visibility check. Otherwise use the tracked oldest ID.
 	 */
-	return (TXNID_LT(id,
-	    TXNID_LT(txn_global->oldest_id, checkpoint_id) ?
-	    txn_global->oldest_id : checkpoint_id));
+	if (TXNID_LT(txn_global->oldest_id, checkpoint_id)) {
+		oldest_id = txn_global->oldest_id;
+		WT_STAT_FAST_CONN_INCR(session, txn_visible_checkpoint);
+	} else {
+		oldest_id = checkpoint_id;
+		WT_STAT_FAST_CONN_INCR(session, txn_not_visible_checkpoint);
+	}
+	return oldest_id;
 }
 
 /*

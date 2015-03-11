@@ -268,8 +268,10 @@ struct __wt_connection_stats {
 	WT_STATS txn_checkpoint_time_total;
 	WT_STATS txn_commit;
 	WT_STATS txn_fail_cache;
+	WT_STATS txn_not_visible_checkpoint;
 	WT_STATS txn_pinned_range;
 	WT_STATS txn_rollback;
+	WT_STATS txn_visible_checkpoint;
 	WT_STATS write_io;
 };
 
