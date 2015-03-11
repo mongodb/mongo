@@ -538,7 +538,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 			 * that can free space in cache, such as LSM discarding
 			 * handles.
 			 */
-			__wt_sleep(0, 1000 * (long)loop);
+			__wt_sleep(0, 1000 * (uint64_t)loop);
 			if (loop == 100) {
 				F_SET(cache, WT_CACHE_STUCK);
 				WT_STAT_FAST_CONN_INCR(
