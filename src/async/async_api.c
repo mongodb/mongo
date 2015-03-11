@@ -187,7 +187,7 @@ __async_config(WT_SESSION_IMPL *session,
 	 * Bound the minimum maximum operations at 10.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "async.ops_max", &cval));
-	conn->async_size = (uint32_t)MAX(cval.val, 10);
+	conn->async_size = (uint32_t)WT_MAX(cval.val, 10);
 
 	WT_RET(__wt_config_gets(session, cfg, "async.threads", &cval));
 	conn->async_workers = (uint32_t)cval.val;
