@@ -1203,7 +1203,7 @@ fast:		/* If the page can't be evicted, give up. */
 		mod = page->modify;
 		if (!modified && mod != NULL && !LF_ISSET(
 		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK) &&
-		    !__wt_txn_visible_all(session, mod->rec_max_txn))
+		    !__wt_txn_visible_checkpoint(session, mod->rec_max_txn))
 			continue;
 
 		/*
@@ -1222,7 +1222,7 @@ fast:		/* If the page can't be evicted, give up. */
 		if (modified && !LF_ISSET(
 		    WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK) &&
 		    (mod->disk_snap_min == S2C(session)->txn_global.oldest_id ||
-		    !__wt_txn_visible_all(session, mod->update_txn)))
+		    !__wt_txn_visible_checkpoint(session, mod->update_txn)))
 			continue;
 
 		WT_ASSERT(session, evict->ref == NULL);

@@ -145,15 +145,18 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 		/*
 		 * Build our snapshot of any concurrent transaction IDs.
 		 *
-		 * Ignore our own ID: we always read our own updates.
-		 *
-		 * Also ignore the ID if it is older than the oldest ID we saw.
-		 * This can happen if we race with a thread that is allocating
-		 * an ID -- the ID will not be used because the thread will
-		 * keep spinning until it gets a valid one.
+		 * Ignore:
+		 *  - Our own ID: we always read our own updates.
+		 *  - The ID that belongs to a checkpoint: that ID is never
+		 *    read from.
+		 *  - The ID if it is older than the oldest ID we saw. This
+		 *     can happen if we race with a thread that is allocating
+		 *     an ID -- the ID will not be used because the thread will
+		 *     keep spinning until it gets a valid one.
 		 */
 		if (s != txn_state &&
 		    (id = s->id) != WT_TXN_NONE &&
+		    id != txn_global->checkpoint_id &&
 		    TXNID_LE(prev_oldest_id, id)) {
 			if (get_snapshot)
 				txn->snapshot[n++] = id;
