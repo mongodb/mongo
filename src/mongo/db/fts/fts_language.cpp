@@ -51,7 +51,7 @@ namespace mongo {
              */
             struct LanguageStringCompare {
                 /** Returns true if lhs < rhs. */
-                bool operator()( StringData lhs, StringData rhs ) const {
+                bool operator()( std::string lhs, std::string rhs ) const {
                     size_t minSize = std::min( lhs.size(), rhs.size() );
 
                     for ( size_t x = 0; x < minSize; x++ ) {
@@ -72,7 +72,7 @@ namespace mongo {
             // Lookup table from user language string (case-insensitive) to FTSLanguage.  Populated
             // by initializers in group FTSAllLanguagesRegistered and initializer
             // FTSRegisterLanguageAliases.  For use with TEXT_INDEX_VERSION_2 text indexes only.
-            typedef std::map<StringData, const FTSLanguage*, LanguageStringCompare> LanguageMapV2;
+            typedef std::map<std::string, const FTSLanguage*, LanguageStringCompare> LanguageMapV2;
             LanguageMapV2 languageMapV2;
 
             // Like languageMapV2, but for use with TEXT_INDEX_VERSION_1 text indexes.
@@ -198,8 +198,7 @@ namespace mongo {
             language->_canonicalName = languageName.toString();
             switch ( textIndexVersion ) {
             case TEXT_INDEX_VERSION_2:
-                verify( languageMapV2.find( languageName ) == languageMapV2.end() );
-                languageMapV2[ languageName ] = language;
+                languageMapV2[ languageName.toString() ] = language;
                 return; 
             case TEXT_INDEX_VERSION_1:
                 verify( languageMapV1.find( languageName ) == languageMapV1.end() );
@@ -215,8 +214,7 @@ namespace mongo {
                                                  TextIndexVersion textIndexVersion ) {
             switch ( textIndexVersion ) {
             case TEXT_INDEX_VERSION_2:
-                verify( languageMapV2.find( alias ) == languageMapV2.end() );
-                languageMapV2[ alias ] = language;
+                languageMapV2[ alias.toString() ] = language;
                 return;
             case TEXT_INDEX_VERSION_1:
                 verify( languageMapV1.find( alias ) == languageMapV1.end() );
@@ -239,7 +237,7 @@ namespace mongo {
                                                  TextIndexVersion textIndexVersion ) {
             switch ( textIndexVersion ) {
                 case TEXT_INDEX_VERSION_2: {
-                    LanguageMapV2::const_iterator it = languageMapV2.find( langName );
+                    LanguageMapV2::const_iterator it = languageMapV2.find( langName.toString() );
                     if ( it == languageMapV2.end() ) {
                         // TEXT_INDEX_VERSION_2 rejects unrecognized language strings.
                         Status status = Status( ErrorCodes::BadValue,
