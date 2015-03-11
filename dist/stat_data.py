@@ -257,6 +257,8 @@ connection_stats = [
     ##########################################
     TxnStat('txn_begin', 'transaction begins'),
     TxnStat('txn_checkpoint', 'transaction checkpoints'),
+    TxnStat('txn_checkpoint_generation',
+        'transaction checkpoint generation', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_max',
         'transaction checkpoint max time (msecs)',
         'no_aggregate,no_clear,no_scale'),
@@ -361,6 +363,8 @@ dsrc_stats = [
     ##########################################
     # Btree statistics
     ##########################################
+    BtreeStat('btree_checkpoint_generation',
+        'btree checkpoint generation', 'no_clear,no_scale'),
     BtreeStat('btree_column_deleted',
         'column-store variable-size deleted values', 'no_scale'),
     BtreeStat('btree_column_fix',

@@ -21,6 +21,8 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->block_major.desc = "block-manager: file major version number";
 	stats->block_size.desc = "block-manager: file size in bytes";
 	stats->block_minor.desc = "block-manager: minor version number";
+	stats->btree_checkpoint_generation.desc =
+	    "btree: btree checkpoint generation";
 	stats->btree_column_fix.desc =
 	    "btree: column-store fixed-size leaf pages";
 	stats->btree_column_internal.desc =
@@ -246,6 +248,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->block_checkpoint_size.v += c->block_checkpoint_size.v;
 	p->block_reuse_bytes.v += c->block_reuse_bytes.v;
 	p->block_size.v += c->block_size.v;
+	p->btree_checkpoint_generation.v += c->btree_checkpoint_generation.v;
 	p->btree_column_fix.v += c->btree_column_fix.v;
 	p->btree_column_internal.v += c->btree_column_internal.v;
 	p->btree_column_deleted.v += c->btree_column_deleted.v;
@@ -513,6 +516,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->txn_begin.desc = "transaction: transaction begins";
 	stats->txn_checkpoint_running.desc =
 	    "transaction: transaction checkpoint currently running";
+	stats->txn_checkpoint_generation.desc =
+	    "transaction: transaction checkpoint generation";
 	stats->txn_checkpoint_time_max.desc =
 	    "transaction: transaction checkpoint max time (msecs)";
 	stats->txn_checkpoint_time_min.desc =

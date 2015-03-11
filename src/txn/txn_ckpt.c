@@ -311,6 +311,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, session_begin_transaction),
@@ -320,6 +321,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	u_int i;
 
 	conn = S2C(session);
+	txn_global = &conn->txn_global;
 	saved_isolation = session->isolation;
 	txn = &session->txn;
 	full = logging = tracking = 0;
@@ -392,6 +394,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_epoch(session, &start));
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
+	txn_global->checkpoint_id = session->txn.id;
+
+	/*
+	 * No need for this to be atomic it is only written while holding the
+	 * checkpoint lock.
+	 */
+	txn_global->checkpoint_gen += 1;
+	WT_STAT_FAST_CONN_SET(session,
+	    txn_checkpoint_generation, txn_global->checkpoint_gen);
+
 	/* Tell logging that we have started a database checkpoint. */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full) {
 		WT_ERR(__wt_txn_checkpoint_log(
@@ -400,6 +412,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
+
+	/* Clear the global checkpoint transaction ID */
+	txn_global->checkpoint_id = WT_TXN_NONE;
 
 	/* Commit the transaction before syncing the file(s). */
 	WT_ERR(__wt_txn_commit(session, NULL));
@@ -920,6 +935,14 @@ fake:	/*
 		else
 			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
+
+	/*
+	 * Update the checkpoint generation for this handle so visible
+	 * updates newer than the checkpoint can be evicted.
+	 */
+	btree->checkpoint_gen = conn->txn_global.checkpoint_gen;
+	WT_STAT_FAST_DATA_SET(session,
+	    btree_checkpoint_generation, btree->checkpoint_gen);
 
 	/* Tell logging that the checkpoint is complete. */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))

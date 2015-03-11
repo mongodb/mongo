@@ -48,6 +48,10 @@ struct __wt_txn_global {
 	/* Count of scanning threads, or -1 for exclusive access. */
 	volatile int32_t scan_count;
 
+	/* Checkpoint tracking. */
+	volatile uint64_t checkpoint_gen;
+	volatile uint64_t checkpoint_id;
+
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
 
