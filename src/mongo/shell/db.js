@@ -196,7 +196,7 @@ DB.prototype.shutdownServer = function(opts) {
         return "shutdown command only works with the admin database; try 'use admin'";
     }
 
-    cmd = {"shutdown" : 1};
+    var cmd = {'shutdown' : 1};
     opts = opts || {};
     for (var o in opts) {
         cmd[o] = opts[o];
@@ -204,13 +204,17 @@ DB.prototype.shutdownServer = function(opts) {
 
     try {
         var res = this.runCommand(cmd);
-        if( res )
-            throw Error( "shutdownServer failed: " + res.errmsg );
-        throw Error( "shutdownServer failed" );
+        if (!res.ok) {
+            throw Error('shutdownServer failed: ' + tojson(res));
+        }
+        throw Error('shutdownServer failed: server is still up.');
     }
-    catch ( e ){
-        assert( tojson( e ).indexOf( "error doing query: failed" ) >= 0 , "unexpected error: " + tojson( e ) );
-        print( "server should be down..." );
+    catch (e) {
+        if (tojson(e).indexOf('error doing query: failed') >= 0) {
+            print('server should be down...');
+            return;
+        }
+        throw e;
     }
 }
 
