@@ -29,35 +29,33 @@
 
 #pragma once
 
-#include <boost/static_assert.hpp>
-#include <boost/type_traits/is_same.hpp> // TODO replace with std::is_same in C++11
 #include <iosfwd>
+#include <type_traits>
 
 #include "mongo/base/status.h"
 
 namespace mongo {
 
-
-    /*
-     * StatusWith is used to return an error or a value
-     * this is designed to make exception code free cleaner by not needing as many out paramters
-     * example:
-      StatusWith<int> fib( int n ) {
-        if ( n < 0 ) return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
-        if ( n <= 1 ) return StatusWith<int>( 1 );
-        StatusWith<int> a = fib( n - 1 );
-        StatusWith<int> b = fib( n - 2 );
-        if ( !a.isOK() ) return a;
-        if ( !b.isOK() ) return b;
-        return StatusWith<int>( a.getValue() + b.getValue() );
-      }
-
-      * Note: the value is copied in the current implementation, so should be small (int, int*)
-      *  not a vector
+    /**
+     * StatusWith is used to return an error or a value.
+     * This class is designed to make exception-free code cleaner by not needing as many out
+     * parameters.
+     *
+     * Example:
+     * StatusWith<int> fib( int n ) {
+     *   if ( n < 0 ) 
+     *       return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
+     *   if ( n <= 1 ) return StatusWith<int>( 1 );
+     *   StatusWith<int> a = fib( n - 1 );
+     *   StatusWith<int> b = fib( n - 2 );
+     *   if ( !a.isOK() ) return a;
+     *   if ( !b.isOK() ) return b;
+     *   return StatusWith<int>( a.getValue() + b.getValue() );
+     * }
      */
     template<typename T>
     class StatusWith {
-        BOOST_STATIC_ASSERT(!(boost::is_same<T, Status>::value)); // StatusWith<Status> is banned.
+        static_assert(!(std::is_same<T, mongo::Status>::value), "StatusWith<Status> is banned.");
     public:
 
         /**
@@ -70,22 +68,56 @@ namespace mongo {
         /**
          * for the error case
          */
-        /*implicit*/ StatusWith( const Status& status )
+        StatusWith( const Status& status )
             : _status( status ) {
-            // verify(( !status.isOK() ); // TODO
         }
 
         /**
          * for the OK case
          */
-        /*implicit*/ StatusWith( const T& t )
-            : _status( Status::OK() ), _t( t ) {
+        StatusWith(T t)
+            : _status(Status::OK()), _t(std::move(t)) {
         }
 
-        const T& getValue() const { /* verify( isOK() ); */ return _t; } // TODO
-        const Status& getStatus() const { return _status;}
+#if defined(_MSC_VER) && _MSC_VER < 1900
+        StatusWith(const StatusWith& s)
+            : _status(s._status), _t(s._t) {
+        }
 
-        bool isOK() const { return _status.isOK(); }
+        StatusWith(StatusWith&& s)
+            : _status(std::move(s._status)), _t(std::move(s._t)) {
+        }
+
+        StatusWith& operator=(const StatusWith& other) {
+            _status = other._status;
+            _t = other._t;
+            return *this;
+        }
+
+        StatusWith& operator=(StatusWith&& other) {
+            _status = std::move(other._status);
+            _t = std::move(other._t);
+            return *this;
+        }
+#endif
+
+        const T& getValue() const {
+            // TODO dassert( isOK() );
+            return _t;
+        }
+
+        T& getValue() {
+            // TODO dassert( isOK() );
+            return _t;
+        }
+
+        const Status& getStatus() const {
+            return _status;
+        }
+
+        bool isOK() const {
+            return _status.isOK();
+        }
 
     private:
         Status _status;
