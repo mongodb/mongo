@@ -3,6 +3,15 @@
 @section version_252 Upgrading to Version 2.5.2
 
 <dl>
+<dt>Configuration string case-sensitivity</dt>
+<dd>
+In previous WiredTiger releases, there were several cases where configuration
+strings were treated in a case-sensitive manner (for example, it was possible
+to specify "True", "true" or even "tRuE" as a boolean value). For consistency,
+in this release all WiredTiger configuration strings are case-sensitive, and
+only "true" will be accepted.
+</dd>
+
 <dt>Statistics cursor refresh</dt>
 <dd>
 In previous releases of WiredTiger, a statistics cursor made a snapshot

@@ -129,7 +129,7 @@ static int __wt_huffman_read(WT_SESSION_IMPL *,
     WT_CONFIG_ITEM *, struct __wt_huffman_table **, u_int *, u_int *);
 
 #define	WT_HUFFMAN_CONFIG_VALID(str, len)				\
-	(WT_STRING_CASE_MATCH("english", (str), (len)) ||		\
+	(WT_STRING_MATCH("english", (str), (len)) ||			\
 	    WT_PREFIX_MATCH((str), "utf8") || WT_PREFIX_MATCH((str), "utf16"))
 
 /*
@@ -193,7 +193,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 
 	if (key_conf.len == 0) {
 		;
-	} else if (strncasecmp(key_conf.str, "english", key_conf.len) == 0) {
+	} else if (strncmp(key_conf.str, "english", key_conf.len) == 0) {
 		struct __wt_huffman_table
 		    copy[WT_ELEMENTS(__wt_huffman_nytenglish)];
 
@@ -204,7 +204,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 		    1, &btree->huffman_key));
 
 		/* Check for a shared key/value table. */
-		if (value_conf.len != 0 && strncasecmp(
+		if (value_conf.len != 0 && strncmp(
 		    value_conf.str, "english", value_conf.len) == 0) {
 			btree->huffman_value = btree->huffman_key;
 			return (0);
@@ -228,8 +228,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 
 	if (value_conf.len == 0) {
 		;
-	} else if (
-	    strncasecmp(value_conf.str, "english", value_conf.len) == 0) {
+	} else if (strncmp(value_conf.str, "english", value_conf.len) == 0) {
 		struct __wt_huffman_table
 		    copy[WT_ELEMENTS(__wt_huffman_nytenglish)];
 
@@ -277,7 +276,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	 * UTF-8 table is 256 bytes, with a range of 0-255.
 	 * UTF-16 is 128KB (2 * 65536) bytes, with a range of 0-65535.
 	 */
-	if (strncasecmp(ip->str, "utf8", 4) == 0) {
+	if (strncmp(ip->str, "utf8", 4) == 0) {
 		entries = UINT8_MAX;
 		*numbytesp = 1;
 		WT_ERR(__wt_calloc_def(session, entries, &table));
@@ -287,7 +286,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 			    "no Huffman table file name specified");
 		WT_ERR(__wt_calloc_def(session, ip->len, &file));
 		memcpy(file, ip->str + 4, ip->len - 4);
-	} else if (strncasecmp(ip->str, "utf16", 5) == 0) {
+	} else if (strncmp(ip->str, "utf16", 5) == 0) {
 		entries = UINT16_MAX;
 		*numbytesp = 2;
 		WT_ERR(__wt_calloc_def(session, entries, &table));
