@@ -26,7 +26,7 @@
  */
 
 #if !defined(_WIN32)
-#if defined(__sunos__) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
+#if defined(__sun) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
 
 #include "mongo/platform/backtrace.h"
 
@@ -223,5 +223,5 @@ namespace {
 
 } // namespace mongo
 
-#endif // #if defined(__sunos__)
+#endif // #if defined(__sun)
 #endif // #if !defined(_WIN32)

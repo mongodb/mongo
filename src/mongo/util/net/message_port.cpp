@@ -48,7 +48,7 @@
 #include "mongo/util/time_support.h"
 
 #ifndef _WIN32
-# ifndef __sunos__
+# ifndef __sun
 #  include <ifaddrs.h>
 # endif
 # include <sys/resource.h>

@@ -927,20 +927,17 @@ elif linux:
         env.Append( LINKFLAGS=" -static " )
 
 elif solaris:
-     env.Append( CPPDEFINES=[ "__sunos__" ] )
      env.Append( LIBS=["socket","resolv","lgrp"] )
 
 elif freebsd:
     env.Append( LIBS=[ "kvm" ] )
     env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
     env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
-    env.Append( CPPDEFINES=[ "__freebsd__" ] )
     env.Append( CCFLAGS=[ "-fno-omit-frame-pointer" ] )
 
 elif openbsd:
     env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
     env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
-    env.Append( CPPDEFINES=[ "__openbsd__" ] )
     env.Append( LIBS=[ "kvm" ] )
 
 elif windows:

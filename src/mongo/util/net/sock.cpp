@@ -42,7 +42,7 @@
 # include <arpa/inet.h>
 # include <errno.h>
 # include <netdb.h>
-# if defined(__openbsd__)
+# if defined(__OpenBSD__)
 #  include <sys/uio.h>
 # endif
 #endif

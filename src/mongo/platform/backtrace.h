@@ -28,7 +28,7 @@
 #pragma once
 
 #if !defined(_WIN32)
-#if defined(__sunos__) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
+#if defined(__sun) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
 
 namespace mongo {
     namespace pal {

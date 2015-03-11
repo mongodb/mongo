@@ -61,7 +61,7 @@ namespace mongo {
 
 namespace {
 
-#if !defined(__sunos__)
+#if !defined(__sun)
     // if doingRepair is true don't consider unclean shutdown an error
     void acquirePathLock(MMAPV1Engine* storageEngine,
                          bool doingRepair,
@@ -153,7 +153,7 @@ namespace {
             uasserted(13618, "can't start without --journal enabled when journal/ files are present");
         }
     }
-#endif  //  !defined(__sunos__)
+#endif  //  !defined(__sun)
 
 
     /// warn if readahead > 256KB (gridfs chunk size)

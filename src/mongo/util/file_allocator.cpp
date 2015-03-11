@@ -38,7 +38,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#if defined(__freebsd__)
+#if defined(__FreeBSD__)
 #   include <sys/param.h>
 #   include <sys/mount.h>
 #endif
@@ -182,7 +182,7 @@ namespace mongo {
     // TODO: pull this out to per-OS files once they exist
     static bool useSparseFiles(int fd) {
 
-#if defined(__linux__) || defined(__freebsd__)
+#if defined(__linux__) || defined(__FreeBSD__)
         struct statfs fs_stats;
         int ret = fstatfs(fd, &fs_stats);
         uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
@@ -197,13 +197,13 @@ namespace mongo {
             || (fs_stats.f_type == TMPFS_MAGIC)
             ;
 
-#elif defined(__freebsd__)
+#elif defined(__FreeBSD__)
 
         return (str::equals(fs_stats.f_fstypename, "zfs") ||
             str::equals(fs_stats.f_fstypename, "nfs") ||
             str::equals(fs_stats.f_fstypename, "oldnfs"));
 
-#elif defined(__sunos__)
+#elif defined(__sun)
         // assume using ZFS which is copy-on-write so no benefit to zero-filling
         // TODO: check which fs we are using like we do elsewhere
         return true;

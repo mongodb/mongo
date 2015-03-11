@@ -25,7 +25,7 @@
  *    then also delete it in the license file.
  */
 
-#if defined(__sunos__)
+#if defined(__sun)
 
 #include "mongo/platform/posix_fadvise.h"
 
@@ -65,4 +65,4 @@ namespace pal {
 
 } // namespace mongo
 
-#endif // #if defined(__sunos__)
+#endif // #if defined(__sun)

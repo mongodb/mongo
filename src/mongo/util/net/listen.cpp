@@ -47,7 +47,7 @@
 
 #ifndef _WIN32
 
-# ifndef __sunos__
+# ifndef __sun
 #  include <ifaddrs.h>
 # endif
 # include <sys/resource.h>
@@ -61,7 +61,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
-#ifdef __openbsd__
+#ifdef __OpenBSD__
 # include <sys/uio.h>
 #endif
 

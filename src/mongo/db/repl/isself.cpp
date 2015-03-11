@@ -47,7 +47,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__freebsd__) || defined(__sunos__) || defined(__openbsd__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || defined(__OpenBSD__)
 #define FASTPATH_UNIX 1
 #endif
 
@@ -60,7 +60,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 
-#ifdef __freebsd__
+#ifdef __FreeBSD__
 #include <netinet/in.h>
 #endif
 

@@ -102,7 +102,7 @@ typedef uint16_t u_int16_t;
 
 #endif
 
-#if defined __sunos__ || defined __freebsd__ || defined __openbsd__
+#if defined __sun || defined __FreeBSD__ || defined __OpenBSD__
 #ifdef _LITTLE_ENDIAN
 #define IS_LITTLE_ENDIAN
 #elif defined _BIG_ENDIAN
@@ -124,17 +124,17 @@ typedef uint16_t u_int16_t;
 #define bswap_16(x) OSSwapInt16(x)
 #define bswap_32(x) OSSwapInt32(x)
 #define bswap_64(x) OSSwapInt64(x)
-#elif defined __sunos__
+#elif defined __sun
 #include <sys/byteorder.h>
 #define bswap_16(x) BSWAP_16(x)
 #define bswap_32(x) BSWAP_32(x)
 #define bswap_64(x) BSWAP_64(x)
-#elif defined __freebsd__
+#elif defined __FreeBSD__
 #include <sys/endian.h>
 #define bswap_16(x) bswap16(x)
 #define bswap_32(x) bswap32(x)
 #define bswap_64(x) bswap64(x)
-#elif defined __openbsd__
+#elif defined __OpenBSD__
 #include <sys/endian.h>
 #define bswap_16(x) swap16(x)
 #define bswap_32(x) swap32(x)
@@ -685,7 +685,7 @@ extern inline void prefetch(const char *x) {}
 
 #endif  // !HAVE_ATTRIBUTE_SECTION
 
-#if defined __sunos__ || defined _WIN32
+#if defined __sun || defined _WIN32
 inline double drem(double x, double y) {
     double quot = x/y;
     int iquot;

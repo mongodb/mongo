@@ -124,7 +124,7 @@ namespace mongo {
         } pageAlignTest;
     }
 
-#if defined(__sunos__)
+#if defined(__sun)
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 #else
@@ -187,7 +187,7 @@ namespace mongo {
         }
 
 
-#if defined(__sunos__)
+#if defined(__sun)
 #warning madvise not supported on solaris yet
 #else
         if ( options & SEQUENTIAL ) {
@@ -238,7 +238,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-#if defined(__sunos__) // SERVER-8795
+#if defined(__sun) // SERVER-8795
         LockMongoFilesExclusive lockMongoFiles;
 #endif
 

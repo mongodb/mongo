@@ -325,7 +325,7 @@ namespace {
         // See SERVER-5723 for performance improvement.
         // See SERVER-5680 to see why this code is necessary on Windows.
         // See SERVER-8795 to see why this code is necessary on Solaris.
-#if defined(_WIN32) || defined(__sunos__)
+#if defined(_WIN32) || defined(__sun)
         LockMongoFilesExclusive lk;
 #else
         LockMongoFilesShared lk;
