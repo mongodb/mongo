@@ -1549,11 +1549,11 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable asynchronous
 	 * operation., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;ops_max, maximum number of expected
-	 * simultaneous asynchronous operations., an integer between 10 and
-	 * 4096; default \c 1024.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the
-	 * number of worker threads to service asynchronous requests., an
-	 * integer between 1 and 20; default \c 2.}
+	 * simultaneous asynchronous operations., an integer between 1 and 4096;
+	 * default \c 1024.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number
+	 * of worker threads to service asynchronous requests., an integer
+	 * between 1 and 20; default \c 2.}
 	 * @config{ ),,}
 	 * @config{cache_overhead, assume the heap allocator overhead is the
 	 * specified percentage\, and adjust the cache usage by that amount (for
@@ -1883,7 +1883,7 @@ struct __wt_connection {
  * boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;ops_max,
  * maximum number of expected simultaneous asynchronous operations., an integer
- * between 10 and 4096; default \c 1024.}
+ * between 1 and 4096; default \c 1024.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number of worker threads to
  * service asynchronous requests., an integer between 1 and 20; default \c 2.}
  * @config{ ),,}
