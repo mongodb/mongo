@@ -49,6 +49,7 @@ namespace mongo {
         std::string sslClusterPassword;   // --sslInternalKeyPassword
         std::string sslCAFile;      // --sslCAFile
         std::string sslCRLFile;     // --sslCRLFile
+        std::string sslCipherConfig; // --sslCipherConfig
         bool sslWeakCertificateValidation; // --sslWeakCertificateValidation
         bool sslFIPSMode; // --sslFIPSMode
         bool sslAllowInvalidCertificates; // --sslAllowInvalidCertificates
