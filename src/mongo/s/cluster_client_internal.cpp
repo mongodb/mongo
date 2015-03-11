@@ -230,112 +230,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status _findAllCollections(const ConnectionString& configLoc,
-                               bool optionalEpochs,
-                               OwnedPointerMap<string, CollectionType>* collections)
-    {
-        scoped_ptr<ScopedDbConnection> connPtr;
-
-        try {
-            connPtr.reset(new ScopedDbConnection(configLoc, 30));
-
-            ScopedDbConnection& conn = *connPtr;
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(CollectionType::ConfigNS,
-                                                                      Query())));
-
-            while (cursor->more()) {
-
-                BSONObj collDoc = cursor->nextSafe();
-
-                // Replace with unique_ptr (also owned ptr map goes away)
-                auto_ptr<CollectionType> coll(new CollectionType());
-                string errMsg;
-                bool parseOk = coll->parseBSON(collDoc, &errMsg);
-
-                // Needed for the v3 to v4 upgrade
-                bool epochNotSet = !coll->isEpochSet() || !coll->getEpoch().isSet();
-                if (optionalEpochs && epochNotSet) {
-                    // Set our epoch to something here, just to allow
-                    coll->setEpoch(OID::gen());
-                }
-
-                if (!parseOk || !coll->isValid(&errMsg)) {
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  stream() << "invalid collection " << collDoc
-                                           << " read from the config server" << causedBy(errMsg));
-                }
-
-                if (coll->isDroppedSet() && coll->getDropped()) {
-                    continue;
-                }
-
-                if (optionalEpochs && epochNotSet) {
-                    coll->setEpoch(OID());
-                }
-    
-                // Get NS before releasing
-                string ns = coll->getNS();
-                collections->mutableMap().insert(make_pair(ns, coll.release()));
-            }
-        }
-        catch (const DBException& e) {
-            return e.toStatus();
-        }
-
-        connPtr->done();
-        return Status::OK();
-    }
-
-    Status findAllCollections(const ConnectionString& configLoc,
-                              OwnedPointerMap<string, CollectionType>* collections)
-    {
-        return _findAllCollections(configLoc, false, collections);
-    }
-
-    Status findAllCollectionsV3(const ConnectionString& configLoc,
-                                OwnedPointerMap<string, CollectionType>* collections)
-    {
-        return _findAllCollections(configLoc, true, collections);
-    }
-
-    Status findAllChunks(const ConnectionString& configLoc,
-                         const string& ns,
-                         OwnedPointerVector<ChunkType>* chunks)
-    {
-        scoped_ptr<ScopedDbConnection> connPtr;
-        scoped_ptr<DBClientCursor> cursor;
-
-        try {
-            connPtr.reset(new ScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ChunkType::ConfigNS,
-                                                                      BSON(ChunkType::ns(ns)))));
-
-            while (cursor->more()) {
-
-                BSONObj chunkDoc = cursor->nextSafe();
-
-                // TODO: replace with unique_ptr when available
-                auto_ptr<ChunkType> chunk(new ChunkType());
-                string errMsg;
-                if (!chunk->parseBSON(chunkDoc, &errMsg) || !chunk->isValid(&errMsg)) {
-                    connPtr->done();
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  stream() << "invalid chunk " << chunkDoc
-                                           << " read from the config server" << causedBy(errMsg));
-                }
-
-                chunks->mutableVector().push_back(chunk.release());
-            }
-        }
-        catch (const DBException& e) {
-            return e.toStatus();
-        }
-
-        connPtr->done();
-        return Status::OK();
-    }
-
     Status logConfigChange(const ConnectionString& configLoc,
                            const string& clientHost,
                            const string& ns,
@@ -402,17 +296,6 @@ namespace mongo {
         }
 
         return result;
-    }
-
-    // Helper function for safe writes to non-SCC config servers
-    void _checkGLE(ScopedDbConnection& conn) {
-        string error = conn->getLastError();
-        if (error != "") {
-            conn.done();
-            // TODO: Make error handling more consistent, throwing and re-catching makes things much
-            // simpler to manage
-            uasserted(16624, str::stream() << "operation failed" << causedBy(error));
-        }
     }
 
     // Helper function for safe cursors
