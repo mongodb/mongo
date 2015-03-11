@@ -1509,35 +1509,6 @@ namespace DocumentSourceTests {
             }
         };
 
-        /** A document with a number field produces a UserException. */
-        class UnexpectedNumber : public UnexpectedTypeBase {
-            void populateData() {
-                client.insert( ns, BSON( "a" << 1 ) );
-            }
-        };
-
-        /** An additional document with a number field produces a UserException. */
-        class LaterUnexpectedNumber : public UnexpectedTypeBase {
-            void populateData() {
-                client.insert( ns, BSON( "a" << BSON_ARRAY( 1 ) ) );
-                client.insert( ns, BSON( "a" << 1 ) );
-            }
-        };
-
-        /** A document with a string field produces a UserException. */
-        class UnexpectedString : public UnexpectedTypeBase {
-            void populateData() {
-                client.insert( ns, BSON( "a" << "foo" ) );
-            }
-        };
-
-        /** A document with an object field produces a UserException. */
-        class UnexpectedObject : public UnexpectedTypeBase {
-            void populateData() {
-                client.insert( ns, BSON( "a" << BSONObj() ) );
-            }
-        };
-
         /** Unwind an array with one value. */
         class UnwindOneValue : public CheckResultsBase {
             void populateData() {
@@ -1974,10 +1945,6 @@ namespace DocumentSourceTests {
             add<DocumentSourceUnwind::MissingField>();
             add<DocumentSourceUnwind::NullField>();
             add<DocumentSourceUnwind::EmptyArray>();
-            add<DocumentSourceUnwind::UnexpectedNumber>();
-            add<DocumentSourceUnwind::LaterUnexpectedNumber>();
-            add<DocumentSourceUnwind::UnexpectedString>();
-            add<DocumentSourceUnwind::UnexpectedObject>();
             add<DocumentSourceUnwind::UnwindOneValue>();
             add<DocumentSourceUnwind::UnwindTwoValues>();
             add<DocumentSourceUnwind::UnwindNull>();
