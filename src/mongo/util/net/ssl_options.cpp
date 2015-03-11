@@ -71,6 +71,10 @@ namespace mongo {
         options->addOptionChaining("net.ssl.CRLFile", "sslCRLFile", moe::String,
                 "Certificate Revocation List file for SSL");
 
+        options->addOptionChaining("net.ssl.sslCipherConfig", "sslCipherConfig", moe::String,
+                "OpenSSL cipher configuration string")
+                                   .hidden();
+
         options->addOptionChaining("net.ssl.weakCertificateValidation",
                 "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
                 "presenting a certificate");
@@ -229,6 +233,10 @@ namespace mongo {
                                          params["net.ssl.CRLFile"].as<std::string>()).generic_string();
         }
 
+        if (params.count("net.ssl.sslCipherConfig")) {
+            sslGlobalParams.sslCipherConfig = params["net.ssl.sslCipherConfig"].as<string>();
+        }
+
         if (params.count("net.ssl.weakCertificateValidation")) {
             sslGlobalParams.sslWeakCertificateValidation =
                 params["net.ssl.weakCertificateValidation"].as<bool>();
@@ -281,6 +289,7 @@ namespace mongo {
                  sslGlobalParams.sslClusterPassword.size() ||
                  sslGlobalParams.sslCAFile.size() ||
                  sslGlobalParams.sslCRLFile.size() ||
+                 sslGlobalParams.sslCipherConfig.size() ||
                  sslGlobalParams.sslWeakCertificateValidation ||
                  sslGlobalParams.sslFIPSMode) {
             return Status(ErrorCodes::BadValue,
