@@ -79,6 +79,7 @@ namespace ReplTests {
             ReplicationCoordinatorMock* replCoord = new ReplicationCoordinatorMock(replSettings);
             setGlobalReplicationCoordinator(replCoord);
 
+            setOplogCollectionName();
             createOplog(&_txn);
 
             Client::WriteContext ctx(&_txn, ns());
