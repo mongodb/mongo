@@ -971,7 +971,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	 * evict the created page.
 	 */
 	if (WT_PAGE_IS_INTERNAL(page) &&
-	    !__wt_txn_visible_all(session, mod->mod_split_txn))
+	    !__wt_txn_visible_checkpoint(session, mod->mod_split_txn))
 		return (0);
 
 	/*
@@ -1007,7 +1007,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	 * is blocked by the exclusive lock.
 	 */
 	if (page->read_gen != WT_READGEN_OLDEST &&
-	    !__wt_txn_visible_all(session, __wt_page_is_modified(page) ?
+	    !__wt_txn_visible_checkpoint(session, __wt_page_is_modified(page) ?
 	    mod->update_txn : mod->rec_max_txn))
 		return (0);
 
@@ -1016,7 +1016,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	 * hope eviction will find it first.
 	 */
 	if (check_splits &&
-	    !__wt_txn_visible_all(session, mod->inmem_split_txn))
+	    !__wt_txn_visible_checkpoint(session, mod->inmem_split_txn))
 		return (0);
 
 	return (1);
