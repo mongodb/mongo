@@ -87,7 +87,6 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, btree_column_internal);
 		pindex = WT_INTL_INDEX_COPY(page);
-		WT_STAT_INCRV(stats, btree_entries, pindex->entries);
 		break;
 	case WT_PAGE_COL_VAR:
 		__stat_page_col_var(page, stats);
@@ -139,7 +138,8 @@ __stat_page_col_var(WT_PAGE *page, WT_DSRC_STATS *stats)
 		} else {
 			orig_deleted = 0;
 			__wt_cell_unpack(cell, unpack);
-			entry_cnt += __wt_cell_rle(unpack);
+			if (unpack->type != WT_CELL_ADDR_DEL)
+				entry_cnt += __wt_cell_rle(unpack);
 			if (unpack->ovfl)
 				++ovfl_cnt;
 		}
@@ -165,7 +165,10 @@ __stat_page_col_var(WT_PAGE *page, WT_DSRC_STATS *stats)
 
 	/* Walk any append list. */
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
-		++entry_cnt;
+		if (WT_UPDATE_DELETED_ISSET(ins->upd))
+			++deleted_cnt;
+		else
+			++entry_cnt;
 
 	WT_STAT_INCRV(stats, btree_column_deleted, deleted_cnt);
 	WT_STAT_INCRV(stats, btree_entries, entry_cnt);
@@ -196,7 +199,6 @@ __stat_page_row_int(
 	 * internal page.
 	 */
 	pindex = WT_INTL_INDEX_COPY(page);
-	WT_STAT_INCRV(stats, btree_entries, pindex->entries);
 
 	/*
 	 * Overflow keys are hard: we have to walk the disk image to count them,
