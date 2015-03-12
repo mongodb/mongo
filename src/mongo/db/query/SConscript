@@ -21,6 +21,7 @@ env.Library(
     ],
     LIBDEPS=[
         "explain_common",
+        "getmore_request",
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
@@ -88,6 +89,16 @@ env.Library(
     target="explain_common",
     source=[
         "explain_common.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson",
+    ],
+)
+
+env.Library(
+    target="getmore_request",
+    source=[
+        "getmore_request.cpp"
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson",

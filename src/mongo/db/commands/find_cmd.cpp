@@ -32,6 +32,7 @@
 
 #include <memory>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -56,20 +57,21 @@ namespace mongo {
      * A command for running .find() queries.
      */
     class FindCmd : public Command {
+        MONGO_DISALLOW_COPYING(FindCmd);
     public:
         FindCmd() : Command("find") { }
 
-        virtual bool isWriteCommandForConfigServer() const { return false; }
+        bool isWriteCommandForConfigServer() const override { return false; }
 
-        virtual bool slaveOk() const { return false; }
+        bool slaveOk() const override { return false; }
 
-        virtual bool slaveOverrideOk() const { return true; }
+        bool slaveOverrideOk() const override { return true; }
 
-        virtual bool maintenanceOk() const { return false; }
+        bool maintenanceOk() const override { return false; }
 
-        virtual bool adminOnly() const { return false; }
+        bool adminOnly() const override { return false; }
 
-        virtual void help(std::stringstream& help) const {
+        void help(std::stringstream& help) const override {
             help << "query for documents";
         }
 
@@ -77,11 +79,11 @@ namespace mongo {
          * A find command does not increment the command counter, but rather increments the
          * query counter.
          */
-        bool shouldAffectCommandCounter() const { return false; }
+        bool shouldAffectCommandCounter() const override { return false; }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
+        Status checkAuthForCommand(ClientBasic* client,
+                                   const std::string& dbname,
+                                   const BSONObj& cmdObj) override {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
             ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
@@ -92,11 +94,11 @@ namespace mongo {
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
 
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const {
+        Status explain(OperationContext* txn,
+                       const std::string& dbname,
+                       const BSONObj& cmdObj,
+                       ExplainCommon::Verbosity verbosity,
+                       BSONObjBuilder* out) const override {
             const std::string fullns = parseNs(dbname, cmdObj);
             const NamespaceString nss(fullns);
 
@@ -166,18 +168,25 @@ namespace mongo {
          * (i.e. call to shardingState.needCollectionMetadata() below), shard version
          * information should be passed as part of the command parameter.
          */
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+        bool run(OperationContext* txn,
+                 const std::string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 std::string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) override {
             const std::string fullns = parseNs(dbname, cmdObj);
             const NamespaceString nss(fullns);
 
             // Although it is a command, a find command gets counted as a query.
             globalOpCounters.gotQuery();
+
+            if (txn->getClient()->isInDirectClient()) {
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::IllegalOperation,
+                                                  "Cannot run find command from "
+                                                  "inside DBDirectClient"));
+            }
 
             // 1a) Parse the command BSON to a LiteParsedQuery.
             std::unique_ptr<LiteParsedQuery> lpq;

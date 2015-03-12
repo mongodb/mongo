@@ -40,12 +40,44 @@ namespace mongo {
 
     class OperationContext;
 
+    class ScopedRecoveryUnitSwapper {
+    public:
+        ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn);
+
+        ~ScopedRecoveryUnitSwapper();
+
+        /**
+         * Dismissing the RU swapper causes it to simply free the recovery unit rather than swapping
+         * it back into the ClientCursor.
+         */
+        void dismiss();
+
+    private:
+        ClientCursor* _cc;
+        OperationContext* _txn;
+        bool _dismissed;
+
+        std::unique_ptr<RecoveryUnit> _txnPreviousRecoveryUnit;
+    };
+
     /**
      * Returns true if enough results have been prepared to stop adding more to the first batch.
      *
      * Should be called *after* adding to the result set rather than before.
      */
     bool enoughForFirstBatch(const LiteParsedQuery& pq, int numDocs, int bytesBuffered);
+
+    /**
+     * Returns true if enough results have been prepared to stop adding more to a getMore batch.
+     *
+     * Should be called *after* adding to the result set rather than before.
+     */
+    bool enoughForGetMore(int ntoreturn, int numDocs, int bytesBuffered);
+
+    /**
+     * Whether or not the ClientCursor* is tailable.
+     */
+    bool isCursorTailable(const ClientCursor* cursor);
 
     /**
      * Returns true if we should keep a cursor around because we're expecting to return more query
@@ -58,6 +90,17 @@ namespace mongo {
                           const Collection* collection,
                           PlanExecutor::ExecState finalState,
                           PlanExecutor* exec);
+
+    /**
+     * Similar to shouldSaveCursor(), but used in getMore to determine whether we should keep
+     * the cursor around for additional getMores().
+     *
+     * If false, the caller should close the cursor and indicate this to the client by sending back
+     * a cursor ID of 0.
+     */
+    bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
+                                 PlanExecutor* exec,
+                                 bool isTailable);
 
     /**
      * Fills out CurOp with information about this query.

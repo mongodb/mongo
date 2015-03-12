@@ -72,6 +72,38 @@ namespace mongo {
     // Failpoint for checking whether we've received a getmore.
     MONGO_FP_DECLARE(failReceivedGetmore);
 
+    ScopedRecoveryUnitSwapper::ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn)
+            : _cc(cc),
+              _txn(txn),
+              _dismissed(false) {
+        // Save this for later.  We restore it upon destruction.
+        _txn->recoveryUnit()->commitAndRestart();
+        _txnPreviousRecoveryUnit.reset(txn->releaseRecoveryUnit());
+
+        // Transfer ownership of the RecoveryUnit from the ClientCursor to the OpCtx.
+        RecoveryUnit* ccRecoveryUnit = cc->releaseOwnedRecoveryUnit();
+        txn->setRecoveryUnit(ccRecoveryUnit);
+    }
+
+    void ScopedRecoveryUnitSwapper::dismiss() {
+        _dismissed = true;
+    }
+
+    ScopedRecoveryUnitSwapper::~ScopedRecoveryUnitSwapper() {
+        _txn->recoveryUnit()->commitAndRestart();
+
+        if (_dismissed) {
+            // Just clean up the recovery unit which we originally got from the ClientCursor.
+            delete _txn->releaseRecoveryUnit();
+        }
+        else {
+            // Swap the RU back into the ClientCursor for subsequent getMores.
+            _cc->setOwnedRecoveryUnit(_txn->releaseRecoveryUnit());
+        }
+
+        _txn->setRecoveryUnit(_txnPreviousRecoveryUnit.release());
+    }
+
     /**
      * If ntoreturn is zero, we stop generating additional results as soon as we have either 101
      * documents or at least 1MB of data. On subsequent getmores, there is no limit on the number
@@ -87,6 +119,15 @@ namespace mongo {
             return (bytesBuffered > 1024 * 1024) || numDocs >= 101;
         }
         return numDocs >= pq.getNumToReturn() || bytesBuffered > MaxBytesToReturnToClientAtOnce;
+    }
+
+    bool enoughForGetMore(int ntoreturn, int numDocs, int bytesBuffered) {
+        return (ntoreturn && numDocs >= ntoreturn)
+               || (bytesBuffered > MaxBytesToReturnToClientAtOnce);
+    }
+
+    bool isCursorTailable(const ClientCursor* cursor) {
+        return cursor->queryOptions() & QueryOption_CursorTailable;
     }
 
     bool shouldSaveCursor(OperationContext* txn,
@@ -114,6 +155,20 @@ namespace mongo {
         // has zero records.
         if (pq.isTailable()) {
             return collection && collection->numRecords(txn) != 0U;
+        }
+
+        return !exec->isEOF();
+    }
+
+    bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
+                                 PlanExecutor* exec,
+                                 bool isTailable) {
+        if (PlanExecutor::FAILURE == finalState || PlanExecutor::DEAD == finalState) {
+            return false;
+        }
+
+        if (isTailable) {
+            return true;
         }
 
         return !exec->isEOF();
@@ -178,30 +233,6 @@ namespace mongo {
             }
         }
     }
-
-    struct ScopedRecoveryUnitSwapper {
-        explicit ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn)
-            : _cc(cc), _txn(txn) {
-
-            // Save this for later.  We restore it upon destruction.
-            _txn->recoveryUnit()->commitAndRestart();
-            _txnPreviousRecoveryUnit = txn->releaseRecoveryUnit();
-
-            // Transfer ownership of the RecoveryUnit from the ClientCursor to the OpCtx.
-            RecoveryUnit* ccRecoveryUnit = cc->releaseOwnedRecoveryUnit();
-            txn->setRecoveryUnit(ccRecoveryUnit);
-        }
-
-        ~ScopedRecoveryUnitSwapper() {
-            _txn->recoveryUnit()->commitAndRestart();
-            _cc->setOwnedRecoveryUnit(_txn->releaseRecoveryUnit());
-            _txn->setRecoveryUnit(_txnPreviousRecoveryUnit);
-        }
-
-        ClientCursor* _cc;
-        OperationContext* _txn;
-        RecoveryUnit* _txnPreviousRecoveryUnit;
-    };
 
     /**
      * Called by db/instance.cpp.  This is the getMore entry point.
@@ -377,22 +408,10 @@ namespace mongo {
                     }
                 }
 
-                if ((ntoreturn && numResults >= ntoreturn)
-                    || bb.len() > MaxBytesToReturnToClientAtOnce) {
+                if (enoughForGetMore(ntoreturn, numResults, bb.len())) {
                     break;
                 }
             }
-
-            // We save the client cursor when there might be more results, and hence we may receive
-            // another getmore. If we receive a EOF or an error, or 'exec' is dead, then we know
-            // that we will not be producing more results. We indicate that the cursor is closed by
-            // sending a cursorId of 0 back to the client.
-            //
-            // On the other hand, if we retrieve all results necessary for this batch, then
-            // 'saveClientCursor' is true and we send a valid cursorId back to the client. In
-            // this case, there may or may not actually be more results (for example, the next call
-            // to getNext(...) might just return EOF).
-            bool saveClientCursor = false;
 
             if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
                 // Propagate this error to caller.
@@ -404,9 +423,6 @@ namespace mongo {
                               WorkingSetCommon::toStatusString(obj));
                 }
 
-                // If we're dead there's no way to get more results.
-                saveClientCursor = false;
-
                 // In the old system tailable capped cursors would be killed off at the
                 // cursorid level.  If a tailable capped cursor is nuked the cursorid
                 // would vanish.
@@ -416,14 +432,6 @@ namespace mongo {
                 if (0 == numResults) {
                     resultFlags = ResultFlag_CursorNotFound;
                 }
-            }
-            else if (PlanExecutor::IS_EOF == state) {
-                // EOF is also end of the line unless it's tailable.
-                saveClientCursor = queryOptions & QueryOption_CursorTailable;
-            }
-            else {
-                verify(PlanExecutor::ADVANCED == state);
-                saveClientCursor = true;
             }
 
             // If we are operating on an aggregation cursor, then we dropped our collection lock
@@ -443,7 +451,7 @@ namespace mongo {
             //    this case, the pin's destructor will be invoked, which will call release() on the
             //    pin.  Because our ClientCursorPin is declared after our lock is declared, this
             //    will happen under the lock.
-            if (!saveClientCursor) {
+            if (!shouldSaveCursorGetMore(state, exec, isCursorTailable(cc))) {
                 ruSwapper.reset();
                 ccPin.deleteUnderlying();
                 // cc is now invalid, as is the executor
@@ -464,8 +472,7 @@ namespace mongo {
                 if (PlanExecutor::IS_EOF == state && (queryOptions & QueryOption_CursorTailable)) {
                     if (!txn->getClient()->isInDirectClient()) {
                         // Don't stash the RU. Get a new one on the next getMore.
-                        ruSwapper.reset();
-                        delete cc->releaseOwnedRecoveryUnit();
+                        ruSwapper->dismiss();
                     }
 
                     if ((queryOptions & QueryOption_AwaitData)
