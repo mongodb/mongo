@@ -532,6 +532,9 @@ err:	/*
 	if (F_ISSET(txn, TXN_RUNNING))
 		WT_TRET(__wt_txn_rollback(session, NULL));
 
+	/* Ensure the checkpoint ID is cleared on the error path. */
+	txn_global->checkpoint_id = WT_TXN_NONE;
+
 	/* Tell logging that we have finished a database checkpoint. */
 	if (logging)
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
