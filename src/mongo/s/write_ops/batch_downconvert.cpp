@@ -34,6 +34,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/client/multi_command_dispatch.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

@@ -5,6 +5,7 @@ Import("env")
 env.Library(
     target='sharding_client',
     source=[
+        'dbclient_multi_command.cpp',
         'shard_connection.cpp',
     ],
     LIBDEPS=[

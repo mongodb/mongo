@@ -26,19 +26,17 @@
  *    it in the license file.
  */
 
-#include "mongo/s/dbclient_multi_command.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/client/dbclient_multi_command.h"
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/bson/mutable/document.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/client_basic.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {

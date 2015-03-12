@@ -32,8 +32,8 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/dbclient_multi_command.h"
 #include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
 

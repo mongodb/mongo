@@ -28,12 +28,15 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/config_coordinator.h"
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/client/multi_command_dispatch.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"

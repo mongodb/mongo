@@ -36,7 +36,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/optime.h"
 #include "mongo/s/ns_targeter.h"
-#include "mongo/s/multi_command_dispatch.h"
 #include "mongo/s/shard_resolver.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -44,6 +43,7 @@
 namespace mongo {
 
     class BatchWriteExecStats;
+    class MultiCommandDispatch;
 
     /**
      * The BatchWriteExec is able to execute client batch write requests, resulting in a batch
@@ -61,7 +61,7 @@ namespace mongo {
      *
      */
     class BatchWriteExec {
-    MONGO_DISALLOW_COPYING (BatchWriteExec);
+        MONGO_DISALLOW_COPYING (BatchWriteExec);
     public:
 
         BatchWriteExec( NSTargeter* targeter,

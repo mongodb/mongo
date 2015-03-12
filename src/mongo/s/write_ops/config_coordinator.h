@@ -31,11 +31,12 @@
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/s/multi_command_dispatch.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
+
+    class MultiCommandDispatch;
 
     class ConfigCoordinator {
     public:

@@ -26,14 +26,14 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/batch_downconvert.h"
+#include "mongo/platform/basic.h"
 
 #include <deque>
 #include <vector>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/s/multi_command_dispatch.h"
+#include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

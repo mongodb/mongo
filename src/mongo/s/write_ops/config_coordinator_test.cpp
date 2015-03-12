@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/s/mock_multi_write_command.h"
+#include "mongo/s/client/mock_multi_write_command.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

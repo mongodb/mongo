@@ -34,8 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/optime.h"
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/s/multi_command_dispatch.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -45,6 +43,8 @@
 // TODO: Remove post-2.6
 
 namespace mongo {
+
+    class MultiCommandDispatch;
 
     // Used for reporting legacy write concern responses
     struct LegacyWCResponse {

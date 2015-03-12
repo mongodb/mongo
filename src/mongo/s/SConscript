@@ -270,7 +270,6 @@ env.Library(
         'chunk_manager_targeter.cpp',
         'cluster_explain.cpp',
         'cluster_write.cpp',
-        'dbclient_multi_command.cpp',
         'dbclient_shard_resolver.cpp',
         'scc_fast_query_handler.cpp',
     ],
@@ -279,6 +278,7 @@ env.Library(
         'batch_write_types',
         'cluster_ops',
         'cluster_write_op_conversion',
+        'client/sharding_client',
     ],
 )
 
