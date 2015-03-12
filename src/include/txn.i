@@ -91,25 +91,11 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 /*
  * __wt_txn_visible_all --
  *	Check if a given transaction ID is "globally visible".	This is, if
- *	all sessions in the system will see the transaction ID.
- */
-static inline int
-__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
-{
-	uint64_t oldest_id;
-
-	oldest_id = S2C(session)->txn_global.oldest_id;
-	return (TXNID_LT(id, oldest_id));
-}
-
-/*
- * __wt_txn_visible_checkpoint --
- *	Check if a given transaction ID is "globally visible".	This is, if
  *	all sessions in the system will see the transaction ID including the
  *      ID that belongs to a running checkpoint.
  */
 static inline int
-__wt_txn_visible_checkpoint(WT_SESSION_IMPL *session, uint64_t id)
+__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t checkpoint_id, oldest_id;
@@ -121,6 +107,7 @@ __wt_txn_visible_checkpoint(WT_SESSION_IMPL *session, uint64_t id)
 	 * WT_TXN_NONE while we are checking visibility.
 	 */
 	checkpoint_id = txn_global->checkpoint_id;
+	oldest_id = txn_global->oldest_id;
 
 	/*
 	 * If there is no active checkpoint or this handle is up to date with
@@ -130,20 +117,19 @@ __wt_txn_visible_checkpoint(WT_SESSION_IMPL *session, uint64_t id)
 	WT_ASSERT(session, S2BT(session) != NULL);
 	if (checkpoint_id == WT_TXN_NONE ||
 	    S2BT(session)->checkpoint_gen == txn_global->checkpoint_gen)
-		return (__wt_txn_visible_all(session, id));
+                return (TXNID_LT(id, oldest_id));
 
 	/*
 	 * If the checkpoint ID is the oldest ID in the system - use it for the
 	 * visibility check. Otherwise use the tracked oldest ID.
 	 */
-	if (TXNID_LT(txn_global->oldest_id, checkpoint_id)) {
-		oldest_id = txn_global->oldest_id;
-		WT_STAT_FAST_CONN_INCR(session, txn_visible_checkpoint);
-	} else {
+	if (TXNID_LT(checkpoint_id, oldest_id)) {
 		oldest_id = checkpoint_id;
 		WT_STAT_FAST_CONN_INCR(session, txn_not_visible_checkpoint);
-	}
-	return oldest_id;
+	} else
+		WT_STAT_FAST_CONN_INCR(session, txn_visible_checkpoint);
+
+	return (oldest_id);
 }
 
 /*

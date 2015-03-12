@@ -867,7 +867,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if (TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
 		if (TXNID_LT(txnid, r->skipped_txn) &&
-		    !__wt_txn_visible_checkpoint(session, txnid))
+		    !__wt_txn_visible_all(session, txnid))
 			r->skipped_txn = txnid;
 
 		/*
@@ -906,7 +906,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * page, so it is possible to skip an update but then find that by the
 	 * end of the scan, all updates are stable.
 	 */
-	if (__wt_txn_visible_checkpoint(session, max_txn) && !skipped)
+	if (__wt_txn_visible_all(session, max_txn) && !skipped)
 		return (0);
 
 	/*

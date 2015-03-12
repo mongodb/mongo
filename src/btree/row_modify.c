@@ -300,7 +300,7 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	 * Walk the list of updates, looking for obsolete updates at the end.
 	 */
 	for (first = NULL; upd != NULL; upd = upd->next)
-		if (__wt_txn_visible_checkpoint(session, upd->txnid)) {
+		if (__wt_txn_visible_all(session, upd->txnid)) {
 			if (first == NULL)
 				first = upd;
 		} else if (upd->txnid != WT_TXN_ABORTED)

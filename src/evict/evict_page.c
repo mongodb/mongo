@@ -382,7 +382,7 @@ __evict_review(
 	 * on the page are old enough they can be discarded from cache.
 	 */
 	if (!exclusive && mod != NULL &&
-	    !__wt_txn_visible_checkpoint(session, mod->rec_max_txn) &&
+	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
 	    !LF_ISSET(WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
 
