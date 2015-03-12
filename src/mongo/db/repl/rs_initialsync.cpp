@@ -64,12 +64,12 @@ namespace {
 
     /**
      * Truncates the oplog (removes any documents) and resets internal variables that were
-     * originally initialized or affected by using values from the oplog at startup time.  These 
+     * originally initialized or affected by using values from the oplog at startup time.  These
      * include the last applied optime, the last fetched optime, and the sync source blacklist.
      * Also resets the bgsync thread so that it reconnects its sync source after the oplog has been
      * truncated.
      */
-    void truncateAndResetOplog(OperationContext* txn, 
+    void truncateAndResetOplog(OperationContext* txn,
                                ReplicationCoordinator* replCoord,
                                BackgroundSync* bgsync) {
         AutoGetDb autoDb(txn, "local", MODE_X);
@@ -158,7 +158,7 @@ namespace {
             const string db = *i;
             if ( db == "local" )
                 continue;
-            
+
             if ( dataPass )
                 log() << "initial sync cloning db: " << db;
             else
@@ -217,7 +217,7 @@ namespace {
             lastOp = r->getLastOp(rsOplogName);
         } catch ( SocketException & ) {
             HostAndPort host = r->getHost();
-            log() << "connection lost to " << host.toString() << 
+            log() << "connection lost to " << host.toString() <<
                 "; is your tcp keepalive interval set appropriately?";
             if ( !r->connect(host) ) {
                 error() << "initial sync couldn't connect to " << host.toString();
@@ -261,7 +261,7 @@ namespace {
             sleepsecs(5);
             return false;
         }
-        
+
         return true;
     }
 
@@ -389,7 +389,11 @@ namespace {
         _tryToApplyOpWithRetry(&txn, &init, lastOp);
         std::deque<BSONObj> ops;
         ops.push_back(lastOp);
-        writeOpsToOplog(&txn, ops);
+
+        OpTime lastOptime = writeOpsToOplog(&txn, ops);
+        txn.getClient()->setLastOp(lastOptime);
+        replCoord->setMyLastOptime(lastOptime);
+        setNewOptime(lastOptime);
 
         std::string msg = "oplog sync 1 of 3";
         log() << msg;
@@ -424,7 +428,7 @@ namespace {
             return Status(ErrorCodes::InitialSyncFailure,
                           str::stream() << "initial sync failed: " << msg);
         }
-        
+
         // ---------
 
         Status status = getGlobalAuthorizationManager()->initialize(&txn);

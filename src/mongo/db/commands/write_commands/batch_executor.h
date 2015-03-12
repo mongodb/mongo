@@ -96,6 +96,7 @@ namespace mongo {
          * times.
          */
         void execInserts( const BatchedCommandRequest& request,
+                          const WriteConcernOptions& originalWC,
                           std::vector<WriteErrorDetail*>* errors );
 
         /**

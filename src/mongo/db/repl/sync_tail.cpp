@@ -273,7 +273,9 @@ namespace repl {
         }
         
         std::vector< std::vector<BSONObj> > writerVectors(replWriterThreadCount);
-        fillWriterVectors(ops, &writerVectors);
+        bool mustAwaitCommit = false;
+
+        fillWriterVectors(ops, &writerVectors, &mustAwaitCommit);
         LOG(2) << "replication batch size is " << ops.size() << endl;
         // We must grab this because we're going to grab write locks later.
         // We hold this mutex the entire time we're writing; it doesn't matter
@@ -297,7 +299,17 @@ namespace repl {
             return OpTime();
         }
 
+        if (mustAwaitCommit) {
+            txn->recoveryUnit()->goingToAwaitCommit();
+        }
         OpTime lastOpTime = writeOpsToOplog(txn, ops);
+        // Wait for journal before setting last op time if any op in batch had j:true
+        if (mustAwaitCommit) {
+            txn->recoveryUnit()->awaitCommit();
+        }
+        txn->getClient()->setLastOp(lastOpTime);
+        replCoord->setMyLastOptime(lastOpTime);
+        setNewOptime(lastOpTime);
 
         BackgroundSync::get()->notify(txn);
 
@@ -305,7 +317,8 @@ namespace repl {
     }
 
     void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops,
-                                     std::vector< std::vector<BSONObj> >* writerVectors) {
+                                     std::vector< std::vector<BSONObj> >* writerVectors,
+                                     bool* mustAwaitCommit) {
 
         for (std::deque<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();
@@ -318,6 +331,12 @@ namespace repl {
             MurmurHash3_x86_32( ns, len, 0, &hash);
 
             const char* opType = it->getField( "op" ).valuestrsafe();
+
+            // Check if any entry needs journaling, and if so return the need
+            const bool foundJournal = it->getField("j").trueValue();
+            if (foundJournal) {
+                *mustAwaitCommit = true;
+            }
 
             if (getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking() &&
                 isCrudOpType(opType)) {
