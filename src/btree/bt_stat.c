@@ -73,7 +73,6 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 static int
 __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 {
-
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
 	 * a count of the page type.
