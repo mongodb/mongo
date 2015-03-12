@@ -97,13 +97,15 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline int
 __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
+	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t checkpoint_id, oldest_id;
 
 	txn_global = &S2C(session)->txn_global;
+	btree = S2BT_SAFE(session);
 
 	/*
-	 * Take a local copy of checkpoint ID in case it is updated to
+	 * Take a local copy of ID in case they are updated while we are
 	 * WT_TXN_NONE while we are checking visibility.
 	 */
 	checkpoint_id = txn_global->checkpoint_id;
@@ -114,22 +116,21 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 	 * the active checkpoint it's safe to ignore the checkpoint ID in the
 	 * visibility check.
 	 */
-	WT_ASSERT(session, S2BT(session) != NULL);
-	if (checkpoint_id == WT_TXN_NONE ||
-	    S2BT(session)->checkpoint_gen == txn_global->checkpoint_gen)
-                return (TXNID_LT(id, oldest_id));
+	if (checkpoint_id != WT_TXN_NONE && btree != NULL &&
+	    btree->checkpoint_gen != txn_global->checkpoint_gen) {
+		/*
+		 * Use the checkpoint ID for the visibility check if it is the
+		 * oldest ID in the system.
+		 */
+		if (TXNID_LT(checkpoint_id, oldest_id)) {
+			oldest_id = checkpoint_id;
+			WT_STAT_FAST_CONN_INCR(
+			    session, txn_not_visible_checkpoint);
+		} else
+			WT_STAT_FAST_CONN_INCR(session, txn_visible_checkpoint);
+	}
 
-	/*
-	 * If the checkpoint ID is the oldest ID in the system - use it for the
-	 * visibility check. Otherwise use the tracked oldest ID.
-	 */
-	if (TXNID_LT(checkpoint_id, oldest_id)) {
-		oldest_id = checkpoint_id;
-		WT_STAT_FAST_CONN_INCR(session, txn_not_visible_checkpoint);
-	} else
-		WT_STAT_FAST_CONN_INCR(session, txn_visible_checkpoint);
-
-	return (oldest_id);
+	return (TXNID_LT(id, oldest_id));
 }
 
 /*
