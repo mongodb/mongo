@@ -357,6 +357,17 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Flush data-sources before we start the checkpoint. */
 	WT_ERR(__checkpoint_data_source(session, cfg));
 
+#ifdef	HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+	{
+		time_t seconds;
+		WT_ERR(__wt_seconds(session, &seconds));
+		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		    "%" PRIu64 ":%" PRIu64
+		    " Full database checkpoint starting write leaves",
+		    seconds, txn_global->checkpoint_gen));
+	}
+#endif
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
@@ -382,6 +393,18 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
+
+#ifdef	HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+	{
+		time_t seconds;
+		WT_ERR(__wt_seconds(session, &seconds));
+		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		    "%" PRIu64 ":%" PRIu64
+		    "Full database checkpoint starting transaction",
+		    seconds, txn_global->checkpoint_gen));
+	}
+#endif
 
 	/*
 	 * Start a snapshot transaction for the checkpoint.
@@ -421,12 +444,36 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Commit the transaction before syncing the file(s). */
 	WT_ERR(__wt_txn_commit(session, NULL));
 
+#ifdef	HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+	{
+		time_t seconds;
+		WT_ERR(__wt_seconds(session, &seconds));
+		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		    "%" PRIu64 ":%" PRIu64
+		    "Full database checkpoint committing transaction",
+		    seconds, txn_global->checkpoint_gen));
+	}
+#endif
+
 	/*
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
+
+#ifdef	HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+	{
+		time_t seconds;
+		WT_ERR(__wt_seconds(session, &seconds));
+		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		    "%" PRIu64 ":%" PRIu64
+		    "Full database checkpoint sync completed",
+		    seconds, txn_global->checkpoint_gen));
+	}
+#endif
 
 	/*
 	 * Disable metadata tracking during the metadata checkpoint.
@@ -447,6 +494,19 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    ret = __wt_checkpoint_sync(session, NULL));
 		WT_ERR(ret);
 	}
+
+#ifdef	HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+	{
+		time_t seconds;
+		WT_ERR(__wt_seconds(session, &seconds));
+		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		    "%" PRIu64 ":%" PRIu64
+		    "Full database checkpoint metadata sync completed",
+		    seconds, txn_global->checkpoint_gen));
+	}
+#endif
+
 	if (full) {
 		WT_ERR(__wt_epoch(session, &stop));
 		__checkpoint_stats(session, &start, &stop);
@@ -945,6 +1005,23 @@ fake:	/*
 	btree->checkpoint_gen = conn->txn_global.checkpoint_gen;
 	WT_STAT_FAST_DATA_SET(session,
 	    btree_checkpoint_generation, btree->checkpoint_gen);
+#ifdef	HAVE_VERBOSE
+	/*
+	 * Check for a global checkpoint ID to see whether the entire
+	 * database is being checkpointed or just this file.
+	 */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT) &&
+	    conn->txn_global.checkpoint_id != WT_TXN_NONE)
+	{
+		time_t seconds;
+		WT_ERR(__wt_seconds(session, &seconds));
+		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
+		    "%" PRIu64 ":%" PRIu64
+		    "Full database checkpoint of %s finished",
+		    seconds, S2C(session)->txn_global.checkpoint_gen,
+		    session->dhandle->name));
+	}
+#endif
 
 	/* Tell logging that the checkpoint is complete. */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
