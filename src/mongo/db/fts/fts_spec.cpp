@@ -185,11 +185,11 @@ namespace mongo {
             Tokenizer i( tools.language, raw );
             while ( i.more() ) {
                 Token t = i.next();
-                if ( t.type != Token::TEXT )
+                if ( t.type != Token::TEXT ) {
                     continue;
+                }
 
-                string term = t.data.toString();
-                makeLower( &term );
+                string term = tolowerString( t.data );
                 if ( tools.stopwords->isStopWord( term ) ) {
                     continue;
                 }

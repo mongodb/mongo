@@ -418,6 +418,7 @@ namespace mongo {
 
                 if (!params.query.parse(search,
                                         fam->getSpec().defaultLanguage().str().c_str(),
+                                        fts::FTSQuery::caseSensitiveDefault,
                                         fam->getSpec().getTextIndexVersion()).isOK()) {
                     return NULL;
                 }

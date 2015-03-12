@@ -200,8 +200,10 @@ namespace mongo {
         // Get all the index scans for each term in our query.
         // TODO it would be more efficient to only have one active scan at a time and create the
         // next when each finishes.
-        for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
-            const string& term = _params.query.getTerms()[i];
+        for (std::set<std::string>::const_iterator it = _params.query.getTermsForBounds().begin();
+             it != _params.query.getTermsForBounds().end();
+             ++it) {
+            const string& term = *it;
             IndexScanParams params;
             params.bounds.startKey = FTSIndexFormat::getIndexKey(MAX_WEIGHT,
                                                                  term,
@@ -318,11 +320,9 @@ namespace mongo {
         _scoreIterator++;
 
         // Filter for phrases and negated terms
-        if (_params.query.hasNonTermPieces()) {
-            if (!_ftsMatcher.matchesNonTerm(wsm->obj.value())) {
-                _ws->free(textRecordData.wsid);
-                return PlanStage::NEED_TIME;
-            }
+        if (!_ftsMatcher.matches(wsm->obj.value())) {
+            _ws->free(textRecordData.wsid);
+            return PlanStage::NEED_TIME;
         }
 
         // Populate the working set member with the text score and return it.

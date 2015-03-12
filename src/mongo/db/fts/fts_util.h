@@ -46,15 +46,6 @@ namespace mongo {
             TEXT_INDEX_VERSION_2 = 2 // Current index format.
         };
 
-
-        /**
-         * destructive!
-         */
-        inline void makeLower( std::string* s ) {
-            std::string::size_type sz = s->size();
-            for ( std::string::size_type i = 0; i < sz; i++ )
-                (*s)[i] = (char)tolower( (int)(*s)[i] );
-        }
     }
 }
 

@@ -29,6 +29,7 @@
 #include "mongo/db/fts/fts_spec.h"
 
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -78,8 +79,7 @@ namespace mongo {
                 if ( t.type != Token::TEXT )
                     continue;
 
-                string term = t.data.toString();
-                makeLower( &term );
+                string term = tolowerString( t.data );
                 if ( tools.stopwords->isStopWord( term ) )
                     continue;
                 term = tools.stemmer->stem( term );

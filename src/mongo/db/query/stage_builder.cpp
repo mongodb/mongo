@@ -264,7 +264,9 @@ namespace mongo {
                                            ? fam->getSpec().defaultLanguage().str()
                                            : node->language);
 
-            Status parseStatus = params.query.parse(node->query, language,
+            Status parseStatus = params.query.parse(node->query,
+                                                    language,
+                                                    fts::FTSQuery::caseSensitiveDefault,
                                                     fam->getSpec().getTextIndexVersion());
             if (!parseStatus.isOK()) {
                 warning() << "Can't parse text search query";
