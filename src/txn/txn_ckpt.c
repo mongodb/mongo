@@ -394,6 +394,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_epoch(session, &start));
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
+	/* Ensure a transaction ID is allocated prior to sharing it globally */
+	WT_ERR(__wt_txn_id_check(session));
 	txn_global->checkpoint_id = session->txn.id;
 
 	/*
