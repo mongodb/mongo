@@ -1,111 +1,94 @@
 //
 // Utility functions for multi-version replica sets
-// 
+//
 
-ReplSetTest.prototype.upgradeSet = function( binVersion, options ){
-    
-    options = options || {}
-    if( options.primaryStepdown == undefined ) options.primaryStepdown = true
-    
-    var nodes = this.nodes
-    var primary = this.getPrimary()
-    
+/**
+ * @param options {Object} see ReplSetTest.start & MongoRunner.runMongod.
+ * @param user {string} optional, user name for authentication.
+ * @param pwd {string} optional, password for authentication. Must be set if user is set.
+ */
+ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
+    options = options || {};
+
+    var primary = this.getPrimary();
+
     // Upgrade secondaries first
-    var nodesToUpgrade = this.getSecondaries()
-    
+    var nodesToUpgrade = this.getSecondaries();
+
     // Then upgrade primaries
-    nodesToUpgrade.push( primary )
-    
+    nodesToUpgrade.push(primary);
+
     // We can upgrade with no primary downtime if we have enough nodes
-    var noDowntimePossible = nodes.length > 2
-    
-    for( var i = 0; i < nodesToUpgrade.length; i++ ){
-        
-        var node = nodesToUpgrade[ i ]
-        
-        if( node == primary && options.primaryStepdown ){
-            
-            node = this.stepdown( node )
-            primary = this.getPrimary()
-        }
-        
-        var prevPrimaryId = this.getNodeId( primary )
-        
-        if( options.custom ){
-            options.custom.binVersion = binVersion;
+    var noDowntimePossible = this.nodes.length > 2;
 
-            for( var nodeName in this.nodeOptions ){
-                this.nodeOptions[ nodeName ] = options.custom
-            }
+    for (var i = 0; i < nodesToUpgrade.length; i++) {
+        var node = nodesToUpgrade[ i ];
+        if (node == primary) {
+            node = this.stepdown(node);
+            primary = this.getPrimary();
         }
 
-        this.upgradeNode( node, binVersion, true, options )
-        
-        if( noDowntimePossible )
-            assert.eq( this.getNodeId( primary ), prevPrimaryId )
+        var prevPrimaryId = this.getNodeId(primary);
+        //merge new options into node settings...
+        for (var nodeName in this.nodeOptions) {
+            this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
+        }
+
+        this.upgradeNode(node, options, user, pwd);
+
+        if (noDowntimePossible)
+            assert.eq(this.getNodeId(primary), prevPrimaryId);
     }
-}
+};
 
-ReplSetTest.prototype.upgradeNode = function( node, binVersion, waitForState, options ){
-
-    var node;
-    if (options.custom) {
-        node = this.restart( node, options.custom );
-    } else {
-        node = this.restart( node, { binVersion : binVersion } );
+ReplSetTest.prototype.upgradeNode = function(node, opts, user, pwd) {
+    if (user != undefined) {
+        assert.eq(1, node.getDB("admin").auth(user, pwd));
     }
 
-    if (options.auth) {
-        // Hardcode admin database, because otherwise can't get repl set status
-        node.getDB("admin").auth(options.auth);
-    }
-    
-    // By default, wait for primary or secondary state
-    if( waitForState == undefined ) waitForState = true
-    if( waitForState == true ) waitForState = [ ReplSetTest.State.PRIMARY, 
-                                                ReplSetTest.State.SECONDARY,
-                                                ReplSetTest.State.ARBITER ]
-    if( waitForState )
-        this.waitForState( node, waitForState )
-    
-    return node
-}
+    assert.commandWorked(node.adminCommand("replSetMaintenance"));
+    this.waitForState(node, ReplSetTest.State.RECOVERING);
 
-ReplSetTest.prototype.stepdown = function( nodeId ){
-        
-    nodeId = this.getNodeId( nodeId )
-    
-    assert.eq( this.getNodeId( this.getPrimary() ), nodeId )    
-    
-    var node = this.nodes[ nodeId ]
-    
+    var newNode = this.restart(node, opts);
+    if (user != undefined) {
+        newNode.getDB("admin").auth(user, pwd);
+    }
+
+    var waitForStates = [ ReplSetTest.State.PRIMARY,
+                          ReplSetTest.State.SECONDARY,
+                          ReplSetTest.State.ARBITER ];
+    this.waitForState(newNode, waitForStates);
+
+    return newNode;
+};
+
+ReplSetTest.prototype.stepdown = function(nodeId) {
+    nodeId = this.getNodeId(nodeId);
+    assert.eq(this.getNodeId(this.getPrimary()), nodeId);
+    var node = this.nodes[nodeId];
+
     try {
-        node.getDB("admin").runCommand({ replSetStepDown: 50, force : true })
-        assert( false )
+        node.getDB("admin").runCommand({ replSetStepDown: 50, force: true });
+        assert(false);
     }
-    catch( e ){
-        printjson( e );
+    catch (ex) {
+        print('Caught exception after stepDown cmd: ' + tojson(ex));
     }
-    
-    return this.reconnect( node )
-}
 
-ReplSetTest.prototype.reconnect = function( node ){
-    
-    var nodeId = this.getNodeId( node )
-    
-    this.nodes[ nodeId ] = new Mongo( node.host )
-    
-    // TODO
-    var except = {}
-    
-    for( var i in node ){
-        if( typeof( node[i] ) == "function" ) continue
-        this.nodes[ nodeId ][ i ] = node[ i ]
+    return this.reconnect(node);
+};
+
+ReplSetTest.prototype.reconnect = function(node) {
+    var nodeId = this.getNodeId(node);
+    this.nodes[nodeId] = new Mongo(node.host);
+    var except = {};
+    for (var i in node) {
+        if (typeof(node[i]) == "function") continue;
+        this.nodes[nodeId][i] = node[i];
     }
-    
-    return this.nodes[ nodeId ]
-}
+
+    return this.nodes[nodeId];
+};
 
 ReplSetTest.prototype.conf = function () {
     var admin = this.getPrimary().getDB('admin');
@@ -115,8 +98,9 @@ ReplSetTest.prototype.conf = function () {
     if (resp.ok && !(resp.errmsg) && resp.config)
         return resp.config;
 
-    else if (resp.errmsg && resp.errmsg.startsWith( "no such cmd" ))
+    else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
         return admin.getSisterDB("local").system.replset.findOne();
 
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
-}
+};
+

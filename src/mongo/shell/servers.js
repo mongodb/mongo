@@ -548,22 +548,23 @@ MongoRunner.mongosOptions = function( opts ){
 
 /**
  * Starts a mongod instance.
- * 
+ *
  * @param {Object} opts
- * 
+ *
  *   {
- *     useHostName {boolean}: Uses hostname of machine if true
- *     forceLock {boolean}: Deletes the lock file if set to true
- *     dbpath {string}: location of db files
- *     cleanData {boolean}: Removes all files in dbpath if true
- *     startClean {boolean}: same as cleanData
- *     noCleanData {boolean}: Do not clean files (cleanData takes priority)
- * 
+ *     useHostName {boolean}: Uses hostname of machine if true.
+ *     forceLock {boolean}: Deletes the lock file if set to true.
+ *     dbpath {string}: location of db files.
+ *     cleanData {boolean}: Removes all files in dbpath if true.
+ *     startClean {boolean}: same as cleanData.
+ *     noCleanData {boolean}: Do not clean files (cleanData takes priority).
+ *     binVersion {string}: version for binary (also see MongoRunner.binVersionSubs).
+ *
  *     @see MongoRunner.mongodOptions for other options
  *   }
- * 
+ *
  * @return {Mongo} connection object to the started mongod instance.
- * 
+ *
  * @see MongoRunner.arrOptions
  */
 MongoRunner.runMongod = function( opts ){
