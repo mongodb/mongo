@@ -39,23 +39,53 @@
 
 namespace mongo {
 
-    TEST( MatchExpressionParserText, Parse1 ) {
-        BSONObj query = fromjson( "{$text:{$search:\"awesome\", $language:\"english\"}}" );
+    TEST( MatchExpressionParserText, Basic ) {
+        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $language:\"english\"}}" );
 
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        MatchExpression* exp = result.getValue();
-        ASSERT_EQUALS( MatchExpression::TEXT, exp->matchType() );
-
-        TextMatchExpression* textExp = static_cast<TextMatchExpression*>( exp );
+        ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
+        boost::scoped_ptr<TextMatchExpression> textExp(
+                static_cast<TextMatchExpression*>( result.getValue() ) );
         ASSERT_EQUALS( textExp->getQuery(), "awesome" );
         ASSERT_EQUALS( textExp->getLanguage(), "english" );
-        delete exp;
+        ASSERT_EQUALS( textExp->getCaseSensitive(), fts::FTSQuery::caseSensitiveDefault );
     }
 
-    TEST( MatchExpressionParserText, Parse2 ) {
-        BSONObj query = fromjson( "{$text:{$search:\"awesome\", $language:\"spanglish\"}}" );
+    TEST( MatchExpressionParserText, LanguageError ) {
+        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $language:\"spanglish\"}}" );
+
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+    }
+
+    TEST( MatchExpressionParserText, CaseSensitiveTrue ) {
+        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $caseSensitive: true}}" );
+
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
+        boost::scoped_ptr<TextMatchExpression> textExp(
+                static_cast<TextMatchExpression*>( result.getValue() ) );
+        ASSERT_EQUALS( textExp->getCaseSensitive(), true );
+    }
+
+    TEST( MatchExpressionParserText, CaseSensitiveFalse ) {
+        BSONObj query = fromjson( "{$text: {$search:\"awesome\", $caseSensitive: false}}" );
+
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
+        boost::scoped_ptr<TextMatchExpression> textExp(
+                static_cast<TextMatchExpression*>( result.getValue() ) );
+        ASSERT_EQUALS( textExp->getCaseSensitive(), false );
+    }
+
+    TEST( MatchExpressionParserText, CaseSensitiveError ) {
+        BSONObj query = fromjson( "{$text:{$search:\"awesome\", $caseSensitive: 0}}" );
 
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );

@@ -151,6 +151,7 @@ namespace mongo {
             ret->indexKeyPattern = index.keyPattern;
             ret->query = textExpr->getQuery();
             ret->language = textExpr->getLanguage();
+            ret->caseSensitive = textExpr->getCaseSensitive();
             return ret;
         }
         else {

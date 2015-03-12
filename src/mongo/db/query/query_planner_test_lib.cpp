@@ -287,6 +287,13 @@ namespace mongo {
                 }
             }
 
+            BSONElement caseSensitiveElt = textObj["caseSensitive"];
+            if (!caseSensitiveElt.eoo()) {
+                if (caseSensitiveElt.trueValue() != node->caseSensitive) {
+                    return false;
+                }
+            }
+
             BSONElement indexPrefix = textObj["prefix"];
             if (!indexPrefix.eoo()) {
                 if (!indexPrefix.isABSONObj()) {

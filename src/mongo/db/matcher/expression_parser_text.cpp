@@ -44,16 +44,20 @@ namespace mongo {
         // Validate queryObj, but defer construction of FTSQuery (which requires access to the
         // target namespace) until stage building time.
 
+        int expectedFieldCount = 1;
+
         if ( mongo::String != queryObj["$search"].type() ) {
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "$search needs a String" );
+            return StatusWithMatchExpression( ErrorCodes::TypeMismatch,
+                                              "$search requires a string value" );
         }
 
         string language = "";
         BSONElement languageElt = queryObj["$language"];
         if ( !languageElt.eoo() ) {
+            expectedFieldCount++;
             if ( mongo::String != languageElt.type() ) {
-                return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                  "$language needs a String" );
+                return StatusWithMatchExpression( ErrorCodes::TypeMismatch,
+                                                  "$language requires a string value" );
             }
             language = languageElt.String();
             Status status =
@@ -65,12 +69,23 @@ namespace mongo {
         }
         string query = queryObj["$search"].String();
 
-        if ( queryObj.nFields() != ( languageElt.eoo() ? 1 : 2 ) ) {
+        BSONElement caseSensitiveElt = queryObj["$caseSensitive"];
+        bool caseSensitive = fts::FTSQuery::caseSensitiveDefault;
+        if ( !caseSensitiveElt.eoo() ) {
+            expectedFieldCount++;
+            if ( mongo::Bool != caseSensitiveElt.type() ) {
+                return StatusWithMatchExpression( ErrorCodes::TypeMismatch,
+                                                  "$caseSensitive requires a boolean value" );
+            }
+            caseSensitive = caseSensitiveElt.trueValue();
+        }
+
+        if ( queryObj.nFields() != expectedFieldCount ) {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "extra fields in $text" );
         }
 
         auto_ptr<TextMatchExpression> e( new TextMatchExpression() );
-        Status s = e->init( query, language );
+        Status s = e->init( query, language, caseSensitive );
         if ( !s.isOK() ) {
             return StatusWithMatchExpression( s );
         }
