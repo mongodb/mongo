@@ -901,7 +901,13 @@ elif windows:
     #  identifier' : type name first seen using 'objecttype1' now seen using 'objecttype2'
     #    This warning occurs when classes and structs are declared with a mix of struct and class
     #    which can cause linker failures
-    env.Append( CCFLAGS=["/we4099"] )
+    # c4930
+    #  'identifier': prototyped function not called (was a variable definition intended?)
+    #     This warning indicates a most-vexing parse error, where a user declared a function that
+    #     was probably intended as a variable definition.  A common example is accidentally
+    #     declaring a function called lock that takes a mutex when one meant to create a guard
+    #     object called lock on the stack.
+    env.Append( CCFLAGS=["/we4099", "/we4930"] )
 
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS"] )
 
