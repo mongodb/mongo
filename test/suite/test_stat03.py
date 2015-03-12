@@ -32,6 +32,8 @@ from wiredtiger import stat
 
 from helper import complex_populate, complex_populate_lsm, simple_populate
 from helper import key_populate, complex_value_populate, value_populate
+from helper import complex_populate_colgroup_count, complex_populate_index_count
+from helper import complex_populate_colgroup_name, complex_populate_index_name
 from wtscenario import multiply_scenarios, number_scenarios
 
 # test_stat03.py
@@ -58,13 +60,23 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
             'error_prefix="%s: "' % self.shortid())
         return conn
 
+    def stat_cursor(self, uri):
+        return self.session.open_cursor(
+            'statistics:' + uri, None, 'statistics=(all)')
+
     def test_stat_cursor_reset(self):
-        self.pop(self, self.uri, 'key_format=S', 100)
-        statc = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(all)')
-        n = statc[stat.dsrc.btree_entries][2]
+        # The number of btree_entries reported is influenced by the
+        # number of column groups and indices.  Each insert will have
+        # a multiplied effect.
         if self.pop == simple_populate:
-            self.assertEqual(n, 101)
+            multiplier = 1   # no declared colgroup is like one big colgroup
+        else:
+            multiplier = complex_populate_colgroup_count() + \
+                         complex_populate_index_count()
+        n = 100
+        self.pop(self, self.uri, 'key_format=S', n)
+        statc = self.stat_cursor(self.uri)
+        self.assertEqual(statc[stat.dsrc.btree_entries][2], n * multiplier)
 
         c = self.session.open_cursor(self.uri)
         c.set_key(key_populate(c, 200))
@@ -76,12 +88,23 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
         c.insert()
 
         # Test that cursor reset re-loads the values.
-        self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
+        self.assertEqual(statc[stat.dsrc.btree_entries][2], n * multiplier)
         statc.reset()
-        if self.pop == simple_populate:
-            self.assertEqual(statc[stat.dsrc.btree_entries][2], n + 1)
-        else:
-            self.assertGreater(statc[stat.dsrc.btree_entries][2], n)
+        n += 1
+        self.assertEqual(statc[stat.dsrc.btree_entries][2], n * multiplier)
+
+        # For applications with indices and/or column groups, verify
+        # that there is a way to count the base number of entries.
+        if self.pop != simple_populate:
+            statc.close()
+            statc = self.stat_cursor(
+                complex_populate_index_name(self, self.uri))
+            self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
+            statc.close()
+            statc = self.stat_cursor(
+                complex_populate_colgroup_name(self, self.uri))
+            self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
+        statc.close()
 
 
 if __name__ == '__main__':
