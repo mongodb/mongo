@@ -229,12 +229,12 @@ usage(void)
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 	fprintf(stderr,
 	    "global options:\n"
-	    "\t" "-C\twiredtiger_open configuration\n"
-	    "\t" "-h\tdatabase directory\n"
-	    "\t" "-L\tturn logging off for debug-mode\n"
-	    "\t" "-R\trun recovery if configured\n"
-	    "\t" "-V\tdisplay library version and exit\n"
-	    "\t" "-v\tverbose\n");
+	    "\t" "-C\t" "wiredtiger_open configuration\n"
+	    "\t" "-h\t" "database directory\n"
+	    "\t" "-L\t" "turn logging off for debug-mode\n"
+	    "\t" "-R\t" "run recovery if configured\n"
+	    "\t" "-V\t" "display library version and exit\n"
+	    "\t" "-v\t" "verbose\n");
 	fprintf(stderr,
 	    "commands:\n"
 	    "\t" "backup\t  database backup\n"
