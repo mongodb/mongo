@@ -364,7 +364,17 @@ connection_runtime_config = [
     Config('eviction_trigger', '95', r'''
         trigger eviction when the cache is using this much memory, as a
         percentage of the total cache size''', min=10, max=99),
-    Config('lsm_manager', '', r'''
+    Config('file_close', '', r'''
+        control how aggressively file handles are closed''',
+        type='category', subconfig=[
+        Config('idle_time', '30', r'''
+            amount of time a file handle needs to be idle before attempting
+            to close it''', min=1, max=1000)
+        Config('interval', '10', r'''
+            interval at which to check for files that are inactive and close
+            them''', min=1, max=1000),
+        ]),
+        Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management''',
         type='category', subconfig=[
         Config('worker_thread_max', '4', r'''

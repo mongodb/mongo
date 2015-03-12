@@ -1607,6 +1607,15 @@ struct __wt_connection {
 	 * @config{eviction_trigger, trigger eviction when the cache is using
 	 * this much memory\, as a percentage of the total cache size., an
 	 * integer between 10 and 99; default \c 95.}
+	 * @config{file_close = (, control how aggressively file handles are
+	 * closed., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;idle_time, amount of time a file
+	 * handle needs to be idle before attempting to close it., an integer
+	 * between 1 and 1000; default \c 30.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;interval, interval at which to check
+	 * for files that are inactive and close them., an integer between 1 and
+	 * 1000; default \c 10.}
+	 * @config{ ),,}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree
 	 * management., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where
@@ -1964,6 +1973,15 @@ struct __wt_connection {
  * WT_CONNECTION::load_extension as the \c config parameter (for example\,
  * <code>extensions=(/path/ext.so={entry=my_entry})</code>)., a list of strings;
  * default empty.}
+ * @config{file_close = (, control how aggressively file handles are closed., a
+ * set of related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;idle_time, amount of time a file handle needs
+ * to be idle before attempting to close it., an integer between 1 and 1000;
+ * default \c 30.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;interval, interval at which
+ * to check for files that are inactive and close them., an integer between 1
+ * and 1000; default \c 10.}
+ * @config{ ),,}
  * @config{file_extend, file extension configuration.  If set\, extend files of
  * the set type in allocations of the set size\, instead of a block at a time as
  * each new block is written.  For example\,

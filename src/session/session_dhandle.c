@@ -288,16 +288,19 @@ __wt_session_close_cache(WT_SESSION_IMPL *session)
 static int
 __session_dhandle_sweep(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
 	time_t now;
+
+	conn = S2C(session);
 
 	/*
 	 * Periodically sweep for dead handles; if we've swept recently, don't
 	 * do it again.
 	 */
 	WT_RET(__wt_seconds(session, &now));
-	if (now - session->last_sweep < WT_DHANDLE_SWEEP_PERIOD)
+	if (now - session->last_sweep < conn->sweep_interval)
 		return (0);
 	session->last_sweep = now;
 
@@ -309,7 +312,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle = dhandle_cache->dhandle;
 		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
-		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
+		    now - dhandle->timeofdeath > conn->sweep_idle_time) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
 			__session_discard_btree(session, dhandle_cache);
 		}
