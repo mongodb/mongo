@@ -3,7 +3,7 @@
 WiredTiger includes a command line utility, \c wt.
 
 @section util_global_synopsis Synopsis
-<code>wt [-rVv] [-C config] [-h directory] command [command-specific arguments]</code>
+<code>wt [-LRVv] [-C config] [-h directory] command [command-specific arguments]</code>
 
 @section util_global_description Description
 The \c wt tool is a command-line utility that provides access to
@@ -16,7 +16,9 @@ There are four global options:
 Specify configuration strings for the ::wiredtiger_open function.
 @par <code>-h directory</code>
 Specify a database home directory.
-@par <code>-r</code>
+@par <code>-L</code>
+Forcibly turn off logging subsystem for debugging purposes.
+@par <code>-R</code>
 Run recovery if the underlying database is configured to do so.
 @par <code>-V</code>
 Display WiredTiger version and exit.

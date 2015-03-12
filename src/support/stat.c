@@ -580,8 +580,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_split.v = 0;
 	stats->cache_eviction_walk.v = 0;
 	stats->cache_write.v = 0;
-	stats->cache_bytes_dirty.v = 0;
-	stats->cache_pages_dirty.v = 0;
 	stats->cache_eviction_clean.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
@@ -626,7 +624,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_sync_dir.v = 0;
 	stats->log_writes.v = 0;
 	stats->log_slot_consolidated.v = 0;
-	stats->log_prealloc_max.v = 0;
 	stats->log_prealloc_files.v = 0;
 	stats->log_prealloc_used.v = 0;
 	stats->log_slot_toobig.v = 0;

@@ -115,6 +115,25 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
+ * __wt_block_configure_first_fit --
+ *	Configure first-fit allocation.
+ */
+void
+__wt_block_configure_first_fit(WT_BLOCK *block, int on)
+{
+	/*
+	 * Switch to first-fit allocation so we rewrite blocks at the start of
+	 * the file; use atomic instructions because checkpoints also configure
+	 * first-fit allocation, and this way we stay on first-fit allocation
+	 * as long as any operation wants it.
+	 */
+	if (on)
+		(void)WT_ATOMIC_ADD4(block->allocfirst, 1);
+	else
+		(void)WT_ATOMIC_SUB4(block->allocfirst, 1);
+}
+
+/*
  * __wt_block_open --
  *	Open a block handle.
  */

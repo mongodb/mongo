@@ -33,7 +33,7 @@ static void	   config_checksum(void);
 static void	   config_compression(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
-static int	   config_find_is_perm(const char *, size_t);
+static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
@@ -57,7 +57,7 @@ config_setup(void)
 	 * trees are only compatible with row-store) and other items depend on
 	 * them.
 	 */
-	if (!config_find_is_perm("data_source", strlen("data_source")))
+	if (!config_is_perm("data_source"))
 		switch (MMRAND(1, 3)) {
 		case 1:
 			config_single("data_source=file", 0);
@@ -70,7 +70,7 @@ config_setup(void)
 			break;
 		}
 
-	if (!config_find_is_perm("file_type", strlen("file_type")))
+	if (!config_is_perm("file_type"))
 		switch (DATASOURCE("lsm") ? 5 : MMRAND(1, 10)) {
 		case 1:
 			config_single("file_type=fix", 0);
@@ -107,14 +107,9 @@ config_setup(void)
 		strcat(g.uri, "dev1/");
 	strcat(g.uri, WT_NAME);
 
-	/* Default single-threaded 10% of the time. */
-	cp = config_find("threads", strlen("threads"));
-	if (!(cp->flags & C_PERM))
-		*cp->v = MMRAND(1, 100) < 10 ? 1: CONF_RAND(cp);
-
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp) {
-		if (cp->flags & (C_IGNORE | C_PERM | C_TEMP))
+		if (F_ISSET(cp, C_IGNORE | C_PERM | C_TEMP))
 			continue;
 
 		/*
@@ -122,7 +117,7 @@ config_setup(void)
 		 * variable's min value is N.  Set the flag if we rolled >=
 		 * the min, 0 otherwise.
 		 */
-		if (cp->flags & C_BOOL)
+		if (F_ISSET(cp, C_BOOL))
 			*cp->v = MMRAND(1, 100) <= cp->min ? 1 : 0;
 		else
 			*cp->v = CONF_RAND(cp);
@@ -143,54 +138,51 @@ config_setup(void)
 	config_isolation();
 
 	/*
+	 * Periodically, run single-threaded so we can compare the results to
+	 * a Berkeley DB copy, as long as the thread-count isn't nailed down.
+	 * Don't do it on the first run, all our smoke tests would hit it.
+	 */
+	if (!g.replay && g.run_cnt % 20 == 19 && !config_is_perm("threads"))
+		g.c_threads = 1;
+
+	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
 	 * as long as the delete percentage isn't nailed down.
+	 * Don't do it on the first run, all our smoke tests would hit it.
 	 */
-	if (!g.replay && g.run_cnt % 10 == 0) {
-		cp = config_find("delete_pct", strlen("delete_pct"));
-		if (cp->name != NULL &&
-		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
-			g.c_delete_pct = 0;
-	}
+	if (!g.replay && g.run_cnt % 10 == 9 && !config_is_perm("delete_pct"))
+		g.c_delete_pct = 0;
 
 	/*
 	 * If this is an LSM run, set the cache size and crank up the insert
 	 * percentage.
 	 */
 	if (DATASOURCE("lsm")) {
-		cp = config_find("cache", strlen("cache"));
-		if (!(cp->flags & C_PERM))
+		if (!config_is_perm("cache"))
 			g.c_cache = 30 * g.c_chunk_size;
 
-		cp = config_find("insert_pct", strlen("insert_pct"));
-		if (cp->name != NULL &&
-		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
+		if (!config_is_perm("insert_pct"))
 			g.c_insert_pct = MMRAND(50, 85);
 	}
 
 	/* Make the default maximum-run length 20 minutes. */
-	cp = config_find("timer", strlen("timer"));
-	if (!(cp->flags & C_PERM))
+	if (!config_is_perm("timer"))
 		g.c_timer = 20;
 
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
 	 * the configuration.
 	 */
-	cp = config_find("key_min", strlen("key_min"));
-	if (!(cp->flags & C_PERM) && g.c_key_min > g.c_key_max)
+	if (!config_is_perm("key_min") && g.c_key_min > g.c_key_max)
 		g.c_key_min = g.c_key_max;
-	cp = config_find("key_max", strlen("key_max"));
-	if (!(cp->flags & C_PERM) && g.c_key_max < g.c_key_min)
+	if (!config_is_perm("key_max") && g.c_key_max < g.c_key_min)
 		g.c_key_max = g.c_key_min;
 	if (g.c_key_min > g.c_key_max)
 		die(EINVAL, "key_min may not be larger than key_max");
 
-	cp = config_find("value_min", strlen("value_min"));
-	if (!(cp->flags & C_PERM) && g.c_value_min > g.c_value_max)
+	if (!config_is_perm("value_min") && g.c_value_min > g.c_value_max)
 		g.c_value_min = g.c_value_max;
-	cp = config_find("value_max", strlen("value_max"));
-	if (!(cp->flags & C_PERM) && g.c_value_max < g.c_value_min)
+	if (!config_is_perm("value_max") && g.c_value_max < g.c_value_min)
 		g.c_value_max = g.c_value_min;
 	if (g.c_value_min > g.c_value_max)
 		die(EINVAL, "value_min may not be larger than value_max");
@@ -206,11 +198,8 @@ config_setup(void)
 static void
 config_checksum(void)
 {
-	CONFIG *cp;
-
 	/* Choose a checksum mode if nothing was specified. */
-	cp = config_find("checksum", strlen("checksum"));
-	if (!(cp->flags & C_PERM))
+	if (!config_is_perm("checksum"))
 		switch (MMRAND(1, 10)) {
 		case 1:					/* 10% */
 			config_single("checksum=on", 0);
@@ -231,7 +220,6 @@ config_checksum(void)
 static void
 config_compression(void)
 {
-	CONFIG *cp;
 	const char *cstr;
 
 	/*
@@ -241,8 +229,7 @@ config_compression(void)
 	 * robust, since it's possible to build compression libraries into
 	 * the WiredTiger library.
 	 */
-	cp = config_find("compression", strlen("compression"));
-	if (!(cp->flags & C_PERM)) {
+	if (!config_is_perm("compression")) {
 		cstr = "compression=none";
 		switch (MMRAND(1, 20)) {
 		case 1: case 2: case 3:			/* 30% no compression */
@@ -276,14 +263,12 @@ config_compression(void)
 static void
 config_isolation(void)
 {
-	CONFIG *cp;
 	const char *cstr;
 
 	/*
 	 * Isolation: choose something if isolation wasn't specified.
 	 */
-	cp = config_find("isolation", strlen("isolation"));
-	if (!(cp->flags & C_PERM)) {
+	if (!config_is_perm("isolation")) {
 		/* Avoid "maybe uninitialized" warnings. */
 		switch (MMRAND(1, 4)) {
 		case 1:
@@ -346,7 +331,7 @@ config_print(int error_display)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		if (cp->flags & C_STRING)
+		if (F_ISSET(cp, C_STRING))
 			fprintf(fp, "%s=%s\n", cp->name,
 			    *cp->vstr == NULL ? "" : *cp->vstr);
 		else
@@ -391,9 +376,9 @@ config_clear(void)
 
 	/* Clear configuration data. */
 	for (cp = c; cp->name != NULL; ++cp) {
-		cp->flags &= ~(uint32_t)C_TEMP;
-		if (!(cp->flags & C_PERM) &&
-		    cp->flags & C_STRING && cp->vstr != NULL) {
+		F_CLR(cp, C_TEMP);
+		if (!F_ISSET(cp, C_PERM) &&
+		    F_ISSET(cp, C_STRING) && cp->vstr != NULL) {
 			free(*cp->vstr);
 			*cp->vstr = NULL;
 		}
@@ -421,10 +406,10 @@ config_single(const char *s, int perm)
 	}
 
 	cp = config_find(s, (size_t)(ep - s));
-	cp->flags |= perm ? C_PERM : C_TEMP;
+	F_SET(cp, perm ? C_PERM : C_TEMP);
 	++ep;
 
-	if (cp->flags & C_STRING) {
+	if (F_ISSET(cp, C_STRING)) {
 		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
 		    strncmp("file", ep, strlen("file")) != 0 &&
 		    strncmp("helium", ep, strlen("helium")) != 0 &&
@@ -466,7 +451,7 @@ config_single(const char *s, int perm)
 		    g.progname, s);
 		exit(EXIT_FAILURE);
 	}
-	if (cp->flags & C_BOOL) {
+	if (F_ISSET(cp, C_BOOL)) {
 		if (v != 0 && v != 1) {
 			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",
 			    g.progname, s);
@@ -582,16 +567,16 @@ config_find(const char *s, size_t len)
 }
 
 /*
- * config_find_is_perm
+ * config_is_perm
  *	Return if a specific configuration entry was permanently set.
  */
 static int
-config_find_is_perm(const char *s, size_t len)
+config_is_perm(const char *s)
 {
 	CONFIG *cp;
 
-	cp = config_find(s, len);
-	return (cp->flags & C_PERM ? 1 : 0);
+	cp = config_find(s, strlen(s));
+	return (F_ISSET(cp, C_PERM) ? 1 : 0);
 }
 
 /*

@@ -20,8 +20,6 @@ struct timespec {
 	long   tv_nsec;		/* nanoseconds */
 };
 
-#define	strncasecmp _strnicmp
-
 /*
  * Windows Portability stuff
  * These are POSIX types which Windows lacks

@@ -18,8 +18,8 @@ __async_op_dequeue(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session,
     WT_ASYNC_OP_IMPL **op)
 {
 	WT_ASYNC *async;
-	long sleep_usec;
 	uint64_t cur_tail, last_consume, my_consume, my_slot, prev_slot;
+	uint64_t sleep_usec;
 	uint32_t tries;
 
 	async = conn->async;

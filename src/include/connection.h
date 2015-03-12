@@ -242,7 +242,7 @@ struct __wt_connection_impl {
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
-	long		 ckpt_usecs;	/* Checkpoint period */
+	uint64_t	 ckpt_usecs;	/* Checkpoint period */
 
 	int compact_in_memory_pass;	/* Compaction serialization */
 
@@ -304,7 +304,7 @@ struct __wt_connection_impl {
 	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
-	long		 stat_usecs;	/* Statistics log period */
+	uint64_t	 stat_usecs;	/* Statistics log period */
 
 #define	WT_CONN_LOG_ARCHIVE	0x01	/* Archive is enabled */
 #define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */

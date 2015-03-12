@@ -30,6 +30,7 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
+	int logoff, recover;
 	char *p;
 	const char *cmd_config, *config, *rec_config;
 
@@ -64,8 +65,9 @@ main(int argc, char *argv[])
 	 * needed, the user can specify -R to run recovery.
 	 */
 	rec_config = REC_ERROR;
+	logoff = recover = 0;
 	/* Check for standard options. */
-	while ((ch = __wt_getopt(progname, argc, argv, "C:h:RVv")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:h:LRVv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			cmd_config = __wt_optarg;
@@ -73,8 +75,13 @@ main(int argc, char *argv[])
 		case 'h':			/* home directory */
 			home = __wt_optarg;
 			break;
+		case 'L':			/* no logging */
+			rec_config = REC_LOGOFF;
+			logoff = 1;
+			break;
 		case 'R':			/* recovery */
 			rec_config = REC_RECOVER;
+			recover = 1;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
@@ -86,6 +93,10 @@ main(int argc, char *argv[])
 		default:
 			return (usage());
 		}
+	if (logoff && recover) {
+		fprintf(stderr, "Only one of -L and -R is allowed.\n");
+		return (EXIT_FAILURE);
+	}
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
@@ -220,6 +231,7 @@ usage(void)
 	    "global options:\n"
 	    "\t" "-C\twiredtiger_open configuration\n"
 	    "\t" "-h\tdatabase directory\n"
+	    "\t" "-L\tturn logging off for debug-mode\n"
 	    "\t" "-R\trun recovery if configured\n"
 	    "\t" "-V\tdisplay library version and exit\n"
 	    "\t" "-v\tverbose\n");
