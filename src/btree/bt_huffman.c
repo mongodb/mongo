@@ -128,28 +128,37 @@ static const struct __wt_huffman_table __wt_huffman_nytenglish[] = {
 static int __wt_huffman_read(WT_SESSION_IMPL *,
     WT_CONFIG_ITEM *, struct __wt_huffman_table **, u_int *, u_int *);
 
-#define	WT_HUFFMAN_CONFIG_VALID(str, len)				\
-	(WT_STRING_MATCH("english", (str), (len)) ||			\
-	    WT_PREFIX_MATCH((str), "utf8") || WT_PREFIX_MATCH((str), "utf16"))
-
 /*
- * __btree_huffman_config --
- *	Verify the key or value strings passed in.
+ * __wt_huffman_confchk --
+ *	Verify Huffman configuration.
  */
-static int
-__btree_huffman_config(WT_SESSION_IMPL *session,
-    WT_CONFIG_ITEM *key_conf, WT_CONFIG_ITEM *value_conf)
+int
+__wt_huffman_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v)
 {
-	if (key_conf->len != 0 &&
-	    !WT_HUFFMAN_CONFIG_VALID(key_conf->str, key_conf->len))
-		WT_RET_MSG(
-		    session, EINVAL, "illegal Huffman key configuration");
-	if (value_conf->len != 0 &&
-	    !WT_HUFFMAN_CONFIG_VALID(value_conf->str, value_conf->len))
-		WT_RET_MSG(
-		    session, EINVAL, "illegal Huffman value configuration");
-	return (0);
+	FILE *fp;
+	const char *p;
 
+	if (v->len == 0)
+		return (0);
+
+	if (WT_STRING_MATCH("english", v->str, v->len))
+		return (0);
+
+	if (WT_PREFIX_MATCH(v->str, "utf8"))
+		p = v->str + strlen("utf8");
+	else if (WT_PREFIX_MATCH(v->str, "utf16"))
+		p = v->str + strlen("utf16");
+	else
+		WT_RET_MSG(session, EINVAL,
+		    "illegal Huffman configuration: %.*s", (int)v->len, v->str);
+
+	if ((fp = fopen(p, "r")) == NULL)
+		WT_RET_MSG(session, __wt_errno(),
+		    "unable to read Huffman table file %.*s",
+		    (int)v->len, v->str);
+	(void)fclose(fp);
+
+	return (0);
 }
 
 /*
@@ -170,11 +179,12 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	cfg = btree->dhandle->cfg;
 
 	WT_RET(__wt_config_gets_none(session, cfg, "huffman_key", &key_conf));
+	WT_RET(__wt_huffman_confchk(session, &key_conf));
 	WT_RET(
 	    __wt_config_gets_none(session, cfg, "huffman_value", &value_conf));
+	WT_RET(__wt_huffman_confchk(session, &value_conf));
 	if (key_conf.len == 0 && value_conf.len == 0)
 		return (0);
-	WT_RET(__btree_huffman_config(session, &key_conf, &value_conf));
 
 	switch (btree->type) {		/* Check file type compatibility. */
 	case BTREE_COL_FIX:
