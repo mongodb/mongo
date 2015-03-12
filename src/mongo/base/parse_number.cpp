@@ -193,7 +193,7 @@ namespace mongo {
     // Definition of the various supported implementations of parseNumberFromStringWithBase.
 
 #define DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(NUMBER_TYPE)          \
-    template MONGO_COMPILER_API_EXPORT Status parseNumberFromStringWithBase<NUMBER_TYPE>(StringData, int, NUMBER_TYPE*);
+    template MONGO_CLIENT_API Status parseNumberFromStringWithBase<NUMBER_TYPE>(StringData, int, NUMBER_TYPE*);
 
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long)
     DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long long)
