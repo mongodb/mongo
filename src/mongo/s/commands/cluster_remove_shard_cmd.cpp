@@ -102,10 +102,12 @@ namespace {
 
             Shard s = Shard::findIfExists(target);
             if (s == Shard::EMPTY) {
-                errmsg = str::stream() << "shard '" << target << "'"
-                                       << " does not exist";
-                log() << errmsg;
-                return false;
+                string msg(str::stream() <<
+                           "Could not drop shard '" << target <<
+                           "' because it does not exist");
+                log() << msg;
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::ShardNotFound, msg));
             }
 
             ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
