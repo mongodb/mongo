@@ -498,6 +498,10 @@ namespace {
                 // do upserts for inserts as we might get replayed more than once
                 OpDebug debug;
 
+                uassert(ErrorCodes::NamespaceNotFound, str::stream() <<
+                        "Failed to apply insert due to missing collection: " << op.toString(),
+                        collection);
+
                 // No _id.
                 // This indicates an issue with the upstream server:
                 //     The oplog entry is corrupted; or

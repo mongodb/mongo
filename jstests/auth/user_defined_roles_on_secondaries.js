@@ -150,6 +150,11 @@ rstest.nodes.forEach(function (node) {
 // NOTE: This section of the test depends on the oplog and roles schemas.
 assert.commandWorked(rstest.getMaster().getDB("admin").runCommand({ applyOps: [
     {
+        op: "c",
+        ns: "admin.$cmd",
+        o: { create: "system.roles" }
+    },
+    {
         op: "i",
         ns: "admin.system.roles",
         o: {
@@ -175,6 +180,11 @@ assert.commandWorked(rstest.getMaster().getDB("admin").runCommand({ applyOps: [
         op: "c",
         ns: "admin.$cmd",
         o: { dropDatabase: 1 }
+    },
+    {
+        op: "c",
+        ns: "admin.$cmd",
+        o: { create: "system.roles" }
     },
     {
         op: "i",
