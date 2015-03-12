@@ -371,6 +371,8 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		cval.str++;
 		cval.len -= 2;
 	}
+	WT_ERR(__wt_config_check(session,
+	   WT_CONFIG_REF(session, session_create), cval.str, cval.len));
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->bloom_config));
 
