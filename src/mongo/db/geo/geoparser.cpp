@@ -79,9 +79,9 @@ namespace mongo {
         if (!allowAddlFields && it.more()) { return BAD_VALUE("Point must only contain two numeric elements"); }
         out->x = x.number();
         out->y = y.number();
-        // Point coordinates must must be finite numbers, neither NaN or infinite.
+        // Point coordinates must be finite numbers, neither NaN or infinite.
         if (!std::isfinite(out->x) || !std::isfinite(out->y)) {
-            return BAD_VALUE("Point coordinates must must be finite numbers");
+            return BAD_VALUE("Point coordinates must be finite numbers");
         }
         return Status::OK();
     }
