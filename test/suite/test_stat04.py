@@ -32,10 +32,10 @@ from wtscenario import number_scenarios, multiply_scenarios
 import wiredtiger, wttest
 from wiredtiger import stat
 
-# test_stat03.py
+# test_stat04.py
 #    Statistics key/value pair count
-class test_stat03(wttest.WiredTigerTestCase, suite_subprocess):
-    uripfx = 'table:test_stat03.'
+class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
+    uripfx = 'table:test_stat04.'
 
     # Note: stats for fixed length bit fields (valuefmt='8t')
     # do not include accurate counts for kv pairs.
