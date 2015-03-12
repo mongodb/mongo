@@ -252,7 +252,7 @@ namespace mongo {
         };
 
         boost::shared_ptr<Latch> get(int32_t desc) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            boost::lock_guard<boost::mutex> lock(_mutex);
             Map::iterator iter = _latches.find(desc);
             jsassert(iter != _latches.end(), "not a valid CountDownLatch descriptor");
             return iter->second;
