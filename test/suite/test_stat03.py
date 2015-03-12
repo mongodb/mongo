@@ -65,8 +65,11 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
             'statistics:' + uri, None, 'statistics=(all)')
 
     def test_stat_cursor_reset(self):
+        # The number of btree_entries reported is influenced by the
+        # number of column groups and indices.  Each insert will have
+        # a multiplied effect.
         if self.pop == simple_populate:
-            multiplier = 1
+            multiplier = 1   # no declared colgroup is like one big colgroup
         else:
             multiplier = complex_populate_colgroup_count() + \
                          complex_populate_index_count()
