@@ -74,9 +74,19 @@ namespace mongo {
     BSONObj DatabaseType::toBSON() const {
         BSONObjBuilder builder;
 
-        if (_isNameSet) builder.append(name(), _name);
-        if (_isPrimarySet) builder.append(primary(), _primary);
-        if (_isDrainingSet) builder.append(draining(), _draining);
+        if (_isNameSet) {
+            builder.append(name(), _name);
+        }
+
+        if (_isPrimarySet) {
+            builder.append(primary(), _primary);
+        }
+
+        builder.appendBool(DEPRECATED_partitioned(), !_isPrimarySet);
+
+        if (_isDrainingSet) {
+            builder.append(draining(), _draining);
+        }
 
         return builder.obj();
     }

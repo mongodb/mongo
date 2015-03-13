@@ -28,22 +28,21 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/config_upgrade.h"
 
-#include "mongo/client/connpool.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/s/cluster_client_internal.h"
-#include "mongo/s/cluster_write.h"
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    using std::endl;
     using std::string;
-
     using mongo::str::stream;
+
 
     /**
      * Upgrade v0 to v7 described here
@@ -52,8 +51,8 @@ namespace mongo {
      */
     bool doUpgradeV0ToV7(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
-                         string* errMsg)
-    {
+                         string* errMsg) {
+
         string dummy;
         if (!errMsg) errMsg = &dummy;
 
@@ -65,7 +64,7 @@ namespace mongo {
         // this.
         //
 
-        log() << "writing initial config version at v" << CURRENT_CONFIG_VERSION << endl;
+        log() << "writing initial config version at v" << CURRENT_CONFIG_VERSION;
 
         OID newClusterId = OID::gen();
 
@@ -81,13 +80,15 @@ namespace mongo {
         // If the cluster has not previously been initialized, we need to set the version before
         // using so subsequent mongoses use the config data the same way.  This requires all three
         // config servers online initially.
-        Status result = clusterUpdate(VersionType::ConfigNS, BSON("_id" << 1),
-                versionInfo.toBSON(),
-                true /* upsert */,
-                false /* multi */,
-                NULL);
+        Status result = grid.catalogManager()->update(
+                                VersionType::ConfigNS,
+                                BSON("_id" << 1),
+                                versionInfo.toBSON(),
+                                true,   // upsert
+                                false,  // multi
+                                NULL);
 
-        if ( !result.isOK() ) {
+        if (!result.isOK()) {
             *errMsg = stream() << "error writing initial config version: "
                                << result.reason();
             return false;

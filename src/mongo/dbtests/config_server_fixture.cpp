@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/dbtests/config_server_fixture.h"
 
 #include <boost/scoped_ptr.hpp>

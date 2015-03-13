@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -83,7 +84,11 @@ namespace {
         }
 
         virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            return cmdObj.firstElement().valuestrsafe();
+            if (cmdObj.firstElement().type() != String) {
+                return "";
+            }
+
+            return cmdObj.firstElement().str();
         }
 
         virtual bool run(OperationContext* txn,
@@ -94,38 +99,28 @@ namespace {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            const std::string dbname = parseNs("admin", cmdObj);
+            const std::string dbname = parseNs("", cmdObj);
 
-            if (dbname.size() == 0) {
-                errmsg = "no db";
+            if (dbname.empty() || !nsIsDbOnly(dbname)) {
+                errmsg = "invalid db name specified: " + dbname;
                 return false;
             }
 
-            if (dbname == "admin") {
-                errmsg = "can't shard the admin db";
-                return false;
-            }
-            if (dbname == "local") {
-                errmsg = "can't shard the local db";
+            if (dbname == "admin" || dbname == "config" || dbname == "local") {
+                errmsg = "can't shard " + dbname + " database";
                 return false;
             }
 
-            DBConfigPtr config = grid.getDBConfig(dbname);
-            if (config->isShardingEnabled()) {
-                errmsg = "already enabled";
-                return false;
+            Status status = grid.catalogManager()->enableSharding(dbname);
+            if (status.isOK()) {
+                audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
             }
 
-            if (!configServer.allUp(false, errmsg)) {
-                return false;
-            }
+            // Make sure to update any stale metadata
+            DBConfigPtr db = grid.getDBConfig(dbname);
+            db->load();
 
-            log() << "enabling sharding on: " << dbname;
-
-            audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
-            config->enableSharding();
-
-            return true;
+            return appendCommandStatus(result, status);
         }
 
     } enableShardingCmd;

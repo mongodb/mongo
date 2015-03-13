@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/config_upgrade_helpers.h"
 
 #include <boost/scoped_ptr.hpp>
@@ -36,8 +38,10 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/cluster_client_internal.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -293,18 +297,20 @@ namespace mongo {
         setUpgradeIdObj << VersionType::upgradeId(upgradeID);
         setUpgradeIdObj << VersionType::upgradeState(BSONObj());
 
-        Status result = clusterUpdate(VersionType::ConfigNS,
-                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                BSON("$set" << setUpgradeIdObj.done()),
-                false, // upsert
-                false, // multi
-                NULL);
-
-        if ( !result.isOK() ) {
-            return Status( result.code(),
-                           str::stream() << "could not initialize version info"
-                                         << "for upgrade: " << result.reason() );
+        Status result = grid.catalogManager()->update(
+                                    VersionType::ConfigNS,
+                                    BSON("_id" << 1 <<
+                                         VersionType::currentVersion(currentVersion)),
+                                    BSON("$set" << setUpgradeIdObj.done()),
+                                    false,
+                                    false,
+                                    NULL);
+        if (!result.isOK()) {
+            return Status(result.code(),
+                          str::stream() << "could not initialize version info"
+                                        << "for upgrade: " << result.reason());
         }
+
         return result;
     }
 
@@ -312,23 +318,25 @@ namespace mongo {
         BSONObjBuilder setUpgradeStateObj;
         setUpgradeStateObj.append(VersionType::upgradeState(), BSON(inCriticalSectionField(true)));
 
-        Status result = clusterUpdate(VersionType::ConfigNS,
-                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                BSON("$set" << setUpgradeStateObj.done()),
-                false, // upsert
-                false, // multi
-                NULL);
+        Status result = grid.catalogManager()->update(
+                                VersionType::ConfigNS,
+                                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                                BSON("$set" << setUpgradeStateObj.done()),
+                                false,
+                                false,
+                                NULL);
 
-        log() << "entered critical section for config upgrade" << endl;
+        log() << "entered critical section for config upgrade";
 
         // No cleanup message here since we're not sure if we wrote or not, and
         // not dangerous either way except to prevent further updates (at which point
         // the message is printed)
 
-        if ( !result.isOK() ) {
-            return Status( result.code(), str::stream() << "could not update version info"
-                                                        << "to enter critical update section: "
-                                                        << result.reason() );
+        if (!result.isOK()) {
+            return Status(result.code(),
+                          str::stream() << "could not update version info"
+                                        << "to enter critical update section: "
+                                        << result.reason());
         }
 
         return result;
@@ -352,17 +360,18 @@ namespace mongo {
         unsetObj.append(VersionType::upgradeState(), 1);
         unsetObj.append("version", 1); // remove deprecated field, no longer supported >= v3.0.
 
-        Status result = clusterUpdate(VersionType::ConfigNS,
-                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
-                BSON("$set" << setObj.done() << "$unset" << unsetObj.done()),
-                false, // upsert
-                false, // multi,
-                NULL);
-
-        if ( !result.isOK() ) {
-            return Status( result.code(), str::stream() << "could not write new version info "
-                                                        << " and exit critical upgrade section: "
-                                                        << result.reason() );
+        Status result = grid.catalogManager()->update(
+                                VersionType::ConfigNS,
+                                BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                                BSON("$set" << setObj.done() << "$unset" << unsetObj.done()),
+                                false,
+                                false,
+                                NULL);
+        if (!result.isOK()) {
+            return Status(result.code(),
+                          str::stream() << "could not write new version info "
+                                        << " and exit critical upgrade section: "
+                                        << result.reason());
         }
 
         return result;

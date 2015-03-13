@@ -42,6 +42,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/shard.h"
@@ -67,7 +68,21 @@ namespace mongo {
 
     MONGO_FP_DECLARE(neverBalance);
 
-    Grid::Grid() : _allowLocalShard(true) {}
+    Grid::Grid() : _allowLocalShard(true) {
+
+    }
+
+    bool Grid::initCatalogManager(const std::vector<std::string>& configHosts) {
+        std::auto_ptr<CatalogManagerLegacy> cm(new CatalogManagerLegacy());
+        Status status = cm->init(configHosts);
+        if (!status.isOK()) {
+            severe() << "Catalog manager failed to initialize " << status;
+            return false;
+        }
+
+        _catalogManager.reset(cm.release());
+        return true;
+    }
 
     DBConfigPtr Grid::getDBConfig( StringData ns , bool create , const string& shardNameHint ) {
         string database = nsToDatabase( ns );
@@ -443,13 +458,10 @@ namespace mongo {
 
         log() << "going to add shard: " << shardDoc << endl;
 
-        Status result = clusterInsert( ShardType::ConfigNS,
-                                       shardDoc,
-                                       NULL );
-
-        if ( !result.isOK() ) {
+        Status result = catalogManager()->insert(ShardType::ConfigNS, shardDoc, NULL);
+        if (!result.isOK()) {
             errMsg = result.reason();
-            log() << "error adding shard: " << shardDoc << " err: " << errMsg << endl;
+            log() << "error adding shard: " << shardDoc << " err: " << errMsg;
             return false;
         }
 

@@ -26,11 +26,12 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/config_coordinator.h"
+#include "mongo/platform/basic.h"
 
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/s/catalog/legacy/config_coordinator.h"
 #include "mongo/s/client/mock_multi_write_command.h"
 #include "mongo/unittest/unittest.h"
 
@@ -39,14 +40,10 @@ namespace {
     using namespace mongo;
     using std::vector;
 
-    //
-    // Tests for the ConfigCoordinator
-    //
-
-    TEST(ConfigCoordinatorTests, Basic) {
+    TEST(ConfigCoordinatorTest, Basic) {
         MockMultiWriteCommand dispatcher;
         vector<ConnectionString> configHosts;
-        ConfigCoordinator exec( &dispatcher, configHosts );
+        ConfigCoordinator exec(&dispatcher, configHosts);
     }
 
-} // unnamed namespace
+} // namespace

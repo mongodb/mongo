@@ -178,7 +178,6 @@ env.Library(
         'write_ops/write_op.cpp',
         'write_ops/batch_write_op.cpp',
         'write_ops/batch_write_exec.cpp',
-        'write_ops/config_coordinator.cpp',
         'multi_host_query.cpp'
     ],
     LIBDEPS=[
@@ -201,19 +200,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/range_arithmetic',
     ]
-)
-
-env.CppUnitTest(
-    target='config_coordinator_test',
-    source=[
-        'write_ops/config_coordinator_test.cpp',
-    ],
-    LIBDEPS=[
-        'base',
-        'cluster_ops',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/clientdriver',
-    ],
 )
 
 env.CppUnitTest(
@@ -275,10 +261,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        'batch_write_types',
+        '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_ops',
         'cluster_write_op_conversion',
-        'client/sharding_client',
     ],
 )
 

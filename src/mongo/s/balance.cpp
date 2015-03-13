@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
@@ -74,9 +75,14 @@ namespace mongo {
 
     Balancer balancer;
 
-    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy() ) {}
+    Balancer::Balancer()
+        : _balancedLastTime(0),
+          _policy(new BalancerPolicy()) {
+
+    }
 
     Balancer::~Balancer() {
+
     }
 
     int Balancer::_moveChunks(const vector<CandidateChunkPtr>* candidateChunks,
@@ -180,16 +186,17 @@ namespace mongo {
         return movedCount;
     }
 
-    void Balancer::_ping( bool waiting ) {
-        clusterUpdate( MongosType::ConfigNS,
-                       BSON( MongosType::name( _myid )),
-                       BSON( "$set" << BSON( MongosType::ping(jsTime()) <<
-                                             MongosType::up(static_cast<int>(time(0)-_started)) <<
-                                             MongosType::waiting(waiting) <<
-                                             MongosType::mongoVersion(versionString) )),
-                       true, // upsert
-                       false, // multi
-                       NULL );
+    void Balancer::_ping(bool waiting) {
+        grid.catalogManager()->update(
+                        MongosType::ConfigNS,
+                        BSON(MongosType::name(_myid)),
+                        BSON("$set" << BSON(MongosType::ping(jsTime()) <<
+                                            MongosType::up(static_cast<int>(time(0) - _started)) <<
+                                            MongosType::waiting(waiting) <<
+                                            MongosType::mongoVersion(versionString))),
+                        true,
+                        false,
+                        NULL);
     }
 
      /* 
@@ -262,7 +269,9 @@ namespace mongo {
                 createActionlog = true;
             }
 
-            Status result = clusterInsert(ActionLogType::ConfigNS, actionLog.toBSON(), NULL);
+            Status result = grid.catalogManager()->insert(ActionLogType::ConfigNS,
+                                                          actionLog.toBSON(),
+                                                          NULL);
             if ( !result.isOK() ) {
                 log() << "Error encountered while logging action from balancer "
                       << result.reason();

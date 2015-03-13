@@ -148,15 +148,13 @@ namespace mongo {
             bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
                 return _passthrough(conf->name(), conf, cmdObj, 0, result);
             }
+
             bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
                 return _passthrough("admin", conf, cmdObj, 0, result);
             }
 
             bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
                 return _passthrough(conf->name(), conf, cmdObj, options, result);
-            }
-            bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
-                return _passthrough("admin", conf, cmdObj, options, result);
             }
 
         private:

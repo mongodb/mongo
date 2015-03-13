@@ -238,13 +238,18 @@ static ExitCode runMongosServer( bool doUpgrade ) {
         dbexit(EXIT_BADOPTIONS);
     }
 
-    if (!configServer.init(mongosGlobalParams.configdbs)) {
-        mongo::log(LogComponent::kDefault) << "couldn't resolve config db address" << endl;
+    if (!grid.initCatalogManager(mongosGlobalParams.configdbs)) {
+        mongo::log(LogComponent::kSharding) << "couldn't initialize catalog manager";
         return EXIT_SHARDING_ERROR;
     }
 
-    if ( ! configServer.ok( true ) ) {
-        mongo::log(LogComponent::kDefault) << "configServer connection startup check failed" << endl;
+    if (!configServer.init(mongosGlobalParams.configdbs)) {
+        mongo::log(LogComponent::kSharding) << "couldn't resolve config db address" << endl;
+        return EXIT_SHARDING_ERROR;
+    }
+
+    if (!configServer.ok(true)) {
+        mongo::log(LogComponent::kSharding) << "configServer connection startup check failed" << endl;
         return EXIT_SHARDING_ERROR;
     }
 

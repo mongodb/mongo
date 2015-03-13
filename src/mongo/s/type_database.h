@@ -58,7 +58,6 @@ namespace mongo {
      *
      */
     class DatabaseType {
-        MONGO_DISALLOW_COPYING(DatabaseType);
     public:
 
         //

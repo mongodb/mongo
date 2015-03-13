@@ -1,0 +1,13 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='catalog_manager',
+    source=[
+        'catalog_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/batch_write_types',
+    ],
+)

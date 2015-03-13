@@ -36,6 +36,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
@@ -161,12 +162,12 @@ namespace {
                 log() << "going to start draining shard: " << s.getName();
                 BSONObj newStatus = BSON("$set" << BSON(ShardType::draining(true)));
 
-                Status status = clusterUpdate(ShardType::ConfigNS,
-                                              searchDoc,
-                                              newStatus,
-                                              false,
-                                              false,
-                                              NULL);
+                Status status = grid.catalogManager()->update(ShardType::ConfigNS,
+                                                              searchDoc,
+                                                              newStatus,
+                                                              false,
+                                                              false,
+                                                              NULL);
                 if (!status.isOK()) {
                     errmsg = status.reason();
                     log() << "error starting remove shard: " << s.getName()
@@ -181,10 +182,11 @@ namespace {
                 if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
                     log() << "This shard is listed as primary of local db. Removing entry.";
 
-                    Status status = clusterDelete(DatabaseType::ConfigNS,
-                                                  BSON(DatabaseType::name("local")),
-                                                  0,
-                                                  NULL);
+                    Status status = grid.catalogManager()->remove(
+                                                                DatabaseType::ConfigNS,
+                                                                BSON(DatabaseType::name("local")),
+                                                                0,
+                                                                NULL);
                     if (!status.isOK()) {
                         log() << "error removing local db: "
                               << status.reason();
@@ -219,10 +221,10 @@ namespace {
                 log() << "going to remove shard: " << s.getName();
                 audit::logRemoveShard(ClientBasic::getCurrent(), s.getName());
 
-                Status status = clusterDelete(ShardType::ConfigNS,
-                                              searchDoc,
-                                              0,
-                                              NULL);
+                Status status = grid.catalogManager()->remove(ShardType::ConfigNS,
+                                                              searchDoc,
+                                                              0,
+                                                              NULL);
                 if (!status.isOK()) {
                     errmsg = status.reason();
                     log() << "error concluding remove shard: " << s.getName()

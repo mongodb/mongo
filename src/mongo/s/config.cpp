@@ -43,6 +43,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
@@ -145,16 +146,16 @@ namespace mongo {
             val.append(CollectionType::DEPRECATED_lastmodEpoch(), ChunkVersion::DROPPED().epoch());
         }
 
-        Status result = clusterUpdate(CollectionType::ConfigNS,
-                                      key,
-                                      val.obj(),
-                                      true /* upsert */,
-                                      false /* multi */,
-                                      NULL);
-
-        if ( !result.isOK() ) {
-            uasserted( 13473, str::stream() << "failed to save collection (" << ns
-                                            << "): " <<  result.reason() );
+        Status result = grid.catalogManager()->update(CollectionType::ConfigNS,
+                                                      key,
+                                                      val.obj(),
+                                                      true,     // upsert
+                                                      false,    // multi
+                                                      NULL);
+        if (!result.isOK()) {
+            uasserted(13473,
+                      str::stream() << "failed to save collection (" << ns << "): "
+                                    << result.reason());
         }
 
         _dirty = false;
@@ -616,7 +617,7 @@ namespace mongo {
         return true;
     }
 
-    void DBConfig::_save( bool db, bool coll ) {
+    void DBConfig::_save(bool db, bool coll) {
         if (db) {
             BSONObj n;
             {
@@ -626,13 +627,12 @@ namespace mongo {
             }
 
             BatchedCommandResponse response;
-            Status result = clusterUpdate( DatabaseType::ConfigNS,
-                                           BSON( DatabaseType::name( _name )),
-                                           n,
-                                           true, // upsert
-                                           false, // multi
-                                           &response );
-
+            Status result = grid.catalogManager()->update(DatabaseType::ConfigNS,
+                                                          BSON(DatabaseType::name(_name)),
+                                                          n,
+                                                          true,  // upsert
+                                                          false, // multi
+                                                          &response);
             if (!result.isOK()) {
                 uasserted(13396,
                           str::stream() << "DBConfig save failed: " << response.toBSON());
@@ -695,13 +695,13 @@ namespace mongo {
         }
 
         // 2
-        grid.removeDB( _name );
-        Status result = clusterDelete( DatabaseType::ConfigNS,
-                                       BSON( DatabaseType::name( _name )),
-                                       0 /* limit */,
-                                       NULL );
+        grid.removeDB(_name);
 
-        if ( !result.isOK() ) {
+        Status result = grid.catalogManager()->remove(DatabaseType::ConfigNS,
+                                                      BSON(DatabaseType::name(_name)),
+                                                      0,
+                                                      NULL);
+        if (!result.isOK()) {
             errmsg = result.reason();
             log() << "could not drop '" << _name << "': " << errmsg << endl;
             return false;
@@ -711,6 +711,7 @@ namespace mongo {
             log() << "error removing from config server even after checking!" << endl;
             return 0;
         }
+
         LOG(1) << "\t removed entry from config server for: " << _name << endl;
 
         set<Shard> allServers;
@@ -718,11 +719,16 @@ namespace mongo {
         // 3
         while ( true ) {
             int num = 0;
-            if ( ! _dropShardedCollections( num , allServers , errmsg ) )
+            if (!_dropShardedCollections(num, allServers, errmsg)) {
                 return 0;
-            log() << "   DBConfig::dropDatabase: " << _name << " dropped sharded collections: " << num << endl;
-            if ( num == 0 )
+            }
+
+            log() << "   DBConfig::dropDatabase: " << _name
+                  << " dropped sharded collections: " << num;
+
+            if (num == 0) {
                 break;
+            }
         }
 
         // 4
@@ -1140,10 +1146,11 @@ namespace mongo {
 
         if ( ! got.count( "chunksize" ) ) {
             const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
-            Status result = clusterInsert( SettingsType::ConfigNS,
-                                           BSON( SettingsType::key("chunksize") <<
-                                                 SettingsType::chunksize(chunkSize)),
-                                           NULL );
+            Status result = grid.catalogManager()->insert(
+                                                    SettingsType::ConfigNS,
+                                                    BSON(SettingsType::key("chunksize")
+                                                            << SettingsType::chunksize(chunkSize)),
+                                                    NULL);
             if (!result.isOK()) {
                 warning() << "couldn't set chunkSize on config db" << causedBy(result);
             }
@@ -1285,13 +1292,10 @@ namespace mongo {
 
             conn.done();
 
-            Status result = clusterInsert( ChangelogType::ConfigNS,
-                                           msg,
-                                           NULL );
-
-            if ( !result.isOK() ) {
+            Status result = grid.catalogManager()->insert(ChangelogType::ConfigNS, msg, NULL);
+            if (!result.isOK()) {
                 log() << "Error encountered while logging config change with ID: " << changeID
-                      << result.reason() << endl;
+                      << result.reason();
             }
         }
 
@@ -1311,18 +1315,19 @@ namespace mongo {
                 return;
             }
 
-            Status result = clusterUpdate(ShardType::ConfigNS,
-                    BSON(ShardType::name(s.getName())),
-                    BSON("$set" << BSON(ShardType::host(newConnectionString))),
-                    false, // upsert
-                    false, // multi
-                    NULL);
-
-            if ( !result.isOK() ) {
+            Status result = grid.catalogManager()->update(
+                                                    ShardType::ConfigNS,
+                                                    BSON(ShardType::name(s.getName())),
+                                                    BSON("$set" << BSON(ShardType::host(
+                                                                            newConnectionString))),
+                                                    false, // upsert
+                                                    false, // multi
+                                                    NULL);
+            if (!result.isOK()) {
                 error() << "RSChangeWatcher: could not update config db for set: "
                         << setName
                         << " to: " << newConnectionString
-                        << ": " << result.reason() << endl;
+                        << ": " << result.reason();
             }
         }
         catch (const std::exception& e) {

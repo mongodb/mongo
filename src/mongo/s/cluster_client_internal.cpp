@@ -39,7 +39,9 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/type_changelog.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_shard.h"
@@ -286,13 +288,13 @@ namespace mongo {
             return e.toStatus();
         }
 
-        Status result = clusterInsert( ChangelogType::ConfigNS,
-                                       changelog.toBSON(),
-                                       NULL );
-
-        if ( !result.isOK() ) {
-            return Status( result.code(), str::stream() << "failed to write to changelog: "
-                                                        << result.reason() );
+        Status result = grid.catalogManager()->insert(ChangelogType::ConfigNS,
+                                                      changelog.toBSON(),
+                                                      NULL);
+        if (!result.isOK()) {
+            return Status(result.code(),
+                          str::stream() << "failed to write to changelog: "
+                                        << result.reason());
         }
 
         return result;

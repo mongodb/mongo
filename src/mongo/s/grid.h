@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+    class CatalogManager;
     class SettingsType;
 
     /**
@@ -48,6 +49,14 @@ namespace mongo {
     class Grid {
     public:
         Grid();
+
+        /**
+         * Called at startup time so the catalog manager can be set.
+         *
+         * Returns whether the catalog manager has been initialized successfully. Must be called
+         * only once.
+         */
+        bool initCatalogManager(const std::vector<std::string>& configHosts);
 
         /**
          * gets the config the db.
@@ -133,6 +142,8 @@ namespace mongo {
          */
         bool getCollShouldBalance(const std::string& ns) const;
 
+        CatalogManager* catalogManager() const { return _catalogManager.get(); }
+
         /**
          * 
          * Obtain grid configuration and settings data.
@@ -172,6 +183,8 @@ namespace mongo {
         // Databases catalog map and mutex to protect it
         mongo::mutex _lock;
         std::map<std::string, DBConfigPtr> _databases;
+
+        boost::scoped_ptr<CatalogManager> _catalogManager;
 
         // can 'localhost' be used in shard addresses?
         bool _allowLocalShard;

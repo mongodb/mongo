@@ -45,6 +45,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_policy.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
@@ -719,16 +720,14 @@ namespace {
         // at least this mongos won't try and keep moving
         _jumbo = true;
 
-        Status result = clusterUpdate( ChunkType::ConfigNS,
-                                       BSON(ChunkType::name(genID())),
-                                       BSON("$set" << BSON(ChunkType::jumbo(true))),
-                                       false, // upsert
-                                       false, // multi
-                                       NULL );
-
-        if ( !result.isOK() ) {
-            warning() << "couldn't set jumbo for chunk: "
-                      << genID() << result.reason();
+        Status result = grid.catalogManager()->update(ChunkType::ConfigNS,
+                                                      BSON(ChunkType::name(genID())),
+                                                      BSON("$set" << BSON(ChunkType::jumbo(true))),
+                                                      false,    // upsert
+                                                      false,    // multi
+                                                      NULL);
+        if (!result.isOK()) {
+            warning() << "couldn't set jumbo for chunk: " << genID() << result.reason();
         }
     }
 

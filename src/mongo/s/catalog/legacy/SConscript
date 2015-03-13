@@ -1,0 +1,31 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='catalog_manager_legacy',
+    source=[
+        'catalog_manager_legacy.cpp',
+        'config_coordinator.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/batch_write_types',
+        '$BUILD_DIR/mongo/s/catalog/catalog_manager',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
+    ]
+)
+
+env.CppUnitTest(
+    target='catalog_manager_legacy_test',
+    source=[
+        'config_coordinator_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
+        '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/coreserver',
+        '$BUILD_DIR/mongo/coreshard',
+        '$BUILD_DIR/mongo/mongoscore',
+        '$BUILD_DIR/mongo/mongocommon',
+    ]
+)

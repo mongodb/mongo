@@ -38,6 +38,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_write.h"
@@ -434,27 +435,28 @@ namespace {
             Chunk temp( this , min , max , shards[ i % shards.size() ], version );
 
             BSONObjBuilder chunkBuilder;
-            temp.serialize( chunkBuilder );
+            temp.serialize(chunkBuilder);
+
             BSONObj chunkObj = chunkBuilder.obj();
 
-            Status result = clusterUpdate( ChunkType::ConfigNS,
-                                           BSON(ChunkType::name(temp.genID())),
-                                           chunkObj,
-                                           true, // upsert
-                                           false, // multi
-                                           NULL );
+            Status result = grid.catalogManager()->update(ChunkType::ConfigNS,
+                                                          BSON(ChunkType::name(temp.genID())),
+                                                          chunkObj,
+                                                          true,
+                                                          false,
+                                                          NULL);
 
             version.incMinor();
 
-            if ( !result.isOK() ) {
+            if (!result.isOK()) {
                 string ss = str::stream() << "creating first chunks failed. result: "
                                           << result.reason();
-                error() << ss ;
-                msgasserted( 15903 , ss );
+                error() << ss;
+                msgasserted(15903, ss);
             }
         }
 
-        _version = ChunkVersion( 0, 0, version.epoch() );
+        _version = ChunkVersion(0, 0, version.epoch());
     }
 
     ChunkPtr ChunkManager::findIntersectingChunk( const BSONObj& shardKey ) const {
@@ -724,15 +726,14 @@ namespace {
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed shard data";
 
         // remove chunk data
-        Status result = clusterDelete( ChunkType::ConfigNS,
-                                       BSON(ChunkType::ns(_ns)),
-                                       0 /* limit */,
-                                       NULL );
-        
-        // Make sure we're dropped on the config
-        if ( !result.isOK() ) {
-            uasserted( 17001, str::stream() << "could not drop chunks for " << _ns
-                                            << ": " << result.reason() );
+        Status result = grid.catalogManager()->remove(ChunkType::ConfigNS,
+                                                      BSON(ChunkType::ns(_ns)),
+                                                      0,
+                                                      NULL);
+        if (!result.isOK()) {
+            uasserted(17001,
+                      str::stream() << "could not drop chunks for " << _ns
+                                    << ": " << result.reason());
         }
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data";

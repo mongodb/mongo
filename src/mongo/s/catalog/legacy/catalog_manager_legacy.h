@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,36 +28,46 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/catalog/catalog_manager.h"
 
 namespace mongo {
 
-    class MultiCommandDispatch;
-
-    class ConfigCoordinator {
+    class CatalogManagerLegacy : public CatalogManager {
     public:
+        CatalogManagerLegacy() = default;
+        virtual ~CatalogManagerLegacy() = default;
 
-        ConfigCoordinator( MultiCommandDispatch* dispatcher,
-                           const std::vector<ConnectionString>& configHosts );
+        /**
+         * Initializes the catalog manager with the hosts, which will be used as a configuration
+         * server. Can only be called once for the lifetime.
+         */
+        Status init(const std::vector<std::string>& configHosts);
 
-        void executeBatch(const BatchedCommandRequest& request, BatchedCommandResponse* response);
+        virtual Status enableSharding(const std::string& dbName);
+
+        virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db);
+
+        virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName);
+
+        virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
+                                             BatchedCommandResponse* response);
 
     private:
 
         /**
-         * Initialize configDB string in config server or if already initialized,
-         * check that it matches. Returns false if an error occured.
+         * Direct network check to see if a particular database does not already exist with the
+         * same name or different case.
          */
-        bool _checkConfigString(BatchedCommandResponse* clientResponse);
+        Status _checkDbDoesNotExist(const std::string& dbName) const;
 
-        // Not owned here
-        MultiCommandDispatch* _dispatcher;
 
-        std::vector<ConnectionString> _configHosts;
+        // Parsed config server hosts, as specified on the command line.
+        ConnectionString _configServerConnectionString;
+        std::vector<ConnectionString> _configServers;
     };
 
-}
+} // namespace mongo

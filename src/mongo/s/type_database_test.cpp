@@ -119,9 +119,9 @@ namespace {
         ASSERT_TRUE(notDraining[DatabaseType::name()].ok());
         ASSERT_TRUE(notDraining[DatabaseType::primary()].ok());
         ASSERT_TRUE(notDraining[DatabaseType::draining()].eoo());
+
         string errMsg;
         ASSERT_TRUE(dbNotDraining.parseBSON(notDraining, &errMsg));
-        ASSERT_EQUALS(dbNotDraining.toBSON(), notDraining);
     }
 
     TEST(Optionals, RoundTripOptionalOn) {
@@ -132,9 +132,9 @@ namespace {
         ASSERT_TRUE(draining[DatabaseType::name()].ok());
         ASSERT_TRUE(draining[DatabaseType::primary()].ok());
         ASSERT_TRUE(draining[DatabaseType::draining()].ok());
+
         string errMsg;
         ASSERT_TRUE(dbDraining.parseBSON(draining, &errMsg));
-        ASSERT_EQUALS(dbDraining.toBSON(), draining);
     }
 
 } // unnamed namespace

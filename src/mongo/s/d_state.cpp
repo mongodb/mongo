@@ -38,6 +38,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/d_state.h"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -57,14 +59,14 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
-#include "mongo/s/d_state.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/metadata_loader.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
-
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -99,7 +101,12 @@ namespace mongo {
 
         ShardedConnectionInfo::addHook();
         shardingState.enable(server);
-        configServer.init(server);
+
+        vector<string> configdbs;
+        splitStringDelim(server, &configdbs, ',');
+
+        configServer.init(configdbs);
+        grid.initCatalogManager(configdbs);
     }
 
     // TODO: Consolidate and eliminate these various ways of setting / validating shard names

@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 
 #include <boost/thread/mutex.hpp>
@@ -39,11 +41,11 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/cluster_write.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
-#include "mongo/s/type_database.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -245,7 +247,8 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
-        return clusterInsert(collectionName, document, NULL);
+
+        return grid.catalogManager()->insert(collectionName, document, NULL);
     }
 
     Status AuthzManagerExternalStateMongos::update(OperationContext* txn,
@@ -256,14 +259,14 @@ namespace mongo {
                                                    bool multi,
                                                    const BSONObj& writeConcern,
                                                    int* nMatched) {
-        BatchedCommandResponse response;
-        Status res = clusterUpdate(collectionName,
-                query,
-                updatePattern,
-                upsert,
-                multi,
-                &response);
 
+        BatchedCommandResponse response;
+        Status res = grid.catalogManager()->update(collectionName,
+                                                   query,
+                                                   updatePattern,
+                                                   upsert,
+                                                   multi,
+                                                   &response);
         if (res.isOK()) {
             *nMatched = response.getN();
         }
@@ -277,9 +280,10 @@ namespace mongo {
             const BSONObj& query,
             const BSONObj& writeConcern,
             int* numRemoved) {
-        BatchedCommandResponse response;
-        Status res = clusterDelete(collectionName, query, 0 /* limit */, &response);
 
+        BatchedCommandResponse response;
+
+        Status res = grid.catalogManager()->remove(collectionName, query, 0, &response);
         if (res.isOK()) {
             *numRemoved = response.getN();
         }
