@@ -142,6 +142,8 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+		if (s->id == txn_global->checkpoint_id)
+			continue;
 		/*
 		 * Build our snapshot of any concurrent transaction IDs.
 		 *
@@ -156,7 +158,6 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 		 */
 		if (s != txn_state &&
 		    (id = s->id) != WT_TXN_NONE &&
-		    id != txn_global->checkpoint_id &&
 		    TXNID_LE(prev_oldest_id, id)) {
 			if (get_snapshot)
 				txn->snapshot[n++] = id;
@@ -219,6 +220,8 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+			if (s->id == txn_global->checkpoint_id)
+				continue;
 			if ((id = s->id) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_id))
 				oldest_id = id;
