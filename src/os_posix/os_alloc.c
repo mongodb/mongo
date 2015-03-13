@@ -134,6 +134,13 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, bytes_to_allocate != 0);
 		WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
+		/*
+		 * We are going to allocate an aligned buffer: round up to
+		 * the aligned size.
+		 */
+		bytes_to_allocate =
+		    WT_ALIGN(bytes_to_allocate, S2C(session)->buffer_alignment);
+
 		if (session != NULL)
 			WT_STAT_FAST_CONN_INCR(session, memory_allocation);
 

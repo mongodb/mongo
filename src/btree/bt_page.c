@@ -305,7 +305,7 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
  */
 int
 __wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep)
+    WT_REF *ref, WT_ITEM *image, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -315,7 +315,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 
 	*pagep = NULL;
 
-	dsk = image;
+	dsk = image->data;
 	alloc_entries = 0;
 
 	/*
@@ -374,7 +374,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	 * Track the memory allocated to build this page so we can update the
 	 * cache statistics in a single call.
 	 */
-	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? dsk->mem_size : 0;
+	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? image->memsize : 0;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
