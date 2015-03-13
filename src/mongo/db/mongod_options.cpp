@@ -1048,6 +1048,10 @@ namespace mongo {
             replSettings.slavedelay = params["slavedelay"].as<int>();
         }
         if (params.count("fastsync")) {
+            if (replSettings.slave != repl::SimpleSlave) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "--fastsync must only be used with --slave");
+            }
             replSettings.fastsync = params["fastsync"].as<bool>();
         }
         if (params.count("autoresync")) {

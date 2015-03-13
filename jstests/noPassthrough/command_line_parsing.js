@@ -14,7 +14,6 @@ var m2 = startMongod( "--port", port+2, "--dbpath", MongoRunner.dataPath + baseN
 var m2expected = {
     "parsed" : {
         "config" : "jstests/libs/testconfig",
-        "fastsync" : true,
         "storage" : {
             "dbPath" : MongoRunner.dataDir + "/jstests_slowNightly_command_line_parsing2",
         },
@@ -41,7 +40,6 @@ var m3 = startMongod("--port", port+4, "--dbpath", MongoRunner.dataPath + baseNa
 var m3expected = {
     "parsed" : {
         "config" : "jstests/libs/testconfig",
-        "fastsync" : true,
         "storage" : {
             "dbPath" : MongoRunner.dataDir + "/jstests_slowNightly_command_line_parsing4",
         },

@@ -302,25 +302,6 @@ namespace {
             return Status(ErrorCodes::InitialSyncFailure, msg);
         }
 
-        if (getGlobalReplicationCoordinator()->getSettings().fastsync) {
-            log() << "fastsync: skipping database clone";
-
-            // prime oplog
-            try {
-                _tryToApplyOpWithRetry(&txn, &init, lastOp);
-                std::deque<BSONObj> ops;
-                ops.push_back(lastOp);
-                writeOpsToOplog(&txn, ops);
-                return Status::OK();
-            } catch (DBException& e) {
-                // Return if in shutdown
-                if (inShutdown()) {
-                    return Status(ErrorCodes::ShutdownInProgress, "shutdown in progress");
-                }
-                throw;
-            }
-        }
-
         // Add field to minvalid document to tell us to restart initial sync if we crash
         setInitialSyncFlag(&txn);
 
