@@ -4,9 +4,9 @@
 
 COMPONENTS
 
-&nbsp;&nbsp;&nbsp;&nbsp;mongod - The database process. <br />
-&nbsp;&nbsp;&nbsp;&nbsp;mongos - Sharding controller. <br />
-&nbsp;&nbsp;&nbsp;&nbsp;mongo  - The database shell (uses interactive javascript). <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongod```` - The database process. <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongos```` - Sharding controller. <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongo````  - The database shell (uses interactive javascript). <br />
 
 UTILITIES
 
