@@ -530,7 +530,7 @@ namespace mongo {
 
             // Verify that no immutable fields were changed and data is valid for storage.
 
-            if (!(request->isFromReplication() || request->isFromMigration())) {
+            if (!(!_txn->writesAreReplicated() || request->isFromMigration())) {
                 const std::vector<FieldRef*>* immutableFields = NULL;
                 if (lifecycle)
                     immutableFields = lifecycle->getImmutableFields();
@@ -554,14 +554,22 @@ namespace mongo {
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
                     invariant(_collection);
+                    newObj = oldObj.value();
                     const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
-                    _collection->updateDocumentWithDamages(_txn, loc,
-                                                           Snapshotted<RecordData>(oldObj.snapshotId(),
-                                                                                   oldRec),
-                                                           source, _damages);
+                    BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
+                    oplogUpdateEntryArgs args;
+                    args.update = logObj;
+                    args.criteria = idQuery;
+                    args.fromMigrate = request->isFromMigration();
+                    _collection->updateDocumentWithDamages(
+                            _txn,
+                            loc,
+                            Snapshotted<RecordData>(oldObj.snapshotId(), oldRec),
+                            source,
+                            _damages,
+                            args);
                 }
 
-                newObj = oldObj.value();
                 _specificStats.fastmod = true;
                 newLoc = loc;
             }
@@ -577,25 +585,23 @@ namespace mongo {
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
                     invariant(_collection);
+                    BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
+                    oplogUpdateEntryArgs args;
+                    args.update = logObj;
+                    args.criteria = idQuery;
+                    args.fromMigrate = request->isFromMigration();
                     StatusWith<RecordId> res = _collection->updateDocument(
-                        _txn,
-                        loc, oldObj, newObj,
-                        true, driver->modsAffectIndices(),
-                        _params.opDebug);
+                            _txn,
+                            loc,
+                            oldObj,
+                            newObj,
+                            true,
+                            driver->modsAffectIndices(),
+                            _params.opDebug,
+                            args);
                     uassertStatusOK(res.getStatus());
                     newLoc = res.getValue();
                 }
-            }
-
-            // Call logOp if requested, and we're not an explain.
-            if (request->shouldCallLogOp() && !logObj.isEmpty() && !request->isExplain()) {
-                BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                getGlobalServiceContext()->getOpObserver()->onUpdate(
-                        _txn,
-                        request->getNamespaceString().ns().c_str(),
-                        logObj,
-                        idQuery,
-                        request->isFromMigration());
             }
 
             invariant(oldObj.snapshotId() == _txn->recoveryUnit()->getSnapshotId());
@@ -710,7 +716,7 @@ namespace mongo {
         _specificStats.inserted = true;
 
         const UpdateRequest* request = _params.request;
-        bool isInternalRequest = request->isFromReplication() || request->isFromMigration();
+        bool isInternalRequest = !_txn->writesAreReplicated() || request->isFromMigration();
 
         // Reset the document we will be writing to.
         _doc.reset();
@@ -738,15 +744,10 @@ namespace mongo {
         WriteUnitOfWork wunit(_txn);
         invariant(_collection);
         StatusWith<RecordId> newLoc = _collection->insertDocument(_txn,
-                                                                 newObj,
-                                                                 !request->isGod()/*enforceQuota*/);
+                                                                  newObj,
+                                                                  !request->isGod()/*enforceQuota*/,
+                                                                  request->isFromMigration());
         uassertStatusOK(newLoc.getStatus());
-        if (request->shouldCallLogOp()) {
-            getGlobalServiceContext()->getOpObserver()->onInsert(_txn,
-                                                              request->getNamespaceString().ns(),
-                                                              newObj,
-                                                              request->isFromMigration());
-        }
 
         // Technically, we should save/restore state here, but since we are going to return EOF
         // immediately after, it would just be wasted work.
@@ -948,8 +949,10 @@ namespace mongo {
         const NamespaceString& nsString(request.getNamespaceString());
 
         // We may have stepped down during the yield.
-        if (request.shouldCallLogOp() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db())) {
+        bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db());
+
+        if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
                           str::stream() << "Demoted from primary while performing update on "
                                         << nsString.ns());

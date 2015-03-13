@@ -120,6 +120,7 @@ namespace mongo {
                        string& errMsg,
                        BSONObjBuilder& result,
                        bool fromRepl) {
+        invariant(!fromRepl == txn->writesAreReplicated());
 
         // Can't be run on secondaries (logTheOp() == false, slaveOk() == false).
         dassert( !fromRepl );
@@ -207,7 +208,6 @@ namespace mongo {
             updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
             updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
             updateRequest.setUpsert( batchItem.getUpdate()->getUpsert() );
-            updateRequest.setUpdateOpLog( true );
             UpdateLifecycleImpl updateLifecycle( true, updateRequest.getNamespaceString() );
             updateRequest.setLifecycle( &updateLifecycle );
             updateRequest.setExplain();
@@ -255,7 +255,6 @@ namespace mongo {
             DeleteRequest deleteRequest( nsString );
             deleteRequest.setQuery( batchItem.getDelete()->getQuery() );
             deleteRequest.setMulti( batchItem.getDelete()->getLimit() != 1 );
-            deleteRequest.setUpdateOpLog(true);
             deleteRequest.setGod( false );
             deleteRequest.setExplain();
 

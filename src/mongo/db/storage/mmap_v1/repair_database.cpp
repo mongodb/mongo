@@ -377,7 +377,7 @@ namespace mongo {
                 Collection* tempCollection = NULL;
                 {
                     WriteUnitOfWork wunit(txn);
-                    tempCollection = tempDatabase->createCollection(txn, ns, options, true, false);
+                    tempCollection = tempDatabase->createCollection(txn, ns, options, false);
                     wunit.commit();
                 }
 
@@ -399,8 +399,9 @@ namespace mongo {
                     }
 
                     Status status = indexer.init( indexes );
-                    if ( !status.isOK() )
+                    if (!status.isOK()) {
                         return status;
+                    }
                 }
 
                 scoped_ptr<RecordIterator> iterator(originalCollection->getIterator(txn));

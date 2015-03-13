@@ -86,6 +86,7 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
+            invariant(!fromRepl == txn->writesAreReplicated());
 
             const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
@@ -163,9 +164,7 @@ namespace mongo {
                 else {
                     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                         WriteUnitOfWork wuow(txn);
-                        uassertStatusOK( userCreateNS( txn, db,
-                                                       ns, BSONObj(),
-                                                       !fromRepl ) );
+                        uassertStatusOK(userCreateNS(txn, db, ns, BSONObj()));
                         wuow.commit();
                     } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", ns);
                 }
@@ -388,8 +387,12 @@ namespace mongo {
             if ( remove ) {
                 _appendHelper(result, doc, found, fields, whereCallback);
                 if ( found ) {
-                    deleteObjects(txn, ctx.db(), ns, queryModified, PlanExecutor::YIELD_MANUAL,
-                                  true, true);
+                    deleteObjects(txn,
+                                  ctx.db(),
+                                  ns,
+                                  queryModified,
+                                  PlanExecutor::YIELD_MANUAL,
+                                  true);
 
                     // Committing the WUOW can close the current snapshot. Until this happens, the
                     // snapshot id should not have changed.
@@ -446,12 +449,6 @@ namespace mongo {
                         uassertStatusOK(collection->insertDocument(txn, newDoc, enforceQuota)
                                         .getStatus());
 
-                        // This is the last thing we do before the WriteUnitOfWork commits (except
-                        // for some BSON manipulation).
-                        getGlobalServiceContext()->getOpObserver()->onInsert(txn,
-                                                                          collection->ns().ns(),
-                                                                          newDoc); 
-
                         // Must commit the write and logOp() before doing anything that could throw.
                         wuow.commit();
 
@@ -483,7 +480,6 @@ namespace mongo {
                     request.setQuery(queryModified);
                     request.setUpdates(update);
                     request.setUpsert(upsert);
-                    request.setUpdateOpLog();
                     request.setStoreResultDoc(returnNew);
 
                     request.setYieldPolicy(PlanExecutor::YIELD_MANUAL);

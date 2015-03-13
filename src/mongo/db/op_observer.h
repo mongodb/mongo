@@ -31,12 +31,19 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
-    class BSONObj;
     struct CollectionOptions;
     class NamespaceString;
     class OperationContext;
+
+    struct oplogUpdateEntryArgs {
+        std::string ns;
+        BSONObj update;
+        BSONObj criteria;
+        bool fromMigrate;
+    };
 
     class OpObserver {
         MONGO_DISALLOW_COPYING(OpObserver);
@@ -49,14 +56,11 @@ namespace mongo {
                            BSONObj indexDoc,
                            bool fromMigrate = false);
         void onInsert(OperationContext* txn,
-                      const std::string& ns,
+                      const NamespaceString& ns,
                       BSONObj doc,
                       bool fromMigrate = false);
         void onUpdate(OperationContext* txn,
-                      const std::string& ns,
-                      const BSONObj& update,
-                      BSONObj& criteria,
-                      bool fromMigrate);
+                      oplogUpdateEntryArgs args);
         void onDelete(OperationContext* txn,
                       const std::string& ns,
                       const BSONObj& idDoc,

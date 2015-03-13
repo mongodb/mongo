@@ -75,7 +75,8 @@ namespace {
 
     OperationContextImpl::OperationContextImpl()
         : _client(currentClient.get()),
-          _locker(clientOperationInfoDecoration(_client).getLocker()) {
+          _locker(clientOperationInfoDecoration(_client).getLocker()),
+          _writesAreReplicated(true) {
 
         invariant(_locker);
 
@@ -218,4 +219,11 @@ namespace {
                 NamespaceString(ns).db());
     }
 
+    void OperationContextImpl::setReplicatedWrites(bool writesAreReplicated) {
+        _writesAreReplicated = writesAreReplicated;
+    }
+
+    bool OperationContextImpl::writesAreReplicated() const {
+        return _writesAreReplicated;
+    }
 }  // namespace mongo

@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -184,6 +185,9 @@ namespace {
         collectionOptions.cappedSize = 1024 * 1024;
 
         WriteUnitOfWork wunit(txn);
+        bool shouldReplicateWrites = txn->writesAreReplicated();
+        txn->setReplicatedWrites(false);
+        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
         invariant(db->createCollection(txn, dbProfilingNS, collectionOptions));
         wunit.commit();
 

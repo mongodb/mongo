@@ -238,7 +238,10 @@ namespace mongo {
         WriteUnitOfWork wunit(&txn);
         if (!collection) {
             BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
-            uassertStatusOK(userCreateNS(&txn, db, ns, options, true));
+            bool shouldReplicateWrites = txn.writesAreReplicated();
+            txn.setReplicatedWrites(false);
+            ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, &txn, shouldReplicateWrites);
+            uassertStatusOK(userCreateNS(&txn, db, ns, options));
             collection = db->getCollection(ns);
         }
         invariant(collection);

@@ -638,7 +638,6 @@ namespace {
                                           pattern,
                                           PlanExecutor::YIELD_MANUAL,
                                           true,     // justone
-                                          false,    // logop
                                           true);    // god
                         }
                         // did we just empty the collection?  if so let's check if it even
@@ -825,6 +824,7 @@ namespace {
 
         log() << "beginning rollback" << rsLog;
 
+        txn->setReplicatedWrites(false);
         unsigned s = _syncRollback(txn, oplogreader, replCoord);
         if (s)
             sleepsecs(s);

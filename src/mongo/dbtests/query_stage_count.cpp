@@ -124,9 +124,16 @@ namespace QueryStageCount {
         void update(const RecordId& oldLoc, const BSONObj& newDoc) {
             WriteUnitOfWork wunit(&_txn);
             BSONObj oldDoc = _coll->getRecordStore()->dataFor( &_txn, oldLoc ).releaseToBson();
-            _coll->updateDocument(&_txn, oldLoc,
-                                  Snapshotted<BSONObj>(_txn.recoveryUnit()->getSnapshotId(), oldDoc),
-                                  newDoc, false, true, NULL);
+            oplogUpdateEntryArgs args;
+            _coll->updateDocument(&_txn,
+                                  oldLoc,
+                                  Snapshotted<BSONObj>(_txn.recoveryUnit()->getSnapshotId(),
+                                                       oldDoc),
+                                  newDoc,
+                                  false,
+                                  true,
+                                  NULL,
+                                  args);
             wunit.commit();
         }
 

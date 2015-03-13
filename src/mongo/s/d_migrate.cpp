@@ -1984,7 +1984,7 @@ namespace mongo {
                     }
 
                     WriteUnitOfWork wuow(txn);
-                    Status status = userCreateNS( txn, db, ns, options, true, false );
+                    Status status = userCreateNS(txn, db, ns, options, false);
                     if ( !status.isOK() ) {
                         warning() << "failed to create collection [" << ns << "] "
                                   << " with options " << options << ": " << status;
@@ -2435,7 +2435,6 @@ namespace mongo {
                                   id,
                                   PlanExecutor::YIELD_MANUAL,
                                   true /* justOne */,
-                                  true /* logOp */,
                                   false /* god */,
                                   true /* fromMigrate */);
 

@@ -94,12 +94,12 @@ namespace mongo {
         // Only user updates should be checked. Any system or replication stuff should pass through.
         // Config db docs shouldn't get checked for valid field names since the shard key can have
         // a dot (".") in it.
-        const bool shouldValidate = !(_request->isFromReplication() ||
+        const bool shouldValidate = !(!_txn->writesAreReplicated() ||
                                       ns.isConfigDB() ||
                                       _request->isFromMigration());
 
         _driver.setLogOp(true);
-        _driver.setModOptions(ModifierInterface::Options(_request->isFromReplication(),
+        _driver.setModOptions(ModifierInterface::Options(!_txn->writesAreReplicated(),
                                                          shouldValidate));
 
         return _driver.parse(_request->getUpdates(), _request->isMulti());

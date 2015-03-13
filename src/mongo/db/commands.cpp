@@ -227,12 +227,6 @@ namespace mongo {
         help << "no help defined";
     }
 
-    std::vector<BSONObj> Command::stopIndexBuilds(OperationContext* opCtx,
-                                                  Database* db,
-                                                  const BSONObj& cmdObj) {
-        return std::vector<BSONObj>();
-    }
-
     Command* Command::findCommand( StringData name ) {
         CommandMap::const_iterator i = _commands->find( name );
         if ( i == _commands->end() )

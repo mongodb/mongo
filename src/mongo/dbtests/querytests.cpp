@@ -193,7 +193,7 @@ namespace QueryTests {
                     _collection = NULL;
                     db->dropCollection( &_txn, ns() );
                 }
-                _collection = db->createCollection( &_txn, ns(), CollectionOptions(), true, false );
+                _collection = db->createCollection( &_txn, ns(), CollectionOptions(), false );
                 wunit.commit();
             }
             ASSERT( _collection );

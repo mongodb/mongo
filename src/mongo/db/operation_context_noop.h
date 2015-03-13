@@ -103,6 +103,12 @@ namespace mongo {
             return 0;
         }
 
+        void setReplicatedWrites(bool writesAreReplicated = true) {}
+
+        bool writesAreReplicated() const {
+            return false;
+        }
+
     private:
         std::auto_ptr<RecoveryUnit> _recoveryUnit;
         boost::scoped_ptr<Locker> _locker;

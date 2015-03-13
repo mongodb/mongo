@@ -86,6 +86,7 @@ namespace mongo {
         virtual bool run(OperationContext* txn,  const string& dbname, BSONObj& cmdObj, int options,
                           string& errmsg, BSONObjBuilder& result,
                           bool fromRepl = false ) {
+            invariant(!fromRepl == txn->writesAreReplicated());
 
             // ---  parse
 
@@ -159,14 +160,8 @@ namespace mongo {
             if ( !collection ) {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                     WriteUnitOfWork wunit(txn);
-                    collection = db->createCollection( txn, ns.ns() );
+                    collection = db->createCollection(txn, ns.ns(), CollectionOptions());
                     invariant( collection );
-                    if (!fromRepl) {
-                        getGlobalServiceContext()->getOpObserver()->onCreateCollection(
-                                txn,
-                                ns,
-                                CollectionOptions());
-                    }
                     wunit.commit();
                 } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
             }

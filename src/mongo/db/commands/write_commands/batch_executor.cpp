@@ -1077,10 +1077,6 @@ namespace mongo {
                                             request->getTargetingNS())));
                 return false;
             }
-            getGlobalServiceContext()->getOpObserver()->onCreateCollection(
-                    txn,
-                    NamespaceString(request->getTargetingNS()),
-                    CollectionOptions());
             wunit.commit();
         }
         return true;
@@ -1204,7 +1200,6 @@ namespace mongo {
             result->setError(toWriteError(status.getStatus()));
         }
         else {
-            getGlobalServiceContext()->getOpObserver()->onInsert(txn, insertNS, docToInsert);
             result->getStats().n = 1;
             wunit.commit();
         }
@@ -1263,7 +1258,6 @@ namespace mongo {
         request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
         request.setMulti(isMulti);
         request.setUpsert(updateItem.getUpdate()->getUpsert());
-        request.setUpdateOpLog(true);
         UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
         request.setLifecycle(&updateLifecycle);
 
@@ -1297,9 +1291,7 @@ namespace mongo {
                     }
                     else {
                         WriteUnitOfWork wuow(txn);
-                        uassertStatusOK( userCreateNS( txn, db,
-                                                       nsString.ns(), BSONObj(),
-                                                       !request.isFromReplication() ) );
+                        uassertStatusOK(userCreateNS(txn, db, nsString.ns(), BSONObj()));
                         wuow.commit();
                     }
                 } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "update", nsString.ns());
@@ -1435,7 +1427,6 @@ namespace mongo {
         DeleteRequest request(nss);
         request.setQuery( removeItem.getDelete()->getQuery() );
         request.setMulti( removeItem.getDelete()->getLimit() != 1 );
-        request.setUpdateOpLog(true);
         request.setGod( false );
 
         // Deletes running through the write commands path can yield.

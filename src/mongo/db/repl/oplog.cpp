@@ -236,6 +236,20 @@ namespace {
             return;
         }
 
+        if (NamespaceString(ns).isSystemDotProfile()) {
+            return;
+        }
+
+        if (!getGlobalReplicationCoordinator()->isReplEnabled()) {
+            return;
+        }
+
+        if (!txn->writesAreReplicated()) {
+            return;
+        }
+
+        fassert(28626, txn->recoveryUnit());
+
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
@@ -522,7 +536,6 @@ namespace {
                 request.setQuery(b.done());
                 request.setUpdates(o);
                 request.setUpsert();
-                request.setFromReplication();
                 UpdateLifecycleImpl updateLifecycle(true, requestNs);
                 request.setLifecycle(&updateLifecycle);
 
@@ -546,7 +559,6 @@ namespace {
             request.setQuery(updateCriteria);
             request.setUpdates(o);
             request.setUpsert(upsert);
-            request.setFromReplication();
             UpdateLifecycleImpl updateLifecycle(true, requestNs);
             request.setLifecycle(&updateLifecycle);
 
@@ -599,8 +611,9 @@ namespace {
                     "Failed to apply delete due to missing _id: " << op.toString(),
                     o.hasField("_id"));
 
-            if ( opType[1] == 0 )
+            if (opType[1] == 0) {
                 deleteObjects(txn, db, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
+            }
             else
                 verify( opType[1] == 'b' ); // "db" advertisement
         }

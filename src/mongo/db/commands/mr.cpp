@@ -436,16 +436,6 @@ namespace mongo {
                 options.temp = true;
                 tempColl = tempCtx.db()->createCollection(_txn, _config.tempNamespace, options);
 
-                // Log the createCollection operation.
-                BSONObjBuilder b;
-                b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
-                b.appendElements( options.toBSON() );
-                string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                getGlobalServiceContext()->getOpObserver()->onCreateCollection(
-                        _txn,
-                        NamespaceString(_config.tempNamespace),
-                        options);
-
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
                         it != indexesToInsert.end(); ++it ) {
                     Status status =
@@ -458,7 +448,7 @@ namespace mongo {
                     }
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
-                    getGlobalServiceContext()->getOpObserver()->onInsert(_txn, logNs, *it);
+                    getGlobalServiceContext()->getOpObserver()->onCreateIndex(_txn, logNs, *it);
                 }
                 wuow.commit();
             }
@@ -695,7 +685,6 @@ namespace mongo {
             BSONObj bo = b.obj();
 
             uassertStatusOK( coll->insertDocument( _txn, bo, true ).getStatus() );
-            getGlobalServiceContext()->getOpObserver()->onInsert(_txn, ns, bo);
             wuow.commit();
         }
 
@@ -708,7 +697,10 @@ namespace mongo {
             OldClientWriteContext ctx(_txn,  _config.incLong );
             WriteUnitOfWork wuow(_txn);
             Collection* coll = getCollectionOrUassert(ctx.db(), _config.incLong);
-            uassertStatusOK( coll->insertDocument( _txn, o, true ).getStatus() );
+            bool shouldReplicateWrites = _txn->writesAreReplicated();
+            _txn->setReplicatedWrites(false);
+            ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _txn, shouldReplicateWrites);
+            uassertStatusOK(coll->insertDocument(_txn, o, true, false).getStatus());
             wuow.commit();
         }
 
@@ -1274,6 +1266,7 @@ namespace mongo {
             }
 
             bool run(OperationContext* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            invariant(!fromRepl == txn->writesAreReplicated());
                 Timer t;
 
                 if (txn->getClient()->isInDirectClient()) {

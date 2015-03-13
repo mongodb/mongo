@@ -659,15 +659,16 @@ namespace {
                           str::stream() << "cannot remove from a capped collection: " <<  nss.ns());
         }
 
-        if (request->shouldCallLogOp() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nss.db())) {
+        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nss.db());
+
+        if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
                           str::stream() << "Not primary while removing from " << nss.ns());
         }
 
         DeleteStageParams deleteStageParams;
         deleteStageParams.isMulti = request->isMulti();
-        deleteStageParams.shouldCallLogOp = request->shouldCallLogOp();
         deleteStageParams.fromMigrate = request->isFromMigrate();
         deleteStageParams.isExplain = request->isExplain();
 
@@ -785,8 +786,10 @@ namespace {
         // writes on a secondary. If this is an update to a secondary from the replication system,
         // however, then we make an exception and let the write proceed. In this case,
         // shouldCallLogOp() will be false.
-        if (request->shouldCallLogOp() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db())) {
+        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db());
+
+        if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
                           str::stream() << "Not primary while performing update on "
                                         << nsString.ns());

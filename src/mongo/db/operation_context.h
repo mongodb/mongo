@@ -142,6 +142,16 @@ namespace mongo {
             _writeConcern = writeConcern;
         }
 
+        /**
+         * Set whether or not operations should generate oplog entries.
+         */
+        virtual void setReplicatedWrites(bool writesAreReplicated = true) = 0;
+
+        /**
+         * Returns true if operations should generate oplog entries.
+         */
+        virtual bool writesAreReplicated() const = 0;
+
     protected:
         OperationContext() { }
 

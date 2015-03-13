@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/apply_ops.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
@@ -74,7 +75,14 @@ namespace mongo {
             // applyOps can do pretty much anything, so require all privileges.
             RoleGraph::generateUniversalPrivileges(out);
         }
-        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            invariant(!fromRepl == txn->writesAreReplicated());
 
             if ( cmdObj.firstElement().type() != Array ) {
                 errmsg = "ops has to be an array";
@@ -94,156 +102,7 @@ namespace mongo {
                 }
             }
 
-            // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
-            // ns used so locking individually requires more analysis
-            ScopedTransaction scopedXact(txn, MODE_X);
-            Lock::GlobalWrite globalWriteLock(txn->lockState());
-
-            if (!fromRepl &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
-                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
-                    << "Not primary while applying ops to database " << dbname));
-            }
-
-            // Preconditions check reads the database state, so needs to be done locked
-            if ( cmdObj["preCondition"].type() == Array ) {
-                BSONObjIterator i( cmdObj["preCondition"].Obj() );
-                while ( i.more() ) {
-                    BSONObj f = i.next().Obj();
-
-                    DBDirectClient db( txn );
-                    BSONObj realres = db.findOne( f["ns"].String() , f["q"].Obj() );
-
-                    // Apply-ops would never have a $where matcher, so use the default callback,
-                    // which will throw an error if $where is found.
-                    Matcher m(f["res"].Obj());
-                    if ( ! m.matches( realres ) ) {
-                        result.append( "got" , realres );
-                        result.append( "whatFailed" , f );
-                        errmsg = "pre-condition failed";
-                        return false;
-                    }
-                }
-            }
-
-            // apply
-            int num = 0;
-            int errors = 0;
-            
-            BSONObjIterator i( ops );
-            BSONArrayBuilder ab;
-            const bool alwaysUpsert = cmdObj.hasField("alwaysUpsert") ?
-                    cmdObj["alwaysUpsert"].trueValue() : true;
-            
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                const BSONObj& temp = e.Obj();
-
-                // Ignore 'n' operations.
-                const char *opType = temp["op"].valuestrsafe();
-                if (*opType == 'n') continue;
-
-                const string ns = temp["ns"].String();
-
-                // Run operations under a nested lock as a hack to prevent yielding.
-                //
-                // The list of operations is supposed to be applied atomically; yielding
-                // would break atomicity by allowing an interruption or a shutdown to occur
-                // after only some operations are applied.  We are already locked globally
-                // at this point, so taking a DBLock on the namespace creates a nested lock,
-                // and yields are disallowed for operations that hold a nested lock.
-                //
-                // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
-                // commit to happen with a subset of ops applied.
-                // TODO figure out what to do about this.
-                Lock::GlobalWrite globalWriteLockDisallowTempRelease(txn->lockState());
-
-                // Ensures that yielding will not happen (see the comment above).
-                DEV {
-                    Locker::LockSnapshot lockSnapshot;
-                    invariant(!txn->lockState()->saveLockStateAndUnlock(&lockSnapshot));
-                };
-
-                OldClientContext ctx(txn, ns);
-
-                Status status(ErrorCodes::InternalError, "");
-                while (true) {
-                    try {
-                        // We assume that in the WriteConflict retry case, either the op rolls back
-                        // any changes it makes or is otherwise safe to rerun.
-                        status =
-                            repl::applyOperation_inlock(txn, ctx.db(), temp, false, alwaysUpsert);
-                        break;
-                    }
-                    catch (const WriteConflictException& wce) {
-                        LOG(2) << "WriteConflictException in applyOps command, retrying.";
-                        txn->recoveryUnit()->commitAndRestart();
-                        continue;
-                    }
-                }
-
-                ab.append(status.isOK());
-                if (!status.isOK()) {
-                    errors++;
-                }
-
-                num++;
-
-                WriteUnitOfWork wuow(txn);
-                logOpForDbHash(txn, ns.c_str());
-                wuow.commit();
-            }
-
-            result.append( "applied" , num );
-            result.append( "results" , ab.arr() );
-
-            if ( ! fromRepl ) {
-                // We want this applied atomically on slaves
-                // so we re-wrap without the pre-condition for speed
-
-                string tempNS = str::stream() << dbname << ".$cmd";
-
-                // TODO: possibly use mutable BSON to remove preCondition field
-                // once it is available
-                BSONObjIterator iter(cmdObj);
-                BSONObjBuilder cmdBuilder;
-
-                while (iter.more()) {
-                    BSONElement elem(iter.next());
-                    if (strcmp(elem.fieldName(), "preCondition") != 0) {
-                        cmdBuilder.append(elem);
-                    }
-                }
-
-                const BSONObj cmdRewritten = cmdBuilder.done();
-
-                // We currently always logOp the command regardless of whether the individial ops
-                // succeeded and rely on any failures to also happen on secondaries. This isn't
-                // perfect, but it's what the command has always done and is part of its "correct"
-                // behavior.
-                while (true) {
-                    try {
-                        WriteUnitOfWork wunit(txn);
-                        getGlobalServiceContext()->getOpObserver()->onApplyOps(txn,
-                                                                            tempNS,
-                                                                            cmdRewritten);
-                        wunit.commit();
-                        break;
-                    }
-                    catch (const WriteConflictException& wce) {
-                        LOG(2) <<
-                            "WriteConflictException while logging applyOps command, retrying.";
-                        txn->recoveryUnit()->commitAndRestart();
-                        continue;
-                    }
-                }
-            }
-
-            if (errors != 0) {
-                return false;
-            }
-
-            return true;
+            return appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
         }
 
     private:

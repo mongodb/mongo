@@ -103,6 +103,7 @@ namespace mongo {
 
         bool isSystem() const { return coll().startsWith( "system." ); }
         bool isSystemDotIndexes() const { return coll() == "system.indexes"; }
+        bool isSystemDotProfile() const { return coll() == "system.profile"; }
         bool isConfigDB() const { return db() == "config"; }
         bool isCommand() const { return coll() == "$cmd"; }
         bool isOplog() const { return oplog( _ns ); }

@@ -42,7 +42,6 @@ namespace mongo {
         explicit DeleteRequest(const NamespaceString& nsString) :
             _nsString(nsString),
             _multi(false),
-            _logop(false),
             _god(false),
             _fromMigrate(false),
             _isExplain(false),
@@ -50,7 +49,6 @@ namespace mongo {
 
         void setQuery(const BSONObj& query) { _query = query; }
         void setMulti(bool multi = true) { _multi = multi; }
-        void setUpdateOpLog(bool logop = true) { _logop = logop; }
         void setGod(bool god = true) { _god = god; }
         void setFromMigrate(bool fromMigrate = true) { _fromMigrate = fromMigrate; }
         void setExplain(bool isExplain = true) { _isExplain = isExplain; }
@@ -59,7 +57,6 @@ namespace mongo {
         const NamespaceString& getNamespaceString() const { return _nsString; }
         const BSONObj& getQuery() const { return _query; }
         bool isMulti() const { return _multi; }
-        bool shouldCallLogOp() const { return _logop; }
         bool isGod() const { return _god; }
         bool isFromMigrate() const { return _fromMigrate; }
         bool isExplain() const { return _isExplain; }
@@ -71,7 +68,6 @@ namespace mongo {
         const NamespaceString& _nsString;
         BSONObj _query;
         bool _multi;
-        bool _logop;
         bool _god;
         bool _fromMigrate;
         bool _isExplain;

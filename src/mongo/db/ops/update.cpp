@@ -41,7 +41,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_driver.h"
@@ -79,24 +78,19 @@ namespace mongo {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 
-            if (!request.isFromReplication() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                nsString.db())) {
+            bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db());
+
+            if (userInitiatedWritesAndNotPrimary) {
                 uassertStatusOK(Status(ErrorCodes::NotMaster, str::stream()
                     << "Not primary while creating collection " << nsString.ns()
                     << " during upsert"));
             }
 
             WriteUnitOfWork wuow(txn);
-            collection = db->createCollection(txn, nsString.ns());
+            collection = db->createCollection(txn, nsString.ns(), CollectionOptions());
             invariant(collection);
 
-            if (!request.isFromReplication()) {
-                getGlobalServiceContext()->getOpObserver()->onCreateCollection(
-                        txn,
-                        NamespaceString(nsString),
-                        CollectionOptions());
-            }
             wuow.commit();
         }
 

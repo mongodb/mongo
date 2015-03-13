@@ -49,14 +49,12 @@ namespace mongo {
                             BSONObj pattern,
                             PlanExecutor::YieldPolicy policy,
                             bool justOne,
-                            bool logop,
                             bool god,
                             bool fromMigrate) {
         NamespaceString nsString(ns);
         DeleteRequest request(nsString);
         request.setQuery(pattern);
         request.setMulti(!justOne);
-        request.setUpdateOpLog(logop);
         request.setGod(god);
         request.setFromMigrate(fromMigrate);
         request.setYieldPolicy(policy);

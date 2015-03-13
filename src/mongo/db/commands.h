@@ -243,10 +243,6 @@ namespace mutablebson {
         ServerStatusMetricField<Counter64> _commandsFailedMetric;
 
     public:
-        // Stops all index builds required to run this command and returns index builds killed.
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db, 
-                                                     const BSONObj& cmdObj);
 
         static const CommandMap* commandsByBestName() { return _commandsByBestName; }
         static const CommandMap* webCommands() { return _webCommands; }

@@ -48,9 +48,7 @@ namespace mongo {
             , _god(false)
             , _upsert(false)
             , _multi(false)
-            , _callLogOp(false)
             , _fromMigration(false)
-            , _fromReplication(false)
             , _lifecycle(NULL)
             , _isExplain(false)
             , _storeResultDoc(false)
@@ -103,28 +101,12 @@ namespace mongo {
             return _multi;
         }
 
-        inline void setUpdateOpLog(bool value = true) {
-            _callLogOp = value;
-        }
-
-        bool shouldCallLogOp() const {
-            return _callLogOp;
-        }
-
         inline void setFromMigration(bool value = true) {
             _fromMigration = value;
         }
 
         bool isFromMigration() const {
             return _fromMigration;
-        }
-
-        inline void setFromReplication(bool value = true) {
-            _fromReplication = value;
-        }
-
-        bool isFromReplication() const {
-            return _fromReplication;
         }
 
         inline void setLifecycle(UpdateLifecycle* value) {
@@ -166,9 +148,7 @@ namespace mongo {
                         << " god: " << _god
                         << " upsert: " << _upsert
                         << " multi: " << _multi
-                        << " callLogOp: " << _callLogOp
                         << " fromMigration: " << _fromMigration
-                        << " fromReplications: " << _fromReplication
                         << " isExplain: " << _isExplain;
         }
     private:
@@ -193,14 +173,8 @@ namespace mongo {
         // True if this update is allowed to affect more than one document.
         bool _multi;
 
-        // True if the effects of the update should be written to the oplog.
-        bool _callLogOp;
-
         // True if this update is on behalf of a chunk migration.
         bool _fromMigration;
-
-        // True if this update is being applied during the application for the oplog.
-        bool _fromReplication;
 
         // The lifecycle data, and events used during the update request.
         UpdateLifecycle* _lifecycle;

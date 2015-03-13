@@ -48,7 +48,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -66,6 +65,7 @@
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -247,7 +247,6 @@ namespace mongo {
         request.setQuery(id);
         request.setUpdates(o);
         request.setUpsert();
-        request.setUpdateOpLog();
         request.setFromMigration(fromMigrate);
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
@@ -264,7 +263,6 @@ namespace mongo {
 
         request.setUpdates(obj);
         request.setUpsert();
-        request.setUpdateOpLog();
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
@@ -449,8 +447,6 @@ namespace mongo {
 
                 BSONObj deletedId;
                 collection->deleteDocument( txn, rloc, false, false, &deletedId );
-                // The above throws on failure, and so is not logged
-                getGlobalServiceContext()->getOpObserver()->onDelete(txn, ns, deletedId, fromMigrate);
                 wuow.commit();
                 numDeleted++;
             }
@@ -582,6 +578,9 @@ namespace mongo {
 
     void Helpers::emptyCollection(OperationContext* txn, const char *ns) {
         OldClientContext context(txn, ns);
+        bool shouldReplicateWrites = txn->writesAreReplicated();
+        txn->setReplicatedWrites(false);
+        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
         deleteObjects(txn, context.db(), ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
     }
 

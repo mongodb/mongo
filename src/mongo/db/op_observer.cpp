@@ -47,9 +47,7 @@ namespace mongo {
                                    const std::string& ns,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
-        if (repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
-            repl::_logOp(txn, "i", ns.c_str(), indexDoc, nullptr, fromMigrate);
-        }
+        repl::_logOp(txn, "i", ns.c_str(), indexDoc, nullptr, fromMigrate);
 
         getGlobalAuthorizationManager()->logOp(txn, "i", ns.c_str(), indexDoc, nullptr);
         logOpForSharding(txn, "i", ns.c_str(), indexDoc, nullptr, fromMigrate);
@@ -57,34 +55,31 @@ namespace mongo {
     }
 
     void OpObserver::onInsert(OperationContext* txn,
-                              const std::string& ns,
+                              const NamespaceString& ns,
                               BSONObj doc,
                               bool fromMigrate) {
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "i", ns.c_str(), doc, nullptr, fromMigrate);
-        }
+        repl::_logOp(txn, "i", ns.ns().c_str(), doc, nullptr, fromMigrate);
 
-        getGlobalAuthorizationManager()->logOp(txn, "i", ns.c_str(), doc, nullptr);
-        logOpForSharding(txn, "i", ns.c_str(), doc, nullptr, fromMigrate);
-        logOpForDbHash(txn, ns.c_str());
-        if ( strstr( ns.c_str(), ".system.js" ) ) {
+        getGlobalAuthorizationManager()->logOp(txn, "i", ns.ns().c_str(), doc, nullptr);
+        logOpForSharding(txn, "i", ns.ns().c_str(), doc, nullptr, fromMigrate);
+        logOpForDbHash(txn, ns.ns().c_str());
+        if (strstr(ns.ns().c_str(), ".system.js")) {
             Scope::storedFuncMod(txn);
         }
     }
 
     void OpObserver::onUpdate(OperationContext* txn,
-                              const std::string& ns,
-                              const BSONObj& update,
-                              BSONObj& criteria,
-                              bool fromMigrate) {
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "u", ns.c_str(), update, &criteria, fromMigrate);
-        }
+                              oplogUpdateEntryArgs args) {
+        repl::_logOp(txn, "u", args.ns.c_str(), args.update, &args.criteria, args.fromMigrate);
 
-        getGlobalAuthorizationManager()->logOp(txn, "u", ns.c_str(), update, &criteria);
-        logOpForSharding(txn, "u", ns.c_str(), update, &criteria, fromMigrate);
-        logOpForDbHash(txn, ns.c_str());
-        if ( strstr( ns.c_str(), ".system.js" ) ) {
+        getGlobalAuthorizationManager()->logOp(txn,
+                                               "u",
+                                               args.ns.c_str(),
+                                               args.update,
+                                               &args.criteria);
+        logOpForSharding(txn, "u", args.ns.c_str(), args.update, &args.criteria, args.fromMigrate);
+        logOpForDbHash(txn, args.ns.c_str());
+        if (strstr(args.ns.c_str(), ".system.js")) {
             Scope::storedFuncMod(txn);
         }
     }
@@ -93,23 +88,18 @@ namespace mongo {
                               const std::string& ns,
                               const BSONObj& idDoc,
                               bool fromMigrate) {
-
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "d", ns.c_str(), idDoc, nullptr, fromMigrate);
-        }
+        repl::_logOp(txn, "d", ns.c_str(), idDoc, nullptr, fromMigrate);
 
         getGlobalAuthorizationManager()->logOp(txn, "d", ns.c_str(), idDoc, nullptr);
         logOpForSharding(txn, "d", ns.c_str(), idDoc, nullptr, fromMigrate);
         logOpForDbHash(txn, ns.c_str());
-        if ( strstr( ns.c_str(), ".system.js" ) ) {
+        if (strstr(ns.c_str(), ".system.js")) {
             Scope::storedFuncMod(txn);
         }
     }
 
     void OpObserver::onOpMessage(OperationContext* txn, const BSONObj& msgObj) {
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "n", "", msgObj, nullptr, false);
-        }
+        repl::_logOp(txn, "n", "", msgObj, nullptr, false);
     }
 
     void OpObserver::onCreateCollection(OperationContext* txn,
@@ -121,9 +111,7 @@ namespace mongo {
         b.appendElements(options.toBSON());
         BSONObj cmdObj = b.obj();
 
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -132,9 +120,7 @@ namespace mongo {
     void OpObserver::onCollMod(OperationContext* txn,
                                const std::string& dbName,
                                const BSONObj& collModCmd) {
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), collModCmd, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), collModCmd, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), collModCmd, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -144,9 +130,7 @@ namespace mongo {
                                     const std::string& dbName) {
         BSONObj cmdObj = BSON("dropDatabase" << 1);
 
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -157,9 +141,7 @@ namespace mongo {
         std::string dbName = collectionName.db().toString() + ".$cmd";
         BSONObj cmdObj = BSON("drop" << collectionName.coll().toString());
 
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -168,9 +150,7 @@ namespace mongo {
     void OpObserver::onDropIndex(OperationContext* txn,
                                  const std::string& dbName,
                                  const BSONObj& idxDescriptor) {
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), idxDescriptor, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), idxDescriptor, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), idxDescriptor, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -187,9 +167,7 @@ namespace mongo {
                               "stayTemp" << stayTemp <<
                               "dropTarget" << dropTarget);
 
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -198,9 +176,7 @@ namespace mongo {
     void OpObserver::onApplyOps(OperationContext* txn,
                                 const std::string& dbName,
                                 const BSONObj& applyOpCmd) {
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), applyOpCmd, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), applyOpCmd, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), applyOpCmd, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -212,9 +188,7 @@ namespace mongo {
         std::string dbName = collectionName.db().toString() + ".$cmd";
         BSONObj cmdObj = BSON("convertToCapped" << collectionName.coll() << "size" << size);
 
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -224,9 +198,7 @@ namespace mongo {
         std::string dbName = collectionName.db().toString() + ".$cmd";
         BSONObj cmdObj = BSON("emptycapped" << collectionName.coll());
 
-        if ( repl::getGlobalReplicationCoordinator()->isReplEnabled() ) {
-            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
-        }
+        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());

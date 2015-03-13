@@ -642,7 +642,6 @@ namespace {
         request.setMulti(multi);
         request.setQuery(query);
         request.setUpdates(toupdate);
-        request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
         UpdateLifecycleImpl updateLifecycle(broadcast, nsString);
         request.setLifecycle(&updateLifecycle);
 
@@ -718,7 +717,7 @@ namespace {
             }
             else {
                 WriteUnitOfWork wuow(txn);
-                uassertStatusOK(userCreateNS(txn, db, nsString.ns(), BSONObj(), true));
+                uassertStatusOK(userCreateNS(txn, db, nsString.ns(), BSONObj()));
                 wuow.commit();
             }
 
@@ -762,7 +761,6 @@ namespace {
         DeleteRequest request(nsString);
         request.setQuery(pattern);
         request.setMulti(!justOne);
-        request.setUpdateOpLog(true);
 
         request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
@@ -952,15 +950,10 @@ namespace {
                 if ( !collection ) {
                     collection = ctx.db()->createCollection( txn, ns );
                     verify( collection );
-                    getGlobalServiceContext()->getOpObserver()->onCreateCollection(
-                            txn,
-                            NamespaceString(ns),
-                            CollectionOptions());
                 }
 
                 StatusWith<RecordId> status = collection->insertDocument( txn, js, true );
                 uassertStatusOK( status.getStatus() );
-                getGlobalServiceContext()->getOpObserver()->onInsert(txn, std::string(ns), js);
                 wunit.commit();
                 break;
             }

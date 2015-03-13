@@ -1,7 +1,5 @@
-// delete.h
-
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,25 +26,33 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/plan_executor.h"
-
+#include "mongo/base/status.h"
 
 namespace mongo {
-
     class Database;
+    class NamespaceString;
     class OperationContext;
 
-    // If justOne is true, deletedId is set to the id of the deleted object.
-    long long deleteObjects(OperationContext* txn,
-                            Database* db,
-                            StringData ns,
-                            BSONObj pattern,
-                            PlanExecutor::YieldPolicy policy,
-                            bool justOne,
-                            bool god = false,
-                            bool fromMigrate = false);
+    /**
+     * Drops all documents contained in the capped collection, "collectionName".
+     */
+    Status emptyCapped(OperationContext* txn,
+                       const NamespaceString& collectionName);
 
-}
+    /**
+     * Clones the collection "shortFrom" to the capped collection "shortTo" with a size of "size".
+     */
+    Status cloneCollectionAsCapped(OperationContext* txn,
+                                   Database* db,
+                                   const std::string& shortFrom,
+                                   const std::string& shortTo,
+                                   double size,
+                                   bool temp);
+
+    /**
+     * Converts the collection "collectionName" to a capped collection with a size of "size".
+     */
+    Status convertToCapped(OperationContext* txn,
+                           const NamespaceString& collectionName,
+                           double size);
+} // namespace mongo

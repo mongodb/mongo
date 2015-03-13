@@ -676,6 +676,7 @@ namespace repl {
         if ( !only.empty() && only != clientName )
             return;
 
+        txn->setReplicatedWrites(false);
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if (replSettings.pretouch &&
             !alreadyLocked/*doesn't make sense if in write lock already*/) {

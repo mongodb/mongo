@@ -158,20 +158,6 @@ namespace mongo {
                     _collection->deleteDocument(_txn, rloc, deleteCappedOK, deleteNoWarn,
                                                 _params.shouldCallLogOp ? &deletedDoc : NULL);
 
-                    if (_params.shouldCallLogOp) {
-                        if (deletedDoc.isEmpty()) {
-                            log() << "Deleted object without id in collection " << _collection->ns()
-                            << ", not logging.";
-                        }
-                        else {
-                            getGlobalServiceContext()->getOpObserver()->onDelete(
-                                    _txn,
-                                    _collection->ns().ns(),
-                                    deletedDoc,
-                                    _params.fromMigrate);
-                        }
-                    }
-
                     wunit.commit();
                 }
 

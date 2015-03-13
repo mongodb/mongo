@@ -148,15 +148,10 @@ namespace mongo {
                          << to_collection.ns() << "]",
                          !createdCollection );
                 WriteUnitOfWork wunit(txn);
-                collection = db->createCollection(txn, to_collection.ns());
+                invariant(logForRepl == txn->writesAreReplicated());
+                collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
                 verify(collection);
 
-                if (logForRepl) {
-                    getGlobalServiceContext()->getOpObserver()->onCreateCollection(
-                            txn,
-                            to_collection,
-                            CollectionOptions());
-                }
                 wunit.commit();
             }
 
@@ -233,8 +228,6 @@ namespace mongo {
                             << ' ' << loc.getStatus() << " obj:" << js;
                 }
                 uassertStatusOK( loc.getStatus() );
-                if (logForRepl)
-                    getGlobalServiceContext()->getOpObserver()->onInsert(txn, to_collection.ns(), js);
 
                 wunit.commit();
 
@@ -338,13 +331,9 @@ namespace mongo {
         Collection* collection = db->getCollection( to_collection );
         if ( !collection ) {
             WriteUnitOfWork wunit(txn);
-            collection = db->createCollection( txn, to_collection.ns() );
+            invariant(logForRepl == txn->writesAreReplicated());
+            collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
             invariant(collection);
-            if (logForRepl) {
-                getGlobalServiceContext()->getOpObserver()->onCreateCollection(txn,
-                                                                            to_collection,
-                                                                            CollectionOptions());
-            }
             wunit.commit();
         }
 
@@ -372,7 +361,7 @@ namespace mongo {
             const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
             for (vector<BSONObj>::const_iterator it = indexesToBuild.begin();
                     it != indexesToBuild.end(); ++it) {
-                getGlobalServiceContext()->getOpObserver()->onInsert(txn, createIndexNs, *it);
+                getGlobalServiceContext()->getOpObserver()->onCreateIndex(txn, createIndexNs, *it);
             }
         }
         wunit.commit();
@@ -408,7 +397,8 @@ namespace mongo {
             BSONObj col = collList.front();
             if (col["options"].isABSONObj()) {
                 WriteUnitOfWork wunit(txn);
-                Status status = userCreateNS(txn, db, ns, col["options"].Obj(), logForRepl, 0);
+                invariant(logForRepl == txn->writesAreReplicated());
+                Status status = userCreateNS(txn, db, ns, col["options"].Obj(), 0);
                 if ( !status.isOK() ) {
                     errmsg = status.toString();
                     return false;
@@ -589,12 +579,8 @@ namespace mongo {
 
                     // we defer building id index for performance - building it in batch is much
                     // faster
-                    Status createStatus = userCreateNS(txn,
-                                                       db,
-                                                       to_name.ns(),
-                                                       options,
-                                                       opts.logForRepl,
-                                                       false);
+                    invariant(opts.logForRepl == txn->writesAreReplicated());
+                    Status createStatus = userCreateNS(txn, db, to_name.ns(), options, false);
                     if ( !createStatus.isOK() ) {
                         errmsg = str::stream() << "failed to create collection \""
                                                << to_name.ns() << "\": "
@@ -650,10 +636,6 @@ namespace mongo {
                         BSONObj id;
 
                         c->deleteDocument(txn, *it, true, true, opts.logForRepl ? &id : NULL);
-                        if (opts.logForRepl)
-                            getGlobalServiceContext()->getOpObserver()->onDelete(txn,
-                                                                              c->ns().ns(),
-                                                                              id);
                         wunit.commit();
                     }
 

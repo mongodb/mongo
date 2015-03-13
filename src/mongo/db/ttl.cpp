@@ -270,8 +270,7 @@ namespace mongo {
                                                ns,
                                                query,
                                                PlanExecutor::YIELD_AUTO,
-                                               false,
-                                               true);
+                                               false);
                     break;
                 }
                 catch (const WriteConflictException& dle) {

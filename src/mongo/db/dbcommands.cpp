@@ -48,7 +48,11 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -69,6 +73,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -87,6 +92,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/print.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -109,6 +115,7 @@ namespace mongo {
     }
 
     bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        invariant(!fromRepl == txn->writesAreReplicated());
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
         long long timeoutSecs = 0;
@@ -148,88 +155,46 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return true; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            invariant(db);
-            std::list<std::string> collections;
-            db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
-
-            std::vector<BSONObj> allKilledIndexes;
-            for (std::list<std::string>::iterator it = collections.begin();
-                 it != collections.end();
-                 ++it) {
-                std::string ns = *it;
-
-                IndexCatalog::IndexKillCriteria criteria;
-                criteria.ns = ns;
-                std::vector<BSONObj> killedIndexes =
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-                allKilledIndexes.insert(allKilledIndexes.end(),
-                                        killedIndexes.begin(),
-                                        killedIndexes.end());
-            }
-            return allKilledIndexes;
-        }
-
         CmdDropDatabase() : Command("dropDatabase") {}
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& cmdObj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
             // disallow dropping the config database
             if (serverGlobalParams.configsvr && (dbname == "config")) {
-                errmsg = "Cannot drop 'config' database if mongod started with --configsvr";
-                return false;
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::IllegalOperation,
+                                                  "Cannot drop 'config' database if mongod started "
+                                                  "with --configsvr"));
             }
 
             if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
                  repl::ReplicationCoordinator::modeNone) &&
                 (dbname == "local")) {
-                errmsg = "Cannot drop 'local' database while replication is active";
-                return false;
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::IllegalOperation,
+                                                  "Cannot drop 'local' database while replication "
+                                                  "is active"));
             }
             BSONElement e = cmdObj.firstElement();
             int p = (int) e.number();
             if ( p != 1 ) {
-                errmsg = "have to pass 1 as db parameter";
-                return false;
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::IllegalOperation,
+                                                  "have to pass 1 as db parameter"));
             }
 
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                ScopedTransaction transaction(txn, MODE_X);
-                Lock::GlobalWrite lk(txn->lockState());
-                AutoGetDb autoDB(txn, dbname, MODE_X);
-                Database* const db = autoDB.getDb();
-                if (!db) {
-                    // DB doesn't exist, so deem it a success.
-                    return true;
-                }
-                OldClientContext context(txn, dbname);
-                if (!fromRepl &&
-                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
-                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
-                        << "Not primary while dropping database " << dbname));
-                }
-
-                log() << "dropDatabase " << dbname << " starting" << endl;
-
-                stopIndexBuilds(txn, db, cmdObj);
-                dropDatabase(txn, db);
-
-                log() << "dropDatabase " << dbname << " finished";
-
-                WriteUnitOfWork wunit(txn);
-
-                if (!fromRepl) {
-                    getGlobalServiceContext()->getOpObserver()->onDropDatabase(txn, dbname + ".$cmd");
-                }
-
-                wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", dbname);
-
-            result.append( "dropped" , dbname );
-
-            return true;
+            Status status = dropDatabase(txn, dbname);
+            if (status.isOK()) {
+                result.append( "dropped" , dbname );
+            }
+            return appendCommandStatus(result, status);
         }
+
     } cmdDropDatabase;
 
     class CmdRepairDatabase : public Command {
@@ -281,6 +246,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            invariant(!fromRepl == txn->writesAreReplicated());
             BSONElement e = cmdObj.firstElement();
             if ( e.numberInt() != 1 ) {
                 errmsg = "bad option";
@@ -301,6 +267,9 @@ namespace mongo {
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
 
             StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
+            bool shouldReplicateWrites = txn->writesAreReplicated();
+            txn->setReplicatedWrites(false);
+            ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
             Status status = repairDatabase(txn, engine, dbname, preserveClonedFilesOnFailure,
                                            backupOriginalFiles );
 
@@ -367,6 +336,7 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
+            invariant(!fromRepl == txn->writesAreReplicated());
 
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
@@ -467,24 +437,17 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return true; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            const std::string nsToDrop = parseNsCollectionRequired(db->name(), cmdObj);
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = nsToDrop;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
-        }
-
-        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            invariant(!fromRepl == txn->writesAreReplicated());
             const std::string nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
 
-            if (!serverGlobalParams.quiet) {
-                LOG(0) << "CMD: drop " << nsToDrop << endl;
-            }
-
-            if ( nsToDrop.find( '$' ) != string::npos ) {
+            if (nsToDrop.find('$') != string::npos) {
                 errmsg = "can't drop collection with reserved $ character in name";
                 return false;
             }
@@ -496,48 +459,11 @@ namespace mongo {
                 return false;
             }
 
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                ScopedTransaction transaction(txn, MODE_IX);
-
-                AutoGetDb autoDb(txn, dbname, MODE_X);
-                Database* const db = autoDb.getDb();
-                Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
-
-                // If db/collection does not exist, short circuit and return.
-                if ( !db || !coll ) {
-                    errmsg = "ns not found";
-                    return false;
-                }
-                OldClientContext context(txn, nsToDrop);
-                if (!fromRepl &&
-                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
-                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
-                        << "Not primary while dropping collection " << nsToDrop));
-                }
-
-                int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
-
-                stopIndexBuilds(txn, db, cmdObj);
-
-                result.append( "ns", nsToDrop );
-                result.append( "nIndexesWas", numIndexes );
-
-                WriteUnitOfWork wunit(txn);
-                Status s = db->dropCollection( txn, nsToDrop );
-
-                if ( !s.isOK() ) {
-                    return appendCommandStatus( result, s );
-                }
-
-                if ( !fromRepl ) {
-                    getGlobalServiceContext()->getOpObserver()->onDropCollection(
-                            txn,
-                            NamespaceString(nsToDrop));
-                }
-                wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", nsToDrop);
-            return true;
+            result.append("ns", nsToDrop);
+            return appendCommandStatus(result,
+                                       dropCollection(txn, NamespaceString(nsToDrop), result));
         }
+
     } cmdDrop;
 
     /* create collection */
@@ -578,7 +504,14 @@ namespace mongo {
 
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
-        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            invariant(!fromRepl == txn->writesAreReplicated());
             BSONObjIterator it(cmdObj);
 
             // Extract ns from first cmdObj element.
@@ -619,7 +552,7 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
 
                 // Create collection.
-                status =  userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl);
+                status =  userCreateNS(txn, ctx.db(), ns.c_str(), options);
                 if ( !status.isOK() ) {
                     return appendCommandStatus( result, status );
                 }
@@ -662,6 +595,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            invariant(!fromRepl == txn->writesAreReplicated());
             const std::string ns = parseNs(dbname, jsobj);
 
             md5digest d;
@@ -815,6 +749,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            invariant(!fromRepl == txn->writesAreReplicated());
             Timer timer;
 
             string ns = jsobj.firstElement().String();
@@ -939,6 +874,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            invariant(!fromRepl == txn->writesAreReplicated());
             int scale = 1;
             if ( jsobj["scale"].isNumber() ) {
                 scale = jsobj["scale"].numberInt();
@@ -1044,147 +980,21 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            invariant(!fromRepl == txn->writesAreReplicated());
+
             const std::string ns = parseNsCollectionRequired(dbname, jsobj);
-
-            ScopedTransaction transaction(txn, MODE_IX);
-            AutoGetDb autoDb(txn, dbname, MODE_X);
-            Database* const db = autoDb.getDb();
-            Collection* coll = db ? db->getCollection(ns) : NULL;
-
-            // If db/collection does not exist, short circuit and return.
-            if ( !db || !coll ) {
-                errmsg = "ns does not exist";
-                return false;
-            }
-
-            OldClientContext ctx(txn,  ns);
-            if (!fromRepl &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
-                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
-                    << "Not primary while setting collection options on " << ns));
-            }
-
-            WriteUnitOfWork wunit(txn);
-
-            bool ok = true;
-
-            BSONForEach( e, jsobj ) {
-                if ( str::equals( "collMod", e.fieldName() ) ) {
-                    // no-op
-                }
-                else if ( str::startsWith( e.fieldName(), "$" ) ) {
-                    // no-op: ignore top-level fields prefixed with $. They are for the command processor.
-                }
-                else if ( LiteParsedQuery::cmdOptionMaxTimeMS == e.fieldNameStringData() ) {
-                    // no-op
-                }
-                else if ( str::equals( "index", e.fieldName() ) ) {
-                    BSONObj indexObj = e.Obj();
-                    BSONObj keyPattern = indexObj.getObjectField( "keyPattern" );
-
-                    if ( keyPattern.isEmpty() ){
-                        errmsg = "no keyPattern specified";
-                        ok = false;
-                        continue;
-                    }
-
-                    BSONElement newExpireSecs = indexObj["expireAfterSeconds"];
-                    if ( newExpireSecs.eoo() ) {
-                        errmsg = "no expireAfterSeconds field";
-                        ok = false;
-                        continue;
-                    }
-                    if ( ! newExpireSecs.isNumber() ) {
-                        errmsg = "expireAfterSeconds field must be a number";
-                        ok = false;
-                        continue;
-                    }
-
-                    const IndexDescriptor* idx = coll->getIndexCatalog()
-                                                     ->findIndexByKeyPattern( txn, keyPattern );
-                    if ( idx == NULL ) {
-                        errmsg = str::stream() << "cannot find index " << keyPattern
-                                               << " for ns " << ns;
-                        ok = false;
-                        continue;
-                    }
-                    BSONElement oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
-                    if( oldExpireSecs.eoo() ){
-                        errmsg = "no expireAfterSeconds field to update";
-                        ok = false;
-                        continue;
-                    }
-                    if( ! oldExpireSecs.isNumber() ) {
-                        errmsg = "existing expireAfterSeconds field is not a number";
-                        ok = false;
-                        continue;
-                    }
-
-                    if ( oldExpireSecs != newExpireSecs ) {
-                        result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
-                        // Change the value of "expireAfterSeconds" on disk.
-                        coll->getCatalogEntry()->updateTTLSetting( txn,
-                                                                   idx->indexName(),
-                                                                   newExpireSecs.numberLong() );
-                        // Notify the index catalog that the definition of this index changed.
-                        idx = coll->getIndexCatalog()->refreshEntry( txn, idx );
-                        result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
-                    }
-                }
-                else {
-                    // As of SERVER-17312 we only support these two options. When SERVER-17320 is
-                    // resolved this will need to be enhanced to handle other options.
-                    typedef CollectionOptions CO;
-                    const StringData name = e.fieldNameStringData();
-                    const int flag = (name == "usePowerOf2Sizes") ? CO::Flag_UsePowerOf2Sizes :
-                                     (name == "noPadding") ? CO::Flag_NoPadding :
-                                     0;
-                    if (!flag) {
-                        errmsg = str::stream() << "unknown option to collMod: " << name;
-                        ok = false;
-                        continue;
-                    }
-
-                    CollectionCatalogEntry* cce = coll->getCatalogEntry();
-
-                    const int oldFlags = cce->getCollectionOptions(txn).flags;
-                    const bool oldSetting = oldFlags & flag;
-                    const bool newSetting = e.trueValue();
-
-                    result.appendBool( name.toString() + "_old", oldSetting );
-                    result.appendBool( name.toString() + "_new", newSetting );
-
-                    const int newFlags = newSetting
-                                       ? (oldFlags | flag) // set flag
-                                       : (oldFlags & ~flag); // clear flag
-
-                    // NOTE we do this unconditionally to ensure that we note that the user has
-                    // explicitly set flags, even if they are just setting the default.
-                    cce->updateFlags(txn, newFlags);
-
-                    const CollectionOptions newOptions = cce->getCollectionOptions(txn);
-                    invariant(newOptions.flags == newFlags);
-                    invariant(newOptions.flagsSet);
-                }
-            }
-
-            if (!ok) {
-                return false;
-            }
-
-            if (!fromRepl) {
-                getGlobalServiceContext()->getOpObserver()->onCollMod(txn,
-                                                                   (dbname + ".$cmd").c_str(),
-                                                                   jsobj);
-            }
-
-            wunit.commit();
-            return true;
+            return appendCommandStatus(result,
+                                       collMod(txn, NamespaceString(ns), jsobj, &result));
         }
 
     } collectionModCommand;
-
 
     class DBStats : public Command {
     public:
@@ -1210,6 +1020,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            invariant(!fromRepl == txn->writesAreReplicated());
             int scale = 1;
             if ( jsobj["scale"].isNumber() ) {
                 scale = jsobj["scale"].numberInt();

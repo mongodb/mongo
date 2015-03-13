@@ -82,12 +82,11 @@ namespace mongo {
 
         const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
 
-        Status dropCollection( OperationContext* txn, StringData fullns );
+        Status dropCollection(OperationContext* txn, StringData fullns);
 
         Collection* createCollection( OperationContext* txn,
                                       StringData ns,
                                       const CollectionOptions& options = CollectionOptions(),
-                                      bool allocateSpace = true,
                                       bool createDefaultIndexes = true );
 
         /**
@@ -162,7 +161,6 @@ namespace mongo {
                          Database* db,
                          StringData ns,
                          BSONObj options,
-                         bool logForReplication,
                          bool createDefaultIndexes = true );
 
 } // namespace mongo

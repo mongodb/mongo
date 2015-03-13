@@ -328,6 +328,7 @@ namespace {
 
         BackgroundSync* bgsync(BackgroundSync::get());
         OperationContextImpl txn;
+        txn.setReplicatedWrites(false);
         ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 
         truncateAndResetOplog(&txn, replCoord, bgsync);

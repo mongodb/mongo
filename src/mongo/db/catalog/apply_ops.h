@@ -1,7 +1,5 @@
-// delete.h
-
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,25 +26,20 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/plan_executor.h"
-
+#include "mongo/base/status.h"
 
 namespace mongo {
-
-    class Database;
+    class BSONObj;
+    class BSONObjBuilder;
     class OperationContext;
 
-    // If justOne is true, deletedId is set to the id of the deleted object.
-    long long deleteObjects(OperationContext* txn,
-                            Database* db,
-                            StringData ns,
-                            BSONObj pattern,
-                            PlanExecutor::YieldPolicy policy,
-                            bool justOne,
-                            bool god = false,
-                            bool fromMigrate = false);
+    /**
+     * Applies ops contained in "applyOpCmd" and populates fields in "result" to be returned to the
+     * user.
+     */
+    Status applyOps(OperationContext* txn,
+                    const std::string& dbName,
+                    const BSONObj& applyOpCmd,
+                    BSONObjBuilder* result);
 
-}
+} // namespace mongo

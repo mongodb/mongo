@@ -55,6 +55,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage_options.h"
@@ -272,8 +273,6 @@ namespace mongo {
                     continue;
                 }
 
-                getGlobalServiceContext()->getOpObserver()->onDropCollection(
-                        txn, NamespaceString(ns));
                 wunit.commit();
             }
             catch (const WriteConflictException& exp) {
@@ -351,7 +350,7 @@ namespace mongo {
         _dbEntry->appendExtraStats( opCtx, output, scale );
     }
 
-    Status Database::dropCollection( OperationContext* txn, StringData fullns ) {
+    Status Database::dropCollection(OperationContext* txn, StringData fullns) {
         invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         LOG(1) << "dropCollection: " << fullns << endl;
@@ -363,12 +362,12 @@ namespace mongo {
             return Status::OK();
         }
 
+        NamespaceString nss(fullns);
         {
-            NamespaceString s( fullns );
-            verify( s.db() == _name );
+            verify(nss.db() == _name);
 
-            if( s.isSystem() ) {
-                if( s.coll() == "system.profile" ) {
+            if (nss.isSystem()) {
+                if (nss.isSystemDotProfile()) {
                     if ( _profile != 0 )
                         return Status( ErrorCodes::IllegalOperation,
                                        "turn off profiling before dropping system.profile collection" );
@@ -417,6 +416,7 @@ namespace mongo {
             }
         }
 
+        getGlobalServiceContext()->getOpObserver()->onDropCollection(txn, nss);
         return Status::OK();
     }
 
@@ -486,7 +486,6 @@ namespace mongo {
     Collection* Database::createCollection( OperationContext* txn,
                                             StringData ns,
                                             const CollectionOptions& options,
-                                            bool allocateDefaultSpace,
                                             bool createIdIndex ) {
         massert( 17399, "collection already exists", getCollection( ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
@@ -513,7 +512,7 @@ namespace mongo {
 
         txn->recoveryUnit()->registerChange( new AddCollectionChange(this, ns) );
 
-        Status status = _dbEntry->createCollection(txn, ns, options, allocateDefaultSpace);
+        Status status = _dbEntry->createCollection(txn, ns, options, true /*allocateDefaultSpace*/);
         massertNoTraceStatusOK(status);
 
 
@@ -536,6 +535,8 @@ namespace mongo {
             }
 
         }
+
+        getGlobalServiceContext()->getOpObserver()->onCreateCollection(txn, nss, options);
 
         return collection;
     }
@@ -592,7 +593,6 @@ namespace mongo {
                          Database* db,
                          StringData ns,
                          BSONObj options,
-                         bool logForReplication,
                          bool createDefaultIndexes ) {
 
         invariant( db );
@@ -619,13 +619,7 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        invariant( db->createCollection( txn, ns, collectionOptions, true, createDefaultIndexes ) );
-
-        if ( logForReplication ) {
-            getGlobalServiceContext()->getOpObserver()->onCreateCollection(txn,
-                                                                        NamespaceString(ns),
-                                                                        collectionOptions);
-        }
+        invariant(db->createCollection(txn, ns, collectionOptions, createDefaultIndexes));
 
         return Status::OK();
     }

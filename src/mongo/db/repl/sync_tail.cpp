@@ -660,6 +660,7 @@ namespace {
         initializeWriterThread();
 
         OperationContextImpl txn;
+        txn.setReplicatedWrites(false);
 
         // allow us to get through the magic barrier
         txn.lockState()->setIsBatchWriter(true);
@@ -692,6 +693,7 @@ namespace {
         initializeWriterThread();
 
         OperationContextImpl txn;
+        txn.setReplicatedWrites(false);
 
         // allow us to get through the magic barrier
         txn.lockState()->setIsBatchWriter(true);

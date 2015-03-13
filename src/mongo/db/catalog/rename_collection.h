@@ -1,7 +1,5 @@
-// delete.h
-
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,25 +26,21 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/plan_executor.h"
-
+#include "mongo/base/status.h"
 
 namespace mongo {
-
-    class Database;
+    class NamespaceString;
     class OperationContext;
 
-    // If justOne is true, deletedId is set to the id of the deleted object.
-    long long deleteObjects(OperationContext* txn,
-                            Database* db,
-                            StringData ns,
-                            BSONObj pattern,
-                            PlanExecutor::YieldPolicy policy,
-                            bool justOne,
-                            bool god = false,
-                            bool fromMigrate = false);
+    /**
+     * Renames the collection "source" to "target" and drops the existing collection named "target"
+     * iff "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
+     * temporariness.
+     */
+    Status renameCollection(OperationContext* txn,
+                            const NamespaceString& source,
+                            const NamespaceString& target,
+                            bool dropTarget,
+                            bool stayTemp);
 
-}
+} // namespace mongo

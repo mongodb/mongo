@@ -66,10 +66,14 @@ namespace mongo {
 
         virtual bool isPrimaryFor( StringData ns );
 
+        virtual void setReplicatedWrites(bool writesAreReplicated = true);
+        virtual bool writesAreReplicated() const;
+
     private:
         std::auto_ptr<RecoveryUnit> _recovery;
         Client* const _client; // cached, not owned
         Locker* const _locker; // cached, not owned
+        bool _writesAreReplicated;
     };
 
 }  // namespace mongo

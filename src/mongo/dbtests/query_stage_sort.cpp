@@ -334,9 +334,10 @@ namespace QueryStageSortTests {
             // This allows us to check that we don't return the new copy of a doc by asserting
             // foo < limit().
             BSONObj newDoc = BSON("_id" << updatedId << "foo" << limit() + 10);
+            oplogUpdateEntryArgs args;
             {
                 WriteUnitOfWork wuow(&_txn);
-                coll->updateDocument(&_txn, *it, oldDoc, newDoc, false, false, NULL);
+                coll->updateDocument(&_txn, *it, oldDoc, newDoc, false, false, NULL, args);
                 wuow.commit();
             }
             exec->restoreState(&_txn);
@@ -354,7 +355,7 @@ namespace QueryStageSortTests {
                 oldDoc = coll->docFor(&_txn, *it);
                 {
                     WriteUnitOfWork wuow(&_txn);
-                    coll->updateDocument(&_txn, *it++, oldDoc, newDoc, false, false, NULL);
+                    coll->updateDocument(&_txn, *it++, oldDoc, newDoc, false, false, NULL, args);
                     wuow.commit();
                 }
             }
