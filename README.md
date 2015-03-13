@@ -2,30 +2,32 @@
 
 ####Welcome to MongoDB!
 
-COMPONENTS
+#####COMPONENTS
 
 &nbsp;&nbsp;&nbsp;&nbsp;````mongod```` - The database process. <br />
 &nbsp;&nbsp;&nbsp;&nbsp;````mongos```` - Sharding controller. <br />
 &nbsp;&nbsp;&nbsp;&nbsp;````mongo````  - The database shell (uses interactive javascript). <br />
 
-UTILITIES
+#####UTILITIES
 
-  mongodump         - MongoDB dump tool - for backups, snapshots, etc.
-  mongorestore      - MongoDB restore a dump
-  mongoexport       - Export a single collection to test (JSON, CSV)
-  mongoimport       - Import from JSON or CSV
-  mongofiles        - Utility for putting and getting files from MongoDB GridFS
-  mongostat         - Show performance statistics
+&nbsp;&nbsp;&nbsp;&nbsp;````mongodump````         - MongoDB dump tool - for backups, snapshots, etc. <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongorestore````      - MongoDB restore a dump <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongoexport````       - Export a single collection to test (JSON, CSV) <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongoimport````       - Import from JSON or CSV <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongofiles````        - Utility for putting and getting files from MongoDB GridFS <br />
+&nbsp;&nbsp;&nbsp;&nbsp;````mongostat````         - Show performance statistics <br />
 
-BUILDING
+#####BUILDING
 
-  See docs/building.md, also www.mongodb.org search for "Building".
+&nbsp;&nbsp;See docs/building.md, also www.mongodb.org search for "Building".
 
-RUNNING
+#####RUNNING
 
-  For command line options invoke:
+&nbsp;&nbsp;For command line options invoke:
 
-    $ ./mongod --help
+````bash
+$ ./mongod --help
+````
 
   To run a single server database:
 
