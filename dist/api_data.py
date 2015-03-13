@@ -134,7 +134,7 @@ file_config = format_meta + [
         configure a compressor for file blocks.  Permitted values are
         \c "none" or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-        for \c "snappy" or \c "zlib" compression, these names are also
+        for \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
         available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages; see @ref
@@ -534,7 +534,7 @@ common_wiredtiger_open = [
             type='boolean'),
         Config('compressor', 'none', r'''
             configure a compressor for log records.  Permitted values are
-            \c "none" or \c "bzip2", \c "snappy" or custom compression
+            \c "none" or \c "bzip2", \c "snappy", \c "lz4" or custom compression
             engine \c "name" created with WT_CONNECTION::add_compressor.
             See @ref compression for more information'''),
         Config('enabled', 'false', r'''
