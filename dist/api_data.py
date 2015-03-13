@@ -315,7 +315,7 @@ connection_runtime_config = [
             type='boolean'),
         Config('ops_max', '1024', r'''
             maximum number of expected simultaneous asynchronous
-                operations''', min='10', max='4096'),
+                operations''', min='1', max='4096'),
         Config('threads', '2', r'''
             the number of worker threads to service asynchronous
                 requests''',

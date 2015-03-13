@@ -40,7 +40,7 @@ static const WT_CONFIG_CHECK confchk_connection_open_session[] = {
 
 static const WT_CONFIG_CHECK confchk_async_subconfigs[] = {
 	{ "enabled", "boolean", NULL, NULL, NULL },
-	{ "ops_max", "int", NULL, "min=10,max=4096", NULL },
+	{ "ops_max", "int", NULL, "min=1,max=4096", NULL },
 	{ "threads", "int", NULL, "min=1,max=20", NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
