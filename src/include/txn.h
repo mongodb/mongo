@@ -51,6 +51,7 @@ struct __wt_txn_global {
 	/* Checkpoint tracking. */
 	volatile uint64_t checkpoint_gen;
 	volatile uint64_t checkpoint_id;
+	volatile uint64_t checkpoint_snap_min;
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };

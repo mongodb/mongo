@@ -419,7 +419,13 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Ensure a transaction ID is allocated prior to sharing it globally */
 	WT_ERR(__wt_txn_id_check(session));
+	/*
+	 * Save a copy of the checkpoint transaction ID so that refresh can
+	 * skip the checkpoint IDs. Save a copy of the snap min so that
+	 * visibility checks for the checkpoint use the right ID.
+	 */
 	txn_global->checkpoint_id = session->txn.id;
+	txn_global->checkpoint_snap_min = session->txn.snap_min;
 
 	/*
 	 * No need for this to be atomic it is only written while holding the
@@ -438,11 +444,18 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
 
-	/* Clear the global checkpoint transaction ID */
-	txn_global->checkpoint_id = WT_TXN_NONE;
+	/*
+	 * Ensure there is no dhandle, so the visibility check doesn't get
+	 * confused about the snap min.
+	 */
+	WT_ASSERT(session, session->dhandle == NULL);
 
 	/* Commit the transaction before syncing the file(s). */
 	WT_ERR(__wt_txn_commit(session, NULL));
+
+	/* Clear the global checkpoint transaction IDs */
+	txn_global->checkpoint_id = WT_TXN_NONE;
+	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
 #ifdef	HAVE_VERBOSE
 	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
@@ -529,11 +542,14 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	if (F_ISSET(txn, TXN_RUNNING))
+	if (F_ISSET(txn, TXN_RUNNING)) {
+		WT_ASSERT(session, session->dhandle == NULL);
 		WT_TRET(__wt_txn_rollback(session, NULL));
+	}
 
-	/* Ensure the checkpoint ID is cleared on the error path. */
+	/* Ensure the checkpoint IDs are cleared on the error path. */
 	txn_global->checkpoint_id = WT_TXN_NONE;
+	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (logging)

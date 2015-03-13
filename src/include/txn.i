@@ -108,7 +108,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 	 * Take a local copy of ID in case they are updated while we are
 	 * checking visibility.
 	 */
-	checkpoint_id = txn_global->checkpoint_id;
+	checkpoint_id = txn_global->checkpoint_snap_min;
 	oldest_id = txn_global->oldest_id;
 
 	/*
