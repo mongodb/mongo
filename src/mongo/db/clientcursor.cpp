@@ -50,6 +50,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/timer.h"
@@ -69,6 +70,8 @@ namespace mongo {
                                                                          &cursorStatsOpenNoTimeout );
     static ServerStatusMetricField<Counter64> dCursorStatusTimedout( "cursor.timedOut",
                                                                      &cursorStatsTimedOut );
+
+    MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis, int, 10 * 60 * 1000 /* 10 minutes */);
 
     long long ClientCursor::totalOpen() {
         return cursorStatsOpen.get();
@@ -231,7 +234,7 @@ namespace mongo {
 
     bool ClientCursor::shouldTimeout(unsigned millis) {
         _idleAgeMillis += millis;
-        return _idleAgeMillis > 600000 && _pinValue == 0;
+        return (static_cast<int>(_idleAgeMillis) > cursorTimeoutMillis) && (_pinValue == 0);
     }
 
     void ClientCursor::setIdleTime( unsigned millis ) {
