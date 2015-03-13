@@ -286,12 +286,12 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	for done := 0; done < MaxInsertThreads; done++ {
 		err := <-resultChan
 		if err != nil {
-			return err
+			return fmt.Errorf("insertion error: %v", err)
 		}
 	}
 	// final error check
 	if err = bsonSource.Err(); err != nil {
-		return err
+		return fmt.Errorf("reading bson input: %v", err)
 	}
 	return nil
 }
