@@ -43,7 +43,7 @@ for (var i=0; i < numDocs; i++) {
 }
 batch.execute();
 
-replTest.awaitReplication();
+replTest.awaitReplication(2*60*1000);
 
 jsTestLog("Start remove/insert on primary");
 var insertAndRemove = function(host) {
