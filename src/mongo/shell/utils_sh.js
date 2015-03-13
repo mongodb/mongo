@@ -430,9 +430,16 @@ sh.getRecentFailedRounds = function() {
     return result;
 }
 
+/**
+ * Returns a summary of chunk migrations that was completed either successfully or not
+ * since yesterday. The format is an array of 2 arrays, where the first array contains
+ * the successful cases, and the second array contains the failure cases.
+ */
 sh.getRecentMigrations = function() {
     var configDB = db.getSiblingDB('config');
     var yesterday = new Date( new Date() - 24 * 60 * 60 * 1000 );
+
+    // Successful migrations.
     var result = configDB.changelog.aggregate([
         {
             $match: {
@@ -458,6 +465,7 @@ sh.getRecentMigrations = function() {
         }
     ]).toArray();
 
+    // Failed migrations.
     result = result.concat(configDB.changelog.aggregate([
         {
             $match: {
