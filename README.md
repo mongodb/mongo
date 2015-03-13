@@ -66,9 +66,11 @@ $ ./mongo
 
 #####32 BIT BUILD NOTES
 
-&nbsp;&nbsp;&nbsp;&nbsp;MongoDB uses memory mapped files.  If built as a 32 bit executable, you will
-&nbsp;&nbsp;&nbsp;&nbsp;not be able to work with large (multi-gigabyte) databases.  However, 32 bit
-&nbsp;&nbsp;&nbsp;&nbsp;builds work fine with small development databases.
+<p>
+MongoDB uses memory mapped files.  If built as a 32 bit executable, you will
+not be able to work with large (multi-gigabyte) databases.  However, 32 bit
+builds work fine with small development databases.
+</p
 
 #####LICENSE
 
