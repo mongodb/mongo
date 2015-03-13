@@ -55,7 +55,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	WT_TXN_STATE *txn_state;
 	int forced_eviction, inmem_split;
 
 	conn = S2C(session);
@@ -66,16 +65,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", page, __wt_page_type_string(page->type)));
-
-	/*
-	 * Pin the oldest transaction ID: eviction looks at page structures
-	 * that are freed when no transaction in the system needs them.
-	 */
-	txn_state = WT_SESSION_TXN_STATE(session);
-	if (txn_state->snap_min == WT_TXN_NONE)
-		txn_state->snap_min = conn->txn_global.oldest_id;
-	else
-		txn_state = NULL;
 
 	/*
 	 * Get exclusive access to the page and review it for conditions that
@@ -141,10 +130,7 @@ err:		if (!exclusive)
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
 
-done:	if (txn_state != NULL)
-		txn_state->snap_min = WT_TXN_NONE;
-
-	if ((inmem_split || (forced_eviction && ret == EBUSY)) &&
+done:	if ((inmem_split || (forced_eviction && ret == EBUSY)) &&
 	    !F_ISSET(conn->cache, WT_CACHE_WOULD_BLOCK)) {
 		F_SET(conn->cache, WT_CACHE_WOULD_BLOCK);
 		WT_TRET(__wt_evict_server_wake(session));
