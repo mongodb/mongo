@@ -45,7 +45,7 @@ $ ./mongo
 
 #####PACKAGING
 
-* Packages are created dynamically by the package.py script located in the buildscripts directory. This will generate RPM and Debian packages.
+* Packages are created dynamically by the ````package.py```` script located in the buildscripts directory. This will generate RPM and Debian packages.
 
 #####DOCUMENTATION
 
