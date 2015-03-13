@@ -60,15 +60,57 @@ class test_huffman01(wttest.WiredTigerTestCase, suite_subprocess):
             # For the UTF settings write some made-up frequency information.
             f = open(dir + '/' + self.kfile, 'w')
             f.write('48 546233\n49 460946\n')
+            f.write('0x4a 546233\n0x4b 460946\n')
             f.close()
         # if self.vfile != None and not os.path.exists(self.vfile):
         if self.vfile != None:
             f = open(dir + '/' + self.vfile, 'w')
             # For the UTF settings write some made-up frequency information.
-            f.write('50 546233\n51 460946\n')
+            f.write('48 546233\n49 460946\n')
+            f.write('0x4a 546233\n0x4b 460946\n')
             f.close()
         config=self.huffkey + self.huffval
         self.session.create(self.table_name, config)
+
+
+# Test Huffman encoding ranges.
+class test_huffman_range(wttest.WiredTigerTestCase):
+    table_name = 'table:test_huff'
+
+    # Test UTF8 out-of-range symbol information.
+    def test_huffman_range_symbol_utf8(self):
+        dir = self.conn.get_home()
+        f = open(dir + '/t8file', 'w')
+        f.write('256 546233\n257 460946\n')
+        f.close()
+        config="huffman_key=utf8t8file"
+        msg = '/not in range/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.table_name, config), msg)
+
+    # Test UTF16 out-of-range symbol information.
+    def test_huffman_range_symbol_utf16(self):
+        dir = self.conn.get_home()
+        f = open(dir + '/t16file', 'w')
+        f.write('65536 546233\n65537 460946\n')
+        f.close()
+        config="huffman_key=utf16t16file"
+        msg = '/not in range/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.table_name, config), msg)
+
+    # Test out-of-range frequency information.
+    def test_huffman_range_frequency(self):
+        # Write out-of-range frequency information.
+        dir = self.conn.get_home()
+        f = open(dir + '/t8file', 'w')
+        f.write('48 4294967296\n49 4294967297\n')
+        f.close()
+        config="huffman_key=utf8t8file"
+        msg = '/not in range/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.table_name, config), msg)
+
 
 if __name__ == '__main__':
     wttest.run()
