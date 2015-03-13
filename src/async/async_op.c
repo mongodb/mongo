@@ -267,11 +267,17 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 
 	conn = S2C(session);
 	async = conn->async;
+
+	/*
+	 * If an application re-uses a WT_ASYNC_OP, we end up here with an
+	 * invalid object.
+	 */
+	if (op->state != WT_ASYNCOP_READY)
+		WT_RET_MSG(session, EINVAL,
+		    "application error: WT_ASYNC_OP already in use");
+
 	/*
 	 * Enqueue op at the tail of the work queue.
-	 */
-	WT_ASSERT(session, op->state == WT_ASYNCOP_READY);
-	/*
 	 * We get our slot in the ring buffer to use.
 	 */
 	my_alloc = WT_ATOMIC_ADD8(async->alloc_head, 1);
