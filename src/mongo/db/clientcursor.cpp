@@ -48,6 +48,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/exit.h"
 
 namespace mongo {
@@ -68,6 +69,8 @@ namespace mongo {
                                                                          &cursorStatsOpenNoTimeout );
     static ServerStatusMetricField<Counter64> dCursorStatusTimedout( "cursor.timedOut",
                                                                      &cursorStatsTimedOut );
+
+    MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis, int, 10 * 60 * 1000 /* 10 minutes */);
 
     long long ClientCursor::totalOpen() {
         return cursorStatsOpen.get();
@@ -171,7 +174,7 @@ namespace mongo {
         if (_isNoTimeout || _isPinned) {
             return false;
         }
-        return _idleAgeMillis > 600000;
+        return _idleAgeMillis > cursorTimeoutMillis;
     }
 
     void ClientCursor::setIdleTime( int millis ) {

@@ -746,6 +746,13 @@ namespace mongo {
         return true;
     }
 
+    template<> bool BSONElement::coerce<long long>( long long* out ) const {
+        if ( !isNumber() )
+            return false;
+        *out = numberLong();
+        return true;
+    }
+
     template<> bool BSONElement::coerce<double>( double* out ) const {
         if ( !isNumber() )
             return false;

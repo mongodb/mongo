@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/max_time.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
@@ -218,7 +219,11 @@ namespace mongo {
 
     // ---- CursorCache -----
 
-    long long CursorCache::TIMEOUT = 600000;
+    long long CursorCache::TIMEOUT = 10 * 60 * 1000 /* 10 minutes */;
+    ExportedServerParameter<long long> cursorCacheTimeoutConfig(ServerParameterSet::getGlobal(),
+                                                                "cursorTimeoutMillis",
+                                                                &CursorCache::TIMEOUT,
+                                                                true, true);
 
     unsigned getCCRandomSeed() {
         scoped_ptr<SecureRandom> sr( SecureRandom::create() );
