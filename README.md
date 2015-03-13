@@ -39,39 +39,38 @@ $ ./mongo
 > help
 ````
 
-DRIVERS
+#####DRIVERS
 
-  Client drivers for most programming languages are available at mongodb.org.  Use the 
-  shell ("mongo") for administrative tasks.
+&nbsp;&nbsp;&nbsp;&nbsp;Client drivers for most programming languages are available at mongodb.org.  Use the shell ("mongo") for administrative tasks.
 
-PACKAGING
+#####PACKAGING
 
   Packages are created dynamically by the package.py script located in the buildscripts directory. This will 
   generate RPM and Debian packages.
 
-DOCUMENTATION
+#####DOCUMENTATION
 
   http://www.mongodb.org/
  
-CLOUD MANAGED MONGODB
+#####CLOUD MANAGED MONGODB
 
   http://mms.mongodb.com/
 
-MAIL LISTS AND IRC
+#####MAIL LISTS AND IRC
 
   http://dochub.mongodb.org/core/community
   
-LEARN MONGODB
+#####LEARN MONGODB
 
   http://university.mongodb.com/
 
-32 BIT BUILD NOTES
+#####32 BIT BUILD NOTES
 
   MongoDB uses memory mapped files.  If built as a 32 bit executable, you will
   not be able to work with large (multi-gigabyte) databases.  However, 32 bit
   builds work fine with small development databases.
 
-LICENSE
+#####LICENSE
 
   Most MongoDB source files (src/mongo folder and below) are made available under the terms of the
   GNU Affero General Public License (AGPL).  See individual files for
