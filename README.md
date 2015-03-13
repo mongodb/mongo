@@ -29,14 +29,15 @@
 $ ./mongod --help
 ````
 
-  To run a single server database:
-
-    $ mkdir /data/db
-    $ ./mongod
-    $
-    $ # The mongo javascript shell connects to localhost and test database by default:
-    $ ./mongo 
-    > help
+&nbsp;&nbsp;To run a single server database:
+````bash
+$ mkdir /data/db
+$ ./mongod
+$
+$ # The mongo javascript shell connects to localhost and test database by default:
+$ ./mongo 
+> help
+````
 
 DRIVERS
 
