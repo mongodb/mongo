@@ -1033,11 +1033,9 @@ namespace mongo {
 
         const int notMasterCodeForInsert = 10058; // This is different from ErrorCodes::NotMaster
         {
-            const bool isIndexBuild = (nsToCollectionSubstring(ns) == "system.indexes");
-            const LockMode mode = isIndexBuild ? MODE_X : MODE_IX;
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbLock(txn->lockState(), nsString.db(), mode);
-            Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), mode);
+            Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
             // CONCURRENCY TODO: is being read locked in big log sufficient here?
             // writelock is used to synchronize stepdowns w/ writes
@@ -1047,7 +1045,7 @@ namespace mongo {
             // Client::Context may implicitly create a database, so check existence
             if (dbHolder().get(txn, nsString.db()) != NULL) {
                 Client::Context ctx(txn, ns);
-                if (mode == MODE_X || ctx.db()->getCollection(nsString)) {
+                if (ctx.db()->getCollection(nsString)) {
                     if (multi.size() > 1) {
                         const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
                         insertMulti(txn, ctx, keepGoing, ns, multi, op);
