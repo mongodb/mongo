@@ -444,6 +444,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
 
+	/* Temporary - I didn't expect dhandle to ever be set. */
+	session->dhandle = NULL;
 	/*
 	 * Ensure there is no dhandle, so the visibility check doesn't get
 	 * confused about the snap min.
