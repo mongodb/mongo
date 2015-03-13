@@ -125,7 +125,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 		 */
                 oldest_id = checkpoint_id;
 
-        if (checkpoint_id != WT_TXN_NONE) {
+        if (btree != NULL && checkpoint_id != WT_TXN_NONE) {
                 if (btree->checkpoint_gen != txn_global->checkpoint_gen)
                         WT_STAT_FAST_CONN_INCR(
                             session, txn_not_visible_checkpoint);
