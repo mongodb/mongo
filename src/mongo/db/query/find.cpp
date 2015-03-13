@@ -47,7 +47,6 @@
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
@@ -231,7 +230,7 @@ namespace mongo {
             cursorManager = collection->getCursorManager();
         }
 
-        QLOG() << "Running getMore, cursorid: " << cursorid << endl;
+        LOG(5) << "Running getMore, cursorid: " << cursorid << endl;
 
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), the only state where
@@ -422,7 +421,7 @@ namespace mongo {
                 // cc is now invalid, as is the executor
                 cursorid = 0;
                 cc = NULL;
-                QLOG() << "getMore NOT saving client cursor, ended with state "
+                LOG(5) << "getMore NOT saving client cursor, ended with state "
                        << PlanExecutor::statestr(state)
                        << endl;
             }
@@ -430,7 +429,7 @@ namespace mongo {
                 // Continue caching the ClientCursor.
                 cc->incPos(numResults);
                 exec->saveState();
-                QLOG() << "getMore saving client cursor ended with state "
+                LOG(5) << "getMore saving client cursor ended with state "
                        << PlanExecutor::statestr(state)
                        << endl;
 
@@ -471,7 +470,7 @@ namespace mongo {
         qr.setStartingFrom(startingResult);
         qr.setNReturned(numResults);
         bb.decouple();
-        QLOG() << "getMore returned " << numResults << " results\n";
+        LOG(5) << "getMore returned " << numResults << " results\n";
         return qr;
     }
 
@@ -637,7 +636,7 @@ namespace mongo {
         }
         invariant(cq.get());
 
-        QLOG() << "Running query:\n" << cq->toString();
+        LOG(5) << "Running query:\n" << cq->toString();
         LOG(2) << "Running query: " << cq->toStringShort();
 
         // Parse, canonicalize, plan, transcribe, and get a plan executor.
@@ -781,13 +780,13 @@ namespace mongo {
             }
 
             if (enoughForFirstBatch(pq, numResults, bb.len())) {
-                QLOG() << "Enough for first batch, wantMore=" << pq.wantMore()
+                LOG(5) << "Enough for first batch, wantMore=" << pq.wantMore()
                        << " numToReturn=" << pq.getNumToReturn()
                        << " numResults=" << numResults
                        << endl;
                 // If only one result requested assume it's a findOne() and don't save the cursor.
                 if (pq.wantMore() && 1 != pq.getNumToReturn()) {
-                    QLOG() << " executor EOF=" << exec->isEOF() << endl;
+                    LOG(5) << " executor EOF=" << exec->isEOF() << endl;
                     saveClientCursor = !exec->isEOF();
                 }
                 break;
@@ -893,7 +892,7 @@ namespace mongo {
                 txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
             }
 
-            QLOG() << "caching executor with cursorid " << ccId
+            LOG(5) << "caching executor with cursorid " << ccId
                    << " after returning " << numResults << " results" << endl;
 
             // TODO document
@@ -915,7 +914,7 @@ namespace mongo {
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
         }
         else {
-            QLOG() << "Not caching executor but returning " << numResults << " results.\n";
+            LOG(5) << "Not caching executor but returning " << numResults << " results.\n";
         }
 
         // Add the results from the query into the output buffer.

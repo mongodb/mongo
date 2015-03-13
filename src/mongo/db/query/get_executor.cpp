@@ -59,7 +59,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_access.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -321,7 +320,6 @@ namespace mongo {
             if (internalQueryPlanOrChildrenIndependently
                 && SubplanStage::canUseSubplanning(*canonicalQuery)) {
 
-                QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
                 LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
 
                 *rootOut = new SubplanStage(opCtx, collection, ws, plannerParams, canonicalQuery);

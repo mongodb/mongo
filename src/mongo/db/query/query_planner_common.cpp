@@ -26,12 +26,13 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/query_planner_common.h"
-
-#include "mongo/db/query/qlog.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -61,7 +62,7 @@ namespace mongo {
             }
 
             if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
-                QLOG() << "Invalid bounds: " << isn->bounds.toString() << std::endl;
+                LOG(5) << "Invalid bounds: " << isn->bounds.toString() << std::endl;
                 invariant(0);
             }
 

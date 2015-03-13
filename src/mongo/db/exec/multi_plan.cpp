@@ -45,7 +45,6 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
@@ -121,7 +120,7 @@ namespace mongo {
         StageState state = bestPlan.root->work(out);
 
         if (PlanStage::FAILURE == state && hasBackupPlan()) {
-            QLOG() << "Best plan errored out switching to backup\n";
+            LOG(5) << "Best plan errored out switching to backup\n";
             // Uncache the bad solution if we fall back
             // on the backup solution.
             //
@@ -139,7 +138,7 @@ namespace mongo {
         }
 
         if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-            QLOG() << "Best plan had a blocking stage, became unblocked\n";
+            LOG(5) << "Best plan had a blocking stage, became unblocked\n";
             _backupPlanIdx = kNoSuchPlan;
         }
 
@@ -241,15 +240,15 @@ namespace mongo {
         std::list<WorkingSetID>& alreadyProduced = bestCandidate.results;
         QuerySolution* bestSolution = bestCandidate.solution;
 
-        QLOG() << "Winning solution:\n" << bestSolution->toString() << endl;
+        LOG(5) << "Winning solution:\n" << bestSolution->toString() << endl;
         LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
 
         _backupPlanIdx = kNoSuchPlan;
         if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
-            QLOG() << "Winner has blocking stage, looking for backup plan...\n";
+            LOG(5) << "Winner has blocking stage, looking for backup plan...\n";
             for (size_t ix = 0; ix < _candidates.size(); ++ix) {
                 if (!_candidates[ix].solution->hasBlockingStage) {
-                    QLOG() << "Candidate " << ix << " is backup child\n";
+                    LOG(5) << "Candidate " << ix << " is backup child\n";
                     _backupPlanIdx = ix;
                     break;
                 }
@@ -336,7 +335,7 @@ namespace mongo {
             bool validSolutions = true;
             for (size_t ix = 0; ix < solutions.size(); ++ix) {
                 if (NULL == solutions[ix]->cacheData.get()) {
-                    QLOG() << "Not caching query because this solution has no cache data: "
+                    LOG(5) << "Not caching query because this solution has no cache data: "
                            << solutions[ix]->toString();
                     validSolutions = false;
                     break;

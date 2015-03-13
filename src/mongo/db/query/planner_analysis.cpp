@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/query/planner_analysis.h"
 
 #include <vector>
@@ -33,7 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/qlog.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -370,7 +372,7 @@ namespace mongo {
 
         // Too many ixscans spoil the performance.
         if (totalNumScans > (size_t)internalQueryMaxScansToExplode) {
-            QLOG() << "Could expand ixscans to pull out sort order but resulting scan count"
+            LOG(5) << "Could expand ixscans to pull out sort order but resulting scan count"
                    << "(" << totalNumScans << ") is too high.";
             return false;
         }
@@ -430,7 +432,7 @@ namespace mongo {
         BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
         if (sorts.end() != sorts.find(reverseSort)) {
             QueryPlannerCommon::reverseScans(solnRoot);
-            QLOG() << "Reversing ixscan to provide sort. Result: "
+            LOG(5) << "Reversing ixscan to provide sort. Result: "
                    << solnRoot->toString() << endl;
             return solnRoot;
         }
@@ -626,14 +628,14 @@ namespace mongo {
 
         // Project the results.
         if (NULL != query.getProj()) {
-            QLOG() << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
-            QLOG() << "PROJECTION: Current plan is:\n" << solnRoot->toString() << endl;
+            LOG(5) << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
+            LOG(5) << "PROJECTION: Current plan is:\n" << solnRoot->toString() << endl;
 
             ProjectionNode::ProjectionType projType = ProjectionNode::DEFAULT;
             BSONObj coveredKeyObj;
 
             if (query.getProj()->requiresDocument()) {
-                QLOG() << "PROJECTION: claims to require doc adding fetch.\n";
+                LOG(5) << "PROJECTION: claims to require doc adding fetch.\n";
                 // If the projection requires the entire document, somebody must fetch.
                 if (!solnRoot->fetched()) {
                     FetchNode* fetch = new FetchNode();
@@ -645,19 +647,19 @@ namespace mongo {
                 // The only way we're here is if it's a simple projection.  That is, we can pick out
                 // the fields we want to include and they're not dotted.  So we want to execute the
                 // projection in the fast-path simple fashion.  Just don't know which fast path yet.
-                QLOG() << "PROJECTION: requires fields\n";
+                LOG(5) << "PROJECTION: requires fields\n";
                 const vector<string>& fields = query.getProj()->getRequiredFields();
                 bool covered = true;
                 for (size_t i = 0; i < fields.size(); ++i) {
                     if (!solnRoot->hasField(fields[i])) {
-                        QLOG() << "PROJECTION: not covered due to field "
+                        LOG(5) << "PROJECTION: not covered due to field "
                              << fields[i] << endl;
                         covered = false;
                         break;
                     }
                 }
 
-                QLOG() << "PROJECTION: is covered?: = " << covered << endl;
+                LOG(5) << "PROJECTION: is covered?: = " << covered << endl;
 
                 // If any field is missing from the list of fields the projection wants,
                 // a fetch is required.
@@ -669,13 +671,13 @@ namespace mongo {
                     // It's simple but we'll have the full document and we should just iterate
                     // over that.
                     projType = ProjectionNode::SIMPLE_DOC;
-                    QLOG() << "PROJECTION: not covered, fetching.";
+                    LOG(5) << "PROJECTION: not covered, fetching.";
                 }
                 else {
                     if (solnRoot->fetched()) {
                         // Fetched implies hasObj() so let's run with that.
                         projType = ProjectionNode::SIMPLE_DOC;
-                        QLOG() << "PROJECTION: covered via FETCH, using SIMPLE_DOC fast path";
+                        LOG(5) << "PROJECTION: covered via FETCH, using SIMPLE_DOC fast path";
                     }
                     else {
                         // If we're here we're not fetched so we're covered.  Let's see if we can
@@ -691,13 +693,13 @@ namespace mongo {
                                 projType = ProjectionNode::COVERED_ONE_INDEX;
                                 IndexScanNode* ixn = static_cast<IndexScanNode*>(leafNodes[0]);
                                 coveredKeyObj = ixn->indexKeyPattern;
-                                QLOG() << "PROJECTION: covered via IXSCAN, using COVERED fast path";
+                                LOG(5) << "PROJECTION: covered via IXSCAN, using COVERED fast path";
                             }
                             else if (STAGE_DISTINCT_SCAN == leafNodes[0]->getType()) {
                                 projType = ProjectionNode::COVERED_ONE_INDEX;
                                 DistinctNode* dn = static_cast<DistinctNode*>(leafNodes[0]);
                                 coveredKeyObj = dn->indexKeyPattern;
-                                QLOG() << "PROJECTION: covered via DISTINCT, using COVERED fast path";
+                                LOG(5) << "PROJECTION: covered via DISTINCT, using COVERED fast path";
                             }
                         }
                     }
