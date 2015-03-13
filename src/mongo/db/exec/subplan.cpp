@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/subplan.h"
@@ -37,9 +39,9 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_access.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -113,7 +115,7 @@ namespace mongo {
         for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {
             const IndexEntry& ie = _plannerParams.indices[i];
             _indexMap[ie.keyPattern] = i;
-            QLOG() << "Subplanner: index " << i << " is " << ie.toString() << endl;
+            LOG(5) << "Subplanner: index " << i << " is " << ie.toString() << endl;
         }
 
         const WhereCallbackReal whereCallback(_txn, _collection->ns().db());
@@ -149,14 +151,14 @@ namespace mongo {
                 _collection->infoCache()->getPlanCache()->get(*branchResult->canonicalQuery.get(),
                                                               &rawCS).isOK()) {
                 // We have a CachedSolution. Store it for later.
-                QLOG() << "Subplanner: cached plan found for child " << i << " of "
+                LOG(5) << "Subplanner: cached plan found for child " << i << " of "
                        << orExpr->numChildren();
 
                 branchResult->cachedSolution.reset(rawCS);
             }
             else {
                 // No CachedSolution found. We'll have to plan from scratch.
-                QLOG() << "Subplanner: planning child " << i << " of " << orExpr->numChildren();
+                LOG(5) << "Subplanner: planning child " << i << " of " << orExpr->numChildren();
 
                 // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
                 // considering any plan that's a collscan.
@@ -171,7 +173,7 @@ namespace mongo {
                        << " " << status.reason();
                     return Status(ErrorCodes::BadValue, ss);
                 }
-                QLOG() << "Subplanner: got " << branchResult->solutions.size() << " solutions";
+                LOG(5) << "Subplanner: got " << branchResult->solutions.size() << " solutions";
 
                 if (0 == branchResult->solutions.size()) {
                     // If one child doesn't have an indexed solution, bail out.
@@ -349,7 +351,7 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, ss);
         }
 
-        QLOG() << "Subplanner: fully tagged tree is " << solnRoot->toString();
+        LOG(5) << "Subplanner: fully tagged tree is " << solnRoot->toString();
 
         // Takes ownership of 'solnRoot'
         _compositeSolution.reset(QueryPlannerAnalysis::analyzeDataAccess(*_query,
@@ -362,7 +364,7 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, ss);
         }
 
-        QLOG() << "Subplanner: Composite solution is " << _compositeSolution->toString() << endl;
+        LOG(5) << "Subplanner: Composite solution is " << _compositeSolution->toString() << endl;
 
         // Use the index tags from planning each branch to construct the composite solution,
         // and set that solution as our child stage.

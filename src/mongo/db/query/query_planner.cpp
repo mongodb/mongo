@@ -43,7 +43,6 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/plan_enumerator.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/util/log.h"
@@ -376,7 +375,7 @@ namespace mongo {
         // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
         MatchExpression* clone = query.root()->shallowClone();
 
-        QLOG() << "Tagging the match expression according to cache data: " << endl
+        LOG(5) << "Tagging the match expression according to cache data: " << endl
                << "Filter:" << endl << clone->toString()
                << "Cache data:" << endl << cacheData.toString();
 
@@ -387,7 +386,7 @@ namespace mongo {
         for (size_t i = 0; i < params.indices.size(); ++i) {
             const IndexEntry& ie = params.indices[i];
             indexMap[ie.keyPattern] = i;
-            QLOG() << "Index " << i << ": " << ie.keyPattern.toString() << endl;
+            LOG(5) << "Index " << i << ": " << ie.keyPattern.toString() << endl;
         }
 
         Status s = tagAccordingToCache(clone, cacheData.tree.get(), indexMap);
@@ -398,7 +397,7 @@ namespace mongo {
         // The planner requires a defined sort order.
         sortUsingTags(clone);
 
-        QLOG() << "Tagged tree:" << endl << clone->toString();
+        LOG(5) << "Tagged tree:" << endl << clone->toString();
 
         // Use the cached index assignments to build solnRoot.  Takes ownership of clone.
         QuerySolutionNode* solnRoot =
@@ -410,7 +409,7 @@ namespace mongo {
                                                                           params,
                                                                           solnRoot);
             if (NULL != soln) {
-                QLOG() << "Planner: solution constructed from the cache:\n" << soln->toString() << endl;
+                LOG(5) << "Planner: solution constructed from the cache:\n" << soln->toString() << endl;
                 *out = soln;
                 return Status::OK();
             }
@@ -461,14 +460,14 @@ namespace mongo {
                               const QueryPlannerParams& params,
                               std::vector<QuerySolution*>* out) {
 
-        QLOG() << "Beginning planning..." << endl
+        LOG(5) << "Beginning planning..." << endl
                << "=============================" << endl
                << "Options = " << optionString(params.options) << endl
                << "Canonical query:" << endl << query.toString()
                << "=============================" << endl;
 
         for (size_t i = 0; i < params.indices.size(); ++i) {
-            QLOG() << "Index " << i << " is " << params.indices[i].toString() << endl;
+            LOG(5) << "Index " << i << " is " << params.indices[i].toString() << endl;
         }
 
         bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
@@ -500,7 +499,7 @@ namespace mongo {
             // A hint overrides a $natural sort. This means that we don't force a table
             // scan if there is a $natural sort with a non-$natural hint.
             if (!naturalHint.eoo() || (!naturalSort.eoo() && hintObj.isEmpty())) {
-                QLOG() << "Forcing a table scan due to hinted $natural\n";
+                LOG(5) << "Forcing a table scan due to hinted $natural\n";
                 // min/max are incompatible with $natural.
                 if (canTableScan && query.getParsed().getMin().isEmpty()
                                  && query.getParsed().getMax().isEmpty()) {
@@ -518,7 +517,7 @@ namespace mongo {
         QueryPlannerIXSelect::getFields(query.root(), "", &fields);
 
         for (unordered_set<string>::const_iterator it = fields.begin(); it != fields.end(); ++it) {
-            QLOG() << "Predicate over field '" << *it << "'" << endl;
+            LOG(5) << "Predicate over field '" << *it << "'" << endl;
         }
 
         // Filter our indices so we only look at indices that are over our predicates.
@@ -557,7 +556,7 @@ namespace mongo {
                 string hintName = firstHintElt.String();
                 for (size_t i = 0; i < params.indices.size(); ++i) {
                     if (params.indices[i].name == hintName) {
-                        QLOG() << "Hint by name specified, restricting indices to "
+                        LOG(5) << "Hint by name specified, restricting indices to "
                                << params.indices[i].keyPattern.toString() << endl;
                         relevantIndices.clear();
                         relevantIndices.push_back(params.indices[i]);
@@ -572,7 +571,7 @@ namespace mongo {
                     if (0 == params.indices[i].keyPattern.woCompare(hintIndex)) {
                         relevantIndices.clear();
                         relevantIndices.push_back(params.indices[i]);
-                        QLOG() << "Hint specified, restricting indices to " << hintIndex.toString()
+                        LOG(5) << "Hint specified, restricting indices to " << hintIndex.toString()
                                << endl;
                         hintIndexNumber = i;
                         break;
@@ -604,13 +603,13 @@ namespace mongo {
             // If there's an index hinted we need to be able to use it.
             if (!hintIndex.isEmpty()) {
                 if (!minObj.isEmpty() && !indexCompatibleMaxMin(minObj, hintIndex)) {
-                    QLOG() << "Minobj doesn't work with hint";
+                    LOG(5) << "Minobj doesn't work with hint";
                     return Status(ErrorCodes::BadValue,
                                   "hint provided does not work with min query");
                 }
 
                 if (!maxObj.isEmpty() && !indexCompatibleMaxMin(maxObj, hintIndex)) {
-                    QLOG() << "Maxobj doesn't work with hint";
+                    LOG(5) << "Maxobj doesn't work with hint";
                     return Status(ErrorCodes::BadValue,
                                   "hint provided does not work with max query");
                 }
@@ -621,7 +620,7 @@ namespace mongo {
 
                 // The min must be less than the max for the hinted index ordering.
                 if (0 <= finishedMinObj.woCompare(finishedMaxObj, kp, false)) {
-                    QLOG() << "Minobj/Maxobj don't work with hint";
+                    LOG(5) << "Minobj/Maxobj don't work with hint";
                     return Status(ErrorCodes::BadValue,
                                   "hint provided does not work with min/max query");
                 }
@@ -657,13 +656,13 @@ namespace mongo {
             }
 
             if (idxNo == numeric_limits<size_t>::max()) {
-                QLOG() << "Can't find relevant index to use for max/min query";
+                LOG(5) << "Can't find relevant index to use for max/min query";
                 // Can't find an index to use, bail out.
                 return Status(ErrorCodes::BadValue,
                               "unable to find relevant index for max/min query");
             }
 
-            QLOG() << "Max/min query using index " << params.indices[idxNo].toString() << endl;
+            LOG(5) << "Max/min query using index " << params.indices[idxNo].toString() << endl;
 
             // Make our scan and output.
             QuerySolutionNode* solnRoot = QueryPlannerAccess::makeIndexScan(params.indices[idxNo],
@@ -681,7 +680,6 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < relevantIndices.size(); ++i) {
-            QLOG() << "Relevant index " << i << " is " << relevantIndices[i].toString() << endl;
             LOG(2) << "Relevant index " << i << " is " << relevantIndices[i].toString() << endl;
         }
 
@@ -704,7 +702,7 @@ namespace mongo {
         }
 
         // query.root() is now annotated with RelevantTag(s).
-        QLOG() << "Rated tree:" << endl << query.root()->toString();
+        LOG(5) << "Rated tree:" << endl << query.root()->toString();
 
         // If there is a GEO_NEAR it must have an index it can use directly.
         MatchExpression* gnNode = NULL;
@@ -712,13 +710,13 @@ namespace mongo {
             // No index for GEO_NEAR?  No query.
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
-                QLOG() << "Unable to find index for $geoNear query." << endl;
+                LOG(5) << "Unable to find index for $geoNear query." << endl;
                 // Don't leave tags on query tree.
                 query.root()->resetTag();
                 return Status(ErrorCodes::BadValue, "unable to find index for $geoNear query");
             }
 
-            QLOG() << "Rated tree after geonear processing:" << query.root()->toString();
+            LOG(5) << "Rated tree after geonear processing:" << query.root()->toString();
         }
 
         // Likewise, if there is a TEXT it must have an index it can use directly.
@@ -754,7 +752,7 @@ namespace mongo {
             // assigned to it.
             invariant(1 == tag->first.size() + tag->notFirst.size());
 
-            QLOG() << "Rated tree after text processing:" << query.root()->toString();
+            LOG(5) << "Rated tree after text processing:" << query.root()->toString();
         }
 
         // If we have any relevant indices, we try to create indexed plans.
@@ -770,7 +768,7 @@ namespace mongo {
 
             MatchExpression* rawTree;
             while (isp.getNext(&rawTree) && (out->size() < params.maxIndexedSolutions)) {
-                QLOG() << "About to build solntree from tagged tree:" << endl
+                LOG(5) << "About to build solntree from tagged tree:" << endl
                        << rawTree->toString();
 
                 // The tagged tree produced by the plan enumerator is not guaranteed
@@ -782,7 +780,7 @@ namespace mongo {
                 PlanCacheIndexTree* cacheData;
                 Status indexTreeStatus = cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
                 if (!indexTreeStatus.isOK()) {
-                    QLOG() << "Query is not cachable: " << indexTreeStatus.reason() << endl;
+                    LOG(5) << "Query is not cachable: " << indexTreeStatus.reason() << endl;
                 }
                 auto_ptr<PlanCacheIndexTree> autoData(cacheData);
 
@@ -797,7 +795,7 @@ namespace mongo {
                                                                               params,
                                                                               solnRoot);
                 if (NULL != soln) {
-                    QLOG() << "Planner: adding solution:" << endl << soln->toString();
+                    LOG(5) << "Planner: adding solution:" << endl << soln->toString();
                     if (indexTreeStatus.isOK()) {
                         SolutionCacheData* scd = new SolutionCacheData();
                         scd->tree.reset(autoData.release());
@@ -811,7 +809,7 @@ namespace mongo {
         // Don't leave tags on query tree.
         query.root()->resetTag();
 
-        QLOG() << "Planner: outputted " << out->size() << " indexed solutions.\n";
+        LOG(5) << "Planner: outputted " << out->size() << " indexed solutions.\n";
 
         // Produce legible error message for failed OR planning with a TEXT child.
         // TODO: support collection scan for non-TEXT children of OR.
@@ -835,7 +833,7 @@ namespace mongo {
                 QuerySolution* soln = buildWholeIXSoln(params.indices[hintIndexNumber],
                                                        query, params);
                 verify(NULL != soln);
-                QLOG() << "Planner: outputting soln that uses hinted index as scan." << endl;
+                LOG(5) << "Planner: outputting soln that uses hinted index as scan." << endl;
                 out->push_back(soln);
             }
             return Status::OK();
@@ -885,7 +883,7 @@ namespace mongo {
 
                     const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
                     if (providesSort(query, kp)) {
-                        QLOG() << "Planner: outputting soln that uses index to provide sort."
+                        LOG(5) << "Planner: outputting soln that uses index to provide sort."
                                << endl;
                         QuerySolution* soln = buildWholeIXSoln(params.indices[i],
                                                                query, params);
@@ -903,7 +901,7 @@ namespace mongo {
                         }
                     }
                     if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
-                        QLOG() << "Planner: outputting soln that uses (reverse) index "
+                        LOG(5) << "Planner: outputting soln that uses (reverse) index "
                                << "to provide sort." << endl;
                         QuerySolution* soln = buildWholeIXSoln(params.indices[i], query,
                                                                params, -1);
@@ -943,7 +941,7 @@ namespace mongo {
                 scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
                 collscan->cacheData.reset(scd);
                 out->push_back(collscan);
-                QLOG() << "Planner: outputting a collscan:" << endl
+                LOG(5) << "Planner: outputting a collscan:" << endl
                        << collscan->toString();
             }
         }

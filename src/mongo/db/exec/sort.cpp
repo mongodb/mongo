@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/exec/sort.h"
 
 #include <algorithm>
@@ -37,9 +39,9 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -239,7 +241,7 @@ namespace mongo {
         auto_ptr<CanonicalQuery> queryForSort(rawQueryForSort);
 
         vector<QuerySolution*> solns;
-        QLOG() << "Sort stage: Planning to obtain bounds for sort." << endl;
+        LOG(5) << "Sort stage: Planning to obtain bounds for sort." << endl;
         QueryPlanner::plan(*queryForSort, params, &solns);
 
         // TODO: are there ever > 1 solns?  If so, do we look for a specific soln?

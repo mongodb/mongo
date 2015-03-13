@@ -34,7 +34,6 @@
 
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -184,7 +183,7 @@ namespace mongo {
         sortUsingTags(*tree);
 
         _root->resetTag();
-        QLOG() << "Enumerator: memo just before moving:" << endl << dumpMemo();
+        LOG(5) << "Enumerator: memo just before moving:" << endl << dumpMemo();
         _done = nextMemo(memoIDForNode(_root));
         return true;
     }
@@ -1147,7 +1146,7 @@ namespace mongo {
     //
 
     void PlanEnumerator::tagMemo(size_t id) {
-        QLOG() << "Tagging memoID " << id << endl;
+        LOG(5) << "Tagging memoID " << id << endl;
         NodeAssignment* assign = _memo[id];
         verify(NULL != assign);
 

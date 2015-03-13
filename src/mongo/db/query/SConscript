@@ -75,7 +75,6 @@ env.Library(
         "interval.cpp",
     ],
     LIBDEPS=[
-        "query_logger",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions_geo",
         "$BUILD_DIR/mongo/index_names",
@@ -111,16 +110,6 @@ env.Library(
     ],
     LIBDEPS=[
         "query_planner",
-    ],
-)
-
-env.Library(
-    target="query_logger",
-    source=[
-        "qlog.cpp"
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 
