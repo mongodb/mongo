@@ -378,7 +378,7 @@ __wt_btree_tree_open(
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
 	WT_ERR(__wt_page_inmem(session, NULL, &dsk,
 	    WT_DATA_IN_ITEM(&dsk) ?
-	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED , &page));
+	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 	dsk.mem = NULL;
 
 	/* Finish initializing the root, root reference links. */

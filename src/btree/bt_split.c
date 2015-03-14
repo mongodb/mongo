@@ -646,8 +646,7 @@ __split_multi_inmem(
 	 */
 	tmp.data = multi->skip_dsk;
 	tmp.memsize = ((WT_PAGE_HEADER*)multi->skip_dsk)->mem_size;
-	WT_RET(__wt_page_inmem(
-	    session, ref, &tmp, WT_PAGE_DISK_ALLOC, &page));
+	WT_RET(__wt_page_inmem(session, ref, &tmp, WT_PAGE_DISK_ALLOC, &page));
 	multi->skip_dsk = NULL;
 
 	if (orig->type == WT_PAGE_ROW_LEAF)
