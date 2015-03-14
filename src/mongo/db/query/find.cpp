@@ -77,22 +77,6 @@ namespace {
         return !pq.getHint().isEmpty() || !pq.getMin().isEmpty() || !pq.getMax().isEmpty();
     }
 
-    /**
-     * Quote:
-     * if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-     * is only a size limit.  The idea is that on a find() where one doesn't use much results,
-     * we don't return much, but once getmore kicks in, we start pushing significant quantities.
-     *
-     * The n limit (vs. size) is important when someone fetches only one small field from big
-     * objects, which causes massive scanning server-side.
-     */
-    bool enoughForFirstBatch(const mongo::LiteParsedQuery& pq, int n, int len) {
-        if (0 == pq.getNumToReturn()) {
-            return (len > 1024 * 1024) || n >= 101;
-        }
-        return n >= pq.getNumToReturn() || len > mongo::MaxBytesToReturnToClientAtOnce;
-    }
-
     bool enough(const mongo::LiteParsedQuery& pq, int n) {
         if (0 == pq.getNumToReturn()) { return false; }
         return n >= pq.getNumToReturn();
@@ -122,6 +106,115 @@ namespace mongo {
 
     // Failpoint for checking whether we've received a getmore.
     MONGO_FP_DECLARE(failReceivedGetmore);
+
+    /**
+     * If ntoreturn is zero, we stop generating additional results as soon as we have either 101
+     * documents or at least 1MB of data. On subsequent getmores, there is no limit on the number
+     * of results; we will stop as soon as we have at least 4 MB of data.  The idea is that on a
+     * find() where one doesn't use much results, we don't return much, but once getmore kicks in,
+     * we start pushing significant quantities.
+     *
+     * If ntoreturn is non-zero, the we stop building the first batch once we either have ntoreturn
+     * results, or when the result set exceeds 4 MB.
+     */
+    bool enoughForFirstBatch(const LiteParsedQuery& pq, int numDocs, int bytesBuffered) {
+        if (0 == pq.getNumToReturn()) {
+            return (bytesBuffered > 1024 * 1024) || numDocs >= 101;
+        }
+        return numDocs >= pq.getNumToReturn() || bytesBuffered > MaxBytesToReturnToClientAtOnce;
+    }
+
+    bool shouldSaveCursor(OperationContext* txn,
+                          const Collection* collection,
+                          PlanExecutor::ExecState finalState,
+                          PlanExecutor* exec) {
+        if (PlanExecutor::FAILURE == finalState || PlanExecutor::DEAD == finalState) {
+            return false;
+        }
+
+        const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
+        if (!pq.wantMore() && !pq.isTailable()) {
+            return false;
+        }
+
+        if (pq.getNumToReturn() == 1) {
+            return false;
+        }
+
+        // We keep a tailable cursor around unless the collection we're tailing has no
+        // records.
+        //
+        // SERVER-13955: we should be able to create a tailable cursor that waits on
+        // an empty collection. Right now we do not keep a cursor if the collection
+        // has zero records.
+        if (pq.isTailable()) {
+            return collection && collection->numRecords(txn) != 0U;
+        }
+
+        return !exec->isEOF();
+    }
+
+    void beginQueryOp(const NamespaceString& nss,
+                      const BSONObj& queryObj,
+                      int ntoreturn,
+                      int ntoskip,
+                      CurOp* curop) {
+        curop->debug().ns = nss.ns();
+        curop->debug().query = queryObj;
+        curop->debug().ntoreturn = ntoreturn;
+        curop->debug().ntoskip = ntoskip;
+        curop->setQuery(queryObj);
+    }
+
+    void endQueryOp(const AutoGetCollectionForRead& ctx,
+                    PlanExecutor* exec,
+                    int numResults,
+                    CursorId cursorId,
+                    CurOp* curop) {
+        invariant(exec);
+        invariant(curop);
+
+        // Fill out basic curop query exec properties.
+        curop->debug().nreturned = numResults;
+        curop->debug().cursorid = (0 == cursorId ? -1 : cursorId);
+
+        // Fill out curop based on explain summary statistics.
+        PlanSummaryStats summaryStats;
+        Explain::getSummaryStats(exec, &summaryStats);
+        curop->debug().scanAndOrder = summaryStats.hasSortStage;
+        curop->debug().nscanned = summaryStats.totalKeysExamined;
+        curop->debug().nscannedObjects = summaryStats.totalDocsExamined;
+        curop->debug().idhack = summaryStats.isIdhack;
+
+        const int dbProfilingLevel = (ctx.getDb() != NULL) ? ctx.getDb()->getProfilingLevel() :
+                                                             serverGlobalParams.defaultProfile;
+        const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
+        const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
+
+        // Set debug information for consumption by the profiler and slow query log.
+        if (dbProfilingLevel > 0
+                || curop->elapsedMillis() > serverGlobalParams.slowMS
+                || logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
+            // Generate plan summary string.
+            curop->debug().planSummary = Explain::getPlanSummary(exec);
+        }
+
+        // Set debug information for consumption by the profiler only.
+        if (dbProfilingLevel > 0) {
+            // Get BSON stats.
+            scoped_ptr<PlanStageStats> execStats(exec->getStats());
+            BSONObjBuilder statsBob;
+            Explain::statsToBSON(*execStats, &statsBob);
+            curop->debug().execStats.set(statsBob.obj());
+
+            // Replace exec stats with plan summary if stats cannot fit into CachedBSONObj.
+            if (curop->debug().execStats.tooBig() && !curop->debug().planSummary.empty()) {
+                BSONObjBuilder bob;
+                bob.append("summary", curop->debug().planSummary.toString());
+                curop->debug().execStats.set(bob.done());
+            }
+        }
+    }
 
     // TODO: Move this and the other command stuff in runQuery outta here and up a level.
     static bool runCommands(OperationContext* txn,
@@ -556,8 +649,6 @@ namespace mongo {
             }
         }
 
-        // cout << "diskloc is " << startLoc.toString() << endl;
-
         // Build our collection scan...
         CollectionScanParams params;
         params.collection = collection;
@@ -582,10 +673,7 @@ namespace mongo {
         uassert(16256, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
 
         // Set curop information.
-        curop.debug().ns = nss.ns();
-        curop.debug().ntoreturn = q.ntoreturn;
-        curop.debug().query = q.query;
-        curop.setQuery(q.query);
+        beginQueryOp(nss, q.query, q.ntoreturn, q.ntoskip, &curop);
 
         // If the query is really a command, run it.
         if (nss.isCommand()) {
@@ -642,12 +730,7 @@ namespace mongo {
         // Parse, canonicalize, plan, transcribe, and get a plan executor.
         PlanExecutor* rawExec = NULL;
 
-        ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollectionForRead ctx(txn, nss);
-
-        const int dbProfilingLevel = (ctx.getDb() != NULL) ? ctx.getDb()->getProfilingLevel() :
-                                                             serverGlobalParams.defaultProfile;
-
         Collection* collection = ctx.getCollection();
 
         // We'll now try to get the query executor that will execute this query for us. There
@@ -754,9 +837,6 @@ namespace mongo {
         // If we're replaying the oplog, we save the last time that we read.
         OpTime slaveReadTill;
 
-        // Do we save the PlanExecutor in a ClientCursor for getMore calls later?
-        bool saveClientCursor = false;
-
         BSONObj obj;
         PlanExecutor::ExecState state;
         // uint64_t numMisplacedDocs = 0;
@@ -784,11 +864,6 @@ namespace mongo {
                        << " numToReturn=" << pq.getNumToReturn()
                        << " numResults=" << numResults
                        << endl;
-                // If only one result requested assume it's a findOne() and don't save the cursor.
-                if (pq.wantMore() && 1 != pq.getNumToReturn()) {
-                    LOG(5) << " executor EOF=" << exec->isEOF() << endl;
-                    saveClientCursor = !exec->isEOF();
-                }
                 break;
             }
         }
@@ -809,19 +884,6 @@ namespace mongo {
             uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }
 
-        // Why save a dead executor?
-        if (PlanExecutor::DEAD == state) {
-            saveClientCursor = false;
-        }
-        else if (pq.isTailable()) {
-            // If we're tailing a capped collection, we don't bother saving the cursor if the
-            // collection is empty. Otherwise, the semantics of the tailable cursor is that the
-            // client will keep trying to read from it. So we'll keep it around.
-            if (collection && collection->numRecords(txn) != 0 && pq.getNumToReturn() != 1) {
-                saveClientCursor = true;
-            }
-        }
-
         // TODO(greg): This will go away soon.
         if (!shardingState.getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
             // if the version changed during the query we might be missing some data and its safe to
@@ -831,39 +893,12 @@ namespace mongo {
                                            shardingState.getVersion(nss.ns()));
         }
 
-        const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
-        const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
-
-        PlanSummaryStats summaryStats;
-        Explain::getSummaryStats(exec.get(), &summaryStats);
-
-        curop.debug().ntoskip = pq.getSkip();
-        curop.debug().nreturned = numResults;
-        curop.debug().scanAndOrder = summaryStats.hasSortStage;
-        curop.debug().nscanned = summaryStats.totalKeysExamined;
-        curop.debug().nscannedObjects = summaryStats.totalDocsExamined;
-        curop.debug().idhack = summaryStats.isIdhack;
-
-        // Set debug information for consumption by the profiler.
-        if (dbProfilingLevel > 0 ||
-            curop.elapsedMillis() > serverGlobalParams.slowMS ||
-            logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
-            // Get BSON stats.
-            scoped_ptr<PlanStageStats> execStats(exec->getStats());
-            BSONObjBuilder statsBob;
-            Explain::statsToBSON(*execStats, &statsBob);
-            curop.debug().execStats.set(statsBob.obj());
-
-            // Replace exec stats with plan summary if stats cannot fit into CachedBSONObj.
-            if (curop.debug().execStats.tooBig() && !curop.debug().planSummary.empty()) {
-                BSONObjBuilder bob;
-                bob.append("summary", curop.debug().planSummary.toString());
-                curop.debug().execStats.set(bob.done());
-            }
-        }
-
+        // Fill out curop based on query results. If we have a cursorid, we will fill out curop with
+        // this cursorid later.
         long long ccId = 0;
-        if (saveClientCursor) {
+        endQueryOp(ctx, exec.get(), numResults, ccId, &curop);
+
+        if (shouldSaveCursor(txn, collection, state, exec.get())) {
             // We won't use the executor until it's getMore'd.
             exec->saveState();
 

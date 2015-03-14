@@ -41,6 +41,46 @@ namespace mongo {
     class OperationContext;
 
     /**
+     * Returns true if enough results have been prepared to stop adding more to the first batch.
+     *
+     * Should be called *after* adding to the result set rather than before.
+     */
+    bool enoughForFirstBatch(const LiteParsedQuery& pq, int numDocs, int bytesBuffered);
+
+    /**
+     * Returns true if we should keep a cursor around because we're expecting to return more query
+     * results.
+     *
+     * If false, the caller should close the cursor and indicate this to the client by sending back
+     * a cursor ID of 0.
+     */
+    bool shouldSaveCursor(OperationContext* txn,
+                          const Collection* collection,
+                          PlanExecutor::ExecState finalState,
+                          PlanExecutor* exec);
+
+    /**
+     * Fills out CurOp with information about this query.
+     */
+    void beginQueryOp(const NamespaceString& nss,
+                      const BSONObj& queryObj,
+                      int ntoreturn,
+                      int ntoskip,
+                      CurOp* curop);
+
+    /**
+     * Fills out CurOp with information regarding this query's execution.
+     *
+     * Uses explain functionality to extract stats from 'exec'. 'ctx' is used to conditionalize
+     * whether or not we do expensive stats gathering based on the database profiling level.
+     */
+    void endQueryOp(const AutoGetCollectionForRead& ctx,
+                    PlanExecutor* exec,
+                    int numResults,
+                    CursorId cursorId,
+                    CurOp* curop);
+
+    /**
      * Constructs a PlanExecutor for a query with the oplogReplay option set to true,
      * for the query 'cq' over the collection 'collection'. The PlanExecutor will
      * wrap a singleton OplogStart stage.
