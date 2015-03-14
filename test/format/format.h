@@ -296,7 +296,6 @@ void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
-void	 die(int, const char *, ...);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, size_t *, uint64_t, int);
@@ -316,3 +315,9 @@ void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
+
+void	 die(int, const char *, ...)
+#if defined(__GNUC__)
+__attribute__((__noreturn__))
+#endif
+;
