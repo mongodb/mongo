@@ -111,6 +111,18 @@ class test_huffman_range(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create(self.table_name, config), msg)
 
+    # Test duplicate symbol information.
+    def test_huffman_range_symbol_dup(self):
+        dir = self.conn.get_home()
+        f = open(dir + '/t8file', 'w')
+        f.write('100 546233\n101 460946\n')
+        f.write('102 546233\n100 460946\n')
+        f.close()
+        config="huffman_key=utf8t8file"
+        msg = '/duplicate symbol/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.table_name, config), msg)
+
 
 if __name__ == '__main__':
     wttest.run()
