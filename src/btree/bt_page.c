@@ -304,8 +304,8 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_REF *ref, void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep)
+__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
+    const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
