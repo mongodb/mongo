@@ -70,7 +70,7 @@ worker.start();
 
 jsTestLog("add a new secondary");
 var secondary = replTest.add({});
-replTest.reInitiate();
+replTest.reInitiate(4*60*1000);
 secondary.setSlaveOk();
 
 // NOTE: This is here to prevent false negatives, but it is racy and dependent on magic numbers.
@@ -87,7 +87,7 @@ if (!droppedDups) {
 jsTestLog("stoping writes and waiting for replica set to coalesce")
 primary.getDB('test').stop.insert({});
 worker.join();
-replTest.awaitReplication(); // Make sure all writes have hit secondary.
+replTest.awaitReplication(2*60*1000); // Make sure all writes have hit secondary.
 
 jsTestLog("check that secondary has correct counts");
 var secondaryColl = secondary.getDB('test').getCollection('cloner');
