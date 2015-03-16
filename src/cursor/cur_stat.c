@@ -40,6 +40,22 @@ __curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_ITEM *buf)
 }
 
 /*
+ * __curstat_free_config --
+ *	Free the saved configuration string stack
+ */
+static void
+__curstat_free_config(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
+{
+	size_t i;
+
+	if (cst->cfg != NULL) {
+		for (i = 0; cst->cfg[i] != NULL; ++i)
+			__wt_free(session, cst->cfg[i]);
+		__wt_free(session, cst->cfg);
+	}
+}
+
+/*
  * __curstat_get_key --
  *	WT_CURSOR->get_key for statistics cursors.
  */
@@ -312,16 +328,11 @@ __curstat_close(WT_CURSOR *cursor)
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	size_t i;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	if (cst->cfg != NULL) {
-		for (i = 0; cst->cfg[i] != NULL; ++i)
-			__wt_free(session, cst->cfg[i]);
-		__wt_free(session, cst->cfg);
-	}
+	__curstat_free_config(session, cst);
 
 	__wt_buf_free(session, &cst->pv);
 
@@ -557,7 +568,8 @@ config_err:	WT_ERR_MSG(session, EINVAL,
 	}
 
 	if (0) {
-err:		__wt_free(session, cst);
+err:		__curstat_free_config(session, cst);
+		__wt_free(session, cst);
 	}
 
 	return (ret);
