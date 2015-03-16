@@ -199,16 +199,19 @@ __split_should_deepen(
 	}
 
 	/*
-	 * Don't allow a single page to put pressure on cache usage. If
-	 * this is a root page with over 100 keys or a single page is taking
-	 * up more than a quarter of the cache let them split. A deep tree is
-	 * better than not being able to make progress due to a full cache.
+	 * Don't allow a single page to put pressure on cache usage. The root
+	 * page cannot be evicted, so if it's larger than the maximum, or if
+	 * and page has a quarter of the cache, let it split, a deep tree is
+	 * better than making no progress at all. Sanity check for 100 on-page
+	 * keys, nothing helps in the case of large keys and a too-small cache.
 	 */
-	if ((__wt_ref_is_root(ref) && pindex->entries > 100) ||
-	    page->memory_footprint > S2C(session)->cache_size / 4) {
+	if (pindex->entries >= 100 &&
+	    (__wt_ref_is_root(ref) ||
+	    page->memory_footprint >= S2C(session)->cache_size / 4)) {
 		*childrenp = pindex->entries / 10;
 		return (1);
 	}
+
 	return (0);
 }
 
