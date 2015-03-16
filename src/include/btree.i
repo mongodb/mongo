@@ -1128,12 +1128,12 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 	WT_DECL_RET;
 	int acquired;
 
-        /*
-         * In rare cases when walking the tree, we try to swap to the same
-         * page.  Fast-path that to avoid thinking about error handling.
-         */
-        if (held == want)
-                return (0);
+	/*
+	 * In rare cases when walking the tree, we try to swap to the same
+	 * page.  Fast-path that to avoid thinking about error handling.
+	 */
+	if (held == want)
+		return (0);
 
 	/*
 	 * This function is here to simplify the error handling during hazard
