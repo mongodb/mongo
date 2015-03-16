@@ -123,7 +123,16 @@ namespace {
                 return false;
             }
 
-            Shard s = Shard::make(to);
+            Shard s = Shard::findIfExists(to);
+            if (!s.ok()) {
+                string msg(str::stream() <<
+                           "Could not move database '" << dbname <<
+                           "' to shard '" << to <<
+                           "' because that shard does not exist");
+                log() << msg;
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::ShardNotFound, msg));
+            }
 
             if (config->getPrimary() == s.getConnString()) {
                 errmsg = "it is already the primary";

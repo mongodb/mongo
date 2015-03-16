@@ -101,7 +101,7 @@ namespace {
             const string target = cmdObj.firstElement().valuestrsafe();
 
             Shard s = Shard::findIfExists(target);
-            if (s == Shard::EMPTY) {
+            if (!s.ok()) {
                 string msg(str::stream() <<
                            "Could not drop shard '" << target <<
                            "' because it does not exist");

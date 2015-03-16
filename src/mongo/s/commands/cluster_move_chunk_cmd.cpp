@@ -132,7 +132,16 @@ namespace {
                 return false;
             }
 
-            Shard to = Shard::make(toString);
+            Shard to = Shard::findIfExists(toString);
+            if (!to.ok()) {
+                string msg(str::stream() <<
+                           "Could not move chunk in '" << ns <<
+                           "' to shard '" << toString <<
+                           "' because that shard does not exist");
+                log() << msg;
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::ShardNotFound, msg));
+            }
 
             // so far, chunk size serves test purposes; it may or may not become a supported parameter
             long long maxChunkSizeBytes = cmdObj["maxChunkSizeBytes"].numberLong();

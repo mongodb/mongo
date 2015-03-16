@@ -40,5 +40,12 @@ assert.eq( s.normalize( s.config.databases.findOne( { _id : "test1" } ).primary 
 assert.eq( 3 , from.getDB( "test1" ).foo.count() , "from doesn't have data after move back" );
 assert.eq( 0 , to.getDB( "test1" ).foo.count() , "to has data after move back" );
 
+// attempting to move primary DB to non-existent shard should error out with appropriate code
+var res = s.admin.runCommand({ movePrimary: 'test1', to: 'dontexist' });
+assert.commandFailed(res,
+                     'attempting to use non-existent shard as primary should error out');
+// ErrorCodes::ShardNotFound === 70
+assert.eq(res.code, 70, 'ShardNotFound code not used');
+
 s.stop();
 

@@ -151,6 +151,8 @@ namespace mongo {
         }
 
         ShardPtr findIfExists( const string& shardName ) {
+            reload();
+
             boost::lock_guard<boost::mutex> lk( _mutex );
             ShardMap::iterator i = _lookup.find( shardName );
             if ( i != _lookup.end() ) return i->second;

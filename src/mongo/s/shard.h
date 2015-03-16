@@ -70,12 +70,22 @@ namespace mongo {
             _isDraining(other._isDraining) {
         }
 
+        /**
+         * Returns a Shard corresponding to 'ident', which can
+         * either be a shard name or a connection string.
+         * Assumes that a corresponding shard with name 'ident' already exists.
+         */
         static Shard make( const std::string& ident ) {
             Shard s;
             s.reset( ident );
             return s;
         }
 
+        /**
+         * Returns a Shard corresponding to 'shardName' if such a shard
+         * exists.
+         * If not, it returns Shard::EMPTY
+         */
         static Shard findIfExists( const std::string& shardName );
 
         /**
