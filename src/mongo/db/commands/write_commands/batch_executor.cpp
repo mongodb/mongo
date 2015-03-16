@@ -756,6 +756,14 @@ namespace mongo {
         Collection* _collection;
     };
 
+    void setupSynchronousCommit( const WriteConcernOptions& writeConcern,
+                                 OperationContext* txn ) {
+        if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL ||
+             writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
+            txn->recoveryUnit()->goingToAwaitCommit();
+        }
+    }
+
     void WriteBatchExecutor::bulkExecute( const BatchedCommandRequest& request,
                                           const WriteConcernOptions& writeConcern,
                                           std::vector<BatchedUpsertDetail*>* upsertedIds,

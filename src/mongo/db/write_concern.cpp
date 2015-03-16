@@ -31,7 +31,6 @@
 #include "mongo/db/write_concern.h"
 
 #include "mongo/base/counter.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
@@ -52,41 +51,6 @@ namespace mongo {
     static Counter64 gleWtimeouts;
     static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
                                                                   &gleWtimeouts );
-
-    void setupSynchronousCommit(const WriteConcernOptions& writeConcern,
-                                OperationContext* txn) {
-        if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL ||
-             writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
-            txn->recoveryUnit()->goingToAwaitCommit();
-        }
-    }
-
-    StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
-        BSONElement writeConcernElement;
-        Status wcStatus = bsonExtractTypedField(cmdObj,
-                                                "writeConcern",
-                                                Object,
-                                                &writeConcernElement);
-
-        if (!wcStatus.isOK()) {
-            if (wcStatus == ErrorCodes::NoSuchKey) {
-                return repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
-            }
-            return wcStatus;
-        }
-
-        WriteConcernOptions writeConcern;
-        wcStatus = writeConcern.parse(writeConcernElement.Obj());
-
-        if (wcStatus.isOK()) {
-            wcStatus = validateWriteConcern(writeConcern);
-        }
-        if (!wcStatus.isOK()) {
-            return wcStatus;
-        }
-
-        return writeConcern;
-    }
 
     Status validateWriteConcern( const WriteConcernOptions& writeConcern ) {
         const bool isJournalEnabled = getGlobalEnvironment()->getGlobalStorageEngine()->isDurable();

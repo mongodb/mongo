@@ -48,8 +48,8 @@ namespace mongo {
     class BSONObjBuilder;
     class Client;
     class Database;
-    class OperationContext;
     class Timer;
+    class OperationContext;
 
 namespace mutablebson {
     class Document;
@@ -314,12 +314,6 @@ namespace mutablebson {
                                                StringData cursorNamespace,
                                                BSONArray firstBatch,
                                                BSONObjBuilder* builder);
-
-        /**
-         * Helper for setting a writeConcernError field in the command result object if
-         * a writeConcern error occurs.
-         */
-        static void appendCommandWCStatus(BSONObjBuilder& result, const Status& status);
 
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;

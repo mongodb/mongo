@@ -34,23 +34,6 @@
 namespace mongo {
 
     class OperationContext;
-    template <typename T> class StatusWith;
-
-    /**
-     * If "writeConcern" indicates a durable commit level,
-     * marks the RecoveryUnit associated with "txn" appropriately.
-     * Provides a hint to the storage engine that
-     * particular operations will be waiting for their changes to become durable.
-     */
-    void setupSynchronousCommit(const WriteConcernOptions& writeConcern,
-                                OperationContext* txn);
-
-    /**
-     * Attempts to extract a writeConcern from cmdObj.
-     * Verifies that the writeConcern is of type Object (BSON type) and
-     * that the resulting writeConcern is valid for this particular host.
-     */
-    StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj);
 
     /**
      * Verifies that a WriteConcern is valid for this particular host.

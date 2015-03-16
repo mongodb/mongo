@@ -51,7 +51,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -259,15 +258,6 @@ namespace mongo {
 
         if (!ok && !have_errmsg) {
             result.append("errmsg", errmsg);
-        }
-    }
-
-    void Command::appendCommandWCStatus(BSONObjBuilder& result, const Status& status) {
-        if (!status.isOK()) {
-            WCErrorDetail wcError;
-            wcError.setErrCode(status.code());
-            wcError.setErrMessage(status.reason());
-            result.append("writeConcernError", wcError.toBSON());
         }
     }
 
