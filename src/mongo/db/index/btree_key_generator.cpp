@@ -212,8 +212,10 @@ namespace mongo {
     }
 
     BtreeKeyGeneratorV1::BtreeKeyGeneratorV1(vector<const char*> fieldNames,
-                                             vector<BSONElement> fixed, bool isSparse)
-        : BtreeKeyGenerator(fieldNames, fixed, isSparse) {
+                                             vector<BSONElement> fixed,
+                                             bool isSparse)
+        : BtreeKeyGenerator(fieldNames, fixed, isSparse),
+          _emptyPositionalInfo(fieldNames.size()) {
 
         BSONObjBuilder b;
         b.appendUndefined( "" );
@@ -221,13 +223,13 @@ namespace mongo {
         _undefinedElt = _undefinedObj.firstElement();
     }
 
-    BSONElement BtreeKeyGeneratorV1::extractNextElement(const BSONObj &obj, const BSONObj &arr,
-                                                        const char *&field,
-                                                        bool &arrayNestedArray) const {
+    BSONElement BtreeKeyGeneratorV1::extractNextElement(const BSONObj &obj,
+                                                        const PositionalPathInfo& positionalInfo,
+                                                        const char*& field,
+                                                        bool& arrayNestedArray) const {
         string firstField = mongoutils::str::before( field, '.' );
         bool haveObjField = !obj.getField( firstField ).eoo();
-        BSONElement arrField = arr.getField( firstField );
-        bool haveArrField = !arrField.eoo();
+        BSONElement arrField = positionalInfo.positionallyIndexedElt;
 
         // An index component field name cannot exist in both a document
         // array and one of that array's children.
@@ -235,29 +237,33 @@ namespace mongo {
                 mongoutils::str::stream() <<
                 "Ambiguous field name found in array (do not use numeric field names in "
                 "embedded elements in an array), field: '" << arrField.fieldName() <<
-                "' for array: " << arr,
-                !haveObjField || !haveArrField );
+                "' for array: " << positionalInfo.arrayObj,
+                !haveObjField || !positionalInfo.hasPositionallyIndexedElt());
 
         arrayNestedArray = false;
         if ( haveObjField ) {
             return obj.getFieldDottedOrArray( field );
         }
-        else if ( haveArrField ) {
+        else if (positionalInfo.hasPositionallyIndexedElt()) {
             if ( arrField.type() == Array ) {
                 arrayNestedArray = true;
             }
-            return arr.getFieldDottedOrArray( field );
+            field = positionalInfo.remainingPath;
+            return positionalInfo.dottedElt;
         }
         return BSONElement();
     }
 
-    void BtreeKeyGeneratorV1::_getKeysArrEltFixed(vector<const char*> &fieldNames,
-                                                  vector<BSONElement> &fixed,
-                                                  const BSONElement &arrEntry, BSONObjSet *keys,
-                                                  unsigned numNotFound,
-                                                  const BSONElement &arrObjElt,
-                                                  const set<unsigned> &arrIdxs,
-                                                  bool mayExpandArrayUnembedded) const {
+    void BtreeKeyGeneratorV1::_getKeysArrEltFixed(
+            vector<const char*>& fieldNames,
+            vector<BSONElement>& fixed,
+            const BSONElement& arrEntry,
+            BSONObjSet* keys,
+            unsigned numNotFound,
+            const BSONElement& arrObjElt,
+            const set<unsigned>& arrIdxs,
+            bool mayExpandArrayUnembedded,
+            const std::vector<PositionalPathInfo>& positionalInfo) const {
         // set up any terminal array values
         for( set<unsigned>::const_iterator j = arrIdxs.begin(); j != arrIdxs.end(); ++j ) {
             if ( *fieldNames[ *j ] == '\0' ) {
@@ -270,18 +276,23 @@ namespace mongo {
                              arrEntry.type() == Object ? arrEntry.embeddedObject() : BSONObj(),
                              keys,
                              numNotFound,
-                             arrObjElt.embeddedObject());
+                             positionalInfo);
     }
 
-    void BtreeKeyGeneratorV1::getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
-                                          const BSONObj &obj, BSONObjSet *keys) const {
-        getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, BSONObj());
+    void BtreeKeyGeneratorV1::getKeysImpl(vector<const char*> fieldNames,
+                                          vector<BSONElement> fixed,
+                                          const BSONObj& obj,
+                                          BSONObjSet* keys) const {
+        getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, _emptyPositionalInfo);
     }
 
-    void BtreeKeyGeneratorV1::getKeysImplWithArray(vector<const char*> fieldNames,
-                                                   vector<BSONElement> fixed, const BSONObj &obj,
-                                                   BSONObjSet *keys, unsigned numNotFound,
-                                                   const BSONObj &array) const {
+    void BtreeKeyGeneratorV1::getKeysImplWithArray(
+            vector<const char*> fieldNames,
+            vector<BSONElement> fixed,
+            const BSONObj& obj,
+            BSONObjSet* keys,
+            unsigned numNotFound,
+            const std::vector<PositionalPathInfo>& positionalInfo) const {
         BSONElement arrElt;
         set<unsigned> arrIdxs;
         bool mayExpandArrayUnembedded = true;
@@ -292,7 +303,10 @@ namespace mongo {
 
             bool arrayNestedArray;
             // Extract element matching fieldName[ i ] from object xor array.
-            BSONElement e = extractNextElement( obj, array, fieldNames[ i ], arrayNestedArray );
+            BSONElement e = extractNextElement(obj,
+                                               positionalInfo[i],
+                                               fieldNames[i],
+                                               arrayNestedArray);
 
             if ( e.eoo() ) {
                 // if field not present, set to null
@@ -335,15 +349,43 @@ namespace mongo {
         else if ( arrElt.embeddedObject().firstElement().eoo() ) {
             // Empty array, so set matching fields to undefined.
             _getKeysArrEltFixed(fieldNames, fixed, _undefinedElt, keys, numNotFound, arrElt,
-                                arrIdxs, true );
+                                arrIdxs, true, _emptyPositionalInfo);
         }
         else {
-            // Non empty array that can be expanded, so generate a key for each member.
             BSONObj arrObj = arrElt.embeddedObject();
+
+            // For positional key patterns, e.g. {'a.1.b': 1}, we lookup the indexed array element
+            // and then traverse the remainder of the field path up front. This prevents us from
+            // having to look up the indexed element again on each recursive call (i.e. once per
+            // array element).
+            std::vector<PositionalPathInfo> subPositionalInfo(fixed.size());
+            for (size_t i = 0; i < fieldNames.size(); ++i) {
+                if (*fieldNames[i] == '\0') {
+                    // We've reached the end of the path.
+                    continue;
+                }
+
+                StringData part = fieldNames[i];
+                part = part.substr(0, part.find('.'));
+                subPositionalInfo[i].positionallyIndexedElt = arrObj[part];
+                if (subPositionalInfo[i].positionallyIndexedElt.eoo()) {
+                    // Not indexing an array by position.
+                    continue;
+                }
+
+                // We're indexing an array element by its position. Traverse the remainder of the
+                // field path now.
+                subPositionalInfo[i].arrayObj = arrObj;
+                subPositionalInfo[i].remainingPath = fieldNames[i];
+                subPositionalInfo[i].dottedElt =
+                    arrObj.getFieldDottedOrArray(subPositionalInfo[i].remainingPath);
+            }
+
+            // Generate a key for each element of the indexed array.
             BSONObjIterator i( arrObj );
             while( i.more() ) {
                 _getKeysArrEltFixed(fieldNames, fixed, i.next(), keys, numNotFound, arrElt, arrIdxs,
-                        mayExpandArrayUnembedded );
+                                    mayExpandArrayUnembedded, subPositionalInfo);
             }
         }
     }
