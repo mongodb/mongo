@@ -531,6 +531,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "transaction: transaction failures due to cache overflow";
 	stats->txn_pinned_range.desc =
 	    "transaction: transaction range of IDs currently pinned";
+	stats->txn_pinned_checkpoint_range.desc =
+	    "transaction: transaction range of IDs currently pinned by a checkpoint";
 	stats->txn_not_visible_checkpoint.desc =
 	    "transaction: Transaction visibility checks where checkpoint ID was not used";
 	stats->txn_visible_checkpoint.desc =
