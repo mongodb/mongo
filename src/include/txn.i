@@ -179,7 +179,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 /*
  * __wt_txn_autocommit_check --
- *      If an auto-commit transaction is required, start one.
+ *	If an auto-commit transaction is required, start one.
 */
 static inline int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
@@ -212,9 +212,35 @@ __wt_txn_new_id(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_idle_cache_check --
+ *	If there is no transaction active in this thread and we haven't checked
+ *	if the cache is full, do it now.  If we have to block for eviction,
+ *	this is the best time to do it.
+ */
+static inline int
+__wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+	WT_TXN_STATE *txn_state;
+
+	txn = &session->txn;
+	txn_state = &S2C(session)->txn_global.states[session->id];
+
+	/*
+	 * Check the published snap_min because read-uncommitted never sets
+	 * TXN_HAS_SNAPSHOT.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING) &&
+	    !F_ISSET(txn, TXN_HAS_ID) && txn_state->snap_min == WT_TXN_NONE)
+		WT_RET(__wt_cache_full_check(session));
+
+	return (0);
+}
+
+/*
  * __wt_txn_id_check --
  *	A transaction is going to do an update, start an auto commit
- *      transaction if required and allocate a transaction ID.
+ *	transaction if required and allocate a transaction ID.
  */
 static inline int
 __wt_txn_id_check(WT_SESSION_IMPL *session)
@@ -228,14 +254,8 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
 
-	/*
-	 * If there is no transaction active in this thread and we haven't
-	 * checked if the cache is full, do it now.  If we have to block for
-	 * eviction, this is the best time to do it.
-	 */
-	if (F_ISSET(txn, TXN_RUNNING) &&
-	    !F_ISSET(txn, TXN_HAS_ID) && !F_ISSET(txn, TXN_HAS_SNAPSHOT))
-		WT_RET(__wt_cache_full_check(session));
+	/* If the transaction is idle, check that the cache isn't full. */
+	WT_RET(__wt_txn_idle_cache_check(session));
 
 	if (!F_ISSET(txn, TXN_HAS_ID)) {
 		conn = S2C(session);
