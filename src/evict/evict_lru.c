@@ -990,9 +990,8 @@ retry:	while (slot < max_entries && ret == 0) {
 			continue;
 
 		/* Skip files if we have used all available hazard pointers. */
-		if (btree->evict_ref == NULL &&
-		    session->nhazard >= conn->hazard_max -
-		    WT_MIN(conn->hazard_max / 2, 10))
+		if (btree->evict_ref == NULL && session->nhazard >=
+		    conn->hazard_max - WT_MIN(conn->hazard_max / 2, 10))
 			continue;
 
 		/*
@@ -1242,9 +1241,8 @@ fast:		/* If the page can't be evicted, give up. */
 	}
 
 	/*
-	 * If we happen to end up on the root page, clear it.  We have to
-	 * track hazard pointers, and the root page complicates that
-	 * calculation.
+	 * If we happen to end up on the root page, clear it.  We have to track
+	 * hazard pointers, and the root page complicates that calculation.
 	 */
 	if ((ref = btree->evict_ref) != NULL && __wt_ref_is_root(ref)) {
 		btree->evict_ref = NULL;
