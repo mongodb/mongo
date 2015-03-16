@@ -8,9 +8,6 @@
 
 #include "wt_internal.h"
 
-static int  __curstat_next(WT_CURSOR *cursor);
-static int  __curstat_prev(WT_CURSOR *cursor);
-
 /*
  * The statistics identifier is an offset from a base to ensure the integer ID
  * values don't overlap (the idea is if they overlap it's easy for application
