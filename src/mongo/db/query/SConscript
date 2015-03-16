@@ -61,6 +61,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
         "$BUILD_DIR/mongo/mocklib",
+        "$BUILD_DIR/mongo/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -236,6 +237,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
         "$BUILD_DIR/mongo/mocklib",
+        "$BUILD_DIR/mongo/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )

@@ -58,6 +58,7 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/ntservice.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/version_reporting.h"
@@ -323,8 +324,23 @@ namespace mongo {
 
         log() << "terminating, shutdown command received" << endl;
 
-        exitCleanly(EXIT_CLEAN); // this never returns
-        invariant(false);
+#if defined(_WIN32)
+        // Signal the ServiceMain thread to shutdown.
+        if(ntservice::shouldStartService()) {
+            signalShutdown();
+
+            // Client expects us to abruptly close the socket as part of exiting
+            // so this function is not allowed to return.
+            // The ServiceMain thread will quit for us so just sleep until it does.
+            while (true)
+                sleepsecs(60); // Loop forever
+        }
+        else
+#endif
+        {
+            exitCleanly(EXIT_CLEAN); // this never returns
+            invariant(false);
+        }
     }
 
     /* for testing purposes only */

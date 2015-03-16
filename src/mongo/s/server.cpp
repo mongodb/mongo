@@ -475,6 +475,11 @@ int main(int argc, char* argv[], char** envp) {
 
 #undef exit
 
+void mongo::signalShutdown() {
+    // Notify all threads shutdown has started
+    dbexitCalled = true;
+}
+
 void mongo::exitCleanly(ExitCode code) {
     // TODO: do we need to add anything?
     mongo::dbexit( code );
@@ -483,7 +488,11 @@ void mongo::exitCleanly(ExitCode code) {
 void mongo::dbexit( ExitCode rc, const char *why ) {
     dbexitCalled = true;
     audit::logShutdown(ClientBasic::getCurrent());
+
 #if defined(_WIN32)
+    // Windows Service Controller wants to be told when we are done shutting down
+    // and call quickExit itself.
+    //
     if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
         log() << "dbexit: exiting because Windows service was stopped" << endl;
         return;

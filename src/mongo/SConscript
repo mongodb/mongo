@@ -241,7 +241,7 @@ env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
 
 env.CppUnitTest('curop_test',
                 ['db/curop_test.cpp'],
-                LIBDEPS=['serveronly', 'coredb', 'coreserver'],
+                LIBDEPS=['serveronly', 'coredb', 'coreserver', 'ntservice_mock'],
                 NO_CRUTCH=True)
 
 env.Library('index_names',["db/index_names.cpp"])
@@ -583,7 +583,10 @@ env.Library('ntservice', ['util/ntservice.cpp'],
 if windows:
     env.CppUnitTest('ntservice_test', 'util/ntservice_test.cpp',
                     LIBDEPS=['ntservice'],
-                    LIBS=['shell32', env['LIBS']])
+                    LIBS=['shell32', env['LIBS']],
+                    NO_CRUTCH=True)
+
+env.Library('ntservice_mock', ['util/ntservice_mock.cpp'])
 
 env.Library(
     target='scripting_common',
@@ -895,7 +898,8 @@ env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                     "coreshard",
                     "mongocommon",
                     "message_server_port",
-                    "mongoscore"],
+                    "mongoscore",
+                    "ntservice_mock"],
                  NO_CRUTCH=True)
 
 env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
@@ -936,6 +940,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -949,6 +954,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -962,6 +968,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -1124,6 +1131,7 @@ env.Install(
                         "tools/mongobridge_options_init.cpp"
                     ],
                     LIBDEPS=[
+                        "ntservice_mock",
                         "serveronly",
                         "coreserver",
                         "coredb",
@@ -1135,6 +1143,7 @@ env.Install(
                         "client/examples/mongoperf.cpp",
                     ],
                     LIBDEPS=[
+                        "ntservice_mock",
                         "serveronly",
                         "coreserver",
                         "coredb",
@@ -1227,6 +1236,7 @@ env.Install('$BUILD_ROOT/', env.Program('file_allocator_bench',
                 'serveronly',
                 'coredb',
                 'coreserver',
+                "ntservice_mock",
             ]))
 
 env.Alias('file_allocator_bench', "$BUILD_ROOT/" + add_exe("file_allocator_bench"))
