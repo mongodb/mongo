@@ -989,6 +989,11 @@ retry:	while (slot < max_entries && ret == 0) {
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
 			continue;
 
+		/* Skip files if we have used all available hazard pointers. */
+		if (btree->evict_ref == NULL && session->nhazard >=
+		    conn->hazard_max - WT_MIN(conn->hazard_max / 2, 10))
+			continue;
+
 		/*
 		 * If we are filling the queue, skip files that haven't been
 		 * useful in the past.
@@ -1103,6 +1108,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
+	WT_REF *ref;
 	uint64_t pages_walked;
 	uint32_t walk_flags;
 	int enough, internal_pages, modified, restarts;
@@ -1137,16 +1143,17 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	    ret = __wt_tree_walk(
 	    session, &btree->evict_ref, &pages_walked, walk_flags)) {
 		enough = (pages_walked > WT_EVICT_MAX_PER_FILE);
-		if (btree->evict_ref == NULL) {
+		if ((ref = btree->evict_ref) == NULL) {
 			if (++restarts == 2 || enough)
 				break;
 			continue;
 		}
 
 		/* Ignore root pages entirely. */
-		if (__wt_ref_is_root(btree->evict_ref))
+		if (__wt_ref_is_root(ref))
 			continue;
-		page = btree->evict_ref->page;
+
+		page = ref->page;
 		modified = __wt_page_is_modified(page);
 
 		/*
@@ -1226,11 +1233,20 @@ fast:		/* If the page can't be evicted, give up. */
 			continue;
 
 		WT_ASSERT(session, evict->ref == NULL);
-		__evict_init_candidate(session, evict, btree->evict_ref);
+		__evict_init_candidate(session, evict, ref);
 		++evict;
 
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" PRIu64, page, page->memory_footprint));
+	}
+
+	/*
+	 * If we happen to end up on the root page, clear it.  We have to track
+	 * hazard pointers, and the root page complicates that calculation.
+	 */
+	if ((ref = btree->evict_ref) != NULL && __wt_ref_is_root(ref)) {
+		btree->evict_ref = NULL;
+		__wt_page_release(session, ref, 0);
 	}
 
 	/* If the walk was interrupted by a locked page, that's okay. */
