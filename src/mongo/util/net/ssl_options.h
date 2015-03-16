@@ -39,7 +39,7 @@ namespace mongo {
 
     namespace moe = mongo::optionenvironment;
 
-    struct SSLGlobalParams {
+    struct SSLParams {
         AtomicInt32 sslMode;        // --sslMode - the SSL operation mode, see enum SSLModes
         bool sslOnNormalPorts;      // --sslOnNormalPorts (deprecated)
         std::string sslPEMKeyFile;       // --sslPEMKeyFile
@@ -54,7 +54,7 @@ namespace mongo {
         bool sslAllowInvalidCertificates; // --sslAllowInvalidCertificates
         bool sslAllowInvalidHostnames; // --sslAllowInvalidHostnames
 
-        SSLGlobalParams() {
+        SSLParams() {
             sslMode.store(SSLMode_disabled);
         }
  
@@ -81,7 +81,7 @@ namespace mongo {
         };
     };
 
-    extern SSLGlobalParams sslGlobalParams;
+    extern SSLParams sslGlobalParams;
 
     Status addSSLServerOptions(moe::OptionSection* options);
 

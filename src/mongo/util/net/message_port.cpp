@@ -214,14 +214,14 @@ again:
                  && header.constView().getResponseTo() != -1) {
                     uassert(17132,
                             "SSL handshake received but server is started without SSL support",
-                            sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_disabled);
+                            sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
                     setX509SubjectName(psock->doSSLHandshake(
                                        reinterpret_cast<const char*>(&header), sizeof(header)));
                     psock->setHandshakeReceived();
                     goto again;
                 }
                 uassert(17189, "The server is configured to only allow SSL connections",
-                        sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_requireSSL);
+                        sslGlobalParams.sslMode.load() != SSLParams::SSLMode_requireSSL);
 #endif // MONGO_CONFIG_SSL
             }
             if ( static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||

@@ -63,7 +63,7 @@ using std::endl;
 
 namespace mongo {
 
-    SSLGlobalParams sslGlobalParams;
+    SSLParams sslGlobalParams;
 
 #ifndef MONGO_CONFIG_SSL   
     const std::string getSSLVersion(const std::string &prefix, const std::string &suffix) {
@@ -155,46 +155,9 @@ namespace mongo {
         static const int BUFFER_SIZE = 8*1024;
         static const int DATE_LEN = 128;
 
-        struct Params {
-            Params(const std::string& pemfile,
-                   const std::string& pempwd,
-                   const std::string& clusterfile,
-                   const std::string& clusterpwd,
-                   const std::string& cafile = "",
-                   const std::string& crlfile = "",
-                   const std::string& cipherConfig = "",
-                   bool weakCertificateValidation = false,
-                   bool allowInvalidCertificates = false,
-                   bool allowInvalidHostnames = false,
-                   bool fipsMode = false) :
-                pemfile(pemfile),
-                pempwd(pempwd),
-                clusterfile(clusterfile),
-                clusterpwd(clusterpwd),
-                cafile(cafile),
-                crlfile(crlfile),
-                cipherConfig(cipherConfig),
-                weakCertificateValidation(weakCertificateValidation),
-                allowInvalidCertificates(allowInvalidCertificates),
-                allowInvalidHostnames(allowInvalidHostnames),
-                fipsMode(fipsMode) {};
-
-            std::string pemfile;
-            std::string pempwd;
-            std::string clusterfile;
-            std::string clusterpwd;
-            std::string cafile;
-            std::string crlfile;
-            std::string cipherConfig;
-            bool weakCertificateValidation;
-            bool allowInvalidCertificates;
-            bool allowInvalidHostnames;
-            bool fipsMode;
-        };
-
         class SSLManager : public SSLManagerInterface {
         public:
-            explicit SSLManager(const Params& params, bool isServer);
+            explicit SSLManager(const SSLParams& params, bool isServer);
 
             virtual ~SSLManager();
 
@@ -251,7 +214,7 @@ namespace mongo {
             /*
              * Init the SSL context using parameters provided in params.
              */
-            bool _initSSLContext(SSL_CTX** context, const Params& params);
+            bool _initSSLContext(SSL_CTX** context, const SSLParams& params);
 
             /*
              * Converts time from OpenSSL return value to unsigned long long
@@ -325,20 +288,8 @@ namespace mongo {
     
     MONGO_INITIALIZER(SSLManager)(InitializerContext* context) {
         SimpleMutex::scoped_lock lck(sslManagerMtx);
-        if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_disabled) {
-            const Params params(
-                sslGlobalParams.sslPEMKeyFile,
-                sslGlobalParams.sslPEMKeyPassword,
-                sslGlobalParams.sslClusterFile,
-                sslGlobalParams.sslClusterPassword,
-                sslGlobalParams.sslCAFile,
-                sslGlobalParams.sslCRLFile,
-                sslGlobalParams.sslCipherConfig,
-                sslGlobalParams.sslWeakCertificateValidation,
-                sslGlobalParams.sslAllowInvalidCertificates,
-                sslGlobalParams.sslAllowInvalidHostnames,
-                sslGlobalParams.sslFIPSMode);
-            theSSLManager = new SSLManager(params, isSSLServer);
+        if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
+            theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
         }
         return Status::OK();
     }
@@ -421,18 +372,18 @@ namespace mongo {
 
     SSLManagerInterface::~SSLManagerInterface() {}
 
-    SSLManager::SSLManager(const Params& params, bool isServer) :
+    SSLManager::SSLManager(const SSLParams& params, bool isServer) :
         _serverContext(NULL),
         _clientContext(NULL),
-        _weakValidation(params.weakCertificateValidation),
-        _allowInvalidCertificates(params.allowInvalidCertificates),
-        _allowInvalidHostnames(params.allowInvalidHostnames) {
+        _weakValidation(params.sslWeakCertificateValidation),
+        _allowInvalidCertificates(params.sslAllowInvalidCertificates),
+        _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
 
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
 
-        if (params.fipsMode) {
+        if (params.sslFIPSMode) {
             _setupFIPS();
         }
 
@@ -453,14 +404,14 @@ namespace mongo {
 
         // pick the certificate for use in outgoing connections,
         std::string clientPEM;
-        if (!isServer || params.clusterfile.empty()) {
+        if (!isServer || params.sslClusterFile.empty()) {
             // We are either a client, or a server without a cluster key,
             // so use the PEM key file, if specified
-            clientPEM = params.pemfile;
+            clientPEM = params.sslPEMKeyFile;
         }
         else {
             // We are a server with a cluster key, so use the cluster key file
-            clientPEM = params.clusterfile;
+            clientPEM = params.sslClusterFile;
         }
 
         if (!clientPEM.empty()) {
@@ -475,7 +426,7 @@ namespace mongo {
                 uasserted(16562, "ssl initialization problem");
             }
 
-            if (!_parseAndValidateCertificate(params.pemfile,
+            if (!_parseAndValidateCertificate(params.sslPEMKeyFile,
                                               &_sslConfiguration.serverSubjectName,
                                               &_sslConfiguration.serverCertificateExpirationDate)) {
                 uasserted(16942, "ssl initialization problem");
@@ -579,7 +530,7 @@ namespace mongo {
 #endif
     }
 
-    bool SSLManager::_initSSLContext(SSL_CTX** context, const Params& params) {
+    bool SSLManager::_initSSLContext(SSL_CTX** context, const SSLParams& params) {
         *context = SSL_CTX_new(SSLv23_method());
         massert(15864,
                 mongoutils::str::stream() << "can't create SSL Context: " <<
@@ -598,8 +549,8 @@ namespace mongo {
         std::string cipherConfig = "HIGH:!EXPORT:!aNULL@STRENGTH";
 
         // Allow the cipher configuration string to be overriden by --sslCipherConfig
-        if (!params.cipherConfig.empty()) {
-            cipherConfig = params.cipherConfig;
+        if (!params.sslCipherConfig.empty()) {
+            cipherConfig = params.sslCipherConfig;
         }
 
         massert(28615, mongoutils::str::stream() << "can't set supported cipher suites: " <<
@@ -619,29 +570,29 @@ namespace mongo {
                     sizeof(*context)));
 
         // Use the clusterfile for internal outgoing SSL connections if specified 
-        if (context == &_clientContext && !params.clusterfile.empty()) {
+        if (context == &_clientContext && !params.sslClusterFile.empty()) {
             EVP_set_pw_prompt("Enter cluster certificate passphrase");
-            if (!_setupPEM(*context, params.clusterfile, params.clusterpwd)) {
+            if (!_setupPEM(*context, params.sslClusterFile, params.sslClusterPassword)) {
                 return false;
             }
         }
         // Use the pemfile for everything else
-        else if (!params.pemfile.empty()) {
+        else if (!params.sslPEMKeyFile.empty()) {
             EVP_set_pw_prompt("Enter PEM passphrase");
-            if (!_setupPEM(*context, params.pemfile, params.pempwd)) {
+            if (!_setupPEM(*context, params.sslPEMKeyFile, params.sslPEMKeyPassword)) {
                 return false;
             }
         }
 
-        if (!params.cafile.empty()) {
+        if (!params.sslCAFile.empty()) {
             // Set up certificate validation with a certificate authority
-            if (!_setupCA(*context, params.cafile)) {
+            if (!_setupCA(*context, params.sslCAFile)) {
                 return false;
             }
         }
 
-        if (!params.crlfile.empty()) {
-            if (!_setupCRL(*context, params.crlfile)) {
+        if (!params.sslCRLFile.empty()) {
+            if (!_setupCRL(*context, params.sslCRLFile)) {
                 return false;
             }
         }
