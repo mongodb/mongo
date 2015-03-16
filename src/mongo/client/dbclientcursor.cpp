@@ -212,10 +212,15 @@ namespace mongo {
 
         if ( qr.getResultFlags() & ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
-            verify( qr.getCursorId() == 0 );
-            cursorId = 0; // 0 indicates no longer valid (dead)
-            if ( ! ( opts & QueryOption_CursorTailable ) )
-                throw UserException( 13127 , "getMore: cursor didn't exist on server, possible restart or timeout?" );
+            invariant(qr.getCursorId() == 0);
+
+            if (!(opts & QueryOption_CursorTailable)) {
+                uasserted(13127,
+                          str::stream() << "cursor id " << cursorId << " didn't exist on server.");
+            }
+
+            // 0 indicates no longer valid (dead)
+            cursorId = 0;
         }
 
         if ( cursorId == 0 || ! ( opts & QueryOption_CursorTailable ) ) {
