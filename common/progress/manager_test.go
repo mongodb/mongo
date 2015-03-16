@@ -3,6 +3,7 @@ package progress
 import (
 	"bytes"
 	. "github.com/smartystreets/goconvey/convey"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -136,7 +137,60 @@ func TestManagerStartAndStop(t *testing.T) {
 				So(manager.Stop, ShouldNotPanic)
 			})
 		})
-
 	})
+}
 
+func TestNumberOfWrites(t *testing.T) {
+	var cw *CountWriter
+	var manager *Manager
+	Convey("With a test manager and counting writer", t, func() {
+		cw = new(CountWriter)
+		manager = NewProgressBarManager(cw, time.Millisecond*10)
+		So(manager, ShouldNotBeNil)
+
+		manager.Attach(&Bar{Name: "1", Watching: NewCounter(10), BarLength: 10})
+
+		Convey("with one attached bar", func() {
+			So(len(manager.bars), ShouldEqual, 1)
+
+			Convey("only one write should be made per render", func() {
+				manager.renderAllBars()
+				So(cw.Count(), ShouldEqual, 1)
+			})
+		})
+
+		Convey("with two bars attached", func() {
+			manager.Attach(&Bar{Name: "2", Watching: NewCounter(10), BarLength: 10})
+			So(len(manager.bars), ShouldEqual, 2)
+
+			Convey("three writes should be made per render, since an empty write is added", func() {
+				manager.renderAllBars()
+				So(cw.Count(), ShouldEqual, 3)
+			})
+		})
+
+		Convey("with 57 bars attached", func() {
+			for i := 2; i <= 57; i++ {
+				manager.Attach(&Bar{Name: strconv.Itoa(i), Watching: NewCounter(10), BarLength: 10})
+			}
+			So(len(manager.bars), ShouldEqual, 57)
+
+			Convey("58 writes should be made per render, since an empty write is added", func() {
+				manager.renderAllBars()
+				So(cw.Count(), ShouldEqual, 58)
+			})
+		})
+	})
+}
+
+// helper type for counting calls to a writer
+type CountWriter int
+
+func (cw CountWriter) Count() int {
+	return int(cw)
+}
+
+func (cw *CountWriter) Write(b []byte) (int, error) {
+	*cw++
+	return len(b), nil
 }
