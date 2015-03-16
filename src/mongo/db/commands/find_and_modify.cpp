@@ -47,6 +47,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -114,6 +115,12 @@ namespace mongo {
                 return false;
             }
 
+            StatusWith<WriteConcernOptions> wcResult = extractWriteConcern(cmdObj);
+            if (!wcResult.isOK()) {
+                return appendCommandStatus(result, wcResult.getStatus());
+            }
+            setupSynchronousCommit(wcResult.getValue(), txn);
+
             bool ok = false;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 errmsg = "";
@@ -174,6 +181,13 @@ namespace mongo {
                              result,
                              errmsg);
             }
+
+            WriteConcernResult res;
+            wcResult = waitForWriteConcern(txn,
+                                           wcResult.getValue(),
+                                           txn->getClient()->getLastOp(),
+                                           &res);
+            appendCommandWCStatus(result, wcResult.getStatus());
 
             return ok;
         }
