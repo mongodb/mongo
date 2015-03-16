@@ -30,18 +30,18 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replset_commands.h"
-
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -58,9 +58,28 @@ namespace repl {
 
     using std::string;
     using std::stringstream;
-    using std::vector;
 
-    unsigned replSetForceInitialSyncFailure = 0;
+    /**
+     * Base class for repl set commands.
+     */
+    class ReplSetCommand : public Command {
+    protected:
+        ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            ActionSet actions;
+            actions.addAction(ActionType::internal);
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
+        }    
+    };
 
     // Testing only, enabled via command-line.
     class CmdReplSetTest : public ReplSetCommand {
@@ -69,9 +88,11 @@ namespace repl {
             help << "Just for regression tests.\n";
         }
         // No auth needed because it only works when enabled via command line.
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {}
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            return Status::OK();
+        }
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSetTest command received: " << cmdObj.toString();
@@ -102,17 +123,7 @@ namespace repl {
     */
     class CmdReplSetGetRBID : public ReplSetCommand {
     public:
-        virtual void help( stringstream &help ) const {
-            help << "internal";
-        }
         CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {}
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK())
@@ -130,12 +141,16 @@ namespace repl {
             help << "{ replSetGetStatus : 1 }";
             help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetGetStatus);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -158,13 +173,17 @@ namespace repl {
             help << "{ replSetGetConfig : 1 }";
             help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetGetConfig);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
+        } 
         CmdReplSetGetConfig() : ReplSetCommand("replSetGetConfig", true) { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj,
                          int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -257,18 +276,21 @@ namespace {
 
     class CmdReplSetInitiate : public ReplSetCommand {
     public:
-        virtual bool isWriteCommandForConfigServer() const { return false; }
         CmdReplSetInitiate() : ReplSetCommand("replSetInitiate") { }
         virtual void help(stringstream& h) const {
             h << "Initiate/christen a replica set.";
             h << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetConfigure);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         virtual bool run(OperationContext* txn,
                          const string& ,
@@ -344,12 +366,16 @@ namespace {
             help << "{ replSetReconfig : config_object }";
             help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetConfigure);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -396,12 +422,16 @@ namespace {
             help << "A process restart unfreezes the member also.\n";
             help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -424,12 +454,16 @@ namespace {
             help << "(If another member with same priority takes over in the meantime, it will stay primary.)\n";
             help << "http://dochub.mongodb.org/core/replicasetcommands";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -495,12 +529,16 @@ namespace {
             help << "{ replSetMaintenance : bool }\n";
             help << "Enable or disable maintenance mode.";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -521,13 +559,17 @@ namespace {
             help << "{ replSetSyncFrom : \"host:port\" }\n";
             help << "Change who this member is syncing from.";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
+        }        
         CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }
         virtual bool run(OperationContext* txn, const string&, 
                          BSONObj& cmdObj, 
@@ -553,16 +595,6 @@ namespace {
 
     class CmdReplSetUpdatePosition: public ReplSetCommand {
     public:
-        virtual void help( stringstream &help ) const {
-            help << "internal";
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
         CmdReplSetUpdatePosition() : ReplSetCommand("replSetUpdatePosition") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg,
                          BSONObjBuilder& result, bool fromRepl) {
@@ -601,7 +633,7 @@ namespace {
      * Used to set the hasData field on replset heartbeat command response.
      */
     bool replHasDatabases(OperationContext* txn) {
-        vector<string> names;
+        std::vector<string> names;
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         storageEngine->listDatabases(&names);
 
@@ -626,15 +658,7 @@ namespace {
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {
     public:
-        void help(stringstream& h) const { h << "internal"; }
         CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
@@ -682,15 +706,7 @@ namespace {
         */
     class CmdReplSetFresh : public ReplSetCommand {
     public:
-        void help(stringstream& h) const { h << "internal"; }
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
 
         virtual bool run(OperationContext* txn,
                          const string&,
@@ -722,15 +738,7 @@ namespace {
 
     class CmdReplSetElect : public ReplSetCommand {
     public:
-        void help(stringstream& h) const { h << "internal"; }
         CmdReplSetElect() : ReplSetCommand("replSetElect") { }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
     private:
         virtual bool run(OperationContext* txn,
                          const string&,

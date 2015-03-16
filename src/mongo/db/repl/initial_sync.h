@@ -49,5 +49,8 @@ namespace repl {
         void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
     };
 
+    // Used for ReplSetTest testing.
+    extern unsigned replSetForceInitialSyncFailure;
+
 } // namespace repl
 } // namespace mongo

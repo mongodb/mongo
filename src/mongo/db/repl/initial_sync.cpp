@@ -33,12 +33,13 @@
 #include "mongo/db/repl/initial_sync.h"
 
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/replset_commands.h"
 #include "mongo/util/log.h"
 
 
 namespace mongo {
 namespace repl {
+
+    unsigned replSetForceInitialSyncFailure = 0;
 
     InitialSync::InitialSync(BackgroundSyncInterface *q) : 
         SyncTail(q, multiInitialSyncApply) {}
