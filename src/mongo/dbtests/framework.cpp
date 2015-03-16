@@ -135,6 +135,14 @@ namespace mongo {
         }
     }  // namespace dbtests
 
+#ifdef _WIN32
+namespace ntservice {
+    bool shouldStartService() {
+        return false;
+    }
+}
+#endif
+
 }  // namespace mongo
 
 void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {

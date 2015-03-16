@@ -77,6 +77,8 @@ namespace mongo {
         return shuttingDown;
     }
 
+    void signalShutdown() {}
+
     DBClientBase* createDirectClient(OperationContext* txn) { return NULL; }
 
     void dbexit(ExitCode rc, const char *why){

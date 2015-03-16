@@ -1106,12 +1106,25 @@ namespace mongo {
         getGlobalEnvironment()->shutdownGlobalStorageEngineCleanly();
     }
 
+    // shutdownLock
+    //
+    // Protects:
+    //  Ensures shutdown is single threaded.
+    // Lock Ordering:
+    //  No restrictions
+    boost::mutex shutdownLock;
+
+    void signalShutdown() {
+        // Notify all threads shutdown has started
+        shutdownInProgress.fetchAndAdd(1);
+    }
+
     void exitCleanly(ExitCode code) {
-        if (shutdownInProgress.fetchAndAdd(1) != 0) {
-            while (true) {
-                sleepsecs(1000);
-            }
-        }
+        // Notify all threads shutdown has started
+        shutdownInProgress.fetchAndAdd(1);
+
+        // Grab the shutdown lock to prevent concurrent callers
+        boost::lock_guard<boost::mutex> lockguard(shutdownLock);
 
         // Global storage engine may not be started in all cases before we exit
         if (getGlobalEnvironment()->getGlobalStorageEngine() == NULL) {
