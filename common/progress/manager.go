@@ -48,7 +48,7 @@ func (manager *Manager) Attach(pb *Bar) {
 	// make sure we are not adding the same bar again
 	for _, bar := range manager.bars {
 		if bar.Name == pb.Name {
-			panic(fmt.Sprintf("progress bar with name '%v' already exists in manager"))
+			panic(fmt.Sprintf("progress bar with name '%v' already exists in manager", pb.Name))
 		}
 	}
 
@@ -88,6 +88,12 @@ func (manager *Manager) renderAllBars() {
 		bar.renderToGridRow(grid)
 	}
 	grid.FlushRows(manager.writer)
+	// add padding of one row if we have more than one active bar
+	if len(manager.bars) > 1 {
+		// we just write an empty array here, since a write call of any
+		// length to our log.Writer will trigger a new logline.
+		manager.writer.Write([]byte{})
+	}
 }
 
 // Start kicks of the timed batch writing of progress bars.
