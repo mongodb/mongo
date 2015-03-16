@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!usr/bin/env python
 #
 # Public Domain 2014-2015 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import helper, wiredtiger, wttest
+import helper, random, wiredtiger, wttest
 from helper import simple_populate
 
 # test_bug011.py
@@ -38,7 +38,8 @@ class test_bug011(wttest.WiredTigerTestCase):
     """
     table_name = 'test_bug011'
     ntables = 50
-    nops = 100
+    nrows = 10000
+    nops = 10000
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
@@ -53,15 +54,22 @@ class test_bug011(wttest.WiredTigerTestCase):
         cursors = []
         for i in range(0, self.ntables):
             this_uri = 'table:' + self.table_name + str(i)
-            simple_populate(self, this_uri, 'key_format=S', 1000)
-            # Make sure we have a cursor for the table so it stays in cache.
-            cursors.append(self.session.open_cursor(this_uri))
+            simple_populate(self, this_uri, 'key_format=S,allocation_size=1KB,leaf_page_max=1KB', self.nrows)
+
+        # Switch over to on-disk trees with multiple leaf pages
+        self.reopen_conn()
+
+        # Make sure we have a cursor for the table so it stays in cache.
+        for i in range(0, self.ntables):
+            this_uri = 'table:' + self.table_name + str(i)
+            cursors.append(self.session.open_cursor(this_uri, None)) 
 
         # Make use of the cache.
         for i in range(0, self.nops):
             for i in range(0, self.ntables):
-                if (cursors[i].next() == wiredtiger.WT_NOTFOUND):
-                    cursors[i].reset()
+                cursors[i].set_key(helper.key_populate(cursors[i], random.randint(0, self.nrows - 1)))
+                cursors[i].search()
+                cursors[i].reset()
 
 if __name__ == '__main__':
     wttest.run()
