@@ -114,6 +114,19 @@ namespace mongo {
         */
         bool ok() const { return !eoo(); }
 
+        /**
+         * True if this element has a value (ie not EOO).
+         *
+         * Makes it easier to check for a field's existence and use it:
+         * if (auto elem = myObj["foo"]) {
+         *     // Use elem
+         * }
+         * else {
+         *     // default behavior
+         * }
+         */
+        explicit operator bool() const { return ok(); }
+
         std::string toString( bool includeFieldName = true, bool full=false) const;
         void toString(StringBuilder& s, bool includeFieldName = true, bool full=false, int depth=0) const;
         std::string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
