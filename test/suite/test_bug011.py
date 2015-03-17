@@ -53,21 +53,24 @@ class test_bug011(wttest.WiredTigerTestCase):
     def test_eviction(self):
         cursors = []
         for i in range(0, self.ntables):
-            this_uri = 'table:' + self.table_name + str(i)
-            simple_populate(self, this_uri, 'key_format=S,allocation_size=1KB,leaf_page_max=1KB', self.nrows)
+            this_uri = 'table:%s-%03d' % (self.table_name, i)
+            simple_populate(self, this_uri,
+                'key_format=S,allocation_size=1KB,leaf_page_max=1KB',
+                self.nrows)
 
         # Switch over to on-disk trees with multiple leaf pages
         self.reopen_conn()
 
         # Make sure we have a cursor for the table so it stays in cache.
         for i in range(0, self.ntables):
-            this_uri = 'table:' + self.table_name + str(i)
+            this_uri = 'table:%s-%03d' % (self.table_name, i)
             cursors.append(self.session.open_cursor(this_uri, None)) 
 
         # Make use of the cache.
         for i in range(0, self.nops):
             for i in range(0, self.ntables):
-                cursors[i].set_key(helper.key_populate(cursors[i], random.randint(0, self.nrows - 1)))
+                cursors[i].set_key(helper.key_populate(cursors[i],
+                    random.randint(0, self.nrows - 1)))
                 cursors[i].search()
                 cursors[i].reset()
 
