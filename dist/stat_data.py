@@ -282,11 +282,7 @@ connection_stats = [
         'no_aggregate,no_clear,no_scale'),
     TxnStat('txn_commit', 'transactions committed'),
     TxnStat('txn_fail_cache', 'transaction failures due to cache overflow'),
-    TxnStat('txn_not_visible_checkpoint',
-        'Transaction visibility checks where checkpoint ID was not used'),
     TxnStat('txn_rollback', 'transactions rolled back'),
-    TxnStat('txn_visible_checkpoint',
-        'Transaction visibility checks where checkpoint ID was used'),
 
     ##########################################
     # LSM statistics

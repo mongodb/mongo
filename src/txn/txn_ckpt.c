@@ -1017,20 +1017,20 @@ fake:	/*
 			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
 
-	/*
-	 * Update the checkpoint generation for this handle so visible
-	 * updates newer than the checkpoint can be evicted.
-	 */
-	btree->checkpoint_gen = conn->txn_global.checkpoint_gen;
-	WT_STAT_FAST_DATA_SET(session,
-	    btree_checkpoint_generation, btree->checkpoint_gen);
-
 	/* Tell logging that the checkpoint is complete. */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
-done: err:
+	/*
+	 * Update the checkpoint generation for this handle so visible
+	 * updates newer than the checkpoint can be evicted.
+	 */
+done:	btree->checkpoint_gen = conn->txn_global.checkpoint_gen;
+	WT_STAT_FAST_DATA_SET(session,
+	    btree_checkpoint_generation, btree->checkpoint_gen);
+
+err:
 	/*
 	 * If the checkpoint didn't complete successfully, make sure the
 	 * tree is marked dirty.

@@ -512,18 +512,19 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	WT_TXN_GLOBAL *txn_global;
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS *stats;
-	uint64_t ckpt_id;
+	uint64_t checkpoint_snap_min;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 	stats = &conn->stats;
-	ckpt_id = txn_global->checkpoint_snap_min;
+	checkpoint_snap_min = txn_global->checkpoint_snap_min;
 
 	WT_STAT_SET(stats, txn_pinned_range,
 	    txn_global->current - txn_global->oldest_id);
 
 	WT_STAT_SET(stats, txn_pinned_checkpoint_range,
-	    ckpt_id == WT_TXN_NONE ? 0 : txn_global->current - ckpt_id);
+	    checkpoint_snap_min == WT_TXN_NONE ?
+	    0 : txn_global->current - checkpoint_snap_min);
 }
 
 /*
