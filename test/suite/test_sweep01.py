@@ -62,8 +62,8 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     def setUpConnectionOpen(self, dir):
         self.home = dir
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-		# Configure sweep to run every 2 seconds with a 6 second timeout.
-		# That matches the ratio of the default 10 and 30 seconds.
+        # Configure sweep to run every 2 seconds with a 6 second timeout.
+        # That matches the ratio of the default 10 and 30 seconds.
         conn_params = \
                 ',create,error_prefix="%s: ",' % self.shortid() + \
                 'file_manager=(close_idle_time=6,close_scan_interval=2),' + \
@@ -107,9 +107,9 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
         # Inactive time on a handle must be a minute or more.
-		# We've configured the sweep server to run every 2 seconds and idle
-		# time to be 6 seconds. It should take at most 8 seconds for a handle
-		# to be closed. Sleep for 12 seconds to be safe.
+        # We've configured the sweep server to run every 2 seconds and idle
+        # time to be 6 seconds. It should take at most 8 seconds for a handle
+        # to be closed. Sleep for 12 seconds to be safe.
         uri = '%s.test' % self.uri
         self.session.create(uri, self.create_params)
         #
