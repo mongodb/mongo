@@ -142,15 +142,14 @@ __huffman_confchk_file(
 
 	/* Look for a prefix and file name. */
 	len = 0;
+	if (is_utf8p != NULL)
+		*is_utf8p = 0;
 	if (WT_PREFIX_MATCH(v->str, "utf8")) {
 		if (is_utf8p != NULL)
 			*is_utf8p = 1;
 		len = strlen("utf8");
-	} else if (WT_PREFIX_MATCH(v->str, "utf16")) {
-		if (is_utf8p != NULL)
-			*is_utf8p = 0;
+	} else if (WT_PREFIX_MATCH(v->str, "utf16"))
 		len = strlen("utf16");
-	}
 	if (len == 0 || len >= v->len)
 		WT_RET_MSG(session, EINVAL,
 		    "illegal Huffman configuration: %.*s", (int)v->len, v->str);
