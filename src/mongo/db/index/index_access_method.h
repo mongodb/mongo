@@ -28,22 +28,22 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <memory>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
     class BSONObjBuilder;
     class UpdateTicket;
     struct InsertDeleteOptions;
-    class BtreeBasedAccessMethod;
 
     /**
      * An IndexAccessMethod is the interface through which all the mutation, lookup, and
@@ -56,7 +56,10 @@ namespace mongo {
      *
      */
     class IndexAccessMethod {
+        MONGO_DISALLOW_COPYING(IndexAccessMethod);
     public:
+
+        IndexAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
         virtual ~IndexAccessMethod() { }
 
         //
@@ -71,21 +74,21 @@ namespace mongo {
          *
          * The behavior of the insertion can be specified through 'options'.
          */
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& obj,
-                              const RecordId& loc,
-                              const InsertDeleteOptions& options,
-                              int64_t* numInserted) = 0;
+        Status insert(OperationContext* txn,
+                      const BSONObj& obj,
+                      const RecordId& loc,
+                      const InsertDeleteOptions& options,
+                      int64_t* numInserted);
 
         /**
          * Analogous to above, but remove the records instead of inserting them.  If not NULL,
          * numDeleted will be set to the number of keys removed from the index for the document.
          */
-        virtual Status remove(OperationContext* txn,
-                              const BSONObj& obj,
-                              const RecordId& loc,
-                              const InsertDeleteOptions& options,
-                              int64_t* numDeleted) = 0;
+        Status remove(OperationContext* txn,
+                      const BSONObj& obj,
+                      const RecordId& loc,
+                      const InsertDeleteOptions& options,
+                      int64_t* numDeleted);
 
         /**
          * Checks whether the index entries for the document 'from', which is placed at location
@@ -97,12 +100,12 @@ namespace mongo {
          *
          * There is no obligation to perform the update after performing validation.
          */
-        virtual Status validateUpdate(OperationContext* txn,
-                                      const BSONObj& from,
-                                      const BSONObj& to,
-                                      const RecordId& loc,
-                                      const InsertDeleteOptions& options,
-                                      UpdateTicket* ticket) = 0;
+        Status validateUpdate(OperationContext* txn,
+                              const BSONObj& from,
+                              const BSONObj& to,
+                              const RecordId& loc,
+                              const InsertDeleteOptions& options,
+                              UpdateTicket* ticket);
 
         /**
          * Perform a validated update.  The keys for the 'from' object will be removed, and the keys
@@ -112,15 +115,13 @@ namespace mongo {
          * called.  If the index was changed, we may return an error, as our ticket may have been
          * invalidated.
          */
-        virtual Status update(OperationContext* txn,
-                              const UpdateTicket& ticket,
-                              int64_t* numUpdated) = 0;
+        Status update(OperationContext* txn, const UpdateTicket& ticket, int64_t* numUpdated);
 
         /**
          * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of
          * failure. If the latter, '*out' contains NULL.  See index_cursor.h for IndexCursor usage.
          */
-        virtual Status newCursor(OperationContext* txn, const CursorOptions& opts, IndexCursor** out) const = 0;
+        Status newCursor(OperationContext* txn, const CursorOptions& opts, IndexCursor** out) const;
 
         // ------ index level operations ------
 
@@ -130,7 +131,7 @@ namespace mongo {
          * only called once for the lifetime of the index
          * if called multiple times, is an error
          */
-        virtual Status initializeAsEmpty(OperationContext* txn) = 0;
+        Status initializeAsEmpty(OperationContext* txn);
 
         /**
          * Try to page-in the pages that contain the keys generated from 'obj'.
@@ -138,12 +139,12 @@ namespace mongo {
          * appropriate pages are not swapped out.
          * See prefetch.cpp.
          */
-        virtual Status touch(OperationContext* txn, const BSONObj& obj) = 0;
+        Status touch(OperationContext* txn, const BSONObj& obj);
 
         /**
          * this pages in the entire index
          */
-        virtual Status touch(OperationContext* txn) const = 0;
+        Status touch(OperationContext* txn) const;
 
         /**
          * Walk the entire index, checking the internal structure for consistency.
@@ -157,8 +158,7 @@ namespace mongo {
          * Currently wasserts that the index is invalid.  This could/should be changed in
          * the future to return a Status.
          */
-        virtual Status validate(OperationContext* txn, bool full, int64_t* numKeys,
-                                BSONObjBuilder* output) = 0;
+        Status validate(OperationContext* txn, bool full, int64_t* numKeys, BSONObjBuilder* output);
 
         /**
          * Add custom statistics about this index to BSON object builder, for display.
@@ -167,14 +167,16 @@ namespace mongo {
          *
          * Returns true if stats were appended.
          */
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* result, double scale)
-            const = 0;
+        bool appendCustomStats(OperationContext* txn, BSONObjBuilder* result, double scale) const;
 
         /**
          * @return The number of bytes consumed by this index.
          *         Exactly what is counted is not defined based on padding, re-use, etc...
          */
-        virtual long long getSpaceUsedBytes( OperationContext* txn ) const = 0;
+        long long getSpaceUsedBytes( OperationContext* txn ) const;
+
+        // XXX: consider migrating callers to use IndexCursor instead
+        RecordId findSingle( OperationContext* txn, const BSONObj& key ) const;
 
         //
         // Bulk operations support
@@ -192,14 +194,14 @@ namespace mongo {
                           int64_t* numInserted);
 
         private:
-            friend class BtreeBasedAccessMethod;
+            friend class IndexAccessMethod;
 
             using Sorter = mongo::Sorter<BSONObj, RecordId>;
 
-            BulkBuilder(const BtreeBasedAccessMethod* index, const IndexDescriptor* descriptor);
+            BulkBuilder(const IndexAccessMethod* index, const IndexDescriptor* descriptor);
 
             std::unique_ptr<Sorter> _sorter;
-            const BtreeBasedAccessMethod* _real;
+            const IndexAccessMethod* _real;
             int64_t _keysInserted = 0;
             bool _isMultiKey = false;
         };
@@ -211,7 +213,7 @@ namespace mongo {
          *
          * It is only legal to initiate bulk when the index is new and empty.
          */
-        virtual std::unique_ptr<BulkBuilder> initiateBulk() = 0;
+        std::unique_ptr<BulkBuilder> initiateBulk();
 
         /**
          * Call this when you are ready to finish your bulk work.
@@ -222,41 +224,56 @@ namespace mongo {
          * @param dups - if NULL, error out on dups if not allowed
          *               if not NULL, put the bad RecordIds there
          */
-        virtual Status commitBulk( OperationContext* txn,
-                                   std::unique_ptr<BulkBuilder> bulk,
-                                   bool mayInterrupt,
-                                   bool dupsAllowed,
-                                   std::set<RecordId>* dups ) = 0;
+        Status commitBulk(OperationContext* txn,
+                          std::unique_ptr<BulkBuilder> bulk,
+                          bool mayInterrupt,
+                          bool dupsAllowed,
+                          std::set<RecordId>* dups);
 
         /**
          * Fills 'keys' with the keys that should be generated for 'obj' on this index.
          */
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) const = 0;
+
+    protected:
+        // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
+        bool ignoreKeyTooLong(OperationContext* txn);
+
+        IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
+        const IndexDescriptor* _descriptor;
+
+    private:
+        void removeOneKey(OperationContext* txn,
+                          const BSONObj& key,
+                          const RecordId& loc,
+                          bool dupsAllowed);
+
+        const std::unique_ptr<SortedDataInterface> _newInterface;
     };
+
+    // Temporary typedef to old name
+    using BtreeBasedAccessMethod = IndexAccessMethod;
 
     /**
      * Updates are two steps: verify that it's a valid update, and perform it.
      * validateUpdate fills out the UpdateStatus and update actually applies it.
      */
     class UpdateTicket {
-    public:
-        UpdateTicket() : _isValid(false) { }
-
-    protected:
-        // These friends are the classes that actually fill out an UpdateStatus.
-        friend class BtreeBasedAccessMethod;
-
-        class PrivateUpdateData;
+        // No public interface
+    private:
+        friend class IndexAccessMethod;
 
         bool _isValid;
 
-        // This is meant to be filled out only by the friends above.
-        boost::scoped_ptr<PrivateUpdateData> _indexSpecificUpdateData;
-    };
+        BSONObjSet oldKeys;
+        BSONObjSet newKeys;
 
-    class UpdateTicket::PrivateUpdateData {
-    public:
-        virtual ~PrivateUpdateData() { }
+        // These point into the sets oldKeys and newKeys.
+        std::vector<BSONObj*> removed;
+        std::vector<BSONObj*> added;
+
+        RecordId loc;
+        bool dupsAllowed;
     };
 
     /**

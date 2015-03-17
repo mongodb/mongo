@@ -28,16 +28,23 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/db/index/index_cursor.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 
     struct CursorOptions;
 
     /**
+     * TODO remove this class in favor of direct usage of SortedDataInterface::Cursor.
+     *
      * An IndexCursor is the interface through which one traverses the entries of a given
      * index. The internal structure of an index is kept isolated.
      *
@@ -53,7 +60,6 @@ namespace mongo {
      */
     class IndexCursor {
     public:
-        virtual ~IndexCursor() { }
 
         /**
          * A cursor doesn't point anywhere by default.  You must seek to the start position.
@@ -65,27 +71,50 @@ namespace mongo {
          * 2. Success: seeked to 'closest' key oriented according to the cursor's direction.
          * 3. Error: can't seek to the position.
          */
-        virtual Status seek(const BSONObj& position) = 0;
+        Status seek(const BSONObj& position);
+
+        Status seek(const std::vector<const BSONElement*>& position,
+                    const std::vector<bool>& inclusive);
+
+        /**
+         * Seek to the key 'position'.  If 'afterKey' is true, seeks to the first
+         * key that is oriented after 'position'.
+         *
+         * Btree-specific.
+         */
+        void seek(const BSONObj& position, bool afterKey);
+
+        Status skip(const BSONObj& keyBegin,
+                    int keyBeginLen,
+                    bool afterKey,
+                    const std::vector<const BSONElement*>& keyEnd,
+                    const std::vector<bool>& keyEndInclusive);
+
+        /**
+         * Returns true if 'this' points at the same exact key as 'other'.
+         * Returns false otherwise.
+         */
+        bool pointsAt(const IndexCursor& other);
 
         //
         // Iteration support
         //
 
         // Are we out of documents?
-        virtual bool isEOF() const = 0;
+        bool isEOF() const;
 
         // Move to the next key/value pair.  Assumes !isEOF().
-        virtual void next() = 0;
+        void next();
         
         //
         // Accessors
         //
 
         // Current key we point at.  Assumes !isEOF().
-        virtual BSONObj getKey() const = 0;
+        BSONObj getKey() const;
 
         // Current value we point at.  Assumes !isEOF().
-        virtual RecordId getValue() const = 0;
+        RecordId getValue() const;
 
         //
         // Yielding support
@@ -106,23 +135,43 @@ namespace mongo {
         /**
          * Save our current position in the index.
          */
-        virtual Status savePosition() = 0;
+        Status savePosition();
 
         /**
          * Restore the saved position.  Errors if there is no saved position.
          * The cursor may be EOF after a restore.
          */
-        virtual Status restorePosition(OperationContext* txn) = 0;
-
-        // Return a std::string describing the cursor.
-        virtual std::string toString() = 0;
+        Status restorePosition(OperationContext* txn);
 
         /**
-         *  Add debugging info to the provided builder.
-         * TODO(hk): We can do this better, perhaps with a more structured format.
+         * Return a std::string describing the cursor.
          */
-        virtual void explainDetails(BSONObjBuilder* b) { }
+        std::string toString();
+
+    private:
+        // We keep the constructor private and only allow the AM to create us.
+        friend class IndexAccessMethod;
+
+        /**
+         * interface is an abstraction to hide the fact that we have two types of Btrees.
+         *
+         * Intentionally private, we're friends with the only class allowed to call it.
+         */
+        IndexCursor(SortedDataInterface::Cursor* cursor);
+
+        bool isSavedPositionValid();
+
+        /**
+         * Move to the next (or previous depending on the direction) key.  Used by normal getNext
+         * and also skipping unused keys.
+         */
+        void advance();
+
+        const std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     };
+
+    // Temporary typedef to old name
+    using BtreeIndexCursor = IndexCursor;
 
     // All the options we might want to set on a cursor.
     struct CursorOptions {

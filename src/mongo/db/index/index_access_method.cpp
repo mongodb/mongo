@@ -36,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/server_parameters.h"
@@ -83,25 +82,25 @@ namespace mongo {
         const int _version;
     };
 
-    BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState,
-                                                   SortedDataInterface* btree)
+    IndexAccessMethod::IndexAccessMethod(IndexCatalogEntry* btreeState,
+                                         SortedDataInterface* btree)
         : _btreeState(btreeState),
           _descriptor(btreeState->descriptor()),
           _newInterface(btree) {
         verify(0 == _descriptor->version() || 1 == _descriptor->version());
     }
 
-    bool BtreeBasedAccessMethod::ignoreKeyTooLong(OperationContext *txn) {
+    bool IndexAccessMethod::ignoreKeyTooLong(OperationContext *txn) {
         // Ignore this error if we're on a secondary or if the user requested it
         return !txn->isPrimaryFor(_btreeState->ns()) || !failIndexKeyTooLong;
     }
 
     // Find the keys for obj, put them in the tree pointing to loc
-    Status BtreeBasedAccessMethod::insert(OperationContext* txn,
-                                          const BSONObj& obj,
-                                          const RecordId& loc,
-                                          const InsertDeleteOptions& options,
-                                          int64_t* numInserted) {
+    Status IndexAccessMethod::insert(OperationContext* txn,
+                                     const BSONObj& obj,
+                                     const RecordId& loc,
+                                     const InsertDeleteOptions& options,
+                                     int64_t* numInserted) {
         *numInserted = 0;
 
         BSONObjSet keys;
@@ -149,10 +148,10 @@ namespace mongo {
         return ret;
     }
 
-    void BtreeBasedAccessMethod::removeOneKey(OperationContext* txn,
-                                              const BSONObj& key,
-                                              const RecordId& loc,
-                                              bool dupsAllowed) {
+    void IndexAccessMethod::removeOneKey(OperationContext* txn,
+                                         const BSONObj& key,
+                                         const RecordId& loc,
+                                         bool dupsAllowed) {
         try {
             _newInterface->unindex(txn, key, loc, dupsAllowed);
         } catch (AssertionException& e) {
@@ -165,17 +164,18 @@ namespace mongo {
         }
     }
 
-    Status BtreeBasedAccessMethod::newCursor(OperationContext* txn, const CursorOptions& opts, IndexCursor** out) const {
+    Status IndexAccessMethod::newCursor(OperationContext* txn, const CursorOptions& opts,
+                                        IndexCursor** out) const {
         *out = new BtreeIndexCursor(_newInterface->newCursor(txn, opts.direction));
         return Status::OK();
     }
 
     // Remove the provided doc from the index.
-    Status BtreeBasedAccessMethod::remove(OperationContext* txn,
-                                          const BSONObj &obj,
-                                          const RecordId& loc,
-                                          const InsertDeleteOptions &options,
-                                          int64_t* numDeleted) {
+    Status IndexAccessMethod::remove(OperationContext* txn,
+                                     const BSONObj &obj,
+                                     const RecordId& loc,
+                                     const InsertDeleteOptions &options,
+                                     int64_t* numDeleted) {
 
         BSONObjSet keys;
         getKeys(obj, &keys);
@@ -209,11 +209,11 @@ namespace mongo {
         }
     }
 
-    Status BtreeBasedAccessMethod::initializeAsEmpty(OperationContext* txn) {
+    Status IndexAccessMethod::initializeAsEmpty(OperationContext* txn) {
         return _newInterface->initAsEmpty(txn);
     }
 
-    Status BtreeBasedAccessMethod::touch(OperationContext* txn, const BSONObj& obj) {
+    Status IndexAccessMethod::touch(OperationContext* txn, const BSONObj& obj) {
         BSONObjSet keys;
         getKeys(obj, &keys);
 
@@ -226,11 +226,11 @@ namespace mongo {
     }
 
 
-    Status BtreeBasedAccessMethod::touch( OperationContext* txn ) const {
+    Status IndexAccessMethod::touch( OperationContext* txn ) const {
         return _newInterface->touch(txn);
     }
 
-    RecordId BtreeBasedAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
+    RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
         cursor->locate(key, RecordId::min());
 
@@ -249,8 +249,8 @@ namespace mongo {
         return cursor->getRecordId();
     }
 
-    Status BtreeBasedAccessMethod::validate(OperationContext* txn, bool full, int64_t* numKeys,
-                                            BSONObjBuilder* output) {
+    Status IndexAccessMethod::validate(OperationContext* txn, bool full, int64_t* numKeys,
+                                       BSONObjBuilder* output) {
         // XXX: long long vs int64_t
         long long keys = 0;
         _newInterface->fullValidate(txn, full, &keys, output);
@@ -258,81 +258,75 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool BtreeBasedAccessMethod::appendCustomStats(OperationContext* txn,
-                                                   BSONObjBuilder* output,
-                                                   double scale) const {
+    bool IndexAccessMethod::appendCustomStats(OperationContext* txn,
+                                              BSONObjBuilder* output,
+                                              double scale) const {
         return _newInterface->appendCustomStats(txn, output, scale);
     }
 
-    long long BtreeBasedAccessMethod::getSpaceUsedBytes( OperationContext* txn ) const {
+    long long IndexAccessMethod::getSpaceUsedBytes( OperationContext* txn ) const {
         return _newInterface->getSpaceUsedBytes( txn );
     }
 
-    Status BtreeBasedAccessMethod::validateUpdate(OperationContext* txn,
-                                                  const BSONObj &from,
-                                                  const BSONObj &to,
-                                                  const RecordId &record,
-                                                  const InsertDeleteOptions &options,
-                                                  UpdateTicket* status) {
+    Status IndexAccessMethod::validateUpdate(OperationContext* txn,
+                                             const BSONObj &from,
+                                             const BSONObj &to,
+                                             const RecordId &record,
+                                             const InsertDeleteOptions &options,
+                                             UpdateTicket* ticket) {
 
-        BtreeBasedPrivateUpdateData *data = new BtreeBasedPrivateUpdateData();
-        status->_indexSpecificUpdateData.reset(data);
+        getKeys(from, &ticket->oldKeys);
+        getKeys(to, &ticket->newKeys);
+        ticket->loc = record;
+        ticket->dupsAllowed = options.dupsAllowed;
 
-        getKeys(from, &data->oldKeys);
-        getKeys(to, &data->newKeys);
-        data->loc = record;
-        data->dupsAllowed = options.dupsAllowed;
+        setDifference(ticket->oldKeys, ticket->newKeys, &ticket->removed);
+        setDifference(ticket->newKeys, ticket->oldKeys, &ticket->added);
 
-        setDifference(data->oldKeys, data->newKeys, &data->removed);
-        setDifference(data->newKeys, data->oldKeys, &data->added);
-
-        status->_isValid = true;
+        ticket->_isValid = true;
 
         return Status::OK();
     }
 
-    Status BtreeBasedAccessMethod::update(OperationContext* txn,
-                                          const UpdateTicket& ticket,
-                                          int64_t* numUpdated) {
+    Status IndexAccessMethod::update(OperationContext* txn,
+                                     const UpdateTicket& ticket,
+                                     int64_t* numUpdated) {
         if (!ticket._isValid) {
             return Status(ErrorCodes::InternalError, "Invalid UpdateTicket in update");
         }
 
-        BtreeBasedPrivateUpdateData* data =
-            static_cast<BtreeBasedPrivateUpdateData*>(ticket._indexSpecificUpdateData.get());
-
-        if (data->oldKeys.size() + data->added.size() - data->removed.size() > 1) {
+        if (ticket.oldKeys.size() + ticket.added.size() - ticket.removed.size() > 1) {
             _btreeState->setMultikey( txn );
         }
 
-        for (size_t i = 0; i < data->removed.size(); ++i) {
+        for (size_t i = 0; i < ticket.removed.size(); ++i) {
             _newInterface->unindex(txn,
-                                   *data->removed[i],
-                                   data->loc,
-                                   data->dupsAllowed);
+                                   *ticket.removed[i],
+                                   ticket.loc,
+                                   ticket.dupsAllowed);
         }
 
-        for (size_t i = 0; i < data->added.size(); ++i) {
+        for (size_t i = 0; i < ticket.added.size(); ++i) {
             Status status = _newInterface->insert(txn,
-                                                  *data->added[i],
-                                                  data->loc,
-                                                  data->dupsAllowed);
+                                                  *ticket.added[i],
+                                                  ticket.loc,
+                                                  ticket.dupsAllowed);
             if ( !status.isOK() ) {
                 return status;
             }
         }
 
-        *numUpdated = data->added.size();
+        *numUpdated = ticket.added.size();
 
         return Status::OK();
     }
 
-    std::unique_ptr<IndexAccessMethod::BulkBuilder> BtreeBasedAccessMethod::initiateBulk() {
+    std::unique_ptr<IndexAccessMethod::BulkBuilder> IndexAccessMethod::initiateBulk() {
 
         return std::unique_ptr<BulkBuilder>(new BulkBuilder(this, _descriptor));
     }
 
-    IndexAccessMethod::BulkBuilder::BulkBuilder(const BtreeBasedAccessMethod* index,
+    IndexAccessMethod::BulkBuilder::BulkBuilder(const IndexAccessMethod* index,
                                                 const IndexDescriptor* descriptor)
             : _sorter(Sorter::make(SortOptions().TempDir(storageGlobalParams.dbpath + "/_tmp")
                                                 .ExtSortAllowed()
@@ -364,11 +358,12 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeBasedAccessMethod::commitBulk(OperationContext* txn,
-                                              std::unique_ptr<BulkBuilder> bulk,
-                                              bool mayInterrupt,
-                                              bool dupsAllowed,
-                                              set<RecordId>* dupsToDrop) {
+
+    Status IndexAccessMethod::commitBulk(OperationContext* txn,
+                                         std::unique_ptr<BulkBuilder> bulk,
+                                         bool mayInterrupt,
+                                         bool dupsAllowed,
+                                         set<RecordId>* dupsToDrop) {
 
         Timer timer;
 

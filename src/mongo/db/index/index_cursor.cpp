@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/index/btree_index_cursor.h"
+#include "mongo/db/index/index_cursor.h"
 
 #include <vector>
 
@@ -42,27 +42,27 @@ namespace mongo {
     using std::string;
     using std::vector;
 
-    BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor) : _cursor(cursor) { }
+    IndexCursor::IndexCursor(SortedDataInterface::Cursor* cursor) : _cursor(cursor) { }
 
-    bool BtreeIndexCursor::isEOF() const { return _cursor->isEOF(); }
+    bool IndexCursor::isEOF() const { return _cursor->isEOF(); }
 
-    Status BtreeIndexCursor::seek(const BSONObj& position) {
+    Status IndexCursor::seek(const BSONObj& position) {
         _cursor->locate(position, 
                         1 == _cursor->getDirection() ? RecordId::min() : RecordId::max());
         return Status::OK();
     }
 
-    void BtreeIndexCursor::seek(const BSONObj& position, bool afterKey) {
+    void IndexCursor::seek(const BSONObj& position, bool afterKey) {
         const bool forward = (1 == _cursor->getDirection());
         _cursor->locate(position, (afterKey == forward) ? RecordId::max() : RecordId::min());
     }
 
-    bool BtreeIndexCursor::pointsAt(const BtreeIndexCursor& other) {
+    bool IndexCursor::pointsAt(const IndexCursor& other) {
         return _cursor->pointsToSamePlaceAs(*other._cursor);
     }
 
-    Status BtreeIndexCursor::seek(const vector<const BSONElement*>& position,
-                                  const vector<bool>& inclusive) {
+    Status IndexCursor::seek(const vector<const BSONElement*>& position,
+                             const vector<bool>& inclusive) {
 
         BSONObj emptyObj;
 
@@ -74,11 +74,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeIndexCursor::skip(const BSONObj &keyBegin,
-                                  int keyBeginLen,
-                                  bool afterKey,
-                                  const vector<const BSONElement*>& keyEnd,
-                                  const vector<bool>& keyEndInclusive) {
+    Status IndexCursor::skip(const BSONObj &keyBegin,
+                             int keyBeginLen,
+                             bool afterKey,
+                             const vector<const BSONElement*>& keyEnd,
+                             const vector<bool>& keyEndInclusive) {
 
         _cursor->advanceTo(keyBegin,
                            keyBeginLen,
@@ -88,35 +88,35 @@ namespace mongo {
         return Status::OK();
     }
 
-    BSONObj BtreeIndexCursor::getKey() const {
+    BSONObj IndexCursor::getKey() const {
         return _cursor->getKey();
     }
 
-    RecordId BtreeIndexCursor::getValue() const {
+    RecordId IndexCursor::getValue() const {
         return _cursor->getRecordId();
     }
 
-    void BtreeIndexCursor::next() {
+    void IndexCursor::next() {
         advance();
     }
 
-    Status BtreeIndexCursor::savePosition() {
+    Status IndexCursor::savePosition() {
         _cursor->savePosition();
         return Status::OK();
     }
 
-    Status BtreeIndexCursor::restorePosition(OperationContext* txn) {
+    Status IndexCursor::restorePosition(OperationContext* txn) {
         _cursor->restorePosition(txn);
         return Status::OK();
     }
 
-    string BtreeIndexCursor::toString() {
+    string IndexCursor::toString() {
         // TODO: is this ever called?
         return "I AM A BTREE INDEX CURSOR!\n";
     }
 
     // Move to the next/prev. key.  Used by normal getNext and also skipping unused keys.
-    void BtreeIndexCursor::advance() {
+    void IndexCursor::advance() {
         _cursor->advance();
     }
 
