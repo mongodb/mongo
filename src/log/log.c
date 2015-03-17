@@ -1397,6 +1397,7 @@ advance:
 		 */
 		if (reclen == 0) {
 			/* This LSN is the end. */
+			eol = 1;
 			break;
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);
