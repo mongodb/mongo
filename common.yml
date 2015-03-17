@@ -288,8 +288,13 @@ functions:
             export ${library_path}
         fi
         export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        export basedir=`pwd`
         cd ${package}
-        go test ${coverage_args} ${args} ${build_tags}
+        go test ${coverage_args} ${args} ${build_tags} -test.v > unit.suite 
+        export exitcode=$?
+        cat unit.suite
+        cp unit.suite $basedir/.
+        exit $exitcode
 
   "setup integration test":
     command: shell.exec
@@ -333,9 +338,16 @@ functions:
             if [ "${run_coverage}" ]; then
                 COVERAGE_ARGS="-coverprofile=coverage_$i.out"
             fi;
-            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags}
+            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags} -test.v > $i.suite
+            if [ $? -ne 0 ]; then
+                echo "suite failed, will exit with error on finish"
+                export exitcode=1
+            fi
+            cat $i.suite
+            cp $i.suite ../.
             cd ..
         done
+        exit $exitcode
 
   "run tool integration tests":
     command: shell.exec
@@ -369,9 +381,16 @@ functions:
             if [ "${run_coverage}" ]; then
                 COVERAGE_ARGS="-coverprofile=coverage_$i.out"
             fi;
-            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags}
+            ${library_path} go test $COVERAGE_ARGS -test.v ${args} ${build_tags} > $i.suite
+            if [ $? -ne 0 ]; then
+                echo "suite failed, will exit with error on finish"
+                export exitcode=1
+            fi
+            cat $i.suite
+            cp $i.suite ../.
             cd ..
         done
+        exit $exitcode
 
   "create coverage reports":
     command: shell.exec
@@ -485,6 +504,9 @@ post:
       script: |
         ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py} >/dev/null 2>&1
         exit 0
+  - command: gotest.parse_files
+    params: 
+      files: ["src/*.suite"]
 
 tasks:
 - name: bsonutil
