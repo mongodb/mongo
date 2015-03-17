@@ -185,7 +185,7 @@ __split_should_deepen(
 	 * maximum size for a page in memory (presumably putting eviction
 	 * pressure on the cache).
 	 */
-	if (page->memory_footprint < S2BT(session)->maxmempage)
+	if (page->memory_footprint < btree->maxmempage)
 		return (0);
 
 	/*
@@ -199,16 +199,19 @@ __split_should_deepen(
 	}
 
 	/*
-	 * The root is a special-case: if it's putting cache pressure on the
-	 * system, split it even if there are only a few entries, we can't
-	 * push it out of memory.  Sanity check: if the root page is too big
-	 * with less than 100 keys, there are huge keys and/or a too-small
-	 * cache, there's not much to do.
+	 * Don't allow a single page to put pressure on cache usage. The root
+	 * page cannot be evicted, so if it's larger than the maximum, or if
+	 * and page has a quarter of the cache, let it split, a deep tree is
+	 * better than making no progress at all. Sanity check for 100 on-page
+	 * keys, nothing helps in the case of large keys and a too-small cache.
 	 */
-	if (__wt_ref_is_root(ref) && pindex->entries > 100) {
+	if (pindex->entries >= 100 &&
+	    (__wt_ref_is_root(ref) ||
+	    page->memory_footprint >= S2C(session)->cache_size / 4)) {
 		*childrenp = pindex->entries / 10;
 		return (1);
 	}
+
 	return (0);
 }
 
