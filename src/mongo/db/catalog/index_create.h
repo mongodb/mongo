@@ -30,8 +30,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -200,22 +199,35 @@ namespace mongo {
         class CleanupIndexesVectorOnRollback;
 
         struct IndexToBuild {
-            IndexToBuild() : real(NULL) {}
+#if defined(_MSC_VER) && _MSC_VER < 1900 // MVSC++ <= 2013 can't generate default move operations
+            IndexToBuild() = default;
+            IndexToBuild(IndexToBuild&& other)
+                : block(std::move(other.block))
+                , real(std::move(other.real))
+                , bulk(std::move(other.bulk))
+                , options(std::move(other.options))
+            {}
 
-            IndexAccessMethod* forInsert() { return bulk ? bulk.get() : real; }
+            IndexToBuild& operator= (IndexToBuild&& other) {
+                block = std::move(other.block);
+                real = std::move(other.real);
+                bulk = std::move(other.bulk);
+                options = std::move(other.options);
+                return *this;
+            }
+#endif
 
-            boost::shared_ptr<IndexCatalog::IndexBuildBlock> block;
+            std::unique_ptr<IndexCatalog::IndexBuildBlock> block;
 
-            IndexAccessMethod* real; // owned elsewhere
-            boost::shared_ptr<IndexAccessMethod> bulk;
+            IndexAccessMethod* real = NULL; // owned elsewhere
+            std::unique_ptr<IndexAccessMethod::BulkBuilder> bulk;
 
             InsertDeleteOptions options;
         };
 
         std::vector<IndexToBuild> _indexes;
 
-        boost::scoped_ptr<BackgroundOperation> _backgroundOperation;
-
+        std::unique_ptr<BackgroundOperation> _backgroundOperation;
 
         // Pointers not owned here and must outlive 'this'
         Collection* _collection;

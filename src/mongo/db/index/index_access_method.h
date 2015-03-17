@@ -29,18 +29,21 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
 
     class BSONObjBuilder;
     class UpdateTicket;
     struct InsertDeleteOptions;
+    class BtreeBasedAccessMethod;
 
     /**
      * An IndexAccessMethod is the interface through which all the mutation, lookup, and
@@ -177,35 +180,50 @@ namespace mongo {
         // Bulk operations support
         //
 
+        class BulkBuilder {
+        public:
+            /**
+             * Insert into the BulkBuilder as-if inserting into an IndexAccessMethod.
+             */
+            Status insert(OperationContext* txn,
+                          const BSONObj& obj,
+                          const RecordId& loc,
+                          const InsertDeleteOptions& options,
+                          int64_t* numInserted);
+
+        private:
+            friend class BtreeBasedAccessMethod;
+
+            using Sorter = mongo::Sorter<BSONObj, RecordId>;
+
+            BulkBuilder(const BtreeBasedAccessMethod* index, const IndexDescriptor* descriptor);
+
+            std::unique_ptr<Sorter> _sorter;
+            const BtreeBasedAccessMethod* _real;
+            int64_t _keysInserted = 0;
+            bool _isMultiKey = false;
+        };
+
         /**
          * Starts a bulk operation.
-         * You work on the returned IndexAccessMethod and then call commitBulk.
+         * You work on the returned BulkBuilder and then call commitBulk.
          * This can return NULL, meaning bulk mode is not available.
          *
-         * Long term, you'll eventually be able to mix/match bulk, not bulk,
-         * have as many as you want, etc..
-         *
-         * Caller owns the returned IndexAccessMethod.
-         *
-         * The provided OperationContext must outlive the IndexAccessMethod returned.
-         *
-         * For now (1/8/14) you can only do bulk when the index is empty
-         * it will fail if you try other times.
+         * It is only legal to initiate bulk when the index is new and empty.
          */
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) = 0;
+        virtual std::unique_ptr<BulkBuilder> initiateBulk() = 0;
 
         /**
          * Call this when you are ready to finish your bulk work.
-         * Pass in the IndexAccessMethod gotten from initiateBulk.
-         * After this method is called, the bulk index access method is invalid
-         * and should not be used.
+         * Pass in the BulkBuilder returned from initiateBulk.
          * @param bulk - something created from initiateBulk
          * @param mayInterrupt - is this commit interruptable (will cancel)
          * @param dupsAllowed - if false, error or fill 'dups' if any duplicate values are found
          * @param dups - if NULL, error out on dups if not allowed
          *               if not NULL, put the bad RecordIds there
          */
-        virtual Status commitBulk( IndexAccessMethod* bulk,
+        virtual Status commitBulk( OperationContext* txn,
+                                   std::unique_ptr<BulkBuilder> bulk,
                                    bool mayInterrupt,
                                    bool dupsAllowed,
                                    std::set<RecordId>* dups ) = 0;

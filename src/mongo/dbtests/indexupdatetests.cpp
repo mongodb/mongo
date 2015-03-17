@@ -37,7 +37,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/index/btree_based_bulk_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/platform/cstdint.h"

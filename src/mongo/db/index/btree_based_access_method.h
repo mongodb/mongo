@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -38,10 +38,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
-
-    class ExternalSortComparison;
 
     /**
      * Any access method that is Btree based subclasses from this.
@@ -91,12 +90,13 @@ namespace mongo {
 
         virtual Status initializeAsEmpty(OperationContext* txn);
 
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn);
+        virtual std::unique_ptr<BulkBuilder> initiateBulk();
 
-        virtual Status commitBulk( IndexAccessMethod* bulk,
-                                   bool mayInterrupt,
-                                   bool dupsAllowed,
-                                   std::set<RecordId>* dups );
+        virtual Status commitBulk(OperationContext* txn,
+                                  std::unique_ptr<BulkBuilder> bulk,
+                                  bool mayInterrupt,
+                                  bool dupsAllowed,
+                                  std::set<RecordId>* dups);
 
         virtual Status touch(OperationContext* txn, const BSONObj& obj);
 
@@ -113,8 +113,6 @@ namespace mongo {
         virtual RecordId findSingle( OperationContext* txn, const BSONObj& key ) const;
 
     protected:
-        friend class BtreeBasedBulkAccessMethod;
-
         // See below for body.
         class BtreeBasedPrivateUpdateData;
 
@@ -130,7 +128,7 @@ namespace mongo {
                           const RecordId& loc,
                           bool dupsAllowed);
 
-        boost::scoped_ptr<SortedDataInterface> _newInterface;
+        const std::unique_ptr<SortedDataInterface> _newInterface;
     };
 
     /**
