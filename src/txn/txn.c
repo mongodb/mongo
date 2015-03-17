@@ -142,20 +142,20 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+		/* Skip the checkpoint transaction; it is never read from. */
 		if (txn_global->checkpoint_id != WT_TXN_NONE &&
 		    s->id == txn_global->checkpoint_id)
 			continue;
+
 		/*
 		 * Build our snapshot of any concurrent transaction IDs.
 		 *
 		 * Ignore:
 		 *  - Our own ID: we always read our own updates.
-		 *  - The ID that belongs to a checkpoint: that ID is never
-		 *    read from.
 		 *  - The ID if it is older than the oldest ID we saw. This
-		 *     can happen if we race with a thread that is allocating
-		 *     an ID -- the ID will not be used because the thread will
-		 *     keep spinning until it gets a valid one.
+		 *    can happen if we race with a thread that is allocating
+		 *    an ID -- the ID will not be used because the thread will
+		 *    keep spinning until it gets a valid one.
 		 */
 		if (s != txn_state &&
 		    (id = s->id) != WT_TXN_NONE &&
@@ -221,7 +221,10 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
-			/* Skip the checkpoint transaction */
+			/*
+			 * Skip the checkpoint transaction; it is never read
+			 * from.
+			 */
 			if (txn_global->checkpoint_id != WT_TXN_NONE &&
 			    s->id == txn_global->checkpoint_id)
 				continue;
@@ -514,11 +517,11 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 	stats = &conn->stats;
+	ckpt_id = txn_global->checkpoint_snap_min;
 
 	WT_STAT_SET(stats, txn_pinned_range,
 	    txn_global->current - txn_global->oldest_id);
 
-	ckpt_id = txn_global->checkpoint_snap_min;
 	WT_STAT_SET(stats, txn_pinned_checkpoint_range,
 	    ckpt_id == WT_TXN_NONE ? 0 : txn_global->current - ckpt_id);
 }
