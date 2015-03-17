@@ -241,6 +241,7 @@ extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_statlog_log_one(WT_SESSION_IMPL *session);
 extern int __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close);
+extern int __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_sweep_create(WT_SESSION_IMPL *session);
 extern int __wt_sweep_destroy(WT_SESSION_IMPL *session);
 extern int __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR **cursorp);

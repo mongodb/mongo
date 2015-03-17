@@ -33,7 +33,7 @@ __sweep(WT_SESSION_IMPL *session)
 		if (WT_IS_METADATA(dhandle))
 			continue;
 		if (dhandle->session_inuse != 0 ||
-		    now <= dhandle->timeofdeath + WT_DHANDLE_SWEEP_WAIT)
+		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
 			continue;
 		if (dhandle->timeofdeath == 0) {
 			dhandle->timeofdeath = now;
@@ -119,8 +119,8 @@ __sweep_server(void *arg)
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
 		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait(session,
-		    conn->sweep_cond, WT_DHANDLE_SWEEP_PERIOD * WT_MILLION));
+		WT_ERR(__wt_cond_wait(session, conn->sweep_cond,
+		    (uint64_t)conn->sweep_interval * WT_MILLION));
 
 		/* Sweep the handles. */
 		WT_ERR(__sweep(session));
@@ -130,6 +130,30 @@ __sweep_server(void *arg)
 err:		WT_PANIC_MSG(session, ret, "handle sweep server error");
 	}
 	return (NULL);
+}
+
+/*
+ * __wt_sweep_config --
+ *	Pull out sweep configuration settings
+ */
+int
+__wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
+	/* Pull out the sweep configurations. */
+	WT_RET(__wt_config_gets(session,
+	    cfg, "file_manager.close_idle_time", &cval));
+	conn->sweep_idle_time = (time_t)cval.val;
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "file_manager.close_scan_interval", &cval));
+	conn->sweep_interval = (time_t)cval.val;
+
+	return (0);
 }
 
 /*

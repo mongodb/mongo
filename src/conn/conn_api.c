@@ -766,6 +766,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
 	WT_ERR(__wt_lsm_manager_reconfig(session, config_cfg));
 	WT_ERR(__wt_statlog_create(session, config_cfg));
+	WT_ERR(__wt_sweep_config(session, cfg));
 	WT_ERR(__wt_verbose_config(session, config_cfg));
 
 	WT_ERR(__wt_config_merge(session, config_cfg, &p));
@@ -1625,6 +1626,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));
+	WT_ERR(__wt_sweep_config(session, cfg));
 	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Now that we know if verbose is configured, output the version. */
