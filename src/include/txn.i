@@ -91,14 +91,40 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 /*
  * __wt_txn_visible_all --
  *	Check if a given transaction ID is "globally visible".	This is, if
- *	all sessions in the system will see the transaction ID.
+ *	all sessions in the system will see the transaction ID including the
+ *	ID that belongs to a running checkpoint.
  */
 static inline int
 __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
-	uint64_t oldest_id;
+	WT_BTREE *btree;
+	WT_TXN_GLOBAL *txn_global;
+	uint64_t checkpoint_snap_min, oldest_id;
 
-	oldest_id = S2C(session)->txn_global.oldest_id;
+	txn_global = &S2C(session)->txn_global;
+	btree = S2BT_SAFE(session);
+
+	/*
+	 * Take a local copy of ID in case they are updated while we are
+	 * checking visibility.
+	 */
+	checkpoint_snap_min = txn_global->checkpoint_snap_min;
+	oldest_id = txn_global->oldest_id;
+
+	/*
+	 * If there is no active checkpoint or this handle is up to date with
+	 * the active checkpoint it's safe to ignore the checkpoint ID in the
+	 * visibility check.
+	 */
+	if (checkpoint_snap_min != WT_TXN_NONE && (btree == NULL ||
+	    btree->checkpoint_gen != txn_global->checkpoint_gen) &&
+	    TXNID_LT(checkpoint_snap_min, oldest_id))
+		/*
+		 * Use the checkpoint ID for the visibility check if it is the
+		 * oldest ID in the system.
+		 */
+		oldest_id = checkpoint_snap_min;
+
 	return (TXNID_LT(id, oldest_id));
 }
 
