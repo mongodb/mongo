@@ -371,8 +371,8 @@ namespace mongo {
         if ( result["reloadConfig"].trueValue() ) {
             if( result["version"].timestampTime() == 0 ){
 
-                warning() << "reloading full configuration for " << conf->getName()
-                          << ", connection state indicates significant version changes" << endl;
+                warning() << "reloading full configuration for " << conf->name()
+                          << ", connection state indicates significant version changes";
 
                 // reload db
                 conf->reload();

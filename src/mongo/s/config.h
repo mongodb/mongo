@@ -60,7 +60,7 @@ namespace mongo {
         DBConfig(std::string name);
         virtual ~DBConfig();
 
-        std::string getName() const { return _name; };
+        const std::string& name() const { return _name; };
 
         /**
          * @return if anything in this db is partitioned or not

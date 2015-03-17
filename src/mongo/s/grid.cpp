@@ -194,21 +194,17 @@ namespace mongo {
 
     }
 
-    void Grid::removeDBIfExists( const DBConfig& database ) {
+    void Grid::removeDBIfExists(const DBConfig& database) {
+        boost::lock_guard<boost::mutex> l(_lock);
 
-        boost::lock_guard<boost::mutex> l( _lock );
-
-        map<string,DBConfigPtr>::iterator it = _databases.find( database.getName() );
-        if( it != _databases.end() && it->second.get() == &database ){
-
-            _databases.erase( it );
-            log() << "erased database " << database.getName() << " from local registry" << endl;
+        map<string, DBConfigPtr>::iterator it = _databases.find(database.name());
+        if (it != _databases.end() && it->second.get() == &database) {
+            _databases.erase(it);
+            log() << "erased database " << database.name() << " from local registry";
         }
-        else{
-
-            log() << database.getName() << "already erased from local registry" << endl;
+        else {
+            log() << database.name() << "already erased from local registry";
         }
-
     }
 
     bool Grid::allowLocalHost() const {

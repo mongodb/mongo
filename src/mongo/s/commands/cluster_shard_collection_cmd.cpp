@@ -175,7 +175,7 @@ namespace {
             BSONObj res;
             {
                 list<BSONObj> all = conn->getCollectionInfos(
-                                                    config->getName(),
+                                                    config->name(),
                                                     BSON("name" << nsToCollectionSubstring(ns)));
                 if (!all.empty()) {
                     res = all.front().getOwned();

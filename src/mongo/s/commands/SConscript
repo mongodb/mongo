@@ -6,6 +6,8 @@ env.Library(
     target='cluster_commands',
     source=[
         'cluster_add_shard_cmd.cpp',
+        'cluster_commands_common.cpp',
+        'cluster_count_cmd.cpp',
         'cluster_enable_sharding_cmd.cpp',
         'cluster_explain_cmd.cpp',
         'cluster_find_cmd.cpp',
