@@ -564,7 +564,6 @@ namespace mongo {
         // getConnectioString and dist lock constructor does not throw, which is what we expect on while
         // on the balancer thread
         ConnectionString config = configServer.getConnectionString();
-        DistributedLock balanceLock( config , "balancer" );
 
         while ( ! inShutdown() ) {
 
@@ -616,9 +615,12 @@ namespace mongo {
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
                 {
-                    dist_lock_try lk( &balanceLock , "doing balance round" );
-                    if ( ! lk.got() ) {
-                        LOG(1) << "skipping balancing round because another balancer is active" << endl;
+                    ScopedDistributedLock balancerLock(config, "balancer");
+                    balancerLock.setLockMessage("doing balance round");
+
+                    Status lockStatus = balancerLock.tryAcquire();
+                    if (!lockStatus.isOK()) {
+                        LOG(1) << "skipping balancing round" << causedBy(lockStatus);
 
                         // Ping again so scripts can determine if we're active without waiting
                         _ping( true );

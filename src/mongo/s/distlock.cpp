@@ -1213,7 +1213,7 @@ namespace mongo {
 
             if (waitForMillis == 0) break;
 
-            if (lastStatus.code() == ErrorCodes::DistributedClockSkewed) {
+            if (lastStatus != ErrorCodes::LockBusy) {
                 return lastStatus;
             }
 

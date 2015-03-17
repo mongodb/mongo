@@ -235,83 +235,6 @@ namespace mongo {
     bool MONGO_CLIENT_API isLockPingerEnabled();
     void MONGO_CLIENT_API setLockPingerEnabled(bool enabled);
 
-
-    class MONGO_CLIENT_API dist_lock_try {
-    public:
-
-        dist_lock_try() : _lock(NULL), _got(false) {}
-
-        dist_lock_try( const dist_lock_try& that ) :
-                _lock(that._lock), _got(that._got), _other(that._other) {
-
-            _other.getOwned();
-
-            // Make sure the lock ownership passes to this object,
-            // so we only unlock once.
-            ((dist_lock_try&) that)._got = false;
-            ((dist_lock_try&) that)._lock = NULL;
-            ((dist_lock_try&) that)._other = BSONObj();
-        }
-
-        // Needed so we can handle lock exceptions in context of lock try.
-        dist_lock_try& operator=( const dist_lock_try& that ){
-
-            if( this == &that ) return *this;
-
-            _lock = that._lock;
-            _got = that._got;
-            _other = that._other;
-            _other.getOwned();
-            _why = that._why;
-
-            // Make sure the lock ownership passes to this object,
-            // so we only unlock once.
-            ((dist_lock_try&) that)._got = false;
-            ((dist_lock_try&) that)._lock = NULL;
-            ((dist_lock_try&) that)._other = BSONObj();
-
-            return *this;
-        }
-
-        dist_lock_try( DistributedLock * lock , const std::string& why, double timeout = 0.0 )
-            : _lock(lock), _why(why) {
-            _got = _lock->lock_try( why , false , &_other, timeout );
-        }
-
-        ~dist_lock_try() {
-            if ( _got ) {
-                verify( ! _other.isEmpty() );
-                _lock->unlock( &_other );
-            }
-        }
-
-        /**
-         * Returns not OK  if the lock is known _not_ to be held.
-         */
-        Status checkStatus(double timeout) {
-            if ( !_lock ) {
-                return Status(ErrorCodes::LockFailed, "Lock is not currently set up");
-            }
-
-            if ( !_got ) {
-                return Status(ErrorCodes::LockFailed,
-                        str::stream() << "Lock " << _lock->_name << " is currently held by "
-                                      << _other);
-            }
-
-            return _lock->checkStatus(timeout);
-        }
-
-        bool got() const { return _got; }
-        BSONObj other() const { return _other; }
-
-    private:
-        DistributedLock * _lock;
-        bool _got;
-        BSONObj _other;
-        std::string _why;
-    };
-
     /**
      * Scoped wrapper for a distributed lock acquisition attempt.  One or more attempts to acquire
      * the distributed lock are managed by this class, and the distributed lock is unlocked if
@@ -343,8 +266,9 @@ namespace mongo {
         void unlock();
 
         /**
-         * Tries multiple times to unlock the lock, using the specified lock try interval, until
-         * a certain amount of time has passed.
+         * Tries multiple times to lock, using the specified lock try interval, until
+         * a certain amount of time has passed or when any error that is not LockBusy
+         * occurred.
          *
          * waitForMillis = 0 indicates there should only be one attempt to acquire the lock, and
          * no waiting.

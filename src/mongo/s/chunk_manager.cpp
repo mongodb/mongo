@@ -673,19 +673,14 @@ namespace {
 
         configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
 
-        DistributedLock nsLock( ConnectionString( configServer.modelServer(),
-                                ConnectionString::SYNC ),
-                                _ns );
+        ScopedDistributedLock nsLock(configServer.getConnectionString(), _ns);
+        nsLock.setLockMessage("drop");
 
-        dist_lock_try dlk;
-        try{
-        	dlk = dist_lock_try( &nsLock  , "drop" );
+        Status lockStatus = nsLock.tryAcquire();
+        if (!lockStatus.isOK()) {
+            uasserted(14022, str::stream() << "Error locking distributed lock for chunk drop"
+                                           << causedBy(lockStatus));
         }
-        catch( LockException& e ){
-        	uassert( 14022, str::stream() << "Error locking distributed lock for chunk drop." << causedBy( e ), false);
-        }
-
-        uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
 
         uassert(10174, "config servers not all up", configServer.allUp(false));
 

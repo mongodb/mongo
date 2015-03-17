@@ -147,23 +147,13 @@ namespace {
             log() << "Moving " << dbname << " primary from: "
                   << config->getPrimary().toString() << " to: " << s.toString();
 
-            // Locking enabled now...
-            DistributedLock lockSetup(configServer.getConnectionString(), dbname + "-movePrimary");
+            ScopedDistributedLock distLock(configServer.getConnectionString(),
+                                           dbname + "-movePrimary");
+            distLock.setLockMessage(str::stream() << "Moving primary shard of " << dbname);
 
-            // Distributed locking added
-            dist_lock_try dlk;
-            try {
-                dlk = dist_lock_try(&lockSetup, string("Moving primary shard of ") + dbname);
-            }
-            catch (LockException& e) {
-                errmsg = str::stream() << "error locking distributed lock to move primary shard of " << dbname << causedBy(e);
-                warning() << errmsg;
-                return false;
-            }
-
-            if (!dlk.got()) {
-                errmsg = (string)"metadata lock is already taken for moving " + dbname;
-                return false;
+            Status lockStatus = distLock.tryAcquire();
+            if (!lockStatus.isOK()) {
+                return appendCommandStatus(result, lockStatus);
             }
 
             set<string> shardedColls;

@@ -1801,31 +1801,7 @@ namespace mongo {
                 bool ok = true;
 
                 {
-                    // take distributed lock to prevent split / migration
-                    /*
-                    ConnectionString config = configServer.getConnectionString();
-                    DistributedLock lockSetup( config , fullns );
-                    dist_lock_try dlk;
-
-
-                    if (shardedInput) {
-                        try{
-                            int tryc = 0;
-                            while ( !dlk.got() ) {
-                                dlk = dist_lock_try( &lockSetup , (string)"mr-parallel" );
-                                if ( ! dlk.got() ) {
-                                    if ( ++tryc % 100 == 0 )
-                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
-                                    sleepmillis(100);
-                                }
-                            }
-                        }
-                        catch( LockException& e ){
-                            errmsg = str::stream() << "error locking distributed lock for mapreduce " << causedBy( e );
-                            return false;
-                        }
-                    }
-                    */
+                    // TODO: take distributed lock to prevent split / migration?
 
                     try {
                         STRATEGY->commandOp( dbName, shardedCommand, 0, fullns, q, &results );
@@ -1955,25 +1931,15 @@ namespace mongo {
 
                     map<BSONObj, int> chunkSizes;
                     {
-                        // take distributed lock to prevent split / migration
-                        ConnectionString config = configServer.getConnectionString();
-                        DistributedLock lockSetup( config , finalColLong );
-                        dist_lock_try dlk;
+                        // take distributed lock to prevent split / migration.
+                        ScopedDistributedLock nsLock(configServer.getConnectionString(),
+                                                     finalColLong);
+                        nsLock.setLockMessage("mr-post-process");
+                        nsLock.setLockTryIntervalMillis(100);
 
-                        try{
-                            int tryc = 0;
-                            while ( !dlk.got() ) {
-                                dlk = dist_lock_try( &lockSetup , (string)"mr-post-process" );
-                                if ( ! dlk.got() ) {
-                                    if ( ++tryc % 100 == 0 )
-                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
-                                    sleepmillis(100);
-                                }
-                            }
-                        }
-                        catch( LockException& e ){
-                            errmsg = str::stream() << "error locking distributed lock for mapreduce " << causedBy( e );
-                            return false;
+                        Status lockStatus = nsLock.acquire(-1 /* retry indefinitely */);
+                        if (!lockStatus.isOK()) {
+                            return appendCommandStatus(result, lockStatus);
                         }
 
                         BSONObj finalCmdObj = finalCmd.obj();
