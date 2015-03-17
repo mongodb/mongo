@@ -166,7 +166,7 @@ namespace mongo {
 
     Status IndexAccessMethod::newCursor(OperationContext* txn, const CursorOptions& opts,
                                         IndexCursor** out) const {
-        *out = new BtreeIndexCursor(_newInterface->newCursor(txn, opts.direction));
+        *out = new IndexCursor(_newInterface->newCursor(txn, opts.direction));
         return Status::OK();
     }
 

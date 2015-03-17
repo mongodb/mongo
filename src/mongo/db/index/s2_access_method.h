@@ -39,12 +39,9 @@ namespace mongo {
     class IndexCursor;
     struct S2IndexingParams;
 
-    class S2AccessMethod : public BtreeBasedAccessMethod {
+    class S2AccessMethod : public IndexAccessMethod {
     public:
-        using BtreeBasedAccessMethod::_descriptor;
-
         S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
-        virtual ~S2AccessMethod() { }
 
         /**
          * Takes an index spec object for this index and returns a copy tweaked to conform to the

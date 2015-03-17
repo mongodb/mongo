@@ -48,7 +48,7 @@ namespace mongo {
     using boost::scoped_ptr;
 
     HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
-        : BtreeBasedAccessMethod(btreeState, btree) {
+        : IndexAccessMethod(btreeState, btree) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 

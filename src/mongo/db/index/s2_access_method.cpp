@@ -47,7 +47,7 @@ namespace mongo {
     static const string kIndexVersionFieldName("2dsphereIndexVersion");
 
     S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
-        : BtreeBasedAccessMethod(btreeState, btree) {
+        : IndexAccessMethod(btreeState, btree) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 

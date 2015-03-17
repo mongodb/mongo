@@ -48,7 +48,6 @@ namespace mongo {
           _workingSet(workingSet),
           _descriptor(params.descriptor),
           _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-          _btreeCursor(NULL),
           _scanState(INITIALIZING),
           _params(params),
           _commonStats(kStageType) {
@@ -76,8 +75,7 @@ namespace mongo {
         Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
         verify(s.isOK());
         verify(cursor);
-        // Is this assumption always valid?  See SERVER-12397
-        _btreeCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
+        _cursor.reset(cursor);
 
         // Create a new bounds checker.  The bounds checker gets our start key and assists in
         // executing the scan and staying within the required bounds.
@@ -92,7 +90,7 @@ namespace mongo {
         key.resize(nFields);
         inc.resize(nFields);
         if (_checker->getStartKey(&key, &inc)) {
-            _btreeCursor->seek(key, inc);
+            _cursor->seek(key, inc);
             _keyElts.resize(nFields);
             _keyEltsInc.resize(nFields);
         }
@@ -116,7 +114,7 @@ namespace mongo {
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
         if (INITIALIZING == _scanState) {
-            invariant(NULL == _btreeCursor.get());
+            invariant(NULL == _cursor.get());
             initIndexCursor();
         }
 
@@ -131,8 +129,8 @@ namespace mongo {
 
         if (GETTING_NEXT == _scanState) {
             // Grab the next (key, value) from the index.
-            BSONObj ownedKeyObj = _btreeCursor->getKey().getOwned();
-            RecordId loc = _btreeCursor->getValue();
+            BSONObj ownedKeyObj = _cursor->getKey().getOwned();
+            RecordId loc = _cursor->getValue();
 
             // The underlying IndexCursor points at the *next* thing we want to return.  We do this
             // so that if we're scanning an index looking for docs to delete we don't continually
@@ -140,11 +138,11 @@ namespace mongo {
 
             // We skip to the next value of the _params.fieldNo-th field in the index key pattern.
             // This is the field we're distinct-ing over.
-            _btreeCursor->skip(_btreeCursor->getKey(),
-                               _params.fieldNo + 1,
-                               true,
-                               _keyElts,
-                               _keyEltsInc);
+            _cursor->skip(_cursor->getKey(),
+                          _params.fieldNo + 1,
+                          true,
+                          _keyElts,
+                          _keyEltsInc);
 
             // On the next call to work, make sure that the cursor is still within the bounds.
             _scanState = CHECKING_END;
@@ -171,7 +169,7 @@ namespace mongo {
             return false;
         }
 
-        return HIT_END == _scanState || _btreeCursor->isEOF();
+        return HIT_END == _scanState || _cursor->isEOF();
     }
 
     void DistinctScan::saveState() {
@@ -181,11 +179,11 @@ namespace mongo {
         if (HIT_END == _scanState || INITIALIZING == _scanState) { return; }
         // We save these so that we know if the cursor moves during the yield.  If it moves, we have
         // to make sure its ending position is valid w.r.t. our bounds.
-        if (!_btreeCursor->isEOF()) {
-            _savedKey = _btreeCursor->getKey().getOwned();
-            _savedLoc = _btreeCursor->getValue();
+        if (!_cursor->isEOF()) {
+            _savedKey = _cursor->getKey().getOwned();
+            _savedLoc = _cursor->getValue();
         }
-        _btreeCursor->savePosition();
+        _cursor->savePosition();
     }
 
     void DistinctScan::restoreState(OperationContext* opCtx) {
@@ -197,12 +195,12 @@ namespace mongo {
 
         // We can have a valid position before we check isEOF(), restore the position, and then be
         // EOF upon restore.
-        if (!_btreeCursor->restorePosition( opCtx ).isOK() || _btreeCursor->isEOF()) {
+        if (!_cursor->restorePosition( opCtx ).isOK() || _cursor->isEOF()) {
             _scanState = HIT_END;
             return;
         }
 
-        if (!_savedKey.binaryEqual(_btreeCursor->getKey()) || _savedLoc != _btreeCursor->getValue()) {
+        if (!_savedKey.binaryEqual(_cursor->getKey()) || _savedLoc != _cursor->getValue()) {
             // Our restored position might be past endKey, see if we've hit the end.
             _scanState = CHECKING_END;
         }
@@ -220,7 +218,7 @@ namespace mongo {
 
         // Use _checker to see how things are.
         IndexBoundsChecker::KeyState keyState;
-        keyState = _checker->checkKey(_btreeCursor->getKey(),
+        keyState = _checker->checkKey(_cursor->getKey(),
                                       &_keyEltsToUse,
                                       &_movePastKeyElts,
                                       &_keyElts,
@@ -240,11 +238,11 @@ namespace mongo {
         }
 
         verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
-        _btreeCursor->skip(_btreeCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
-                           _keyElts, _keyEltsInc);
+        _cursor->skip(_cursor->getKey(), _keyEltsToUse, _movePastKeyElts,
+                      _keyElts, _keyEltsInc);
 
         // Must check underlying cursor EOF after every cursor movement.
-        if (_btreeCursor->isEOF()) {
+        if (_cursor->isEOF()) {
             _scanState = HIT_END;
         }
     }

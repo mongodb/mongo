@@ -137,7 +137,7 @@ namespace mongo {
         const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
 
         // The cursor we use to navigate the tree.
-        boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
+        boost::scoped_ptr<IndexCursor> _cursor;
 
         // Keeps track of what work we need to do next.
         ScanState _scanState;

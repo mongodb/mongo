@@ -40,7 +40,7 @@ namespace mongo {
 
     // Standard Btree implementation below.
     BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree )
-        : BtreeBasedAccessMethod(btreeState, btree) {
+        : IndexAccessMethod(btreeState, btree) {
 
         // The key generation wants these values.
         vector<const char*> fieldNames;

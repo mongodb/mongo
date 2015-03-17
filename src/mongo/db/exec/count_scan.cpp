@@ -48,7 +48,6 @@ namespace mongo {
           _workingSet(workingSet),
           _descriptor(params.descriptor),
           _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-          _btreeCursor(NULL),
           _params(params),
           _hitEnd(false),
           _shouldDedup(params.descriptor->isMultikey(txn)),
@@ -67,13 +66,11 @@ namespace mongo {
         Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
         verify(s.isOK());
         verify(cursor);
+        _cursor.reset(cursor);
 
-        // Is this assumption always valid?  See SERVER-12397
-        _btreeCursor.reset(static_cast<BtreeIndexCursor*>(cursor));
-
-        // _btreeCursor points at our start position.  We move it forward until it hits a cursor
+        // _cursor points at our start position.  We move it forward until it hits a cursor
         // that points at the end.
-        _btreeCursor->seek(_params.startKey, !_params.startKeyInclusive);
+        _cursor->seek(_params.startKey, !_params.startKeyInclusive);
 
         ++_specificStats.keysExamined;
 
@@ -81,9 +78,7 @@ namespace mongo {
         IndexCursor* endCursor;
         verify(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
         verify(endCursor);
-
-        // Is this assumption always valid?  See SERVER-12397
-        _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
+        _endCursor.reset(endCursor);
 
         // If the end key is inclusive we want to point *past* it since that's the end.
         _endCursor->seek(_params.endKey, _params.endKeyInclusive);
@@ -99,11 +94,11 @@ namespace mongo {
 
         if (_endCursor->isEOF()) {
             // If the endCursor is EOF we're only done when our 'current count position' hits EOF.
-            _hitEnd = _btreeCursor->isEOF();
+            _hitEnd = _cursor->isEOF();
         }
         else {
             // If not, we're only done when we hit the end cursor's (valid) position.
-            _hitEnd = _btreeCursor->pointsAt(*_endCursor.get());
+            _hitEnd = _cursor->pointsAt(*_endCursor.get());
         }
     }
 
@@ -113,7 +108,7 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        if (NULL == _btreeCursor.get()) {
+        if (NULL == _cursor.get()) {
             // First call to work().  Perform cursor init.
             try {
                 initIndexCursor();
@@ -121,7 +116,7 @@ namespace mongo {
             }
             catch (const WriteConflictException& wce) {
                 // Release our owned cursors and try again next time.
-                _btreeCursor.reset();
+                _cursor.reset();
                 _endCursor.reset();
                 *out = WorkingSet::INVALID_ID;
                 return PlanStage::NEED_YIELD;
@@ -132,14 +127,14 @@ namespace mongo {
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
-        RecordId loc = _btreeCursor->getValue();
+        RecordId loc = _cursor->getValue();
 
         try {
-            _btreeCursor->next();
+            _cursor->next();
         }
         catch (const WriteConflictException& wce) {
             // The cursor shouldn't have moved.
-            invariant(_btreeCursor->getValue() == loc);
+            invariant(_cursor->getValue() == loc);
             *out = WorkingSet::INVALID_ID;
             return PlanStage::NEED_YIELD;
         }
@@ -164,20 +159,20 @@ namespace mongo {
     }
 
     bool CountScan::isEOF() {
-        if (NULL == _btreeCursor.get()) {
+        if (NULL == _cursor.get()) {
             // Have to call work() at least once.
             return false;
         }
 
-        return _hitEnd || _btreeCursor->isEOF();
+        return _hitEnd || _cursor->isEOF();
     }
 
     void CountScan::saveState() {
         _txn = NULL;
         ++_commonStats.yields;
-        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
+        if (_hitEnd || (NULL == _cursor.get())) { return; }
 
-        _btreeCursor->savePosition();
+        _cursor->savePosition();
         _endCursor->savePosition();
     }
 
@@ -185,21 +180,21 @@ namespace mongo {
         invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
-        if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
+        if (_hitEnd || (NULL == _cursor.get())) { return; }
 
-        if (!_btreeCursor->restorePosition( opCtx ).isOK()) {
+        if (!_cursor->restorePosition( opCtx ).isOK()) {
             _hitEnd = true;
             return;
         }
 
-        if (_btreeCursor->isEOF()) {
+        if (_cursor->isEOF()) {
             _hitEnd = true;
             return;
         }
 
         // See if we're somehow already past our end key (maybe the thing we were pointing at got
         // deleted...)
-        int cmp = _btreeCursor->getKey().woCompare(_params.endKey, _descriptor->keyPattern(), false);
+        int cmp = _cursor->getKey().woCompare(_params.endKey, _descriptor->keyPattern(), false);
         if (cmp > 0 || (cmp == 0 && !_params.endKeyInclusive)) {
             _hitEnd = true;
             return;
@@ -210,7 +205,7 @@ namespace mongo {
             return;
         }
 
-        // If we were EOF when we yielded we don't always want to have _btreeCursor run until
+        // If we were EOF when we yielded we don't always want to have _cursor run until
         // EOF.  New documents may have been inserted after our endKey and our end marker
         // may be before them.
         //

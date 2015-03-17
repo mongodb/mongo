@@ -182,11 +182,7 @@ namespace mongo {
         if ( indexFound )
             *indexFound = 1;
 
-        // See SERVER-12397.  This may not always be true.
-        BtreeBasedAccessMethod* accessMethod =
-            static_cast<BtreeBasedAccessMethod*>(catalog->getIndex( desc ));
-
-        RecordId loc = accessMethod->findSingle( txn, query["_id"].wrap() );
+        RecordId loc = catalog->getIndex(desc)->findSingle( txn, query["_id"].wrap() );
         if ( loc.isNull() )
             return false;
         result = collection->docFor(txn, loc).value();
@@ -200,10 +196,7 @@ namespace mongo {
         IndexCatalog* catalog = collection->getIndexCatalog();
         const IndexDescriptor* desc = catalog->findIdIndex( txn );
         uassert(13430, "no _id index", desc);
-        // See SERVER-12397.  This may not always be true.
-        BtreeBasedAccessMethod* accessMethod =
-            static_cast<BtreeBasedAccessMethod*>(catalog->getIndex( desc ));
-        return accessMethod->findSingle( txn, idquery["_id"].wrap() );
+        return catalog->getIndex(desc)->findSingle( txn, idquery["_id"].wrap() );
     }
 
     /* Get the first object from a collection.  Generally only useful if the collection

@@ -118,12 +118,8 @@ namespace mongo {
                 return PlanStage::IS_EOF;
             }
 
-            // This may not be valid always.  See SERVER-12397.
-            const BtreeBasedAccessMethod* accessMethod =
-                static_cast<const BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
-
-            // Look up the key by going directly to the Btree.
-            RecordId loc = accessMethod->findSingle(_txn, _key);
+            // Look up the key by going directly to the index.
+            RecordId loc = catalog->getIndex(idDesc)->findSingle(_txn, _key);
 
             // Key not found.
             if (loc.isNull()) {

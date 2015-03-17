@@ -71,12 +71,6 @@ namespace mongo {
      * Stage scans over an index from startKey to endKey, returning results that pass the provided
      * filter.  Internally dedups on RecordId.
      *
-     * TODO: we probably should split this into 2 stages: one btree-only "fast" ixscan and one that
-     * strictly talks through the index API.  Need to figure out what we really want to ship down
-     * through that API predicate-wise though, currently the language is a BSONObj but that's
-     * clearly not enough (or we need different index scan exec nodes per index type?). See
-     * SERVER-12397 for tracking.
-     *
      * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
      */
     class IndexScan : public PlanStage {
@@ -168,18 +162,8 @@ namespace mongo {
         IndexScanStats _specificStats;
 
         //
-        // Btree-specific navigation state.
-        //
-
-        // Either NULL or points to the same object as '_indexCursor'. The index scan stage should
-        // not need to use both IndexCursor and BtreeIndexCursor. This is being tracked in
-        // SERVER-12397.
-        BtreeIndexCursor* _btreeCursor;
-
-        //
-        // If we have decided to use the BtreeIndexCursor methods for navigation, we make a decision
-        // to employ one of two different algorithms for determining when the index scan has reached
-        // the end:
+        // If we aren't doing a "simple" index scan, we make a decision to employ one of two
+        // different algorithms for determining when the index scan has reached the end:
         //
 
         //
@@ -202,7 +186,7 @@ namespace mongo {
         //
 
         // The end cursor.
-        boost::scoped_ptr<BtreeIndexCursor> _endCursor;
+        boost::scoped_ptr<IndexCursor> _endCursor;
 
         // The key that the end cursor should point to.
         BSONObj _endKey;

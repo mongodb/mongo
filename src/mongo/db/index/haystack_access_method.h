@@ -54,12 +54,9 @@ namespace mongo {
      *   bucketSize specifies the dimension of the square bucket for the data in pos.
      * ALL fields are mandatory.
      */
-    class HaystackAccessMethod : public BtreeBasedAccessMethod {
+    class HaystackAccessMethod : public IndexAccessMethod {
     public:
-        using BtreeBasedAccessMethod::_descriptor;
-
         HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
-        virtual ~HaystackAccessMethod() { }
 
     protected:
         friend class GeoHaystackSearchCommand;

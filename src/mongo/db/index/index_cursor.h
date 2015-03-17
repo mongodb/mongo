@@ -170,9 +170,6 @@ namespace mongo {
         const std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     };
 
-    // Temporary typedef to old name
-    using BtreeIndexCursor = IndexCursor;
-
     // All the options we might want to set on a cursor.
     struct CursorOptions {
         // Set the direction of the scan.  Ignored if the cursor doesn't have directions (geo).

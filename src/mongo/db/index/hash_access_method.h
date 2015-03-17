@@ -41,12 +41,9 @@ namespace mongo {
     /**
      * This is the access method for "hashed" indices.
      */
-    class HashAccessMethod : public BtreeBasedAccessMethod {
+    class HashAccessMethod : public IndexAccessMethod {
     public:
-        using BtreeBasedAccessMethod::_descriptor;
-
         HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
-        virtual ~HashAccessMethod() { }
 
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;

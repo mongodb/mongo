@@ -72,7 +72,6 @@ namespace mongo {
           _shouldDedup(true),
           _params(params),
           _commonStats(kStageType),
-          _btreeCursor(NULL),
           _keyEltsToUse(0),
           _movePastKeyElts(false),
           _endKeyInclusive(false) {
@@ -127,8 +126,6 @@ namespace mongo {
             }
         }
         else {
-            _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
-
             // For single intervals, we can use an optimized scan which checks against the position
             // of an end cursor.  For all other index scans, we fall back on using
             // IndexBoundsChecker to determine when we've finished the scan.
@@ -141,14 +138,12 @@ namespace mongo {
                                                      &_endKeyInclusive)) {
                 // We want to point at the start key if it's inclusive, and we want to point past
                 // the start key if it's exclusive.
-                _btreeCursor->seek(startKey, !startKeyInclusive);
+                _indexCursor->seek(startKey, !startKeyInclusive);
 
                 IndexCursor* endCursor;
                 invariant(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
                 invariant(endCursor);
-
-                // TODO: Get rid of this cast. See SERVER-12397.
-                _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
+                _endCursor.reset(endCursor);
 
                 // If the end key is inclusive, we want to point *past* it since that's the end.
                 _endCursor->seek(_endKey, _endKeyInclusive);
@@ -164,7 +159,7 @@ namespace mongo {
                 key.resize(nFields);
                 inc.resize(nFields);
                 if (_checker->getStartKey(&key, &inc)) {
-                    _btreeCursor->seek(key, inc);
+                    _indexCursor->seek(key, inc);
                     _keyElts.resize(nFields);
                     _keyEltsInc.resize(nFields);
                 }
@@ -199,7 +194,6 @@ namespace mongo {
                 _scanState = INITIALIZING;
                 _indexCursor.reset();
                 _endCursor.reset();
-                _btreeCursor = NULL;
                 *out = WorkingSet::INVALID_ID;
                 return PlanStage::NEED_YIELD;
             }
@@ -348,12 +342,12 @@ namespace mongo {
                 return;
             }
 
-            // If we were EOF when we yielded, we don't always want to have '_btreeCursor' run until
+            // If we were EOF when we yielded, we don't always want to have '_indexCursor' run until
             // EOF. New documents may have been inserted after our end key, and our end marker may
             // be before them.
             //
             // As an example, say we're counting from 5 to 10 and the index only has keys for 6, 7,
-            // 8, and 9. '_btreeCursor' will point at key 6 at the start and '_endCursor' will be
+            // 8, and 9. '_indexCursor' will point at key 6 at the start and '_endCursor' will be
             // EOF. If we insert a document with key 11 during a yield, we need to relocate
             // '_endCursor' to point at the new key as the end key of our scan.
             _endCursor->seek(_endKey, _endKeyInclusive);
@@ -417,7 +411,7 @@ namespace mongo {
             _scanState = GETTING_NEXT;
 
             // "Normal" start -> end scanning.
-            verify(NULL == _btreeCursor);
+            verify(NULL == _endCursor);
             verify(NULL == _checker.get());
 
             // If there is an empty endKey we will scan until we run out of index to scan over.
@@ -440,7 +434,7 @@ namespace mongo {
             _scanState = GETTING_NEXT;
             invariant(!_checker);
 
-            if (_endCursor->pointsAt(*_btreeCursor)) {
+            if (_endCursor->pointsAt(*_indexCursor)) {
                 _scanState = HIT_END;
             }
             else {
@@ -448,7 +442,7 @@ namespace mongo {
             }
         }
         else {
-            verify(NULL != _btreeCursor);
+            verify(NULL != _indexCursor);
             verify(NULL != _checker.get());
 
             IndexBoundsChecker::KeyState keyState;
@@ -472,11 +466,11 @@ namespace mongo {
             }
 
             verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
-            _btreeCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
+            _indexCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
                                _keyElts, _keyEltsInc);
 
             // Must check underlying cursor EOF after every cursor movement.
-            if (_btreeCursor->isEOF()) {
+            if (_indexCursor->isEOF()) {
                 _scanState = HIT_END;
                 return;
             }

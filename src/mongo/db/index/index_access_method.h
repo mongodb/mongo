@@ -251,9 +251,6 @@ namespace mongo {
         const std::unique_ptr<SortedDataInterface> _newInterface;
     };
 
-    // Temporary typedef to old name
-    using BtreeBasedAccessMethod = IndexAccessMethod;
-
     /**
      * Updates are two steps: verify that it's a valid update, and perform it.
      * validateUpdate fills out the UpdateStatus and update actually applies it.

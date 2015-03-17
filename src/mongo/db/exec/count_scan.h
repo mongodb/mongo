@@ -109,11 +109,11 @@ namespace mongo {
         const IndexDescriptor* _descriptor;
         const IndexAccessMethod* _iam;
 
-        // Our start cursor is _btreeCursor.
-        boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
+        // Our start cursor.
+        boost::scoped_ptr<IndexCursor> _cursor;
 
         // Our end marker.
-        boost::scoped_ptr<BtreeIndexCursor> _endCursor;
+        boost::scoped_ptr<IndexCursor> _endCursor;
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
         unordered_set<RecordId, RecordId::Hasher> _returned;

@@ -40,13 +40,9 @@ namespace mongo {
     class IndexDescriptor;
     struct TwoDIndexingParams;
 
-    class TwoDAccessMethod : public BtreeBasedAccessMethod {
+    class TwoDAccessMethod : public IndexAccessMethod {
     public:
-        using BtreeBasedAccessMethod::_descriptor;
-
-        TwoDAccessMethod(IndexCatalogEntry* btreeState,
-                         SortedDataInterface* btree);
-        virtual ~TwoDAccessMethod() { }
+        TwoDAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
     private:
 
