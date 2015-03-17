@@ -50,29 +50,19 @@ class test_sweep02(wttest.WiredTigerTestCase):
 
     def test_config01(self):
         self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_close=()")
+            self.base_config + "file_manager=()")
 
     def test_config02(self):
         self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_close=(interval=1)")
+            self.base_config + "file_manager=(close_scan_interval=1)")
 
     def test_config03(self):
         self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_close=(idle_time=1)")
+            self.base_config + "file_manager=(close_idle_time=1)")
 
     def test_config04(self):
-        self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_close=(interval=1,idle_time=1)")
-
-    def test_config05(self):
-        self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_close=(interval=3)")
-        self.conn.reconfigure("file_close=(idle_time=4)")
-        # TODO: Validate this once config cursors work
-
-    def test_config06(self):
-        self.conn = wiredtiger_open(self.dir, self.base_config)
-        self.conn.reconfigure("file_close=(idle_time=4,interval=100)")
+        self.conn = wiredtiger_open(self.dir, self.base_config + \
+            "file_manager=(close_scan_interval=1,close_idle_time=1)")
 
 if __name__ == '__main__':
     wttest.run()

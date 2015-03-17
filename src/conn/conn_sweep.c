@@ -146,11 +146,12 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Pull out the sweep configurations. */
 	WT_RET(__wt_config_gets(session,
-	    cfg, "file_close.interval", &cval));
-	conn->sweep_interval = (time_t)cval.val;
-	WT_RET(__wt_config_gets(session,
-	    cfg, "file_close.idle_time", &cval));
+	    cfg, "file_manager.close_idle_time", &cval));
 	conn->sweep_idle_time = (time_t)cval.val;
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "file_manager.close_scan_interval", &cval));
+	conn->sweep_interval = (time_t)cval.val;
 
 	return (0);
 }

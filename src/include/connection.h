@@ -335,8 +335,8 @@ struct __wt_connection_impl {
 	wt_thread_t	 sweep_tid;	/* Handle sweep thread */
 	int		 sweep_tid_set;	/* Handle sweep thread set */
 	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
-	time_t		 sweep_interval;/* Handle sweep interval */
 	time_t		 sweep_idle_time;/* Handle sweep idle time */
+	time_t		 sweep_interval;/* Handle sweep interval */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
