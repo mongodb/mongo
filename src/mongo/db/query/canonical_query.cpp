@@ -275,6 +275,11 @@ namespace {
                 *os << "d";
             }
             encodeUserString(elt.fieldName(), os);
+
+            // Sort argument separator
+            if (it.more()) {
+                *os << ",";
+            }
         }
     }
 
