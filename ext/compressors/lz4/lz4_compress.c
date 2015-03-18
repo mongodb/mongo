@@ -164,8 +164,8 @@ wt_lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 {
 	size_t dst_buffer_len_needed;
 
-	WT_UNUSED(session);
-	WT_UNUSED(src);
+	(void)session;
+	(void)src;
 
 	/*
 	 * LZ4 can use more space than the input data size, use the library
