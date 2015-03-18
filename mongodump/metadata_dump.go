@@ -13,7 +13,7 @@ import (
 
 // Metadata holds information about a collection's options and indexes.
 type Metadata struct {
-	Options bson.M        `json:"options,omitempty"`
+	Options interface{}   `json:"options,omitempty"`
 	Indexes []interface{} `json:"indexes"`
 }
 
@@ -62,10 +62,14 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		log.Logf(log.DebugLow, "Warning: no metadata found for collection: `%v`: %v", nsID, err)
 		return nil
 	}
-	meta.Options = bson.M{}
+	meta.Options = bsonutil.MarshalD{}
 	if opts, err := bsonutil.FindValueByKey("options", collectionInfo); err == nil {
 		if optsD, ok := opts.(bson.D); ok {
-			meta.Options = optsD.Map()
+			// make the options properly json-able
+			meta.Options, err = bsonutil.ConvertBSONValueToJSON(optsD)
+			if err != nil {
+				return fmt.Errorf("error converting collection options to JSON: %v", err)
+			}
 		} else {
 			return fmt.Errorf("collection options contains invalid data: %v", opts)
 		}

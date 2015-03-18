@@ -132,6 +132,7 @@ func GetCollectionOptions(coll *mgo.Collection) (*bson.D, error) {
 		}
 		if nameStr, ok := name.(string); ok {
 			if nameStr == comparisonName {
+				// we've found the collection we're looking for
 				return collInfo, nil
 			}
 		} else {
