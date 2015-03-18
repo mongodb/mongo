@@ -74,7 +74,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     size_t *result_lenp, int *compression_failed)
 {
 	char *lz4buf;
-	int lz4_len;
+	size_t lz4_len;
 
 	/*
 	 * The buffer should always be large enough due to the lz4_pre_size
@@ -86,7 +86,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	/* Store the length of the compressed block in the first 8 bytes */
 	lz4buf = (char *)dst + sizeof(size_t);
-	lz4_len = LZ4_compress((const char *)src, lz4buf, src_len);
+	lz4_len = (size_t)LZ4_compress((const char *)src, lz4buf, src_len);
 
 	/*
 	 * Flag no-compression if the result was larger than the original
