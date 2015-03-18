@@ -1,5 +1,6 @@
 /*-
- * Public Domain 2015 MongoDB, Inc.
+ * Public Domain 2014-2015 MongoDB, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -33,10 +34,10 @@
 #include <wiredtiger_ext.h>
 
 /*
- * For the wiredtiger library we expect to use the system library.
- * When wiredtiger is "vendored" in mongod, we use the lz4 source
- * from https://github.com/Cyan4973/lz4 (LZ4 implementation in C).
- * 
+ * For the wiredtiger library we expect to use the system library.  When
+ * wiredtiger is built as part of MongoDB, we use the lz4 source from
+ * https://github.com/Cyan4973/lz4 (LZ4 implementation in C).
+ *
  * This code is licensed under the BSD 3-Clause License.
  */
 #include <lz4.h>
@@ -47,15 +48,11 @@
  */
 #include "wiredtiger_config.h"
 
-
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
-
 	WT_EXTENSION_API *wt_api;		/* Extension API */
-
 } LZ4_COMPRESSOR;
-
 
 /*
  *  lz4_compress --
@@ -71,34 +68,36 @@ lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	*compression_failed = 0;
 	if (dst_len < src_len + 8) {
-        /*
-         *  do not attempt but should not happen with prior call to lz4_pre_size
-         *  TODO: consider change to assert
-         */
+	/*
+	 *  do not attempt but should not happen with prior call to lz4_pre_size
+	 *  TODO: consider change to assert
+	 */
 		*compression_failed = 1;
 		return (0);
 	}
 
-    /*
-     *  Store the length of the compressed block in the first sizeof(size_t) bytes.
-     *  We will skip past the length value to store the compressed bytes.
+	/*
+	 *  Store the length of the compressed block in the first
+	 *  sizeof(size_t) bytes.  We will skip past the length value to store
+	 *  the compressed bytes.
 	 */
 	char *buf = (char *)dst + sizeof(size_t);
 
-    /*
-     * Call LZ4 to compress
-     */
-    int lz4_len = LZ4_compress((const char *)src, buf, src_len);
+	/*
+	 * Call LZ4 to compress
+	 */
+	int lz4_len = LZ4_compress((const char *)src, buf, src_len);
 	*result_lenp = lz4_len;
-    *(size_t *)dst = (size_t)lz4_len;
+	*(size_t *)dst = (size_t)lz4_len;
 
-    /* return the compressed data length, including our size_t compressed data byte count */
-    *result_lenp = lz4_len + sizeof(size_t);
+	/*
+	 * Return the compressed data length, including our size_t compressed
+	 * data byte count
+	 */
+	*result_lenp = lz4_len + sizeof(size_t);
 
 	return (0);
 }
-
-
 
 /*
  * lz4_decompress --
@@ -113,34 +112,36 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	(void)session;				/* Unused parameters */
 	(void)src_len;
 
-    /* retrieve compressed data length from start of compressed data buffer */
-    size_t src_data_len = *(size_t *)src;
+	/*
+	 * Retrieve compressed data length from start of compressed data buffer
+	 */
+	size_t src_data_len = *(size_t *)src;
 
-    /* skip over sizeof(size_t) bytes for actual start of compressed data */
-    char *compressed_data = (char *)src + sizeof(size_t);
+	/* Skip over sizeof(size_t) bytes for actual start of compressed data */
+	char *compressed_data = (char *)src + sizeof(size_t);
 
-    /*
-     *  the destination buffer length should always be sufficient
-     *  because wiredtiger keeps track of the byte count before compression
-     */
+	/*
+	 *  The destination buffer length should always be sufficient because
+	 *  wiredtiger keeps track of the byte count before compression
+	 */
 
-    /* Call LZ4 to decompress */
-    int decoded = LZ4_decompress_safe(compressed_data, (char *)dst, src_data_len, dst_len);
-    if (decoded < 0) {
-        WT_EXTENSION_API *wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
-      	(void)wt_api->err_printf(wt_api, session, "LZ4 error: LZ4_decompress_safe: %d", decoded);
-        return (WT_ERROR);
-    }
+	/* Call LZ4 to decompress */
+	int decoded = LZ4_decompress_safe(
+	    compressed_data, (char *)dst, src_data_len, dst_len);
+	if (decoded < 0) {
+		WT_EXTENSION_API *wt_api =
+		    ((LZ4_COMPRESSOR *)compressor)->wt_api;
+		(void)wt_api->err_printf(wt_api,
+		    session, "LZ4 error: LZ4_decompress_safe: %d", decoded);
+		return (WT_ERROR);
+	}
 
-    size_t decompressed_data_len = decoded;
-    /* return the uncompressed data length */
-    *result_lenp = decompressed_data_len;
-    
-    return(0);
+	size_t decompressed_data_len = decoded;
+	/* return the uncompressed data length */
+	*result_lenp = decompressed_data_len;
+
+	return (0);
 }
-
-
-
 
 /*
  * lz4_pre_size --
@@ -151,23 +152,23 @@ lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     size_t *result_lenp)
 {
-	(void)session;    /* Unused parameters */
-	(void)src;
+	size_t dst_buffer_len_needed;
 
-    /*
-     *  we must reserve a little extra space for our compressed data length
-     *  value stored at the start of the compressed data buffer.  Random
-     *  data doesn't compress well and we could overflow the destination buffer.
-     */
+	WT_UNUSED(session);
+	WT_UNUSED(src);
 
-    size_t dst_buffer_len_needed = src_len + sizeof(size_t);
-    /* return the buffer length needed */
+	/*
+	 *  We must reserve a little extra space for our compressed data length
+	 *  value stored at the start of the compressed data buffer.  Random
+	 *  data doesn't compress well and we could overflow the destination
+	 *  buffer.
+	 */
+	dst_buffer_len_needed = src_len + sizeof(size_t);
+
+	/* return the buffer length needed */
 	*result_lenp = dst_buffer_len_needed;
 	return (0);
 }
-
-
-
 
 /*
  * lz4_terminate --
@@ -176,16 +177,13 @@ lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 static int
 lz4_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
-	(void)session;    /* Unused parameters */
+	WT_UNUSED(session);
 
 	/* Free the allocated memory. */
 	free(compressor);
 
 	return (0);
 }
-
-
-
 
 /*
  * wiredtiger_extension_init --
@@ -225,8 +223,6 @@ lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	return (connection->add_compressor(
 	    connection, "lz4", (WT_COMPRESSOR *)lz4_compressor, NULL));
 }
-
-
 
 /*
  * We have to remove this symbol when building as a builtin extension otherwise
