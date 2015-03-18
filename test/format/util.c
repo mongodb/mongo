@@ -293,12 +293,15 @@ path_setup(const char *home)
 	/*
 	 * Home directory initialize command: remove everything except the RNG
 	 * log file.
+	 *
+	 * Redirect the "cd" command to /dev/null so chatty cd implementations
+	 * don't add the new working directory to our output.
 	 */
 #undef	CMD
 #ifdef _WIN32
 #define	CMD	"cd %s && del /s /q * && rd /s /q KVS"
 #else
-#define	CMD	"cd %s && rm -rf `ls | sed /rand/d`"
+#define	CMD	"cd %s > /dev/null && rm -rf `ls | sed /rand/d`"
 #endif
 	len = strlen(g.home) + strlen(CMD) + 1;
 	if ((g.home_init = malloc(len)) == NULL)
@@ -320,16 +323,19 @@ path_setup(const char *home)
 	/*
 	 * Salvage command, save the interesting files so we can replay the
 	 * salvage command as necessary.
+	 *
+	 * Redirect the "cd" command to /dev/null so chatty cd implementations
+	 * don't add the new working directory to our output.
 	 */
 #undef	CMD
 #ifdef _WIN32
 #define	CMD								\
-	"cd %s && "							\
+	"cd %s "							\
 	"rd /q /s slvg.copy & mkdir slvg.copy && "			\
 	"copy WiredTiger* slvg.copy\\ && copy wt* slvg.copy\\"
 #else
 #define	CMD								\
-	"cd %s && "							\
+	"cd %s > /dev/null && "						\
 	"rm -rf slvg.copy && mkdir slvg.copy && "			\
 	"cp WiredTiger* wt* slvg.copy/"
 #endif
