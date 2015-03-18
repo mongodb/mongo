@@ -59,7 +59,7 @@ wt_lz4_error(
 	wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
 
 	(void)wt_api->err_printf(wt_api, session,
-	    "lz4 error: %s: %s: %d", call, zError(zret), zret);
+	    "lz4 error: %s: %d: %d", call, zret, zret);
 	return (WT_ERROR);
 }
 
@@ -75,7 +75,6 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 {
 	char *lz4buf;
 	int lz4_len;
-	uint64_t lz4_len;
 
 	/*
 	 * The buffer should always be large enough due to the lz4_pre_size
@@ -83,7 +82,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 */
 	if (dst_len < src_len + sizeof(size_t))
 		return (wt_lz4_error(compressor, session,
-		    "LZ4 compress buffer too small", 0, ret));
+		    "LZ4 compress buffer too small", 0));
 
 	/* Store the length of the compressed block in the first 8 bytes */
 	lz4buf = (char *)dst + sizeof(size_t);
@@ -120,9 +119,12 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
+	WT_EXTENSION_API *wt_api;
 	char *compressed_data;
 	int decoded;
 	size_t src_data_len;
+
+	wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
 
 	/* Retrieve compressed length from start of the data buffer */
 	src_data_len = *(size_t *)src;
@@ -145,7 +147,7 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	if (decoded < 0)
 		return (wt_lz4_error(compressor, session,
-		    "LZ4 decompress error", decoded, ret));
+		    "LZ4 decompress error", decoded));
 
 	/* return the uncompressed data length */
 	*result_lenp = (size_t)decoded;
@@ -162,8 +164,7 @@ wt_lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     size_t *result_lenp)
 {
-	size_t dst_buffer_len_needed;
-
+	(void)compressor;
 	(void)session;
 	(void)src;
 
@@ -182,7 +183,7 @@ wt_lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 static int
 wt_lz4_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
-	WT_UNUSED(session);
+	(void)session;
 
 	/* Free the allocated memory. */
 	free(compressor);
@@ -190,12 +191,14 @@ wt_lz4_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	return (0);
 }
 
+int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+
 /*
- * wiredtiger_extension_init --
+ * lz4_extension_init --
  *	A simple shared library compression example.
  */
 int
-wt_lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	LZ4_COMPRESSOR *lz4_compressor;
 
@@ -226,7 +229,7 @@ wt_lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 	/* Load the compressor */
 	return (connection->add_compressor(
-	    connection, "lz4", (WT_COMPRESSOR *)wt_lz4_compressor, NULL));
+	    connection, "lz4", (WT_COMPRESSOR *)lz4_compressor, NULL));
 }
 
 /*
@@ -241,6 +244,6 @@ wt_lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	return wt_lz4_extension_init(connection, config);
+	return lz4_extension_init(connection, config);
 }
 #endif
