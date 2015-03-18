@@ -142,8 +142,8 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * The destination buffer length should always be sufficient because
 	 * wiredtiger keeps track of the byte count before compression
 	 */
-	decoded = LZ4_decompress_safe(
-	    compressed_data, (char *)dst, (int)src_data_len, (int)dst_len);
+	decoded =
+	    LZ4_decompress_fast(compressed_data, (char *)dst, (int)dst_len);
 
 	if (decoded < 0)
 		return (wt_lz4_error(compressor, session,
