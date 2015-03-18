@@ -383,7 +383,13 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		/* Try to lock the handle; if this succeeds, we're done. */
 		if ((ret = __wt_session_lock_dhandle(session, flags)) == 0)
 			goto done;
-		WT_RET_NOTFOUND_OK(ret);
+
+		/*
+		 * If the handle isn't available (or seems busy from our quick
+		 * check, fall through to the slow path.
+		 */
+		if (ret != EBUSY && ret != WT_NOTFOUND)
+			return (ret);
 
 		/* We found the data handle, don't try to get it again. */
 		LF_SET(WT_DHANDLE_HAVE_REF);
