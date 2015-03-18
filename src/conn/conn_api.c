@@ -148,6 +148,9 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
 	extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+	extern int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+#endif
 
 /*
  * __conn_load_default_extensions --
@@ -162,6 +165,9 @@ __conn_load_default_extensions(WT_CONNECTION_IMPL *conn)
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
 	WT_RET(zlib_extension_init(&conn->iface, NULL));
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+	WT_RET(lz4_extension_init(&conn->iface, NULL));
 #endif
 	return (0);
 }

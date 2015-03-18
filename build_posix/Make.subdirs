@@ -10,6 +10,7 @@ ext/compressors/bzip2 BZIP2
 ext/compressors/nop
 ext/compressors/snappy SNAPPY
 ext/compressors/zlib ZLIB
+ext/compressors/lz4 LZ4
 ext/datasources/helium HAVE_HELIUM
 ext/test/kvs_bdb HAVE_BERKELEY_DB
 .

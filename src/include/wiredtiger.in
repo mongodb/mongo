@@ -993,7 +993,7 @@ struct __wt_session {
 	 * @config{block_compressor, configure a compressor for file blocks.
 	 * Permitted values are \c "none" or custom compression engine name
 	 * created with WT_CONNECTION::add_compressor.  If WiredTiger has
-	 * builtin support for \c "snappy" or \c "zlib" compression\, these
+	 * builtin support for \c "snappy", \c "lz4" or \c "zlib" compression\, these
 	 * names are also available.  See @ref compression for more
 	 * information., a string; default \c none.}
 	 * @config{cache_resident, do not ever evict the object's pages; see
