@@ -158,7 +158,7 @@ namespace {
             ShardVersionMap shardVersions;
             Timer t;
 
-            bool success = _load(config, chunkMap, shards, &shardVersions, oldManager);
+            bool success = _load(config, chunkMap, shards, shardVersions, oldManager);
 
             if( success ){
                 {
@@ -201,7 +201,7 @@ namespace {
     bool ChunkManager::_load(const string& config,
                              ChunkMap& chunkMap,
                              set<Shard>& shards,
-                             ShardVersionMap* shardVersions,
+                             ShardVersionMap& shardVersions,
                              const ChunkManager* oldManager)
     {
 
@@ -215,7 +215,7 @@ namespace {
             // Get the old max version
             _version = oldManager->getVersion();
             // Load a copy of the old versions
-            *shardVersions = oldManager->_shardVersions;
+            shardVersions = oldManager->_shardVersions;
 
             // Load a copy of the chunk map, replacing the chunk manager with our own
             const ChunkMap& oldChunkMap = oldManager->getChunkMap();
@@ -243,7 +243,7 @@ namespace {
 
         // Attach a diff tracker for the versioned chunk data
         CMConfigDiffTracker differ( this );
-        differ.attach( _ns, chunkMap, _version, *shardVersions );
+        differ.attach( _ns, chunkMap, _version, shardVersions );
 
         // Diff tracker should *always* find at least one chunk if collection exists
         int diffsApplied = differ.calculateConfigDiff(config);
@@ -252,17 +252,9 @@ namespace {
             LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
                    << " with version " << _version;
 
-            // Add all existing shards we find to the shards set
-            for (ShardVersionMap::iterator it = shardVersions->begin();
-                 it != shardVersions->end();
-                ) {
-                if (Shard::findIfExists(it->first).ok()) {
-                    shards.insert(it->first);
-                    ++it;
-                }
-                else {
-                    shardVersions->erase(it++);
-                }
+            // Add all the shards we find to the shards set
+            for( ShardVersionMap::iterator it = shardVersions.begin(); it != shardVersions.end(); it++ ){
+                shards.insert( it->first );
             }
 
             return true;
@@ -275,7 +267,7 @@ namespace {
 
             // Set all our data to empty
             chunkMap.clear();
-            shardVersions->clear();
+            shardVersions.clear();
             _version = ChunkVersion( 0, 0, OID() );
 
             return true;
@@ -299,7 +291,7 @@ namespace {
 
             // Set all our data to empty to be extra safe
             chunkMap.clear();
-            shardVersions->clear();
+            shardVersions.clear();
             _version = ChunkVersion( 0, 0, OID() );
 
             return allInconsistent;

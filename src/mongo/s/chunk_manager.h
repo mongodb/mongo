@@ -224,7 +224,7 @@ namespace mongo {
         bool _load(const std::string& config,
                    ChunkMap& chunks,
                    std::set<Shard>& shards,
-                   ShardVersionMap* shardVersions,
+                   ShardVersionMap& shardVersions,
                    const ChunkManager* oldManager);
         static bool _isValid(const ChunkMap& chunks);
 
