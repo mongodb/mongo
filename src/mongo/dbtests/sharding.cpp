@@ -44,6 +44,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/util/log.h"
 
 namespace ShardingTests {
@@ -121,6 +122,10 @@ namespace ShardingTests {
                            false /* draining */);
             // Need to run this to ensure the shard is in the global lookup table
             Shard::installShard(_shard.getName(), _shard);
+            // Add dummy shard to config DB
+            _client.insert(ShardType::ConfigNS,
+                           BSON(ShardType::name() << _shard.getName() <<
+                                ShardType::host() << _shard.getConnString()));
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
             ASSERT_OK(dbtests::createIndex(
