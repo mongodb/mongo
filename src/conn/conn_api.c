@@ -1210,6 +1210,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		len = (size_t)snprintf(buf, sizeof(buf),
 		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
 		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
+		WT_ERR(__wt_fsync(session, fh));
 
 		conn->is_new = 1;
 	} else {
