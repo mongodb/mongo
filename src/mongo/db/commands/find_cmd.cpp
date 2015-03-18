@@ -43,6 +43,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/d_state.h"
 #include "mongo/util/log.h"
@@ -220,6 +221,9 @@ namespace mongo {
             AutoGetCollectionForRead ctx(txn, nss);
             Collection* collection = ctx.getCollection();
 
+            const int dbProfilingLevel = ctx.getDb() ? ctx.getDb()->getProfilingLevel() :
+                                                       serverGlobalParams.defaultProfile;
+
             // 3) Get the execution plan for the query.
             //
             // TODO: Do we need to handle oplog replay here?
@@ -251,7 +255,8 @@ namespace mongo {
                 // there is no ClientCursor id, and then return.
                 const int numResults = 0;
                 const CursorId cursorId = 0;
-                endQueryOp(ctx, execHolder.get(), numResults, cursorId, txn->getCurOp());
+                endQueryOp(execHolder.get(), dbProfilingLevel, numResults, cursorId,
+                           txn->getCurOp());
                 Command::appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &result);
                 return true;
             }
@@ -333,7 +338,7 @@ namespace mongo {
             }
 
             // Fill out curop based on the results.
-            endQueryOp(ctx, exec, numResults, cursorId, txn->getCurOp());
+            endQueryOp(exec, dbProfilingLevel, numResults, cursorId, txn->getCurOp());
 
             // 7) Generate the response object to send to the client.
             Command::appendCursorResponseObject(cursorId, nss.ns(), firstBatch.arr(), &result);

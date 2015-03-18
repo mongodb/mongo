@@ -71,11 +71,13 @@ namespace mongo {
     /**
      * Fills out CurOp with information regarding this query's execution.
      *
-     * Uses explain functionality to extract stats from 'exec'. 'ctx' is used to conditionalize
-     * whether or not we do expensive stats gathering based on the database profiling level.
+     * Uses explain functionality to extract stats from 'exec'.
+     *
+     * The database profiling level, 'dbProfilingLevel', is used to conditionalize whether or not we
+     * do expensive stats gathering.
      */
-    void endQueryOp(const AutoGetCollectionForRead& ctx,
-                    PlanExecutor* exec,
+    void endQueryOp(PlanExecutor* exec,
+                    int dbProfilingLevel,
                     int numResults,
                     CursorId cursorId,
                     CurOp* curop);

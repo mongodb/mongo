@@ -166,8 +166,8 @@ namespace mongo {
         curop->setQuery(queryObj);
     }
 
-    void endQueryOp(const AutoGetCollectionForRead& ctx,
-                    PlanExecutor* exec,
+    void endQueryOp(PlanExecutor* exec,
+                    int dbProfilingLevel,
                     int numResults,
                     CursorId cursorId,
                     CurOp* curop) {
@@ -186,8 +186,6 @@ namespace mongo {
         curop->debug().nscannedObjects = summaryStats.totalDocsExamined;
         curop->debug().idhack = summaryStats.isIdhack;
 
-        const int dbProfilingLevel = (ctx.getDb() != NULL) ? ctx.getDb()->getProfilingLevel() :
-                                                             serverGlobalParams.defaultProfile;
         const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
         const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
 
@@ -733,6 +731,9 @@ namespace mongo {
         AutoGetCollectionForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
 
+        const int dbProfilingLevel = ctx.getDb() ? ctx.getDb()->getProfilingLevel() :
+                                                   serverGlobalParams.defaultProfile;
+
         // We'll now try to get the query executor that will execute this query for us. There
         // are a few cases in which we know upfront which executor we should get and, therefore,
         // we shortcut the selection process here.
@@ -896,7 +897,7 @@ namespace mongo {
         // Fill out curop based on query results. If we have a cursorid, we will fill out curop with
         // this cursorid later.
         long long ccId = 0;
-        endQueryOp(ctx, exec.get(), numResults, ccId, &curop);
+        endQueryOp(exec.get(), dbProfilingLevel, numResults, ccId, &curop);
 
         if (shouldSaveCursor(txn, collection, state, exec.get())) {
             // We won't use the executor until it's getMore'd.
