@@ -1375,7 +1375,7 @@ __conn_write_config(
 
 	/*
 	 * We were passed an array of configuration strings where slot 0 is all
-	 * all possible values and the second and subsequent slots are changes
+	 * possible values and the second and subsequent slots are changes
 	 * specified by the application during open (using the wiredtiger_open
 	 * configuration string, an environment variable, or user-configuration
 	 * file). The base configuration file contains all changes to default
