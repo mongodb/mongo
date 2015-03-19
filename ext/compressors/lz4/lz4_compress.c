@@ -150,7 +150,7 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		    "LZ4 decompress error", decoded));
 
 	/* return the uncompressed data length */
-	*result_lenp = (size_t)decoded;
+	*result_lenp = dst_len;
 
 	return (0);
 }
