@@ -1377,11 +1377,12 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 		return (0);
 
 	/*
-	 * We don't test separately if we're creating the database as we might
-	 * have crashed between creating the "WiredTiger" file and creating the
-	 * base configuration file. There's always a base configuration file,
-	 * and we rename it into place, so it can only NOT exist if we crashed
-	 * before it was created. If it already exists, we're done.
+	 * We don't test separately if we're creating the database in this run
+	 * as we might have crashed between creating the "WiredTiger" file and
+	 * creating the base configuration file. If configured, there's always
+	 * a base configuration file, and we rename it into place, so it can
+	 * only NOT exist if we crashed before it was created; in other words,
+	 * if the base configuration file exists, we're done.
 	 */
 	WT_RET(__wt_exist(session, WT_BASECONFIG, &exist));
 	if (exist)
