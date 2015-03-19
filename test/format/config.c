@@ -241,12 +241,13 @@ config_compression(void)
 			cstr = "compression=bzip-raw";
 			break;
 		case 8: case 9: case 10: case 11:	/* 20% lz4 */
-			/* TODO: Enable lz4 in random configurations. At the
-			 * moment it is introducing data corruption failures.
-			 * Disable it until we get to the bottom of the problems
+#if 0
+			TODO: Enable lz4 in random configurations. At the moment
+			it is introducing data corruption failures.  Disable it
+			until we get to the bottom of the problems.
 			cstr = "compression=lz4";
-			*/
 			break;
+#endif
 		case 12: case 13: case 14: case 15:	/* 20% snappy */
 			cstr = "compression=snappy";
 			break;
