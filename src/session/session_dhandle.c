@@ -385,10 +385,16 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			goto done;
 
 		/*
-		 * If the handle isn't available (or seems busy from our quick
-		 * check, fall through to the slow path.
+		 * Fall through to the slow path if the handle isn't available
+		 * or was busy and we wanted exclusive access and found a busy
+		 * handle.
+		 * The EBUSY check is a hack. Sometimes we want to keep trying
+		 * and other times we want to give up - the exclusive flag
+		 * currently matches those uses and saves us adding another
+		 * parameter to the function.
 		 */
-		if (ret != EBUSY && ret != WT_NOTFOUND)
+		if (ret != WT_NOTFOUND &&
+		    ret == EBUSY && !LF_ISSET(WT_DHANDLE_EXCLUSIVE))
 			return (ret);
 
 		/* We found the data handle, don't try to get it again. */
