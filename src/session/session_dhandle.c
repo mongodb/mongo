@@ -384,11 +384,18 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		if ((ret = __wt_session_lock_dhandle(session, flags)) == 0)
 			goto done;
 
+		/* Propagate errors we don't expect. */
+		if (ret != WT_NOTFOUND && ret != EBUSY)
+			return (ret);
+
 		/*
-		 * If the handle isn't available (or seems busy from our quick
-		 * check, fall through to the slow path.
+		 * Don't try harder to get the btree handle if our caller
+		 * hasn't allowed us to take the schema lock - they do so on
+		 * purpose and will handle error returns.
 		 */
-		if (ret != EBUSY && ret != WT_NOTFOUND)
+		if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+		    F_ISSET(session,
+		    WT_SESSION_HANDLE_LIST_LOCKED | WT_SESSION_TABLE_LOCKED))
 			return (ret);
 
 		/* We found the data handle, don't try to get it again. */
