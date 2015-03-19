@@ -59,7 +59,7 @@ namespace mongo {
         class WiredTigerRecordStoreThread : public BackgroundJob {
         public:
             WiredTigerRecordStoreThread(const NamespaceString& ns)
-                : _ns(ns) {
+                : BackgroundJob(true /* deleteSelf */), _ns(ns) {
                 _name = std::string("WiredTigerRecordStoreThread for ") + _ns.toString();
             }
 
