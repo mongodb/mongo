@@ -26,6 +26,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/clientdriver',
         '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/getmore_request',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
         ])
@@ -220,3 +221,25 @@ env.CppUnitTest('isself_test',
                     "$BUILD_DIR/mongo/ntservice_mock",
                 ],
                 NO_CRUTCH = True)
+
+env.Library(
+    target='fetcher',
+    source=[
+        'fetcher.cpp',
+    ],
+    LIBDEPS=[
+        'replication_executor',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/logger/logger',
+        '$BUILD_DIR/mongo/namespace_string',
+    ],
+)
+
+env.CppUnitTest(
+    target='fetcher_test',
+    source='fetcher_test.cpp',
+    LIBDEPS=[
+        'fetcher',
+        'replmocks',
+    ],
+)
