@@ -103,7 +103,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		 */
 		*(size_t *)dst = lz4_len;
 		*result_lenp = lz4_len + sizeof(size_t);
-		*compression_failed = 1;
+		*compression_failed = 0;
 	}
 
 	return (0);
