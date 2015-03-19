@@ -47,6 +47,7 @@ namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
     class Client;
+    class CurOp;
     class Database;
     class OperationContext;
     class Timer;
@@ -347,10 +348,18 @@ namespace mutablebson {
 
     bool _runCommands(OperationContext* txn,
                       const char* ns,
-                      BSONObj& jsobj,
+                      BSONObj& _cmdobj,
                       BufBuilder& b,
                       BSONObjBuilder& anObjBuilder,
-                      bool fromRepl,
-                      int queryOptions);
+                      bool fromRepl, int queryOptions);
+
+    bool runCommands(OperationContext* txn,
+                     const char* ns,
+                     BSONObj& jsobj,
+                     CurOp& curop,
+                     BufBuilder& b,
+                     BSONObjBuilder& anObjBuilder,
+                     bool fromRepl,
+                     int queryOptions);
 
 } // namespace mongo

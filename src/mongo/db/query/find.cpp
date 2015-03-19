@@ -204,32 +204,6 @@ namespace mongo {
         }
     }
 
-    // TODO: Move this and the other command stuff in runQuery outta here and up a level.
-    static bool runCommands(OperationContext* txn,
-                            const char *ns,
-                            BSONObj& jsobj,
-                            CurOp& curop,
-                            BufBuilder &b,
-                            BSONObjBuilder& anObjBuilder,
-                            bool fromRepl,
-                            int queryOptions) {
-        try {
-            return _runCommands(txn, ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
-        }
-        catch( SendStaleConfigException& ){
-            throw;
-        }
-        catch ( AssertionException& e ) {
-            verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
-
-            Command::appendCommandStatus(anObjBuilder, e.toStatus());
-            curop.debug().exceptionInfo = e.getInfo();
-        }
-        BSONObj x = anObjBuilder.done();
-        b.appendBuf((void*) x.objdata(), x.objsize());
-        return true;
-    }
-
     struct ScopedRecoveryUnitSwapper {
         explicit ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn)
             : _cc(cc), _txn(txn) {
@@ -650,50 +624,16 @@ namespace mongo {
     }
 
     std::string runQuery(OperationContext* txn,
-                         Message& m,
                          QueryMessage& q,
                          const NamespaceString& nss,
                          CurOp& curop,
                          Message &result) {
         // Validate the namespace.
         uassert(16256, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
+        invariant(!nss.isCommand());
 
         // Set curop information.
         beginQueryOp(nss, q.query, q.ntoreturn, q.ntoskip, &curop);
-
-        // If the query is really a command, run it.
-        if (nss.isCommand()) {
-            int nToReturn = q.ntoreturn;
-            uassert(16979, str::stream() << "bad numberToReturn (" << nToReturn
-                                         << ") for $cmd type ns - can only be 1 or -1",
-                    nToReturn == 1 || nToReturn == -1);
-
-            curop.markCommand();
-
-            BufBuilder bb;
-            bb.skip(sizeof(QueryResult::Value));
-
-            BSONObjBuilder cmdResBuf;
-            if (!runCommands(txn, q.ns, q.query, curop, bb, cmdResBuf, false, q.queryOptions)) {
-                uasserted(13530, "bad or malformed command request?");
-            }
-
-            curop.debug().iscommand = true;
-            // TODO: Does this get overwritten/do we really need to set this twice?
-            curop.debug().query = q.query;
-
-            QueryResult::View qr = bb.buf();
-            bb.decouple();
-            qr.setResultFlagsToOk();
-            qr.msgdata().setLen(bb.len());
-            curop.debug().responseLength = bb.len();
-            qr.msgdata().setOperation(opReply);
-            qr.setCursorId(0);
-            qr.setStartingFrom(0);
-            qr.setNReturned(1);
-            result.setData(qr.view2ptr(), true);
-            return "";
-        }
 
         // Parse the qm into a CanonicalQuery.
         std::auto_ptr<CanonicalQuery> cq;

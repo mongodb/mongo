@@ -113,7 +113,6 @@ namespace mongo {
      * Run the query 'q' and place the result in 'result'.
      */
     std::string runQuery(OperationContext* txn,
-                         Message& m,
                          QueryMessage& q,
                          const NamespaceString& ns,
                          CurOp& curop,
