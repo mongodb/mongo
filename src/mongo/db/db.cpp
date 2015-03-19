@@ -439,6 +439,19 @@ namespace mongo {
     static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
 
+        // Due to SERVER-15389, we must setupSockets first thing at startup in order to avoid
+        // obtaining too high a file descriptor for our calls to select().
+        MessageServer::Options options;
+        options.port = listenPort;
+        options.ipList = serverGlobalParams.bind_ip;
+
+        MessageServer* server = createServer(options, new MyMessageHandler());
+        server->setAsTimeTracker();
+
+        // This is what actually creates the sockets, but does not yet listen on them because we
+        // do not want connections to just hang if recovery takes a very long time.
+        server->setupSockets();
+
         // Warn if we detect configurations for multiple registered storage engines in
         // the same configuration file/environment.
         if (serverGlobalParams.parsedOpts.hasField("storage")) {
@@ -509,19 +522,6 @@ namespace mongo {
                     ss.str().c_str(),
                     boost::filesystem::exists(storageGlobalParams.repairpath));
         }
-
-        // Due to SERVER-15389, we must setupSockets first thing at startup in order to avoid
-        // obtaining too high a file descriptor for our calls to select().
-        MessageServer::Options options;
-        options.port = listenPort;
-        options.ipList = serverGlobalParams.bind_ip;
-
-        MessageServer* server = createServer(options, new MyMessageHandler());
-        server->setAsTimeTracker();
-
-        // This is what actually creates the sockets, but does not yet listen on them because we
-        // do not want connections to just hang if recovery takes a very long time.
-        server->setupSockets();
 
         // TODO:  This should go into a MONGO_INITIALIZER once we have figured out the correct
         // dependencies.
