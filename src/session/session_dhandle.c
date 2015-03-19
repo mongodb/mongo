@@ -386,7 +386,9 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 		/*
 		 * If the handle isn't available (or seems busy from our quick
-		 * check, fall through to the slow path.
+		 * check), fall through to the slow path, the sweep server
+		 * relies on there being a retry loop if an exclusive operation
+		 * such as verify conflicts with a sweep.
 		 */
 		if (ret != EBUSY && ret != WT_NOTFOUND)
 			return (ret);
