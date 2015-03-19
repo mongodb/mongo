@@ -298,7 +298,7 @@ namespace mongo {
         ConstDataCursor ids(_ids);
         int numDeleted = 0;
         for ( int i = 0; i < n; i++ ) {
-            if ( eraseCursorGlobalIfAuthorized(txn, ids.readLEAndAdvance<int64_t>()))
+            if ( eraseCursorGlobalIfAuthorized(txn, ids.readAndAdvance<LittleEndian<int64_t>>()))
                 numDeleted++;
             if ( inShutdown() )
                 break;

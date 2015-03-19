@@ -1,4 +1,4 @@
-/*    Copyright 2014 MongoDB Inc.
+/*    Copyright 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,71 +25,44 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_range.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
-#include <cstring>
-#include <type_traits>
-
-#include "mongo/config.h"
-
-#include "mongo/base/data_type.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    class ConstDataView {
+    TEST(BSONObjDataType, ConstDataTypeRangeBSON) {
+        char buf[1000] = { 0 };
 
-    public:
-        typedef const char* bytes_type;
+        DataRangeCursor drc(buf, buf + sizeof(buf));
 
-        ConstDataView(bytes_type bytes)
-            : _bytes(bytes) {
+        {
+            BSONObjBuilder b;
+            b.append("a", 1);
+
+            ASSERT_OK(drc.writeAndAdvance(b.obj()));
+        }
+        {
+            BSONObjBuilder b;
+            b.append("b", "fooo");
+
+            ASSERT_OK(drc.writeAndAdvance(b.obj()));
+        }
+        {
+            BSONObjBuilder b;
+            b.append("c", 3);
+
+            ASSERT_OK(drc.writeAndAdvance(b.obj()));
         }
 
-        bytes_type view(std::size_t offset = 0) const {
-            return _bytes + offset;
-        }
+        ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
 
-        template<typename T>
-        const ConstDataView& read(T* t, size_t offset = 0) const {
-            DataType::unsafeLoad(t, view(offset), nullptr);
-
-            return *this;
-        }
-
-        template<typename T>
-        T read(std::size_t offset = 0) const {
-            T t(DataType::defaultConstruct<T>());
-
-            read(&t, offset);
-
-            return t;
-        }
-
-    private:
-        bytes_type _bytes;
-    };
-
-    class DataView : public ConstDataView {
-
-    public:
-        typedef char* bytes_type;
-
-        DataView(bytes_type bytes)
-            : ConstDataView(bytes) {
-        }
-
-        bytes_type view(std::size_t offset = 0) const {
-            // It is safe to cast away const here since the pointer stored in our base class was
-            // originally non-const by way of our constructor.
-            return const_cast<bytes_type>(ConstDataView::view(offset));
-        }
-
-        template<typename T>
-        DataView& write(const T& value, std::size_t offset = 0) {
-            DataType::unsafeStore(value, view(offset), nullptr);
-
-            return *this;
-        }
-    };
+        ASSERT_EQUALS(1, cdrc.readAndAdvance<BSONObj>().getValue().getField("a").numberInt());
+        ASSERT_EQUALS("fooo", cdrc.readAndAdvance<BSONObj>().getValue().getField("b").str());
+        ASSERT_EQUALS(3, cdrc.readAndAdvance<BSONObj>().getValue().getField("c").numberInt());
+    }
 
 } // namespace mongo

@@ -181,7 +181,7 @@ namespace mongo {
 
         template <typename T> T readType(BufReader* reader, bool inverted) {
             // TODO for C++11 to static_assert that T is integral
-            T t = ConstDataView(static_cast<const char*>(reader->skip(sizeof(T)))).readNative<T>();
+            T t = ConstDataView(static_cast<const char*>(reader->skip(sizeof(T)))).read<T>();
             if (inverted)
                 return ~t;
             return t;

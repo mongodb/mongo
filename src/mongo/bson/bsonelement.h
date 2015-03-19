@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
@@ -134,7 +135,7 @@ namespace mongo {
 
         /** Returns the type of the element */
         BSONType type() const {
-            const signed char typeByte = ConstDataView(data).readLE<signed char>();
+            const signed char typeByte = ConstDataView(data).read<signed char>();
             return static_cast<BSONType>(typeByte);
         }
 
@@ -210,7 +211,7 @@ namespace mongo {
             @see Bool(), trueValue()
         */
         Date_t date() const {
-            return Date_t(ConstDataView(value()).readLE<unsigned long long>());
+            return Date_t(ConstDataView(value()).read<LittleEndian<unsigned long long>>());
         }
 
         /** Convert the value to boolean, regardless of its type, in a javascript-like fashion
@@ -226,17 +227,17 @@ namespace mongo {
 
         /** Return double value for this field. MUST be NumberDouble type. */
         double _numberDouble() const {
-            return ConstDataView(value()).readLE<double>();
+            return ConstDataView(value()).read<LittleEndian<double>>();
         }
 
         /** Return int value for this field. MUST be NumberInt type. */
         int _numberInt() const {
-            return ConstDataView(value()).readLE<int>();
+            return ConstDataView(value()).read<LittleEndian<int>>();
         }
 
         /** Return long long value for this field. MUST be NumberLong type. */
         long long _numberLong() const {
-            return ConstDataView(value()).readLE<long long>();
+            return ConstDataView(value()).read<LittleEndian<long long>>();
         }
 
         /** Retrieve int value for the element safely.  Zero returned if not a number. */
@@ -278,12 +279,12 @@ namespace mongo {
             @return std::string size including terminating null
         */
         int valuestrsize() const {
-            return ConstDataView(value()).readLE<int>();
+            return ConstDataView(value()).read<LittleEndian<int>>();
         }
 
         // for objects the size *includes* the size of the size field
         size_t objsize() const {
-            return ConstDataView(value()).readLE<uint32_t>();
+            return ConstDataView(value()).read<LittleEndian<uint32_t>>();
         }
 
         /** Get a string's value.  Also gives you start of the real data for an embedded object.
@@ -320,7 +321,7 @@ namespace mongo {
          *  This INCLUDES the null char at the end */
         int codeWScopeCodeLen() const {
             massert( 16178 , "not codeWScope" , type() == CodeWScope );
-            return ConstDataView(value() + 4).readLE<int>();
+            return ConstDataView(value() + 4).read<LittleEndian<int>>();
         }
 
         /** Get the scope SavedContext of a CodeWScope data element.
@@ -454,21 +455,23 @@ namespace mongo {
         }
 
         Timestamp timestamp() const {
-            if( type() == mongo::Date || type() == bsonTimestamp )
-                return Timestamp(ConstDataView(value()).readLE<unsigned long long>());
+            if( type() == mongo::Date || type() == bsonTimestamp ) {
+                return Timestamp(
+                    ConstDataView(value()).read<LittleEndian<unsigned long long>>().value);
+            }
             return Timestamp();
         }
 
         Date_t timestampTime() const {
-            unsigned long long t = ConstDataView(value() + 4).readLE<unsigned int>();
+            unsigned long long t = ConstDataView(value() + 4).read<LittleEndian<unsigned int>>();
             return t * 1000;
         }
         unsigned int timestampInc() const {
-            return ConstDataView(value()).readLE<unsigned int>();
+            return ConstDataView(value()).read<LittleEndian<unsigned int>>();
         }
 
         unsigned long long timestampValue() const {
-            return ConstDataView(value()).readLE<unsigned long long>();
+            return ConstDataView(value()).read<LittleEndian<unsigned long long>>();
         }
 
         const char * dbrefNS() const {
@@ -479,7 +482,7 @@ namespace mongo {
         const mongo::OID dbrefOID() const {
             uassert( 10064 ,  "not a dbref" , type() == DBRef );
             const char * start = value();
-            start += 4 + ConstDataView(start).readLE<int>();
+            start += 4 + ConstDataView(start).read<LittleEndian<int>>();
             return mongo::OID::from(start);
         }
 

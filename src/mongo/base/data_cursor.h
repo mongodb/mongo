@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <cstring>
 
+#include "mongo/base/data_type.h"
 #include "mongo/base/data_view.h"
 #include "mongo/platform/endian.h"
 
@@ -84,34 +85,30 @@ namespace mongo {
 
         template <typename T>
         ConstDataCursor& skip() {
-            *this = view() + sizeof(T);
+            size_t advance = 0;
+
+            DataType::unsafeLoad<T>(nullptr, view(), &advance);
+            *this += advance;
+
             return *this;
         }
 
         template <typename T>
-        ConstDataCursor& readNativeAndAdvance(T* t) {
-            readNative(t);
-            skip<T>();
+        ConstDataCursor& readAndAdvance(T* t) {
+            size_t advance = 0;
+
+            DataType::unsafeLoad(t, view(), &advance);
+            *this += advance;
+
             return *this;
         }
 
         template <typename T>
-        T readNativeAndAdvance() {
-            T out;
-            readNativeAndAdvance(&out);
+        T readAndAdvance() {
+            T out(DataType::defaultConstruct<T>());
+            readAndAdvance(&out);
             return out;
         }
-
-        template <typename T>
-        T readLEAndAdvance() {
-            return endian::littleToNative(readNativeAndAdvance<T>());
-        }
-
-        template <typename T>
-        T readBEAndAdvance() {
-            return endian::bigToNative(readNativeAndAdvance<T>());
-        }
-
     };
 
     class DataCursor : public DataView {
@@ -166,49 +163,39 @@ namespace mongo {
 
         template <typename T>
         DataCursor& skip() {
-            *this = view() + sizeof(T);
+            size_t advance = 0;
+
+            DataType::unsafeLoad<T>(nullptr, view(), &advance);
+            *this += advance;
+
             return *this;
         }
 
         template <typename T>
-        DataCursor& readNativeAndAdvance(T* t) {
-            readNative(t);
-            skip<T>();
+        DataCursor& readAndAdvance(T* t) {
+            size_t advance = 0;
+
+            DataType::unsafeLoad(t, view(), &advance);
+            *this += advance;
+
             return *this;
         }
 
         template <typename T>
-        T readNativeAndAdvance() {
-            T out;
-            readNativeAndAdvance(&out);
+        T readAndAdvance() {
+            T out(DataType::defaultConstruct<T>());
+            readAndAdvance(&out);
             return out;
         }
 
         template <typename T>
-        T readLEAndAdvance() {
-            return endian::littleToNative(readNativeAndAdvance<T>());
-        }
+        DataCursor& writeAndAdvance(const T& value) {
+            size_t advance = 0;
 
-        template <typename T>
-        T readBEAndAdvance() {
-            return endian::bigToNative(readNativeAndAdvance<T>());
-        }
+            DataType::unsafeStore(value, view(), &advance);
+            *this += advance;
 
-        template <typename T>
-        DataCursor& writeNativeAndAdvance(const T& value) {
-            writeNative(value);
-            skip<T>();
             return *this;
-        }
-
-        template <typename T>
-        DataCursor& writeLEAndAdvance(const T& value) {
-            return writeNativeAndAdvance(endian::nativeToLittle(value));
-        }
-
-        template <typename T>
-        DataCursor& writeBEAndAdvance(const T& value) {
-            return writeNativeAndAdvance(endian::nativeToBig(value));
         }
     };
 

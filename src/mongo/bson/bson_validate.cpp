@@ -65,7 +65,7 @@ namespace mongo {
                 if ( ( _position + sizeof(N) ) > _maxLength )
                     return false;
                 if ( out ) {
-                    *out = ConstDataView(_buffer).readLE<N>(_position);
+                    *out = ConstDataView(_buffer).read<LittleEndian<N>>(_position);
                 }
                 _position += sizeof(N);
                 return true;

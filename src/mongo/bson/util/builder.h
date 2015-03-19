@@ -37,6 +37,7 @@
 
 #include <boost/static_assert.hpp>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/inline_decls.h"
@@ -262,7 +263,7 @@ namespace mongo {
             // by a BufBuilder are intended for external use: either written to disk
             // or to the wire. Since all of our encoding formats are little endian,
             // we bake that assumption in here. This decision should be revisited soon.
-            DataView(grow(sizeof(t))).writeLE(t);
+            DataView(grow(sizeof(t))).write(tagLittleEndian(t));
         }
 
 

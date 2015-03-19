@@ -6,7 +6,10 @@ env.Command(['error_codes.h', 'error_codes.cpp'], ['generate_error_codes.py', 'e
             '$PYTHON $SOURCES $TARGETS')
 
 env.Library('base',
-            ['error_codes.cpp',
+            ['data_range.cpp',
+             'data_range_cursor.cpp',
+             'data_type.cpp',
+             'error_codes.cpp',
              'global_initializer.cpp',
              'global_initializer_registerer.cpp',
              'init.cpp',
@@ -24,16 +27,18 @@ env.Library('base',
             ])
 
 env.CppUnitTest('base_test',
-                ['initializer_dependency_graph_test.cpp',
+                ['counter_test.cpp',
+                 'data_cursor_test.cpp',
+                 'data_range_cursor_test.cpp',
+                 'data_range_test.cpp',
+                 'data_view_test.cpp',
+                 'encoded_value_storage_test.cpp',
+                 'initializer_dependency_graph_test.cpp',
                  'initializer_test.cpp',
-                 'owned_pointer_vector_test.cpp',
                  'owned_pointer_map_test.cpp',
+                 'owned_pointer_vector_test.cpp',
                  'parse_number_test.cpp',
                  'status_test.cpp',
                  'status_with_test.cpp',
-                 'encoded_value_storage_test.cpp',
-                 'data_view_test.cpp',
-                 'data_cursor_test.cpp',
-                 'counter_test.cpp',
                  'string_data_test.cpp'
                 ])

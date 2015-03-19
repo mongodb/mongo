@@ -33,6 +33,7 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"
 #include "mongo/util/allocator.h"
@@ -133,19 +134,19 @@ namespace mongo {
             }
 
             int32_t getMessageLength() const {
-                return data().readLE<int32_t>(offsetof(Layout, messageLength));
+                return data().read<LittleEndian<int32_t>>(offsetof(Layout, messageLength));
             }
 
             int32_t getRequestID() const {
-                return data().readLE<int32_t>(offsetof(Layout, requestID));
+                return data().read<LittleEndian<int32_t>>(offsetof(Layout, requestID));
             }
 
             int32_t getResponseTo() const {
-                return data().readLE<int32_t>(offsetof(Layout, responseTo));
+                return data().read<LittleEndian<int32_t>>(offsetof(Layout, responseTo));
             }
 
             int32_t getOpCode() const {
-                return data().readLE<int32_t>(offsetof(Layout, opCode));
+                return data().read<LittleEndian<int32_t>>(offsetof(Layout, opCode));
             }
 
         protected:
@@ -169,19 +170,19 @@ namespace mongo {
             }
 
             void setMessageLength(int32_t value) {
-                data().writeLE(value, offsetof(Layout, messageLength));
+                data().write(tagLittleEndian(value), offsetof(Layout, messageLength));
             }
 
             void setRequestID(int32_t value) {
-                data().writeLE(value, offsetof(Layout, requestID));
+                data().write(tagLittleEndian(value), offsetof(Layout, requestID));
             }
 
             void setResponseTo(int32_t value) {
-                data().writeLE(value, offsetof(Layout, responseTo));
+                data().write(tagLittleEndian(value), offsetof(Layout, responseTo));
             }
 
             void setOpCode(int32_t value) {
-                data().writeLE(value, offsetof(Layout, opCode));
+                data().write(tagLittleEndian(value), offsetof(Layout, opCode));
             }
 
         private:
@@ -248,7 +249,7 @@ namespace mongo {
             int64_t getCursor() const {
                 verify( getResponseTo() > 0 );
                 verify( getOperation() == opReply );
-                return ConstDataView(data() + sizeof(int32_t)).readLE<int64_t>();
+                return ConstDataView(data() + sizeof(int32_t)).read<LittleEndian<int64_t>>();
             }
 
             int dataLen() const; // len without header

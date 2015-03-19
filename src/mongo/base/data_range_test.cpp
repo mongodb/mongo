@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_view.h"
+#include "mongo/base/data_range.h"
 
 #include <cstring>
 
@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    TEST(DataView, ConstDataView) {
+    TEST(DataRange, ConstDataRange) {
         char buf[sizeof(uint32_t) * 3];
         uint32_t native = 1234;
         uint32_t le = endian::nativeToLittle(native);
@@ -46,32 +46,36 @@ namespace mongo {
         std::memcpy(buf + sizeof(uint32_t), &le, sizeof(uint32_t));
         std::memcpy(buf + sizeof(uint32_t) * 2, &be, sizeof(uint32_t));
 
-        ConstDataView cdv(buf);
+        ConstDataRange cdv(buf, buf + sizeof(buf));
 
-        ASSERT_EQUALS(buf, cdv.view());
-        ASSERT_EQUALS(buf + 5, cdv.view(5));
+        ASSERT_EQUALS(native, cdv.read<uint32_t>().getValue());
+        ASSERT_EQUALS(native, cdv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)).getValue());
+        ASSERT_EQUALS(native, cdv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2).getValue());
 
-        ASSERT_EQUALS(native, cdv.read<uint32_t>());
-        ASSERT_EQUALS(native, cdv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)));
-        ASSERT_EQUALS(native, cdv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2));
+        auto result = cdv.read<uint32_t>(sizeof(uint32_t) * 3);
+        ASSERT_EQUALS(false, result.isOK());
+        ASSERT_EQUALS(ErrorCodes::Overflow, result.getStatus().code());
     }
 
-    TEST(DataView, DataView) {
+    TEST(DataRange, DataRange) {
         char buf[sizeof(uint32_t) * 3];
         uint32_t native = 1234;
 
-        DataView dv(buf);
+        DataRange dv(buf, buf + sizeof(buf));
 
-        dv.write(native);
-        dv.write(LittleEndian<uint32_t>(native), sizeof(uint32_t));
-        dv.write(BigEndian<uint32_t>(native), sizeof(uint32_t) * 2);
+        ASSERT_EQUALS(true, dv.write(native).isOK());
+        ASSERT_EQUALS(true, dv.write(LittleEndian<uint32_t>(native), sizeof(uint32_t)).isOK());
+        ASSERT_EQUALS(true, dv.write(BigEndian<uint32_t>(native), sizeof(uint32_t) * 2).isOK());
 
-        ASSERT_EQUALS(buf, dv.view());
-        ASSERT_EQUALS(buf + 5, dv.view(5));
+        auto result = dv.write(native, sizeof(uint32_t) * 3);
+        ASSERT_EQUALS(false, result.isOK());
+        ASSERT_EQUALS(ErrorCodes::Overflow, result.code());
 
-        ASSERT_EQUALS(native, dv.read<uint32_t>());
-        ASSERT_EQUALS(native, dv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)));
-        ASSERT_EQUALS(native, dv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2));
+        ASSERT_EQUALS(native, dv.read<uint32_t>().getValue());
+        ASSERT_EQUALS(native, dv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)).getValue());
+        ASSERT_EQUALS(native, dv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2).getValue());
+
+        ASSERT_EQUALS(false, dv.read<uint32_t>(sizeof(uint32_t) * 3).isOK());
     }
 
 } // namespace mongo

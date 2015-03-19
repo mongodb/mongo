@@ -103,7 +103,7 @@ namespace mongo {
         const char* p = _nsStart + _nsLen + 1;
         checkRead<int>(p, 2);
 
-        return ConstDataView(p).readLE<int32_t>(sizeof(int32_t));
+        return ConstDataView(p).read<LittleEndian<int32_t>>(sizeof(int32_t));
     }
 
     int DbMessage::pullInt() {
@@ -161,7 +161,7 @@ namespace mongo {
     T DbMessage::read() const {
         checkRead<T>(_nextjsobj, 1);
 
-        return ConstDataView(_nextjsobj).readLE<T>();
+        return ConstDataView(_nextjsobj).read<LittleEndian<T>>();
     }
 
     template<typename T> T DbMessage::readAndAdvance() {

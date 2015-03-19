@@ -30,6 +30,7 @@
 
 #include <cstring>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/platform/endian.h"
 #include "mongo/unittest/unittest.h"
 
@@ -57,15 +58,15 @@ namespace EncodedValueStorageTest {
         }
 
         uint32_t getNative() {
-            return data().readNative<uint32_t>(offsetof(Layout, native));
+            return data().read<uint32_t>(offsetof(Layout, native));
         }
 
         uint32_t getLE() {
-            return data().readLE<uint32_t>(offsetof(Layout, le));
+            return data().read<LittleEndian<uint32_t>>(offsetof(Layout, le));
         }
 
         uint32_t getBE() {
-            return data().readBE<uint32_t>(offsetof(Layout, be));
+            return data().read<BigEndian<uint32_t>>(offsetof(Layout, be));
         }
 
     protected:
@@ -89,15 +90,15 @@ namespace EncodedValueStorageTest {
         }
 
         void setNative(uint32_t value) {
-            data().writeNative(value, offsetof(Layout, native));
+            data().write(value, offsetof(Layout, native));
         }
 
         void setLE(uint32_t value) {
-            data().writeLE(value, offsetof(Layout, le));
+            data().write(tagLittleEndian(value), offsetof(Layout, le));
         }
 
         void setBE(uint32_t value) {
-            data().writeBE(value, offsetof(Layout, be));
+            data().write(tagBigEndian(value), offsetof(Layout, be));
         }
 
     private:

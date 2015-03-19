@@ -175,8 +175,8 @@ namespace mongo {
             break;
         case BinData: {
             ConstDataCursor reader( value() );
-            const int len = reader.readLEAndAdvance<int>();
-            BinDataType type = static_cast<BinDataType>(reader.readLEAndAdvance<uint8_t>());
+            const int len = reader.readAndAdvance<LittleEndian<int>>();
+            BinDataType type = static_cast<BinDataType>(reader.readAndAdvance<uint8_t>());
 
             s << "{ \"$binary\" : \"";
             base64::encode( s , reader.view() , len );
@@ -411,7 +411,7 @@ namespace mongo {
 
     BSONObj BSONElement::codeWScopeObject() const {
         verify( type() == CodeWScope );
-        int strSizeWNull = ConstDataView(value() + 4).readLE<int>();
+        int strSizeWNull = ConstDataView(value() + 4).read<LittleEndian<int>>();
         return BSONObj( value() + 4 + 4 + strSizeWNull );
     }
 
@@ -715,7 +715,8 @@ namespace mongo {
         case Code:
             return std::string(valuestr(), valuestrsize()-1);
         case CodeWScope:
-            return std::string(codeWScopeCode(), ConstDataView(valuestr()).readLE<int>() - 1);
+            return std::string(codeWScopeCode(),
+                               ConstDataView(valuestr()).read<LittleEndian<int>>() - 1);
         default:
             log() << "can't convert type: " << (int)(type()) << " to code" << std::endl;
         }

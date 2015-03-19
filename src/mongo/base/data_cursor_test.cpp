@@ -28,6 +28,7 @@
 
 #include "mongo/base/data_cursor.h"
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/platform/endian.h"
 #include "mongo/unittest/unittest.h"
 
@@ -36,15 +37,15 @@ namespace mongo {
     TEST(DataCursor, ConstDataCursor) {
         char buf[100];
 
-        DataView(buf).writeNative<uint16_t>(1);
-        DataView(buf).writeLE<uint32_t>(2, sizeof(uint16_t));
-        DataView(buf).writeBE<uint64_t>(3, sizeof(uint16_t) + sizeof(uint32_t));
+        DataView(buf).write<uint16_t>(1);
+        DataView(buf).write<LittleEndian<uint32_t>>(2, sizeof(uint16_t));
+        DataView(buf).write<BigEndian<uint64_t>>(3, sizeof(uint16_t) + sizeof(uint32_t));
 
         ConstDataCursor cdc(buf);
 
-        ASSERT_EQUALS(static_cast<uint16_t>(1), cdc.readNativeAndAdvance<uint16_t>());
-        ASSERT_EQUALS(static_cast<uint32_t>(2), cdc.readLEAndAdvance<uint32_t>());
-        ASSERT_EQUALS(static_cast<uint64_t>(3), cdc.readBEAndAdvance<uint64_t>());
+        ASSERT_EQUALS(static_cast<uint16_t>(1), cdc.readAndAdvance<uint16_t>());
+        ASSERT_EQUALS(static_cast<uint32_t>(2), cdc.readAndAdvance<LittleEndian<uint32_t>>());
+        ASSERT_EQUALS(static_cast<uint64_t>(3), cdc.readAndAdvance<BigEndian<uint64_t>>());
 
         // test skip()
         cdc = buf;
@@ -93,15 +94,15 @@ namespace mongo {
 
         DataCursor dc(buf);
 
-        dc.writeNativeAndAdvance<uint16_t>(1);
-        dc.writeLEAndAdvance<uint32_t>(2);
-        dc.writeBEAndAdvance<uint64_t>(3);
+        dc.writeAndAdvance<uint16_t>(1);
+        dc.writeAndAdvance<LittleEndian<uint32_t>>(2);
+        dc.writeAndAdvance<BigEndian<uint64_t>>(3);
 
         ConstDataCursor cdc(buf);
 
-        ASSERT_EQUALS(static_cast<uint16_t>(1), cdc.readNativeAndAdvance<uint16_t>());
-        ASSERT_EQUALS(static_cast<uint32_t>(2), cdc.readLEAndAdvance<uint32_t>());
-        ASSERT_EQUALS(static_cast<uint64_t>(3), cdc.readBEAndAdvance<uint64_t>());
+        ASSERT_EQUALS(static_cast<uint16_t>(1), cdc.readAndAdvance<uint16_t>());
+        ASSERT_EQUALS(static_cast<uint32_t>(2), cdc.readAndAdvance<LittleEndian<uint32_t>>());
+        ASSERT_EQUALS(static_cast<uint64_t>(3), cdc.readAndAdvance<BigEndian<uint64_t>>());
     }
 
 } // namespace mongo

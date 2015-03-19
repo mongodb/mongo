@@ -40,7 +40,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/base/data_view.h"
+#include "mongo/base/data_type.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
@@ -94,12 +94,16 @@ namespace mongo {
     class BSONObj {
     public:
 
+        static const char kMinBSONLength = 5;
+
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj() {
             // Little endian ordering here, but that is ok regardless as BSON is spec'd to be
             // little endian external to the system. (i.e. the rest of the implementation of
             // bson, not this part, fails to support big endian)
-            static const char kEmptyObjectPrototype[] = { /*size*/5, 0, 0, 0, /*eoo*/0 };
+            static const char kEmptyObjectPrototype[] =
+                { /*size*/kMinBSONLength, 0, 0, 0, /*eoo*/0 };
+
             _objdata = kEmptyObjectPrototype;
         }
 
@@ -317,7 +321,7 @@ namespace mongo {
 
         /** @return total size of the BSON object in bytes */
         int objsize() const {
-            return ConstDataView(objdata()).readLE<int>();
+            return ConstDataView(objdata()).read<LittleEndian<int>>();
         }
 
         /** performs a cursory check on the object's size only. */
@@ -371,7 +375,7 @@ namespace mongo {
         }
 
         /** @return true if object is empty -- i.e.,  {} */
-        bool isEmpty() const { return objsize() <= 5; }
+        bool isEmpty() const { return objsize() <= kMinBSONLength; }
 
         void dump() const;
 
@@ -747,4 +751,16 @@ namespace mongo {
      */
 #define BSONForEach(elemName, obj) for (BSONElement elemName : (obj))
 
+    template <>
+    struct DataType::Handler<BSONObj> {
+        static Status load(BSONObj* bson, const char *ptr, size_t length, size_t *advanced,
+                           std::ptrdiff_t debug_offset);
+
+        static Status store(const BSONObj& bson, char *ptr, size_t length,
+                            size_t *advanced, std::ptrdiff_t debug_offset);
+
+        static BSONObj defaultConstruct() {
+            return BSONObj();
+        }
+    };
 }

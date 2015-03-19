@@ -80,29 +80,29 @@ namespace {
     }
 
     void OID::setTimestamp(const OID::Timestamp timestamp) {
-        _view().writeBE<Timestamp>(timestamp, kTimestampOffset);
+        _view().write<BigEndian<Timestamp>>(timestamp, kTimestampOffset);
     }
 
     void OID::setInstanceUnique(const OID::InstanceUnique unique) {
         // Byte order doesn't matter here
-        _view().writeNative<InstanceUnique>(unique, kInstanceUniqueOffset);
+        _view().write<InstanceUnique>(unique, kInstanceUniqueOffset);
     }
 
     void OID::setIncrement(const OID::Increment inc) {
-        _view().writeNative<Increment>(inc, kIncrementOffset);
+        _view().write<Increment>(inc, kIncrementOffset);
     }
 
     OID::Timestamp OID::getTimestamp() const {
-        return view().readBE<Timestamp>(kTimestampOffset);
+        return view().read<BigEndian<Timestamp>>(kTimestampOffset);
     }
 
     OID::InstanceUnique OID::getInstanceUnique() const {
         // Byte order doesn't matter here
-        return view().readNative<InstanceUnique>(kInstanceUniqueOffset);
+        return view().read<InstanceUnique>(kInstanceUniqueOffset);
     }
 
     OID::Increment OID::getIncrement() const {
-        return view().readNative<Increment>(kIncrementOffset);
+        return view().read<Increment>(kIncrementOffset);
     }
 
     void OID::hash_combine(size_t &seed) const {

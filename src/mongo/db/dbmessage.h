@@ -116,15 +116,15 @@ namespace mongo {
             }
 
             int64_t getCursorId() const {
-                return storage().readLE<int64_t>(offsetof(Layout, cursorId));
+                return storage().read<LittleEndian<int64_t>>(offsetof(Layout, cursorId));
             }
 
             int32_t getStartingFrom() const {
-                return storage().readLE<int32_t>(offsetof(Layout, startingFrom));
+                return storage().read<LittleEndian<int32_t>>(offsetof(Layout, startingFrom));
             }
 
             int32_t getNReturned() const {
-                return storage().readLE<int32_t>(offsetof(Layout, nReturned));
+                return storage().read<LittleEndian<int32_t>>(offsetof(Layout, nReturned));
             }
 
             const char* data() const {
@@ -155,23 +155,23 @@ namespace mongo {
             }
 
             void setCursorId(int64_t value) {
-                storage().writeLE(value, offsetof(Layout, cursorId));
+                storage().write(tagLittleEndian(value), offsetof(Layout, cursorId));
             }
 
             void setStartingFrom(int32_t value) {
-                storage().writeLE(value, offsetof(Layout, startingFrom));
+                storage().write(tagLittleEndian(value), offsetof(Layout, startingFrom));
             }
 
             void setNReturned(int32_t value) {
-                storage().writeLE(value, offsetof(Layout, nReturned));
+                storage().write(tagLittleEndian(value), offsetof(Layout, nReturned));
             }
 
             int32_t getResultFlags() {
-                return DataView(msgdata().data()).readLE<int32_t>();
+                return DataView(msgdata().data()).read<LittleEndian<int32_t>>();
             }
 
             void setResultFlags(int32_t value) {
-                DataView(msgdata().data()).writeLE(value);
+                DataView(msgdata().data()).write(tagLittleEndian(value));
             }
 
             void setResultFlagsToOk() {
@@ -298,7 +298,7 @@ namespace mongo {
             if ( d.moreJSObjs() ) {
                 fields = d.nextJsObj();
             }
-            queryOptions = DataView(d.msg().header().data()).readLE<int32_t>();
+            queryOptions = DataView(d.msg().header().data()).read<LittleEndian<int32_t>>();
         }
     };
 

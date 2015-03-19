@@ -385,7 +385,7 @@ namespace mongo {
         ClientBasic* client = ClientBasic::getCurrent();
         AuthorizationSession* authSession = client->getAuthorizationSession();
         for ( int i=0; i<n; i++ ) {
-            long long id = cursors.readLEAndAdvance<int64_t>();
+            long long id = cursors.readAndAdvance<LittleEndian<int64_t>>();
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
 
             if ( ! id ) {

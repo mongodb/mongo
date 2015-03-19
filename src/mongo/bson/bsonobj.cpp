@@ -33,6 +33,7 @@
 
 #include <boost/functional/hash.hpp>
 
+#include "mongo/base/data_range.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/json.h"
 #include "mongo/util/allocator.h"
@@ -800,6 +801,72 @@ namespace mongo {
             e.toString( s, !isArray, full, depth );
         }
         s << ( isArray ? " ]" : " }" );
+    }
+
+    Status DataType::Handler<BSONObj>::load(BSONObj* bson, const char *ptr, size_t length,
+                                            size_t *advanced, std::ptrdiff_t debug_offset) {
+        auto len = ConstDataRange(ptr, ptr + length).read<LittleEndian<uint32_t>>();
+
+        if (!len.isOK()) {
+            mongoutils::str::stream ss;
+            ss << "buffer size too small to read length at offset: " << debug_offset;
+            return Status(ErrorCodes::InvalidBSON, ss);
+        }
+
+        if (len.getValue() > length) {
+            mongoutils::str::stream ss;
+            ss << "length (" << len.getValue() << ") greater than buffer size ("
+               << length << ") at offset: " << debug_offset;
+            return Status(ErrorCodes::InvalidBSON, ss);
+        }
+
+        if (len.getValue() < BSONObj::kMinBSONLength) {
+            mongoutils::str::stream ss;
+            ss << "Invalid bson length (" << len.getValue() << ") at offset: "
+               << debug_offset;
+            return Status(ErrorCodes::InvalidBSON, ss);
+        }
+
+        try {
+            BSONObj temp(ptr);
+
+            if (bson) {
+                *bson = std::move(temp);
+            }
+        }
+        catch (...) {
+            auto status = exceptionToStatus();
+            mongoutils::str::stream ss;
+            ss << status.reason() << " at offset: " << debug_offset;
+
+            return Status(status.code(), ss);
+        }
+
+        if (advanced) {
+            *advanced = len.getValue();
+        }
+
+        return Status::OK();
+    }
+
+    Status DataType::Handler<BSONObj>::store(const BSONObj& bson, char *ptr, size_t length,
+                                             size_t *advanced, std::ptrdiff_t debug_offset) {
+        if (bson.objsize() > static_cast<int>(length)) {
+            mongoutils::str::stream ss;
+            ss << "buffer too small to write bson of size (" << bson.objsize()
+               << ") at offset: " << debug_offset;
+            return Status(ErrorCodes::Overflow, ss);
+        }
+
+        if (ptr) {
+            std::memcpy(ptr, bson.objdata(), bson.objsize());
+        }
+
+        if (advanced) {
+            *advanced = bson.objsize();
+        }
+
+        return Status::OK();
     }
 
     std::ostream& operator<<( std::ostream &s, const BSONObj &o ) {
