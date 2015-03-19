@@ -577,6 +577,13 @@ session_ops(WT_SESSION *session)
 	/*! [Create a bzip2 compressed table] */
 	ret = session->drop(session, "table:mytable", NULL);
 
+	/*! [Create a lz4 compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=lz4,key_format=S,value_format=S");
+	/*! [Create a lz4 compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
+
 	/*! [Create a snappy compressed table] */
 	ret = session->create(session,
 	    "table:mytable",
@@ -1032,6 +1039,14 @@ main(void)
 	    "create,"
 	    "extensions=[/usr/local/lib/libwiredtiger_bzip2.so]", &conn);
 	/*! [Configure bzip2 extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure lz4 extension] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/libwiredtiger_lz4.so]", &conn);
+	/*! [Configure lz4 extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 

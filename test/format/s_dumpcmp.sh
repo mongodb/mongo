@@ -51,6 +51,10 @@ bzip_raw_ext=".libs/bzip_raw_compress.so"
 if test -e $bzip_raw_ext ; then
         ext="$ext,\"$bzip_raw_ext\""
 fi
+lz4_ext="$top/ext/compressors/lz4/.libs/libwiredtiger_lz4.so"
+if test -e $lz4_ext ; then
+        ext="$ext,\"$lz4_ext\""
+fi
 snappy_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
 if test -e $snappy_ext ; then
         ext="$ext,\"$snappy_ext\""

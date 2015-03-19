@@ -140,9 +140,11 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 
 	/* Extensions. */
 	p += snprintf(p, REMAIN(p, end),
-	    ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    ",extensions=["
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
@@ -315,6 +317,10 @@ wts_create(void)
 	case COMPRESS_BZIP_RAW:
 		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"bzip2-raw-test\"");
+		break;
+	case COMPRESS_LZ4:
+		p += snprintf(p, REMAIN(p, end),
+		    ",block_compressor=\"lz4\"");
 		break;
 	case COMPRESS_LZO:
 		p += snprintf(p, REMAIN(p, end),

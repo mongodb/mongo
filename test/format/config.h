@@ -118,8 +118,8 @@ static CONFIG c[] = {
 
 	{ "compression",
 	  "type of compression "
-	  "(none | bzip | bzip-raw | lzo | snappy | zlib | zlib-noraw)",
-	  C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
+	  "(none | bzip | bzip-raw | lz4 | lzo | snappy | zlib | zlib-noraw)",
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_compression },
 
 	{ "data_extend",
 	  "if data files are extended",				/* 5% */
