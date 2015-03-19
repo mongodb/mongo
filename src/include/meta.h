@@ -9,18 +9,20 @@
 #define	WT_WIREDTIGER		"WiredTiger"		/* Version file */
 #define	WT_SINGLETHREAD		"WiredTiger.lock"	/* Locking file */
 
-#define	WT_BASECONFIG		"WiredTiger.basecfg"	/* Configuration */
-#define	WT_USERCONFIG		"WiredTiger.config"	/* Configuration */
+#define	WT_BASECONFIG		"WiredTiger.basecfg"	/* Base configuration */
+#define	WT_BASECONFIG_SET	"WiredTiger.basecfg.set"/* Base config temp */
 
-#define	WT_INCREMENTAL_BACKUP						\
-    "WiredTiger.ibackup"	/* Incremental backup file */
+#define	WT_USERCONFIG		"WiredTiger.config"	/* User configuration */
+
 #define	WT_METADATA_BACKUP	"WiredTiger.backup"	/* Hot backup file */
+#define	WT_INCREMENTAL_BACKUP	"WiredTiger.ibackup"	/* Incremental backup */
 
 #define	WT_METADATA_TURTLE	"WiredTiger.turtle"	/* Metadata metadata */
 #define	WT_METADATA_TURTLE_SET	"WiredTiger.turtle.set"	/* Turtle temp file */
 
 #define	WT_METADATA_URI		"metadata:"		/* Metadata alias */
 #define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata file URI */
+
 /*
  * Pre computed hash for the metadata file. Used to optimize comparisons
  * against the metafile URI. The validity is checked on connection open
