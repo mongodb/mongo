@@ -4,6 +4,7 @@ package main
 import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/password"
 	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/text"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -65,6 +66,12 @@ func main() {
 	if opts.Auth.Username != "" && opts.Auth.Source == "" && !opts.Auth.RequiresExternalDB() {
 		log.Logf(log.Always, "--authenticationDatabase is required when authenticating against a non $external database")
 		os.Exit(util.ExitBadOptions)
+	}
+
+	// we have to check this here, otherwise the user will be prompted
+	// for a password for each discovered node
+	if opts.Auth.ShouldAskForPassword() {
+		opts.Auth.Password = password.Prompt()
 	}
 
 	var formatter mongostat.LineFormatter

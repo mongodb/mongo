@@ -230,6 +230,13 @@ func (auth *Auth) RequiresExternalDB() bool {
 	return auth.Mechanism == "GSSAPI" || auth.Mechanism == "PLAIN" || auth.Mechanism == "MONGODB-X509"
 }
 
+// ShouldAskForPassword returns true if the user specifies a username flag
+// but no password, and the authentication mechanism requires a password.
+func (auth *Auth) ShouldAskForPassword() bool {
+	return auth.Username != "" && auth.Password == "" &&
+		!(auth.Mechanism == "MONGODB-X509" || auth.Mechanism == "GSSAPI")
+}
+
 // Get the authentication database to use. Should be the value of
 // --authenticationDatabase if it's provided, otherwise, the database that's
 // specified in the tool's --db arg.
