@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/password"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -124,6 +125,11 @@ func (self *SessionProvider) SetFlags(flagBits sessionFlag) {
 func NewSessionProvider(opts options.ToolOptions) (*SessionProvider, error) {
 	// create the provider
 	provider := &SessionProvider{}
+
+	// finalize auth options, filling in missing passwords
+	if opts.Auth.ShouldAskForPassword() {
+		opts.Auth.Password = password.Prompt()
+	}
 
 	// create the connector for dialing the database
 	provider.connector = getConnector(opts)
