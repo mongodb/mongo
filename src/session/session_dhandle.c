@@ -384,17 +384,18 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		if ((ret = __wt_session_lock_dhandle(session, flags)) == 0)
 			goto done;
 
+		/* Propagate errors we don't expect. */
+		if (ret != WT_NOTFOUND && ret != EBUSY)
+			return (ret);
+
 		/*
-		 * Fall through to the slow path if the handle isn't available
-		 * or was busy and we wanted exclusive access and found a busy
-		 * handle.
-		 * The EBUSY check is a hack. Sometimes we want to keep trying
-		 * and other times we want to give up - the exclusive flag
-		 * currently matches those uses and saves us adding another
-		 * parameter to the function.
+		 * Don't try harder to get the btree handle if our caller
+		 * hasn't allowed us to take the schema lock - they do so on
+		 * purpose and will handle error returns.
 		 */
-		if (ret != WT_NOTFOUND &&
-		    ret == EBUSY && !LF_ISSET(WT_DHANDLE_EXCLUSIVE))
+		if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+		    F_ISSET(session,
+		    WT_SESSION_HANDLE_LIST_LOCKED | WT_SESSION_TABLE_LOCKED))
 			return (ret);
 
 		/* We found the data handle, don't try to get it again. */
