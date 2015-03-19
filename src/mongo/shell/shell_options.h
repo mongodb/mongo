@@ -66,9 +66,12 @@ namespace mongo {
         bool useWriteCommandsDefault;
         std::string writeMode;
 
+        std::string readMode;
+
         ShellGlobalParams() : autoKillOp(false),
                               useWriteCommandsDefault(true),
-                              writeMode("commands") {
+                              writeMode("commands"),
+                              readMode("compatibility") {
         }
     };
 

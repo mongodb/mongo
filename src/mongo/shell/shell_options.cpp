@@ -142,6 +142,12 @@ namespace mongo {
                                    "mode to determine how writes are done:"
                                    " commands, compatibility, legacy").hidden();
 
+        options->addOptionChaining("readMode",
+                                   "readMode",
+                                   moe::String,
+                                   "mode to determine how .find() queries are done:"
+                                   " commands, compatibility").hidden();
+
         return Status::OK();
     }
 
@@ -259,6 +265,16 @@ namespace mongo {
                                                 "Unknown writeMode option: " << mode);
             }
             shellGlobalParams.writeMode = mode;
+        }
+        if (params.count("readMode")) {
+            std::string mode = params["readMode"].as<string>();
+            if (mode != "commands" && mode != "compatibility") {
+                throw MsgAssertionException(17397,
+                                            mongoutils::str::stream()
+                                            << "Unknown readMode option: '" << mode
+                                            << "'. Valid modes are: {commands, compatibility}");
+            }
+            shellGlobalParams.readMode = mode;
         }
 
         /* This is a bit confusing, here are the rules:

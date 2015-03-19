@@ -362,6 +362,11 @@ if (typeof(_writeMode) == 'undefined') {
     _writeMode = function() { return "commands"; };
 };
 
+if (typeof(_readMode) == 'undefined') {
+    // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
+    _readMode = function() { return "compatibility"; };
+};
+
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
         // Make sure that we have a db var before we use it

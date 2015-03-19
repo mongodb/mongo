@@ -80,8 +80,25 @@ DBQuery.prototype._checkModify = function(){
 DBQuery.prototype._exec = function(){
     if ( ! this._cursor ){
         assert.eq( 0 , this._numReturned );
-        this._cursor = this._mongo.find( this._ns , this._query , this._fields , this._limit , this._skip , this._batchSize , this._options );
         this._cursorSeen = 0;
+
+        if (this._mongo.useFindCommand() && this._collection.getName().indexOf("$cmd") !== 0) {
+            // Run the query as a find command. Since runCommand() is implemented by running
+            // a findOne() against the $cmd collection, we have to make sure that we don't try
+            // to run a find command against the $cmd collection.
+            var findCmd = this._convertToCommand();
+            var cmdRes = this._db.runCommand(findCmd);
+            this._cursor = new DBCommandCursor(this._mongo, cmdRes);
+        }
+        else {
+            this._cursor = this._mongo.find(this._ns,
+                                            this._query,
+                                            this._fields,
+                                            this._limit,
+                                            this._skip,
+                                            this._batchSize,
+                                            this._options);
+        }
     }
     return this._cursor;
 }
