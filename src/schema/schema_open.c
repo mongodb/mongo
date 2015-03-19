@@ -148,8 +148,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 		F_SET(idx, WT_INDEX_IMMUTABLE);
 
 	/*
-	 * Compatibility: we didn't always collator info in index metadata.
-	 * Cope if it isn't found.
+	 * Compatibility: we didn't always maintain collator information in
+	 * index metadata, cope when it isn't found.
 	 */
 	WT_CLEAR(cval);
 	WT_ERR_NOTFOUND_OK(__wt_config_getones(
