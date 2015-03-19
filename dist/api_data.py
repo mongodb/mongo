@@ -20,6 +20,10 @@ class Config:
 common_meta = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
+    Config('collator', 'none', r'''
+        configure custom collation for keys.  Permitted values are
+        \c "none" or a custom collator name created with
+        WT_CONNECTION::add_collator'''),
     Config('columns', '', r'''
         list of the column names.  Comma-separated list of the form
         <code>(column[,...])</code>.  For tables, the number of entries
@@ -148,10 +152,6 @@ file_config = format_meta + [
         applications which can rely on decompression to fail if a block
         has been corrupted''',
         choices=['on', 'off', 'uncompressed']),
-    Config('collator', 'none', r'''
-        configure custom collation for keys.  Permitted values are
-        \c "none" or a custom collator name created with
-        WT_CONNECTION::add_collator'''),
     Config('dictionary', '0', r'''
         the maximum number of unique values remembered in the Btree
         row-store leaf page value dictionary; see

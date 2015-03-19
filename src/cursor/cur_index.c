@@ -61,6 +61,35 @@ err:	cursor->saved_err = ret;
 }
 
 /*
+ * __curindex_compare --
+ *	WT_CURSOR->compare method for the index cursor type.
+ */
+static int
+__curindex_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
+{
+	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	cindex = (WT_CURSOR_INDEX *)a;
+	CURSOR_API_CALL(a, session, compare, NULL);
+
+	/* Check both cursors are "index:" type. */
+	if (!WT_PREFIX_MATCH(a->uri, "index:") ||
+	    !WT_PREFIX_MATCH(b->uri, "index:"))
+		WT_ERR_MSG(session, EINVAL,
+		    "Cursors must reference the same object");
+
+	WT_CURSOR_CHECKKEY(a);
+	WT_CURSOR_CHECKKEY(b);
+
+	ret = __wt_compare(
+	    session, cindex->index->collator, &a->key, &b->key, cmpp);
+
+err:	API_END_RET(session, ret);
+}
+
+/*
  * __curindex_move --
  *	When an index cursor changes position, set the primary key in the
  *	associated column groups and update their positions to match.
@@ -189,8 +218,9 @@ __curindex_search(WT_CURSOR *cursor)
 	WT_CURSOR *child;
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
+	WT_ITEM found_key;
 	WT_SESSION_IMPL *session;
-	int exact;
+	int cmp;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	child = cindex->child;
@@ -201,7 +231,7 @@ __curindex_search(WT_CURSOR *cursor)
 	 * matches the prefix.  Fail if there is no matching item.
 	 */
 	__wt_cursor_set_raw_key(child, &cursor->key);
-	WT_ERR(child->search_near(child, &exact));
+	WT_ERR(child->search_near(child, &cmp));
 
 	/*
 	 * We expect partial matches, and want the smallest record with a key
@@ -210,11 +240,16 @@ __curindex_search(WT_CURSOR *cursor)
 	 * otherwise the primary key columns will be appended to the index key,
 	 * but we don't disallow that (odd) case.
 	 */
-	if (exact < 0)
+	if (cmp < 0)
 		WT_ERR(child->next(child));
 
-	if (child->key.size < cursor->key.size ||
-	    memcmp(child->key.data, cursor->key.data, cursor->key.size) != 0) {
+	if (child->key.size < cursor->key.size)
+		WT_ERR(WT_NOTFOUND);
+	found_key = child->key;
+	found_key.size = cursor->key.size;
+	WT_ERR(__wt_compare(
+	    session, cindex->index->collator, &cursor->key, &found_key, &cmp));
+	if (cmp != 0) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}
@@ -342,8 +377,8 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	    __curindex_get_value,	/* get-value */
 	    __wt_cursor_set_key,	/* set-key */
 	    __curindex_set_value,	/* set-value */
-	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* equals */
+	    __curindex_compare,		/* compare */
+	    __wt_cursor_equals,		/* equals */
 	    __curindex_next,		/* next */
 	    __curindex_prev,		/* prev */
 	    __curindex_reset,		/* reset */
