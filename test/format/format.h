@@ -73,6 +73,8 @@ extern WT_EXTENSION_API *wt_api;
 
 #define	BZIP_PATH							\
 	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
+#define	LZ4_PATH							\
+	EXTPATH "compressors/lz4/.libs/libwiredtiger_lz4.so"
 #define	SNAPPY_PATH							\
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
 #define	ZLIB_PATH							\
@@ -239,10 +241,11 @@ typedef struct {
 #define	COMPRESS_NONE			1
 #define	COMPRESS_BZIP			2
 #define	COMPRESS_BZIP_RAW		3
-#define	COMPRESS_LZO			4
-#define	COMPRESS_SNAPPY			5
-#define	COMPRESS_ZLIB			6
-#define	COMPRESS_ZLIB_NO_RAW		7
+#define	COMPRESS_LZ4			4
+#define	COMPRESS_LZO			5
+#define	COMPRESS_SNAPPY			6
+#define	COMPRESS_ZLIB			7
+#define	COMPRESS_ZLIB_NO_RAW		8
 	u_int c_compression_flag;		/* Compression flag value */
 
 #define	ISOLATION_RANDOM		1

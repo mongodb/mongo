@@ -1210,6 +1210,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		len = (size_t)snprintf(buf, sizeof(buf),
 		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
 		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
+		WT_ERR(__wt_fsync(session, fh));
 
 		conn->is_new = 1;
 	} else {
@@ -1374,7 +1375,7 @@ __conn_write_config(
 
 	/*
 	 * We were passed an array of configuration strings where slot 0 is all
-	 * all possible values and the second and subsequent slots are changes
+	 * possible values and the second and subsequent slots are changes
 	 * specified by the application during open (using the wiredtiger_open
 	 * configuration string, an environment variable, or user-configuration
 	 * file). The base configuration file contains all changes to default

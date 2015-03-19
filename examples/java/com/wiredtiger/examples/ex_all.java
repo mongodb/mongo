@@ -522,6 +522,12 @@ session_ops(Session session)
     /*! [Create a bzip2 compressed table] */
     ret = session.drop("table:mytable", null);
 
+    /*! [Create a lz4 compressed table] */
+    ret = session.create("table:mytable",
+        "block_compressor=lz4,key_format=S,value_format=S");
+    /*! [Create a lz4 compressed table] */
+    ret = session.drop("table:mytable", null);
+
     /*! [Create a snappy compressed table] */
     ret = session.create("table:mytable",
         "block_compressor=snappy,key_format=S,value_format=S");
@@ -898,6 +904,13 @@ allExample()
         "create," +
         "extensions=[/usr/local/lib/libwiredtiger_bzip2.so]");
     /*! [Configure bzip2 extension] */
+    conn.close(null);
+
+    /*! [Configure lz4 extension] */
+    conn = wiredtiger.open(home,
+        "create," +
+        "extensions=[/usr/local/lib/libwiredtiger_lz4.so]");
+    /*! [Configure lz4 extension] */
     conn.close(null);
 
     /*! [Configure snappy extension] */

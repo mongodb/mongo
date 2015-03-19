@@ -58,8 +58,8 @@ wt_lz4_error(
 
 	wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
 
-	(void)wt_api->err_printf(wt_api, session,
-	    "lz4 error: %s: %d: %d", call, zret, zret);
+	(void)wt_api->err_printf(wt_api,
+	    session, "lz4 error: %s: %d", call, zret);
 	return (WT_ERROR);
 }
 
@@ -86,7 +86,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	/* Store the length of the compressed block in the first 8 bytes */
 	lz4buf = (char *)dst + sizeof(size_t);
-	lz4_len = (size_t)LZ4_compress((const char *)src, lz4buf, src_len);
+	lz4_len = (size_t)LZ4_compress((const char *)src, lz4buf, (int)src_len);
 
 	/*
 	 * Flag no-compression if the result was larger than the original
@@ -103,7 +103,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		 */
 		*(size_t *)dst = lz4_len;
 		*result_lenp = lz4_len + sizeof(size_t);
-		*compression_failed = 1;
+		*compression_failed = 0;
 	}
 
 	return (0);
@@ -142,15 +142,15 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * The destination buffer length should always be sufficient because
 	 * wiredtiger keeps track of the byte count before compression
 	 */
-	decoded = LZ4_decompress_safe(
-	    compressed_data, (char *)dst, src_data_len, dst_len);
+	decoded =
+	    LZ4_decompress_fast(compressed_data, (char *)dst, (int)dst_len);
 
 	if (decoded < 0)
 		return (wt_lz4_error(compressor, session,
 		    "LZ4 decompress error", decoded));
 
 	/* return the uncompressed data length */
-	*result_lenp = (size_t)decoded;
+	*result_lenp = dst_len;
 
 	return (0);
 }
