@@ -93,6 +93,7 @@
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/task.h"
@@ -477,7 +478,7 @@ namespace mongo {
         }
 
         getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
-        getGlobalEnvironment()->setOpObserver(std::unique_ptr<OpObserver>(new OpObserver));
+        getGlobalEnvironment()->setOpObserver(stdx::make_unique<OpObserver>());
 
         const repl::ReplSettings& replSettings =
                 repl::getGlobalReplicationCoordinator()->getSettings();

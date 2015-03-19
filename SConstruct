@@ -1770,6 +1770,29 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
+    def CheckCXX14MakeUnique(context):
+        test_body = """
+        #include <memory>
+        int main(int argc, char **argv) {
+            auto foo = std::make_unique<int>(5);
+            return 0;
+        }
+        """
+        context.Message('Checking for C++14 std::make_unique support... ')
+        ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
+        context.Result(ret)
+        return ret
+
+    # Check for std::make_unique support without using the __cplusplus macro
+    conf = Configure(myenv, help=False, custom_tests = {
+        'CheckCXX14MakeUnique': CheckCXX14MakeUnique,
+    })
+
+    if conf.CheckCXX14MakeUnique():
+        conf.env.Append(CPPDEFINES=['MONGO_HAVE_STD_MAKE_UNIQUE'])
+
+    myenv = conf.Finish()
+
     def CheckBoostMinVersion(context):
         compile_test_body = textwrap.dedent("""
         #include <boost/version.hpp>
