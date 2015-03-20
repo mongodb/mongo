@@ -423,6 +423,7 @@ autoheader
 bInheritHandle
 basecfg
 bdb
+beginthreadex
 bigram
 bitcnt
 bitfield

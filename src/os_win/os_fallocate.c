@@ -15,6 +15,8 @@
 void
 __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 {
+	WT_UNUSED(session);
+
 	fh->fallocate_available = WT_FALLOCATE_AVAILABLE;
 
 	/*

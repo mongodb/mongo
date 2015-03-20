@@ -69,7 +69,7 @@ err:	__wt_scr_free(session, &tmp);
  * __ckpt_server --
  *	The checkpoint server thread.
  */
-static void *
+static WT_THREAD_RET
 __ckpt_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -112,7 +112,7 @@ __ckpt_server(void *arg)
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "checkpoint server error");
 	}
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*

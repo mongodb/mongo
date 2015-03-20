@@ -314,7 +314,7 @@ err:	__wt_scr_free(session, &build);
  * __config_merge_cmp --
  *	Qsort function: sort the config merge array.
  */
-static int
+static int WT_CDECL
 __config_merge_cmp(const void *a, const void *b)
 {
 	WT_CONFIG_MERGE_ENTRY *ae, *be;

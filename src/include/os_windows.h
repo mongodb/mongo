@@ -14,6 +14,18 @@ typedef CONDITION_VARIABLE	wt_cond_t;
 typedef CRITICAL_SECTION	wt_mutex_t;
 typedef HANDLE			wt_thread_t;
 
+/*
+ * Thread callbacks need to match the return signature of _beginthreadex.
+ */
+#define	WT_THREAD_CALLBACK(x)	unsigned (__stdcall x)
+#define	WT_THREAD_RET		unsigned __stdcall
+#define	WT_THREAD_RET_VALUE	0
+
+/*
+ * WT declaration for calling convention type
+ */
+#define	WT_CDECL  		__cdecl
+
 #if _MSC_VER < 1900
 /* Timespec is a POSIX structure not defined in Windows */
 struct timespec {
@@ -29,7 +41,7 @@ struct timespec {
  */
 typedef uint32_t	u_int;
 typedef unsigned char	u_char;
-typedef unsigned long	u_long;
+typedef uint64_t	u_long;
 
 /* <= VS 2013 is not C99 compat */
 #if _MSC_VER < 1900
