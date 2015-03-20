@@ -136,11 +136,11 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 
 		/*
 		 * We are going to allocate an aligned buffer.  When we do this
-		 * repeatedly, the allocator has keep starting on a boundary
-		 * each time.  Account for that by never asking for less than a
-		 * full alignment size.  The primary use case for aligned
-		 * buffers is Linux direct I/O, which requires that the size be
-		 * a multiple of the alignment anyway.
+		 * repeatedly, the allocator is expected to start on a boundary
+		 * each time, account for that additional space by never asking
+		 * for less than a full alignment size.  The primary use case
+		 * for aligned buffers is Linux direct I/O, which requires that
+		 * the size be a multiple of the alignment anyway.
 		 */
 		bytes_to_allocate =
 		    WT_ALIGN(bytes_to_allocate, S2C(session)->buffer_alignment);
