@@ -110,6 +110,10 @@ namespace mongo {
                      vector<string>& headers,
                      const SockAddr &from) {
 
+            if ( !cc().getAuthorizationSession()->getAuthorizationManager().isAuthEnabled() ) {
+                return true;
+            }
+
             if ( from.isLocalHost() && !_webUsers->haveAdminUsers(txn) ) {
                 cc().getAuthorizationSession()->grantInternalAuthorization();
                 return true;
