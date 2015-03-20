@@ -70,24 +70,23 @@ ext_collator_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
  */
 static int
 __collator_confchk(
-    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname, WT_NAMED_COLLATOR **ncollp)
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname, WT_COLLATOR **collatorp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COLLATOR *ncoll;
 
-	if (ncollp != NULL)
-		*ncollp = NULL;
+	if (collatorp != NULL)
+		*collatorp = NULL;
 
 	conn = S2C(session);
 	TAILQ_FOREACH(ncoll, &conn->collqh, q)
-		if (WT_STRING_MATCH(ncoll->name, cname->str, cname->len))
-			break;
-	if (ncoll == NULL)
-		WT_RET_MSG(session, EINVAL,
-		    "unknown collator '%.*s'", (int)cname->len, cname->str);
-	if (ncollp != NULL)
-		*ncollp = ncoll;
-	return (0);
+		if (WT_STRING_MATCH(ncoll->name, cname->str, cname->len)) {
+			if (collatorp != NULL)
+				*collatorp = ncoll->collator;
+			return (0);
+		}
+	WT_RET_MSG(session, EINVAL,
+	    "unknown collator '%.*s'", (int)cname->len, cname->str);
 }
 
 /*
@@ -110,14 +109,12 @@ __wt_collator_config(WT_SESSION_IMPL *session, const char *uri,
     WT_COLLATOR **collatorp, int *ownp)
 {
 	WT_COLLATOR *collator;
-	WT_NAMED_COLLATOR *ncoll;
 
 	*collatorp = NULL;
 	*ownp = 0;
 
-	WT_RET(__collator_confchk(session, cname, &ncoll));
+	WT_RET(__collator_confchk(session, cname, &collator));
 
-	collator = ncoll->collator;
 	if (collator->customize != NULL)
 		WT_RET(collator->customize(collator,
 		    &session->iface, uri, metadata, collatorp));

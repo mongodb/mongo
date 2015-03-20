@@ -36,21 +36,28 @@ class test_bug012(wttest.WiredTigerTestCase):
         msg = '/unknown collator/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create('table:A',
-                'type=lsm,lsm=(bloom_config=(collator="foo"))'), msg)
+                'type=lsm,lsm=(bloom_config=(collator="xyzzy"))'), msg)
 
     # Test that we detect illegal key formats.
     def test_illegal_key_format(self):
         msg = '/Invalid type/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create('table:A',
-                'type=lsm,lsm=(bloom_config=(key_format="X"))'), msg)
+                'type=lsm,lsm=(bloom_config=(key_format="xyzzy"))'), msg)
 
     # Test that we detect illegal value formats.
     def test_illegal_value_format(self):
         msg = '/Invalid type/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create('table:A',
-                'type=lsm,lsm=(bloom_config=(value_format="X"))'), msg)
+                'type=lsm,lsm=(bloom_config=(value_format="xyzzy"))'), msg)
+
+    # Test that we detect illegal compressors.
+    def test_illegal_compressor(self):
+        msg = '/unknown block compressor/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create('table:A',
+                'type=lsm,lsm=(bloom_config=(block_compressor="xyzzy"))'), msg)
 
 if __name__ == '__main__':
     wttest.run()

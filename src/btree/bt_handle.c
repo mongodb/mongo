@@ -177,6 +177,41 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __compressor_confchk --
+ *	Validate the compressor.
+ */
+static int
+__compressor_confchk(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_COMPRESSOR **compressorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COMPRESSOR *ncomp;
+
+	if (compressorp != NULL)
+		*compressorp = NULL;
+
+	conn = S2C(session);
+	TAILQ_FOREACH(ncomp, &conn->compqh, q)
+		if (WT_STRING_MATCH(ncomp->name, cval->str, cval->len)) {
+			if (compressorp != NULL)
+				*compressorp = ncomp->compressor;
+			return (0);
+		}
+	WT_RET_MSG(session, EINVAL,
+	    "unknown block compressor '%.*s'", (int)cval->len, cval->str);
+}
+
+/*
+ * __wt_compressor_confchk --
+ *	Validate the compressor (public).
+ */
+int
+__wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
+{
+	return (__compressor_confchk(session, cval, NULL));
+}
+
+/*
  * __btree_conf --
  *	Configure a WT_BTREE structure.
  */
@@ -185,15 +220,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval, metadata;
-	WT_CONNECTION_IMPL *conn;
-	WT_NAMED_COMPRESSOR *ncomp;
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
 	const char **cfg;
 
 	btree = S2BT(session);
-	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
 
 	/* Dump out format information. */
@@ -307,17 +339,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	}
 
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
-	if (cval.len > 0) {
-		TAILQ_FOREACH(ncomp, &conn->compqh, q)
-			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
-				btree->compressor = ncomp->compressor;
-				break;
-			}
-		if (btree->compressor == NULL)
-			WT_RET_MSG(session, EINVAL,
-			    "unknown block compressor '%.*s'",
-			    (int)cval.len, cval.str);
-	}
+	if (cval.len > 0)
+		WT_RET(
+		    __compressor_confchk(session, &cval, &btree->compressor));
 
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(

@@ -140,7 +140,8 @@ file_config = format_meta + [
         \c "none" or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
         for \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
-        available.  See @ref compression for more information'''),
+        available.  See @ref compression for more information''',
+        func='__wt_compressor_confchk'),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages; see @ref
         tuning_cache_resident for more information''',

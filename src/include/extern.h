@@ -120,6 +120,7 @@ extern void __wt_free_ref( WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref,
 extern void __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, int free_pages);
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
+extern int __wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval);
 extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
 extern int __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
