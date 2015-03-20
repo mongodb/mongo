@@ -391,7 +391,7 @@ __compressor_confchk(
 			return (0);
 		}
 	WT_RET_MSG(session, EINVAL,
-	    "unknown block compressor '%.*s'", (int)cval->len, cval->str);
+	    "unknown compressor '%.*s'", (int)cval->len, cval->str);
 }
 
 /*

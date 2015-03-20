@@ -54,7 +54,7 @@ class test_bug012(wttest.WiredTigerTestCase):
 
     # Test that we detect illegal compressors.
     def test_illegal_compressor(self):
-        msg = '/unknown block compressor/'
+        msg = '/unknown compressor/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create('table:A',
                 'type=lsm,lsm=(bloom_config=(block_compressor="xyzzy"))'), msg)
