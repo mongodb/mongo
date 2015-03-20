@@ -496,6 +496,7 @@ compat
 concat
 cond
 conf
+confchk
 config
 conn
 connectionp

@@ -163,11 +163,13 @@ file_config = format_meta + [
     Config('huffman_key', 'none', r'''
         configure Huffman encoding for keys.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information'''),
+        See @ref huffman for more information''',
+        func='__wt_huffman_confchk'),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information'''),
+        See @ref huffman for more information''',
+        func='__wt_huffman_confchk'),
     Config('internal_key_truncate', 'true', r'''
         configure internal key truncation, discarding unnecessary
         trailing bytes on internal keys (ignored for custom

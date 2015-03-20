@@ -540,12 +540,18 @@ __evict_pass(WT_SESSION_IMPL *session)
 			 */
 			__wt_sleep(0, 1000 * (uint64_t)loop);
 			if (loop == 100) {
-				F_SET(cache, WT_CACHE_STUCK);
-				WT_STAT_FAST_CONN_INCR(
-				    session, cache_eviction_slow);
-				WT_RET(__wt_verbose(
-				    session, WT_VERB_EVICTSERVER,
-				    "unable to reach eviction goal"));
+				/*
+				 * Mark the cache as stuck if we need space
+				 * and aren't evicting any pages.
+				 */
+				if (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK)) {
+					F_SET(cache, WT_CACHE_STUCK);
+					WT_STAT_FAST_CONN_INCR(
+					    session, cache_eviction_slow);
+					WT_RET(__wt_verbose(
+					    session, WT_VERB_EVICTSERVER,
+					    "unable to reach eviction goal"));
+				}
 				break;
 			}
 		} else {

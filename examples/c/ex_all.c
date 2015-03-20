@@ -33,8 +33,8 @@
  *	fragments.
  */
 
-#include <assert.h>
-#include <errno.h>
+#include <sys/stat.h>
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +45,6 @@
 #else
 #include "windows_shim.h"
 #endif
-#include <sys/stat.h>
 
 #include <wiredtiger.h>
 
@@ -937,7 +936,6 @@ pack_ops(WT_SESSION *session)
 	size_t size;
 	ret = wiredtiger_struct_size(session, &size, "iSh", 42, "hello", -3);
 	/*! [Get the packed size] */
-	assert(size < 100);
 	}
 
 	{
