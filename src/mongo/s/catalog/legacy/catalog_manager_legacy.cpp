@@ -231,6 +231,8 @@ namespace {
     }
 
     Status CatalogManagerLegacy::updateDatabase(const std::string& dbName, const DatabaseType& db) {
+        fassert(28616, db.validate());
+
         BatchedCommandResponse response;
         Status status = update(DatabaseType::ConfigNS,
                                BSON(DatabaseType::name(dbName)),
@@ -257,14 +259,7 @@ namespace {
                           stream() <<  "database " << dbName << " not found.");
         }
 
-        DatabaseType db;
-        string errmsg;
-
-        if (!db.parseBSON(dbObj, &errmsg)) {
-            return Status(ErrorCodes::InvalidBSON, errmsg);
-        }
-
-        return StatusWith<DatabaseType>(db);
+        return DatabaseType::fromBSON(dbObj);
     }
 
     void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& request,
@@ -312,16 +307,15 @@ namespace {
         ScopedDbConnection conn(_configServerConnectionString, 30);
 
         BSONObjBuilder b;
-        b.appendRegex("_id", (string)"^" + pcrecpp::RE::QuoteMeta(dbName) + "$", "i");
+        b.appendRegex(DatabaseType::name(),
+                      (string)"^" + pcrecpp::RE::QuoteMeta(dbName) + "$", "i");
 
         BSONObj dbObj = conn->findOne(DatabaseType::ConfigNS, b.obj());
         conn.done();
 
         // If our name is exactly the same as the name we want, try loading
         // the database again.
-        if (!dbObj.isEmpty() &&
-                dbObj[DatabaseType::name()].String() == dbName) {
-
+        if (!dbObj.isEmpty() && dbObj[DatabaseType::name()].String() == dbName) {
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "database " << dbName << " already exists");
         }

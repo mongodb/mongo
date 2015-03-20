@@ -28,65 +28,45 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bson_field.h"
 
 namespace mongo {
 
+    class BSONObj;
+    class Status;
+    template<typename T> class StatusWith;
+
+
     /**
-     * This class represents the layout and contents of documents contained in the
-     * config.databases collection. All manipulation of documents coming from that
-     * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(DatabaseType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(DatabaseType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     DatabaseType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
-     *     }
-     *     // use 'exampleType'
-     *
+     * This class represents the layout and contents of documents contained in the config.databases
+     * collection. All manipulation of documents coming from that collection should be done with
+     * this class.
      */
     class DatabaseType {
     public:
-
-        //
-        // schema declarations
-        //
-
         // Name of the databases collection in the config server.
         static const std::string ConfigNS;
 
-        // Field names and types in the databases collection type.
         static const BSONField<std::string> name;
         static const BSONField<std::string> primary;
-        static const BSONField<bool> draining;
-        static const BSONField<bool> DEPRECATED_partitioned;
-        static const BSONField<std::string> DEPRECATED_name;
-        static const BSONField<bool> DEPRECATED_sharded;
+        static const BSONField<bool> sharded;
 
-        //
-        // databases type methods
-        //
 
         DatabaseType();
-        ~DatabaseType();
 
         /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
+         * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
          */
-        bool isValid(std::string* errMsg) const;
+        static StatusWith<DatabaseType> fromBSON(const BSONObj& source);
+
+        /**
+         * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
+         * about what is the first field which is missing.
+         */
+        Status validate() const;
 
         /**
          * Returns the BSON representation of the entry.
@@ -94,92 +74,35 @@ namespace mongo {
         BSONObj toBSON() const;
 
         /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
-
-        /**
          * Clears the internal state.
          */
         void clear();
-
-        /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(DatabaseType* other) const;
 
         /**
          * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 
-        //
-        // individual field accessors
-        //
+        const std::string& getName() const { return _name.get(); }
+        void setName(const std::string& name);
 
-        // Mandatory Fields
-        void setName(StringData name) {
-            _name = name.toString();
-            _isNameSet = true;
-        }
+        const std::string& getPrimary() const { return _primary.get(); }
+        void setPrimary(const std::string& primary);
 
-        void unsetName() { _isNameSet = false; }
-
-        bool isNameSet() const { return _isNameSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getName() const {
-            dassert(_isNameSet);
-            return _name;
-        }
-
-        void setPrimary(StringData primary) {
-            _primary = primary.toString();
-            _isPrimarySet = true;
-        }
-
-        void unsetPrimary() { _isPrimarySet = false; }
-
-        bool isPrimarySet() const { return _isPrimarySet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getPrimary() const {
-            dassert(_isPrimarySet);
-            return _primary;
-        }
-
-        // Optional Fields
-        void setDraining(bool draining) {
-            _draining = draining;
-            _isDrainingSet = true;
-        }
-
-        void unsetDraining() { _isDrainingSet = false; }
-
-        bool isDrainingSet() const {
-            return _isDrainingSet || draining.hasDefault();
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getDraining() const {
-            if (_isDrainingSet) {
-                return _draining;
-            } else {
-                dassert(draining.hasDefault());
-                return draining.getDefault();
-            }
-        }
+        bool getSharded() const { return _sharded.get(); }
+        void setSharded(bool sharded) { _sharded = sharded; }
 
     private:
-        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _name;     // (M)  database name
-        bool _isNameSet;
-        std::string _primary;     // (M)  primary shard for the database
-        bool _isPrimarySet;
-        bool _draining;     // (O)  is this database about to be deleted?
-        bool _isDrainingSet;
+        // Requred database name
+        boost::optional<std::string> _name;
+
+        // Required primary shard (must be set even if the database is sharded, because there
+        // might be collections, which are unsharded).
+        boost::optional<std::string> _primary;
+
+        // Required whether sharding is enabled for this database. Even though this field is of
+        // type optional, it is only used as an indicator that the value was explicitly set.
+        boost::optional<bool> _sharded;
     };
 
 } // namespace mongo

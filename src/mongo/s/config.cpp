@@ -538,45 +538,26 @@ namespace mongo {
         _save();
     }
 
-    void DBConfig::serialize(BSONObjBuilder& to) {
-        to.append("_id", _name);
-        to.appendBool(DatabaseType::DEPRECATED_partitioned(), _shardingEnabled );
-        to.append(DatabaseType::primary(), _primary.getName() );
-    }
-
-    void DBConfig::unserialize(const BSONObj& from) {
-        LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-        verify( _name == from[DatabaseType::name()].String() );
-
-        _shardingEnabled = from.getBoolField(DatabaseType::DEPRECATED_partitioned().c_str());
-        _primary.reset( from.getStringField(DatabaseType::primary().c_str()));
-
-        // In the 1.5.x series, we used to have collection metadata nested in the database entry. The 1.6.x series
-        // had migration code that ported that info to where it belongs now: the 'collections' collection. We now
-        // just assert that we're not migrating from a 1.5.x directly into a 1.7.x without first converting.
-        BSONObj sharded = from.getObjectField(DatabaseType::DEPRECATED_sharded().c_str());
-        if ( ! sharded.isEmpty() )
-            uasserted( 13509 , "can't migrate from 1.5.x release to the current one; need to upgrade to 1.6.x first");
-    }
-
     bool DBConfig::load() {
         boost::lock_guard<boost::mutex> lk( _lock );
         return _load();
     }
 
     bool DBConfig::_load() {
-        ScopedDbConnection conn(configServer.modelServer(), 30.0);
-
-        BSONObj dbObj = conn->findOne( DatabaseType::ConfigNS,
-                                       BSON( DatabaseType::name( _name ) ) );
-
-        if ( dbObj.isEmpty() ) {
-            conn.done();
+        StatusWith<DatabaseType> status = grid.catalogManager()->getDatabase(_name);
+        if (status == ErrorCodes::DatabaseNotFound) {
             return false;
         }
 
-        unserialize( dbObj );
+        // All other errors are connectivity, etc so throw an exception.
+        uassertStatusOK(status.getStatus());
 
+        DatabaseType dbt = status.getValue();
+        invariant(_name == dbt.getName());
+        _primary.reset(dbt.getPrimary());
+        _shardingEnabled = dbt.getSharded();
+
+        // Load all collections
         BSONObjBuilder b;
         b.appendRegex(CollectionType::ns(),
                       (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
@@ -584,6 +565,7 @@ namespace mongo {
         int numCollsErased = 0;
         int numCollsSharded = 0;
 
+        ScopedDbConnection conn(configServer.modelServer(), 30.0);
         auto_ptr<DBClientCursor> cursor = conn->query(CollectionType::ConfigNS, b.obj());
         verify( cursor.get() );
         while ( cursor->more() ) {
@@ -619,24 +601,12 @@ namespace mongo {
 
     void DBConfig::_save(bool db, bool coll) {
         if (db) {
-            BSONObj n;
-            {
-                BSONObjBuilder b;
-                serialize(b);
-                n = b.obj();
-            }
+            DatabaseType dbt;
+            dbt.setName(_name);
+            dbt.setPrimary(_primary.getName());
+            dbt.setSharded(_shardingEnabled);
 
-            BatchedCommandResponse response;
-            Status result = grid.catalogManager()->update(DatabaseType::ConfigNS,
-                                                          BSON(DatabaseType::name(_name)),
-                                                          n,
-                                                          true,  // upsert
-                                                          false, // multi
-                                                          &response);
-            if (!result.isOK()) {
-                uasserted(13396,
-                          str::stream() << "DBConfig save failed: " << response.toBSON());
-            }
+            uassertStatusOK(grid.catalogManager()->updateDatabase(_name, dbt));
         }
 
         if (coll) {

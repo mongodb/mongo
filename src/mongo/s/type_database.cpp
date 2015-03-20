@@ -25,123 +25,105 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/type_database.h"
 
-#include "mongo/db/field_parser.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
     using std::string;
 
-    using mongoutils::str::stream;
-
     const std::string DatabaseType::ConfigNS = "config.databases";
 
     const BSONField<std::string> DatabaseType::name("_id");
     const BSONField<std::string> DatabaseType::primary("primary");
-    const BSONField<bool> DatabaseType::draining("draining", false);
-    const BSONField<bool> DatabaseType::DEPRECATED_partitioned("partitioned");
-    const BSONField<std::string> DatabaseType::DEPRECATED_name("name");
-    const BSONField<bool> DatabaseType::DEPRECATED_sharded("sharded");
+    const BSONField<bool> DatabaseType::sharded("partitioned");
+
 
     DatabaseType::DatabaseType() {
         clear();
     }
 
-    DatabaseType::~DatabaseType() {
+    StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
+        DatabaseType dbt;
+
+        {
+            std::string dbtName;
+            Status status = bsonExtractStringField(source, name.name(), &dbtName);
+            if (!status.isOK()) return status;
+
+            dbt._name = dbtName;
+        }
+
+        {
+            std::string dbtPrimary;
+            Status status = bsonExtractStringField(source, primary.name(), &dbtPrimary);
+            if (!status.isOK()) return status;
+
+            dbt._primary = dbtPrimary;
+        }
+
+        {
+            bool dbtSharded;
+            Status status = bsonExtractBooleanFieldWithDefault(source, sharded.name(), false, &dbtSharded);
+            if (!status.isOK()) return status;
+
+            dbt._sharded = dbtSharded;
+        }
+
+        return StatusWith<DatabaseType>(dbt);
     }
 
-    bool DatabaseType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
+    Status DatabaseType::validate() const {
+        if (!_name.is_initialized() || _name->empty()) {
+            return Status(ErrorCodes::NoSuchKey, "missing name");
         }
 
-        // All the mandatory fields must be present.
-        if (!_isNameSet) {
-            *errMsg = stream() << "missing " << name.name() << " field";
-            return false;
-        }
-        if (!_isPrimarySet) {
-            *errMsg = stream() << "missing " << primary.name() << " field";
-            return false;
+        if (!_primary.is_initialized() || _primary->empty()) {
+            return Status(ErrorCodes::NoSuchKey, "missing primary");
         }
 
-        return true;
+        if (!_sharded.is_initialized()) {
+            return Status(ErrorCodes::NoSuchKey, "missing sharded");
+        }
+
+        return Status::OK();
     }
 
     BSONObj DatabaseType::toBSON() const {
         BSONObjBuilder builder;
-
-        if (_isNameSet) {
-            builder.append(name(), _name);
-        }
-
-        if (_isPrimarySet) {
-            builder.append(primary(), _primary);
-        }
-
-        builder.appendBool(DEPRECATED_partitioned(), !_isPrimarySet);
-
-        if (_isDrainingSet) {
-            builder.append(draining(), _draining);
-        }
+        builder.append(name.name(), _name.get_value_or(""));
+        builder.append(primary.name(), _primary.get_value_or(""));
+        builder.append(sharded.name(), _sharded.get_value_or(false));
 
         return builder.obj();
     }
 
-    bool DatabaseType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
-
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
-
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, name, &_name, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, primary, &_primary, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isPrimarySet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, draining, &_draining, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDrainingSet = fieldState == FieldParser::FIELD_SET;
-
-        return true;
-    }
-
     void DatabaseType::clear() {
-
-        _name.clear();
-        _isNameSet = false;
-
-        _primary.clear();
-        _isPrimarySet = false;
-
-        _draining = false;
-        _isDrainingSet = false;
-
-    }
-
-    void DatabaseType::cloneTo(DatabaseType* other) const {
-        other->clear();
-
-        other->_name = _name;
-        other->_isNameSet = _isNameSet;
-
-        other->_primary = _primary;
-        other->_isPrimarySet = _isPrimarySet;
-
-        other->_draining = _draining;
-        other->_isDrainingSet = _isDrainingSet;
-
+        _name.reset();
+        _primary.reset();
+        _sharded.reset();
     }
 
     std::string DatabaseType::toString() const {
         return toBSON().toString();
+    }
+
+    void DatabaseType::setName(const std::string& name) {
+        invariant(!name.empty());
+        _name = name;
+    }
+
+    void DatabaseType::setPrimary(const std::string& primary) {
+        invariant(!primary.empty());
+        _primary = primary;
     }
 
 } // namespace mongo

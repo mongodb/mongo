@@ -124,10 +124,6 @@ namespace mongo {
         // model stuff
 
         // lockless loading
-        void serialize(BSONObjBuilder& to);
-
-        void unserialize(const BSONObj& from);
-
         void getAllShards(std::set<Shard>& shards) const;
 
         void getAllShardedCollections(std::set<std::string>& namespaces) const;
