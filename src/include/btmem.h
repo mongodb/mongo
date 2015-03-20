@@ -847,13 +847,20 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 	 */
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
-#define	WT_UPDATE_MEMSIZE(upd)						\
-	(sizeof(WT_UPDATE) + (WT_UPDATE_DELETED_ISSET(upd) ? 0 : (upd)->size))
 	uint32_t size;			/* update length */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */
 #define	WT_UPDATE_DATA(upd)						\
 	((void *)((uint8_t *)(upd) + sizeof(WT_UPDATE)))
+
+	/*
+	 * The memory size of an update: include some padding because this is
+	 * such a common case that overhead of tiny allocations can swamp our
+	 * cache overhead calculation.
+	 */
+#define	WT_UPDATE_MEMSIZE(upd)						\
+	WT_ALIGN(sizeof(WT_UPDATE) +					\
+	    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : (upd)->size), 32)
 };
 
 /*

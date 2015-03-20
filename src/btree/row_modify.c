@@ -278,7 +278,7 @@ __wt_update_alloc(
 	}
 
 	*updp = upd;
-	*sizep = sizeof(WT_UPDATE) + size;
+	*sizep = WT_UPDATE_MEMSIZE(upd);
 	return (0);
 }
 

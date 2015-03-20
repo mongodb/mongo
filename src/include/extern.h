@@ -124,6 +124,7 @@ extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
 extern int __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_btree_evictable(WT_SESSION_IMPL *session, int on);
+extern int __wt_huffman_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
 extern int __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t addr_size);
@@ -142,7 +143,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #endif
  );
 extern int __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep);
-extern int __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep);
+extern int __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep);
 extern int __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd);
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[]);

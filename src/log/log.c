@@ -1382,7 +1382,7 @@ advance:
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
 		/*
-		 * First 8 bytes is the real record length.  See if we
+		 * First 4 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
 		 * that we rarely will have to read more.  Most log records
 		 * will be fairly small.

@@ -1603,17 +1603,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_CKPT_SYNC);
 
-	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
-	if (cval.val == -1)
-		conn->buffer_alignment = WT_BUFFER_ALIGNMENT_DEFAULT;
-	else
-		conn->buffer_alignment = (size_t)cval.val;
-#ifndef HAVE_POSIX_MEMALIGN
-	if (conn->buffer_alignment != 0)
-		WT_ERR_MSG(session, EINVAL,
-		    "buffer_alignment requires posix_memalign");
-#endif
-
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
 	for (ft = file_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
@@ -1623,6 +1612,22 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
+
+	/*
+	 * If buffer alignment is not configured, use zero unless direct I/O is
+	 * also configured, in which case use the build-time default.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
+	if (cval.val == -1)
+		conn->buffer_alignment =
+		    (conn->direct_io == 0) ? 0 : WT_BUFFER_ALIGNMENT_DEFAULT;
+	else
+		conn->buffer_alignment = (size_t)cval.val;
+#ifndef HAVE_POSIX_MEMALIGN
+	if (conn->buffer_alignment != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "buffer_alignment requires posix_memalign");
+#endif
 
 	WT_ERR(__wt_config_gets(session, cfg, "file_extend", &cval));
 	for (ft = file_types; ft->name != NULL; ft++) {

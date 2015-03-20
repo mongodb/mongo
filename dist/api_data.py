@@ -20,6 +20,10 @@ class Config:
 common_meta = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
+    Config('collator', 'none', r'''
+        configure custom collation for keys.  Permitted values are
+        \c "none" or a custom collator name created with
+        WT_CONNECTION::add_collator'''),
     Config('columns', '', r'''
         list of the column names.  Comma-separated list of the form
         <code>(column[,...])</code>.  For tables, the number of entries
@@ -148,10 +152,6 @@ file_config = format_meta + [
         applications which can rely on decompression to fail if a block
         has been corrupted''',
         choices=['on', 'off', 'uncompressed']),
-    Config('collator', 'none', r'''
-        configure custom collation for keys.  Permitted values are
-        \c "none" or a custom collator name created with
-        WT_CONNECTION::add_collator'''),
     Config('dictionary', '0', r'''
         the maximum number of unique values remembered in the Btree
         row-store leaf page value dictionary; see
@@ -163,11 +163,13 @@ file_config = format_meta + [
     Config('huffman_key', 'none', r'''
         configure Huffman encoding for keys.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information'''),
+        See @ref huffman for more information''',
+        func='__wt_huffman_confchk'),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information'''),
+        See @ref huffman for more information''',
+        func='__wt_huffman_confchk'),
     Config('internal_key_truncate', 'true', r'''
         configure internal key truncation, discarding unnecessary
         trailing bytes on internal keys (ignored for custom
@@ -501,8 +503,9 @@ session_config = [
 common_wiredtiger_open = [
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O.  The
-        default value of -1 indicates a platform-specific alignment
-        value should be used (4KB on Linux systems, zero elsewhere)''',
+        default value of -1 indicates a platform-specific alignment value
+        should be used (4KB on Linux systems when direct I/O is configured,
+        zero elsewhere)''',
         min='-1', max='1MB'),
     Config('checkpoint_sync', 'true', r'''
         flush files to stable storage when closing or writing

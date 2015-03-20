@@ -28,6 +28,9 @@ struct __wt_index {
 
 	WT_CONFIG_ITEM colconf;		/* List of columns from config */
 
+	WT_COLLATOR *collator;		/* Custom collator */
+	int collator_owned;		/* Collator is owned by this index */
+
 	WT_EXTRACTOR *extractor;	/* Custom key extractor */
 	int extractor_owned;		/* Extractor is owned by this index */
 

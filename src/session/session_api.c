@@ -605,9 +605,15 @@ __session_truncate(WT_SESSION *wt_session,
 				    "the truncate method should not specify any"
 				    "target after the log: URI prefix.");
 			ret = __wt_log_truncate_files(session, start, cfg);
-		} else
+		} else {
+			/* Wait for checkpoints to avoid EBUSY errors. */
+			__wt_spin_lock(session,
+			    &S2C(session)->checkpoint_lock);
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_truncate(session, uri, cfg));
+			__wt_spin_unlock(session,
+			    &S2C(session)->checkpoint_lock);
+		}
 		goto done;
 	}
 

@@ -61,7 +61,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 		 * image on return, the page steals it.
 		 */
 		WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
-		WT_ERR(__wt_page_inmem(session, ref, tmp.data,
+		WT_ERR(__wt_page_inmem(session, ref, tmp.data, tmp.memsize,
 		    WT_DATA_IN_ITEM(&tmp) ?
 		    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 		tmp.mem = NULL;
