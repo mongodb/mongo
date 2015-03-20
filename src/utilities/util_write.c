@@ -46,7 +46,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	} else
 		if (argc < 3 || ((argc - 1) % 2 != 0))
 			return (usage());
-	if ((uri = util_name(*argv, "table")) == NULL)
+	if ((uri = util_name(session, *argv, "table")) == NULL)
 		return (1);
 
 	/* Open the object. */
@@ -54,7 +54,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	    append ? "append=true" : "", overwrite ? "overwrite=true" : "");
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0)
-		return (util_err(ret, "%s: session.open", uri));
+		return (util_err(session, ret, "%s: session.open", uri));
 
 	/*
 	 * A simple search only makes sense if the key format is a string or a
@@ -81,7 +81,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	while (*++argv != NULL) {
 		if (!append) {
 			if (rkey) {
-				if (util_str2recno(*argv, &recno))
+				if (util_str2recno(session, *argv, &recno))
 					return (1);
 				cursor->set_key(cursor, recno);
 			} else
@@ -91,7 +91,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 		cursor->set_value(cursor, *argv);
 
 		if ((ret = cursor->insert(cursor)) != 0)
-			return (util_cerr(uri, "search", ret));
+			return (util_cerr(cursor, "search", ret));
 	}
 
 	return (0);

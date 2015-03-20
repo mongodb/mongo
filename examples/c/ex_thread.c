@@ -73,7 +73,8 @@ scan_thread(void *conn_arg)
 	}
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
-		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+		    "WT_CURSOR.next: %s\n",
+		    cursor->session->strerror(cursor->session, ret));
 
 	return (NULL);
 }

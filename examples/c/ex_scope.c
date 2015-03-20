@@ -56,9 +56,12 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		{ "key1", "value2", cursor->remove, },
 		{ NULL, NULL, NULL }
 	};
+	WT_SESSION *session;
 	const char *key, *value;
 	char keybuf[10], valuebuf[10];
 	int ret;
+
+	session = cursor->session;
 
 	for (op = ops; op->key != NULL; op++) {
 		key = value = NULL;
@@ -78,7 +81,7 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		/* Apply the operation (insert, update, search or remove). */
 		if ((ret = op->apply(cursor)) != 0) {
 			fprintf(stderr, "Error performing the operation: %s\n",
-			    wiredtiger_strerror(ret));
+			    session->strerror(session, ret));
 			return (ret);
 		}
 
@@ -100,7 +103,7 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		    (op->apply != cursor->remove &&
 		    (ret = cursor->get_value(cursor, &value)) != 0)) {
 			fprintf(stderr, "Error in get_key/value: %s\n",
-			    wiredtiger_strerror(ret));
+			     session->strerror(session, ret));
 			return (ret);
 		}
 

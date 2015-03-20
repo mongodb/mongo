@@ -54,7 +54,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-	if ((name = util_name(*argv, "table")) == NULL)
+	if ((name = util_name(session, *argv, "table")) == NULL)
 		return (1);
 
 	/* Build the configuration string as necessary. */
@@ -68,7 +68,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 		    strlen("dump_offsets[],") +
 		    (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + 20;
 		if ((config = malloc(size)) == NULL) {
-			(void)util_err(errno, NULL);
+			(void)util_err(session, errno, NULL);
 			goto err;
 		}
 		snprintf(config, size,
@@ -83,7 +83,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 	}
 	if ((ret = session->verify(session, name, config)) != 0) {
 		fprintf(stderr, "%s: verify(%s): %s\n",
-		    progname, name, wiredtiger_strerror(ret));
+		    progname, name, session->strerror(session, ret));
 		goto err;
 	}
 
