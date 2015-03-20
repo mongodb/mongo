@@ -10,6 +10,7 @@ env.Alias('generated-sources', generateErrorCodes)
 
 env.CppUnitTest('base_test',
                 ['counter_test.cpp',
+                 'data_builder_test.cpp',
                  'data_cursor_test.cpp',
                  'data_range_cursor_test.cpp',
                  'data_range_test.cpp',
