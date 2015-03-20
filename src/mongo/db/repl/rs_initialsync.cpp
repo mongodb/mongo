@@ -311,6 +311,13 @@ namespace {
         log() << "initial sync clone all databases";
 
         list<string> dbs = r.conn()->getDatabaseNames();
+        {
+            // Clone admin database first, to catch schema errors.
+            list<string>::iterator admin = std::find(dbs.begin(), dbs.end(), "admin");
+            if (admin != dbs.end()) {
+                dbs.splice(dbs.begin(), dbs, admin);
+            }
+        }
 
         Cloner cloner;
         if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
