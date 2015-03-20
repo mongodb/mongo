@@ -25,6 +25,9 @@ AddOption("--enable-attach", dest="attach", action="store_true", default=False,
 AddOption("--enable-diagnostic", dest="diagnostic", action="store_true", default=False,
           help="Configure WiredTiger to perform various run-time diagnostic tests. DO NOT configure this option in production environments.")
 
+AddOption("--enable-lz4", dest="lz4", type="string", nargs=1, action="store",
+          help="Use LZ4 compression")
+
 AddOption("--enable-python", dest="lang-python", type="string", nargs=1, action="store",
           help="Build Python extension, specify location of swig.exe binary")
 
@@ -102,6 +105,7 @@ env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 
 useZlib = GetOption("zlib")
 useSnappy = GetOption("snappy")
+useLz4 = GetOption("lz4")
 useBdb = GetOption("bdb")
 wtlibs = []
 
@@ -128,6 +132,16 @@ if useSnappy:
         wtlibs.append("snappy")
     else:
         print 'snappy-c.h must be installed!'
+        Exit(1)
+
+if useLz4:
+    conf.env.Append(CPPPATH=[useLz4 + "/include"])
+    conf.env.Append(LIBPATH=[useLz4 + "/lib"])
+    if conf.CheckCHeader('lz4.h'):
+        conf.env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_LZ4'])
+        wtlibs.append("lz4")
+    else:
+        print 'lz4.h must be installed!'
         Exit(1)
 
 if useBdb:
@@ -216,6 +230,9 @@ if useZlib:
 
 if useSnappy:
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
+
+if useLz4:
+    wtsources.append("ext/compressors/lz4/lz4_compress.c")
 
 wt_objs = [env.Object(a) for a in wtsources]
 
