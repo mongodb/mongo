@@ -485,6 +485,8 @@ extern int __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *t
 extern int __wt_read( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf);
 extern int __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, const void *buf);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
+extern int __wt_fp_open(WT_SESSION_IMPL *session, const char *name, FILE **fpp);
+extern int __wt_fp_close(WT_SESSION_IMPL *session, FILE **fpp);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, void *(*func)(void *), void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid);
@@ -589,8 +591,6 @@ extern int __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_filename(WT_SESSION_IMPL *session, const char *name, char **path);
 extern int __wt_nfilename( WT_SESSION_IMPL *session, const char *name, size_t namelen, char **path);
 extern int __wt_remove_if_exists(WT_SESSION_IMPL *session, const char *name);
-extern int __wt_fp_open(WT_SESSION_IMPL *session, const char *name, FILE **fpp);
-extern int __wt_fp_close(WT_SESSION_IMPL *session, FILE **fpp);
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
