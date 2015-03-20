@@ -18,16 +18,16 @@ __wt_fopen(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	const char *path;
-	char *buf;
+	char *pathbuf;
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: fopen", name));
 
-	buf = NULL;
+	pathbuf = NULL;
 	if (LF_ISSET(WT_FOPEN_FIXED))
 		path = name;
 	else {
-		WT_RET(__wt_filename(session, name, &buf));
-		path = buf;
+		WT_RET(__wt_filename(session, name, &pathbuf));
+		path = pathbuf;
 	}
 
 #ifdef _WIN32
@@ -47,8 +47,8 @@ __wt_fopen(WT_SESSION_IMPL *session,
 	if (*fpp == NULL)
 		ret = __wt_errno();
 
-	if (buf != NULL)
-		__wt_free(session, buf);
+	if (pathbuf != NULL)
+		__wt_free(session, pathbuf);
 
 	if (ret == 0)
 		return (0);
