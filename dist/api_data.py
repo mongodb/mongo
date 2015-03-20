@@ -292,7 +292,8 @@ index_only_config = [
     Config('extractor', 'none', r'''
         configure custom extractor for indices.  Permitted values are
         \c "none" or an extractor name created with
-        WT_CONNECTION::add_extractor'''),
+        WT_CONNECTION::add_extractor''',
+        func='__wt_extractor_confchk'),
     Config('immutable', 'false', r'''
         configure the index to be immutable - that is an index is not changed
         by any update to a record in the table''', type='boolean'),

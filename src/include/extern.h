@@ -208,6 +208,7 @@ extern int __wt_collator_config(WT_SESSION_IMPL *session, const char *uri, WT_CO
 extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_data_source(WT_SESSION_IMPL *session);
+extern int __wt_extractor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname);
 extern int __wt_extractor_config(WT_SESSION_IMPL *session, const char *config, WT_EXTRACTOR **extractorp, int *ownp);
 extern int __wt_conn_remove_extractor(WT_SESSION_IMPL *session);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);

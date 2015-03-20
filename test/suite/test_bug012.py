@@ -59,5 +59,12 @@ class test_bug012(wttest.WiredTigerTestCase):
             lambda: self.session.create('table:A',
                 'type=lsm,lsm=(bloom_config=(block_compressor="xyzzy"))'), msg)
 
+    # Test that we detect illegal extractors.
+    def test_illegal_extractor(self):
+        msg = '/unknown extractor/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create('table:A',
+                'type=lsm,lsm=(bloom_config=(extractor="xyzzy"))'), msg)
+
 if __name__ == '__main__':
     wttest.run()
