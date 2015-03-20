@@ -455,18 +455,9 @@ static int
 __backup_file_create(
     WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, int incremental)
 {
-	WT_DECL_RET;
-	char *path;
-
-	/* Open the hot backup file. */
-	if (incremental)
-		WT_RET(__wt_filename(session, WT_INCREMENTAL_BACKUP, &path));
-	else
-		WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
-	ret = __wt_fopen(session, path, "w", 0, &cb->bfp);
-
-	__wt_free(session, path);
-	return (ret);
+	return (__wt_fopen(session,
+	    incremental ? WT_INCREMENTAL_BACKUP : WT_METADATA_BACKUP,
+	    "w", 0, &cb->bfp));
 }
 
 /*
