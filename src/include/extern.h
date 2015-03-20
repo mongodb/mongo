@@ -120,7 +120,6 @@ extern void __wt_free_ref( WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref,
 extern void __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, int free_pages);
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
-extern int __wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval);
 extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
 extern int __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
@@ -206,6 +205,8 @@ extern const char *__wt_wiredtiger_error(int error);
 extern int __wt_collator_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname);
 extern int __wt_collator_config(WT_SESSION_IMPL *session, const char *uri, WT_CONFIG_ITEM *cname, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collatorp, int *ownp);
 extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
+extern int __wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval);
+extern int __wt_compressor_config( WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_COMPRESSOR **compressorp);
 extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_data_source(WT_SESSION_IMPL *session);
 extern int __wt_extractor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname);

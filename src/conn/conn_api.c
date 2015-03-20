@@ -370,6 +370,52 @@ __wt_conn_remove_collator(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __compressor_confchk --
+ *	Validate the compressor.
+ */
+static int
+__compressor_confchk(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_COMPRESSOR **compressorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COMPRESSOR *ncomp;
+
+	if (compressorp != NULL)
+		*compressorp = NULL;
+
+	conn = S2C(session);
+	TAILQ_FOREACH(ncomp, &conn->compqh, q)
+		if (WT_STRING_MATCH(ncomp->name, cval->str, cval->len)) {
+			if (compressorp != NULL)
+				*compressorp = ncomp->compressor;
+			return (0);
+		}
+	WT_RET_MSG(session, EINVAL,
+	    "unknown block compressor '%.*s'", (int)cval->len, cval->str);
+}
+
+/*
+ * __wt_compressor_confchk --
+ *	Validate the compressor (public).
+ */
+int
+__wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
+{
+	return (__compressor_confchk(session, cval, NULL));
+}
+
+/*
+ * __wt_compressor_config --
+ *	Given a configuration, configure the compressor.
+ */
+int
+__wt_compressor_config(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_COMPRESSOR **compressorp)
+{
+	return (__compressor_confchk(session, cval, compressorp));
+}
+
+/*
  * __conn_add_compressor --
  *	WT_CONNECTION->add_compressor method.
  */
