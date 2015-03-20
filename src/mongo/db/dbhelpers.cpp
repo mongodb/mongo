@@ -199,19 +199,18 @@ namespace mongo {
         return catalog->getIndex(desc)->findSingle( txn, idquery["_id"].wrap() );
     }
 
-    /* Get the first object from a collection.  Generally only useful if the collection
-       only ever has a single object -- which is a "singleton collection". Note that the
-       BSONObj returned is *not* owned and will become invalid if the database is closed.
-
-       Returns: true if object exists.
-    */
     bool Helpers::getSingleton(OperationContext* txn, const char *ns, BSONObj& result) {
         AutoGetCollectionForRead ctx(txn, ns);
         auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn, ns, ctx.getCollection()));
-
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
+
         txn->getCurOp()->done();
-        return PlanExecutor::ADVANCED == state;
+
+        if (PlanExecutor::ADVANCED == state) {
+            result = result.getOwned();
+            return true;
+        }
+        return false;
     }
 
     bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
@@ -220,9 +219,13 @@ namespace mongo {
                                                                     ns,
                                                                     autoColl.getCollection(),
                                                                     InternalPlanner::BACKWARD));
-
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
-        return PlanExecutor::ADVANCED == state;
+
+        if (PlanExecutor::ADVANCED == state) {
+            result = result.getOwned();
+            return true;
+        }
+        return false;
     }
 
     void Helpers::upsert( OperationContext* txn,

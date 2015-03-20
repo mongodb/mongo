@@ -107,20 +107,27 @@ namespace mongo {
         static RecordId findById(OperationContext* txn,
                                 Collection* collection, const BSONObj& query);
 
-        /** Get/put the first (or last) object from a collection.  Generally only useful if the collection
-            only ever has a single object -- which is a "singleton collection".
-
-            You do not need to set the database (Context) before calling.
-
-            @return true if object exists.
-        */
+        /**
+         * Get the first object generated from a forward natural-order scan on "ns".  Callers do not
+         * have to lock "ns".
+         *
+         * Returns true if there is such an object.  An owned copy of the object is placed into the
+         * out-argument "result".
+         *
+         * Returns false if there is no such object.
+         */
         static bool getSingleton(OperationContext* txn, const char *ns, BSONObj& result);
-        static void putSingleton(OperationContext* txn, const char *ns, BSONObj obj);
 
         /**
-         * get last object int he collection; e.g. {$natural : -1}
+         * Same as getSingleton, but with a reverse natural-order scan on "ns".
          */
         static bool getLast(OperationContext* txn, const char *ns, BSONObj& result);
+
+        /**
+         * Performs an upsert of "obj" into the collection "ns", with an empty update predicate.
+         * Callers must have "ns" locked.
+         */
+        static void putSingleton(OperationContext* txn, const char *ns, BSONObj obj);
 
         /**
          * you have to lock
