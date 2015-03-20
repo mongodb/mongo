@@ -1892,8 +1892,8 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
  * I/O. The default value of -1 indicates a platform-specific alignment value
- * should be used (4KB on Linux systems\, zero elsewhere)., an integer between
- * -1 and 1MB; default \c -1.}
+ * should be used (4KB on Linux systems when direct I/O is configured\, zero
+ * elsewhere)., an integer between -1 and 1MB; default \c -1.}
  * @config{cache_overhead, assume the heap allocator overhead is the specified
  * percentage\, and adjust the cache usage by that amount (for example\, if
  * there is 10GB of data in cache\, a percentage of 10 means WiredTiger treats

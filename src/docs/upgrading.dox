@@ -21,6 +21,13 @@ the cursor was used. In the WiredTiger 2.5.2 release, calling the
 WT_CURSOR::reset method to reset the cursor refreshes the statistics
 returned by the cursor.
 </dd>
+
+<dt>Buffer alignment on Linux</dt>
+<dd>
+In previous releases of WiredTiger, all buffers used for I/O were aligned
+to 4KB boundaries by default.  In the WiredTiger 2.5.2 release, alignment
+is only enforced when direct I/O is configured.
+</dd>
 </dl>
 
 @section version_251 Upgrading to Version 2.5.1
