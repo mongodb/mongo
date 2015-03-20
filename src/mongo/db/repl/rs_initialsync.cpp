@@ -33,6 +33,7 @@
 #include "mongo/db/repl/rs_initialsync.h"
 
 #include "mongo/bson/optime.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection.h"
@@ -93,6 +94,59 @@ namespace {
         wunit.commit();
     }
 
+    /**
+     * Confirms that the "admin" database contains a supported version of the auth
+     * data schema.  Terminates the process if the "admin" contains clearly incompatible
+     * auth data.
+     */
+    void checkAdminDatabasePostClone(OperationContext* txn, Database* adminDb) {
+        // Assumes txn holds MODE_X or MODE_S lock on "admin" database.
+        if (!adminDb) {
+            return;
+        }
+        Collection* const usersCollection =
+            adminDb->getCollection(AuthorizationManager::usersCollectionNamespace);
+        const bool hasUsers = usersCollection &&
+            !Helpers::findOne(txn, usersCollection, BSONObj(), false).isNull();
+        Collection* const adminVersionCollection =
+            adminDb->getCollection(AuthorizationManager::versionCollectionNamespace);
+        BSONObj authSchemaVersionDocument;
+        if (!adminVersionCollection || !Helpers::findOne(txn,
+                                                         adminVersionCollection,
+                                                         AuthorizationManager::versionDocumentQuery,
+                                                         authSchemaVersionDocument)) {
+            if (!hasUsers) {
+                // It's OK to have no auth version document if there are no user documents.
+                return;
+            }
+            severe() << "During initial sync, found documents in " <<
+                AuthorizationManager::usersCollectionNamespace <<
+                " but could not find an auth schema version document in " <<
+                AuthorizationManager::versionCollectionNamespace;
+            severe() << "This indicates that the primary of this replica set was not successfully "
+                "upgraded to schema version " << AuthorizationManager::schemaVersion26Final <<
+                ", which is the minimum supported schema version in this version of MongoDB";
+            fassertFailedNoTrace(28620);
+        }
+        long long foundSchemaVersion;
+        Status status = bsonExtractIntegerField(authSchemaVersionDocument,
+                                                AuthorizationManager::schemaVersionFieldName,
+                                                &foundSchemaVersion);
+        if (!status.isOK()) {
+            severe() << "During initial sync, found malformed auth schema version document: " <<
+                status << "; document: " << authSchemaVersionDocument;
+            fassertFailedNoTrace(28618);
+        }
+        if ((foundSchemaVersion != AuthorizationManager::schemaVersion26Final) &&
+            (foundSchemaVersion != AuthorizationManager::schemaVersion28SCRAM)) {
+            severe() << "During initial sync, found auth schema version " << foundSchemaVersion <<
+                ", but this version of MongoDB only supports schema versions " <<
+                AuthorizationManager::schemaVersion26Final << " and " <<
+                AuthorizationManager::schemaVersion28SCRAM;
+            fassertFailedNoTrace(28619);
+        }
+    }
+
     bool _initialSyncClone(OperationContext* txn,
                            Cloner& cloner,
                            const std::string& host,
@@ -131,6 +185,10 @@ namespace {
                       << (dataPass ? "cloning " : "indexing ") << db
                       << ".  " << (err.empty() ? "" : err + ".  ");
                 return false;
+            }
+
+            if (db == "admin") {
+                checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
             }
         }
 
