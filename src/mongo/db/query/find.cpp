@@ -72,16 +72,6 @@ namespace mongo {
 
 namespace {
 
-    // TODO: Remove this or use it.
-    bool hasIndexSpecifier(const mongo::LiteParsedQuery& pq) {
-        return !pq.getHint().isEmpty() || !pq.getMin().isEmpty() || !pq.getMax().isEmpty();
-    }
-
-    bool enough(const mongo::LiteParsedQuery& pq, int n) {
-        if (0 == pq.getNumToReturn()) { return false; }
-        return n >= pq.getNumToReturn();
-    }
-
     /**
      * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
      * Such predicates can be used for the oplog start hack.
