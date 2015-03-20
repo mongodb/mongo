@@ -49,40 +49,53 @@ swig_binary = GetOption("lang-python")
 
 # Initialize environment
 #
+var = Variables()
+
+var.Add('MSVC_USE_SCRIPT', 'Path to vcvars.bat to override SCons default VS tool search');
+
+var.Add('CPPPATH', 'C Preprocessor include path', [
+    "#/src/include/",
+    "#/build_win",
+    "#/test/windows",
+    "#/.",
+])
+
+var.Add('CFLAGS', 'C Compiler Flags', [
+    "/Z7", # Generate debugging symbols
+    "/wd4090", # Ignore warning about mismatched const qualifiers
+    "/wd4996", # Ignore deprecated functions
+    "/W3", # Warning level 3
+    "/we4013", # Error on undefined functions
+    "/TC", # Compile as C code
+    #"/Od", # Disable optimization
+    "/Ob1", # inline expansion
+    "/O2", # optimize for speed
+    "/GF", # enable string pooling
+    "/EHsc", # extern "C" does not throw
+    #"/RTC1", # enable stack checks
+    "/GS", # enable secrutiy checks
+    "/Gy", # separate functions for linker
+    "/Zc:wchar_t",
+    "/Gd",
+    "/MD" if GetOption("dynamic-crt") else "/MT",
+])
+
+var.Add('LINKFLAGS', 'Linker Flags', [
+    "/DEBUG", # Generate debug symbols
+    "/INCREMENTAL:NO", # Disable incremental linking
+    "/OPT:REF", # Remove dead code
+    "/DYNAMICBASE",
+    "/NXCOMPAT",
+])
+
+var.Add('TOOLS', 'SCons tools', [
+    "default",
+    "swig",
+    "textfile"
+])
+
 env = Environment(
-    CPPPATH = ["#/src/include/",
-               "#/build_win",
-               "#/test/windows",
-               "#/.",
-           ],
-    CFLAGS = [
-        "/Z7", # Generate debugging symbols
-        "/wd4090", # Ignore warning about mismatched const qualifiers
-        "/wd4996",
-        "/W3", # Warning level 3
-        "/we4013", # Error on undefined functions
-        "/TC", # Compile as C code
-        #"/Od", # Disable optimization
-        "/Ob1", # inline expansion
-        "/O2", # optimize for speed
-        "/GF", # enable string pooling
-        "/EHsc", # extern "C" does not throw
-        #"/RTC1", # enable stack checks
-        "/GS", # enable secrutiy checks
-        "/Gy", # separate functions for linker
-        "/Zc:wchar_t",
-        "/Gd",
-        "/MD" if GetOption("dynamic-crt") else "/MT",
-        ],
-    LINKFLAGS = [
-        "/DEBUG", # Generate debug symbols
-        "/INCREMENTAL:NO", # Disable incremental linking
-        "/OPT:REF", # Remove dead code
-        "/DYNAMICBASE",
-        "/NXCOMPAT",
-        ],
-    tools=["default", "swig", "textfile"],
-    SWIG=swig_binary
+    variables = var
 )
 
 env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
