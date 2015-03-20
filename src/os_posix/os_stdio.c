@@ -9,17 +9,26 @@
 #include "wt_internal.h"
 
 /*
- * __wt_fp_open --
+ * __wt_fopen --
  *	Open a FILE handle.
  */
 int
-__wt_fp_open(WT_SESSION_IMPL *session,
-    const char *name, const char *mode, FILE **fpp)
+__wt_fopen(WT_SESSION_IMPL *session,
+    const char *name, const char *mode, u_int flags, FILE **fpp)
 {
 	WT_DECL_RET;
-	char *path;
+	const char *path;
+	char *buf;
 
-	WT_RET(__wt_filename(session, name, &path));
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: fopen", name));
+
+	buf = NULL;
+	if (LF_ISSET(WT_FOPEN_FIXED))
+		path = name;
+	else {
+		WT_RET(__wt_filename(session, name, &buf));
+		path = buf;
+	}
 
 #ifdef _WIN32
 	{
@@ -38,17 +47,67 @@ __wt_fp_open(WT_SESSION_IMPL *session,
 	if (*fpp == NULL)
 		ret = __wt_errno();
 
-	__wt_free(session, path);
+	if (buf != NULL)
+		__wt_free(session, buf);
+
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "%s: fopen", name);
+}
+
+/*
+ * __wt_vfprintf --
+ *	Vfprintf for a FILE handle.
+ */
+int
+__wt_vfprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, va_list ap)
+{
+	WT_DECL_RET;
+
+	WT_UNUSED(session);
+
+	return (vfprintf(fp, fmt, ap) < 0 ? __wt_errno() : ret);
+}
+
+/*
+ * __wt_fprintf --
+ *	Fprintf for a FILE handle.
+ */
+int
+__wt_fprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+{
+	WT_DECL_RET;
+	va_list ap;
+
+	WT_UNUSED(session);
+
+	va_start(ap, fmt);
+	ret = __wt_vfprintf(session, fp, fmt, ap);
+	va_end(ap);
 
 	return (ret);
 }
 
 /*
- * __wt_fp_close --
+ * __wt_fflush --
+ *	Flush a FILE handle.
+ */
+int
+__wt_fflush(WT_SESSION_IMPL *session, FILE *fp)
+{
+	WT_UNUSED(session);
+
+	/* Flush the handle. */
+	return (fflush(fp) == 0 ? 0 : __wt_errno());
+}
+
+/*
+ * __wt_fclose --
  *	Close a FILE handle.
  */
 int
-__wt_fp_close(WT_SESSION_IMPL *session, FILE **fpp)
+__wt_fclose(WT_SESSION_IMPL *session, FILE **fpp)
 {
 	WT_DECL_RET;
 

@@ -72,16 +72,13 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(value);
 	WT_DECL_RET;
-	char *path;
-
-	path = NULL;
+	int exist;
 
 	/* Look for a hot backup file: if we find it, load it. */
-	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
-	fp = fopen(path, "r");
-	__wt_free(session, path);
-	if (fp == NULL)
+	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist));
+	if (!exist)
 		return (0);
+	WT_RET(__wt_fopen(session, WT_METADATA_BACKUP, "r", 0, &fp));
 
 	/* Read line pairs and load them into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 512, &key));
@@ -98,7 +95,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 
 	F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
-err:	WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+err:	WT_TRET(__wt_fclose(session, &fp));
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &value);
 	return (ret);
@@ -230,12 +227,9 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	FILE *fp;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	int match;
-	char *path;
+	int exist, match;
 
 	*valuep = NULL;
-
-	path = NULL;
 
 	/*
 	 * Open the turtle file; there's one case where we won't find the turtle
@@ -243,13 +237,11 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	 * the turtle file, and that means returning the default configuration
 	 * string for the metadata file.
 	 */
-	WT_RET(__wt_filename(session, WT_METADATA_TURTLE, &path));
-	if ((fp = fopen(path, "r")) == NULL)
-		ret = __wt_errno();
-	__wt_free(session, path);
-	if (fp == NULL)
+	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
+	if (!exist)
 		return (strcmp(key, WT_METAFILE_URI) == 0 ?
-		    __metadata_config(session, valuep) : ret);
+		    __metadata_config(session, valuep) : WT_NOTFOUND);
+	WT_RET(__wt_fopen(session, WT_METADATA_TURTLE, "r", 0, &fp));
 
 	/* Search for the key. */
 	WT_ERR(__wt_scr_alloc(session, 512, &buf));
@@ -271,7 +263,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	/* Copy the value for the caller. */
 	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
-err:	WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+err:	WT_TRET(__wt_fclose(session, &fp));
 	__wt_scr_free(session, &buf);
 	return (ret);
 }
