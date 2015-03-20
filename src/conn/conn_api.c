@@ -78,6 +78,9 @@ __collator_confchk(
 	if (collatorp != NULL)
 		*collatorp = NULL;
 
+	if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
+		return (0);
+
 	conn = S2C(session);
 	TAILQ_FOREACH(ncoll, &conn->collqh, q)
 		if (WT_STRING_MATCH(ncoll->name, cname->str, cname->len)) {
@@ -114,6 +117,8 @@ __wt_collator_config(WT_SESSION_IMPL *session, const char *uri,
 	*ownp = 0;
 
 	WT_RET(__collator_confchk(session, cname, &collator));
+	if (collator == NULL)
+		return (0);
 
 	if (collator->customize != NULL)
 		WT_RET(collator->customize(collator,
@@ -383,6 +388,9 @@ __compressor_confchk(
 	if (compressorp != NULL)
 		*compressorp = NULL;
 
+	if (cval->len == 0 || WT_STRING_MATCH("none", cval->str, cval->len))
+		return (0);
+
 	conn = S2C(session);
 	TAILQ_FOREACH(ncomp, &conn->compqh, q)
 		if (WT_STRING_MATCH(ncomp->name, cval->str, cval->len)) {
@@ -605,6 +613,9 @@ __extractor_confchk(
 	if (extractorp != NULL)
 		*extractorp = NULL;
 
+	if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
+		return (0);
+
 	conn = S2C(session);
 	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
 		if (WT_STRING_MATCH(nextractor->name, cname->str, cname->len)) {
@@ -646,6 +657,9 @@ __wt_extractor_config(WT_SESSION_IMPL *session,
 		return (0);
 
 	WT_RET(__extractor_confchk(session, &cname, &extractor));
+	if (extractor == NULL)
+		return (0);
+
 	if (extractor->customize != NULL) {
 		WT_RET(__wt_config_getones(session,
 		    config, "app_metadata", &cname));

@@ -61,9 +61,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	 */
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
-	if (cval.len > 0)
-		WT_RET(__wt_compressor_config(
-		    session, &cval, &conn->log_compressor));
+	WT_RET(__wt_compressor_config(session, &cval, &conn->log_compressor));
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
