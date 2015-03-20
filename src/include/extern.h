@@ -489,7 +489,7 @@ extern int __wt_fopen(WT_SESSION_IMPL *session, const char *name, const char *mo
 extern int __wt_vfprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, va_list ap);
 extern int __wt_fprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
 extern int __wt_fflush(WT_SESSION_IMPL *session, FILE *fp);
-extern int __wt_fclose(WT_SESSION_IMPL *session, FILE **fpp);
+extern int __wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, int iswrite);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, void *(*func)(void *), void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid);

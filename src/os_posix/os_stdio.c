@@ -107,18 +107,30 @@ __wt_fflush(WT_SESSION_IMPL *session, FILE *fp)
  *	Close a FILE handle.
  */
 int
-__wt_fclose(WT_SESSION_IMPL *session, FILE **fpp)
+__wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, int iswrite)
 {
+	FILE *fp;
 	WT_DECL_RET;
 
-	WT_UNUSED(session);
+	if (*fpp == NULL)
+		return (0);
 
-	/* Close the handle (which implicitly flushes the file to disk). */
-	if (*fpp != NULL) {
-		if (fclose(*fpp) != 0)
-			ret = __wt_errno();
-		*fpp = NULL;
+	fp = *fpp;
+	*fpp = NULL;
+
+	/*
+	 * If the handle was opened for writing, flush the file to the backing
+	 * OS buffers, then flush the OS buffers to the backing disk.
+	 */
+	if (iswrite) {
+		ret = __wt_fflush(session, fp);
+		if (fsync(fileno(fp)) != 0)
+			WT_TRET(__wt_errno());
 	}
+
+	/* Close the handle. */
+	if (fclose(fp) != 0)
+		WT_TRET(__wt_errno());
 
 	return (ret);
 }

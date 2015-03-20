@@ -300,7 +300,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	if ((log_file = conn->stat_fp) == NULL ||
 	    path == NULL || strcmp(tmp->mem, path->mem) != 0) {
 		conn->stat_fp = NULL;
-		WT_RET(__wt_fclose(session, &log_file));
+		WT_RET(__wt_fclose(session, &log_file, 1));
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
 		WT_RET(__wt_fopen(session, tmp->mem, "a", 0, &log_file));
@@ -528,7 +528,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 	conn->stat_session = NULL;
 	conn->stat_tid_set = 0;
 	conn->stat_format = NULL;
-	WT_TRET(__wt_fclose(session, &conn->stat_fp));
+	WT_TRET(__wt_fclose(session, &conn->stat_fp, 1));
 	conn->stat_path = NULL;
 	conn->stat_sources = NULL;
 	conn->stat_stamp = NULL;

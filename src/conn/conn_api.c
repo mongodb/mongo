@@ -1441,7 +1441,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* Flush to disk and close our handle. */
-	WT_ERR(__wt_fclose(session, &fp));
+	WT_ERR(__wt_fclose(session, &fp, 1));
 
 	/*
 	 * Rename the file into place: that's an atomic operation so we can be
@@ -1449,7 +1449,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_ERR(__wt_rename(session, WT_BASECONFIG_SET, WT_BASECONFIG));
 
-err:	WT_TRET(__wt_fclose(session, &fp));
+err:	WT_TRET(__wt_fclose(session, &fp, 1));
 
 	/* Discard any damaged temporary file, not required but cleaner. */
 	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));

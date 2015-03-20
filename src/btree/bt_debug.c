@@ -131,7 +131,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	}
 
 	/* Close any file we opened. */
-	(void)__wt_fclose(session, &ds->fp);
+	(void)__wt_fclose(session, &ds->fp, 1);
 }
 
 /*
