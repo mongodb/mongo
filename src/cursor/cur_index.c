@@ -227,26 +227,34 @@ __curindex_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
 	/*
-	 * We expect partial matches, but we want the smallest item that
-	 * matches the prefix.  Fail if there is no matching item.
+	 * We are searching using the application-specified key, which
+	 * (usually) doesn't contain the primary key, so it is just a prefix of
+	 * any matching index key.  Do a search_near, step to the next entry if
+	 * we land on one that is too small, then check that the prefix
+	 * matches.
 	 */
 	__wt_cursor_set_raw_key(child, &cursor->key);
 	WT_ERR(child->search_near(child, &cmp));
 
-	/*
-	 * We expect partial matches, and want the smallest record with a key
-	 * greater than or equal to the search key.  The only way for the key
-	 * to be equal is if there is an index on the primary key, because
-	 * otherwise the primary key columns will be appended to the index key,
-	 * but we don't disallow that (odd) case.
-	 */
 	if (cmp < 0)
 		WT_ERR(child->next(child));
 
-	if (child->key.size < cursor->key.size)
-		WT_ERR(WT_NOTFOUND);
+	/*
+	 * We expect partial matches, and want the smallest record with a key
+	 * greater than or equal to the search key.
+	 *
+	 * If the key we find is shorter than the search key, it can't possibly
+	 * match.
+	 *
+	 * The only way for the key to be exactly equal is if there is an index
+	 * on the primary key, because otherwise the primary key columns will
+	 * be appended to the index key, but we don't disallow that (odd) case.
+	 */
 	found_key = child->key;
+	if (found_key.size < cursor->key.size)
+		WT_ERR(WT_NOTFOUND);
 	found_key.size = cursor->key.size;
+
 	WT_ERR(__wt_compare(
 	    session, cindex->index->collator, &cursor->key, &found_key, &cmp));
 	if (cmp != 0) {
