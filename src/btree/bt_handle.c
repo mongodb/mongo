@@ -212,7 +212,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
-	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	WT_RET(__wt_struct_confchk(session, &cval));
 	if (WT_STRING_MATCH("r", cval.str, cval.len))
 		btree->type = BTREE_COL_VAR;
 	else
@@ -220,7 +220,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->key_format));
 
 	WT_RET(__wt_config_gets(session, cfg, "value_format", &cval));
-	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	WT_RET(__wt_struct_confchk(session, &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 
 	/* Row-store key comparison and key gap for prefix compression. */

@@ -57,7 +57,7 @@ format_meta = common_meta + [
         raw byte arrays. By default, records are stored in row-store
         files: keys of type \c 'r' are record numbers and records
         referenced by record number are stored in column-store files''',
-        type='format'),
+        type='format', func='__wt_struct_confchk'),
     Config('value_format', 'u', r'''
         the format of the data packed into value items.  See @ref
         schema_format_types for details.  By default, the value_format
@@ -65,7 +65,7 @@ format_meta = common_meta + [
         manipulate raw byte arrays. Value items of type 't' are
         bitfields, and when configured with record number type keys,
         will be stored using a fixed-length store''',
-        type='format'),
+        type='format', func='__wt_struct_confchk'),
 ]
 
 lsm_config = [

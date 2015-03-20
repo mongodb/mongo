@@ -38,5 +38,19 @@ class test_bug012(wttest.WiredTigerTestCase):
             lambda: self.session.create('table:A',
                 'type=lsm,lsm=(bloom_config=(collator="foo"))'), msg)
 
+    # Test that we detect illegal key formats.
+    def test_illegal_key_format(self):
+        msg = '/Invalid type/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create('table:A',
+                'type=lsm,lsm=(bloom_config=(key_format="X"))'), msg)
+
+    # Test that we detect illegal value formats.
+    def test_illegal_value_format(self):
+        msg = '/Invalid type/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create('table:A',
+                'type=lsm,lsm=(bloom_config=(value_format="X"))'), msg)
+
 if __name__ == '__main__':
     wttest.run()

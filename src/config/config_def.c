@@ -164,7 +164,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "internal_page_max", "int",
 	    NULL, "min=512B,max=512MB",
 	    NULL },
-	{ "key_format", "format", NULL, NULL, NULL },
+	{ "key_format", "format", __wt_struct_confchk, NULL, NULL },
 	{ "key_gap", "int", NULL, "min=0", NULL },
 	{ "leaf_item_max", "int", NULL, "min=0", NULL },
 	{ "leaf_key_max", "int", NULL, "min=0", NULL },
@@ -178,7 +178,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "split_deepen_min_child", "int", NULL, NULL, NULL },
 	{ "split_deepen_per_child", "int", NULL, NULL, NULL },
 	{ "split_pct", "int", NULL, "min=25,max=100", NULL },
-	{ "value_format", "format", NULL, NULL, NULL },
+	{ "value_format", "format", __wt_struct_confchk, NULL, NULL },
 	{ "version", "string", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
@@ -190,10 +190,10 @@ static const WT_CONFIG_CHECK confchk_index_meta[] = {
 	{ "extractor", "string", NULL, NULL, NULL },
 	{ "immutable", "boolean", NULL, NULL, NULL },
 	{ "index_key_columns", "int", NULL, NULL, NULL },
-	{ "key_format", "format", NULL, NULL, NULL },
+	{ "key_format", "format", __wt_struct_confchk, NULL, NULL },
 	{ "source", "string", NULL, NULL, NULL },
 	{ "type", "string", NULL, NULL, NULL },
-	{ "value_format", "format", NULL, NULL, NULL },
+	{ "value_format", "format", __wt_struct_confchk, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -265,7 +265,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "internal_page_max", "int",
 	    NULL, "min=512B,max=512MB",
 	    NULL },
-	{ "key_format", "format", NULL, NULL, NULL },
+	{ "key_format", "format", __wt_struct_confchk, NULL, NULL },
 	{ "key_gap", "int", NULL, "min=0", NULL },
 	{ "leaf_item_max", "int", NULL, "min=0", NULL },
 	{ "leaf_key_max", "int", NULL, "min=0", NULL },
@@ -282,7 +282,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "split_deepen_per_child", "int", NULL, NULL, NULL },
 	{ "split_pct", "int", NULL, "min=25,max=100", NULL },
 	{ "type", "string", NULL, NULL, NULL },
-	{ "value_format", "format", NULL, NULL, NULL },
+	{ "value_format", "format", __wt_struct_confchk, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -338,8 +338,8 @@ static const WT_CONFIG_CHECK confchk_table_meta[] = {
 	{ "colgroups", "list", NULL, NULL, NULL },
 	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
-	{ "key_format", "format", NULL, NULL, NULL },
-	{ "value_format", "format", NULL, NULL, NULL },
+	{ "key_format", "format", __wt_struct_confchk, NULL, NULL },
+	{ "value_format", "format", __wt_struct_confchk, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
