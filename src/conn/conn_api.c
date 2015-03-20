@@ -1388,7 +1388,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (exist)
 		return (0);
 
-	WT_RET(__wt_fp_open(session, WT_BASECONFIG_SET, &fp));
+	WT_RET(__wt_fp_open(session, WT_BASECONFIG_SET, "w", &fp));
 
 	fprintf(fp, "%s\n\n",
 	    "# Do not modify this file.\n"

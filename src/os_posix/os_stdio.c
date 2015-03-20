@@ -13,14 +13,29 @@
  *	Open a FILE handle.
  */
 int
-__wt_fp_open(WT_SESSION_IMPL *session, const char *name, FILE **fpp)
+__wt_fp_open(WT_SESSION_IMPL *session,
+    const char *name, const char *mode, FILE **fpp)
 {
 	WT_DECL_RET;
 	char *path;
 
 	WT_RET(__wt_filename(session, name, &path));
 
-	if ((*fpp = fopen(path, "w")) == NULL)
+#ifdef _WIN32
+	{
+	char buf[10];
+	/*
+	 * Open in binary (untranslated) mode; translations involving
+	 * carriage-return and linefeed characters are suppressed.
+	 */
+	(void)snprintf(buf, sizeof(buf), "%s" "b", mode);
+
+	*fpp = fopen(path, buf);
+	}
+#else
+	*fpp = fopen(path, mode);
+#endif
+	if (*fpp == NULL)
 		ret = __wt_errno();
 
 	__wt_free(session, path);
