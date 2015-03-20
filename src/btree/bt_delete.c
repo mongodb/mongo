@@ -338,8 +338,8 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 		upd_array[i] = upd;
 	}
 
-	__wt_cache_page_inmem_incr(session, page,
-	    page->pg_row_entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
+	__wt_cache_page_inmem_incr(session, page, page->pg_row_entries *
+	    (sizeof(WT_UPDATE *) + WT_UPDATE_MEMSIZE(upd)));
 
 	return (0);
 

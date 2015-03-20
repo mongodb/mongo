@@ -503,8 +503,9 @@ session_config = [
 common_wiredtiger_open = [
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O.  The
-        default value of -1 indicates a platform-specific alignment
-        value should be used (4KB on Linux systems, zero elsewhere)''',
+        default value of -1 indicates a platform-specific alignment value
+        should be used (4KB on Linux systems when direct I/O is configured,
+        zero elsewhere)''',
         min='-1', max='1MB'),
     Config('checkpoint_sync', 'true', r'''
         flush files to stable storage when closing or writing
