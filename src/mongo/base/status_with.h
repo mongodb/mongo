@@ -184,22 +184,22 @@ namespace mongo {
     //
 
     template<typename T>
-    bool operator==(const StatusWith<T>& sw, const ErrorCodes& code) {
+    bool operator==(const StatusWith<T>& sw, const ErrorCodes::Error code) {
         return sw.getStatus() == code;
     }
 
     template<typename T>
-    bool operator==(const ErrorCodes::Error& code, const StatusWith<T>& sw) {
+    bool operator==(const ErrorCodes::Error code, const StatusWith<T>& sw) {
         return code == sw.getStatus();
     }
 
     template<typename T>
-    bool operator!=(const StatusWith<T>& sw, const ErrorCodes::Error& code) {
+    bool operator!=(const StatusWith<T>& sw, const ErrorCodes::Error code) {
         return !(sw == code);
     }
 
     template<typename T>
-    bool operator!=(const ErrorCodes::Error& code, const StatusWith<T>& sw) {
+    bool operator!=(const ErrorCodes::Error code, const StatusWith<T>& sw) {
         return !(code == sw);
     }
 
