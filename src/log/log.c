@@ -221,7 +221,7 @@ __wt_log_extract_lognum(
 	if (id == NULL || name == NULL)
 		return (WT_ERROR);
 	if ((p = strrchr(name, '.')) == NULL ||
-	    sscanf(++p, "%" PRIu32, id) != 1)
+	    sscanf(++p, "%" SCNu32, id) != 1)
 		WT_RET_MSG(session, WT_ERROR, "Bad log file name '%s'", name);
 	return (0);
 }
@@ -1382,7 +1382,7 @@ advance:
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
 		/*
-		 * First 8 bytes is the real record length.  See if we
+		 * First 4 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
 		 * that we rarely will have to read more.  Most log records
 		 * will be fairly small.
@@ -1397,6 +1397,7 @@ advance:
 		 */
 		if (reclen == 0) {
 			/* This LSN is the end. */
+			eol = 1;
 			break;
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);

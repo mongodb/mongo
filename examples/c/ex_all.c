@@ -33,8 +33,8 @@
  *	fragments.
  */
 
-#include <assert.h>
-#include <errno.h>
+#include <sys/stat.h>
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +45,6 @@
 #else
 #include "windows_shim.h"
 #endif
-#include <sys/stat.h>
 
 #include <wiredtiger.h>
 
@@ -577,6 +576,13 @@ session_ops(WT_SESSION *session)
 	/*! [Create a bzip2 compressed table] */
 	ret = session->drop(session, "table:mytable", NULL);
 
+	/*! [Create a lz4 compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=lz4,key_format=S,value_format=S");
+	/*! [Create a lz4 compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
+
 	/*! [Create a snappy compressed table] */
 	ret = session->create(session,
 	    "table:mytable",
@@ -930,7 +936,6 @@ pack_ops(WT_SESSION *session)
 	size_t size;
 	ret = wiredtiger_struct_size(session, &size, "iSh", 42, "hello", -3);
 	/*! [Get the packed size] */
-	assert(size < 100);
 	}
 
 	{
@@ -1032,6 +1037,14 @@ main(void)
 	    "create,"
 	    "extensions=[/usr/local/lib/libwiredtiger_bzip2.so]", &conn);
 	/*! [Configure bzip2 extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure lz4 extension] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/libwiredtiger_lz4.so]", &conn);
+	/*! [Configure lz4 extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 

@@ -123,6 +123,7 @@ struct __wt_btree {
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
+	uint64_t checkpoint_gen;	/* Checkpoint generation */
 	uint64_t write_gen;		/* Write generation */
 
 	WT_REF  *evict_ref;		/* Eviction thread's location */

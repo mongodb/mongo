@@ -37,32 +37,7 @@ if test $# -ne 0; then
 	exit 1
 fi
 
-ext="\"$top/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so\""
-
-bzip2_ext="$top/ext/compressors/bzip2/.libs/libwiredtiger_bzip2.so"
-if test -e $bzip2_ext ; then
-        ext="$ext,\"$bzip2_ext\""
-fi
-lzo_ext=".libs/lzo_compress.so"
-if test -e $lzo_ext ; then
-        ext="$ext,\"$lzo_ext\""
-fi
-bzip_raw_ext=".libs/bzip_raw_compress.so"
-if test -e $bzip_raw_ext ; then
-        ext="$ext,\"$bzip_raw_ext\""
-fi
-snappy_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
-if test -e $snappy_ext ; then
-        ext="$ext,\"$snappy_ext\""
-fi
-zlib_ext="$top/ext/compressors/zlib/.libs/libwiredtiger_zlib.so"
-if test -e $zlib_ext ; then
-        ext="$ext,\"$zlib_ext\""
-fi
-
-config='extensions=['$ext']'
-
-$top/wt -h $home -C "$config" dump $wturi |
+$top/wt -h $home dump $wturi |
     sed -e '1,/^Data$/d' > $home/wt_dump
 
 if test "X$bdbdir" = "X"; then

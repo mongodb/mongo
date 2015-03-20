@@ -260,6 +260,7 @@ struct __wt_connection_stats {
 	WT_STATS session_open;
 	WT_STATS txn_begin;
 	WT_STATS txn_checkpoint;
+	WT_STATS txn_checkpoint_generation;
 	WT_STATS txn_checkpoint_running;
 	WT_STATS txn_checkpoint_time_max;
 	WT_STATS txn_checkpoint_time_min;
@@ -267,6 +268,7 @@ struct __wt_connection_stats {
 	WT_STATS txn_checkpoint_time_total;
 	WT_STATS txn_commit;
 	WT_STATS txn_fail_cache;
+	WT_STATS txn_pinned_checkpoint_range;
 	WT_STATS txn_pinned_range;
 	WT_STATS txn_rollback;
 	WT_STATS write_io;
@@ -294,6 +296,7 @@ struct __wt_dsrc_stats {
 	WT_STATS bloom_page_evict;
 	WT_STATS bloom_page_read;
 	WT_STATS bloom_size;
+	WT_STATS btree_checkpoint_generation;
 	WT_STATS btree_column_deleted;
 	WT_STATS btree_column_fix;
 	WT_STATS btree_column_internal;

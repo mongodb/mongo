@@ -24,10 +24,12 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
     )
 {
 	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 	int restarts = 0;
 
 	btree = S2BT(session);
+	conn = S2C(session);
 	*busyp = 0;
 
 	/* If a file can never be evicted, hazard pointers aren't required. */
@@ -54,19 +56,27 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	 * for that case.
 	 */
 	for (hp = session->hazard + session->nhazard;; ++hp) {
-		/* Expand the number of hazard pointers if available.*/
+		/*
+		 * If we get to the end of the array, either:
+		 * 1. If we know there are free slots somewhere, and this is
+		 *    the first time through, continue the search from the
+		 *    start.  Don't actually continue the loop because that
+		 *    will skip the first slot.
+		 * 2. If we have searched all the way through and we have
+		 *    allocated the maximum number of slots, give up.
+		 * 3. Allocate another increment of slots, up to the maximum.
+		 *    The slot we are on should now be available.
+		 */
 		if (hp >= session->hazard + session->hazard_size) {
-			if (session->hazard_size >= S2C(session)->hazard_max)
-				break;
-			/* Restart the search. */
 			if (session->nhazard < session->hazard_size &&
-			    restarts++ == 0) {
+			    restarts++ == 0)
 				hp = session->hazard;
-				continue;
-			}
-			WT_PUBLISH(session->hazard_size,
-			    WT_MIN(session->hazard_size + WT_HAZARD_INCR,
-			    S2C(session)->hazard_max));
+			else if (session->hazard_size >= conn->hazard_max)
+				break;
+			else
+				WT_PUBLISH(session->hazard_size, WT_MIN(
+				    session->hazard_size + WT_HAZARD_INCR,
+				    conn->hazard_max));
 		}
 
 		if (hp->page != NULL)

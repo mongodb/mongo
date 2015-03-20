@@ -39,9 +39,6 @@
  * is being built into the WiredTiger library.
  */
 #include "wiredtiger_config.h"
-#ifdef _MSC_VER
-#define	inline __inline
-#endif
 
 /* Local compressor structure. */
 typedef struct {
@@ -70,6 +67,8 @@ wt_snappy_error(WT_COMPRESSOR *compressor,
 	case SNAPPY_INVALID_INPUT:
 		msg = "SNAPPY_INVALID_INPUT";
 		break;
+	case SNAPPY_OK:
+		return (0);
 	default:
 		msg = "unknown error";
 		break;

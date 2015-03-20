@@ -134,7 +134,7 @@ file_config = format_meta + [
         configure a compressor for file blocks.  Permitted values are
         \c "none" or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-        for \c "snappy" or \c "zlib" compression, these names are also
+        for \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
         available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages; see @ref
@@ -366,6 +366,16 @@ connection_runtime_config = [
     Config('eviction_trigger', '95', r'''
         trigger eviction when the cache is using this much memory, as a
         percentage of the total cache size''', min=10, max=99),
+    Config('file_manager', '', r'''
+        control how file handles are managed''',
+        type='category', subconfig=[
+        Config('close_idle_time', '30', r'''
+            amount of time in seconds a file handle needs to be idle
+            before attempting to close it''', min=1, max=1000),
+        Config('close_scan_interval', '10', r'''
+            interval in seconds at which to check for files that are
+            inactive and close them''', min=1, max=1000)
+        ]),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management''',
         type='category', subconfig=[
@@ -536,7 +546,7 @@ common_wiredtiger_open = [
             type='boolean'),
         Config('compressor', 'none', r'''
             configure a compressor for log records.  Permitted values are
-            \c "none" or \c "bzip2", \c "snappy" or custom compression
+            \c "none" or \c "bzip2", \c "snappy", \c "lz4" or custom compression
             engine \c "name" created with WT_CONNECTION::add_compressor.
             See @ref compression for more information'''),
         Config('enabled', 'false', r'''

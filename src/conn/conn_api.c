@@ -148,6 +148,9 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
 	extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+	extern int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+#endif
 
 /*
  * __conn_load_default_extensions --
@@ -162,6 +165,9 @@ __conn_load_default_extensions(WT_CONNECTION_IMPL *conn)
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
 	WT_RET(zlib_extension_init(&conn->iface, NULL));
+#endif
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+	WT_RET(lz4_extension_init(&conn->iface, NULL));
 #endif
 	return (0);
 }
@@ -766,6 +772,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
 	WT_ERR(__wt_lsm_manager_reconfig(session, config_cfg));
 	WT_ERR(__wt_statlog_create(session, config_cfg));
+	WT_ERR(__wt_sweep_config(session, cfg));
 	WT_ERR(__wt_verbose_config(session, config_cfg));
 
 	WT_ERR(__wt_config_merge(session, config_cfg, &p));
@@ -1203,6 +1210,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		len = (size_t)snprintf(buf, sizeof(buf),
 		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
 		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
+		WT_ERR(__wt_fsync(session, fh));
 
 		conn->is_new = 1;
 	} else {
@@ -1367,7 +1375,7 @@ __conn_write_config(
 
 	/*
 	 * We were passed an array of configuration strings where slot 0 is all
-	 * all possible values and the second and subsequent slots are changes
+	 * possible values and the second and subsequent slots are changes
 	 * specified by the application during open (using the wiredtiger_open
 	 * configuration string, an environment variable, or user-configuration
 	 * file). The base configuration file contains all changes to default
@@ -1625,6 +1633,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));
+	WT_ERR(__wt_sweep_config(session, cfg));
 	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Now that we know if verbose is configured, output the version. */
