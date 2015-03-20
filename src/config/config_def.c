@@ -4,6 +4,7 @@
 
 static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 	{ "app_metadata", "string", NULL, NULL, NULL },
+	{ "collator", "string", NULL, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "source", "string", NULL, NULL, NULL },
 	{ "type", "string", NULL, NULL, NULL },
@@ -184,6 +185,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 
 static const WT_CONFIG_CHECK confchk_index_meta[] = {
 	{ "app_metadata", "string", NULL, NULL, NULL },
+	{ "collator", "string", NULL, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "extractor", "string", NULL, NULL, NULL },
 	{ "immutable", "boolean", NULL, NULL, NULL },
@@ -334,6 +336,7 @@ static const WT_CONFIG_CHECK confchk_session_verify[] = {
 static const WT_CONFIG_CHECK confchk_table_meta[] = {
 	{ "app_metadata", "string", NULL, NULL, NULL },
 	{ "colgroups", "list", NULL, NULL, NULL },
+	{ "collator", "string", NULL, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "key_format", "format", NULL, NULL, NULL },
 	{ "value_format", "format", NULL, NULL, NULL },
@@ -613,7 +616,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 
 static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "colgroup.meta",
-	  "app_metadata=,columns=,source=,type=file",
+	  "app_metadata=,collator=,columns=,source=,type=file",
 	  confchk_colgroup_meta
 	},
 	{ "connection.add_collator",
@@ -686,8 +689,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_file_meta
 	},
 	{ "index.meta",
-	  "app_metadata=,columns=,extractor=,immutable=0,index_key_columns="
-	  ",key_format=u,source=,type=file,value_format=u",
+	  "app_metadata=,collator=,columns=,extractor=,immutable=0,"
+	  "index_key_columns=,key_format=u,source=,type=file,value_format=u",
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
@@ -774,7 +777,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_session_verify
 	},
 	{ "table.meta",
-	  "app_metadata=,colgroups=,columns=,key_format=u,value_format=u",
+	  "app_metadata=,colgroups=,collator=,columns=,key_format=u,"
+	  "value_format=u",
 	  confchk_table_meta
 	},
 	{ "wiredtiger_open",
