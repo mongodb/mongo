@@ -136,11 +136,11 @@ file_config = format_meta + [
         requirements from the operating system or storage device''',
         min='512B', max='128MB'),
     Config('block_compressor', 'none', r'''
-        configure a compressor for file blocks.  Permitted values are
-        \c "none" or custom compression engine name created with
-        WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-        for \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
-        available.  See @ref compression for more information''',
+        configure a compressor for file blocks.  Permitted values are \c "none"
+        or custom compression engine name created with
+        WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
+        \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression, these names
+        are also available.  See @ref compression for more information''',
         func='__wt_compressor_confchk'),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages; see @ref
@@ -398,9 +398,9 @@ connection_runtime_config = [
         eviction configuration options.''',
         type='category', subconfig=[
             Config('threads_max', '1', r'''
-        maximum number of threads WiredTiger will start to help evict
-        pages from cache. The number of threads started will vary
-        depending on the current eviction load''',
+                maximum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads started will vary
+                depending on the current eviction load''',
                 min=1, max=20),
             Config('threads_min', '1', r'''
                 minimum number of threads WiredTiger will start to help evict
@@ -550,9 +550,11 @@ common_wiredtiger_open = [
             type='boolean'),
         Config('compressor', 'none', r'''
             configure a compressor for log records.  Permitted values are
-            \c "none" or \c "bzip2", \c "snappy", \c "lz4" or custom compression
-            engine \c "name" created with WT_CONNECTION::add_compressor.
-            See @ref compression for more information'''),
+            \c "none" or custom compression engine name created with
+            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
+            for \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression,
+            these names are also available. See @ref compression for more
+            information'''),
         Config('enabled', 'false', r'''
             enable logging subsystem''',
             type='boolean'),
