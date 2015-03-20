@@ -398,8 +398,6 @@ namespace mongo {
                 ctx.reset(); // unlocks
             }
 
-            CollectionMetadataPtr collMetadata = cc->getCollMetadata();
-
             // If we're replaying the oplog, we save the last time that we read.
             OpTime slaveReadTill;
 
@@ -803,18 +801,6 @@ namespace mongo {
                 slaveOK);
         uassertStatusOK(status);
 
-        // If this exists, the collection is sharded.
-        // If it doesn't exist, we can assume we're not sharded.
-        // If we're sharded, we might encounter data that is not consistent with our sharding state.
-        // We must ignore this data.
-        CollectionMetadataPtr collMetadata;
-        if (!shardingState.needCollectionMetadata(nss.ns())) {
-            collMetadata = CollectionMetadataPtr();
-        }
-        else {
-            collMetadata = shardingState.getCollectionMetadata(nss.ns());
-        }
-
         // Run the query.
         // bb is used to hold query results
         // this buffer should contain either requested documents per query or
@@ -931,8 +917,6 @@ namespace mongo {
                 curop.debug().exhaust = true;
             }
 
-            // Set attributes for getMore.
-            cc->setCollMetadata(collMetadata);
             cc->setPos(numResults);
 
             // If the query had a time limit, remaining time is "rolled over" to the cursor (for

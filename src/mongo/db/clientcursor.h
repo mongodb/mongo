@@ -132,13 +132,6 @@ namespace mongo {
         }
 
         //
-        // Sharding-specific data.  TODO: Document.
-        //
-
-        void setCollMetadata( CollectionMetadataPtr metadata ){ _collMetadata = metadata; }
-        CollectionMetadataPtr getCollMetadata(){ return _collMetadata; }
-
-        //
         // Replication-related stuff.  TODO: Document and clean.
         //
 

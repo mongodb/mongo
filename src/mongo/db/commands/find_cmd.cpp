@@ -140,8 +140,6 @@ namespace mongo {
                 }
                 else {
                     size_t options = QueryPlannerParams::DEFAULT;
-                    // TODO: The version attached to the TLS cannot be relied upon, the shard
-                    // version should be passed as part of the command parameter.
                     if (shardingState.needCollectionMetadata(cq->getParsed().ns())) {
                         options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
                     }
@@ -175,6 +173,10 @@ namespace mongo {
          *   5) Generate the first batch.
          *   6) Save state for getMore.
          *   7) Generate response to send to the client.
+         *
+         * TODO: Rather than using the sharding version available in thread-local storage
+         * (i.e. call to shardingState.needCollectionMetadata() below), shard version
+         * information should be passed as part of the command parameter.
          */
         virtual bool run(OperationContext* txn,
                          const std::string& dbname,
@@ -231,12 +233,12 @@ namespace mongo {
             {
                 PlanExecutor* rawExec;
                 size_t options = QueryPlannerParams::DEFAULT;
-                // TODO: The version attached to the TLS cannot be relied upon, the shard
-                // version should be passed as part of the command parameter.
                 if (shardingState.needCollectionMetadata(cq->getParsed().ns())) {
                     options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
                 }
 
+                // TODO (SERVER-17284): This can yield before creating a ClientCursor, which means
+                // that we have to throw an error if the shard version changes during yield.
                 Status execStatus = getExecutor(txn,
                                                 collection,
                                                 cq.release(),
@@ -318,7 +320,6 @@ namespace mongo {
                 // State will be restored on getMore.
                 exec->saveState();
 
-                // TODO: Do we also need to set collection metadata here?
                 cursor->setLeftoverMaxTimeMicros(txn->getCurOp()->getRemainingMaxTimeMicros());
                 cursor->setPos(numResults);
 
