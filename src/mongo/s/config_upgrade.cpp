@@ -34,8 +34,10 @@
 
 #include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/cluster_client_internal.h"
 #include "mongo/s/distlock.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/mongo_version_range.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/s/type_database.h"
@@ -353,8 +355,8 @@ namespace mongo {
                       const ConfigUpgradeRegistry& registry,
                       const VersionType& lastVersionInfo,
                       VersionType* upgradedVersionInfo,
-                      string* errMsg)
-    {
+                      string* errMsg) {
+
         int fromVersion = lastVersionInfo.getCurrentVersion();
 
         ConfigUpgradeRegistry::const_iterator foundIt = registry.find(fromVersion);
@@ -375,19 +377,10 @@ namespace mongo {
         log() << "starting next upgrade step from v" << fromVersion << " to v" << toVersion << endl;
 
         // Log begin to config.changelog
-        Status logStatus = logConfigChange(configLoc,
-                                           "",
-                                           VersionType::ConfigNS,
-                                           "starting upgrade of config database",
-                                           BSON("from" << fromVersion << "to" << toVersion));
-
-        if (!logStatus.isOK()) {
-
-            *errMsg = stream() << "could not write initial changelog entry for upgrade"
-                               << causedBy(logStatus);
-
-            return false;
-        }
+        grid.catalogManager()->logChange(NULL,
+                                         "starting upgrade of config database",
+                                         VersionType::ConfigNS,
+                                         BSON("from" << fromVersion << "to" << toVersion));
 
         if (!upgrade.upgradeCallback(configLoc, lastVersionInfo, errMsg)) {
 
@@ -401,28 +394,16 @@ namespace mongo {
         Status verifyConfigStatus = getConfigVersion(configLoc, upgradedVersionInfo);
 
         if (!verifyConfigStatus.isOK()) {
-
             *errMsg = stream() << "failed to validate v" << fromVersion << " config version upgrade"
                                << causedBy(verifyConfigStatus);
 
             return false;
         }
 
-        // Log end to config.changelog
-        logStatus = logConfigChange(configLoc,
-                                    "",
-                                    VersionType::ConfigNS,
-                                    "finished upgrade of config database",
-                                    BSON("from" << fromVersion << "to" << toVersion));
-
-        if (!logStatus.isOK()) {
-
-            *errMsg = stream() << "could not write final changelog entry for upgrade"
-                               << causedBy(logStatus);
-
-            return false;
-        }
-
+        grid.catalogManager()->logChange(NULL,
+                                         "finished upgrade of config database",
+                                         VersionType::ConfigNS,
+                                         BSON("from" << fromVersion << "to" << toVersion));
         return true;
     }
 

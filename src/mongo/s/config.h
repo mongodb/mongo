@@ -237,17 +237,6 @@ namespace mongo {
 
         void reloadSettings();
 
-        /**
-         * Create a metadata change log entry in the config.changelog collection.
-         *
-         * @param what e.g. "split" , "migrate"
-         * @param ns to which collection the metadata change is being applied
-         * @param msg additional info about the metadata change
-         *
-         * This call is guaranteed never to throw.
-         */
-        void logChange( const std::string& what , const std::string& ns , const BSONObj& detail = BSONObj() );
-
         ConnectionString getConnectionString() const {
             return ConnectionString( _primary.getConnString() , ConnectionString::SYNC );
         }

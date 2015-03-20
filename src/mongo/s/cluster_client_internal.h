@@ -57,17 +57,6 @@ namespace mongo {
     Status checkClusterMongoVersions(const ConnectionString& configLoc,
                                      const std::string& minMongoVersion);
 
-    /**
-     * Logs to the config.changelog collection
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status logConfigChange(const ConnectionString& configLoc,
-                           const std::string& clientHost,
-                           const std::string& ns,
-                           const std::string& description,
-                           const BSONObj& details);
-
     //
     // Needed to normalize exception behavior of connections and cursors
     // TODO: Remove when we refactor the client connection interface to something more consistent.

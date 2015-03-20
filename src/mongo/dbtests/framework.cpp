@@ -129,6 +129,7 @@ namespace mongo {
             std::vector<std::string> configHosts;
             configHosts.push_back("$dummy:10000");
 
+            configServer.init(configHosts);
             invariant(grid.initCatalogManager(configHosts));
 
             TestWatchDog twd;

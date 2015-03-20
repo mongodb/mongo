@@ -38,6 +38,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
@@ -165,7 +167,7 @@ namespace {
                                                        s.toString(),
                                                        shardedColls);
 
-            configServer.logChange("movePrimary.start", dbname, moveStartDetails);
+            grid.catalogManager()->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
 
             BSONArrayBuilder barr;
             barr.append(shardedColls);
@@ -247,8 +249,8 @@ namespace {
                                                         oldPrimary,
                                                         s.toString(),
                                                         shardedColls);
-            configServer.logChange("movePrimary", dbname, moveFinishDetails);
 
+            grid.catalogManager()->logChange(txn, "movePrimary", dbname, moveFinishDetails);
             return true;
         }
 

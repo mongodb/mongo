@@ -39,6 +39,7 @@ namespace mongo {
     class BatchedCommandResponse;
     class BSONObj;
     class DatabaseType;
+    class OperationContext;
     class Status;
     template<typename T> class StatusWith;
 
@@ -77,6 +78,21 @@ namespace mongo {
          * Retrieves the metadata for a given database.
          */
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName) = 0;
+
+        /**
+         * Logs a diagnostic event locally and on the config server.
+         *
+         * NOTE: This method is best effort so it should never throw.
+         *
+         * @param opCtx The operation context of the call doing the logging
+         * @param what E.g. "split", "migrate"
+         * @param ns To which collection the metadata change is being applied
+         * @param detail Additional info about the metadata change (not interpreted)
+         */
+        virtual void logChange(OperationContext* opCtx,
+                               const std::string& what,
+                               const std::string& ns,
+                               const BSONObj& detail) = 0;
 
         /**
          * Directly sends the specified command to the config server and returns the response.

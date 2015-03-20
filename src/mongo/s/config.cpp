@@ -50,7 +50,6 @@
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
-#include "mongo/s/type_changelog.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_database.h"
@@ -266,7 +265,10 @@ namespace mongo {
             collectionDetail.append("initShards", initialShards);
             collectionDetail.append("numChunks", (int)(initPoints->size() + 1));
 
-            configServer.logChange("shardCollection.start", ns, collectionDetail.obj());
+            grid.catalogManager()->logChange(NULL,
+                                             "shardCollection.start",
+                                             ns,
+                                             collectionDetail.obj());
 
             ChunkManager* cm = new ChunkManager( ns, fieldsAndOrder, unique );
             cm->createFirstChunks(configServer.getPrimary().getConnString(),
@@ -306,7 +308,8 @@ namespace mongo {
         // Record finish in changelog
         BSONObjBuilder finishDetail;
         finishDetail.append("version", manager->getVersion().toString());
-        configServer.logChange("shardCollection", ns, finishDetail.obj());
+
+        grid.catalogManager()->logChange(NULL, "shardCollection", ns, finishDetail.obj());
 
         return manager;
     }
@@ -646,7 +649,7 @@ namespace mongo {
         return _load();
     }
 
-    bool DBConfig::dropDatabase( string& errmsg ) {
+    bool DBConfig::dropDatabase(string& errmsg) {
         /**
          * 1) make sure everything is up
          * 2) update config server
@@ -656,7 +659,7 @@ namespace mongo {
          */
 
         log() << "DBConfig::dropDatabase: " << _name << endl;
-        configServer.logChange( "dropDatabase.start" , _name , BSONObj() );
+        grid.catalogManager()->logChange(NULL, "dropDatabase.start", _name, BSONObj());
 
         // 1
         if (!configServer.allUp(false, errmsg)) {
@@ -725,7 +728,8 @@ namespace mongo {
 
         LOG(1) << "\t dropped primary db for: " << _name << endl;
 
-        configServer.logChange( "dropDatabase" , _name , BSONObj() );
+        grid.catalogManager()->logChange(NULL, "dropDatabase", _name, BSONObj());
+
         return true;
     }
 
@@ -1221,58 +1225,6 @@ namespace mongo {
         }
 
         return name;
-    }
-
-    /* must never throw */
-    void ConfigServer::logChange( const string& what , const string& ns , const BSONObj& detail ) {
-        string changeID;
-
-        try {
-            // get this entry's ID so we can use on the exception code path too
-            stringstream id;
-            id << getHostNameCached() << "-" << terseCurrentTime() << "-" << OID::gen();
-            changeID = id.str();
-
-            // send a copy of the message to the log in case it doesn't manage to reach config.changelog
-            Client* c = currentClient.get();
-            BSONObj msg = BSON( ChangelogType::changeID(changeID) <<
-                                ChangelogType::server(getHostNameCached()) <<
-                                ChangelogType::clientAddr((c ? c->clientAddress(true) : "N/A")) <<
-                                ChangelogType::time(jsTime()) <<
-                                ChangelogType::what(what) <<
-                                ChangelogType::ns(ns) <<
-                                ChangelogType::details(detail) );
-            log() << "about to log metadata event: " << msg << endl;
-
-            verify( _primary.ok() );
-
-            ScopedDbConnection conn(_primary.getConnString(), 30.0);
-
-            static bool createdCapped = false;
-            if ( ! createdCapped ) {
-                try {
-                    conn->createCollection( ChangelogType::ConfigNS , 1024 * 1024 * 10 , true );
-                }
-                catch ( UserException& e ) {
-                    LOG(1) << "couldn't create changelog (like race condition): " << e << endl;
-                    // don't care
-                }
-                createdCapped = true;
-            }
-
-            conn.done();
-
-            Status result = grid.catalogManager()->insert(ChangelogType::ConfigNS, msg, NULL);
-            if (!result.isOK()) {
-                log() << "Error encountered while logging config change with ID: " << changeID
-                      << result.reason();
-            }
-        }
-
-        catch ( std::exception& e ) {
-            // if we got here, it means the config change is only in the log; it didn't make it to config.changelog
-            log() << "not logging config change: " << changeID << " " << e.what() << endl;
-        }
     }
 
     void ConfigServer::replicaSetChange(const string& setName, const string& newConnectionString) {

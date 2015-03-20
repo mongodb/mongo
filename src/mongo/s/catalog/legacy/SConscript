@@ -9,7 +9,6 @@ env.Library(
         'config_coordinator.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/batch_write_types',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager',
         '$BUILD_DIR/mongo/s/client/sharding_client',
     ]

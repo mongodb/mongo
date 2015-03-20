@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    /**
+     * Implements the catalog manager using the legacy 3-config server protocol.
+     */
     class CatalogManagerLegacy : public CatalogManager {
     public:
         CatalogManagerLegacy() = default;
@@ -53,11 +56,15 @@ namespace mongo {
 
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName);
 
+        virtual void logChange(OperationContext* txn,
+                               const std::string& what,
+                               const std::string& ns,
+                               const BSONObj& detail);
+
         virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
                                              BatchedCommandResponse* response);
 
     private:
-
         /**
          * Direct network check to see if a particular database does not already exist with the
          * same name or different case.

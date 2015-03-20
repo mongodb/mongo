@@ -73,11 +73,13 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logger/ramlog.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/assert_util.h"
@@ -175,7 +177,11 @@ namespace mongo {
                 if ( !_cmdErrmsg->empty() ) {
                     _b.append( "errmsg" , *_cmdErrmsg );
                 }
-                configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
+
+                grid.catalogManager()->logChange(_txn,
+                                                 (string)"moveChunk." + _where,
+                                                 _ns,
+                                                 _b.obj());
             }
             catch ( const std::exception& e ) {
                 warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what() << migrateLog;
@@ -1183,7 +1189,8 @@ namespace mongo {
             BSONObj chunkInfo =
                 BSON("min" << min << "max" << max <<
                      "from" << fromShard.getName() << "to" << toShard.getName());
-            configServer.logChange("moveChunk.start", ns, chunkInfo);
+
+            grid.catalogManager()->logChange(txn, "moveChunk.start", ns, chunkInfo);
 
             // Always refresh our metadata remotely
             ChunkVersion origShardVersion;
@@ -1719,9 +1726,11 @@ namespace mongo {
                 // 5.d
                 BSONObjBuilder commitInfo;
                 commitInfo.appendElements( chunkInfo );
-                if ( res["counts"].type() == Object )
-                    commitInfo.appendElements( res["counts"].Obj() );
-                configServer.logChange( "moveChunk.commit" , ns , commitInfo.obj() );
+                if (res["counts"].type() == Object) {
+                    commitInfo.appendElements(res["counts"].Obj());
+                }
+
+                grid.catalogManager()->logChange(txn, "moveChunk.commit", ns, commitInfo.obj());
             }
 
             migrateFromStatus.done(txn);

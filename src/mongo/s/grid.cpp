@@ -39,6 +39,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern.h"
@@ -479,7 +480,8 @@ namespace mongo {
         BSONObjBuilder shardDetails;
         shardDetails.append("name", *name);
         shardDetails.append("host", servers.toString());
-        configServer.logChange("addShard", "", shardDetails.obj());
+
+        grid.catalogManager()->logChange(NULL, "addShard", "", shardDetails.obj());
 
         return true;
     }

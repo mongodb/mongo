@@ -6,8 +6,22 @@ env.Library(
     target='catalog_manager',
     source=[
         'catalog_manager.cpp',
+        'type_changelog.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/batch_write_types',
     ],
+)
+
+env.CppUnitTest(
+    target='catalog_manager_test',
+    source=[
+        'type_changelog_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/catalog_manager',
+    ]
 )

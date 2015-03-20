@@ -36,6 +36,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_write.h"
@@ -204,10 +205,10 @@ namespace {
                 conn.done();
 
                 // Record start in changelog
-                configServer.logChange("removeShard.start",
-                                       "",
-                                       buildRemoveLogEntry(s, true));
-
+                grid.catalogManager()->logChange(txn,
+                                                 "removeShard.start",
+                                                 "",
+                                                 buildRemoveLogEntry(s, true));
                 return true;
             }
 
@@ -246,8 +247,10 @@ namespace {
                 conn.done();
 
                 // Record finish in changelog
-                configServer.logChange("removeShard", "", buildRemoveLogEntry(s, false));
-
+                grid.catalogManager()->logChange(txn,
+                                                 "removeShard",
+                                                 "",
+                                                 buildRemoveLogEntry(s, false));
                 return true;
             }
 

@@ -38,11 +38,9 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/db/write_concern.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/type_changelog.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/log.h"
@@ -230,74 +228,6 @@ namespace mongo {
         }
 
         return Status::OK();
-    }
-
-    Status logConfigChange(const ConnectionString& configLoc,
-                           const string& clientHost,
-                           const string& ns,
-                           const string& description,
-                           const BSONObj& details)
-    {
-        //
-        // The code for writing to the changelog collection exists elsewhere - we duplicate here to
-        // avoid dependency issues.
-        // TODO: Merge again once config.cpp is cleaned up.
-        //
-
-        string changeID = stream() << getHostNameCached() << "-" << terseCurrentTime() << "-"
-                                   << OID::gen();
-
-        ChangelogType changelog;
-        changelog.setChangeID(changeID);
-        changelog.setServer(getHostNameCached());
-        changelog.setClientAddr(clientHost == "" ? "N/A" : clientHost);
-        changelog.setTime(jsTime());
-        changelog.setWhat(description);
-        changelog.setNS(ns);
-        changelog.setDetails(details);
-
-        log() << "about to log new metadata event: " << changelog.toBSON() << endl;
-
-        scoped_ptr<ScopedDbConnection> connPtr;
-
-        try {
-            connPtr.reset(new ScopedDbConnection(configLoc, 30));
-            ScopedDbConnection& conn = *connPtr;
-
-            // TODO: better way here
-            static bool createdCapped = false;
-            if (!createdCapped) {
-
-                try {
-                    conn->createCollection(ChangelogType::ConfigNS, 1024 * 1024 * 10, true);
-                }
-                catch (const DBException& e) {
-                    // don't care, someone else may have done this for us
-                    // if there's still a problem, caught in outer try
-                    LOG(1) << "couldn't create the changelog, continuing " << e << endl;
-                }
-
-                createdCapped = true;
-            }
-            connPtr->done();
-        }
-        catch (const DBException& e) {
-            // if we got here, it means the config change is only in the log,
-            // it didn't make it to config.changelog
-            log() << "not logging config change: " << changeID << causedBy(e) << endl;
-            return e.toStatus();
-        }
-
-        Status result = grid.catalogManager()->insert(ChangelogType::ConfigNS,
-                                                      changelog.toBSON(),
-                                                      NULL);
-        if (!result.isOK()) {
-            return Status(result.code(),
-                          str::stream() << "failed to write to changelog: "
-                                        << result.reason());
-        }
-
-        return result;
     }
 
     // Helper function for safe cursors

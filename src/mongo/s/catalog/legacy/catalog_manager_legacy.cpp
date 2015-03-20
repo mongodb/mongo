@@ -37,8 +37,12 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/legacy/config_coordinator.h"
+#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_database.h"
@@ -84,6 +88,9 @@ namespace {
 
         dassert(response->isValid(NULL));
     }
+
+    // Whether the logChange call should attempt to create the changelog collection
+    AtomicInt32 changeLogCollectionCreated(0);
 
 } // namespace
 
@@ -260,6 +267,56 @@ namespace {
         }
 
         return DatabaseType::fromBSON(dbObj);
+    }
+
+    void CatalogManagerLegacy::logChange(OperationContext* opCtx,
+                                         const string& what,
+                                         const string& ns,
+                                         const BSONObj& detail) {
+
+        // Create the change log collection and ensure that it is capped. Wrap in try/catch,
+        // because creating an existing collection throws.
+        if (changeLogCollectionCreated.load() == 0) {
+            try {
+                ScopedDbConnection conn(_configServerConnectionString, 30.0);
+                conn->createCollection(ChangelogType::ConfigNS, 1024 * 1024 * 10, true);
+                conn.done();
+
+                changeLogCollectionCreated.store(1);
+            }
+            catch (const UserException& e) {
+                // It's ok to ignore this exception
+                LOG(1) << "couldn't create changelog collection: " << e;
+            }
+        }
+
+        // Store this entry's ID so we can use on the exception code path too
+        StringBuilder changeIdBuilder;
+        changeIdBuilder << getHostNameCached() << "-" << terseCurrentTime()
+                        << "-" << OID::gen();
+
+        const string changeID = changeIdBuilder.str();
+
+        Client* const client = (opCtx ? opCtx->getClient() : currentClient.get());
+
+        // Send a copy of the message to the local log in case it doesn't manage to reach
+        // config.changelog
+        BSONObj msg = BSON(ChangelogType::changeID(changeID) <<
+                           ChangelogType::server(getHostNameCached()) <<
+                           ChangelogType::clientAddr((client ?
+                                                        client->clientAddress(true) : "")) <<
+                           ChangelogType::time(jsTime()) <<
+                           ChangelogType::what(what) <<
+                           ChangelogType::ns(ns) <<
+                           ChangelogType::details(detail));
+
+        log() << "about to log metadata event: " << msg;
+
+        Status result = insert(ChangelogType::ConfigNS, msg, NULL);
+        if (!result.isOK()) {
+            warning() << "Error encountered while logging config change with ID "
+                      << changeID << ": " << result;
+        }
     }
 
     void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& request,

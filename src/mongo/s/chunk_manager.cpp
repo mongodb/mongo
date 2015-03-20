@@ -673,7 +673,10 @@ namespace {
     void ChunkManager::drop() const {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
-        configServer.logChange( "dropCollection.start" , _ns , BSONObj() );
+        grid.catalogManager()->logChange(NULL,
+                                         "dropCollection.start",
+                                         _ns,
+                                         BSONObj());
 
         ScopedDistributedLock nsLock(configServer.getConnectionString(), _ns);
         nsLock.setLockMessage("drop");
@@ -762,7 +765,7 @@ namespace {
         }
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t DONE";
-        configServer.logChange( "dropCollection" , _ns , BSONObj() );
+        grid.catalogManager()->logChange(NULL, "dropCollection", _ns, BSONObj());
     }
 
     ChunkVersion ChunkManager::getVersion(const std::string& shardName) const {
