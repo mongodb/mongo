@@ -23,7 +23,8 @@ common_meta = [
     Config('collator', 'none', r'''
         configure custom collation for keys.  Permitted values are
         \c "none" or a custom collator name created with
-        WT_CONNECTION::add_collator'''),
+        WT_CONNECTION::add_collator''',
+        func='__wt_collator_confchk'),
     Config('columns', '', r'''
         list of the column names.  Comma-separated list of the form
         <code>(column[,...])</code>.  For tables, the number of entries

@@ -202,6 +202,7 @@ extern int __wt_ext_config_parser_open(WT_EXTENSION_API *wt_ext, WT_SESSION *wt_
 extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg, const char *key, WT_CONFIG_ITEM *cval);
 extern int __wt_config_upgrade(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern const char *__wt_wiredtiger_error(int error);
+extern int __wt_collator_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname);
 extern int __wt_collator_config(WT_SESSION_IMPL *session, const char *uri, WT_CONFIG_ITEM *cname, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collatorp, int *ownp);
 extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);

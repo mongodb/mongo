@@ -4,7 +4,7 @@
 
 static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 	{ "app_metadata", "string", NULL, NULL, NULL },
-	{ "collator", "string", NULL, NULL, NULL },
+	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "source", "string", NULL, NULL, NULL },
 	{ "type", "string", NULL, NULL, NULL },
@@ -149,7 +149,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "checksum", "string",
 	    NULL, "choices=[\"on\",\"off\",\"uncompressed\"]",
 	    NULL },
-	{ "collator", "string", NULL, NULL, NULL },
+	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "dictionary", "int", NULL, "min=0", NULL },
 	{ "format", "string", NULL, "choices=[\"btree\"]", NULL },
@@ -185,7 +185,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 
 static const WT_CONFIG_CHECK confchk_index_meta[] = {
 	{ "app_metadata", "string", NULL, NULL, NULL },
-	{ "collator", "string", NULL, NULL, NULL },
+	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "extractor", "string", NULL, NULL, NULL },
 	{ "immutable", "boolean", NULL, NULL, NULL },
@@ -248,7 +248,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	    NULL, "choices=[\"on\",\"off\",\"uncompressed\"]",
 	    NULL },
 	{ "colgroups", "list", NULL, NULL, NULL },
-	{ "collator", "string", NULL, NULL, NULL },
+	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "dictionary", "int", NULL, "min=0", NULL },
 	{ "exclusive", "boolean", NULL, NULL, NULL },
@@ -336,7 +336,7 @@ static const WT_CONFIG_CHECK confchk_session_verify[] = {
 static const WT_CONFIG_CHECK confchk_table_meta[] = {
 	{ "app_metadata", "string", NULL, NULL, NULL },
 	{ "colgroups", "list", NULL, NULL, NULL },
-	{ "collator", "string", NULL, NULL, NULL },
+	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "key_format", "format", NULL, NULL, NULL },
 	{ "value_format", "format", NULL, NULL, NULL },
