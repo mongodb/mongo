@@ -997,8 +997,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	/* Append it to the stack. */
 	__conn_config_append(cfg, cbuf->data);
 
-err:	if (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
+err:	WT_TRET(__wt_close(session, &fh));
 	return (ret);
 }
 
@@ -1227,8 +1226,7 @@ err:	/*
 	 * We ignore the connection's lock file handle on error, it will be
 	 * closed when the connection structure is destroyed.
 	 */
-	if (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_close(session, &fh));
 
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 	return (ret);
