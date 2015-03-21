@@ -1440,18 +1440,12 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR_NOTFOUND_OK(ret);
 	}
 
-	/* Flush to disk and close our handle. */
-	WT_ERR(__wt_fclose(session, &fp, 1));
+	/* Flush the handle and rename the file into place. */
+	return (__wt_sync_and_rename_fp(
+	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG));
 
-	/*
-	 * Rename the file into place: that's an atomic operation so we can be
-	 * confident we never see a partial file.
-	 */
-	WT_ERR(__wt_rename(session, WT_BASECONFIG_SET, WT_BASECONFIG));
-
+	/* Close any file handle left open, remove any temporary file. */
 err:	WT_TRET(__wt_fclose(session, &fp, 1));
-
-	/* Discard any damaged temporary file, not required but cleaner. */
 	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 
 	return (ret);

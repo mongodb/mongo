@@ -292,28 +292,17 @@ __wt_turtle_update(
 	    WT_METADATA_VERSION_STR, version,
 	    WT_METADATA_VERSION, vmajor, vminor, vpatch,
 	    key, value));
-
 	WT_ERR(__wt_write(session, fh, 0, buf->size, buf->data));
 
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
-		WT_ERR(__wt_fsync(session, fh));
+	/* Flush the handle and rename the file into place. */
+	ret = __wt_sync_and_rename_fh(
+	    session, &fh, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
 
-	ret = __wt_close(session, fh);
-	fh = NULL;
-	WT_ERR(ret);
-
-	WT_ERR(
-	    __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
-
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
-		WT_ERR(__wt_directory_sync(session, NULL));
-
-	if (0) {
-err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
-	}
-
-	if  (fh != NULL)
+	/* Close any file handle left open, remove any temporary file. */
+err:	if (fh != NULL)
 		WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET));
+
 	__wt_scr_free(session, &buf);
 	return (ret);
 }
