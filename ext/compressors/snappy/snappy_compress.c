@@ -60,6 +60,7 @@ wt_snappy_error(WT_COMPRESSOR *compressor,
 
 	wt_api = ((SNAPPY_COMPRESSOR *)compressor)->wt_api;
 
+	msg = "unknown snappy status error";
 	switch (snret) {
 	case SNAPPY_BUFFER_TOO_SMALL:
 		msg = "SNAPPY_BUFFER_TOO_SMALL";
