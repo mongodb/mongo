@@ -163,9 +163,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * Discard any turtle setup file left-over from previous runs.  This
 	 * doesn't matter for correctness, it's just cleaning up random files.
 	 */
-	WT_RET(__wt_exist(session, WT_METADATA_TURTLE_SET, &exist));
-	if (exist)
-		WT_RET(__wt_remove(session, WT_METADATA_TURTLE_SET));
+	WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET));
 
 	/*
 	 * We could die after creating the turtle file and before creating the
@@ -206,12 +204,8 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	WT_RET(__metadata_config(session, &metaconf));
 	WT_ERR(__wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 
-	/* Remove the backup file if it exists, we'll never read it again. */
-	if (exist_incr)
-		WT_ERR(__wt_remove(session, WT_INCREMENTAL_BACKUP));
-	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
-	if (exist)
-		WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));
+	/* Remove the backup files, we'll never read them again. */
+	WT_ERR(__wt_backup_file_remove(session));
 
 err:	__wt_free(session, metaconf);
 	return (ret);

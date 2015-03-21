@@ -246,6 +246,7 @@ extern int __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_sweep_create(WT_SESSION_IMPL *session);
 extern int __wt_sweep_destroy(WT_SESSION_IMPL *session);
 extern int __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR **cursorp);
+extern int __wt_backup_file_remove(WT_SESSION_IMPL *session);
 extern int __wt_backup_list_uri_append( WT_SESSION_IMPL *session, const char *name, int *skip);
 extern int __wt_curbulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, int bitmap, int skip_sort_check);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR **cursorp);

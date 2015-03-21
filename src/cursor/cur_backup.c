@@ -11,7 +11,6 @@
 static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, int);
-static int __backup_file_remove(WT_SESSION_IMPL *);
 static int __backup_list_all_append(WT_SESSION_IMPL *, const char *[]);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
@@ -316,7 +315,7 @@ __backup_stop(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	/* Remove any backup specific file. */
-	ret = __backup_file_remove(session);
+	ret = __wt_backup_file_remove(session);
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
 	__wt_spin_lock(session, &conn->hot_backup_lock);
@@ -461,22 +460,16 @@ __backup_file_create(
 }
 
 /*
- * __backup_file_remove --
- *	Remove the meta-data backup file.
+ * __wt_backup_file_remove --
+ *	Remove the incremental and meta-data backup files.
  */
-static int
-__backup_file_remove(WT_SESSION_IMPL *session)
+int
+__wt_backup_file_remove(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	int exist;
 
-	WT_ERR(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist));
-	if (exist)
-		WT_ERR(__wt_remove(session, WT_INCREMENTAL_BACKUP));
-	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
-	if (exist)
-		WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));
-err:
+	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_BACKUP));
+	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_BACKUP));
 	return (ret);
 }
 
