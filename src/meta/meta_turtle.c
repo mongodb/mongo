@@ -300,7 +300,7 @@ __wt_turtle_update(
 	    session, WT_METADATA_TURTLE_SET, 1, 1, WT_FILE_TYPE_TURTLE, &fh));
 
 	version = wiredtiger_version(&vmajor, &vminor, &vpatch);
-	WT_ERR(__wt_scr_alloc(session, 1000, &buf));
+	WT_ERR(__wt_scr_alloc(session, 2 * 1024, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s\n%s\n%s\n" "major=%d,minor=%d,patch=%d\n%s\n%s\n",
 	    WT_METADATA_VERSION_STR, version,
