@@ -23,7 +23,8 @@ common_meta = [
     Config('collator', 'none', r'''
         configure custom collation for keys.  Permitted values are
         \c "none" or a custom collator name created with
-        WT_CONNECTION::add_collator'''),
+        WT_CONNECTION::add_collator''',
+        func='__wt_collator_confchk'),
     Config('columns', '', r'''
         list of the column names.  Comma-separated list of the form
         <code>(column[,...])</code>.  For tables, the number of entries
@@ -56,7 +57,7 @@ format_meta = common_meta + [
         raw byte arrays. By default, records are stored in row-store
         files: keys of type \c 'r' are record numbers and records
         referenced by record number are stored in column-store files''',
-        type='format'),
+        type='format', func='__wt_struct_confchk'),
     Config('value_format', 'u', r'''
         the format of the data packed into value items.  See @ref
         schema_format_types for details.  By default, the value_format
@@ -64,7 +65,7 @@ format_meta = common_meta + [
         manipulate raw byte arrays. Value items of type 't' are
         bitfields, and when configured with record number type keys,
         will be stored using a fixed-length store''',
-        type='format'),
+        type='format', func='__wt_struct_confchk'),
 ]
 
 lsm_config = [
@@ -135,11 +136,12 @@ file_config = format_meta + [
         requirements from the operating system or storage device''',
         min='512B', max='128MB'),
     Config('block_compressor', 'none', r'''
-        configure a compressor for file blocks.  Permitted values are
-        \c "none" or custom compression engine name created with
-        WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-        for \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
-        available.  See @ref compression for more information'''),
+        configure a compressor for file blocks.  Permitted values are \c "none"
+        or custom compression engine name created with
+        WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
+        \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression, these names
+        are also available.  See @ref compression for more information''',
+        func='__wt_compressor_confchk'),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages; see @ref
         tuning_cache_resident for more information''',
@@ -290,7 +292,8 @@ index_only_config = [
     Config('extractor', 'none', r'''
         configure custom extractor for indices.  Permitted values are
         \c "none" or an extractor name created with
-        WT_CONNECTION::add_extractor'''),
+        WT_CONNECTION::add_extractor''',
+        func='__wt_extractor_confchk'),
     Config('immutable', 'false', r'''
         configure the index to be immutable - that is an index is not changed
         by any update to a record in the table''', type='boolean'),
@@ -395,9 +398,9 @@ connection_runtime_config = [
         eviction configuration options.''',
         type='category', subconfig=[
             Config('threads_max', '1', r'''
-        maximum number of threads WiredTiger will start to help evict
-        pages from cache. The number of threads started will vary
-        depending on the current eviction load''',
+                maximum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads started will vary
+                depending on the current eviction load''',
                 min=1, max=20),
             Config('threads_min', '1', r'''
                 minimum number of threads WiredTiger will start to help evict
@@ -547,9 +550,11 @@ common_wiredtiger_open = [
             type='boolean'),
         Config('compressor', 'none', r'''
             configure a compressor for log records.  Permitted values are
-            \c "none" or \c "bzip2", \c "snappy", \c "lz4" or custom compression
-            engine \c "name" created with WT_CONNECTION::add_compressor.
-            See @ref compression for more information'''),
+            \c "none" or custom compression engine name created with
+            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
+            for \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression,
+            these names are also available. See @ref compression for more
+            information'''),
         Config('enabled', 'false', r'''
             enable logging subsystem''',
             type='boolean'),
@@ -587,13 +592,13 @@ common_wiredtiger_open = [
         how to sync log records when the transaction commits''',
         type='category', subconfig=[
         Config('enabled', 'false', r'''
-            whether to sync the log on every commit by default, can
-        be overridden by the \c sync setting to
-        WT_SESSION::begin_transaction''',
+            whether to sync the log on every commit by default, can be
+            overridden by the \c sync setting to
+            WT_SESSION::begin_transaction''',
             type='boolean'),
         Config('method', 'fsync', r'''
-            the method used to ensure log records are stable on disk,
-        see @ref tune_durability for more information''',
+            the method used to ensure log records are stable on disk, see
+            @ref tune_durability for more information''',
             choices=['dsync', 'fsync', 'none']),
         ]),
 ]

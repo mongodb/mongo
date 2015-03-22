@@ -86,7 +86,8 @@ my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	void *buffer;
 	if ((buffer = wt_api->scr_alloc(wt_api, session, 512)) == NULL) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "buffer allocation: %s", wiredtiger_strerror(ENOMEM));
+		    "buffer allocation: %s",
+		    session->strerror(session, ENOMEM));
 		return (ENOMEM);
 	}
 	/*! [WT_EXTENSION_API scr_alloc] */
@@ -311,7 +312,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_api->config_get(
 	    wt_api, session, config, "overwrite", &v)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "overwrite configuration: %s", wiredtiger_strerror(ret));
+		    "overwrite configuration: %s",
+		    session->strerror(session, ret));
 		return (ret);
 	}
 	my_data_source_overwrite = v.val != 0;
@@ -332,7 +334,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_api->config_get(
 	    wt_api, session, config, "page_size", &v)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "page_size configuration: %s", wiredtiger_strerror(ret));
+		    "page_size configuration: %s",
+		    session->strerror(session, ret));
 		return (ret);
 	}
 	my_data_source_page_size = v.val;
@@ -353,7 +356,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_api->config_get(
 	    wt_api, session, config, "key_format", &v)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "key_format configuration: %s", wiredtiger_strerror(ret));
+		    "key_format configuration: %s",
+		    session->strerror(session, ret));
 		return (ret);
 	}
 
@@ -380,7 +384,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret = wt_api->collator_config(wt_api, session,
 	    "dsrc:", config, &collator, &collator_owned)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "collator configuration: %s", wiredtiger_strerror(ret));
+		    "collator configuration: %s",
+		    session->strerror(session, ret));
 		return (ret);
 	}
 	/*! [WT_EXTENSION collator config] */
@@ -408,7 +413,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	if ((ret = wt_api->metadata_insert(wt_api, session, key, value)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata insert: %s", key, wiredtiger_strerror(ret));
+		    "%s: metadata insert: %s", key,
+		    session->strerror(session, ret));
 		return (ret);
 	}
 	/*! [WT_EXTENSION metadata insert] */
@@ -423,7 +429,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	if ((ret = wt_api->metadata_remove(wt_api, session, key)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata remove: %s", key, wiredtiger_strerror(ret));
+		    "%s: metadata remove: %s", key,
+		    session->strerror(session, ret));
 		return (ret);
 	}
 	/*! [WT_EXTENSION metadata remove] */
@@ -440,7 +447,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	if ((ret =
 	    wt_api->metadata_search(wt_api, session, key, &value)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata search: %s", key, wiredtiger_strerror(ret));
+		    "%s: metadata search: %s", key,
+		     session->strerror(session, ret));
 		return (ret);
 	}
 	printf("metadata: %s has a value of %s\n", key, value);
@@ -458,7 +466,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	if ((ret = wt_api->metadata_update(wt_api, session, key, value)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
-		    "%s: metadata update: %s", key, wiredtiger_strerror(ret));
+		    "%s: metadata update: %s", key,
+		    session->strerror(session, ret));
 		return (ret);
 	}
 	/*! [WT_EXTENSION metadata update] */

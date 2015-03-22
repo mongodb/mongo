@@ -345,7 +345,8 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_key(cursor, key);
 	if ((ret = cursor->remove(cursor)) != 0) {
 		fprintf(stderr,
-		    "cursor.remove: %s\n", wiredtiger_strerror(ret));
+		    "cursor.remove: %s\n",
+		    cursor->session->strerror(cursor->session, ret));
 		return (ret);
 	}
 	/*! [Display an error] */
@@ -988,7 +989,7 @@ backup(WT_SESSION *session)
 		ret = 0;
 	if (ret != 0)
 		fprintf(stderr, "%s: cursor next(backup:) failed: %s\n",
-		    progname, wiredtiger_strerror(ret));
+		    progname, session->strerror(session, ret));
 
 	ret = cursor->close(cursor);
 	/*! [backup]*/

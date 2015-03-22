@@ -340,6 +340,20 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 
 	F_CLR(conn, WT_CONN_EVICTION_RUN);
 
+	/*
+	 * Wait for the main eviction thread to exit before waiting on the
+	 * helpers.  The eviction server spawns helper threads, so we can't
+	 * safely know how many helpers are running until the main thread is
+	 * done.
+	 */
+	WT_TRET(__wt_verbose(
+	    session, WT_VERB_EVICTSERVER, "waiting for main thread"));
+	if (conn->evict_tid_set) {
+		WT_TRET(__wt_evict_server_wake(session));
+		WT_TRET(__wt_thread_join(session, conn->evict_tid));
+		conn->evict_tid_set = 0;
+	}
+
 	WT_TRET(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "waiting for helper threads"));
 	for (i = 0; i < conn->evict_workers; i++) {
@@ -354,12 +368,6 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 				WT_TRET(wt_session->close(wt_session, NULL));
 		}
 		__wt_free(session, conn->evict_workctx);
-	}
-
-	if (conn->evict_tid_set) {
-		WT_TRET(__wt_evict_server_wake(session));
-		WT_TRET(__wt_thread_join(session, conn->evict_tid));
-		conn->evict_tid_set = 0;
 	}
 
 	if (conn->evict_session != NULL) {

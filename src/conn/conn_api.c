@@ -65,6 +65,44 @@ ext_collator_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
 }
 
 /*
+ * __collator_confchk --
+ *	Check for a valid custom collator.
+ */
+static int
+__collator_confchk(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname, WT_COLLATOR **collatorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COLLATOR *ncoll;
+
+	if (collatorp != NULL)
+		*collatorp = NULL;
+
+	if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
+		return (0);
+
+	conn = S2C(session);
+	TAILQ_FOREACH(ncoll, &conn->collqh, q)
+		if (WT_STRING_MATCH(ncoll->name, cname->str, cname->len)) {
+			if (collatorp != NULL)
+				*collatorp = ncoll->collator;
+			return (0);
+		}
+	WT_RET_MSG(session, EINVAL,
+	    "unknown collator '%.*s'", (int)cname->len, cname->str);
+}
+
+/*
+ * __wt_collator_confchk --
+ *	Check for a valid custom collator (public).
+ */
+int
+__wt_collator_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname)
+{
+	return (__collator_confchk(session, cname, NULL));
+}
+
+/*
  * __wt_collator_config --
  *	Configure a custom collator.
  */
@@ -74,23 +112,14 @@ __wt_collator_config(WT_SESSION_IMPL *session, const char *uri,
     WT_COLLATOR **collatorp, int *ownp)
 {
 	WT_COLLATOR *collator;
-	WT_CONNECTION_IMPL *conn;
-	WT_NAMED_COLLATOR *ncoll;
 
 	*collatorp = NULL;
 	*ownp = 0;
 
-	conn = S2C(session);
+	WT_RET(__collator_confchk(session, cname, &collator));
+	if (collator == NULL)
+		return (0);
 
-	TAILQ_FOREACH(ncoll, &conn->collqh, q)
-		if (WT_STRING_MATCH(ncoll->name, cname->str, cname->len))
-			break;
-
-	if (ncoll == NULL)
-		WT_RET_MSG(session, EINVAL,
-		    "unknown collator '%.*s'", (int)cname->len, cname->str);
-
-	collator = ncoll->collator;
 	if (collator->customize != NULL)
 		WT_RET(collator->customize(collator,
 		    &session->iface, uri, metadata, collatorp));
@@ -346,6 +375,55 @@ __wt_conn_remove_collator(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __compressor_confchk --
+ *	Validate the compressor.
+ */
+static int
+__compressor_confchk(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_COMPRESSOR **compressorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COMPRESSOR *ncomp;
+
+	if (compressorp != NULL)
+		*compressorp = NULL;
+
+	if (cval->len == 0 || WT_STRING_MATCH("none", cval->str, cval->len))
+		return (0);
+
+	conn = S2C(session);
+	TAILQ_FOREACH(ncomp, &conn->compqh, q)
+		if (WT_STRING_MATCH(ncomp->name, cval->str, cval->len)) {
+			if (compressorp != NULL)
+				*compressorp = ncomp->compressor;
+			return (0);
+		}
+	WT_RET_MSG(session, EINVAL,
+	    "unknown compressor '%.*s'", (int)cval->len, cval->str);
+}
+
+/*
+ * __wt_compressor_confchk --
+ *	Validate the compressor (public).
+ */
+int
+__wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
+{
+	return (__compressor_confchk(session, cval, NULL));
+}
+
+/*
+ * __wt_compressor_config --
+ *	Given a configuration, configure the compressor.
+ */
+int
+__wt_compressor_config(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_COMPRESSOR **compressorp)
+{
+	return (__compressor_confchk(session, cval, compressorp));
+}
+
+/*
  * __conn_add_compressor --
  *	WT_CONNECTION->add_compressor method.
  */
@@ -522,6 +600,44 @@ err:	if (nextractor != NULL) {
 }
 
 /*
+ * __extractor_confchk --
+ *	Check for a valid custom extractor.
+ */
+static int
+__extractor_confchk(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname, WT_EXTRACTOR **extractorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_EXTRACTOR *nextractor;
+
+	if (extractorp != NULL)
+		*extractorp = NULL;
+
+	if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
+		return (0);
+
+	conn = S2C(session);
+	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
+		if (WT_STRING_MATCH(nextractor->name, cname->str, cname->len)) {
+			if (extractorp != NULL)
+				*extractorp = nextractor->extractor;
+			return (0);
+		}
+	WT_RET_MSG(session, EINVAL,
+	    "unknown extractor '%.*s'", (int)cname->len, cname->str);
+}
+
+/*
+ * __wt_extractor_confchk --
+ *	Check for a valid custom extractor (public).
+ */
+int
+__wt_extractor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname)
+{
+	return (__extractor_confchk(session, cname, NULL));
+}
+
+/*
  * __wt_extractor_config --
  *	Given a configuration, configure the extractor.
  */
@@ -529,38 +645,30 @@ int
 __wt_extractor_config(WT_SESSION_IMPL *session,
     const char *config, WT_EXTRACTOR **extractorp, int *ownp)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_CONFIG_ITEM cval;
-	WT_NAMED_EXTRACTOR *nextractor;
+	WT_CONFIG_ITEM cname;
+	WT_EXTRACTOR *extractor;
 
 	*extractorp = NULL;
 	*ownp = 0;
 
-	conn = S2C(session);
-
 	WT_RET_NOTFOUND_OK(
-	    __wt_config_getones_none(session, config, "extractor", &cval));
-	if (cval.len == 0)
+	    __wt_config_getones_none(session, config, "extractor", &cname));
+	if (cname.len == 0)
 		return (0);
 
-	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
-		if (WT_STRING_MATCH(nextractor->name, cval.str, cval.len))
-			break;
+	WT_RET(__extractor_confchk(session, &cname, &extractor));
+	if (extractor == NULL)
+		return (0);
 
-	if (nextractor == NULL)
-		WT_RET_MSG(session, EINVAL,
-		    "unknown extractor '%.*s'", (int)cval.len, cval.str);
-
-	if (nextractor->extractor->customize != NULL) {
+	if (extractor->customize != NULL) {
 		WT_RET(__wt_config_getones(session,
-		    config, "app_metadata", &cval));
-		WT_RET(nextractor->extractor->customize(
-		    nextractor->extractor, &session->iface,
-		    session->dhandle->name, &cval, extractorp));
+		    config, "app_metadata", &cname));
+		WT_RET(extractor->customize(extractor, &session->iface,
+		   session->dhandle->name, &cname, extractorp));
 	}
 
 	if (*extractorp == NULL)
-		*extractorp = nextractor->extractor;
+		*extractorp = extractor;
 	else
 		*ownp = 1;
 
@@ -987,8 +1095,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	/* Append it to the stack. */
 	__conn_config_append(cfg, cbuf->data);
 
-err:	if (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
+err:	WT_TRET(__wt_close(session, &fh));
 	return (ret);
 }
 
@@ -1217,8 +1324,7 @@ err:	/*
 	 * We ignore the connection's lock file handle on error, it will be
 	 * closed when the connection structure is destroyed.
 	 */
-	if (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_close(session, &fh));
 
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 	return (ret);
