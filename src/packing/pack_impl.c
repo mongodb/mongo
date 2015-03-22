@@ -44,6 +44,16 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_struct_confchk --
+ *	Check that the specified packing format is valid, configuration version.
+ */
+int
+__wt_struct_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v)
+{
+	return (__wt_struct_check(session, v->str, v->len, NULL, NULL));
+}
+
+/*
  * __wt_struct_size --
  *	Calculate the size of a packed byte string.
  */

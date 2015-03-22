@@ -37,7 +37,7 @@ __wt_block_manager_truncate(
 	WT_ERR(__wt_fsync(session, fh));
 
 	/* Close the file handle. */
-err:	WT_TRET(__wt_close(session, fh));
+err:	WT_TRET(__wt_close(session, &fh));
 
 	return (ret);
 }
@@ -67,7 +67,7 @@ __wt_block_manager_create(
 	WT_TRET(__wt_fsync(session, fh));
 
 	/* Close the file handle. */
-	WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_close(session, &fh));
 
 	/*
 	 * If checkpoint syncing is enabled, some filesystems require that we
@@ -105,7 +105,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		__wt_free(session, block->name);
 
 	if (block->fh != NULL)
-		WT_TRET(__wt_close(session, block->fh));
+		WT_TRET(__wt_close(session, &block->fh));
 
 	__wt_spin_destroy(session, &block->live_lock);
 
