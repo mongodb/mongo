@@ -149,7 +149,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 		__wt_errx(session,
 		    "Connection has open file handles: %s", fh->name);
-		WT_TRET(__wt_close(session, fh));
+		WT_TRET(__wt_close(session, &fh));
 		fh = SLIST_FIRST(&conn->fhlh);
 	}
 

@@ -316,7 +316,7 @@ __log_close_server(void *arg)
 			WT_ERR(__wt_fsync(session, close_fh));
 			__wt_spin_lock(session, &log->log_sync_lock);
 			locked = 1;
-			WT_ERR(__wt_close(session, close_fh));
+			WT_ERR(__wt_close(session, &close_fh));
 			log->sync_lsn = close_end_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 			locked = 0;

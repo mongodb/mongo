@@ -312,9 +312,7 @@ __wt_turtle_update(
 	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
 		WT_ERR(__wt_fsync(session, fh));
 
-	ret = __wt_close(session, fh);
-	fh = NULL;
-	WT_ERR(ret);
+	WT_ERR(__wt_close(session, &fh));
 
 	WT_ERR(
 	    __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
@@ -326,8 +324,7 @@ __wt_turtle_update(
 err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
 	}
 
-	if  (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_close(session, &fh));
 	__wt_scr_free(session, &buf);
 	return (ret);
 }
