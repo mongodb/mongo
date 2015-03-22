@@ -9,6 +9,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+        '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )
 
@@ -110,7 +111,6 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/s/cluster_ops_impl",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/concurrency/rwlock",
-        "$BUILD_DIR/mongo/util/signal_handlers_synchronous",
         "mocklib",
         "testframework",
     ],

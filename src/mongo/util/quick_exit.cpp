@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+// NOTE: This file *must not* depend on any mongo symbols.
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/config.h"

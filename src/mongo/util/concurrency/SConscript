@@ -2,11 +2,6 @@
 
 Import("env")
 
-env.Library('thread_name',
-            ['thread_name.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/third_party/shim_boost'])
-
 env.Library(
     target='thread_pool',
     source=[
@@ -25,13 +20,16 @@ env.CppUnitTest(
 
 env.Library('ticketholder',
             ['ticketholder.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/base/base',
+            LIBDEPS=['$BUILD_DIR/mongo/base',
                      '$BUILD_DIR/third_party/shim_boost'])
 
 env.Library(
     target='synchronization',
     source=[
         'synchronization.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -59,6 +57,7 @@ env.Library(
         'task.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/background_job',
     ],
 )
 
@@ -68,5 +67,6 @@ env.Library(
         'rwlockimpl.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_boost',
     ],
 )

@@ -9,6 +9,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
         ]
     )
@@ -17,15 +18,23 @@ env.Library(
 env.Library(
     target='kv_database_catalog_entry_core',
     source=['kv_database_catalog_entry.cpp'],
-    LIBDEPS=[]
-    )
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+    ],
+)
 
 # Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_storage_engine',
     source=['kv_storage_engine.cpp'],
-    LIBDEPS=[]
-    )
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+        'kv_database_catalog_entry_core',
+    ],
+)
 
 # KVDatabaseCatalogEntry::getIndex() depends on index access methods
 # in $BUILD_DIR/mongo/serveronly.
@@ -62,6 +71,7 @@ env.Library(
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
         'kv_engine_core',
         ]
     )

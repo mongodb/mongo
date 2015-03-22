@@ -16,11 +16,10 @@ env.Library(target="unittest",
 env.Library("unittest_main", ['unittest_main.cpp'],
             LIBDEPS=[
                 'unittest',
-                '$BUILD_DIR/mongo/base/base',
-                '$BUILD_DIR/mongo/util/signal_handlers_synchronous',
+                '$BUILD_DIR/mongo/base',
                  ])
 
-env.Library("unittest_crutch", ['crutch.cpp'])
+env.Library("unittest_crutch", ['crutch.cpp'], LIBDEPS=['$BUILD_DIR/mongo/base'])
 
 
 env.CppUnitTest('unittest_test', 'unittest_test.cpp')
@@ -33,5 +32,6 @@ env.Library(
         'barrier.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )

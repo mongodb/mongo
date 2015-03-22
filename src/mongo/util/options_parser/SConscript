@@ -14,7 +14,8 @@ optsEnv.Library('options_parser', ['environment.cpp',
                                'startup_option_init.cpp',
                                'startup_options.cpp',
                                ],
-                              LIBDEPS=['$BUILD_DIR/mongo/bson/bson',
+                              LIBDEPS=['$BUILD_DIR/mongo/base',
+                                       '$BUILD_DIR/third_party/shim_boost',
                                        '$BUILD_DIR/third_party/shim_yaml',
                                        '$BUILD_DIR/third_party/shim_pcrecpp'
                               ])

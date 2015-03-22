@@ -45,6 +45,80 @@ env.SConscript(
     ],
 )
 
+# NOTE: This library does not really belong here. Its presence here is
+# temporary. Do not add to this library, do not remove from it, and do
+# not declare other libraries in this file.
+
+env.Library(
+    target='base',
+    source=[
+        'base/data_range.cpp',
+        'base/data_range_cursor.cpp',
+        'base/data_type.cpp',
+        'base/data_type_string_data.cpp',
+        'base/data_type_terminated.cpp',
+        'base/error_codes.cpp',
+        'base/global_initializer.cpp',
+        'base/global_initializer_registerer.cpp',
+        'base/init.cpp',
+        'base/initializer.cpp',
+        'base/initializer_context.cpp',
+        'base/initializer_dependency_graph.cpp',
+        'base/make_string_vector.cpp',
+        'base/parse_number.cpp',
+        'base/status.cpp',
+        'base/string_data.cpp',
+        'base/validate_locale.cpp',
+        'bson/bson_validate.cpp',
+        'bson/bsonelement.cpp',
+        'bson/bsonmisc.cpp',
+        'bson/bsonobj.cpp',
+        'bson/bsonobjbuilder.cpp',
+        'bson/bsontypes.cpp',
+        'bson/json.cpp',
+        'bson/oid.cpp',
+        'bson/timestamp.cpp',
+        'logger/component_message_log_domain.cpp',
+        'logger/console.cpp',
+        'logger/log_component.cpp',
+        'logger/log_component_settings.cpp',
+        'logger/log_manager.cpp',
+        'logger/logger.cpp',
+        'logger/log_severity.cpp',
+        'logger/logstream_builder.cpp',
+        'logger/message_event_utf8_encoder.cpp',
+        'logger/message_log_domain.cpp',
+        'logger/ramlog.cpp',
+        'logger/rotatable_file_manager.cpp',
+        'logger/rotatable_file_writer.cpp',
+        'platform/random.cpp',
+        'util/allocator.cpp',
+        'util/assert_util.cpp',
+        'util/base64.cpp',
+        'util/concurrency/thread_name.cpp',
+        'util/exception_filter_win32.cpp',
+        'util/hex.cpp',
+        'util/log.cpp',
+        'util/signal_handlers_synchronous.cpp',
+        'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
+        'util/static_observer.cpp',
+        'util/stringutils.cpp',
+        'util/system_tick_source.cpp',
+        'util/text.cpp',
+        'util/time_support.cpp',
+        'util/version.cpp',
+    ],
+    LIBDEPS=[
+        # NOTE: This library *must not* depend on any libraries than
+        # the ones declared here. Do not add to this list.
+        '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
+        '$BUILD_DIR/third_party/shim_boost',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
+        'util/debugger',
+        'util/quick_exit',
+    ]
+)
+
 def get_toolchain_ver(tool):
     # By default we don't know the version of each tool, and only report what
     # command gets executed (gcc vs /opt/mongodbtoolchain/bin/gcc).
@@ -156,7 +230,6 @@ config_header_substs = (
     ('@mongo_config_have_std_make_unique@', 'MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
     ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
     ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
-    ('@mongo_config_use_gdbserver@', 'MONGO_CONFIG_USE_GDBSERVER'),
 )
 
 def makeConfigHeaderDefine(self, key):
@@ -171,15 +244,6 @@ generateConfigHeaderFile = env.Substfile(
     SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
 )
 env.Alias('generated-sources', generateConfigHeaderFile)
-
-env.Library('version',
-            [
-                'util/version.cpp'
-            ],
-            LIBDEPS=[
-                'bson/bson',
-                '$BUILD_DIR/mongo/base/base'
-            ])
 
 mongod = env.Program(
     target="mongod",
@@ -218,7 +282,6 @@ env.Install(
                         "db/coredb",
                         "db/serveronly",
                         "util/ntservice_mock",
-                        "util/signal_handlers_synchronous",
                     ]),
     ])
 
@@ -262,7 +325,6 @@ if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
                                               LIBDEPS = [
                                                  "db/serveronly",
                                                  "db/coredb",
-                                                 "util/signal_handlers_synchronous",
                                               ] ) )
 
 # --- shell ---
@@ -295,7 +357,13 @@ if not has_option('noshell') and (usev8 or usemozjs):
 
     # mongo shell options
     shell_core_env.Library("shell_options", ["shell/shell_options.cpp"],
-                LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser_init'])
+                LIBDEPS=[
+                    '$BUILD_DIR/mongo/db/server_options_core',
+                    '$BUILD_DIR/mongo/rpc/protocol',
+                    '$BUILD_DIR/mongo/util/net/network',
+                    '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+                    'shell_core',
+                ])
 
     shellEnv = env.Clone()
     if env.TargetOSIs('windows'):

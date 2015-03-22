@@ -22,7 +22,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/background_job',
-        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/foundation',
         # Temporary crutch since the ssl cleanup is hard coded in background.cpp
         '$BUILD_DIR/mongo/util/net/network',

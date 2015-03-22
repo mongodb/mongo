@@ -31,24 +31,22 @@ env.Library('authcore', ['action_set.cpp',
                          'user_name.cpp',
                          'user_set.cpp'],
             LIBDEPS=['sasl_options',
-                     '$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/mongo/bson/bson',
+                     '$BUILD_DIR/mongo/base',
                      '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
                      '$BUILD_DIR/mongo/bson/util/bson_extract',
                      '$BUILD_DIR/mongo/crypto/scramauth',
                      '$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/db/ops/update_driver',
                      '$BUILD_DIR/mongo/db/namespace_string',
-                     '$BUILD_DIR/mongo/util/signal_handlers_synchronous',
-                     '$BUILD_DIR/mongo/util/stringutils',
                      '$BUILD_DIR/mongo/util/md5'])
 
 env.Library('authcommon',
             ['internal_user_auth.cpp'],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/bson/bson',
+                '$BUILD_DIR/mongo/base',
                 '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
                 '$BUILD_DIR/mongo/bson/util/bson_extract',
+                '$BUILD_DIR/mongo/db/server_options_core',
             ])
 
 env.Library('authorization_manager_global',
@@ -88,10 +86,20 @@ env.Library('authservercommon',
             ])
 
 env.Library('security_file',
-            ['security_file.cpp'])
+            ['security_file.cpp'],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base',
+            ],
+)
 
 env.Library('sasl_options',
-            ['sasl_options.cpp'])
+            ['sasl_options.cpp'],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/db/server_parameters',
+                '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            ],
+)
 
 env.Library('saslauth',
              ['native_sasl_authentication_session.cpp',
@@ -101,6 +109,7 @@ env.Library('saslauth',
              'sasl_server_conversation.cpp'],
              LIBDEPS=[
                 'authcore',
+                'authmocks', # Wat?
                 'sasl_options',
                 '$BUILD_DIR/mongo/crypto/scramauth',
                 '$BUILD_DIR/mongo/util/net/network'])
@@ -133,6 +142,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/ops/update_driver',
         '$BUILD_DIR/mongo/db/service_context',
+        'authcore'
     ]
 )
 

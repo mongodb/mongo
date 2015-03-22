@@ -9,7 +9,7 @@ env.Library(
         'server_status_metric.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson'
+        '$BUILD_DIR/mongo/base'
         ]
     )
 

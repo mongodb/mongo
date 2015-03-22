@@ -8,29 +8,6 @@ generateErrorCodes = env.Command(
     action='$PYTHON $SOURCES $TARGETS')
 env.Alias('generated-sources', generateErrorCodes)
 
-env.Library('base',
-            ['data_range.cpp',
-             'data_range_cursor.cpp',
-             'data_type.cpp',
-             'data_type_string_data.cpp',
-             'data_type_terminated.cpp',
-             'error_codes.cpp',
-             'global_initializer.cpp',
-             'global_initializer_registerer.cpp',
-             'init.cpp',
-             'initializer.cpp',
-             'initializer_context.cpp',
-             'initializer_dependency_graph.cpp',
-             'validate_locale.cpp',
-             'make_string_vector.cpp',
-             'parse_number.cpp',
-             'status.cpp',
-             'string_data.cpp',
-            ],
-            LIBDEPS=['$BUILD_DIR/mongo/util/quick_exit',
-                     '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-            ])
-
 env.CppUnitTest('base_test',
                 ['counter_test.cpp',
                  'data_cursor_test.cpp',

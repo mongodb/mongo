@@ -33,8 +33,10 @@ debuggerEnv.Library(
     source=[
         'debugger.cpp',
         ],
-    LIBDEPS=[]
-    )
+    LIBDEPS=[
+        # NOTE: You *must not* add any library dependencies to the debugger library
+    ],
+)
 
 env.Library(
     target='decorable',
@@ -61,7 +63,8 @@ env.Library(
         'progress_meter.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/logger/logger',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/foundation',
     ],
 )
 
@@ -99,26 +102,15 @@ env.Library(
     source=[
         "startup_test.cpp",
         "touch_pages.cpp",
-        'assert_util.cpp',
-        'exception_filter_win32.cpp',
         'file.cpp',
-        'log.cpp',
         'platform_init.cpp',
-        'static_observer.cpp',
-        'system_tick_source.cpp',
-        'text.cpp',
         'thread_safe_string.cpp',
-        'time_support.cpp',
         'timer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/logger/logger',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/platform/platform',
-        '$BUILD_DIR/mongo/util/stacktrace',
         '$BUILD_DIR/mongo/util/concurrency/synchronization',
-        '$BUILD_DIR/mongo/util/concurrency/thread_name',
-        '$BUILD_DIR/mongo/util/debugger',
         '$BUILD_DIR/third_party/shim_allocator',
         '$BUILD_DIR/third_party/shim_boost',
         '$BUILD_DIR/third_party/shim_tz',
@@ -152,22 +144,13 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target='stringutils',
-    source=[
-        'base64.cpp',
-        'hex.cpp',
-        'stringutils.cpp',
-    ],
-)
-
 env.CppUnitTest(
     target="stringutils_test",
     source=[
         "stringutils_test.cpp",
     ],
     LIBDEPS=[
-        "stringutils",
+        "$BUILD_DIR/mongo/base",
     ],
 )
 
@@ -178,8 +161,9 @@ env.Library(
         "processinfo_${TARGET_OS}.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson",
-        "foundation",
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/platform/platform",
+        "$BUILD_DIR/mongo/util/foundation",
     ],
 )
 
@@ -201,8 +185,7 @@ env.Library(
         "fail_point_service.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson",
-        "foundation",
+        "$BUILD_DIR/mongo/base",
     ],
 )
 
@@ -222,7 +205,9 @@ env.Library(
         "background.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         'concurrency/spin_lock',
+        'foundation',
     ],
 )
 
@@ -261,7 +246,9 @@ if get_option('allocator') == 'tcmalloc':
             'tcmalloc_set_parameter.cpp',
         ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/coredb',
             '$BUILD_DIR/mongo/db/server_parameters',
+            '$BUILD_DIR/mongo/util/net/network',
         ],
         LIBDEPS_DEPENDENTS=[
             '$BUILD_DIR/mongo/${PROGPREFIX}mongod${PROGSUFFIX}',
@@ -315,19 +302,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='stacktrace',
-    source=[
-        'stacktrace_${TARGET_OS_FAMILY}.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/version',
-        'stringutils',
-    ],
-)
-
 quick_exit_env = env.Clone()
 if has_option('gcov'):
     quick_exit_env.Append(
@@ -335,23 +309,15 @@ if has_option('gcov'):
             'MONGO_GCOV',
         ],
     )
+
 quick_exit_env.Library(
     target='quick_exit',
     source=[
         'quick_exit.cpp',
     ],
-)
-
-env.Library(
-    target="signal_handlers_synchronous",
-    source=[
-        'allocator.cpp',
-        'signal_handlers_synchronous.cpp',
-    ],
     LIBDEPS=[
-        "foundation",
-        "stacktrace",
-    ],
+        # NOTE: You *must not* add any library dependencies to the quick_exit library
+    ]
 )
 
 if not env.TargetOSIs('windows'):
@@ -361,7 +327,7 @@ if not env.TargetOSIs('windows'):
             'signal_handlers_synchronous_test.cpp',
         ],
         LIBDEPS=[
-            'signal_handlers_synchronous',
+            '$BUILD_DIR/mongo/base',
         ],
     )
 
@@ -373,8 +339,9 @@ env.Library(
     ],
     LIBDEPS=[
         "foundation",
-        "signal_handlers_synchronous",
+        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/server_options_core",
     ],
 )
 
@@ -394,7 +361,7 @@ env.Library(
         'safe_num.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -404,7 +371,7 @@ env.CppUnitTest(
         'safe_num_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         'safe_num',
     ],
 )
@@ -415,7 +382,7 @@ env.CppUnitTest(
         'string_map_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         'foundation',
     ],
 )
@@ -426,5 +393,6 @@ env.Library(
         'password.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )

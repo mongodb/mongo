@@ -14,7 +14,6 @@ mongobridge = env.Program(
         "$BUILD_DIR/mongo/util/net/network",
         "$BUILD_DIR/mongo/util/ntservice_mock",
         "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
-        "$BUILD_DIR/mongo/util/signal_handlers_synchronous",
     ],
 )
 

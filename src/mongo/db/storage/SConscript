@@ -16,7 +16,9 @@ env.Library(
     source=[
         'index_entry_comparison.cpp',
         ],
-    LIBDEPS=[]
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ],
     )
 
 env.Library(
@@ -24,7 +26,9 @@ env.Library(
     source=[
         'key_string.cpp',
         ],
-    LIBDEPS=[]
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        ],
     )
 
 
@@ -45,7 +49,7 @@ env.Library(
         'oplog_hack.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         ]
     )
 
@@ -55,6 +59,7 @@ env.Library(
         'paths.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -80,6 +85,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
         'index_entry_comparison',
     ],
 )
@@ -105,6 +111,7 @@ env.Library(
         'record_store_test_validate.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/db/service_context',
         ]
     )
@@ -115,6 +122,7 @@ env.Library(
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/platform/platform',
         'paths',
         ]
     )
@@ -133,7 +141,7 @@ env.Library(
         'storage_engine_metadata.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         ]
     )
 
@@ -150,6 +158,6 @@ env.CppUnitTest(
     source='key_string_test.cpp',
     LIBDEPS=[
         'key_string',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         ]
 )

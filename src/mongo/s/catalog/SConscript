@@ -27,8 +27,7 @@ env.Library(
     ],
     LIBDEPS=[
         'mongo_version_range',
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
     ]
@@ -40,8 +39,7 @@ env.Library(
         'mongo_version_range.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
     ]
 )
 
@@ -52,8 +50,7 @@ env.Library(
         'catalog_manager.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/batch_write_types',
         '$BUILD_DIR/mongo/s/catalog/catalog_types',
@@ -100,7 +97,7 @@ env.Library(
         'dist_lock_ping_info.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -111,6 +108,7 @@ env.Library(
     ],
     LIBDEPS=[
         'dist_lock_manager',
+        '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )
 
@@ -130,7 +128,7 @@ env.Library(
     ],
     LIBDEPS=[
         'catalog_types',
-        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/client/remote_command_targeter',
         '$BUILD_DIR/mongo/db/common',
@@ -164,8 +162,8 @@ env.Library(
         'dist_lock_catalog_mock.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
         'catalog_types',
         'dist_lock_catalog_interface',
     ]
 )
-

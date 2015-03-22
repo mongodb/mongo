@@ -36,7 +36,11 @@ env.Library('network_interface_mock',
                 'thread_pool_mock.cpp',
             ],
             LIBDEPS=[
+                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/rpc/metadata',
+                '$BUILD_DIR/mongo/util/net/network',
                 'network_interface',
+                'task_executor_interface',
             ])
 
 env.Library(target='network_test_env',
@@ -82,6 +86,7 @@ env.Library(
         'task_executor_test_fixture.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
         'network_interface_mock',
         'task_executor_interface',
     ]

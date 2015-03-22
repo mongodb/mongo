@@ -52,7 +52,11 @@ env.CppUnitTest(
         'chunk_version_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/range_arithmetic',
+        'catalog/catalog_types',
     ]
 )
 
@@ -88,8 +92,8 @@ env.Library(
         'write_ops/write_error_detail.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
     ],
 )
 
@@ -123,7 +127,7 @@ env.Library(
         'write_ops/batch_write_exec.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver',
         'batch_write_types',
         '$BUILD_DIR/mongo/util/concurrency/synchronization'
@@ -152,7 +156,7 @@ env.Library(
         'write_ops/batch_downconvert.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common', # for Message
         '$BUILD_DIR/mongo/db/lasterror',
         'cluster_ops',
@@ -188,7 +192,7 @@ env.Library(
         'dbclient_shard_resolver.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         'cluster_ops',
         'cluster_write_op_conversion',
         'client/sharding_client',

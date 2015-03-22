@@ -14,4 +14,8 @@ if env.TargetOSIs('solaris'):
 env.Library("math",
           [ "mathutil.cc",
            # "mathlimits.cc",
+          ],
+          LIBDEPS=[
+              '$BUILD_DIR/mongo/base',
+              '$BUILD_DIR/third_party/s2/base/base',
           ])

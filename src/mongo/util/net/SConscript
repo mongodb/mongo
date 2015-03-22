@@ -65,6 +65,7 @@ env.Library(
         "message_port_mock.cpp",
     ],
     LIBDEPS=[
+        'network',
     ],
 )
 
@@ -85,6 +86,7 @@ env.Library(
         "message_server_port.cpp",
     ],
     LIBDEPS=[
+        'network',
         '$BUILD_DIR/mongo/db/stats/counters',
     ],
 )
@@ -95,5 +97,6 @@ env.Library(
         'miniwebserver.cpp',
     ],
     LIBDEPS=[
+        'network',
     ],
 )

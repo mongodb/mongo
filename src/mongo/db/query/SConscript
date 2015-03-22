@@ -26,7 +26,7 @@ env.Library(
         "command_request_response",
         "index_bounds",
         "lite_parsed_query",
-        "$BUILD_DIR/mongo/bson/bson",
+        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/matcher/expression_algo",
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "$BUILD_DIR/mongo/db/matcher/expressions_text",
@@ -80,7 +80,7 @@ env.Library(
         "interval.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson",
+        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/index/expression_params",
         "$BUILD_DIR/mongo/db/index/s2_keys",
@@ -96,7 +96,7 @@ env.Library(
         "explain_common.cpp"
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson",
+        "$BUILD_DIR/mongo/base",
     ],
 )
 
@@ -112,7 +112,7 @@ env.Library(
         'killcursors_response.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/rpc/command_status',
@@ -140,6 +140,9 @@ env.Library(
         "internal_plans.cpp"
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/exec',
+        '$BUILD_DIR/mongo/db/exec/working_set',
     ],
 )
 
@@ -149,7 +152,7 @@ env.Library(
         "lite_parsed_query.cpp"
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson",
+        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/repl/read_concern_args",
     ],
 )

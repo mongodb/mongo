@@ -27,7 +27,7 @@ env.Library(
         ],
     LIBDEPS=[
         'field_path',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/intrusive_counter',
         ]

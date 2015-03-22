@@ -2,7 +2,7 @@
 
 Import("env")
 
-env.Library('collection_options', ['collection_options.cpp'], LIBDEPS=['$BUILD_DIR/mongo/bson/bson'])
+env.Library('collection_options', ['collection_options.cpp'], LIBDEPS=['$BUILD_DIR/mongo/base'])
 
 env.CppUnitTest('collection_options_test', ['collection_options_test.cpp'],
                 LIBDEPS=['collection_options'])
@@ -13,7 +13,7 @@ env.Library(
         "index_key_validate.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index_names',
     ],

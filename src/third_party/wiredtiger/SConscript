@@ -128,7 +128,12 @@ if useSnappy:
 
 wtlib = env.Library(
     target="wiredtiger",
-    source=wtsources)
+    source=wtsources,
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_snappy',
+        '$BUILD_DIR/third_party/shim_zlib',
+    ],
+)
 
 env.Depends(wtlib, [filelistfile, version_file])
 

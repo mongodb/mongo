@@ -10,7 +10,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/safe_num',
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -20,6 +20,7 @@ env.Library(
         'mutable_bson_test_utils.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
         'mutable_bson',
     ],
 )

@@ -9,7 +9,7 @@ env.Library(
         'cluster_get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
-
+        '$BUILD_DIR/mongo/s/client/sharding_client',
     ]
 )
 

@@ -36,6 +36,7 @@ env.Library(
         'file_allocator',
         'logfile',
         'compress',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/storage/paths',
     ]
     )
@@ -50,6 +51,7 @@ compressEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/paths',
+        '$BUILD_DIR/third_party/shim_snappy',
     ],
 )
 
@@ -60,7 +62,7 @@ env.Library(
         'extent_manager.cpp',
         ],
     LIBDEPS= [
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/foundation',
         ]
     )
@@ -72,6 +74,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/paths',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/processinfo',
     ],
 )
 
@@ -82,6 +87,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/paths',
+        'mmap',
     ],
 )
 
@@ -94,6 +100,7 @@ env.Library(
     LIBDEPS=[
         'file_allocator',
         '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/progress_meter',
     ],
 )
 
@@ -121,6 +128,7 @@ env.Library(
     source=['record_store_v1_test_help.cpp',
             ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
         'record_store_v1'
         ]
     )
@@ -130,6 +138,9 @@ env.Library(
     source=['record_access_tracker.cpp',
             ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/processinfo',
         ]
     )
 
@@ -196,8 +207,9 @@ env.Library(
         'btree/key.cpp'
         ],
     LIBDEPS= [
-        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        'record_store_v1',
         ]
     )
 
