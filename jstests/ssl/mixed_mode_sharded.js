@@ -2,10 +2,6 @@
  * This test checks if different mixtures of ssl modes
  * in a sharded cluster can or cannot function
  */
-
-// If we are running in use-x509 passthrough mode, turn it off
-// since it is not necessary for this test.
-TestData.useX509 = false;
 load("jstests/ssl/libs/ssl_helpers.js");
 
 print("=== Testing requireSSL/requireSSL cluster ===");

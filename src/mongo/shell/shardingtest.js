@@ -424,7 +424,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         );
     }
 
-    if (jsTestOptions().keyFile || jsTestOptions().useX509) {
+    if (jsTestOptions().keyFile) {
         jsTest.authenticate( this._configConnection );
         jsTest.authenticateNodes( this._configServers );
         jsTest.authenticateNodes( this._mongos );

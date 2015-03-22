@@ -1,15 +1,14 @@
 // Test mongod start with FIPS mode enabled
-ports = allocatePorts(1);
-port1 = ports[0];
-var baseName = "jstests_ssl_ssl_fips";
 
+var md = MongoRunner.runMongod({sslMode: "requireSSL",
+                                sslPEMKeyFile: "jstests/libs/server.pem",
+                                sslCAFile: "jstests/libs/ca.pem",
+                                sslFIPSMode: ""});
 
-var md = startMongod("--port", port1, "--dbpath",
-                     MongoRunner.dataPath + baseName, "--sslMode", "requireSSL",
-                     "--sslPEMKeyFile", "jstests/libs/server.pem",
-                     "--sslFIPSMode");
-
-var mongo = runMongoProgram("mongo", "--port", port1, "--ssl", "--sslAllowInvalidCertificates",
+var mongo = runMongoProgram("mongo",
+                            "--port", md.port,
+                            "--ssl",
+                            "--sslAllowInvalidCertificates",
                             "--sslPEMKeyFile", "jstests/libs/client.pem",
                             "--sslFIPSMode",
                             "--eval", ";");
@@ -22,5 +21,5 @@ if (mongo != 0) {
 }
 else {
     // kill mongod
-    stopMongod(port1);
+    MongoRunner.stopMongod(md);
 }

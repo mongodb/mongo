@@ -5,6 +5,7 @@ var x509_options = {sslMode : "requireSSL",
                     sslPEMKeyFile : "jstests/libs/server.pem",
                     sslCAFile: "jstests/libs/ca.pem",
                     sslClusterFile: "jstests/libs/cluster_cert.pem",
+                    sslAllowInvalidHostnames: "",
                     clusterAuthMode: "x509"};
 
 // Start ShardingTest with enableBalancer because ShardingTest attempts to turn
