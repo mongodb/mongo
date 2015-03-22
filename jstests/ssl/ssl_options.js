@@ -5,7 +5,8 @@ jsTest.log("Testing censorship of ssl options");
 var mongodConfig = { sslPEMKeyFile : "jstests/libs/password_protected.pem",
                      sslMode : "requireSSL",
                      sslPEMKeyPassword : "qwerty",
-                     sslClusterPassword : "qwerty" };
+                     sslClusterPassword : "qwerty",
+                     sslCAFile: "jstests/libs/ca.pem"};
 var mongodSource = MongoRunner.runMongod(mongodConfig);
 
 var getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");

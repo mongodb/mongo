@@ -1,6 +1,5 @@
 // Test changing the --sslMode and --clusterAuthMode 
 // parameters using setParameter
-TestData.useX509 = false;
 
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
@@ -19,7 +18,7 @@ function testSSLTransition(oldMode, newMode, shouldSucceed) {
                                    "sslMode" : newMode });
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    stopMongod(port);
+    MongoRunner.stopMongod(port);
 }
 
 function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
@@ -36,7 +35,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
                                    "clusterAuthMode" : newMode });
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    stopMongod(port);
+    MongoRunner.stopMongod(port);
 }
 
 testSSLTransition("allowSSL", "invalid", false);

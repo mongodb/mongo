@@ -157,9 +157,7 @@ jsTestOptions = function(){
                               authPassword : TestData.keyFileData,
                               authMechanism : TestData.authMechanism,
                               adminUser : TestData.adminUser || "admin",
-                              adminPassword : TestData.adminPassword || "password",
-                              useSSL : TestData.useSSL,
-                              useX509 : TestData.useX509});
+                              adminPassword : TestData.adminPassword || "password"});
     }
     return _jsTestOptions;
 }
@@ -195,7 +193,7 @@ jsTest.randomize = function( seed ) {
 }
 
 jsTest.authenticate = function(conn) {
-    if (!jsTest.options().auth && !jsTest.options().keyFile && !jsTest.options().useX509) {
+    if (!jsTest.options().auth && !jsTest.options().keyFile) {
         conn.authenticated = true;
         return true;
     }

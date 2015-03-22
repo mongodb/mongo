@@ -1,7 +1,3 @@
-// Must turn these off so we don't have CA file supplied automatically.
-TestData.usex509 = false;
-TestData.useSSL = false;
-
 var SERVER_CERT = "jstests/libs/server.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
 var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";

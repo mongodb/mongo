@@ -44,7 +44,7 @@ function testCombination(sslMode, sslShell, shouldSucceed) {
         assert.eq(1, mongo, "Connection attempt succeeded when it should fail sslMode:" + 
                   sslMode + " SSL-shell:" + sslShell);
     }
-    stopMongod(port);
+    MongoRunner.stopMongod(port);
 }
 
 testCombination("disabled", false, true);

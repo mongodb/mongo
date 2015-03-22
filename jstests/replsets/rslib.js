@@ -47,7 +47,7 @@ reconnect = function(a) {
           db = a;
         }
         db.bar.stats();
-        if (jsTest.options().keyFile || jsTest.options().useX509) { // SERVER-4241: Shell connections don't re-authenticate on reconnect
+        if (jsTest.options().keyFile) { // SERVER-4241: Shell connections don't re-authenticate on reconnect
           return jsTest.authenticate(db.getMongo());
         }
         return true;

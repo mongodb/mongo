@@ -423,23 +423,7 @@ MongoRunner.mongoOptions = function( opts ){
     // Default for waitForConnect is true
     opts.waitForConnect = (waitForConnect == undefined || waitForConnect == null) ?
         true : waitForConnect;
-    
-    if( jsTestOptions().useSSL ) {
-        if (!opts.sslMode) opts.sslMode = "requireSSL";
-        if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
-        if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
 
-        // Needed for jstest/ssl/upgrade_to_ssl.js
-        opts.sslWeakCertificateValidation = "";
-
-        // Needed for jstest/ssl/ssl_hostname_validation.js
-        opts.sslAllowInvalidHostnames = "";
-    }
-
-    if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
-        opts.clusterAuthMode = "x509";
-    }
-    
     opts.port = opts.port || MongoRunner.nextOpenPort()
     MongoRunner.usedPortMap[ "" + parseInt( opts.port ) ] = true
     
@@ -491,22 +475,6 @@ MongoRunner.mongodOptions = function( opts ){
 
     if( jsTestOptions().keyFile && !opts.keyFile) {
         opts.keyFile = jsTestOptions().keyFile
-    }
-
-    if( jsTestOptions().useSSL ) {
-        if (!opts.sslMode) opts.sslMode = "requireSSL";
-        if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
-        if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
-
-        // Needed for jstest/ssl/upgrade_to_ssl.js
-        opts.sslWeakCertificateValidation = "";
-
-        // Needed for jstest/ssl/ssl_hostname_validation.js
-        opts.sslAllowInvalidHostnames = "";
-    }
-
-    if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
-        opts.clusterAuthMode = "x509";
     }
 
     if( opts.noReplSet ) opts.replSet = null
