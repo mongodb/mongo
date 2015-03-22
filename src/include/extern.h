@@ -202,10 +202,14 @@ extern int __wt_ext_config_parser_open(WT_EXTENSION_API *wt_ext, WT_SESSION *wt_
 extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg, const char *key, WT_CONFIG_ITEM *cval);
 extern int __wt_config_upgrade(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern const char *__wt_wiredtiger_error(int error);
+extern int __wt_collator_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname);
 extern int __wt_collator_config(WT_SESSION_IMPL *session, const char *uri, WT_CONFIG_ITEM *cname, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collatorp, int *ownp);
 extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
+extern int __wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval);
+extern int __wt_compressor_config( WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_COMPRESSOR **compressorp);
 extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_data_source(WT_SESSION_IMPL *session);
+extern int __wt_extractor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname);
 extern int __wt_extractor_config(WT_SESSION_IMPL *session, const char *config, WT_EXTRACTOR **extractorp, int *ownp);
 extern int __wt_conn_remove_extractor(WT_SESSION_IMPL *session);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -496,6 +500,7 @@ extern int __wt_ext_struct_pack(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session
 extern int __wt_ext_struct_size(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, size_t *sizep, const char *fmt, ...);
 extern int __wt_ext_struct_unpack(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const void *buffer, size_t size, const char *fmt, ...);
 extern int __wt_struct_check(WT_SESSION_IMPL *session, const char *fmt, size_t len, int *fixedp, uint32_t *fixed_lenp);
+extern int __wt_struct_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v);
 extern int __wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, ...);
 extern int __wt_struct_pack(WT_SESSION_IMPL *session, void *buffer, size_t size, const char *fmt, ...);
 extern int __wt_struct_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, ...);
