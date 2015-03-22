@@ -455,6 +455,14 @@ add_option('variables-files',
     help="Specify variables files to load",
 )
 
+link_model_choices = ['auto', 'object', 'static', 'dynamic', 'dynamic-strict']
+add_option('link-model',
+    choices=link_model_choices,
+    default='object',
+    help='Select the linking model for the project',
+    type='choice'
+)
+
 variable_parse_mode_choices=['auto', 'posix', 'other']
 add_option('variable-parse-mode',
     choices=variable_parse_mode_choices,
@@ -992,6 +1000,59 @@ if has_option("cache"):
         env.FatalError("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
     env.CacheDir(str(env.Dir(cacheDir)))
 
+# Normalize the link model. If it is auto, then a release build uses 'object' mode. Otherwise
+# we automatically select the 'static' model on non-windows platforms, or 'object' if on
+# Windows. If the user specified, honor the request, unless it conflicts with the requirement
+# that release builds use the 'object' mode, in which case, error out.
+#
+# We require the use of the 'object' mode for release builds because it is the only linking
+# model that works across all of our platforms. We would like to ensure that all of our
+# released artifacts are built with the same known-good-everywhere model.
+link_model = get_option('link-model')
+
+if link_model == "auto":
+    link_model = "object" if (env.TargetOSIs('windows') or has_option("release")) else "static"
+elif has_option("release") and link_model != "object":
+    print("The link model for release builds is required to be 'object'")
+    Exit(1)
+
+# The only link model currently supported on Windows is 'object', since there is no equivalent
+# to --whole-archive.
+if env.TargetOSIs('windows') and link_model != 'object':
+    print("Windows builds must use the 'object' link model");
+    Exit(1);
+
+# The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
+# modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
+env['_LIBDEPS'] = '$_LIBDEPS_OBJS' if link_model == "object" else '$_LIBDEPS_LIBS'
+
+if link_model.startswith("dynamic"):
+
+    # Redirect the 'Library' target, which we always use instead of 'StaticLibrary' for things
+    # that can be built in either mode, to point to SharedLibrary.
+    env['BUILDERS']['Library'] = env['BUILDERS']['SharedLibrary']
+
+    # TODO: Ideally, the conditions below should be based on a detection of what linker we are
+    # using, not the local OS, but I doubt very much that we will see the mach-o linker on
+    # anything other than Darwin, or a BFD/sun-esque linker elsewhere.
+
+    # On Darwin, we need to tell the linker that undefined symbols are resolved via dynamic
+    # lookup; otherwise we get build failures. On other unixes, we need to suppress as-needed
+    # behavior so that initializers are ensured present, even if there is no visible edge to
+    # the library in the symbol graph.
+    #
+    # NOTE: The darwin linker flag is only needed because the library graph is not a DAG. Once
+    # the graph is a DAG, we will require all edges to be expressed, and we should drop the
+    # flag. When that happens, we should also add -z,defs flag on ELF platforms to ensure that
+    # missing symbols due to unnamed dependency edges result in link errors.
+    if env.TargetOSIs('osx'):
+        if link_model != "dynamic-strict":
+            env.AppendUnique(SHLINKFLAGS=["-Wl,-undefined,dynamic_lookup"])
+    else:
+        env.AppendUnique(SHLINKFLAGS=["-Wl,--no-as-needed"])
+        if link_model == "dynamic-strict":
+            env.AppendUnique(SHLINKFLAGS=["-Wl,-z,defs"])
+
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
@@ -1022,8 +1083,6 @@ if endian == "little":
 elif endian == "big":
     env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "4321")
 
-env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
-
 if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # The libraries we build in LIBDEPS_OBJS mode are just placeholders for tracking dependencies.
     # This avoids wasting time and disk IO on them.
@@ -1040,17 +1099,23 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     env['RANLIBCOM'] = noop_action
     env['RANLIBCOMSTR'] = 'Skipping ranlib for $TARGET'
 
-libdeps.setup_environment( env )
+libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")))
 
-if env.TargetOSIs('linux', 'freebsd'):
+if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
+    env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,--whole-archive'
+    env['LINK_WHOLE_ARCHIVE_END'] = '-Wl,--no-whole-archive'
 elif env.TargetOSIs('osx'):
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
+    env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,-all_load'
+    env['LINK_WHOLE_ARCHIVE_END'] = '-Wl,-noall_load'
 elif env.TargetOSIs('solaris'):
-    env['LINK_LIBGROUP_START'] = '-z rescan'
-    env['LINK_LIBGROUP_END'] = ''
+    env['LINK_LIBGROUP_START'] = '-z rescan-start'
+    env['LINK_LIBGROUP_END'] = '-z rescan-end'
+    env['LINK_WHOLE_ARCHIVE_START'] = '-z allextract'
+    env['LINK_WHOLE_ARCHIVE_END'] = '-z defaultextract'
 
 # ---- other build setup -----
 if debugBuild:
