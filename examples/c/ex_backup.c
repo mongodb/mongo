@@ -220,7 +220,7 @@ take_full_backup(WT_SESSION *session, int i)
 	}
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
-		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+		    "WT_CURSOR.next: %s\n", session->strerror(session, ret));
 	ret = cursor->close(cursor);
 	return (ret);
 }
@@ -255,7 +255,7 @@ take_incr_backup(WT_SESSION *session, int i)
 	}
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
-		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+		    "WT_CURSOR.next: %s\n", session->strerror(session, ret));
 	ret = 0;
 	/*
 	 * With an incremental cursor, we want to truncate on the backup
@@ -280,8 +280,7 @@ main(void)
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (ret);
 	}
-	if ((ret = wiredtiger_open(home, NULL,
-	    CONN_CONFIG, &wt_conn)) != 0) {
+	if ((ret = wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 		return (ret);

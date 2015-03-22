@@ -188,7 +188,7 @@ main(int argc, char *argv[])
 		len += strlen(cmd_config);
 	len += strlen(rec_config);
 	if ((p = malloc(len)) == NULL) {
-		ret = util_err(errno, NULL);
+		ret = util_err(NULL, errno, NULL);
 		goto err;
 	}
 	(void)snprintf(p, len, "%s,%s,%s",
@@ -199,11 +199,11 @@ main(int argc, char *argv[])
 	/* Open the database and a session. */
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0) {
-		ret = util_err(ret, NULL);
+		ret = util_err(NULL, ret, NULL);
 		goto err;
 	}
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		ret = util_err(ret, NULL);
+		ret = util_err(NULL, ret, NULL);
 		goto err;
 	}
 
@@ -263,7 +263,7 @@ usage(void)
  *	Build a name.
  */
 char *
-util_name(const char *s, const char *type)
+util_name(WT_SESSION *session, const char *s, const char *type)
 {
 	size_t len;
 	char *name;
@@ -279,7 +279,7 @@ util_name(const char *s, const char *type)
 
 	len = strlen(type) + strlen(s) + 2;
 	if ((name = calloc(len, 1)) == NULL) {
-		(void)util_err(errno, NULL);
+		(void)util_err(session, errno, NULL);
 		return (NULL);
 	}
 

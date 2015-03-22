@@ -71,7 +71,7 @@ main(void)
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)
-		fprintf(stderr, "Error connecting to %s: %s\n",
+		fprintf(stderr, "Error closing %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/*! [processes] */
 

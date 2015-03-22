@@ -54,8 +54,8 @@ void *
 scan_thread(void *conn_arg)
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	const char *key, *value;
 	int ret;
 
@@ -73,7 +73,7 @@ scan_thread(void *conn_arg)
 	}
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
-		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+		    "WT_CURSOR.next: %s\n", session->strerror(session, ret));
 
 	return (NULL);
 }

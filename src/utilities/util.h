@@ -27,25 +27,25 @@ extern int   __wt_optreset;		/* reset getopt */
 extern char *__wt_optarg;		/* argument associated with option */
 
 int	 util_backup(WT_SESSION *, int, char *[]);
-int	 util_cerr(const char *, const char *, int);
+int	 util_cerr(WT_CURSOR *, const char *, int);
 int	 util_compact(WT_SESSION *, int, char *[]);
 void	 util_copyright(void);
 int	 util_create(WT_SESSION *, int, char *[]);
 int	 util_drop(WT_SESSION *, int, char *[]);
 int	 util_dump(WT_SESSION *, int, char *[]);
-int	 util_err(int, const char *, ...);
+int	 util_err(WT_SESSION *, int, const char *, ...);
 int	 util_flush(WT_SESSION *, const char *);
 int	 util_list(WT_SESSION *, int, char *[]);
 int	 util_load(WT_SESSION *, int, char *[]);
 int	 util_loadtext(WT_SESSION *, int, char *[]);
-char	*util_name(const char *, const char *);
+char	*util_name(WT_SESSION *, const char *, const char *);
 int	 util_printlog(WT_SESSION *, int, char *[]);
 int	 util_read(WT_SESSION *, int, char *[]);
-int	 util_read_line(ULINE *, int, int *);
+int	 util_read_line(WT_SESSION *, ULINE *, int, int *);
 int	 util_rename(WT_SESSION *, int, char *[]);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);
-int	 util_str2recno(const char *p, uint64_t *recnop);
+int	 util_str2recno(WT_SESSION *, const char *p, uint64_t *recnop);
 int	 util_upgrade(WT_SESSION *, int, char *[]);
 int	 util_verify(WT_SESSION *, int, char *[]);
 int	 util_write(WT_SESSION *, int, char *[]);

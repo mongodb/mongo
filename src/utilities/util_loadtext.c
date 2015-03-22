@@ -22,8 +22,8 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
 		switch (ch) {
 		case 'f':	/* input file */
 			if (freopen(__wt_optarg, "r", stdin) == NULL)
-				return (
-				    util_err(errno, "%s: reopen", __wt_optarg));
+				return (util_err(
+				    session, errno, "%s: reopen", __wt_optarg));
 			break;
 		case '?':
 		default:
@@ -35,7 +35,7 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
-	if ((uri = util_name(*argv, "table")) == NULL)
+	if ((uri = util_name(session, *argv, "table")) == NULL)
 		return (1);
 
 	return (text(session, uri));
@@ -60,7 +60,7 @@ text(WT_SESSION *session, const char *uri)
 	 */
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, "append,overwrite", &cursor)) != 0)
-		return (util_err(ret, "%s: session.open", uri));
+		return (util_err(session, ret, "%s: session.open", uri));
 
 	/*
 	 * We're about to load strings, make sure the formats match.
@@ -71,7 +71,7 @@ text(WT_SESSION *session, const char *uri)
 	if (strcmp(cursor->value_format, "S") != 0 ||
 	    (strcmp(cursor->key_format, "S") != 0 &&
 	    strcmp(cursor->key_format, "r") != 0))
-		return (util_err(EINVAL,
+		return (util_err(session, EINVAL,
 		    "the loadtext command can only load objects configured "
 		    "for record number or string keys, and string values"));
 	readkey = strcmp(cursor->key_format, "r") == 0 ? 0 : 1;
@@ -85,7 +85,7 @@ text(WT_SESSION *session, const char *uri)
 	 * the close succeed, it's better to fail early when loading files.
 	 */
 	if ((tret = cursor->close(cursor)) != 0) {
-		tret = util_err(tret, "%s: cursor.close", uri);
+		tret = util_err(session, tret, "%s: cursor.close", uri);
 		if (ret == 0)
 			ret = tret;
 	}
@@ -104,8 +104,11 @@ insert(WT_CURSOR *cursor, const char *name, int readkey)
 {
 	ULINE key, value;
 	WT_DECL_RET;
+	WT_SESSION *session;
 	uint64_t insert_count;
 	int eof;
+
+	session = cursor->session;
 
 	memset(&key, 0, sizeof(key));
 	memset(&value, 0, sizeof(value));
@@ -119,20 +122,21 @@ insert(WT_CURSOR *cursor, const char *name, int readkey)
 		 * all (flat-text load).
 		 */
 		if (readkey) {
-			if (util_read_line(&key, 1, &eof))
+			if (util_read_line(session, &key, 1, &eof))
 				return (1);
 			if (eof == 1)
 				break;
 			cursor->set_key(cursor, key.mem);
 		}
-		if (util_read_line(&value, readkey ? 0 : 1, &eof))
+		if (util_read_line(session, &value, readkey ? 0 : 1, &eof))
 			return (1);
 		if (eof == 1)
 			break;
 		cursor->set_value(cursor, value.mem);
 
 		if ((ret = cursor->insert(cursor)) != 0)
-			return (util_err(ret, "%s: cursor.insert", name));
+			return (
+			    util_err(session, ret, "%s: cursor.insert", name));
 
 		/* Report on progress every 100 inserts. */
 		if (verbose && ++insert_count % 100 == 0) {

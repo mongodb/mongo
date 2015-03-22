@@ -54,8 +54,7 @@ setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)
 {
 	int ret;
 
-	if ((ret = wiredtiger_open(home2, NULL,
-	    CONN_CONFIG, wt_connp)) != 0) {
+	if ((ret = wiredtiger_open(home2, NULL, CONN_CONFIG, wt_connp)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home1, wiredtiger_strerror(ret));
 		return (ret);
@@ -94,13 +93,14 @@ compare_tables(WT_SESSION *session, WT_SESSION *sess_copy)
 	}
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
-		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+		    "WT_CURSOR.next: %s\n", session->strerror(session, ret));
 	ret = cursor->close(cursor);
 
 	ret = curs_copy->next(curs_copy);
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
-		    "copy: WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+		    "copy: WT_CURSOR.next: %s\n",
+		    session->strerror(session, ret));
 	ret = curs_copy->close(curs_copy);
 
 	return (ret);
@@ -285,8 +285,7 @@ main(void)
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (ret);
 	}
-	if ((ret = wiredtiger_open(home1, NULL,
-	    CONN_CONFIG, &wt_conn)) != 0) {
+	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home1, wiredtiger_strerror(ret));
 		return (ret);
@@ -330,8 +329,7 @@ main(void)
 	 * have archiving turned off.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
-	if ((ret = wiredtiger_open(home1, NULL,
-	    CONN_CONFIG, &wt_conn)) != 0) {
+	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home1, wiredtiger_strerror(ret));
 		return (ret);
