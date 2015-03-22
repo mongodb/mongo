@@ -10,7 +10,7 @@ else {
     PATH = MongoRunner.dataDir + "/dur_remove_old_journals";
     SYNC_DELAY = 5; // must be a number
 
-    conn = startMongodEmpty("--port", 30001, "--dbpath", PATH, "--dur", "--smallfiles", "--syncdelay", ''+SYNC_DELAY);
+    var conn = MongoRunner.runMongod({dbpath: PATH, dur: "", smallfiles: "", syncdelay: SYNC_DELAY});
     db = conn.getDB("test");
 
     longString = 'x';
@@ -51,7 +51,7 @@ else {
 
     assert.eq(2, nfiles); // latest journal file and lsn
 
-    stopMongod(30001);
+    MongoRunner.stopMongod(conn);
 }
 
 print("*** success ***");

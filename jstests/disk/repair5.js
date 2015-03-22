@@ -2,17 +2,17 @@
 
 var baseName = "jstests_disk_repair5";
 
-port = allocatePorts( 1 )[ 0 ];
 dbpath = MongoRunner.dataPath + baseName + "/";
 repairpath = dbpath + "repairDir/"
 
 resetDbpath( dbpath );
 resetDbpath( repairpath );
 
-m = startMongodTest(port,
-                    baseName + "/",
-                    true,
-                    {repairpath : repairpath, nohttpinterface : "", bind_ip : "127.0.0.1"});
+m = MongoRunner.runMongod({dbpath: dbpath,
+                           repairpath: repairpath,
+                           restart:true,
+                           cleanData: false, // Don't clean data so repair dir doesn't get removed
+                           bind_ip: "127.0.0.1"});
 
 db = m.getDB( baseName );
 
@@ -48,4 +48,4 @@ s();
 assert.eq( 20000, db[ baseName ].find().itcount() );
 assert( db[ baseName ].validate().valid );
 
-stopMongod( port )
+MongoRunner.stopMongod(m);

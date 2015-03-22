@@ -34,7 +34,7 @@ assert.commandWorked(db.adminCommand('serverStatus'));
 jsTest.log('repeat without config server')
 
 // shut down only config server
-stopMongod(config.port, /*signal*/15);
+MongoRunner.stopMongod(config.port, /*signal*/15);
 
 // open a new connection to mongos (unauthorized)
 var conn2 = new Mongo(mongos.host);

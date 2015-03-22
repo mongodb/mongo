@@ -9,9 +9,7 @@ var runner;
 var conn;
 
 var primeSystemReplset = function() {
-    var port = allocatePorts(1)[0];
-    runner = new MongodRunner(port, MongoRunner.dataDir + "/jstests_slowNightly-ttl");
-    conn = runner.start();
+    conn = MongoRunner.runMongod();
     var localDB = conn.getDB("local");
     localDB.system.replset.insert({x:1});
 
@@ -21,8 +19,8 @@ var primeSystemReplset = function() {
 };
 
 var restartWithConfig = function() {
-    stopMongod(runner.port(), 15);
-    conn = runner.start(true /* reuse data */);
+    MongoRunner.stopMongod(conn.port, 15);
+    conn = MongoRunner.runMongod({restart:true, cleanData: false, dbpath: conn.dbpath});
     testDB = conn.getDB("test");
     var n = 100;
     for (var i=0; i<n; i++) {
@@ -39,15 +37,15 @@ var restartWithoutConfig = function() {
     var localDB = conn.getDB("local");
     assert.writeOK(localDB.system.replset.remove({}));
 
-    stopMongod(runner.port(), 15);
+    MongoRunner.stopMongod(conn.port, 15);
 
-    conn = runner.start(true /* reuse data */);
+    conn = MongoRunner.runMongod({restart:true, cleanData: false, dbpath: conn.dbpath});
 
     assert.soon(function() {
         return conn.getDB("test").foo.count() < 100;
     }, "never deleted", 65000);
 
-    stopMongod(runner.port(), 15);
+    MongoRunner.stopMongod(conn.port, 15);
 };
 
 print("Create a TTL collection and put doc in local.system.replset");

@@ -26,7 +26,7 @@ st.printShardingStatus()
 var port = parseInt( st._configDB.replace( /^.*:/, "" ) )
 jsTestLog( "Stopping " + port + "..." )
 
-stopMongod( port )
+MongoRunner.stopMongod( port )
 
 jsTestLog( "Config flushed and config server down!" )
 

@@ -548,10 +548,10 @@ ShardingTest.prototype.getFirstOther = function( one ){
 
 ShardingTest.prototype.stop = function(){
     for ( var i=0; i<this._mongos.length; i++ ){
-        stopMongoProgram( 31000 - i - 1 );
+        _stopMongoProgram( 31000 - i - 1 );
     }
     for ( var i=0; i<this._connections.length; i++){
-        stopMongod( 30000 + i );
+        _stopMongoProgram( 30000 + i );
     }
     if ( this._rs ){
         for ( var i=0; i<this._rs.length; i++ ){

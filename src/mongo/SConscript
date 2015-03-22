@@ -1333,7 +1333,6 @@ env.JSHeader(
             target="shell/mongo-server.cpp",
             source=[
                 "shell/servers.js",
-                "shell/mongodtest.js",
                 "shell/shardingtest.js",
                 "shell/servers_misc.js",
                 "shell/replsettest.js",

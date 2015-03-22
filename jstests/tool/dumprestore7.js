@@ -36,8 +36,7 @@ var master = replTest.getMaster();
     }
 }
 {
-    var port = 30020;
-    var conn = startMongodTest(port, name + "-other");
+    var conn = MongoRunner.runMongod({});
 }
 
 step("try mongodump with $timestamp");
@@ -52,7 +51,7 @@ MongoRunner.runMongoTool( "mongodump",
 
 step("try mongorestore from $timestamp");
 
-runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+port, "--dir", data, "--writeConcern", 1);
+runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+conn.port, "--dir", data, "--writeConcern", 1);
 var x = 9;
 x = conn.getDB("local").getCollection("oplog.rs").count();
 

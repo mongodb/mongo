@@ -76,14 +76,20 @@ var path2 = MongoRunner.dataPath + testname+"dur";
 
 // run mongod with a short --syncdelay to make LSN writing sooner
 log("run mongod --dur and a short --syncdelay");
-conn = startMongodEmpty("--syncdelay", 2, "--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);
+conn = MongoRunner.runMongod({dbpath: path2,
+                              syncdelay: 2,
+                              dur: "",
+                              smallfiles: "",
+                              durOptions: 8 /*DurParanoid*/,
+                              master: "",
+                              oplogSize: 64});
 work();
 
 log("wait a while for a sync and an lsn write");
 sleep(14); // wait for lsn write
 
 log("kill mongod -9");
-stopMongod(30001, /*signal*/9);
+MongoRunner.stopMongod(conn, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
@@ -103,7 +109,14 @@ stopMongod(30001, /*signal*/9);
 
 // restart and recover
 log("restart mongod, recover, verify");
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 24, "--master", "--oplogSize", 64);
+conn = MongoRunner.runMongod({restart:true,
+                              cleanData: false,
+                              dbpath: path2,
+                              dur: "",
+                              smallfiles: "",
+                              durOptions: 24,
+                              master: "",
+                              oplogSize: 64});
 verify();
 
 // idea here is to verify (in a simplistic way) that we are in a good state to do further ops after recovery
@@ -120,7 +133,7 @@ log("add data after recovery");
     d.xyz.insert({ x: 1 });
 }
 
-log("stop mongod 30002");
-stopMongod(30002);
+log("stop mongod " + conn.port);
+MongoRunner.stopMongod(conn);
 
 print(testname + " SUCCESS");

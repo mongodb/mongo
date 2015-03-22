@@ -2,9 +2,7 @@
 //
 // this tests writing 1GB in an atomic update to make sure we commit periodically
 
-var path = MongoRunner.dataDir + "/dur_big_atomic_update";
-
-conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--durOptions", 8);
+var conn = MongoRunner.runMongod({dur: "", durOptions: 8});
 d = conn.getDB("test");
 d.foo.drop();
 
@@ -49,6 +47,6 @@ assert(err.n == 1024);
 // free up space
 d.dropDatabase();
 
-stopMongod(30001);
+MongoRunner.stopMongod(conn);
 
 print("dur big atomic update SUCCESS");

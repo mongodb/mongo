@@ -2,8 +2,8 @@
 // don't start any shards, yet
 s = new ShardingTest( "add_shard2", 1, 0, 1, {useHostname : true} );
 
-var conn1 = startMongodTest( 30001 , "add_shard21" , 0 , {useHostname : true} );
-var conn2 = startMongodTest( 30002 , "add_shard22" , 0 , {useHostname : true} );
+var conn1 = MongoRunner.runMongod({useHostname: true});
+var conn2 = MongoRunner.runMongod({useHostname: true});
 
 var rs1 = new ReplSetTest( { "name" : "add_shard2_rs1", nodes : 3 , startPort : 31200 } );
 rs1.startSet();
@@ -26,7 +26,8 @@ rs4.startSet();
 rs4.initiate();
 
 // step 1. name given
-assert(s.admin.runCommand({"addshard" : getHostName()+":30001", "name" : "bar"}).ok, "failed to add shard in step 1");
+assert(s.admin.runCommand({"addshard" : getHostName()+":" + conn1.port, "name" : "bar"}).ok,
+       "failed to add shard in step 1");
 var shard = s.getDB("config").shards.findOne({"_id" : {"$nin" : ["shard0000"]}});
 assert(shard, "shard wasn't found");
 assert.eq("bar", shard._id, "shard has incorrect name");
@@ -45,7 +46,8 @@ assert(shard, "shard wasn't found");
 assert.eq("myshard", shard._id, "t3 name");
 
 // step 4. no name given
-assert(s.admin.runCommand({"addshard" : getHostName()+":30002"}).ok, "failed to add shard in step 4");
+assert(s.admin.runCommand({"addshard" : getHostName()+":" + conn2.port}).ok,
+       "failed to add shard in step 4");
 shard = s.getDB("config").shards.findOne({"_id" : {"$nin" : ["shard0000", "bar", "add_shard2_rs1", "myshard"]}});
 assert(shard, "shard wasn't found");
 assert.eq("shard0001", shard._id, "t4 name");

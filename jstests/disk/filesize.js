@@ -3,9 +3,7 @@ var port = allocatePorts( 1 )[ 0 ];
 var baseName = "filesize";
 
 // Start mongod with --smallfiles
-var m = startMongod(
-    "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface",
-    "--bind_ip", "127.0.0.1" , "--nojournal" , "--smallfiles" );
+var m = MongoRunner.runMongod({bind_ip: "127.0.0.1", nojournal: "", smallfiles: ""});
 
 var db = m.getDB( baseName );
 
@@ -14,10 +12,9 @@ if (db.serverBuildInfo().bits == 32) {
     print("Skip on 32-bit");
 } else {
     // Restart mongod without --smallFiles
-    stopMongod( port );
-    m = startMongodNoReset(
-        "--port", port, "--dbpath", MongoRunner.dataPath + baseName,
-        "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" );
+    MongoRunner.stopMongod(m);
+    m = MongoRunner.runMongod({
+        restart: true, cleanData: false, dbpath: m.dbpath, bind_ip: "127.0.0.1", nojournal: ""});
 
     db = m.getDB( baseName );
     var log = db.adminCommand( { getLog : "global" } ).log

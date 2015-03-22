@@ -1,6 +1,6 @@
 var baseName = "jstests_dbNoCreate";
 
-var m = startMongod( "--port", "27018", "--dbpath", MongoRunner.dataPath + baseName );
+var m = MongoRunner.runMongod({});
 
 var t = m.getDB( baseName ).t;
 
@@ -9,9 +9,9 @@ t.remove({});
 t.update( {}, { a:1 } );
 t.drop();
 
-stopMongod( 27018 );
+MongoRunner.stopMongod(m);
 
-var m = startMongoProgram( "mongod", "--port", "27018", "--dbpath", MongoRunner.dataPath + baseName );
+m = MongoRunner.runMongod({restart:true, cleanData:false, dbpath: m.dbpath});
 assert.eq( -1, 
            m.getDBNames().indexOf( baseName ), 
            "found " + baseName + " in " + tojson(m.getDBNames()));

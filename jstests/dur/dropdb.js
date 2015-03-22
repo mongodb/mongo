@@ -110,20 +110,20 @@ var path2 = MongoRunner.dataPath + testname + "dur";
 
 // non-durable version
 log("mongod nodur");
-conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles");
+conn = MongoRunner.runMongod({dbpath: path1, nodur: "", smallfiles: ""});
 work();
 verify();
-stopMongod(30000);
+MongoRunner.stopMongod(conn);
 
 // durable version
 log("mongod dur");
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+conn = MongoRunner.runMongod({dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
 work();
 verify();
 
 // kill the process hard
 log("kill 9");
-stopMongod(30001, /*signal*/9);
+MongoRunner.stopMongod(conn.port, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
@@ -133,13 +133,13 @@ removeFile(path2 + "/test.0");
 removeFile(path2 + "/lsn");
 
 log("restart and recover");
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 9);
+conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 9});
 
 log("verify after recovery");
 verify();
 
 log("stop mongod 30002");
-stopMongod(30002);
+MongoRunner.stopMongod(conn);
 sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files

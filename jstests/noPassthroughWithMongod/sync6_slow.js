@@ -11,7 +11,7 @@ var test = new SyncCCTest("sync6", {logpath: bitbucket, logappend: ""});
 
 // Startup another process to handle our commands to the cluster, mostly so it's
 // easier to read.
-var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {});
+var commandConn = MongoRunner.runMongod({});
 
 // Up the log level for this test
 commandConn.getDB( "admin" ).runCommand( { setParameter : 1, logLevel : 0 } );
@@ -79,5 +79,5 @@ for ( var i = 4; i < 5; i++ ) {
 }
 }
 
-stopMongoProgram( 30004 );
+MongoRunner.stopMongod(commandConn);
 test.stop();

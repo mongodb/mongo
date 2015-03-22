@@ -5,7 +5,7 @@ SlowWeeklyMongod = function( name ) {
     
     this.start = new Date();
 
-    this.conn = startMongodEmpty("--port", this.port, "--dbpath", MongoRunner.dataPath + this.name , "--smallfiles", "--nojournal" );
+    this.conn = MongoRunner.runMongod({port: this.port, smallfiles: "", nojournal: ""});
 };
 
 SlowWeeklyMongod.prototype.getDB = function( name ) {
@@ -13,7 +13,7 @@ SlowWeeklyMongod.prototype.getDB = function( name ) {
 }
 
 SlowWeeklyMongod.prototype.stop = function(){
-    stopMongod( this.port );
+    MongoRunner.stopMongod( this.conn );
     var end = new Date();
     print( "slowWeekly test: " + this.name + " completed successfully in " + ( ( end.getTime() - this.start.getTime() ) / 1000 ) + " seconds" );
 };

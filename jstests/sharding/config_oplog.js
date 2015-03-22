@@ -19,12 +19,12 @@ assert.eq( true, oplogEntry.o.partitioned );
 
 test.stop();
 
-var conn = startMongodTest( 30001, "config_oplog", false, { configsvr : "", oplogSize : 2 } );
+var conn = MongoRunner.runMongod({configsvr: "", oplogSize: 2})
 stats = conn.getDB( "local" ).getCollection( "oplog.$main" ).stats();
 
 assert.eq( true, stats.capped );
 assert.eq( 2 * 1024 * 1024, stats.maxSize );
 
-stopMongoProgram( 30001 );
+MongoRunner.stopMongod(conn);
 
 print("END config_oplog.js");

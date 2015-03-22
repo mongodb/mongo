@@ -1,11 +1,8 @@
 // Check functioning of --quotaFiles parameter, including with respect to SERVER-3293 ('local' database).
 
-port = allocatePorts( 1 )[ 0 ];
-
 baseName = "jstests_disk_quota";
-dbpath = MongoRunner.dataPath + baseName;
 
-m = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--quotaFiles", "2", "--smallfiles" );
+var m = MongoRunner.runMongod({quotaFiles: 2, smallfiles: ""});
 db = m.getDB( baseName );
 
 big = new Array( 10000 ).toString();
@@ -18,7 +15,7 @@ while( !res.hasWriteError() ) {
 }
 
 dotTwoDataFile = baseName + ".2";
-files = listFiles( dbpath );
+files = listFiles( m.dbpath );
 for( i in files ) {
     // Since only one data file is allowed, a .0 file is expected and a .1 file may be preallocated (SERVER-3410) but no .2 file is expected.
     assert.neq( dotTwoDataFile, files[ i ].baseName );
@@ -33,7 +30,7 @@ for( i = 0; i < 10000; ++i ) {
     if ( i % 100 != 0 ) {
         continue;
     }
-    files = listFiles( dbpath );
+    files = listFiles( m.dbpath );
     for( f in files ) {
      	if ( files[ f ].baseName == dotTwoDataFile ) {
          	dotTwoFound = true;

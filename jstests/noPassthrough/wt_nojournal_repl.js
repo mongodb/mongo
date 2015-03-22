@@ -56,7 +56,7 @@ else {
     assert.commandWorked(secondary1.getDB("admin").runCommand({fsync : 1}));
 
     jsTestLog("kill -9 secondary 1");
-    stopMongod(secondary1.port, /*signal*/ 9);
+    MongoRunner.stopMongod(secondary1.port, /*signal*/ 9);
 
     jsTestLog("add some data to a new collection bar");
     for (var i=0; i<100; i++) {

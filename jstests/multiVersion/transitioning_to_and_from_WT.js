@@ -136,7 +136,7 @@
         assert.eq(0, ret);
 
         // stop previous mongod
-        stopMongod(toolTest.port);
+        MongoRunner.stopMongod(toolTest.port);
 
         // clear old node configuration info
         toolTest.m = null;

@@ -28,8 +28,7 @@ if ( ! _isWindows() ) {
     mkdir(path);
     var dataPath = MongoRunner.dataDir + "/sockpath_data";
     
-    var conn = new MongodRunner(ports[0], dataPath, null, null, ["--unixSocketPrefix", path]);
-    conn.start();
+    var conn = MongoRunner.runMongod({port: ports[0], dbpath: dataPath, unixSocketPrefix: path});
     
     var sock2 = new Mongo(path+"/mongodb-"+ports[0]+".sock");
     sockdb2 = sock2.getDB(db.getName())

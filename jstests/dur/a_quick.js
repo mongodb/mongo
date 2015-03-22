@@ -59,16 +59,16 @@ var path2 = MongoRunner.dataDir + "/quickdur";
 
 // non-durable version
 tst.log("start mongod without dur");
-var conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur");
+var conn = MongoRunner.runMongod({dbpath: path1, nodur: ""});
 tst.log("without dur work");
 var d = conn.getDB("test");
 assert.writeOK(d.foo.insert({ _id: 123 }));
 tst.log("stop without dur");
-stopMongod(30000);
+MongoRunner.stopMongod(conn);
 
 // durable version
 tst.log("start mongod with dur");
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--durOptions", 8);
+conn = MongoRunner.runMongod({dbpath: path2, dur: "", durOptions: 8});
 tst.log("with dur work");
 d = conn.getDB("test");
 assert.writeOK(d.foo.insert({ _id: 123 }));
@@ -81,7 +81,7 @@ sleep(8000);
 
 // kill the process hard
 tst.log("kill -9 mongod");
-stopMongod(30001, /*signal*/9);
+MongoRunner.stopMongod(conn.port, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
@@ -104,7 +104,7 @@ if (files.some(function (f) { return f.name.indexOf("lsn") >= 0; })) {
 
 // restart and recover
 tst.log("restart and recover");
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--durOptions", 9);
+conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", durOptions: 9});
 tst.log("check data results");
 d = conn.getDB("test");
 
@@ -115,7 +115,7 @@ if (!countOk) {
 }
 
 tst.log("stop");
-stopMongod(30002);
+MongoRunner.stopMongod(conn);
 
 // at this point, after clean shutdown, there should be no journal files
 tst.log("check no journal files");

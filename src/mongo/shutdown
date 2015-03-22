@@ -1,0 +1,321 @@
+client/dbclient.cpp:            clientSet->isntMaster();
+client/dbclient.cpp:                clientSet->isntMaster();
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:            vector<HostAndPort> hostList(_replSet->getHosts());
+client/dbclient_rs_test.cpp:                _replSet->kill(iter->toString(true));
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:            _replSet->kill(_replSet->getPrimary());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:            _replSet->kill(_replSet->getSecondaries().front());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts());
+client/dbclient_rs_test.cpp:        ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
+client/dbclient_rs_test.cpp:                mongo::MockReplicaSet::ReplConfigMap config = _replSet->getReplConfig();
+client/dbclient_rs_test.cpp:                    const string host(_replSet->getPrimary());
+client/dbclient_rs_test.cpp:                    _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
+client/dbclient_rs_test.cpp:                vector<string> secNodes = _replSet->getSecondaries();
+client/dbclient_rs_test.cpp:                    _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
+client/dbclient_rs_test.cpp:                    _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
+client/dbclient_rs_test.cpp:                    _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
+client/dbclient_rs_test.cpp:                    _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
+client/dbclient_rs_test.cpp:                _replSet->setConfig(config);
+client/dbclient_rs_test.cpp:        seedList.push_back(HostAndPort(replSet->getPrimary()));
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+client/dbclient_rs_test.cpp:        seedList.push_back(HostAndPort(replSet->getPrimary()));
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+client/dbclient_rs_test.cpp:        ReplicaSetMonitor::get(replSet->getSetName())->failedHost(dest);
+client/dbclient_rs_test.cpp:        seedList.push_back(HostAndPort(replSet->getPrimary()));
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+client/dbclient_rs_test.cpp:        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+client/dbclient_rs_test.cpp:            ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
+client/dbclient_rs_test.cpp:        seedList.push_back(HostAndPort(replSet->getPrimary()));
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+client/dbclient_rs_test.cpp:        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+client/dbclient_rs_test.cpp:            ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
+client/dbclient_rs_test.cpp:        seedList.push_back(HostAndPort(replSet->getPrimary()));
+client/dbclient_rs_test.cpp:        DBClientReplicaSet replConn(replSet->getSetName(), seedList);
+client/dbclient_rs_test.cpp:        ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
+client/dbclient_rs_test.cpp:        ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
+db/catalog/index_catalog.cpp:                    !repl::theReplSet->buildIndexes()) {
+db/client.cpp:        return repl::theReplSet->registerSlave(_remoteId, o["member"].Int());
+db/commands/auth_schema_upgrade_d.cpp:            const unsigned rsSelfId = repl::theReplSet->selfId();
+db/commands/auth_schema_upgrade_d.cpp:                repl::theReplSet->config().members;
+db/commands/auth_schema_upgrade_d.cpp:                const repl::Member* other = repl::theReplSet->findById(otherId);
+db/commands/get_last_error.cpp:                    if (electionId != repl::theReplSet->getElectionId()) {
+db/commands/get_last_error.cpp:                               << ", but our id is " << repl::theReplSet->getElectionId();
+db/commands/write_commands/batch_executor.cpp:                    response->setElectionId(repl::theReplSet->getElectionId());
+db/dbcommands.cpp:                repl::theReplSet->getConfig().members.size() > 1 &&
+db/dbcommands.cpp:                repl::theReplSet->isPrimary()) {
+db/dbcommands.cpp:            OpTime lastOp = repl::theReplSet->lastOpTimeWritten;
+db/dbcommands.cpp:            OpTime closest = repl::theReplSet->lastOtherOpTime();
+db/dbcommands.cpp:                lastOp = repl::theReplSet->lastOpTimeWritten;
+db/dbcommands.cpp:                closest = repl::theReplSet->lastOtherOpTime();
+db/dbcommands.cpp:            repl::theReplSet->stepDown(120);
+db/dbcommands.cpp:            lastOp = repl::theReplSet->lastOpTimeWritten;
+db/dbcommands.cpp:                closest = repl::theReplSet->lastOtherOpTime();
+db/dbcommands.cpp:        MaintenanceModeSetter() : maintenanceModeSet(repl::theReplSet->setMaintenanceMode(true))
+db/dbcommands.cpp:                repl::theReplSet->setMaintenanceMode(false);
+db/dbcommands.cpp:                && !repl::theReplSet->isSecondary()) {
+db/dbcommands.cpp:                                    repl::theReplSet->getElectionId());
+db/exec/2d.cpp:        WorkingSetID id = _workingSet->allocate();
+db/exec/2d.cpp:        WorkingSetMember* member = _workingSet->get(id);
+db/exec/2d.cpp:                WorkingSetID id = _workingSet->allocate();
+db/exec/2d.cpp:                WorkingSetMember* member = _workingSet->get(id);
+db/exec/2d.cpp:                _workingSet->flagForReview(id);
+db/exec/2dnear.cpp:                WorkingSetID id = _workingSet->allocate();
+db/exec/2dnear.cpp:                WorkingSetMember* member = _workingSet->get(id);
+db/exec/2dnear.cpp:        WorkingSetMember* member = _workingSet->get(*out);
+db/exec/2dnear.cpp:            WorkingSetMember* member = _workingSet->get(it->second);
+db/exec/collection_scan.cpp:        WorkingSetID id = _workingSet->allocate();
+db/exec/collection_scan.cpp:        WorkingSetMember* member = _workingSet->get(id);
+db/exec/collection_scan.cpp:            _workingSet->free(id);
+db/exec/distinct_scan.cpp:        WorkingSetID id = _workingSet->allocate();
+db/exec/distinct_scan.cpp:        WorkingSetMember* member = _workingSet->get(id);
+db/exec/index_scan.cpp:            WorkingSetID id = _workingSet->allocate();
+db/exec/index_scan.cpp:            WorkingSetMember* member = _workingSet->get(id);
+db/exec/keep_mutations.cpp:            _flaggedIterator = _workingSet->getFlagged().begin();
+db/exec/keep_mutations.cpp:        if (_flaggedIterator == _workingSet->getFlagged().end()) {
+db/exec/keep_mutations.cpp:        WorkingSetMember* member = _workingSet->get(idToTest);
+db/exec/keep_mutations.cpp:            _workingSet->free(idToTest);
+db/exec/oplogstart.cpp:            WorkingSetID id = _workingSet->allocate();
+db/exec/oplogstart.cpp:            WorkingSetMember* member = _workingSet->get(id);
+db/exec/oplogstart.cpp:        WorkingSetMember* member = _workingSet->get(*out);
+db/exec/oplogstart.cpp:            _workingSet->free(*out);
+db/exec/sort.cpp:            if (_dataSet->size() < limit) {
+db/exec/sort.cpp:                _dataSet->insert(item);
+db/exec/sort.cpp:            SortableDataItemSet::const_iterator lastItemIt = --(_dataSet->end());
+db/exec/sort.cpp:                _dataSet->erase(lastItemIt);
+db/exec/sort.cpp:                _dataSet->insert(item);
+db/exec/sort.cpp:            vector<SortableDataItem> newData(_dataSet->begin(), _dataSet->end());
+db/instance.cpp:            repl::theReplSet->shutdown();
+db/ops/modifier_table.cpp:            nameMap->insert(make_pair(StringData(entryAddToSet->name), entryAddToSet));
+db/ops/modifier_table.cpp:            nameMap->insert(make_pair(StringData(entrySet->name), entrySet));
+db/prefetch.cpp:                                                    repl::theReplSet->getIndexPrefetchConfig();
+db/query/plan_executor.cpp:                WorkingSetMember* member = _workingSet->get(id);
+db/query/plan_executor.cpp:                            _workingSet->free(id);
+db/query/plan_executor.cpp:                        _workingSet->free(id);
+db/query/plan_executor.cpp:                        _workingSet->free(id);
+db/query/plan_executor.cpp:                    _workingSet->free(id);
+db/repl/bgsync.cpp:        theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
+db/repl/bgsync.cpp:        MemberState state = theReplSet->state();
+db/repl/bgsync.cpp:        if (theReplSet->lastOpTimeWritten.isNull()) {
+db/repl/bgsync.cpp:                if (theReplSet->gotForceSync()) {
+db/repl/bgsync.cpp:                if (isAssumingPrimary() || theReplSet->isPrimary()) {
+db/repl/bgsync.cpp:        return theReplSet->shouldChangeSyncTarget(_currentSyncTarget->hbinfo().opTime);
+db/repl/bgsync.cpp:        while ((target = theReplSet->getMemberToSyncTo()) != NULL) {
+db/repl/bgsync.cpp:                theReplSet->veto(current);
+db/repl/bgsync.cpp:                theReplSet->veto(current, 600);
+db/repl/bgsync.cpp:            theReplSet->goStale(stale, oldest);
+db/repl/bgsync.cpp:                    theReplSet->syncRollback(r);
+db/repl/bgsync.cpp:            theReplSet->syncRollback(r);
+db/repl/bgsync.cpp:        _lastOpTimeFetched = theReplSet->lastOpTimeWritten;
+db/repl/bgsync.cpp:        _lastH = theReplSet->lastH;
+db/repl/consensus.cpp:            const Member* primary = theReplSet->box.getPrimary();
+db/repl/consensus.cpp:            const Member* hopeful = theReplSet->findById(id);
+db/repl/consensus.cpp:            const Member *highestPriority = theReplSet->getMostElectable();
+db/repl/consensus.cpp:            if (theReplSet->isPrimary() &&
+db/repl/consensus.cpp:                theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime) {
+db/repl/consensus.cpp:            if (!theReplSet->isElectable(id)) {
+db/repl/consensus.cpp:            if( cmdObj["set"].String() != theReplSet->name() ) {
+db/repl/consensus.cpp:            if( theReplSet->config().version > cfgver ) {
+db/repl/consensus.cpp:            else if( opTime < theReplSet->lastOpTimeWritten ||
+db/repl/consensus.cpp:                     opTime < theReplSet->lastOtherOpTime())  {
+db/repl/consensus.cpp:            result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+db/repl/consensus.cpp:            theReplSet->elect.electCmdReceived(cmdObj, &result);
+db/repl/consensus.cpp:        const OpTime ord = theReplSet->lastOpTimeWritten;
+db/repl/consensus.cpp:        verify( ord <= theReplSet->lastOpTimeWritten ); // <= as this may change while we are working...
+db/repl/consensus.cpp:            const OpTime ord = theReplSet->lastOpTimeWritten;
+db/repl/health.cpp:            s << td( a(q.str(), myMinValid, theReplSet->lastOpTimeWritten.toString()) );
+db/repl/health.cpp:                string s = theReplSet->hbmsg();
+db/repl/health.cpp:                    bb.appendTimestamp("electionTime", theReplSet->getElectionTime().asDate());
+db/repl/health.cpp:                    bb.appendDate("electionDate", theReplSet->getElectionTime().getSecs() * 1000LL);
+db/repl/heartbeat.cpp:                    errmsg = str::stream() << theReplSet->selfFullName() << " is blind";
+db/repl/heartbeat.cpp:            if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
+db/repl/heartbeat.cpp:            if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) {
+db/repl/heartbeat.cpp:            result.append("set", theReplSet->name());
+db/repl/heartbeat.cpp:            MemberState currentState = theReplSet->state();
+db/repl/heartbeat.cpp:                result.appendDate("electionTime", theReplSet->getElectionTime().asDate());
+db/repl/heartbeat.cpp:            result.append("e", theReplSet->iAmElectable());
+db/repl/heartbeat.cpp:            result.append("hbmsg", theReplSet->hbmsg());
+db/repl/heartbeat.cpp:            result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
+db/repl/heartbeat.cpp:            int v = theReplSet->config().version;
+db/repl/heartbeat.cpp:                result << "config" << theReplSet->config().asBson();
+db/repl/heartbeat.cpp:                    from = theReplSet->getMutableMember(cmdObj["fromId"].Int());
+db/repl/heartbeat.cpp:                from = theReplSet->findByName(cmdObj.getStringField("from"));
+db/repl/heartbeat.cpp:            theReplSet->mgr->send(stdx::bind(&ReplSet::msgUpdateHBRecv,
+db/repl/heartbeat.cpp:            me = theReplSet->selfId();
+db/repl/heartbeat.cpp:        mgr->send( stdx::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+db/repl/heartbeat.cpp:        theReplSet->syncSourceFeedback.go();
+db/repl/is_master.h:                return theReplSet->isPrimary();
+db/repl/manager.cpp:            theReplSet->addToElectable(rs->selfId());
+db/repl/manager.cpp:            theReplSet->rmFromElectable(rs->selfId());
+db/repl/manager.cpp:        const Member *highestPriority = theReplSet->getMostElectable();
+db/repl/member.cpp:        bool buildIndexes = theReplSet ? theReplSet->buildIndexes() : true;
+db/repl/oplog.cpp:                if( !(theReplSet->lastOpTimeWritten<ts) ) {
+db/repl/oplog.cpp:                          << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
+db/repl/oplog.cpp:                    if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+db/repl/oplog.cpp:                theReplSet->lastOpTimeWritten = ts;
+db/repl/oplog.cpp:                theReplSet->lastH = h;
+db/repl/oplog.cpp:            if (!theReplSet->box.getState().primary()) {
+db/repl/oplog.cpp:            hashNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
+db/repl/oplog.cpp:            if( !(theReplSet->lastOpTimeWritten<ts) ) {
+db/repl/oplog.cpp:                      << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
+db/repl/oplog.cpp:                if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+db/repl/oplog.cpp:            theReplSet->lastOpTimeWritten = ts;
+db/repl/oplog.cpp:            theReplSet->lastH = hashNew;
+db/repl/oplogreader.cpp:            cmd.append("member", theReplSet->selfId());
+db/repl/oplogreader.cpp:            cmd.append("config", theReplSet->myConfig().asBson());
+db/repl/oplogreader.cpp:            const Member* chainedMember = theReplSet->findById(nextOnChainId);
+db/repl/repl_reads_ok.cpp:                    theReplSet && theReplSet->isSecondary() );
+db/repl/repl_set_health_poll_task.cpp:            _timeout = theReplSet->config().getHeartbeatTimeout();
+db/repl/repl_set_health_poll_task.cpp:        theReplSet->mgr->send( stdx::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
+db/repl/repl_set_health_poll_task.cpp:            theReplSet->mgr->send( stdx::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+db/repl/repl_set_health_poll_task.cpp:            ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(),
+db/repl/repl_set_health_poll_task.cpp:                                  h.toString(), *info, theReplSet->config().version,
+db/repl/repl_set_health_poll_task.cpp:        theReplSet->rmFromElectable(mem.id());
+db/repl/repl_set_health_poll_task.cpp:        const Member* oldMemInfo = theReplSet->findById(mem.id());
+db/repl/repl_set_health_poll_task.cpp:        theReplSet->rmFromElectable(mem.id());
+db/repl/repl_set_health_poll_task.cpp:            const Member *member = theReplSet->findById(mem.id());
+db/repl/repl_set_health_poll_task.cpp:                theReplSet->addToElectable(mem.id());
+db/repl/repl_set_health_poll_task.cpp:                theReplSet->rmFromElectable(mem.id());
+db/repl/repl_set_health_poll_task.cpp:                 mem.opTime >= theReplSet->lastOpTimeWritten.getSecs() - 10) {
+db/repl/repl_set_health_poll_task.cpp:            unsigned lastOp = theReplSet->lastOtherOpTime().getSecs();
+db/repl/repl_set_health_poll_task.cpp:                theReplSet->addToElectable(mem.id());
+db/repl/repl_set_health_poll_task.cpp:            theReplSet->rmFromElectable(mem.id());
+db/repl/repl_set_health_poll_task.cpp:                stdx::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
+db/repl/repl_set_health_poll_task.cpp:            theReplSet->mgr->send(f);
+db/repl/repl_set_impl.cpp:                theReplSet->syncSourceFeedback.ensureMe();
+db/repl/repl_settings.cpp:            if( theReplSet == 0 || theReplSet->state().shunned() ) {
+db/repl/repl_settings.cpp:                theReplSet->fillIsMaster(result);
+db/repl/repl_settings.cpp:            result.appendTimestamp("latestOptime", theReplSet->lastOpTimeWritten.asDate());
+db/repl/repl_settings.cpp:                                   theReplSet->getEarliestOpTimeWritten().asDate());
+db/repl/replset_commands.cpp:            theReplSet->summarizeStatus(result);
+db/repl/replset_commands.cpp:            if( !force && !theReplSet->box.getState().primary() ) {
+db/repl/replset_commands.cpp:                if( !ReplSetConfig::legalChange(theReplSet->getConfig(), *newConfig, errmsg) ) {
+db/repl/replset_commands.cpp:                theReplSet->haveNewConfig(*newConfig, true);
+db/repl/replset_commands.cpp:            if( theReplSet->freeze(secs) ) {
+db/repl/replset_commands.cpp:            if( !theReplSet->box.getState().primary() ) {
+db/repl/replset_commands.cpp:                                        theReplSet->lastOpTimeWritten.getSecs());
+db/repl/replset_commands.cpp:                                        theReplSet->lastOtherElectableOpTime().getSecs());
+db/repl/replset_commands.cpp:            return theReplSet->stepDown(secs);
+db/repl/replset_commands.cpp:            if (!theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue())) {
+db/repl/replset_commands.cpp:                if (theReplSet->isPrimary()) {
+db/repl/replset_commands.cpp:            return theReplSet->forceSyncFrom(newTarget, errmsg, result);
+db/repl/replset_commands.cpp:                if (!theReplSet->isPrimary()) {
+db/repl/replset_commands.cpp:                    theReplSet->syncSourceFeedback.forwardSlaveHandshake();
+db/repl/replset_web_handler.cpp:                    theReplSet->getOplogDiagsAsHtml(_id, s);
+db/repl/replset_web_handler.cpp:                    theReplSet->summarizeAsHtml(txn, s);
+db/repl/resync.cpp:                if (theReplSet->isPrimary()) {
+db/repl/resync.cpp:                return theReplSet->resync(errmsg);
+db/repl/rs.cpp:        return theReplSet && theReplSet->isPrimary();
+db/repl/rs.cpp:            theReplSet->sethbmsg(s, level);
+db/repl/rs.cpp:            theReplSet->haveNewConfig(*config, false);
+db/repl/rs.cpp:                theReplSet->fatal();
+db/repl/rs.cpp:            ReplSetImpl::IndexPrefetchConfig ip = theReplSet->getIndexPrefetchConfig();
+db/repl/rs.cpp:            theReplSet->setIndexPrefetchConfig(prefetchConfig);
+db/repl/rs.h:        MemberState ms = theReplSet->state();
+db/repl/rs.h:        if (theReplSet->oplogVersion < 2) {
+db/repl/rs_config.cpp:            //theReplSet->lastOpTimeWritten = ??;
+db/repl/rs_config.cpp:            if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
+db/repl/rs_initialsync.cpp:            theReplSet->sethbmsg(m, 0);
+db/repl/rs_initialsync.cpp:            theReplSet->setInitialSyncFlag();
+db/repl/rs_initialsync.cpp:            theReplSet->setMinValid(minValid);
+db/repl/rs_initialsync.cpp:            theReplSet->clearInitialSyncFlag();
+db/repl/rs_initialsync.cpp:            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+db/repl/rs_initialsync.cpp:            theReplSet->initialSyncRequested = false;
+db/repl/rs_initiate.cpp:                        const Member* m = theReplSet->findById( i->_id );
+db/repl/rs_sync.cpp:            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+db/repl/rs_sync.cpp:            initialSyncRequested = theReplSet->initialSyncRequested;
+db/repl/rs_sync.cpp:            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+db/repl/rs_sync.cpp:            theReplSet->initialSyncRequested = true;
+db/repl/rs_sync.cpp:        theReplSet->syncThread();
+db/repl/sync_source_feedback.cpp:            sub.append("member", theReplSet->selfId());
+db/repl/sync_source_feedback.cpp:            sub.append("config", theReplSet->myConfig().asBson());
+db/repl/sync_source_feedback.cpp:        if (theReplSet->isPrimary()) {
+db/repl/sync_source_feedback.cpp:                    entry.append("config", theReplSet->myConfig().asBson());
+db/repl/sync_source_feedback.cpp:            MemberState state = theReplSet->state();
+db/repl/sync_tail.cpp:        threadpool::ThreadPool& prefetcherPool = theReplSet->getPrefetchPool();
+db/repl/sync_tail.cpp:        ThreadPool& writerPool = theReplSet->getWriterPool();
+db/repl/sync_tail.cpp:        std::vector< std::vector<BSONObj> > writerVectors(theReplSet->replWriterThreadCount);
+db/repl/sync_tail.cpp:            theReplSet->oplogVersion = 1;
+db/repl/sync_tail.cpp:            theReplSet->oplogVersion = version.Int();
+db/repl/sync_tail.cpp:                if (theReplSet->isPrimary()) {
+db/repl/sync_tail.cpp:                        boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+db/repl/sync_tail.cpp:                        if (theReplSet->initialSyncRequested) {
+db/repl/sync_tail.cpp:                    if (!theReplSet->isSecondary()) {
+db/repl/sync_tail.cpp:                        theReplSet->tryToGoLiveAsASecondary(&txn, minvalid);
+db/repl/sync_tail.cpp:                    if (theReplSet->config().members.size() == 1 &&
+db/repl/sync_tail.cpp:                        theReplSet->myConfig().potentiallyHot()) {
+db/repl/sync_tail.cpp:                        Manager* mgr = theReplSet->mgr;
+db/repl/sync_tail.cpp:                            mgr->send(stdx::bind(&Manager::msgCheckNewState, theReplSet->mgr));
+db/repl/sync_tail.cpp:                const int slaveDelaySecs = theReplSet->myConfig().slaveDelay;
+db/repl/sync_tail.cpp:            theReplSet->setMinValid(lastOp);
+db/repl/sync_tail.cpp:            if (!theReplSet->mgr) {
+db/repl/sync_tail.cpp:                // this updates theReplSet->lastOpTimeWritten
+db/repl/sync_tail.cpp:        int sd = theReplSet->myConfig().slaveDelay;
+db/repl/sync_tail.cpp:        if( sd && theReplSet->isSecondary() ) {
+db/repl/sync_tail.cpp:                        if( theReplSet->myConfig().slaveDelay != sd ) // reconf
+db/repl/sync_tail.cpp:        bool convertUpdatesToUpserts = theReplSet->oplogVersion > 1 ? true : false;
+db/repl/write_concern.cpp:                if (theReplSet && theReplSet->isPrimary()) {
+db/repl/write_concern.cpp:                    const Member* mem = theReplSet->findById(ident.obj["config"]["_id"].Int());
+db/repl/write_concern.cpp:                return replicatedToNum(op, theReplSet->config().getMajority());
+db/repl/write_concern.cpp:            map<string,ReplSetConfig::TagRule*>::const_iterator it = theReplSet->config().rules.find(wStr);
+db/repl/write_concern.cpp:                    it != theReplSet->config().rules.end());
+db/repl/write_concern.cpp:                result.push_back(theReplSet->myConfig().asBson());
+db/repl/write_concern.cpp:            if (theReplSet && !theReplSet->isPrimary()) {
+db/repl/write_concern.cpp:                theReplSet->syncSourceFeedback.updateMap(entry["_id"].OID(), ot);
+db/repl/write_concern.cpp:        if (theReplSet && !theReplSet->isPrimary()) {
+db/repl/write_concern.cpp:            theReplSet->syncSourceFeedback.updateMap(rid["_id"].OID(), lastOp);
+db/ttl.cpp:                        !repl::theReplSet->state().readable())
+dbtests/replica_set_monitor_test.cpp:        replSet->kill(replSet->getSecondaries());
+dbtests/replica_set_monitor_test.cpp:        const string replSetName(replSet->getSetName());
+dbtests/replica_set_monitor_test.cpp:        seedList.insert(HostAndPort(replSet->getPrimary()));
+dbtests/replica_set_monitor_test.cpp:        replSet->kill(replSet->getPrimary());
+dbtests/replica_set_monitor_test.cpp:        ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
+dbtests/replica_set_monitor_test.cpp:            mongo::MockReplicaSet::ReplConfigMap config = _replSet->getReplConfig();
+dbtests/replica_set_monitor_test.cpp:                const string host(_replSet->getPrimary());
+dbtests/replica_set_monitor_test.cpp:                const string host(_replSet->getSecondaries().front());
+dbtests/replica_set_monitor_test.cpp:            _replSet->setConfig(config);
+dbtests/replica_set_monitor_test.cpp:        seedList.insert(HostAndPort(replSet->getPrimary()));
+dbtests/replica_set_monitor_test.cpp:        ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+dbtests/replica_set_monitor_test.cpp:        const string secHost(replSet->getSecondaries().front());
+dbtests/replica_set_monitor_test.cpp:        replSet->kill(secHost);
+dbtests/replica_set_monitor_test.cpp:        ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
+dbtests/replica_set_monitor_test.cpp:        replSet->restore(secHost);
+dbtests/replica_set_monitor_test.cpp:        seedList.insert(HostAndPort(replSet->getPrimary()));
+dbtests/replica_set_monitor_test.cpp:        ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+dbtests/replica_set_monitor_test.cpp:        const string secHost(replSet->getSecondaries().front());
+dbtests/replica_set_monitor_test.cpp:        replSet->kill(secHost);
+dbtests/replica_set_monitor_test.cpp:        ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
+dbtests/replica_set_monitor_test.cpp:        replSet->restore(secHost);
+dbtests/replsettests.cpp:            repl::theReplSet->syncSourceFeedback.ensureMe();
+s/d_migrate.cpp:                    if (repl::theReplSet->config().getMajority() <= 1) {
+s/d_migrate.cpp:                                  << " majority: " << repl::theReplSet->config().getMajority()
+s/d_migrate.cpp:                replSetMajorityCount = repl::theReplSet->config().getMajority();

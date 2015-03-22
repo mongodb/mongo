@@ -68,21 +68,33 @@ if( debugging ) {
 var path = MongoRunner.dataPath + testname+"dur";
 
 log("run mongod with --dur");
-conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);
+conn = MongoRunner.runMongod({dbpath: path,
+                              dur: "",
+                              smallfiles: "",
+                              durOptions: 8 /*DurParanoid*/,
+                              master: "",
+                              oplogSize: 64});
 work();
 
 log("kill -9");
-stopMongod(30001, /*signal*/9);
+MongoRunner.stopMongod(conn, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 assert(listFiles(path + "/journal/").length > 0, "journal directory is unexpectantly empty after kill");
 
 // restart and recover
 log("restart mongod and recover");
-conn = startMongodNoReset("--port", 30002, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8, "--master", "--oplogSize", 64);
+conn = MongoRunner.runMongod({restart: true,
+                              cleanData: false,
+                              dbpath: path,
+                              dur: "",
+                              smallfiles: "",
+                              durOptions: 8,
+                              master: "",
+                              oplogSize: 64});
 verify();
 
-log("stopping mongod 30002");
-stopMongod(30002);
+log("stopping mongod " + conn.port);
+MongoRunner.stopMongod(conn);
 
 print(testname + " SUCCESS");

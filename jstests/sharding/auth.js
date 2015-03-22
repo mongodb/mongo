@@ -61,7 +61,7 @@ function runTest(s) {
     printjson(s.getDB("config").settings.find().toArray());
 
     print("restart mongos");
-    stopMongoProgram(31000);
+    MongoRunner.stopMongos(31000);
     var opts = { port : 31000, v : 2, configdb : s._configDB, keyFile : "jstests/libs/key1", chunkSize : 1 };
     var conn = startMongos( opts );
     s.s = s._mongos[0] = s["s0"] = conn;
