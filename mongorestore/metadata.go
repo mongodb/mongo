@@ -81,6 +81,12 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 		}
 	}
 
+	// parse the values of options fields, to support extended json
+	meta.Options, err = bsonutil.GetExtendedBsonD(meta.Options)
+	if err != nil {
+		return nil, nil, fmt.Errorf("extended json in 'options': %v", err)
+	}
+
 	return meta.Options, meta.Indexes, nil
 }
 
