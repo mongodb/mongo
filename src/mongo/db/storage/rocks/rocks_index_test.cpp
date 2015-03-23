@@ -40,12 +40,13 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/db/storage/rocks/rocks_engine.h"
-#include "mongo/db/storage/rocks/rocks_index.h"
-#include "mongo/db/storage/rocks/rocks_recovery_unit.h"
-#include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+
+#include "rocks_engine.h"
+#include "rocks_index.h"
+#include "rocks_recovery_unit.h"
+#include "rocks_transaction.h"
 
 namespace mongo {
 

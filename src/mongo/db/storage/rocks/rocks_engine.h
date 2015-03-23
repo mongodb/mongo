@@ -33,6 +33,7 @@
 #include <map>
 #include <string>
 #include <memory>
+#include <unordered_set>
 
 #include <boost/optional.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -40,13 +41,15 @@
 #include <boost/thread/mutex.hpp>
 
 #include <rocksdb/cache.h>
+#include <rocksdb/rate_limiter.h>
 #include <rocksdb/status.h>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/util/string_map.h"
+
+#include "rocks_transaction.h"
 
 namespace rocksdb {
     class ColumnFamilyHandle;
@@ -103,11 +106,7 @@ namespace mongo {
 
         virtual bool isDurable() const override { return _durable; }
 
-        virtual int64_t getIdentSize(OperationContext* opCtx,
-                                      const StringData& ident) {
-          // TODO: return correct size.
-          return 1;
-        }
+        virtual int64_t getIdentSize(OperationContext* opCtx, const StringData& ident);
 
         virtual Status repairIdent(OperationContext* opCtx,
                                     const StringData& ident) {
@@ -129,6 +128,12 @@ namespace mongo {
         rocksdb::DB* getDB() { return _db.get(); }
         const rocksdb::DB* getDB() const { return _db.get(); }
         size_t getBlockCacheUsage() const { return _block_cache->GetUsage(); }
+        std::unordered_set<uint32_t> getDroppedPrefixes() const;
+
+        RocksTransactionEngine* getTransactionEngine() { return &_transactionEngine; }
+
+        int getMaxWriteMBPerSec() const { return _maxWriteMBPerSec; }
+        void setMaxWriteMBPerSec(int maxWriteMBPerSec);
 
     private:
         Status _createIdentPrefix(const StringData& ident);
@@ -139,6 +144,8 @@ namespace mongo {
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
         std::shared_ptr<rocksdb::Cache> _block_cache;
+        int _maxWriteMBPerSec;
+        std::shared_ptr<rocksdb::RateLimiter> _rateLimiter;
 
         const bool _durable;
 
@@ -146,15 +153,20 @@ namespace mongo {
         mutable boost::mutex _identPrefixMapMutex;
         typedef StringMap<uint32_t> IdentPrefixMap;
         IdentPrefixMap _identPrefixMap;
+        std::string _oplogIdent;
 
         // protected by _identPrefixMapMutex
         uint32_t _maxPrefix;
+
+        // set of all prefixes that are deleted. we delete them in the background thread
+        mutable boost::mutex _droppedPrefixesMutex;
+        std::unordered_set<uint32_t> _droppedPrefixes;
 
         // This is for concurrency control
         RocksTransactionEngine _transactionEngine;
 
         static const std::string kMetadataPrefix;
+        static const std::string kDroppedPrefix;
     };
 
-    Status toMongoStatus( rocksdb::Status s );
 }

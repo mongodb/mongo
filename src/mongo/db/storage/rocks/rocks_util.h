@@ -29,6 +29,9 @@
 #pragma once
 
 #include <string>
+#include <rocksdb/status.h>
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -44,5 +47,25 @@ namespace mongo {
         }
         return nextPrefix;
     }
+
+    Status rocksToMongoStatus_slow(const rocksdb::Status& status, const char* prefix);
+
+    /**
+     * converts rocksdb status to mongodb status
+     */
+    inline Status rocksToMongoStatus(const rocksdb::Status& status, const char* prefix = NULL) {
+        if (MONGO_likely(status.ok())) {
+            return Status::OK();
+        }
+        return rocksToMongoStatus_slow(status, prefix);
+    }
+
+#define invariantRocksOK(expression) do { \
+        auto _invariantRocksOK_status = expression; \
+        if (MONGO_unlikely(!_invariantRocksOK_status.ok())) { \
+            invariantOKFailed(#expression, rocksToMongoStatus(_invariantRocksOK_status), \
+                              __FILE__, __LINE__); \
+        } \
+    } while (false)
 
 }  // namespace mongo

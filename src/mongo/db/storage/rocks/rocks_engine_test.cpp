@@ -38,8 +38,9 @@
 
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
-#include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/unittest/temp_dir.h"
+
+#include "rocks_engine.h"
 
 namespace mongo {
     class RocksEngineHarnessHelper : public KVHarnessHelper {

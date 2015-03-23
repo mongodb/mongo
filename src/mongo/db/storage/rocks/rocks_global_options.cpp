@@ -31,9 +31,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/storage/rocks/rocks_global_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/constraints.h"
+
+#include "rocks_global_options.h"
 
 namespace mongo {
 
@@ -52,6 +53,14 @@ namespace mongo {
                                        "[none|snappy|zlib]")
             .format("(:?none)|(:?snappy)|(:?zlib)", "(none/snappy/zlib)")
             .setDefault(moe::Value(std::string("snappy")));
+        rocksOptions
+            .addOptionChaining(
+                 "storage.rocksdb.maxWriteMBPerSec", "rocksdbMaxWriteMBPerSec", moe::Int,
+                 "Maximum speed that RocksDB will write to storage. Reducing this can "
+                 "help reduce read latency spikes during compactions. However, reducing this "
+                 "below a certain point might slow down writes. Defaults to 1GB/sec")
+            .validRange(1, 1024)
+            .setDefault(moe::Value(1024));
         rocksOptions.addOptionChaining("storage.rocksdb.configString", "rocksdbConfigString",
                                        moe::String,
                                        "RocksDB storage engine custom "
@@ -70,6 +79,11 @@ namespace mongo {
             rocksGlobalOptions.compression =
                 params["storage.rocksdb.compression"].as<std::string>();
             log() << "Compression: " << rocksGlobalOptions.compression;
+        }
+        if (params.count("storage.rocksdb.maxWriteMBPerSec")) {
+            rocksGlobalOptions.maxWriteMBPerSec =
+                params["storage.rocksdb.maxWriteMBPerSec"].as<int>();
+            log() << "MaxWriteMBPerSec: " << rocksGlobalOptions.maxWriteMBPerSec;
         }
         if (params.count("storage.rocksdb.configString")) {
             rocksGlobalOptions.configString =

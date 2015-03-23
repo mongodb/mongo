@@ -41,11 +41,12 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/rocks/rocks_record_store.h"
-#include "mongo/db/storage/rocks/rocks_recovery_unit.h"
-#include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/unittest/temp_dir.h"
+
+#include "rocks_record_store.h"
+#include "rocks_recovery_unit.h"
+#include "rocks_transaction.h"
 
 namespace mongo {
 
@@ -203,7 +204,6 @@ namespace mongo {
         return res;
     }
 
-    // TODO remove from here once mongo made the test generic
     TEST(RocksRecordStoreTest, OplogHack) {
         RocksRecordStoreHarnessHelper harnessHelper;
         scoped_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("local.oplog.foo"));

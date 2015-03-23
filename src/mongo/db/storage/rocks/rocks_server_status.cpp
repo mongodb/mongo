@@ -31,8 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/rocks/rocks_server_status.h"
-#include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "rocks_server_status.h"
 
 #include "boost/scoped_ptr.hpp"
 
@@ -40,9 +39,12 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+
+#include "rocks_recovery_unit.h"
+#include "rocks_engine.h"
+#include "rocks_transaction.h"
 
 namespace mongo {
     using std::string;
@@ -62,7 +64,7 @@ namespace mongo {
     }  // namespace
 
     RocksServerStatusSection::RocksServerStatusSection(RocksEngine* engine)
-        : ServerStatusSection("RocksDB"), _engine(engine) {}
+        : ServerStatusSection("rocksdb"), _engine(engine) {}
 
     bool RocksServerStatusSection::includeByDefault() const { return true; }
 
@@ -108,6 +110,10 @@ namespace mongo {
         }
         bob.append("total-live-recovery-units", RocksRecoveryUnit::getTotalLiveRecoveryUnits());
         bob.append("block-cache-usage", PrettyPrintBytes(_engine->getBlockCacheUsage()));
+        bob.append("transaction-engine-keys",
+                   static_cast<long long>(_engine->getTransactionEngine()->numKeysTracked()));
+        bob.append("transaction-engine-snapshots",
+                   static_cast<long long>(_engine->getTransactionEngine()->numActiveSnapshots()));
 
         return bob.obj();
     }

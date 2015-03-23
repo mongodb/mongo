@@ -27,31 +27,23 @@
  */
 
 
-#include <iostream>
+#include "rocks_util.h"
 
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
-
-#include "rocks_global_options.h"
+#include <string>
+#include <rocksdb/status.h>
 
 namespace mongo {
 
-    MONGO_MODULE_STARTUP_OPTIONS_REGISTER(RocksOptions)(InitializerContext* context) {
-        return rocksGlobalOptions.add(&moe::startupOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_VALIDATE(RocksOptions)(InitializerContext* context) {
-        return Status::OK();
-    }
-
-    MONGO_STARTUP_OPTIONS_STORE(RocksOptions)(InitializerContext* context) {
-        Status ret = rocksGlobalOptions.store(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+    Status rocksToMongoStatus_slow(const rocksdb::Status& status, const char* prefix) {
+        if (status.ok()) {
+            return Status::OK();
         }
-        return Status::OK();
+
+        if (status.IsCorruption()) {
+            return Status(ErrorCodes::BadValue, status.ToString());
+        }
+
+        return Status(ErrorCodes::InternalError, status.ToString());
     }
-}
+
+}  // namespace mongo

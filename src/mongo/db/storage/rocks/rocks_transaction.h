@@ -37,12 +37,17 @@
 
 #include <boost/thread/mutex.hpp>
 
+#include "mongo/base/string_data.h"
+
 namespace mongo {
     class RocksTransaction;
 
     class RocksTransactionEngine {
     public:
         RocksTransactionEngine();
+
+        size_t numKeysTracked();
+        size_t numActiveSnapshots();
 
     private:
         // REQUIRES: transaction engine lock locked
@@ -84,13 +89,13 @@ namespace mongo {
         // * snapshot ID of the last commit to this key
         // * an iterator pointing to the corresponding entry in _keysSortedBySnapshot. This is used
         // to update the list at the same time as we update the _keyInfo
-        // TODO optimize these structures to store only one key instead of two
         typedef std::list<std::pair<std::string, uint64_t>> KeysSortedBySnapshotList;
         typedef std::list<std::pair<std::string, uint64_t>>::iterator KeysSortedBySnapshotListIter;
         KeysSortedBySnapshotList _keysSortedBySnapshot;
         // map of key -> pair{seq_id, pointer to corresponding _keysSortedBySnapshot}
-        std::unordered_map<std::string, std::pair<uint64_t, KeysSortedBySnapshotListIter>> _keyInfo;
-
+        // key is a StringData and it points to the actual string in _keysSortedBySnapshot
+        std::unordered_map<StringData, std::pair<uint64_t, KeysSortedBySnapshotListIter>,
+                           StringData::Hasher> _keyInfo;
         std::unordered_map<std::string, uint64_t> _uncommittedTransactionId;
 
         // this list is sorted

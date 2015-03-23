@@ -42,12 +42,13 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage/rocks/rocks_engine.h"
-#include "mongo/db/storage/rocks/rocks_record_store.h"
-#include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+
+#include "rocks_engine.h"
+#include "rocks_record_store.h"
+#include "rocks_recovery_unit.h"
 
 namespace mongo {
 
@@ -59,7 +60,7 @@ namespace mongo {
         class RocksRecordStoreThread : public BackgroundJob {
         public:
             RocksRecordStoreThread(const NamespaceString& ns)
-                : _ns(ns) {
+                : BackgroundJob(true /* deleteSelf */), _ns(ns) {
                 _name = std::string("RocksRecordStoreThread for ") + _ns.toString();
             }
 
@@ -123,11 +124,9 @@ namespace mongo {
                         // If we removed 0 documents, sleep a bit in case we're on a laptop
                         // or something to be nice.
                         sleepmillis(1000);
-                    }
-                    else if(removed < 1000) {
-                        // 1000 is the batch size, so we didn't even do a full batch,
-                        // which is the most efficient.
-                        sleepmillis(10);
+                    } else {
+                        // wake up every 100ms
+                        sleepmillis(100);
                     }
                 }
 

@@ -29,9 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/rocks/rocks_engine.h"
-#include "mongo/db/storage/rocks/rocks_server_status.h"
-
 #include "mongo/base/init.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage_options.h"
@@ -39,10 +36,15 @@
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include "rocks_engine.h"
+#include "rocks_server_status.h"
+#include "rocks_parameters.h"
+
 namespace mongo {
-    const std::string kRocksDBEngineName = "RocksDB";
+    const std::string kRocksDBEngineName = "rocksdb";
 
     namespace {
+
         class RocksFactory : public StorageEngine::Factory {
         public:
             virtual ~RocksFactory(){}
@@ -56,6 +58,7 @@ namespace mongo {
                 auto engine = new RocksEngine(params.dbpath + "/db", params.dur);
                 // Intentionally leaked.
                 auto leaked __attribute__((unused)) = new RocksServerStatusSection(engine);
+                auto leaked2 __attribute__((unused)) = new RocksRateLimiterServerParameter(engine);
 
                 return new KVStorageEngine(engine, options);
             }
@@ -106,7 +109,11 @@ namespace mongo {
             // and mongorestore.
             // * Version 1 was the format with many column families -- one column family for each
             // collection and index
-            // * Version 2 (current) keeps all collections and indexes in a single column family
+            // * Version 2 keeps all collections and indexes in a single column family
+            // * Version 3 (current) reserves two prefixes for oplog. one prefix keeps the oplog
+            // documents and another only keeps keys. That way, we can cleanup the oplog without
+            // reading full documents
+            // oplog cleanup
             const int kRocksFormatVersion = 2;
             const std::string kRocksFormatVersionString = "rocksFormatVersion";
         };

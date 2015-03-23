@@ -75,6 +75,7 @@ namespace mongo {
     };
 
     class RocksRecoveryUnit;
+    class RocksOplogKeyTracker;
 
     class RocksRecordStore : public RecordStore {
     public:
@@ -88,7 +89,7 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
 
-        virtual long long dataSize(OperationContext* txn) const { return _dataSize.load(); }
+        virtual long long dataSize(OperationContext* txn) const;
 
         virtual long long numRecords( OperationContext* txn ) const;
 
@@ -167,11 +168,8 @@ namespace mongo {
 
         virtual Status oplogDiskLocRegister(OperationContext* txn, const OpTime& opTime);
 
-        virtual void updateStatsAfterRepair(OperationContext* txn,
-                                            long long numRecords,
-                                            long long dataSize) {
-            // TODO
-        }
+        virtual void updateStatsAfterRepair(OperationContext* txn, long long numRecords,
+                                            long long dataSize);
 
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
           _cappedDeleteCallback = cb;
@@ -187,6 +185,8 @@ namespace mongo {
         static rocksdb::Comparator* newRocksCollectionComparator();
 
     private:
+        // we just need to expose _makePrefixedKey to RocksOplogKeyTracker
+        friend class RocksOplogKeyTracker;
         // NOTE: RecordIterator might outlive the RecordStore. That's why we use all those
         // shared_ptrs
         class Iterator : public RecordIterator {
@@ -207,7 +207,6 @@ namespace mongo {
             void _locate(const RecordId& loc);
             RecordId _decodeCurr() const;
             bool _forward() const;
-            void _checkStatus();
 
             OperationContext* _txn;
             rocksdb::DB* _db; // not owned
@@ -220,12 +219,6 @@ namespace mongo {
             RecordId _lastLoc;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
-
-        /**
-         * Returns a new ReadOptions struct, containing the snapshot held in opCtx, if opCtx is not
-         * null
-         */
-        static rocksdb::ReadOptions _readOptions(OperationContext* opCtx = NULL);
 
         static RecordId _makeRecordId( const rocksdb::Slice& slice );
 
@@ -254,7 +247,14 @@ namespace mongo {
         int _cappedDeleteCheckCount;      // see comment in ::cappedDeleteAsNeeded
 
         const bool _isOplog;
-        int _oplogCounter;
+        // nullptr iff _isOplog == false
+        RocksOplogKeyTracker* _oplogKeyTracker;
+        // SeekToFirst() on an oplog is an expensive operation because bunch of keys at the start
+        // are deleted. To reduce the overhead, we remember the next key to delete and seek directly
+        // to it. This will not work correctly if somebody inserted a key before this
+        // _oplogNextToDelete. However, we prevent this from happening by using
+        // _cappedVisibilityManager and checking isCappedHidden() during deletions
+        RecordId _oplogNextToDelete;
 
         boost::shared_ptr<CappedVisibilityManager> _cappedVisibilityManager;
 

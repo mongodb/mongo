@@ -53,14 +53,15 @@ namespace mongo {
     public:
         RocksIndexBase(rocksdb::DB* db, std::string prefix, std::string ident, Ordering order);
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                           bool dupsAllowed) = 0;
 
         virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
                                   BSONObjBuilder* output) const;
 
         virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output,
                                        double scale) const {
-            // TODO
+            // nothing to say here, really
             return false;
         }
 
@@ -81,6 +82,10 @@ namespace mongo {
 
         // used to construct RocksCursors
         const Ordering _order;
+
+        class StandardBulkBuilder;
+        class UniqueBulkBuilder;
+        friend class UniqueBulkBuilder;
     };
 
     class RocksUniqueIndex : public RocksIndexBase {
@@ -94,6 +99,9 @@ namespace mongo {
         virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
+
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                           bool dupsAllowed) override;
     };
 
     class RocksStandardIndex : public RocksIndexBase {
@@ -110,6 +118,9 @@ namespace mongo {
             // dupKeyCheck shouldn't be called for non-unique indexes
             invariant(false);
         }
+
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                           bool dupsAllowed) override;
     };
 
 } // namespace mongo

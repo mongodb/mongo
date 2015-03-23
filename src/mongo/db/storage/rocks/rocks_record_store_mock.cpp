@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/rocks/rocks_engine.h"
+#include "rocks_engine.h"
 
 namespace mongo {
 
