@@ -214,9 +214,10 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::commitAndRestart() {
-        invariant( _depth == 0 );
-        if ( _active ) {
-            _txnClose( true );
+        invariant(_depth == 0);
+        if (_active) {
+            // Can't be in a WriteUnitOfWork, so safe to rollback
+            _txnClose(false);
         }
     }
 
