@@ -287,10 +287,14 @@ namespace mongo {
                 return PlanStage::NEED_TIME;
             }
 
-            verify(member->hasLoc());
-            verify(_dataMap.end() == _dataMap.find(member->loc));
-
-            _dataMap[member->loc] = id;
+            if (!_dataMap.insert(std::make_pair(member->loc, id)).second) {
+                // Didn't insert because we already had this loc inside the map. This should only
+                // happen if we're seeing a newer copy of the same doc in a more recent snapshot.
+                // Throw out the newer copy of the doc.
+                _ws->free(id);
+                ++_commonStats.needTime;
+                return PlanStage::NEED_TIME;
+            }
 
             // Update memory stats.
             _memUsage += member->getMemUsage();
