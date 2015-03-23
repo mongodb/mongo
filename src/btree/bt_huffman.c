@@ -137,6 +137,7 @@ __huffman_confchk_file(
     WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v, int *is_utf8p, FILE **fpp)
 {
 	FILE *fp;
+	WT_DECL_RET;
 	size_t len;
 	char *fname;
 
@@ -156,7 +157,7 @@ __huffman_confchk_file(
 
 	/* Check the file exists. */
 	WT_RET(__wt_strndup(session, v->str + len, v->len - len, &fname));
-	WT_RET(__wt_fopen(session, fname, "r", WT_FOPEN_FIXED, &fp));
+	WT_ERR(__wt_fopen(session, fname, "r", WT_FOPEN_FIXED, &fp));
 
 	/* Optionally return the file handle. */
 	if (fpp == NULL)
@@ -164,7 +165,9 @@ __huffman_confchk_file(
 	else
 		*fpp = fp;
 
-	return (0);
+err:	__wt_free(session, fname);
+
+	return (ret);
 }
 
 /*
