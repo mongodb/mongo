@@ -41,14 +41,11 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
 		__m128i res_eq, res_less, u, t;
-		uint8_t *val_res_eq, *val_res_less;
-		u_int j;
-
-		remainder = len % WT_VECTOR_SIZE;
-		len -= remainder;
 
 		userp = (uint8_t *)user_item->data;
 		treep = (uint8_t *)tree_item->data;
+		remainder = len % WT_VECTOR_SIZE;
+		len -= remainder;
 		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
@@ -71,10 +68,13 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 			}
 
 		if (len != 0) {
+			uint8_t *val_res_eq, *val_res_less;
+			u_int j;
+
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
-			for (j = 0; j < WT_VECTOR_SIZE; j++) {
+			for (j = 0;; j++) {
 				if (val_res_eq[j] == 0)
 					return (val_res_less[j] == 0 ? 1 : -1);
 			}
@@ -140,14 +140,11 @@ __wt_lex_compare_skip(
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
 		__m128i res_eq, res_less, u, t;
-		uint8_t *val_res_eq, *val_res_less;
-		u_int j;
-
-		remainder = len % WT_VECTOR_SIZE;
-		len -= remainder;
 
 		userp = (uint8_t *)user_item->data + *matchp;
 		treep = (uint8_t *)tree_item->data + *matchp;
+		remainder = len % WT_VECTOR_SIZE;
+		len -= remainder;
 		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
@@ -172,10 +169,13 @@ __wt_lex_compare_skip(
 			}
 
 		if (len != 0) {
+			uint8_t *val_res_eq, *val_res_less;
+			u_int j;
+
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
-			for (j = 0; j < WT_VECTOR_SIZE; j++) {
+			for (j = 0;; j++) {
 				if (val_res_eq[j] == 0)
 					return (val_res_less[j] == 0 ? 1 : -1);
 				++*matchp;
