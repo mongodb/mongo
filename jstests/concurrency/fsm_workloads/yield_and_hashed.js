@@ -5,9 +5,6 @@
  *
  * Intersperse queries which use the AND_HASH stage with updates and deletes of documents they may
  * match.
- * This test workload is blacklisted until SERVER-17119 is resolved. Updates during the AND_HASHED
- * stage can cause a verify to fail in WiredTiger since it doesn't expect to see the same doc
- * twice during the phase.
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield_rooted_or.js'); // for $config
