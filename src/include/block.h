@@ -218,7 +218,7 @@ struct __wt_block {
 	SLIST_ENTRY(__wt_block) hashl;	/* Hashed list of handles */
 
 	/* Configuration information, set when the file is opened. */
-	int	 allocfirst;		/* Allocation is first-fit */
+	uint32_t allocfirst;		/* Allocation is first-fit */
 	uint32_t allocsize;		/* Allocation size */
 	size_t	 os_cache;		/* System buffer cache flush max */
 	size_t	 os_cache_max;
@@ -239,7 +239,6 @@ struct __wt_block {
 	int		ckpt_inprogress;/* Live checkpoint in progress */
 
 				/* Compaction support */
-	int	allocfirst_save;	/* Saved: allocation is first-fit */
 	int	compact_pct_tenths;	/* Percent to compact */
 
 				/* Salvage support */

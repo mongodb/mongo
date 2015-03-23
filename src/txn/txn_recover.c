@@ -304,6 +304,7 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_LSN lsn;
+	intmax_t offset;
 	uint32_t fileid;
 
 	WT_RET(__wt_config_getones(r->session, config, "id", &cval));
@@ -325,8 +326,10 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 	/* If there is checkpoint logged for the file, apply everything. */
 	if (cval.type != WT_CONFIG_ITEM_STRUCT)
 		WT_INIT_LSN(&lsn);
-	else if (sscanf(cval.str, "(%" PRIu32 ",%" PRIdMAX ")",
-	    &lsn.file, (intmax_t*)&lsn.offset) != 2)
+	else if (sscanf(cval.str,
+	    "(%" SCNu32 ",%" SCNdMAX ")", &lsn.file, &offset) == 2)
+		lsn.offset = offset;
+	else
 		WT_RET_MSG(r->session, EINVAL,
 		    "Failed to parse checkpoint LSN '%.*s'",
 		    (int)cval.len, cval.str);

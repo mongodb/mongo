@@ -97,7 +97,7 @@ __handler_failure(WT_SESSION_IMPL *session,
 
 	(void)snprintf(s, sizeof(s),
 	    "application %s event handler failed: %s",
-	    which, wiredtiger_strerror(error));
+	    which, __wt_strerror(session, error, NULL, 0));
 
 	/*
 	 * Use the error handler to report the failure, unless it was the error
@@ -175,7 +175,8 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	if (session == NULL)
 		return (fprintf(stderr, "WiredTiger Error%s%s: ",
 		    error == 0 ? "" : ": ",
-		    error == 0 ? "" : wiredtiger_strerror(error)) < 0 ||
+		    error == 0 ? "" :
+		    __wt_strerror(session, error, NULL, 0)) < 0 ||
 		    vfprintf(stderr, fmt, ap) < 0 ||
 		    fprintf(stderr, "\n") < 0 ||
 		    fflush(stderr) != 0 ? __wt_errno() : 0);
@@ -249,7 +250,7 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		 * Use strcmp to compare: both strings are nul-terminated, and
 		 * we don't want to run past the end of the buffer.
 		 */
-		err = wiredtiger_strerror(error);
+		err = __wt_strerror(session, error, NULL, 0);
 		len = strlen(err);
 		if (WT_PTRDIFF(p, s) < len || strcmp(p - len, err) != 0) {
 			remain = WT_PTRDIFF(end, p);

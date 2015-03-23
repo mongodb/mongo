@@ -14,13 +14,13 @@ typedef CONDITION_VARIABLE	wt_cond_t;
 typedef CRITICAL_SECTION	wt_mutex_t;
 typedef HANDLE			wt_thread_t;
 
+#if _MSC_VER < 1900
 /* Timespec is a POSIX structure not defined in Windows */
 struct timespec {
 	time_t tv_sec;		/* seconds */
 	long   tv_nsec;		/* nanoseconds */
 };
-
-#define	strncasecmp _strnicmp
+#endif
 
 /*
  * Windows Portability stuff

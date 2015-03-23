@@ -118,8 +118,8 @@ static CONFIG c[] = {
 
 	{ "compression",
 	  "type of compression "
-	  "(none | bzip | bzip-raw | lzo | snappy | zlib | zlib-noraw)",
-	  C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
+	  "(none | bzip | bzip-raw | lz4 | lzo | snappy | zlib | zlib-noraw)",
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_compression },
 
 	{ "data_extend",
 	  "if data files are extended",				/* 5% */
@@ -206,10 +206,6 @@ static CONFIG c[] = {
 	  "if log file pre-allocation configured",		/* 50% */
 	  C_BOOL, 50, 0, 0, &g.c_logging_prealloc, NULL },
 
-	{ "logging",
-	  "if logging configured",				/* 30% */
-	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
-
 	{ "lsm_worker_threads",
 	  "the number of LSM worker threads",
 	  0x0, 3, 4, 20, &g.c_lsm_worker_threads, NULL },
@@ -263,8 +259,8 @@ static CONFIG c[] = {
 	  C_BOOL, 5, 0, 0, &g.c_statistics_server, NULL },
 
 	{ "threads",
-	  "the number of threads",
-	  C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
+	  "the number of worker threads",
+	  0x0, 1, 32, 128, &g.c_threads, NULL },
 
 	{ "timer",
 	  "maximum time to run in minutes (default 20 minutes)",

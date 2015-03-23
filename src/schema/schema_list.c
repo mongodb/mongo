@@ -139,6 +139,15 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
 {
 	WT_DECL_RET;
 
+	/* If there is a custom collator configured, terminate it. */
+	if (idx->collator != NULL &&
+	    idx->collator_owned && idx->collator->terminate != NULL) {
+		WT_TRET(idx->collator->terminate(
+		    idx->collator, &session->iface));
+		idx->collator = NULL;
+		idx->collator_owned = 0;
+	}
+
 	/* If there is a custom extractor configured, terminate it. */
 	if (idx->extractor != NULL &&
 	    idx->extractor_owned && idx->extractor->terminate != NULL) {

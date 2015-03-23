@@ -300,7 +300,7 @@ __wt_turtle_update(
 	    session, WT_METADATA_TURTLE_SET, 1, 1, WT_FILE_TYPE_TURTLE, &fh));
 
 	version = wiredtiger_version(&vmajor, &vminor, &vpatch);
-	WT_ERR(__wt_scr_alloc(session, 1000, &buf));
+	WT_ERR(__wt_scr_alloc(session, 2 * 1024, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s\n%s\n%s\n" "major=%d,minor=%d,patch=%d\n%s\n%s\n",
 	    WT_METADATA_VERSION_STR, version,
@@ -312,9 +312,7 @@ __wt_turtle_update(
 	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
 		WT_ERR(__wt_fsync(session, fh));
 
-	ret = __wt_close(session, fh);
-	fh = NULL;
-	WT_ERR(ret);
+	WT_ERR(__wt_close(session, &fh));
 
 	WT_ERR(
 	    __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
@@ -326,8 +324,7 @@ __wt_turtle_update(
 err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
 	}
 
-	if  (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_close(session, &fh));
 	__wt_scr_free(session, &buf);
 	return (ret);
 }

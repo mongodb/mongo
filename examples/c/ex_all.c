@@ -33,8 +33,8 @@
  *	fragments.
  */
 
-#include <assert.h>
-#include <errno.h>
+#include <sys/stat.h>
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +45,6 @@
 #else
 #include "windows_shim.h"
 #endif
-#include <sys/stat.h>
 
 #include <wiredtiger.h>
 
@@ -346,7 +345,8 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_key(cursor, key);
 	if ((ret = cursor->remove(cursor)) != 0) {
 		fprintf(stderr,
-		    "cursor.remove: %s\n", wiredtiger_strerror(ret));
+		    "cursor.remove: %s\n",
+		    cursor->session->strerror(cursor->session, ret));
 		return (ret);
 	}
 	/*! [Display an error] */
@@ -575,6 +575,13 @@ session_ops(WT_SESSION *session)
 	    "table:mytable",
 	    "block_compressor=bzip2,key_format=S,value_format=S");
 	/*! [Create a bzip2 compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
+
+	/*! [Create a lz4 compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=lz4,key_format=S,value_format=S");
+	/*! [Create a lz4 compressed table] */
 	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a snappy compressed table] */
@@ -935,7 +942,6 @@ pack_ops(WT_SESSION *session)
 	size_t size;
 	ret = wiredtiger_struct_size(session, &size, "iSh", 42, "hello", -3);
 	/*! [Get the packed size] */
-	assert(size < 100);
 	}
 
 	{
@@ -988,7 +994,7 @@ backup(WT_SESSION *session)
 		ret = 0;
 	if (ret != 0)
 		fprintf(stderr, "%s: cursor next(backup:) failed: %s\n",
-		    progname, wiredtiger_strerror(ret));
+		    progname, session->strerror(session, ret));
 
 	ret = cursor->close(cursor);
 	/*! [backup]*/
@@ -1037,6 +1043,14 @@ main(void)
 	    "create,"
 	    "extensions=[/usr/local/lib/libwiredtiger_bzip2.so]", &conn);
 	/*! [Configure bzip2 extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure lz4 extension] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/libwiredtiger_lz4.so]", &conn);
+	/*! [Configure lz4 extension] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 

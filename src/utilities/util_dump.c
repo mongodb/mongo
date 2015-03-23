@@ -9,21 +9,21 @@
 #include "util.h"
 
 static int dump_config(WT_SESSION *, const char *, int);
-static int dump_json_begin(void);
-static int dump_json_end(void);
-static int dump_json_separator(void);
+static int dump_json_begin(WT_SESSION *);
+static int dump_json_end(WT_SESSION *);
+static int dump_json_separator(WT_SESSION *);
 static int dump_json_table_begin(
     WT_SESSION *, WT_CURSOR *, const char *, const char *);
-static int dump_json_table_cg(WT_SESSION *, WT_CURSOR *,
-    const char *, const char *, const char *, const char *);
+static int dump_json_table_cg(
+    WT_SESSION *, WT_CURSOR *, const char *, const char *, const char *);
 static int dump_json_table_config(WT_SESSION *, const char *);
-static int dump_json_table_end(void);
-static int dump_prefix(int);
-static int dump_record(WT_CURSOR *, const char *, int, int);
-static int dump_suffix(void);
+static int dump_json_table_end(WT_SESSION *);
+static int dump_prefix(WT_SESSION *, int);
+static int dump_record(WT_CURSOR *, int, int);
+static int dump_suffix(WT_SESSION *);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
-static int dump_table_config_type(WT_SESSION *,
-    WT_CURSOR *, WT_CURSOR *, const char *, const char *, const char *);
+static int dump_table_config_type(
+    WT_SESSION *, WT_CURSOR *, WT_CURSOR *, const char *, const char *);
 static int dup_json_string(const char *, char **);
 static int print_config(WT_SESSION *, const char *, const char *, const char *);
 static int usage(void);
@@ -46,8 +46,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			break;
 		case 'f':			/* output file */
 			if (freopen(__wt_optarg, "w", stdout) == NULL)
-				return (
-				    util_err(errno, "%s: reopen", __wt_optarg));
+				return (util_err(
+				    session, errno, "%s: reopen", __wt_optarg));
 			break;
 		case 'j':
 			json = 1;
@@ -77,18 +77,18 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	if (argc < 1 || (argc != 1 && !json))
 		return (usage());
 
-	if (json && (ret = dump_json_begin()) != 0)
+	if (json && (ret = dump_json_begin(session)) != 0)
 		goto err;
 
 	for (i = 0; i < argc; i++) {
 		if (json && i > 0)
-			if ((ret = dump_json_separator()) != 0)
+			if ((ret = dump_json_separator(session)) != 0)
 				goto err;
 		if (name != NULL) {
 			free(name);
 			name = NULL;
 		}
-		if ((name = util_name(argv[i], "table")) == NULL)
+		if ((name = util_name(session, argv[i], "table")) == NULL)
 			goto err;
 
 		if (json && dump_json_table_config(session, name) != 0)
@@ -115,16 +115,16 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		if ((ret = session->open_cursor(
 		    session, name, NULL, config, &cursor)) != 0) {
 			fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-			    progname, name, wiredtiger_strerror(ret));
+			    progname, name, session->strerror(session, ret));
 			goto err;
 		}
 
-		if ((ret = dump_record(cursor, name, reverse, json)) != 0)
+		if ((ret = dump_record(cursor, reverse, json)) != 0)
 			goto err;
-		if (json && (ret = dump_json_table_end()) != 0)
+		if (json && (ret = dump_json_table_end(session)) != 0)
 			goto err;
 	}
-	if (json && ((ret = dump_json_end()) != 0))
+	if (json && ((ret = dump_json_end(session)) != 0))
 		goto err;
 
 	if (0) {
@@ -154,7 +154,7 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 	if ((ret = session->open_cursor(
 	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
+		    progname, WT_METADATA_URI, session->strerror(session, ret));
 		return (1);
 	}
 	/*
@@ -164,17 +164,17 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 	 */
 	cursor->set_key(cursor, uri);
 	if ((ret = cursor->search(cursor)) == 0) {
-		if (dump_prefix(hex) != 0 ||
+		if (dump_prefix(session, hex) != 0 ||
 		    dump_table_config(session, cursor, uri) != 0 ||
-		    dump_suffix() != 0)
+		    dump_suffix(session) != 0)
 			ret = 1;
 	} else if (ret == WT_NOTFOUND)
-		ret = util_err(0, "%s: No such object exists", uri);
+		ret = util_err(session, 0, "%s: No such object exists", uri);
 	else
-		ret = util_err(ret, "%s", uri);
+		ret = util_err(session, ret, "%s", uri);
 
 	if ((tret = cursor->close(cursor)) != 0) {
-		tret = util_cerr(uri, "close", tret);
+		tret = util_cerr(cursor, "close", tret);
 		if (ret == 0)
 			ret = tret;
 	}
@@ -187,10 +187,10 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
  *	Output the dump file header prefix.
  */
 static int
-dump_json_begin(void)
+dump_json_begin(WT_SESSION *session)
 {
 	if (printf("{\n") < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (0);
 }
 
@@ -199,10 +199,10 @@ dump_json_begin(void)
  *	Output the dump file header suffix.
  */
 static int
-dump_json_end(void)
+dump_json_end(WT_SESSION *session)
 {
 	if (printf("\n}\n") < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (0);
 }
 
@@ -211,10 +211,10 @@ dump_json_end(void)
  *	Output the dump file header prefix.
  */
 static int
-dump_json_separator(void)
+dump_json_separator(WT_SESSION *session)
 {
 	if (printf(",\n") < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (0);
 }
 
@@ -241,29 +241,29 @@ dump_json_table_begin(
 
 	if ((ret = 
 	    __wt_session_create_strip(session, config, NULL, &stripped)) != 0)
-		return (util_err(ret, NULL));
+		return (util_err(session, ret, NULL));
 	ret = dup_json_string(stripped, &jsonconfig);
 	free(stripped);
 	if (ret != 0)
-		return (util_cerr(uri, "config dup", ret));
+		return (util_cerr(cursor, "config dup", ret));
 	if (printf("    \"%s\" : [\n        {\n", uri) < 0)
 		goto eio;
 	if (printf("            \"config\" : \"%s\",\n", jsonconfig) < 0)
 		goto eio;
 
 	if ((ret = dump_json_table_cg(
-	    session, cursor, uri, name, "colgroup:", "colgroups")) == 0) {
+	    session, cursor, name, "colgroup:", "colgroups")) == 0) {
 		if (printf(",\n") < 0)
 			goto eio;
 		ret = dump_json_table_cg(
-		    session, cursor, uri, name, "index:", "indices");
+		    session, cursor, name, "index:", "indices");
 	}
 
 	if (printf("\n        },\n        {\n            \"data\" : [") < 0)
 		goto eio;
 
 	if (0) {
-eio:		ret = util_err(EIO, NULL);
+eio:		ret = util_err(session, EIO, NULL);
 	}
 
 	free(jsonconfig);
@@ -276,7 +276,7 @@ eio:		ret = util_err(EIO, NULL);
  */
 static int
 dump_json_table_cg(WT_SESSION *session, WT_CURSOR *cursor,
-    const char *uri, const char *name, const char *entry, const char *header)
+    const char *name, const char *entry, const char *header)
 {
 	WT_DECL_RET;
 	const char *key, *skip, *value;
@@ -286,14 +286,14 @@ dump_json_table_cg(WT_SESSION *session, WT_CURSOR *cursor,
 
 	once = 0;
 	if (printf("            \"%s\" : [", header) < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 
 	/*
 	 * For table dumps, we're done.
 	 */
 	if (cursor == NULL) {
 		if (printf("]") < 0)
-			return (util_err(EIO, NULL));
+			return (util_err(session, EIO, NULL));
 		else
 			return (0);
 	}
@@ -307,13 +307,13 @@ dump_json_table_cg(WT_SESSION *session, WT_CURSOR *cursor,
 	if ((ret = cursor->search_near(cursor, &exact)) != 0) {
 		if (ret == WT_NOTFOUND)
 			return (0);
-		return (util_cerr(uri, "search_near", ret));
+		return (util_cerr(cursor, "search_near", ret));
 	}
 	if (exact >= 0)
 		goto match;
 	while ((ret = cursor->next(cursor)) == 0) {
 match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(uri, "get_key", ret));
+			return (util_cerr(cursor, "get_key", ret));
 
 		/* Check if we've finished the list of entries. */
 		if (!WT_PREFIX_MATCH(key, entry))
@@ -327,15 +327,15 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 
 		/* Get the value. */
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(uri, "get_value", ret));
+			return (util_cerr(cursor, "get_value", ret));
 
 		if ((ret = __wt_session_create_strip(
 		    session, value, NULL, &stripped)) != 0)
-			return (util_err(ret, NULL));
+			return (util_err(session, ret, NULL));
 		ret = dup_json_string(stripped, &jsonconfig);
 		free(stripped);
 		if (ret != 0)
-			return (util_cerr(uri, "config dup", ret));
+			return (util_cerr(cursor, "config dup", ret));
 		ret = printf("%s\n"
 		    "%s{\n"
 		    "%s    \"uri\" : \"%s\",\n"
@@ -345,15 +345,15 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 		    indent, indent, key, indent, jsonconfig, indent);
 		free(jsonconfig);
 		if (ret < 0)
-			return (util_err(EIO, NULL));
+			return (util_err(session, EIO, NULL));
 
 		once = 1;
 	}
 	if (printf("%s]", (once == 0 ? "" : "\n            ")) < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	if (ret == 0 || ret == WT_NOTFOUND)
 		return (0);
-	return (util_cerr(uri, "next", ret));
+	return (util_cerr(cursor, "next", ret));
 }
 
 /*
@@ -376,7 +376,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 		    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 			fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
 			    progname, WT_METADATA_URI,
-			    wiredtiger_strerror(ret));
+			    session->strerror(session, ret));
 			return (1);
 		}
 
@@ -389,17 +389,18 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 		cursor->set_key(cursor, uri);
 		if ((ret = cursor->search(cursor)) == 0) {
 			if ((ret = cursor->get_value(cursor, &value)) != 0)
-				ret = util_cerr(uri, "get_value", ret);
+				ret = util_cerr(cursor, "get_value", ret);
 			else if (dump_json_table_begin(
 			    session, cursor, uri, value) != 0)
 				ret = 1;
 		} else if (ret == WT_NOTFOUND)
-			ret = util_err(0, "%s: No such object exists", uri);
+			ret = util_err(
+			    session, 0, "%s: No such object exists", uri);
 		else
-			ret = util_err(ret, "%s", uri);
+			ret = util_err(session, ret, "%s", uri);
 
 		if ((tret = cursor->close(cursor)) != 0) {
-			tret = util_cerr(uri, "close", tret);
+			tret = util_cerr(cursor, "close", tret);
 			if (ret == 0)
 				ret = tret;
 		}
@@ -421,9 +422,10 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 			    session, NULL, uri, value) != 0)
 				ret = 1;
 		} else if (ret == WT_NOTFOUND)
-			ret = util_err(0, "%s: No such object exists", uri);
+			ret = util_err(
+			    session, 0, "%s: No such object exists", uri);
 		else
-			ret = util_err(ret, "%s", uri);
+			ret = util_err(session, ret, "%s", uri);
 	}
 
 	return (ret);
@@ -434,10 +436,10 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
  *	Output the JSON syntax that ends a table.
  */
 static int
-dump_json_table_end(void)
+dump_json_table_end(WT_SESSION *session)
 {
 	if (printf("            ]\n        }\n    ]") < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (0);
 }
 
@@ -466,11 +468,11 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	 */
 	cursor->set_key(cursor, uri);
 	if ((ret = cursor->search(cursor)) != 0)
-		return (util_cerr(uri, "search", ret));
+		return (util_cerr(cursor, "search", ret));
 	if ((ret = cursor->get_key(cursor, &key)) != 0)
-		return (util_cerr(uri, "get_key", ret));
+		return (util_cerr(cursor, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
-		return (util_cerr(uri, "get_value", ret));
+		return (util_cerr(cursor, "get_value", ret));
 	if (print_config(session, key, value, NULL) != 0)
 		return (1);
 
@@ -480,15 +482,15 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	 */
 	if ((ret =
 	    session->open_cursor(session, NULL, cursor, NULL, &srch)) != 0)
-		return (util_cerr(uri, "open_cursor", ret));
+		return (util_cerr(cursor, "open_cursor", ret));
 
 	if ((ret = dump_table_config_type(
-	    session, cursor, srch, uri, name, "colgroup:")) == 0)
+	    session, cursor, srch, name, "colgroup:")) == 0)
 		ret = dump_table_config_type(
-		    session, cursor, srch, uri, name, "index:");
+		    session, cursor, srch, name, "index:");
 
 	if ((tret = srch->close(srch)) != 0) {
-		tret = util_cerr(uri, "close", tret);
+		tret = util_cerr(cursor, "close", tret);
 		if (ret == 0)
 			ret = tret;
 	}
@@ -502,8 +504,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
  */
 static int
 dump_table_config_type(WT_SESSION *session,
-    WT_CURSOR *cursor, WT_CURSOR *srch,
-    const char *uri, const char *name, const char *entry)
+    WT_CURSOR *cursor, WT_CURSOR *srch, const char *name, const char *entry)
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
@@ -520,13 +521,13 @@ dump_table_config_type(WT_SESSION *session,
 	if ((ret = cursor->search_near(cursor, &exact)) != 0) {
 		if (ret == WT_NOTFOUND)
 			return (0);
-		return (util_cerr(uri, "search_near", ret));
+		return (util_cerr(cursor, "search_near", ret));
 	}
 	if (exact >= 0)
 		goto match;
 	while ((ret = cursor->next(cursor)) == 0) {
 match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(uri, "get_key", ret));
+			return (util_cerr(cursor, "get_key", ret));
 
 		/* Check if we've finished the list of entries. */
 		if (!WT_PREFIX_MATCH(key, entry))
@@ -540,39 +541,40 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 
 		/* Get the value. */
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(uri, "get_value", ret));
+			return (util_cerr(cursor, "get_value", ret));
 
 		/* Crack it and get the underlying source. */
 		if ((ret = __wt_config_getones(
 		    (WT_SESSION_IMPL *)session, value, "source", &cval)) != 0)
-			return (util_err(ret, "%s: source entry", key));
+			return (
+			    util_err(session, ret, "%s: source entry", key));
 
 		/* Nul-terminate the source entry. */
 		if ((p = malloc(cval.len + 10)) == NULL)
-			return (util_err(errno, NULL));
+			return (util_err(session, errno, NULL));
 		(void)strncpy(p, cval.str, cval.len);
 		p[cval.len] = '\0';
 		srch->set_key(srch, p);
 		if ((ret = srch->search(srch)) != 0)
-			ret = util_err(ret, "%s: %s", key, p);
+			ret = util_err(session, ret, "%s: %s", key, p);
 		free(p);
 		if (ret != 0)
 			return (1);
 
 		/* Get the source's value. */
 		if ((ret = srch->get_value(srch, &value_source)) != 0)
-			return (util_cerr(uri, "get_value", ret));
+			return (util_cerr(cursor, "get_value", ret));
 
 		/*
 		 * The dumped configuration string is the original key plus the
 		 * source's configuration.
 		 */
 		if (print_config(session, key, value, value_source) != 0)
-			return (util_err(EIO, NULL));
+			return (util_err(session, EIO, NULL));
 	}
 	if (ret == 0 || ret == WT_NOTFOUND)
 		return (0);
-	return (util_cerr(uri, "next", ret));
+	return (util_cerr(cursor, "next", ret));
 }
 
 /*
@@ -580,7 +582,7 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
  *	Output the dump file header prefix.
  */
 static int
-dump_prefix(int hex)
+dump_prefix(WT_SESSION *session, int hex)
 {
 	int vmajor, vminor, vpatch;
 
@@ -591,7 +593,7 @@ dump_prefix(int hex)
 	    vmajor, vminor, vpatch) < 0 ||
 	    printf("Format=%s\n", hex ? "hex" : "print") < 0 ||
 	    printf("Header\n") < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (0);
 }
 
@@ -601,11 +603,14 @@ dump_prefix(int hex)
  *	with JSON formatting if needed.
  */
 static int
-dump_record(WT_CURSOR *cursor, const char *name, int reverse, int json)
+dump_record(WT_CURSOR *cursor, int reverse, int json)
 {
 	WT_DECL_RET;
+	WT_SESSION *session;
 	const char *infix, *key, *prefix, *suffix, *value;
 	int once;
+
+	session = cursor->session;
 
 	once = 0;
 	if (json) {
@@ -620,18 +625,18 @@ dump_record(WT_CURSOR *cursor, const char *name, int reverse, int json)
 	while ((ret =
 	    (reverse ? cursor->prev(cursor) : cursor->next(cursor))) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(name, "get_key", ret));
+			return (util_cerr(cursor, "get_key", ret));
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(name, "get_value", ret));
+			return (util_cerr(cursor, "get_value", ret));
 		if (printf("%s%s%s%s%s%s", (json && once) ? "," : "",
 		    prefix, key, infix, value, suffix) < 0)
-			return (util_err(EIO, NULL));
+			return (util_err(session, EIO, NULL));
 		once = 1;
 	}
 	if (json && once && printf("\n") < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (ret == WT_NOTFOUND ? 0 :
-	    util_cerr(name, (reverse ? "prev" : "next"), ret));
+	    util_cerr(cursor, (reverse ? "prev" : "next"), ret));
 }
 
 /*
@@ -639,10 +644,10 @@ dump_record(WT_CURSOR *cursor, const char *name, int reverse, int json)
  *	Output the dump file header suffix.
  */
 static int
-dump_suffix(void)
+dump_suffix(WT_SESSION *session)
 {
 	if (printf("Data\n") < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (0);
 }
 
@@ -696,11 +701,11 @@ print_config(WT_SESSION *session,
 	}
 
 	if ((ret = __wt_session_create_strip(session, v1, v2, &value_ret)) != 0)
-		return (util_err(ret, NULL));
+		return (util_err(session, ret, NULL));
 	ret = printf("%s\n%s\n", key, value_ret);
 	free((char *)value_ret);
 	if (ret < 0)
-		return (util_err(EIO, NULL));
+		return (util_err(session, EIO, NULL));
 	return (0);
 }
 

@@ -182,8 +182,8 @@ struct __wt_lsm_tree {
 
 	uint64_t dsk_gen;
 
-	long ckpt_throttle;		/* Rate limiting due to checkpoints */
-	long merge_throttle;		/* Rate limiting due to merges */
+	uint64_t ckpt_throttle;		/* Rate limiting due to checkpoints */
+	uint64_t merge_throttle;	/* Rate limiting due to merges */
 	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
 	struct timespec last_flush_ts;	/* Timestamp last flush finished */
 	struct timespec work_push_ts;	/* Timestamp last work unit added */

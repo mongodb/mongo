@@ -135,6 +135,10 @@ with the HyperDex product, and specify \c rocksdb to build a version of the
 LevelDB API compatible with applications using Facebook's RocksDB
 engine. See @ref leveldb for more information.
 
+@par \c --enable-lz4
+Configure WiredTiger for <a href="https://github.com/Cyan4973/lz4">LZ4</a>
+compression; see @ref compression for more information.
+
 @par \c --enable-python
 Build the WiredTiger <a href="http://www.python.org">Python</a> API.
 
@@ -153,7 +157,7 @@ compression; see @ref compression for more information.
 @par <code>--with-builtins</code>
 Configure WiredTiger to include support for extensions in the main library.
 This avoids requiring additional libraries for supported extensions. Currently
-supported options are \c snappy and \c zlib.
+supported options are \c lz4, \c snappy and \c zlib.
 
 @par <code>--with-python-prefix</code>
 Configure WiredTiger to install Python libraries to a non-standard Python

@@ -165,9 +165,12 @@ w = textwrap.TextWrapper(width=64, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
 def checkstr(c):
-    '''Generate the JSON string used by __wt_config_check to validate the
-    config string'''
+    '''Generate the function reference and JSON string used by __wt_config_check
+       to validate the config string'''
     checks = c.flags
+    cfunc = str(checks.get('func', ''))
+    if not cfunc:
+        cfunc = 'NULL';
     cmin = str(checks.get('min', ''))
     cmax = str(checks.get('max', ''))
     choices = checks.get('choices', [])
@@ -180,9 +183,9 @@ def checkstr(c):
         result.append('choices=' + '[' +
             ','.join('\\"' + s + '\\"' for s in choices) + ']')
     if result:
-        return '"' + ','.join(result) + '"'
+        return cfunc + ', "' + ','.join(result) + '"'
     else:
-        return 'NULL'
+        return cfunc + ', NULL'
 
 def get_default(c):
     t = gettype(c)
@@ -206,7 +209,7 @@ def add_subconfig(c):
     tfile.write('''
 static const WT_CONFIG_CHECK confchk_%(name)s_subconfigs[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL, NULL }
 };
 ''' % {
     'name' : c.name,
@@ -230,7 +233,7 @@ for name in sorted(api_data.methods.keys()):
         tfile.write('''
 static const WT_CONFIG_CHECK confchk_%(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL, NULL }
 };
 ''' % {
     'name' : name.replace('.', '_'),

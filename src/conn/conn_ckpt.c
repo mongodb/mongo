@@ -31,7 +31,7 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	 * Checkpoints based on log size also require logging be enabled.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
-	conn->ckpt_usecs = (long)cval.val * 1000000;
+	conn->ckpt_usecs = (uint64_t)cval.val * 1000000;
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
 	conn->ckpt_logsize = (wt_off_t)cval.val;
 	__wt_log_written_reset(session);

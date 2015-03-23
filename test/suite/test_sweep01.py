@@ -40,11 +40,11 @@ import wttest
 class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     tablebase = 'test_sweep01'
     uri = 'table:' + tablebase
-    numfiles = 500
-    numkv = 100
+    numfiles = 50
+    numkv = 1000
     ckpt_list = [
         ('off', dict(ckpt=0)),
-        ('on', dict(ckpt=20)),
+        ('on', dict(ckpt=10)),
     ]
 
     types = [
@@ -56,14 +56,18 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
-    scenarios = number_scenarios(prune_scenarios(multiply_scenarios('.', types, ckpt_list), 1, 100))
+    scenarios = number_scenarios(
+        prune_scenarios(multiply_scenarios('.', types, ckpt_list), 1, 100))
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
+        # Configure sweep to run every 2 seconds with a 6 second timeout.
+        # That matches the ratio of the default 10 and 30 seconds.
         conn_params = \
                 ',create,error_prefix="%s: ",' % self.shortid() + \
+                'file_manager=(close_idle_time=6,close_scan_interval=2),' + \
                 'checkpoint=(wait=%d),' % self.ckpt + \
                 'statistics=(fast),'
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
@@ -104,9 +108,9 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
         # Inactive time on a handle must be a minute or more.
-        # At some point the sweep thread will run and set the time of death
-        # to be a minute later.  So sleep 2 minutes to make sure it has run
-        # enough times to timeout the handles.
+        # We've configured the sweep server to run every 2 seconds and idle
+        # time to be 6 seconds. It should take at most 8 seconds for a handle
+        # to be closed. Sleep for 12 seconds to be safe.
         uri = '%s.test' % self.uri
         self.session.create(uri, self.create_params)
         #
@@ -117,13 +121,13 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep=0
-        while sleep < 120:
+        while sleep < 12:
             k = k+1
             c.set_key(k)
             c.set_value(1)
             c.insert()
-            sleep += 10
-            time.sleep(10)
+            sleep += 2
+            time.sleep(2)
         c.close()
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)

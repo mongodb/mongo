@@ -580,9 +580,9 @@ __create_data_source(WT_SESSION_IMPL *session,
 	 * data source doesn't have access to the functions that check.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
-	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	WT_RET(__wt_struct_confchk(session, &cval));
 	WT_RET(__wt_config_gets(session, cfg, "value_format", &cval));
-	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	WT_RET(__wt_struct_confchk(session, &cval));
 
 	/*
 	 * User-specified collators aren't supported for data-source objects.

@@ -45,14 +45,13 @@ err:	__wt_free(session, cond);
  *	Wait on a mutex, optionally timing out.
  */
 int
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
+__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 {
 	struct timespec ts;
 	WT_DECL_RET;
 	int locked;
 
 	locked = 0;
-	WT_ASSERT(session, usecs >= 0);
 
 	/* Fast path if already signalled. */
 	if (WT_ATOMIC_ADD4(cond->waiters, 1) == 0)
@@ -73,8 +72,10 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 
 	if (usecs > 0) {
 		WT_ERR(__wt_epoch(session, &ts));
-		ts.tv_sec += (ts.tv_nsec + 1000 * usecs) / WT_BILLION;
-		ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
+		ts.tv_sec += (time_t)
+		    (((uint64_t)ts.tv_nsec + 1000 * usecs) / WT_BILLION);
+		ts.tv_nsec = (long)
+		    (((uint64_t)ts.tv_nsec + 1000 * usecs) % WT_BILLION);
 		ret = pthread_cond_timedwait(&cond->cond, &cond->mtx, &ts);
 	} else
 		ret = pthread_cond_wait(&cond->cond, &cond->mtx);

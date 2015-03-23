@@ -40,7 +40,7 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	case 0:
 		break;
 	case 1:
-		if ((name = util_name(*argv, "table")) == NULL)
+		if ((name = util_name(session, *argv, "table")) == NULL)
 			return (1);
 		break;
 	default:
@@ -78,7 +78,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 			return (0);
 
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
+		    progname, WT_METADATA_URI, session->strerror(session, ret));
 		return (1);
 	}
 
@@ -86,7 +86,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 	while ((ret = cursor->next(cursor)) == 0) {
 		/* Get the key. */
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr("metadata", "get_key", ret));
+			return (util_cerr(cursor, "get_key", ret));
 
 		/*
 		 * If a name is specified, only show objects that match.
@@ -113,13 +113,12 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 			return (ret);
 		if (vflag) {
 			if ((ret = cursor->get_value(cursor, &value)) != 0)
-				return (
-				    util_cerr("metadata", "get_value", ret));
+				return (util_cerr(cursor, "get_value", ret));
 			printf("%s\n", value);
 		}
 	}
 	if (ret != WT_NOTFOUND)
-		return (util_cerr("metadata", "next", ret));
+		return (util_cerr(cursor, "next", ret));
 	if (!found) {
 		fprintf(stderr, "%s: %s: not found\n", progname, name);
 		return (1);

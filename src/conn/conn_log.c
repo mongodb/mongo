@@ -46,7 +46,6 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_NAMED_COMPRESSOR *ncomp;
 
 	conn = S2C(session);
 
@@ -62,17 +61,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	 */
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
-	if (cval.len > 0) {
-		TAILQ_FOREACH(ncomp, &conn->compqh, q)
-			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
-				conn->log_compressor = ncomp->compressor;
-				break;
-			}
-		if (conn->log_compressor == NULL)
-			WT_RET_MSG(session, EINVAL,
-			    "unknown log compressor '%.*s'",
-			    (int)cval.len, cval.str);
-	}
+	WT_RET(__wt_compressor_config(session, &cval, &conn->log_compressor));
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
@@ -327,7 +316,7 @@ __log_close_server(void *arg)
 			WT_ERR(__wt_fsync(session, close_fh));
 			__wt_spin_lock(session, &log->log_sync_lock);
 			locked = 1;
-			WT_ERR(__wt_close(session, close_fh));
+			WT_ERR(__wt_close(session, &close_fh));
 			log->sync_lsn = close_end_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 			locked = 0;
