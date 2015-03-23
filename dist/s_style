@@ -33,7 +33,8 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 done
 
 # Return of 0 in functions after a jump to the error label.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.[ci]' |
+	sed -e '/3rdparty/d'`; do
 	file_parse $f |
 	egrep -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
 	egrep '[^a-z_]err:.*return \(0\);' |
@@ -48,7 +49,9 @@ done
 for f in \
     `find bench examples ext src test -name '*.[chisy]' -o -name '*.in' |
     sed -e '/Makefile.in/d' \
+	-e '/3rdparty/d' \
 	-e '/build_win\/wiredtiger_config.h/d'`; do
+
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t
@@ -188,6 +191,7 @@ test -s $t && {
 # Check for common typos (Wikipedia's list).
 find bench examples ext src test \
     -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
+    sed -e '/3rdparty/d' |
 xargs egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' > $t
 	test -s $t && {
 		echo "paired typo"

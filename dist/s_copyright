@@ -82,6 +82,7 @@ for i in `cd .. &&
         -e '/api\/leveldb\/hyperleveldb\//d' \
         -e '/api\/leveldb\/leveldb\//d' \
         -e '/api\/leveldb\/rocksdb\//d' \
+        -e '/include\/3rdparty\//d' \
         -e '/test\/3rdparty\//d' \
         -e '/tools\/wtperf_stats\/3rdparty\//d' \
 	-e 's/^\.\///'`

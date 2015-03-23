@@ -331,6 +331,7 @@ struct __wt_update;
 #include "txn.i"			/* required by btree.i */
 
 #include "btree.i"			/* required by cursor.i */
+#include "btree_cmp.i"
 #include "cursor.i"
 
 #include "bitstring.i"
