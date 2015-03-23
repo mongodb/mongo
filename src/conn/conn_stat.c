@@ -303,7 +303,8 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		WT_RET(__wt_fclose(session, &log_file, 1));
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
-		WT_RET(__wt_fopen(session, tmp->mem, "a", 0, &log_file));
+		WT_RET(__wt_fopen(
+		    session, tmp->mem, "a", WT_FOPEN_FIXED, &log_file));
 	}
 	conn->stat_fp = log_file;
 
