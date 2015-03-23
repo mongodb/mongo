@@ -69,15 +69,14 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 
 		if (len != 0) {
 			uint8_t *val_res_eq, *val_res_less;
-			u_int j;
+			u_int i;
 
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
-			for (j = 0;; j++) {
-				if (val_res_eq[j] == 0)
-					return (val_res_less[j] == 0 ? 1 : -1);
-			}
+			for (i = 0;; i++)
+				if (val_res_eq[i] == 0)
+					return (val_res_less[i] == 0 ? 1 : -1);
 		}
 	}
 #endif
@@ -170,16 +169,14 @@ __wt_lex_compare_skip(
 
 		if (len != 0) {
 			uint8_t *val_res_eq, *val_res_less;
-			u_int j;
+			u_int i;
 
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
-			for (j = 0;; j++) {
-				if (val_res_eq[j] == 0)
-					return (val_res_less[j] == 0 ? 1 : -1);
-				++*matchp;
-			}
+			for (i = 0;; i++, ++*matchp)
+				if (val_res_eq[i] == 0)
+					return (val_res_less[i] == 0 ? 1 : -1);
 		}
 	}
 #endif
