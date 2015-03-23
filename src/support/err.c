@@ -187,7 +187,7 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		    error == 0 ? "" : __wt_strerror(session, error, NULL, 0)));
 		WT_RET(__wt_vfprintf(session, stderr, fmt, ap));
 		WT_RET(__wt_fprintf(session, stderr, "\n"));
-		WT_RET(__wt_fflush(session, stderr));
+		return (__wt_fflush(session, stderr));
 	}
 
 	p = s;
