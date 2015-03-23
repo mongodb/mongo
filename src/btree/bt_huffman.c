@@ -156,15 +156,11 @@ __huffman_confchk_file(
 
 	/* Check the file exists. */
 	WT_RET(__wt_strndup(session, v->str + len, v->len - len, &fname));
-	fp = fopen(fname, "r");
-	__wt_free(session, fname);
-	if (fp == NULL)
-		WT_RET_MSG(session, __wt_errno(),
-		    "unable to read Huffman table file %s", fname);
+	WT_RET(__wt_fopen(session, fname, "r", WT_FOPEN_FIXED, &fp));
 
 	/* Optionally return the file handle. */
 	if (fpp == NULL)
-		(void)fclose(fp);
+		(void)__wt_fclose(session, &fp, 0);
 	else
 		*fpp = fp;
 
@@ -368,8 +364,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	if (0) {
 err:		__wt_free(session, table);
 	}
-	if (fp != NULL)
-		(void)fclose(fp);
+	(void)__wt_fclose(session, &fp, 0);
 	return (ret);
 }
 

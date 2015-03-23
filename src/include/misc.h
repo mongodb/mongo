@@ -32,6 +32,11 @@
 #define	WT_DIRLIST_INCLUDE	0x2	/* Include files matching prefix */
 
 /*
+ * FILE handle open configuration.
+ */
+#define	WT_FOPEN_FIXED		0x1	/* Path isn't relative to home */
+
+/*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
  * common structures to save space.  To minimize conversions from size_t to
  * uint32_t through the code, we use the following macros.
