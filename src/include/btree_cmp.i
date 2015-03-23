@@ -47,22 +47,30 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 		remainder = len % WT_VECTOR_SIZE;
 		len -= remainder;
 
-		for (userp = (uint8_t *)user_item->data,
-		    treep = (uint8_t *)tree_item->data;
-		    len > 0;
-		    len -= WT_VECTOR_SIZE,
-		    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
-			if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep)) {
+		userp = (uint8_t *)user_item->data;
+		treep = (uint8_t *)tree_item->data;
+		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
+			for (; len > 0;
+			    len -= WT_VECTOR_SIZE,
+			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
 				u = _mm_load_si128((__m128i *)userp);
 				t = _mm_load_si128((__m128i *)treep);
-			} else {
+				res_eq = _mm_cmpeq_epi8(u, t);
+				if (_mm_movemask_epi8(res_eq) != 65535)
+					break;
+			}
+		else
+			for (; len > 0;
+			    len -= WT_VECTOR_SIZE,
+			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
 				u = _mm_loadu_si128((__m128i *)userp);
 				t = _mm_loadu_si128((__m128i *)treep);
+				res_eq = _mm_cmpeq_epi8(u, t);
+				if (_mm_movemask_epi8(res_eq) != 65535)
+					break;
 			}
-			res_eq = _mm_cmpeq_epi8(u, t);
-			if (_mm_movemask_epi8(res_eq) == 65535) /* Equal */
-				continue;
 
+		if (len != 0) {
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
@@ -138,23 +146,32 @@ __wt_lex_compare_skip(
 		remainder = len % WT_VECTOR_SIZE;
 		len -= remainder;
 
-		for (userp = (uint8_t *)user_item->data + *matchp,
-		    treep = (uint8_t *)tree_item->data + *matchp;
-		    len > 0;
-		    len -= WT_VECTOR_SIZE,
-		    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
-		    *matchp += WT_VECTOR_SIZE) {
-			if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep)) {
+		userp = (uint8_t *)user_item->data + *matchp;
+		treep = (uint8_t *)tree_item->data + *matchp;
+		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
+			for (; len > 0;
+			    len -= WT_VECTOR_SIZE,
+			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
+			    *matchp += WT_VECTOR_SIZE) {
 				u = _mm_load_si128((__m128i *)userp);
 				t = _mm_load_si128((__m128i *)treep);
-			} else {
+				res_eq = _mm_cmpeq_epi8(u, t);
+				if (_mm_movemask_epi8(res_eq) != 65535)
+					break;
+			}
+		else
+			for (; len > 0;
+			    len -= WT_VECTOR_SIZE,
+			    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
+			    *matchp += WT_VECTOR_SIZE) {
 				u = _mm_loadu_si128((__m128i *)userp);
 				t = _mm_loadu_si128((__m128i *)treep);
+				res_eq = _mm_cmpeq_epi8(u, t);
+				if (_mm_movemask_epi8(res_eq) != 65535)
+					break;
 			}
-			res_eq = _mm_cmpeq_epi8(u, t);
-			if (_mm_movemask_epi8(res_eq) == 65535) /* Equal */
-				continue;
 
+		if (len != 0) {
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
