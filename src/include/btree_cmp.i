@@ -30,13 +30,11 @@ static inline int
 __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	const uint8_t *userp, *treep;
-	ssize_t remainder;
-	size_t len, usz, tsz;
+	size_t len, remainder, usz, tsz;
 
 	usz = user_item->size;
 	tsz = tree_item->size;
-	len = WT_MIN(usz, tsz);
-	remainder = len;
+	len = remainder = WT_MIN(usz, tsz);
 
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
@@ -74,7 +72,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
-			for (i = 0;; i++)
+			for (i = 0;; ++i)
 				if (val_res_eq[i] == 0)
 					return (val_res_less[i] == 0 ? 1 : -1);
 		}
@@ -128,13 +126,11 @@ __wt_lex_compare_skip(
     const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
 {
 	const uint8_t *userp, *treep;
-	ssize_t remainder;
-	size_t len, usz, tsz;
+	size_t len, remainder, usz, tsz;
 
 	usz = user_item->size;
 	tsz = tree_item->size;
-	len = WT_MIN(usz, tsz) - *matchp;
-	remainder = len;
+	len = remainder = WT_MIN(usz, tsz) - *matchp;
 
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
@@ -174,7 +170,7 @@ __wt_lex_compare_skip(
 			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
-			for (i = 0;; i++, ++*matchp)
+			for (i = 0;; ++i, ++*matchp)
 				if (val_res_eq[i] == 0)
 					return (val_res_less[i] == 0 ? 1 : -1);
 		}
