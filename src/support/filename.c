@@ -80,7 +80,7 @@ __wt_sync_and_rename_fh(
 
 	/* Flush to disk and close the handle. */
 	ret = __wt_fsync(session, fh);
-	WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_close(session, &fh));
 	WT_RET(ret);
 
 	/* Rename the source file to the target. */
