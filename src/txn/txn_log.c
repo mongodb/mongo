@@ -300,7 +300,7 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
-		*ckpt_lsn = S2C(session)->log->alloc_lsn;
+		*ckpt_lsn = S2C(session)->log->write_start_lsn;
 		break;
 
 	case WT_TXN_LOG_CKPT_START:
@@ -325,7 +325,7 @@ __wt_txn_checkpoint_log(
 			txn->ckpt_nsnapshot = 0;
 			WT_CLEAR(empty);
 			ckpt_snapshot = &empty;
-			*ckpt_lsn = S2C(session)->log->alloc_lsn;
+			*ckpt_lsn = S2C(session)->log->write_start_lsn;
 		} else
 			ckpt_snapshot = txn->ckpt_snapshot;
 
