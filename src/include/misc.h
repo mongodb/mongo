@@ -32,8 +32,15 @@
 #define	WT_DIRLIST_INCLUDE	0x2	/* Include files matching prefix */
 
 /*
- * FILE handle open configuration.
+ * FILE handle close/open configuration.
  */
+#define	WT_FCLOSE_APPEND	1
+#define	WT_FCLOSE_READ		0
+#define	WT_FCLOSE_WRITE		1
+#define	WT_FOPEN_APPEND		"a"
+#define	WT_FOPEN_READ		"r"
+#define	WT_FOPEN_WRITE		"w"
+
 #define	WT_FOPEN_FIXED		0x1	/* Path isn't relative to home */
 
 /*
