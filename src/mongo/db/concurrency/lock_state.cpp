@@ -502,8 +502,6 @@ namespace {
         lockerInfo->waitingResource = ResourceId();
         lockerInfo->stats.reset();
 
-        if (!isLocked()) return;
-
         _lock.lock();
         LockRequestsMap::ConstIterator it = _requests.begin();
         while (!it.finished()) {
