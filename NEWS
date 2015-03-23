@@ -13,7 +13,7 @@ Bug fixes and other important changes:
 
 * When skipping a dirty page during a checkpoint, make sure the tree is marked
   dirty.
-  refs SUPPORT-1248, SERVER-17319 SERVER-17506 #1404 #1643 #1721 #1735
+  refs SUPPORT-1248, SERVER-17319, SERVER-17506, #1404, #1643, #1721, #1735
 
 * Fix a bug in range truncate where we could remove the wrong records.
   refs SERVER-17345
@@ -29,21 +29,21 @@ Bug fixes and other important changes:
 
 * Fix some bugs in logging - where system crashes could leave empty files that
   would stop recovery working on re-start.
-  refs #1717 #1719
+  refs #1717, #1719, SERVER-17451
 
 * Fix a bug in recovery. Force recovery instead of returning an error if the
   LSN given doesn't exist.
-  refs #1700 #1704
+  refs #1700, #1704
 
 * Move writing into log worker thread to avoid latency in application threads.
   refs #1683
 
 * Fix a bug in the reconfigure API related to adhering to shared cache quotas.
-  refs #1712 #1713
+  refs #1712, #1713
 
 * Fix a bug in WiredTiger statistics where we weren't recording overflow
   record statistics.
-  refs #1520 #1703 #1711
+  refs #1520, #1703, #1711
 
 * Several enhancements to eviction of large pages including:
   - Don't do forced eviction of a page if it is the current walk point.
@@ -55,7 +55,7 @@ Bug fixes and other important changes:
  refs #1706
 
 * Use raw mode when dumping indices.
-  Refs #1709.
+  refs #1709
 
 * Fix a bug where we could race opening files while a WT_CONNECTION::close is
   in progress.
@@ -63,14 +63,14 @@ Bug fixes and other important changes:
 
 * Fix a bug in LSM where snapshot transaction updates could have the wrong
   visibility check applied. Leading to invalid updates.
-  refs #1641 #1701 #1702
+  refs #1641, #1701, #1702
 
 * Fix a bug in checkpoint where it could get an EBUSY return unnecessarily.
-  refs #1404 #1589 #1705
+  refs #1404, #1589, #1705
 
 * Fix a bug when writing a page from memory to disk (reconciling). We could
   overwrite the end of a temporary buffer in some cases.
-  refs 1697 1699
+  refs #1697, #1699
 
 * Sometimes we would choose a sub-optimal layout for on disk pages when
   writing them out from memory.
