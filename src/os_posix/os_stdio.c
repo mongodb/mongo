@@ -80,8 +80,6 @@ __wt_fprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, ...)
 	WT_DECL_RET;
 	va_list ap;
 
-	WT_UNUSED(session);
-
 	va_start(ap, fmt);
 	ret = __wt_vfprintf(session, fp, fmt, ap);
 	va_end(ap);
