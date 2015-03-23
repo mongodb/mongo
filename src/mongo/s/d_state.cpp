@@ -82,16 +82,9 @@ namespace mongo {
           _configServerTickets( 3 /* max number of concurrent config server refresh threads */ ) {
     }
 
-    void ShardingState::enable( const string& server ) {
+    bool ShardingState::enabled() {
         boost::lock_guard<boost::mutex> lk(_mutex);
-
-        _enabled = true;
-        verify( server.size() );
-        if ( _configServer.size() == 0 )
-            _configServer = server;
-        else {
-            verify( server == _configServer );
-        }
+        return _enabled;
     }
 
     void ShardingState::initialize(const string& server) {
@@ -99,14 +92,7 @@ namespace mongo {
                 "Unable to obtain host name during sharding initialization.",
                 !getHostName().empty());
 
-        ShardedConnectionInfo::addHook();
-        shardingState.enable(server);
-
-        vector<string> configdbs;
-        splitStringDelim(server, &configdbs, ',');
-
-        configServer.init(configdbs);
-        grid.initCatalogManager(configdbs);
+        shardingState._initialize(server);
     }
 
     // TODO: Consolidate and eliminate these various ways of setting / validating shard names
@@ -191,7 +177,7 @@ namespace mongo {
         return true;
     }
 
-    const ChunkVersion ShardingState::getVersion( const string& ns ) const {
+    ChunkVersion ShardingState::getVersion(const string& ns) {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -468,6 +454,28 @@ namespace mongo {
                                              const string& ns,
                                              ChunkVersion* latestShardVersion) {
         return doRefreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
+    }
+
+    void ShardingState::_initialize(const string& server) {
+        // Ensure only one caller at a time initializes
+        boost::lock_guard<boost::mutex> lk(_mutex);
+
+        if (_enabled) {
+            return;
+        }
+
+        ShardedConnectionInfo::addHook();
+
+        invariant(_configServer.empty());
+        _configServer = server;
+
+        vector<string> configdbs;
+        splitStringDelim(server, &configdbs, ',');
+
+        configServer.init(configdbs);
+        grid.initCatalogManager(configdbs);
+
+        _enabled = true;
     }
 
     Status ShardingState::doRefreshMetadata( OperationContext* txn,

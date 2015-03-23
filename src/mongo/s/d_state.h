@@ -49,9 +49,8 @@ namespace mongo {
     public:
         ShardingState();
 
-        bool enabled() const { return _enabled; }
+        bool enabled();
         const std::string& getConfigServer() const { return _configServer; }
-        void enable( const std::string& server );
 
         // Initialize sharding state and begin authenticating outgoing connections and handling
         // shard versions.  If this is not run before sharded operations occur auth will not work
@@ -75,7 +74,7 @@ namespace mongo {
 
         bool hasVersion( const std::string& ns );
         bool hasVersion( const std::string& ns , ChunkVersion& version );
-        const ChunkVersion getVersion( const std::string& ns ) const;
+        ChunkVersion getVersion(const std::string& ns);
 
         /**
          * If the metadata for 'ns' at this shard is at or above the requested version,
@@ -265,6 +264,8 @@ namespace mongo {
 
     private:
 
+        void _initialize(const std::string& server);
+
         /**
          * Refreshes collection metadata by asking the config server for the latest information.
          * May or may not be based on a requested version.
@@ -275,14 +276,16 @@ namespace mongo {
                                   bool useRequestedVersion,
                                   ChunkVersion* latestShardVersion );
 
-        bool _enabled;
-
         std::string _configServer;
 
         std::string _shardName;
 
         // protects state below
-        mutable mongo::mutex _mutex;
+        mongo::mutex _mutex;
+
+        // Whether ::initialize has been called
+        bool _enabled;
+
         // protects accessing the config server
         // Using a ticket holder so we can have multiple redundant tries at any given time
         mutable TicketHolder _configServerTickets;
