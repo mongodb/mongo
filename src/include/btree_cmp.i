@@ -36,12 +36,13 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	tsz = tree_item->size;
 	len = remainder = WT_MIN(usz, tsz);
 
+	userp = user_item->data;
+	treep = tree_item->data;
+
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
 		__m128i res_eq, res_less, u, t;
 
-		userp = (uint8_t *)user_item->data;
-		treep = (uint8_t *)tree_item->data;
 		remainder = len % WT_VECTOR_SIZE;
 		len -= remainder;
 		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
@@ -82,9 +83,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	 * Use the non-vectorized version for the remaining bytes and for the
 	 * small key sizes.
 	 */
-	for (userp = user_item->data, treep = tree_item->data;
-	    remainder > 0;
-	    --remainder, ++userp, ++treep)
+	for (; remainder > 0; --remainder, ++userp, ++treep)
 		if (*userp != *treep)
 			return (*userp < *treep ? -1 : 1);
 
@@ -132,12 +131,13 @@ __wt_lex_compare_skip(
 	tsz = tree_item->size;
 	len = remainder = WT_MIN(usz, tsz) - *matchp;
 
+	userp = (uint8_t *)user_item->data + *matchp;
+	treep = (uint8_t *)tree_item->data + *matchp;
+
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
 		__m128i res_eq, res_less, u, t;
 
-		userp = (uint8_t *)user_item->data + *matchp;
-		treep = (uint8_t *)tree_item->data + *matchp;
 		remainder = len % WT_VECTOR_SIZE;
 		len -= remainder;
 		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
@@ -180,10 +180,7 @@ __wt_lex_compare_skip(
 	 * Use the non-vectorized version for the remaining bytes and for the
 	 * small key sizes.
 	 */
-	for (userp = (uint8_t *)user_item->data + *matchp,
-	    treep = (uint8_t *)tree_item->data + *matchp;
-	    remainder > 0;
-	    --remainder, ++userp, ++treep, ++*matchp)
+	for (; remainder > 0; --remainder, ++userp, ++treep, ++*matchp)
 		if (*userp != *treep)
 			return (*userp < *treep ? -1 : 1);
 
