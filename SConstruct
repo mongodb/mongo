@@ -425,6 +425,10 @@ env_vars.Add('LINKFLAGS',
     help='Sets flags for the linker',
     converter=variable_shlex_converter)
 
+env_vars.Add('RPATH',
+    help='Set the RPATH for dynamic libraries and executables',
+    converter=variable_shlex_converter)
+
 env_vars.Add('SHCCFLAGS',
     help='Sets flags for the C and C++ compiler when building shared libraries',
     converter=variable_shlex_converter)
