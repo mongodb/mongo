@@ -60,10 +60,10 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 				t = _mm_loadu_si128((__m128i *)treep);
 			}
 			res_eq = _mm_cmpeq_epi8(u, t);
-			res_less = _mm_cmplt_epi8(u, t);
 			if (_mm_movemask_epi8(res_eq) == 65535) /* Equal */
 				continue;
 
+			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
 			for (j = 0; j < WT_VECTOR_SIZE; j++) {
@@ -152,10 +152,10 @@ __wt_lex_compare_skip(
 				t = _mm_loadu_si128((__m128i *)treep);
 			}
 			res_eq = _mm_cmpeq_epi8(u, t);
-			res_less = _mm_cmplt_epi8(u, t);
 			if (_mm_movemask_epi8(res_eq) == 65535) /* Equal */
 				continue;
 
+			res_less = _mm_cmplt_epi8(u, t);
 			val_res_eq = (uint8_t *)&res_eq;
 			val_res_less = (uint8_t *)&res_less;
 			for (j = 0; j < WT_VECTOR_SIZE; j++) {
