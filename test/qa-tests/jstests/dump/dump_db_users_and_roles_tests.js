@@ -63,7 +63,7 @@ if (typeof getToolTest === 'undefined') {
   db.getSiblingDB('admin').system.roles.remove({ role: 'taco' });
   db.getSiblingDB('admin').system.roles.remove({ role: 'bacon' });
 
-  var restoreArgs = ['restore', '--restoreDbUsersAndRoles'].
+  var restoreArgs = ['restore', "--db", "foo", '--restoreDbUsersAndRoles', 'dump/foo'].
     concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
     'mongorestore should succeed');
