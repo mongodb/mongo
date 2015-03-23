@@ -429,6 +429,10 @@ env_vars.Add('MSVC_USE_SCRIPT',
 env_vars.Add('MSVC_VERSION',
     help='Sets the version of Visual Studio to use (e.g.  12.0, 11.0, 10.0)')
 
+env_vars.Add('RPATH',
+    help='Set the RPATH for dynamic libraries and executables',
+    converter=variable_shlex_converter)
+
 env_vars.Add('SHCCFLAGS',
     help='Sets flags for the C and C++ compiler when building shared libraries',
     converter=variable_shlex_converter)
