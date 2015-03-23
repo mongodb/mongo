@@ -841,8 +841,9 @@ namespace mongo {
         string tmpBase64 = base64::decode(*utf);
         // length property stores the decoded length
         it->ForceSet(scope->v8StringData("len"),
-                     v8::Number::New(scope->getIsolate(), tmpBase64.length()));
-        it->ForceSet(scope->v8StringData("type"), type);
+                     v8::Number::New(scope->getIsolate(), tmpBase64.length()),
+                     v8::PropertyAttribute::ReadOnly);
+        it->ForceSet(scope->v8StringData("type"), type, v8::PropertyAttribute::ReadOnly);
         it->SetInternalField(0, args[1]);
 
         return it;
@@ -872,16 +873,14 @@ namespace mongo {
                                       const v8::FunctionCallbackInfo<v8::Value>& args) {
         v8::Local<v8::Object> it = args.This();
         verify(scope->BinDataFT()->HasInstance(it));
-        int len = v8::Local<v8::Number>::Cast(it->Get(
-            v8::String::NewFromUtf8(scope->getIsolate(), "len")))->Int32Value();
         verify(it->InternalFieldCount() == 1);
         string data = base64::decode(toSTLString(it->GetInternalField(0)));
         stringstream ss;
         ss.setf (ios_base::hex, ios_base::basefield);
         ss.fill ('0');
         ss.setf (ios_base::right, ios_base::adjustfield);
-        for(int i = 0; i < len; i++) {
-            unsigned v = (unsigned char) data[i];
+        for(std::string::iterator it = data.begin(); it != data.end(); ++it) {
+            unsigned v = (unsigned char) *it;
             ss << setw(2) << v;
         }
         return v8::String::NewFromUtf8(scope->getIsolate(), ss.str().c_str());

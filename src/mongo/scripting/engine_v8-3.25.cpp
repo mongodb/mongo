@@ -1633,11 +1633,11 @@ namespace mongo {
 
         verify(BinDataFT()->HasInstance(obj));
         verify(obj->InternalFieldCount() == 1);
-        int len = obj->Get(strLitToV8("len"))->ToInt32()->Value();
+        std::string binData(base64::decode(toSTLString(obj->GetInternalField(0))));
         b.appendBinData(elementName,
-                        len,
+                        binData.size(),
                         mongo::BinDataType(obj->Get(strLitToV8("type"))->ToInt32()->Value()),
-                        base64::decode(toSTLString(obj->GetInternalField(0))).c_str());
+                        binData.c_str());
     }
 
     OID V8Scope::v8ToMongoObjectID(v8::Local<v8::Object> obj) {
