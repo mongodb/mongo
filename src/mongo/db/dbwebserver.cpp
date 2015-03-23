@@ -149,6 +149,10 @@ namespace mongo {
                             !user->getCredentials().isExternal);
                     string ha1 = user->getCredentials().password;
                     authzManager.releaseUser(user);
+                    if (ha1.empty()) {
+                        return false;
+                    }
+
                     string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
 
                     stringstream r;
