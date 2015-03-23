@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/mgo.v2"
 	"testing"
 )
 
@@ -64,6 +65,10 @@ func TestBasicOps(t *testing.T) {
 					{"size", 10000}},
 				bson.M{}),
 				ShouldBeNil)
+
+			// create the collection we are testing against (ignore errors)
+			sess.DB("mongooplog_test").C("data").Create(&mgo.CollectionInfo{})
+			
 
 			// clear out the collection we'll use for testing
 			testColl := sess.DB("mongooplog_test").C("data")
