@@ -1355,6 +1355,10 @@ namespace {
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommandHandshakes(
             std::vector<BSONObj>* handshakes) {
         boost::lock_guard<boost::mutex> lock(_mutex);
+        // do not send handshakes if we have been removed from the config
+        if (_selfIndex == -1) {
+            return;
+        }
         // handshake objs for ourself and all chained members
         for (SlaveInfoVector::const_iterator itr = _slaveInfo.begin();
                 itr != _slaveInfo.end(); ++itr) {
