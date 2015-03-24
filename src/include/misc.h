@@ -24,37 +24,6 @@
 #define	WT_EXABYTE	((uint64_t)1152921504606846976)
 
 /*
- * Number of directory entries can grow dynamically.
- */
-#define	WT_DIR_ENTRY	32
-
-#define	WT_DIRLIST_EXCLUDE	0x1	/* Exclude files matching prefix */
-#define	WT_DIRLIST_INCLUDE	0x2	/* Include files matching prefix */
-
-/*
- * FILE handle close/open configuration.
- */
-typedef enum {
-	WT_FHANDLE_APPEND, WT_FHANDLE_READ, WT_FHANDLE_WRITE
-} WT_FHANDLE_MODE;
-
-#ifdef	_WIN32
-/*
- * Open in binary (untranslated) mode; translations involving
- * carriage-return and linefeed characters are suppressed.
- */
-#define	WT_FOPEN_APPEND		"ab"
-#define	WT_FOPEN_READ		"rb"
-#define	WT_FOPEN_WRITE		"wb"
-#else
-#define	WT_FOPEN_APPEND		"a"
-#define	WT_FOPEN_READ		"r"
-#define	WT_FOPEN_WRITE		"w"
-#endif
-
-#define	WT_FOPEN_FIXED		0x1	/* Path isn't relative to home */
-
-/*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
  * common structures to save space.  To minimize conversions from size_t to
  * uint32_t through the code, we use the following macros.

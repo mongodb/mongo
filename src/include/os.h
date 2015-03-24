@@ -6,6 +6,37 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * FILE handle close/open configuration.
+ */
+typedef enum {
+	WT_FHANDLE_APPEND, WT_FHANDLE_READ, WT_FHANDLE_WRITE
+} WT_FHANDLE_MODE;
+
+#ifdef	_WIN32
+/*
+ * Open in binary (untranslated) mode; translations involving carriage-return
+ * and linefeed characters are suppressed.
+ */
+#define	WT_FOPEN_APPEND		"ab"
+#define	WT_FOPEN_READ		"rb"
+#define	WT_FOPEN_WRITE		"wb"
+#else
+#define	WT_FOPEN_APPEND		"a"
+#define	WT_FOPEN_READ		"r"
+#define	WT_FOPEN_WRITE		"w"
+#endif
+
+#define	WT_FOPEN_FIXED		0x1	/* Path isn't relative to home */
+
+/*
+ * Number of directory entries can grow dynamically.
+ */
+#define	WT_DIR_ENTRY	32
+
+#define	WT_DIRLIST_EXCLUDE	0x1	/* Exclude files matching prefix */
+#define	WT_DIRLIST_INCLUDE	0x2	/* Include files matching prefix */
+
 #define	WT_SYSCALL_RETRY(call, ret) do {				\
 	int __retry;							\
 	for (__retry = 0; __retry < 10; ++__retry) {			\
@@ -72,9 +103,3 @@ struct __wt_fh {
 	    WT_FALLOCATE_SYS } fallocate_available;
 	int	fallocate_requires_locking;
 };
-
-#ifndef _WIN32
-#define	WT_SIZET_FMT	"zu"			/* size_t format string */
-#else
-#define	WT_SIZET_FMT	"Iu"			/* size_t format string */
-#endif
