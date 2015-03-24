@@ -1144,6 +1144,22 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "fsyncUnlock",
+            command: {fsyncUnlock: 1},
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["fsync"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
             testname: "geoNear",
             command: {geoNear: "x", near: [50, 50], num: 1},
             setup: function (db) {
