@@ -57,6 +57,8 @@ struct __wt_cache {
 	 */
 	uint64_t bytes_inmem;		/* Bytes/pages in memory */
 	uint64_t pages_inmem;
+	uint64_t bytes_internal;	/* Bytes of internal pages */
+	uint64_t bytes_overflow;	/* Bytes of overflow pages */
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
 	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
