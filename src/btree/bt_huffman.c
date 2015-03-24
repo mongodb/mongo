@@ -157,11 +157,12 @@ __huffman_confchk_file(
 
 	/* Check the file exists. */
 	WT_RET(__wt_strndup(session, v->str + len, v->len - len, &fname));
-	WT_ERR(__wt_fopen(session, fname, "r", WT_FOPEN_FIXED, &fp));
+	WT_ERR(__wt_fopen(session,
+	    fname, WT_FHANDLE_READ, WT_FOPEN_FIXED, &fp));
 
 	/* Optionally return the file handle. */
 	if (fpp == NULL)
-		(void)__wt_fclose(session, &fp, 0);
+		(void)__wt_fclose(session, &fp, WT_FHANDLE_READ);
 	else
 		*fpp = fp;
 
@@ -367,7 +368,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	if (0) {
 err:		__wt_free(session, table);
 	}
-	(void)__wt_fclose(session, &fp, 0);
+	(void)__wt_fclose(session, &fp, WT_FHANDLE_READ);
 	return (ret);
 }
 
