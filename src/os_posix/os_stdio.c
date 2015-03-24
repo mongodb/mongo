@@ -30,6 +30,7 @@ __wt_fopen(WT_SESSION_IMPL *session,
 		path = pathbuf;
 	}
 
+	mode = NULL;
 	switch (mode_flag) {
 	case WT_FHANDLE_APPEND:
 		mode = WT_FOPEN_APPEND;
