@@ -1093,8 +1093,11 @@ int
 __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
+	int bulk, need_tracking;
 
 	btree = S2BT(session);
+	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
 
 	/* Handle forced discard (when dropping a file). */
 	if (force)
@@ -1104,7 +1107,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 	 * If closing an unmodified file, check that no update is required
 	 * for active readers.
 	 */
-	if (!btree->modified && !F_ISSET(btree, WT_BTREE_BULK)) {
+	if (!btree->modified && !bulk) {
 		__wt_txn_update_oldest(session);
 		return (__wt_txn_visible_all(session, btree->rec_max_txn) ?
 		    __wt_cache_op(session, NULL, WT_SYNC_DISCARD) : EBUSY);
@@ -1120,12 +1123,17 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 	 * already checked for read-only trees.
 	 */
 	if (!final)
-		WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||
-		    F_ISSET(btree, WT_BTREE_BULK));
+		WT_ASSERT(session,
+		    bulk || F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
-	WT_RET(__checkpoint_worker(session, NULL, 0));
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
-		WT_RET(__wt_checkpoint_sync(session, NULL));
+	need_tracking = !bulk && !final && !WT_META_TRACKING(session);
+	if (need_tracking)
+		WT_RET(__wt_meta_track_on(session));
 
-	return (0);
+	WT_TRET(__checkpoint_worker(session, NULL, 0));
+
+	if (need_tracking)
+		WT_RET(__wt_meta_track_off(session, ret != 0));
+
+	return (ret);
 }
