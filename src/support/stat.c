@@ -401,6 +401,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
 	stats->cache_write.desc = "cache: pages written from cache";
 	stats->cache_overhead.desc = "cache: percentage overhead";
+	stats->cache_bytes_internal.desc =
+	    "cache: tracked bytes belonging to internal pages in the cache";
+	stats->cache_bytes_leaf.desc =
+	    "cache: tracked bytes belonging to leaf pages in the cache";
+	stats->cache_bytes_overflow.desc =
+	    "cache: tracked bytes belonging to overflow pages in the cache";
 	stats->cache_bytes_dirty.desc =
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_pages_dirty.desc =
