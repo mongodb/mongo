@@ -727,7 +727,8 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int tret;
+	int need_dhandle_lock, tret;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	dhandle = session->dhandle;
 
@@ -747,9 +748,30 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 	 */
 	F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
 
-	/* Try to remove the handle, protected by the data handle lock. */
-	WT_WITH_DHANDLE_LOCK(session,
-	    WT_TRET(__conn_dhandle_remove(session, final)));
+	/*
+	 * Try to remove the handle, protected by the data handle lock.
+	 *
+	 * If we need the handle list lock and it is busy, give up unless we
+	 * are closing: we already have an exclusive lock on the handle and
+	 * waiting here could deadlock (e.g., with a checkpoint gathering
+	 * the list of handles to operate on).
+	 */
+	need_dhandle_lock = !F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED);
+	if (need_dhandle_lock) {
+		if (final)
+			__wt_spin_lock(session, &S2C(session)->dhandle_lock);
+		else
+			WT_RET(__wt_spin_trylock(
+			    session, &S2C(session)->dhandle_lock, &id));
+		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);
+	}
+
+	WT_TRET(__conn_dhandle_remove(session, final));
+
+	if (need_dhandle_lock) {
+		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		__wt_spin_unlock(session, &S2C(session)->dhandle_lock);
+	}
 
 	/*
 	 * After successfully removing the handle, clean it up.
