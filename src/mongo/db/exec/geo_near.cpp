@@ -433,11 +433,6 @@ namespace mongo {
                                                      Collection* collection,
                                                      WorkingSetID* out)
     {
-        if (SPHERE == _nearParams.nearQuery->centroid->crs) {
-            _boundsIncrement = kMaxEarthDistanceInMeters / 1000.0;
-            return PlanStage::IS_EOF;
-        }
-
         if (!_densityEstimator) {
             _densityEstimator.reset(new DensityEstimator(_twoDIndex, &_nearParams));
         }
@@ -447,8 +442,28 @@ namespace mongo {
                                                               &estimatedDistance);
 
         if (state == PlanStage::IS_EOF) {
+            // 2d index only works with legacy points as centroid. $nearSphere will project
+            // the point into SPHERE CRS and calculate distance based on that.
+            // STRICT_SPHERE is impossible here, as GeoJSON centroid is not allowed for 2d index.
+
             // Estimator finished its work, we need to finish initialization too.
-            _boundsIncrement = 3 * estimatedDistance;
+            if (SPHERE == _nearParams.nearQuery->centroid->crs) {
+                // Estimated distance is in degrees, convert it to meters.
+                _boundsIncrement = deg2rad(estimatedDistance) * kRadiusOfEarthInMeters * 3;
+                // Limit boundsIncrement to ~20KM, so that the first circle won't be too aggressive.
+                _boundsIncrement = std::min(_boundsIncrement, kMaxEarthDistanceInMeters / 1000.0);
+            }
+            else {
+                // We expand the radius by 3 times to give a reasonable starting search area.
+                // Assume points are distributed evenly. X is the edge size of cells at whose
+                // level we found a document in 4 neighbors. Thus the closest point is at least
+                // X/2 far from the centroid. The distance between two points is at least X.
+                // The area of Pi * (3X)^2 ~= 28 * X^2 will cover dozens of points at most.
+                // We'll explore the space with exponentially increasing radius if this guess is
+                // too small, so starting from a conservative initial radius doesn't hurt.
+
+                _boundsIncrement = 3 * estimatedDistance;
+            }
             invariant(_boundsIncrement > 0.0);
 
             // Clean up
