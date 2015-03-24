@@ -34,12 +34,23 @@
 /*
  * FILE handle close/open configuration.
  */
-#define	WT_FCLOSE_APPEND	1
-#define	WT_FCLOSE_READ		0
-#define	WT_FCLOSE_WRITE		1
+typedef enum {
+	WT_FHANDLE_APPEND, WT_FHANDLE_READ, WT_FHANDLE_WRITE
+} WT_FHANDLE_MODE;
+
+#ifdef	_WIN32
+/*
+ * Open in binary (untranslated) mode; translations involving
+ * carriage-return and linefeed characters are suppressed.
+ */
+#define	WT_FOPEN_APPEND		"ab"
+#define	WT_FOPEN_READ		"rb"
+#define	WT_FOPEN_WRITE		"wb"
+#else
 #define	WT_FOPEN_APPEND		"a"
 #define	WT_FOPEN_READ		"r"
 #define	WT_FOPEN_WRITE		"w"
+#endif
 
 #define	WT_FOPEN_FIXED		0x1	/* Path isn't relative to home */
 
