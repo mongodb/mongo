@@ -1090,27 +1090,39 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
  *	Checkpoint a single file as part of closing the handle.
  */
 int
-__wt_checkpoint_close(WT_SESSION_IMPL *session, int force)
+__wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 {
-	WT_DECL_RET;
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
 
 	/* Handle forced discard (when dropping a file). */
 	if (force)
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
 
-	/* If closing an unmodified file, try to evict its pages. */
-	if (!S2BT(session)->modified) {
-		ret = __wt_cache_op(session, NULL, WT_SYNC_DISCARD);
-		if (ret != EBUSY)
-			return (ret);
+	/*
+	 * If closing an unmodified file, check that no update is required
+	 * for active readers.
+	 */
+	if (!btree->modified && !F_ISSET(btree, WT_BTREE_BULK)) {
+		__wt_txn_update_oldest(session);
+		return (__wt_txn_visible_all(session, btree->rec_max_txn) ?
+		    __wt_cache_op(session, NULL, WT_SYNC_DISCARD) : EBUSY);
 	}
 
 	/*
-	 * If closing a modified file, or closing an unmodified file was blocked
-	 * for any reason, checkpoint the file and optionally flush the writes
-	 * (the checkpoint call will discard the blocks, there's no additional
-	 * step needed).
+	 * If closing a modified file, checkpoint the file and optionally flush
+	 * the writes (the checkpoint call will discard the blocks, there's no
+	 * additional step needed).
+	 *
+	 * We should already have the schema lock unless we're finishing a bulk
+	 * load -- the only other paths to closing files (sweep and LSM) have
+	 * already checked for read-only trees.
 	 */
+	if (!final)
+		WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||
+		    F_ISSET(btree, WT_BTREE_BULK));
+
 	WT_RET(__checkpoint_worker(session, NULL, 0));
 	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
 		WT_RET(__wt_checkpoint_sync(session, NULL));

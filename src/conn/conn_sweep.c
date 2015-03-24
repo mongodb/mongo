@@ -15,6 +15,7 @@
 static int
 __sweep(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle, *dhandle_next;
 	WT_DECL_RET;
@@ -63,10 +64,16 @@ __sweep(WT_SESSION_IMPL *session)
 		WT_RET(ret);
 		locked = 1;
 
+		/* Only sweep clean trees where all updates are visible. */
+		btree = dhandle->handle;
+		if (btree->modified ||
+		    !__wt_txn_visible_all(session, btree->rec_max_txn))
+			goto unlock;
+
 		/* If the handle is open, try to close it. */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __wt_conn_btree_sync_and_close(session, 0));
+			WT_WITH_DHANDLE(session, dhandle, ret =
+			    __wt_conn_btree_sync_and_close(session, 0, 0));
 			if (ret != 0)
 				goto unlock;
 

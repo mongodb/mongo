@@ -117,8 +117,12 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			mod = page->modify;
 
 			/* Skip clean pages. */
-			if (!__wt_page_is_modified(page))
+			if (!__wt_page_is_modified(page)) {
+				if (mod != NULL && TXNID_LT(
+				    btree->rec_max_txn, mod->rec_max_txn))
+					btree->rec_max_txn = mod->rec_max_txn;
 				continue;
+			}
 
 			/*
 			 * Write dirty pages, unless we can be sure they only
@@ -153,6 +157,9 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 				++leaf_pages;
 			}
 			WT_ERR(__wt_reconcile(session, walk, NULL, 0));
+
+			if (TXNID_LT(btree->rec_max_txn, mod->rec_max_txn))
+				btree->rec_max_txn = mod->rec_max_txn;
 		}
 		break;
 	}

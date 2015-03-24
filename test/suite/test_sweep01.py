@@ -42,10 +42,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablebase
     numfiles = 50
     numkv = 1000
-    ckpt_list = [
-        ('off', dict(ckpt=0)),
-        ('on', dict(ckpt=10)),
-    ]
+    ckpt=10
 
     types = [
         ('row', dict(tabletype='row',
@@ -56,8 +53,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
-    scenarios = number_scenarios(
-        prune_scenarios(multiply_scenarios('.', types, ckpt_list), 1, 100))
+    scenarios = types
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
