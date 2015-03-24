@@ -28,32 +28,50 @@
 
 #pragma once
 
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include <atomic>
+#include <set>
+#include <unordered_map>
+#include <memory>
+#include <string>
+#include <list>
+
+#include <boost/thread/mutex.hpp>
+
+#include <rocksdb/db.h>
+#include <rocksdb/slice.h>
+
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
-    namespace moe = mongo::optionenvironment;
-
-    class RocksGlobalOptions {
+    class RocksCounterManager {
     public:
-        RocksGlobalOptions()
-            : cacheSizeGB(0),
-              maxWriteMBPerSec(1024),
-              compression("snappy"),
-              crashSafeCounters(false) {}
+        RocksCounterManager(rocksdb::DB* db, bool crashSafe)
+            : _db(db), _crashSafe(crashSafe), _syncing(false), _syncCounter(0) {}
 
-        Status add(moe::OptionSection* options);
-        Status store(const moe::Environment& params, const std::vector<std::string>& args);
+        long long loadCounter(const std::string& counterKey);
 
-        size_t cacheSizeGB;
-        int maxWriteMBPerSec;
+        void updateCounter(const std::string& counterKey, long long count,
+                           rocksdb::WriteBatch* writeBatch);
 
-        std::string compression;
-        std::string configString;
+        void sync();
 
-        bool crashSafeCounters;
+        bool crashSafe() const { return _crashSafe; }
+
+    private:
+        static rocksdb::Slice _encodeCounter(long long counter, int64_t* storage);
+
+        rocksdb::DB* _db; // not owned
+        const bool _crashSafe;
+        boost::mutex _lock;
+        // protected by _lock
+        bool _syncing;
+        // protected by _lock
+        std::unordered_map<std::string, long long> _counters;
+        // protected by _lock
+        int _syncCounter;
+
+        static const int kSyncEvery = 10000;
     };
 
-    extern RocksGlobalOptions rocksGlobalOptions;
 }

@@ -29,7 +29,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
-#include "mongo/platform/endian.h"
 
 #include "rocks_recovery_unit.h"
 
@@ -104,9 +103,10 @@ namespace mongo {
     std::atomic<int> RocksRecoveryUnit::_totalLiveRecoveryUnits(0);
 
     RocksRecoveryUnit::RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db,
-                                         bool durable)
+                                         RocksCounterManager* counterManager, bool durable)
         : _transactionEngine(transactionEngine),
           _db(db),
+          _counterManager(counterManager),
           _durable(durable),
           _transaction(transactionEngine),
           _writeBatch(),
@@ -194,20 +194,20 @@ namespace mongo {
 
     void RocksRecoveryUnit::_commit() {
         invariant(_writeBatch);
+        rocksdb::WriteBatch* wb = _writeBatch->GetWriteBatch();
         for (auto pair : _deltaCounters) {
             auto& counter = pair.second;
             counter._value->fetch_add(counter._delta, std::memory_order::memory_order_relaxed);
             long long newValue = counter._value->load(std::memory_order::memory_order_relaxed);
-            int64_t storage;
-            writeBatch()->Put(pair.first, encodeCounter(newValue, &storage));
+            _counterManager->updateCounter(pair.first, newValue, wb);
         }
 
-        if (_writeBatch->GetWriteBatch()->Count() != 0) {
+        if (wb->Count() != 0) {
             // Order of operations here is important. It needs to be synchronized with
             // _transaction.recordSnapshotId() and _db->GetSnapshot() and
             rocksdb::WriteOptions writeOptions;
             writeOptions.disableWAL = !_durable;
-            auto status = _db->Write(rocksdb::WriteOptions(), _writeBatch->GetWriteBatch());
+            auto status = _db->Write(rocksdb::WriteOptions(), wb);
             invariantRocksOK(status);
             _transaction.commit();
         }
@@ -297,27 +297,7 @@ namespace mongo {
         }
     }
 
-    long long RocksRecoveryUnit::getCounterValue(rocksdb::DB* db, const rocksdb::Slice counterKey) {
-        std::string value;
-        auto s = db->Get(rocksdb::ReadOptions(), counterKey, &value);
-        if (s.IsNotFound()) {
-            return 0;
-        }
-        invariantRocksOK(s);
-
-        int64_t ret;
-        invariant(sizeof(ret) == value.size());
-        memcpy(&ret, value.data(), sizeof(ret));
-        // we store counters in little endian
-        return static_cast<long long>(endian::littleToNative(ret));
-    }
-
     RocksRecoveryUnit* RocksRecoveryUnit::getRocksRecoveryUnit(OperationContext* opCtx) {
         return checked_cast<RocksRecoveryUnit*>(opCtx->recoveryUnit());
-    }
-
-    rocksdb::Slice RocksRecoveryUnit::encodeCounter(long long counter, int64_t* storage) {
-        *storage = static_cast<int64_t>(endian::littleToNative(counter));
-        return rocksdb::Slice(reinterpret_cast<const char*>(storage), sizeof(*storage));
     }
 }

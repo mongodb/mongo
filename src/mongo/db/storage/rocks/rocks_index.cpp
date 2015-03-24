@@ -112,7 +112,6 @@ namespace mongo {
                 auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
                 _iterator.reset(ru->NewIterator(_prefix));
                 _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
-                invariantRocksOK(_iterator->status());
             }
 
             int getDirection() const { return _forward ? 1 : -1; }
@@ -234,7 +233,6 @@ namespace mongo {
                 auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
                 if (_currentSequenceNumber != ru->snapshot()->GetSequenceNumber()) {
                     _iterator.reset(ru->NewIterator(_prefix));
-                    invariantRocksOK(_iterator->status());
                     _currentSequenceNumber = ru->snapshot()->GetSequenceNumber();
 
                     if (!_savedEOF) {
@@ -260,7 +258,9 @@ namespace mongo {
                 } else {
                     _iterator->Prev();
                 }
-                invariantRocksOK(_iterator->status());
+                if (!_iterator->Valid()) {
+                    invariantRocksOK(_iterator->status());
+                }
             }
 
             // Seeks to query. Returns true on exact match.
@@ -268,11 +268,14 @@ namespace mongo {
                 const rocksdb::Slice keySlice(query.getBuffer(), query.getSize());
                 _iterator->Seek(keySlice);
                 if (!_iterator->Valid()) {
+                    invariantRocksOK(_iterator->status());
                     if (!_forward) {
                         // this will give lower bound behavior for backwards
                         _iterator->SeekToLast();
+                        if (!_iterator->Valid()) {
+                            invariantRocksOK(_iterator->status());
+                        }
                     }
-                    invariantRocksOK(_iterator->status());
                     return false;
                 }
 
@@ -288,7 +291,9 @@ namespace mongo {
                     // were
                     // searching for.
                     _iterator->Prev();
-                    invariantRocksOK(_iterator->status());
+                    if (!_iterator->Valid()) {
+                        invariantRocksOK(_iterator->status());
+                    }
                 }
 
                 return false;

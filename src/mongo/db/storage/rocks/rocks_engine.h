@@ -49,6 +49,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/util/string_map.h"
 
+#include "rocks_counter_manager.h"
 #include "rocks_transaction.h"
 
 namespace rocksdb {
@@ -113,7 +114,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual void cleanShutdown() {}
+        virtual void cleanShutdown();
 
         /**
          * Initializes a background job to remove excess documents in the oplog collections.
@@ -134,6 +135,8 @@ namespace mongo {
 
         int getMaxWriteMBPerSec() const { return _maxWriteMBPerSec; }
         void setMaxWriteMBPerSec(int maxWriteMBPerSec);
+
+        Status backup(const std::string& path);
 
     private:
         Status _createIdentPrefix(const StringData& ident);
@@ -164,6 +167,9 @@ namespace mongo {
 
         // This is for concurrency control
         RocksTransactionEngine _transactionEngine;
+
+        // CounterManages manages counters like numRecords and dataSize for record stores
+        boost::scoped_ptr<RocksCounterManager> _counterManager;
 
         static const std::string kMetadataPrefix;
         static const std::string kDroppedPrefix;

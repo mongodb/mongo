@@ -65,6 +65,15 @@ namespace mongo {
                                        moe::String,
                                        "RocksDB storage engine custom "
                                        "configuration settings").hidden();
+        rocksOptions.addOptionChaining("storage.rocksdb.crashSafeCounters",
+                                       "rocksdbCrashSafeCounters", moe::Bool,
+                                       "If true, numRecord and dataSize counter will be consistent "
+                                       "even after power failure. If false, numRecord and dataSize "
+                                       "might be a bit inconsistent after power failure, but "
+                                       "should be correct under normal conditions. Setting this to "
+                                       "true will make database inserts a bit slower.")
+            .setDefault(moe::Value(false))
+            .hidden();
 
         return options->addSection(rocksOptions);
     }
@@ -89,6 +98,11 @@ namespace mongo {
             rocksGlobalOptions.configString =
                 params["storage.rocksdb.configString"].as<std::string>();
             log() << "Engine custom option: " << rocksGlobalOptions.configString;
+        }
+        if (params.count("storage.rocksdb.crashSafeCounters")) {
+            rocksGlobalOptions.crashSafeCounters =
+                params["storage.rocksdb.crashSafeCounters"].as<bool>();
+            log() << "Crash safe counters: " << rocksGlobalOptions.crashSafeCounters;
         }
 
         return Status::OK();

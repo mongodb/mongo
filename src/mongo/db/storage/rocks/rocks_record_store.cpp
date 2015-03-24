@@ -56,6 +56,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
+#include "rocks_counter_manager.h"
 #include "rocks_engine.h"
 #include "rocks_recovery_unit.h"
 #include "rocks_util.h"
@@ -169,13 +170,13 @@ namespace mongo {
         std::string _prefix;
     };
 
-    RocksRecordStore::RocksRecordStore(const StringData& ns, const StringData& id,
-                                       rocksdb::DB* db,  // not owned here
-                                       std::string prefix, bool isCapped, int64_t cappedMaxSize,
-                                       int64_t cappedMaxDocs,
+    RocksRecordStore::RocksRecordStore(const StringData& ns, const StringData& id, rocksdb::DB* db,
+                                       RocksCounterManager* counterManager, std::string prefix,
+                                       bool isCapped, int64_t cappedMaxSize, int64_t cappedMaxDocs,
                                        CappedDocumentDeleteCallback* cappedDeleteCallback)
         : RecordStore(ns),
           _db(db),
+          _counterManager(counterManager),
           _prefix(std::move(prefix)),
           _isCapped(isCapped),
           _cappedMaxSize(cappedMaxSize),
@@ -184,8 +185,9 @@ namespace mongo {
           _cappedDeleteCallback(cappedDeleteCallback),
           _cappedDeleteCheckCount(0),
           _isOplog(NamespaceString::oplog(ns)),
-          _oplogKeyTracker(
-              _isOplog ? new RocksOplogKeyTracker(std::move(rocksGetNextPrefix(_prefix))) : nullptr),
+          _oplogKeyTracker(_isOplog
+                               ? new RocksOplogKeyTracker(std::move(rocksGetNextPrefix(_prefix)))
+                               : nullptr),
           _oplogNextToDelete(0),
           _cappedVisibilityManager((_isCapped || _isOplog) ? new CappedVisibilityManager()
                                                            : nullptr),
@@ -207,6 +209,7 @@ namespace mongo {
         boost::scoped_ptr<rocksdb::Iterator> iter(
             RocksRecoveryUnit::NewIteratorNoSnapshot(_db, _prefix));
         iter->SeekToLast();
+        bool emptyCollection = !iter->Valid();
         if (iter->Valid()) {
             rocksdb::Slice lastSlice = iter->key();
             RecordId lastId = _makeRecordId(lastSlice);
@@ -220,10 +223,33 @@ namespace mongo {
         }
 
         // load metadata
-        _numRecords.store(RocksRecoveryUnit::getCounterValue(_db, _numRecordsKey));
-        _dataSize.store(RocksRecoveryUnit::getCounterValue(_db, _dataSizeKey));
+        _numRecords.store(_counterManager->loadCounter(_numRecordsKey));
+        _dataSize.store(_counterManager->loadCounter(_dataSizeKey));
         invariant(_dataSize.load() >= 0);
         invariant(_numRecords.load() >= 0);
+
+        if (!emptyCollection && !_counterManager->crashSafe() &&
+            _numRecords.load() < kCollectionScanOnCreationThreshold) {
+            LOG(1) << "doing scan of collection " << ns << " to get info";
+
+            _numRecords.store(0);
+            _dataSize.store(0);
+
+            long long numRecords = 0, dataSize = 0;
+            for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
+                numRecords++;
+                dataSize += static_cast<long long>(iter->value().size());
+            }
+
+            _numRecords.store(numRecords);
+            _dataSize.store(dataSize);
+
+            rocksdb::WriteBatch wb;
+            _counterManager->updateCounter(_numRecordsKey, numRecords, &wb);
+            _counterManager->updateCounter(_dataSizeKey, dataSize, &wb);
+            auto s = _db->Write(rocksdb::WriteOptions(), &wb);
+            invariantRocksOK(s);
+        }
 
         _hasBackgroundThread = RocksEngine::initRsOplogBackgroundThread(ns);
     }
@@ -699,11 +725,12 @@ namespace mongo {
         _numRecords.store(numRecords);
         _dataSize.store(dataSize);
         rocksdb::WriteBatch wb;
-        int64_t storage;
-        wb.Put(_numRecordsKey, RocksRecoveryUnit::encodeCounter(numRecords, &storage));
-        wb.Put(_dataSizeKey, RocksRecoveryUnit::encodeCounter(dataSize, &storage));
-        auto s = _db->Write(rocksdb::WriteOptions(), &wb);
-        invariantRocksOK(s);
+        _counterManager->updateCounter(_numRecordsKey, numRecords, &wb);
+        _counterManager->updateCounter(_dataSizeKey, dataSize, &wb);
+        if (wb.Count() > 0) {
+            auto s = _db->Write(rocksdb::WriteOptions(), &wb);
+            invariantRocksOK(s);
+        }
     }
 
     /**
@@ -876,8 +903,6 @@ namespace mongo {
         else
             _iterator->Prev();
 
-        invariantRocksOK(_iterator->status());
-
         if (_iterator->Valid()) {
             _curr = _decodeCurr();
             if (_cappedVisibilityManager.get()) {  // isCapped?
@@ -896,6 +921,7 @@ namespace mongo {
                 }
             }  // isCapped?
         } else {
+            invariantRocksOK(_iterator->status());
             _eof = true;
             // we leave _curr as it is on purpose
         }
@@ -965,7 +991,6 @@ namespace mongo {
                 int64_t locStorage;
                 _iterator->Seek(RocksRecordStore::_makeKey(loc, &locStorage));
             }
-            invariantRocksOK(_iterator->status());
         } else {  // backward iterator
             if (loc.isNull()) {
                 _iterator->SeekToLast();
@@ -973,17 +998,17 @@ namespace mongo {
                 // lower bound on reverse iterator
                 int64_t locStorage;
                 _iterator->Seek(RocksRecordStore::_makeKey(loc, &locStorage));
-                invariantRocksOK(_iterator->status());
                 if (!_iterator->Valid()) {
+                    invariantRocksOK(_iterator->status());
                     _iterator->SeekToLast();
                 } else if (_decodeCurr() != loc) {
                     _iterator->Prev();
                 }
             }
-            invariantRocksOK(_iterator->status());
         }
         _eof = !_iterator->Valid();
         if (_eof) {
+            invariantRocksOK(_iterator->status());
             _curr = loc;
         } else {
             _curr = _decodeCurr();

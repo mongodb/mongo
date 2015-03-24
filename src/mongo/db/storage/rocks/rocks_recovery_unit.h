@@ -46,6 +46,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 
 #include "rocks_transaction.h"
+#include "rocks_counter_manager.h"
 
 namespace rocksdb {
     class DB;
@@ -64,7 +65,8 @@ namespace mongo {
     class RocksRecoveryUnit : public RecoveryUnit {
         MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
     public:
-        RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db, bool durable);
+        RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db,
+                          RocksCounterManager* counterManager, bool durable);
         virtual ~RocksRecoveryUnit();
 
         virtual void beginUnitOfWork(OperationContext* opCtx);
@@ -104,13 +106,11 @@ namespace mongo {
 
         long long getDeltaCounter(const rocksdb::Slice& counterKey);
 
-        static long long getCounterValue(rocksdb::DB* db, const rocksdb::Slice counterKey);
-
         void setOplogReadTill(const RecordId& loc);
         RecordId getOplogReadTill() const { return _oplogReadTill; }
 
         RocksRecoveryUnit* newRocksRecoveryUnit() {
-            return new RocksRecoveryUnit(_transactionEngine, _db, _durable);
+            return new RocksRecoveryUnit(_transactionEngine, _db, _counterManager, _durable);
         }
 
         struct Counter {
@@ -126,8 +126,6 @@ namespace mongo {
 
         static int getTotalLiveRecoveryUnits() { return _totalLiveRecoveryUnits.load(); }
 
-        static rocksdb::Slice encodeCounter(long long counter, int64_t* storage);
-
     private:
         void _releaseSnapshot();
 
@@ -135,7 +133,8 @@ namespace mongo {
 
         void _abort();
         RocksTransactionEngine* _transactionEngine;  // not owned
-        rocksdb::DB* _db; // not owned
+        rocksdb::DB* _db;                            // not owned
+        RocksCounterManager* _counterManager;        // not owned
 
         const bool _durable;
 

@@ -64,6 +64,7 @@ namespace mongo {
             auto s = rocksdb::DB::Open(options, _tempDir.path(), &db);
             ASSERT(s.ok());
             _db.reset(db);
+            _counterManager.reset(new RocksCounterManager(_db.get(), true));
         }
 
         virtual SortedDataInterface* newSortedDataInterface(bool unique) {
@@ -75,7 +76,7 @@ namespace mongo {
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new RocksRecoveryUnit(&_transactionEngine, _db.get(), true);
+            return new RocksRecoveryUnit(&_transactionEngine, _db.get(), _counterManager.get(), true);
         }
 
     private:
@@ -84,6 +85,7 @@ namespace mongo {
         unittest::TempDir _tempDir;
         scoped_ptr<rocksdb::DB> _db;
         RocksTransactionEngine _transactionEngine;
+        scoped_ptr<RocksCounterManager> _counterManager;
     };
 
     HarnessHelper* newHarnessHelper() { return new RocksIndexHarness(); }

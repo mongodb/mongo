@@ -30,10 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include "rocks_parameters.h"
+#include "rocks_util.h"
 
 #include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+
+#include <rocksdb/db.h>
+#include <rocksdb/experimental.h>
 
 namespace mongo {
 
@@ -69,5 +73,44 @@ namespace mongo {
         _engine->setMaxWriteMBPerSec(newNum);
 
         return Status::OK();
+    }
+
+    RocksBackupServerParameter::RocksBackupServerParameter(RocksEngine* engine)
+        : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbBackup", false, true),
+          _engine(engine) {}
+
+    void RocksBackupServerParameter::append(OperationContext* txn, BSONObjBuilder& b,
+                                            const std::string& name) {
+        b.append(name, "");
+    }
+
+    Status RocksBackupServerParameter::set(const BSONElement& newValueElement) {
+        auto str = newValueElement.str();
+        if (str.size() == 0) {
+            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a string");
+        }
+        return setFromString(str);
+    }
+
+    Status RocksBackupServerParameter::setFromString(const std::string& str) {
+        return _engine->backup(str);
+    }
+
+    RocksCompactServerParameter::RocksCompactServerParameter(RocksEngine* engine)
+        : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbCompact", false, true),
+          _engine(engine) {}
+
+    void RocksCompactServerParameter::append(OperationContext* txn, BSONObjBuilder& b,
+                                             const std::string& name) {
+        b.append(name, "");
+    }
+
+    Status RocksCompactServerParameter::set(const BSONElement& newValueElement) {
+        return setFromString("");
+    }
+
+    Status RocksCompactServerParameter::setFromString(const std::string& str) {
+        auto s = rocksdb::experimental::SuggestCompactRange(_engine->getDB(), nullptr, nullptr);
+        return rocksToMongoStatus(s);
     }
 }

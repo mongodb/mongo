@@ -59,6 +59,8 @@ namespace mongo {
                 // Intentionally leaked.
                 auto leaked __attribute__((unused)) = new RocksServerStatusSection(engine);
                 auto leaked2 __attribute__((unused)) = new RocksRateLimiterServerParameter(engine);
+                auto leaked3 __attribute__((unused)) = new RocksBackupServerParameter(engine);
+                auto leaked4 __attribute__((unused)) = new RocksCompactServerParameter(engine);
 
                 return new KVStorageEngine(engine, options);
             }

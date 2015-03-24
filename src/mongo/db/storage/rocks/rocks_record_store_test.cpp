@@ -64,23 +64,25 @@ namespace mongo {
             auto s = rocksdb::DB::Open(options, _tempDir.path(), &db);
             ASSERT(s.ok());
             _db.reset(db);
+            _counterManager.reset(new RocksCounterManager(_db.get(), true));
         }
 
         virtual RecordStore* newNonCappedRecordStore() {
           return newNonCappedRecordStore("foo.bar");
         }
         RecordStore* newNonCappedRecordStore(const std::string& ns) {
-            return new RocksRecordStore(ns, "1", _db.get(), "prefix");
+            return new RocksRecordStore(ns, "1", _db.get(), _counterManager.get(), "prefix");
         }
 
         RecordStore* newCappedRecordStore(const std::string& ns, int64_t cappedMaxSize,
                                           int64_t cappedMaxDocs) {
-            return new RocksRecordStore(ns, "1", _db.get(), "prefix", true, cappedMaxSize,
-                                        cappedMaxDocs);
+            return new RocksRecordStore(ns, "1", _db.get(), _counterManager.get(), "prefix", true,
+                                        cappedMaxSize, cappedMaxDocs);
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new RocksRecoveryUnit(&_transactionEngine, _db.get(), true);
+            return new RocksRecoveryUnit(&_transactionEngine, _db.get(), _counterManager.get(),
+                                         true);
         }
 
     private:
@@ -88,6 +90,7 @@ namespace mongo {
         unittest::TempDir _tempDir;
         boost::scoped_ptr<rocksdb::DB> _db;
         RocksTransactionEngine _transactionEngine;
+        scoped_ptr<RocksCounterManager> _counterManager;
     };
 
     HarnessHelper* newHarnessHelper() { return new RocksRecordStoreHarnessHelper(); }

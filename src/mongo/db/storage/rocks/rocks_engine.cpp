@@ -49,6 +49,7 @@
 #include <rocksdb/utilities/convenience.h>
 #include <rocksdb/filter_policy.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
+#include <rocksdb/utilities/checkpoint.h>
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -59,6 +60,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 
+#include "rocks_counter_manager.h"
 #include "rocks_global_options.h"
 #include "rocks_record_store.h"
 #include "rocks_recovery_unit.h"
@@ -175,6 +177,9 @@ namespace mongo {
         invariantRocksOK(s);
         _db.reset(db);
 
+        _counterManager.reset(
+            new RocksCounterManager(_db.get(), rocksGlobalOptions.crashSafeCounters));
+
         // open iterator
         boost::scoped_ptr<rocksdb::Iterator> iter(_db->NewIterator(rocksdb::ReadOptions()));
 
@@ -246,10 +251,11 @@ namespace mongo {
         }
     }
 
-    RocksEngine::~RocksEngine() {}
+    RocksEngine::~RocksEngine() { cleanShutdown(); }
 
     RecoveryUnit* RocksEngine::newRecoveryUnit() {
-        return new RocksRecoveryUnit(&_transactionEngine, _db.get(), _durable);
+        return new RocksRecoveryUnit(&_transactionEngine, _db.get(), _counterManager.get(),
+                                     _durable);
     }
 
     Status RocksEngine::createRecordStore(OperationContext* opCtx, const StringData& ns,
@@ -275,11 +281,12 @@ namespace mongo {
         }
         if (options.capped) {
             return new RocksRecordStore(
-                ns, ident, _db.get(), _getIdentPrefix(ident), true,
+                ns, ident, _db.get(), _counterManager.get(), _getIdentPrefix(ident), true,
                 options.cappedSize ? options.cappedSize : 4096,  // default size
                 options.cappedMaxDocs ? options.cappedMaxDocs : -1);
         } else {
-            return new RocksRecordStore(ns, ident, _db.get(), _getIdentPrefix(ident));
+            return new RocksRecordStore(ns, ident, _db.get(), _counterManager.get(),
+                                        _getIdentPrefix(ident));
         }
     }
 
@@ -361,6 +368,8 @@ namespace mongo {
         return indents;
     }
 
+    void RocksEngine::cleanShutdown() { _counterManager->sync(); }
+
     int64_t RocksEngine::getIdentSize(OperationContext* opCtx, const StringData& ident) {
         uint64_t storageSize;
         std::string prefix = _getIdentPrefix(ident);
@@ -373,6 +382,16 @@ namespace mongo {
     void RocksEngine::setMaxWriteMBPerSec(int maxWriteMBPerSec) {
         _maxWriteMBPerSec = maxWriteMBPerSec;
         _rateLimiter->SetBytesPerSecond(static_cast<int64_t>(_maxWriteMBPerSec) * 1024 * 1024);
+    }
+
+    Status RocksEngine::backup(const std::string& path) {
+        rocksdb::Checkpoint* checkpoint;
+        auto s = rocksdb::Checkpoint::Create(_db.get(), &checkpoint);
+        if (s.ok()) {
+            s = checkpoint->CreateCheckpoint(path);
+        }
+        delete checkpoint;
+        return rocksToMongoStatus(s);
     }
 
     std::unordered_set<uint32_t> RocksEngine::getDroppedPrefixes() const {
@@ -454,7 +473,11 @@ namespace mongo {
         // allow override
         if (!rocksGlobalOptions.configString.empty()) {
             rocksdb::Options base_options(options);
-            rocksdb::GetOptionsFromString(base_options, rocksGlobalOptions.configString, &options);
+            auto s = rocksdb::GetOptionsFromString(base_options, rocksGlobalOptions.configString, &options);
+            if (!s.ok()) {
+              log() << "Invalid rocksdbConfigString \"" << rocksGlobalOptions.configString << "\"";
+              invariantRocksOK(s);
+            }
         }
 
         return options;
