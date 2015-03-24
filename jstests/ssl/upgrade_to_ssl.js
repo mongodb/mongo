@@ -7,14 +7,13 @@
  * and therefore cannot test modes that do not allow ssl.
  */
 
+// If we are running in use-x509 passthrough mode, turn it off
+// since it is not necessary for this test.
+TestData.useX509 = false;
 load("jstests/ssl/libs/ssl_helpers.js");
 
 // "sslAllowInvalidCertificates" is enabled to avoid hostname conflicts with our testing certs
-var opts = {sslMode:"allowSSL",
-            sslPEMKeyFile: SERVER_CERT,
-            sslAllowInvalidCertificates: "",
-            sslAllowConnectionsWithoutCertificates: "",
-            sslCAFile: "jstests/libs/ca.pem"};
+opts = {sslMode:"allowSSL", sslPEMKeyFile: SERVER_CERT, sslAllowInvalidCertificates: ""};
 var rst = new ReplSetTest({ name: 'sslSet', nodes: 3, nodeOptions : opts });
 rst.startSet();
 rst.initiate();
@@ -24,8 +23,7 @@ rstConn1.getDB("test").a.insert({a:1, str:"TESTTESTTEST"});
 assert.eq(1, rstConn1.getDB("test").a.count(), "Error interacting with replSet");
 
 print("===== UPGRADE allowSSL -> preferSSL =====");
-opts.sslMode = "preferSSL";
-rst.upgradeSet(opts);
+rst.upgradeSet({sslMode:"preferSSL", sslPEMKeyFile: SERVER_CERT, sslAllowInvalidCertificates: ""});
 var rstConn2 = rst.getMaster();
 rstConn2.getDB("test").a.insert({a:2, str:"CHECKCHECK"});
 assert.eq(2, rstConn2.getDB("test").a.count(), "Error interacting with replSet");
@@ -35,8 +33,7 @@ var canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval",
 assert.eq(0, canConnectNoSSL, "non-SSL Connection attempt failed when it should succeed");
 
 print("===== UPGRADE preferSSL -> requireSSL =====");
-opts.sslMode = "requireSSL";
-rst.upgradeSet(opts);
+rst.upgradeSet({sslMode:"requireSSL", sslPEMKeyFile: SERVER_CERT, sslAllowInvalidCertificates: ""});
 var rstConn3 = rst.getMaster();
 rstConn3.getDB("test").a.insert({a:3, str:"GREENEGGSANDHAM"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");

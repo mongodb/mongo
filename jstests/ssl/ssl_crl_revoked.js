@@ -2,12 +2,18 @@
 // Note: crl_client_revoked.pem is a CRL with the client.pem certificate listed as revoked.
 // This test should test that the user cannot connect with client.pem certificate.
 
-var md = MongoRunner.runMongod({sslMode: "requireSSL",
-                                sslPEMKeyFile: "jstests/libs/server.pem",
-                                sslCAFile: "jstests/libs/ca.pem",
-                                sslCRLFile: "jstests/libs/crl_client_revoked.pem"});
+port = allocatePorts( 1 )[ 0 ];
+var baseName = "jstests_ssl_ssl_crl_revoked";
 
-var mongo = runMongoProgram("mongo", "--port", md.port, "--ssl", "--sslAllowInvalidCertificates",
+
+var md = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName,
+                    "--sslMode","requireSSL",
+                    "--sslPEMKeyFile", "jstests/libs/server.pem",
+                    "--sslCAFile", "jstests/libs/ca.pem",
+                    "--sslCRLFile", "jstests/libs/crl_client_revoked.pem");
+
+
+var mongo = runMongoProgram("mongo", "--port", port, "--ssl", "--sslAllowInvalidCertificates",
                             "--sslPEMKeyFile", "jstests/libs/client_revoked.pem",
                             "--eval", ";");
 

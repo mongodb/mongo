@@ -1,10 +1,6 @@
 // Basic tests for cluster authentication using x509.
 
-var common_options = {keyFile : "jstests/libs/key1",
-                      sslMode : "requireSSL",
-                      sslPEMKeyFile: "jstests/libs/server.pem",
-                      sslCAFile: "jstests/libs/ca.pem",
-                      sslAllowInvalidHostnames: ""};
+var common_options = {keyFile : "jstests/libs/key1"};
 
 function runInitialSyncTest() {
     load("jstests/replsets/rslib.js");

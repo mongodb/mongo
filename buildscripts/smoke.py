@@ -252,11 +252,14 @@ class mongod(NullMongod):
             self.auth = True
         if self.kwargs.get('keyFile'):
             argv += ['--keyFile', self.kwargs.get('keyFile')]
-        if self.kwargs.get('use_ssl'):
+        if self.kwargs.get('use_ssl') or self.kwargs.get('use_x509'):
             argv += ['--sslMode', "requireSSL",
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
                      '--sslCAFile', 'jstests/libs/ca.pem',
-                     '--sslAllowConnectionsWithoutCertificates']
+                     '--sslWeakCertificateValidation']
+        if self.kwargs.get('use_x509'):
+            argv += ['--clusterAuthMode','x509'];
+            self.auth = True
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
@@ -453,7 +456,7 @@ def skipTest(path):
         if basename in ["fastsync.js", "index_retry.js", "ttl_repl_maintenance.js", 
                         "unix_socket1.js"]:
             return True;
-    if auth or keyFile: # For tests running with auth
+    if auth or keyFile or use_x509: # For tests running with auth
         # Skip any tests that run with auth explicitly
         if parentDir.lower() == "auth" or "auth" in basename.lower():
             return True
@@ -585,7 +588,9 @@ def runTest(test, result):
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";" + \
                      'TestData.authMechanism = ' + ternary( authMechanism,
-                                               '"' + str(authMechanism) + '"', 'null') + ";"
+                                               '"' + str(authMechanism) + '"', 'null') + ";" + \
+                     'TestData.useSSL = ' + ternary( use_ssl ) + ";" + \
+                     'TestData.useX509 = ' + ternary( use_x509 ) + ";"
         # this updates the default data directory for mongod processes started through shell (src/mongo/shell/servers.js)
         evalString += 'MongoRunner.dataDir = "' + os.path.abspath(smoke_db_prefix + '/data/db') + '";'
         evalString += 'MongoRunner.dataPath = MongoRunner.dataDir + "/";'
@@ -697,7 +702,8 @@ def run_tests(tests):
                             auth=auth,
                             authMechanism=authMechanism,
                             keyFile=keyFile,
-                            use_ssl=use_ssl)
+                            use_ssl=use_ssl,
+                            use_x509=use_x509)
             master.start()
 
         if small_oplog:
@@ -724,7 +730,8 @@ def run_tests(tests):
                            auth=auth,
                            authMechanism=authMechanism,
                            keyFile=keyFile,
-                           use_ssl=use_ssl)
+                           use_ssl=use_ssl,
+                           use_x509=use_x509)
             slave.start()
             primary = Connection(port=master.port, slave_okay=True);
 
@@ -805,7 +812,8 @@ def run_tests(tests):
                                         auth=auth,
                                         authMechanism=authMechanism,
                                         keyFile=keyFile,
-                                        use_ssl=use_ssl)
+                                        use_ssl=use_ssl,
+                                        use_x509=use_x509)
                         master.start()
 
             except TestFailure, f:
@@ -1087,7 +1095,7 @@ def set_globals(options, tests):
     global small_oplog, small_oplog_rs
     global no_journal, set_parameters, set_parameters_mongos, no_preallocj, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
     global auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
-    global use_ssl
+    global use_ssl, use_x509
     global file_of_commands_mode
     global report_file, shell_write_mode, use_write_commands
     global temp_path
@@ -1097,6 +1105,9 @@ def set_globals(options, tests):
     start_mongod = options.start_mongod
     if hasattr(options, 'use_ssl'):
         use_ssl = options.use_ssl
+    if hasattr(options, 'use_x509'):
+        use_x509 = options.use_x509
+        use_ssl = use_ssl or use_x509
     #Careful, this can be called multiple times
     test_path = options.test_path
 
@@ -1287,6 +1298,9 @@ def main():
     parser.add_option('--auth', dest='auth', default=False,
                       action="store_true",
                       help='Run standalone mongods in tests with authentication enabled')
+    parser.add_option('--use-x509', dest='use_x509', default=False,
+                      action="store_true",
+                      help='Use x509 auth for internal cluster authentication')
     parser.add_option('--authMechanism', dest='authMechanism', default='SCRAM-SHA-1',
                       help='Use the given authentication mechanism, when --auth is used.')
     parser.add_option('--keyFile', dest='keyFile', default=None,

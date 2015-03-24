@@ -7,6 +7,12 @@ var SAN_CERT = "jstests/libs/localhostnameSAN.pem";
 var CLIENT_CERT = "jstests/libs/client.pem"
 var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
+// We want to be able to control all SSL parameters
+// but still need an SSL shell hence the test is placed
+// in the /ssl directory
+TestData.useX509 = false;
+TestData.useSSL = false;
+
 port = allocatePorts(1)[0];
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
@@ -46,7 +52,7 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
         assert.eq(1, mongo, "Connection attempt succeeded when it should fail certPath: " + 
                   certPath);
     }
-    MongoRunner.stopMongod(port);
+    stopMongod(port);
 }
 
 // 1. Test client connections with different server certificates

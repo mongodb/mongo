@@ -10,13 +10,13 @@ resetDbpath(dbpath);
 mkdir(external_scratch_dir);
 
 // Password is correct
-var md = MongoRunner.runMongod({nopreallocj: "",
-                                port: port,
-                                dbpath: dbpath,
-                                sslMode: "requireSSL",
-                                sslPEMKeyFile: "jstests/libs/password_protected.pem",
-                                sslPEMKeyPassword: "qwerty"});
-// MongoRunner.runMongod connects a Mongo shell, so if we get here, the test is successful.
+md = startMongod("--nopreallocj",
+                 "--port", port, 
+                 "--dbpath", dbpath, 
+                 "--sslMode","requireSSL",
+                 "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
+                 "--sslPEMKeyPassword", "qwerty");
+// startMongod connects a Mongo shell, so if we get here, the test is successful.
 
 
 // Password incorrect; error logged is:
@@ -134,6 +134,6 @@ assert.eq(md5, md5_stored, "hash of stored file does not match the expected valu
 
 if (!_isWindows()) {
     // Stop the server
-    var exitCode = MongoRunner.stopMongod(port, 15);
+    var exitCode = stopMongod(port, 15);
     assert(exitCode == 0);
 }

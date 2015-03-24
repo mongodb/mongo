@@ -34,6 +34,17 @@ startMongodTest = function (port, dirname, restart, extraOptions) {
         options["auth"] = "";
     if(jsTestOptions().keyFile && (!extraOptions || !extraOptions['keyFile']))
         options['keyFile'] = jsTestOptions().keyFile
+    if(jsTestOptions().useSSL) {
+        if (!options["sslMode"])
+            options["sslMode"] = "requireSSL";
+        if (!options["sslPEMKeyFile"])
+            options["sslPEMKeyFile"] = "jstests/libs/server.pem";
+        if (!options["sslCAFile"])
+            options["sslCAFile"] = "jstests/libs/ca.pem";
+        options["sslWeakCertificateValidation"] = "";
+    }
+    if (jsTestOptions().useX509 && !options["clusterAuthMode"])
+        options["clusterAuthMode"] = "x509";
 
     if (extraOptions)
         Object.extend(options , extraOptions);
