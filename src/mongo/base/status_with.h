@@ -31,6 +31,7 @@
 
 #include <iosfwd>
 #include <type_traits>
+#include <utility>
 
 #include "mongo/base/status.h"
 
@@ -123,6 +124,11 @@ namespace mongo {
         Status _status;
         T _t;
     };
+
+    template<typename T, typename... Args>
+    StatusWith<T> makeStatusWith(Args&&... args) {
+        return StatusWith<T>{T(std::forward<Args>(args)...)};
+    }
 
     template<typename T>
     std::ostream& operator<<(std::ostream& stream, const StatusWith<T>& sw) {

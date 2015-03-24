@@ -241,6 +241,16 @@ namespace mongo {
         }
     }
 
+    template<typename T>
+    MONGO_CLIENT_API inline T uassertStatusOK(StatusWith<T> sw) {
+        if (MONGO_unlikely(!sw.isOK())) {
+            const auto& status = sw.getStatus();
+            uasserted((status.location() != 0 ? status.location() : status.code()),
+                      status.reason());
+        }
+        return std::move(sw.getValue());
+    }
+
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) do {                                 \
         if (MONGO_unlikely(!(_Expression))) {                               \
