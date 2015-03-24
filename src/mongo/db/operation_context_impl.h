@@ -32,7 +32,6 @@
 
 #include "mongo/db/operation_context.h"
 
-
 namespace mongo {
 
     class OperationContextImpl : public OperationContext  {

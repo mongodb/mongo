@@ -120,7 +120,8 @@ namespace mongo {
             if (!wcResult.isOK()) {
                 return appendCommandStatus(result, wcResult.getStatus());
             }
-            setupSynchronousCommit(wcResult.getValue(), txn);
+            txn->setWriteConcern(wcResult.getValue());
+            setupSynchronousCommit(txn);
 
             bool ok = false;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
@@ -184,11 +185,8 @@ namespace mongo {
             }
 
             WriteConcernResult res;
-            wcResult = waitForWriteConcern(txn,
-                                           wcResult.getValue(),
-                                           txn->getClient()->getLastOp(),
-                                           &res);
-            appendCommandWCStatus(result, wcResult.getStatus());
+            Status waitStatus = waitForWriteConcern(txn, txn->getClient()->getLastOp(), &res);
+            appendCommandWCStatus(result, waitStatus);
 
             return ok;
         }

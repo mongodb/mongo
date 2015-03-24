@@ -62,7 +62,6 @@ namespace mongo {
         class ExecInsertsState;
 
         WriteBatchExecutor( OperationContext* txn,
-                            const WriteConcernOptions& defaultWriteConcern,
                             OpCounters* opCounters,
                             LastError* le );
 
@@ -86,7 +85,6 @@ namespace mongo {
          * Dispatches to one of the three functions below for DBLock, CurOp, and stats management.
          */
         void bulkExecute( const BatchedCommandRequest& request,
-                          const WriteConcernOptions& writeConcern,
                           std::vector<BatchedUpsertDetail*>* upsertedIds,
                           std::vector<WriteErrorDetail*>* errors );
 
@@ -98,7 +96,6 @@ namespace mongo {
          * times.
          */
         void execInserts( const BatchedCommandRequest& request,
-                          const WriteConcernOptions& writeConcern,
                           std::vector<WriteErrorDetail*>* errors );
 
         /**
@@ -144,9 +141,6 @@ namespace mongo {
                             CurOp* currentOp );
 
         OperationContext* _txn;
-
-        // Default write concern, if one isn't provide in the batches.
-        const WriteConcernOptions _defaultWriteConcern;
 
         // OpCounters object to update - needed for stats reporting
         // Not owned here.

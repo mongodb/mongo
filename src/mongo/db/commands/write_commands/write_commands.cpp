@@ -48,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/d_state.h"
 
 namespace mongo {
@@ -137,11 +138,14 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNSS(nss);
 
-        WriteConcernOptions defaultWriteConcern =
-            repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
+        StatusWith<WriteConcernOptions> wcStatus = extractWriteConcern(cmdObj);
+
+        if (!wcStatus.isOK()) {
+            return appendCommandStatus(result, wcStatus.getStatus());
+        }
+        txn->setWriteConcern(wcStatus.getValue());
 
         WriteBatchExecutor writeBatchExecutor(txn,
-                                              defaultWriteConcern,
                                               &globalOpCounters,
                                               lastError.get());
 

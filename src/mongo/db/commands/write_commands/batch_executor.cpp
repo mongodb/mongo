@@ -112,11 +112,9 @@ namespace mongo {
     using mongoutils::str::stream;
 
     WriteBatchExecutor::WriteBatchExecutor( OperationContext* txn,
-                                            const WriteConcernOptions& wc,
                                             OpCounters* opCounters,
                                             LastError* le ) :
         _txn(txn),
-        _defaultWriteConcern( wc ),
         _opCounters( opCounters ),
         _le( le ),
         _stats( new WriteBatchStats ) {
@@ -198,39 +196,6 @@ namespace mongo {
             return;
         }
 
-        // Validate write concern
-        // TODO: Lift write concern parsing out of this entirely
-        WriteConcernOptions writeConcern;
-
-        BSONObj wcDoc;
-        if ( request.isWriteConcernSet() ) {
-            wcDoc = request.getWriteConcern();
-        }
-
-        Status wcStatus = Status::OK();
-        if ( wcDoc.isEmpty() ) {
-
-            // The default write concern if empty is w : 1
-            // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
-            writeConcern = _defaultWriteConcern;
-
-            if ( writeConcern.wNumNodes == 0 && writeConcern.wMode.empty() ) {
-                writeConcern.wNumNodes = 1;
-            }
-        }
-        else {
-            wcStatus = writeConcern.parse( wcDoc );
-        }
-
-        if ( wcStatus.isOK() ) {
-            wcStatus = validateWriteConcern( writeConcern );
-        }
-
-        if ( !wcStatus.isOK() ) {
-            toBatchError( wcStatus, response );
-            return;
-        }
-
         if ( request.sizeWriteOps() == 0u ) {
             toBatchError( Status( ErrorCodes::InvalidLength,
                                   "no write ops were included in the batch" ),
@@ -251,6 +216,7 @@ namespace mongo {
         // End validation
         //
 
+        const WriteConcernOptions& writeConcern = _txn->getWriteConcern();
         bool silentWC = writeConcern.wMode.empty() && writeConcern.wNumNodes == 0
                         && writeConcern.syncMode == WriteConcernOptions::NONE;
 
@@ -267,7 +233,7 @@ namespace mongo {
         // Stops on error if batch is ordered.
         //
 
-        bulkExecute( request, writeConcern, &upserted, &writeErrors );
+        bulkExecute( request, &upserted, &writeErrors );
 
         //
         // Try to enforce the write concern if everything succeeded (unordered or ordered)
@@ -284,7 +250,7 @@ namespace mongo {
             _txn->getCurOp()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
-            Status status = waitForWriteConcern( _txn, writeConcern, _txn->getClient()->getLastOp(), &res );
+            Status status = waitForWriteConcern( _txn, _txn->getClient()->getLastOp(), &res );
 
             if ( !status.isOK() ) {
                 wcError.reset( toWriteConcernError( status, res ) );
@@ -758,18 +724,17 @@ namespace mongo {
     };
 
     void WriteBatchExecutor::bulkExecute( const BatchedCommandRequest& request,
-                                          const WriteConcernOptions& writeConcern,
                                           std::vector<BatchedUpsertDetail*>* upsertedIds,
                                           std::vector<WriteErrorDetail*>* errors ) {
 
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
-            execInserts( request, writeConcern, errors );
+            execInserts( request, errors );
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
 
                 if ( i + 1 == request.sizeWriteOps() )
-                    setupSynchronousCommit( writeConcern, _txn );
+                    setupSynchronousCommit( _txn );
 
                 WriteErrorDetail* error = NULL;
                 BSONObj upsertedId;
@@ -794,7 +759,7 @@ namespace mongo {
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
 
                 if ( i + 1 == request.sizeWriteOps() )
-                    setupSynchronousCommit( writeConcern, _txn );
+                    setupSynchronousCommit( _txn );
 
                 WriteErrorDetail* error = NULL;
                 execRemove( BatchItemRef( &request, i ), &error );
@@ -837,7 +802,6 @@ namespace mongo {
     }
 
     void WriteBatchExecutor::execInserts( const BatchedCommandRequest& request,
-                                          const WriteConcernOptions& writeConcern,
                                           std::vector<WriteErrorDetail*>* errors ) {
 
         // Theory of operation:
@@ -871,7 +835,7 @@ namespace mongo {
              ++state.currIndex) {
 
             if (state.currIndex + 1 == state.request->sizeWriteOps())
-                setupSynchronousCommit(writeConcern, _txn);
+                setupSynchronousCommit(_txn);
 
             if (elapsedTracker.intervalHasElapsed()) {
                 // Yield between inserts.

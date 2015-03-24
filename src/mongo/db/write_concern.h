@@ -37,13 +37,12 @@ namespace mongo {
     template <typename T> class StatusWith;
 
     /**
-     * If "writeConcern" indicates a durable commit level,
+     * If txn->getWriteConcern() indicates a durable commit level,
      * marks the RecoveryUnit associated with "txn" appropriately.
      * Provides a hint to the storage engine that
      * particular operations will be waiting for their changes to become durable.
      */
-    void setupSynchronousCommit(const WriteConcernOptions& writeConcern,
-                                OperationContext* txn);
+    void setupSynchronousCommit(OperationContext* txn);
 
     /**
      * Attempts to extract a writeConcern from cmdObj.
@@ -95,7 +94,6 @@ namespace mongo {
      * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
      */
     Status waitForWriteConcern( OperationContext* txn,
-                                const WriteConcernOptions& writeConcern,
                                 const OpTime& replOpTime,
                                 WriteConcernResult* result );
 

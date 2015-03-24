@@ -33,6 +33,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
@@ -40,7 +41,6 @@ namespace mongo {
     class CurOp;
     class ProgressMeter;
     class StringData;
-
     /**
      * This class encompasses the state required by an operation.
      *
@@ -131,8 +131,22 @@ namespace mongo {
          */
         virtual bool isPrimaryFor( StringData ns ) = 0;
 
+        /**
+         * Returns WriteConcernOptions of the current operation
+         */
+        const WriteConcernOptions& getWriteConcern() const {
+            return _writeConcern;
+        }
+
+        void setWriteConcern(const WriteConcernOptions& writeConcern) {
+            _writeConcern = writeConcern;
+        }
+
     protected:
         OperationContext() { }
+
+    private:
+        WriteConcernOptions _writeConcern;
     };
 
     class WriteUnitOfWork {
@@ -172,7 +186,7 @@ namespace mongo {
 
     /**
      * RAII-style class to mark the scope of a transaction. ScopedTransactions may be nested.
-     * An outermost ScopedTransaction calls commitAndRestart() on destruction, so that the storage 
+     * An outermost ScopedTransaction calls commitAndRestart() on destruction, so that the storage
      * engine can release resources, such as snapshots or locks, that it may have acquired during
      * the transaction. Note that any writes are committed in nested WriteUnitOfWork scopes,
      * so write conflicts cannot happen on completing a ScopedTransaction.
