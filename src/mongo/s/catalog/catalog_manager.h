@@ -38,6 +38,7 @@ namespace mongo {
     class BatchedCommandRequest;
     class BatchedCommandResponse;
     class BSONObj;
+    class ConnectionString;
     class DatabaseType;
     class OperationContext;
     class Status;
@@ -67,6 +68,22 @@ namespace mongo {
          *  - ShardNotFound - could not find a shard to place the DB on
          */
         virtual Status enableSharding(const std::string& dbName) = 0;
+
+        /**
+         *
+         * Adds a new shard. It expects a standalone mongod process or replica set to be running
+         * on the provided address.
+         *
+         * @param  name is an optional string with the name of the shard.
+         *         If empty, a name will be automatically generated.
+         * @param  shardConnectionString is the connection string of the shard being added.
+         * @param  maxSize is the optional space quota in bytes. Zeros means there's
+         *         no limitation to space usage.
+         * @return either an !OK status or the name of the newly added shard.
+         */
+        virtual StatusWith<std::string> addShard(const std::string& name,
+                                                 const ConnectionString& shardConnectionString,
+                                                 const long long maxSize) = 0;
 
         /**
          * Updates the metadata for a given database. Currently, if the specified DB entry does

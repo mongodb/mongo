@@ -34,6 +34,7 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/log.h"
@@ -125,12 +126,16 @@ namespace {
 
             audit::logAddShard(ClientBasic::getCurrent(), name, servers.toString(), maxSize);
 
-            if (!grid.addShard(&name, servers, maxSize, errmsg)) {
-                log() << "addshard request " << cmdObj << " failed: " << errmsg;
-                return false;
+            StatusWith<string> addShardResult =
+                grid.catalogManager()->addShard(name, servers, maxSize);
+            if (!addShardResult.isOK()) {
+                log() << "addShard request '" << cmdObj << "'"
+                      << " failed: " << addShardResult.getStatus().reason();
+                return appendCommandStatus(result, addShardResult.getStatus());
             }
 
-            result << "shardAdded" << name;
+            result << "shardAdded" << addShardResult.getValue();
+
             return true;
         }
 

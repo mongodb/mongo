@@ -98,21 +98,6 @@ namespace mongo {
         void setAllowLocalHost( bool allow );
 
         /**
-         *
-         * addShard will create a new shard in the grid. It expects a mongod process to be running
-         * on the provided address. Adding a shard that is a replica set is supported.
-         *
-         * @param name is an optional std::string with the name of the shard. if omitted, grid will
-         *        generate one and update the parameter.
-         * @param servers is the connection std::string of the shard being added
-         * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
-         *        space usage
-         * @param errMsg is the error description in case the operation failed.
-         * @return true if shard was successfully added.
-         */
-        bool addShard( std::string* name , const ConnectionString& servers , long long maxSize , std::string& errMsg );
-
-        /**
          * @return true if the config database knows about a host 'name'
          */
         bool knowAboutShard( const std::string& name ) const;

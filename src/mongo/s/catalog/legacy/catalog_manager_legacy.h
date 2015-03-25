@@ -52,6 +52,10 @@ namespace mongo {
 
         virtual Status enableSharding(const std::string& dbName);
 
+        virtual StatusWith<std::string> addShard(const std::string& name,
+                                                 const ConnectionString& shardConnectionString,
+                                                 const long long maxSize);
+
         virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db);
 
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName);
@@ -71,6 +75,11 @@ namespace mongo {
          */
         Status _checkDbDoesNotExist(const std::string& dbName) const;
 
+        /**
+         * Generates a new shard name "shard<xxxx>"
+         * where <xxxx> is an autoincrementing value and <xxxx> < 10000
+         */
+        StatusWith<std::string> _getNewShardName() const;
 
         // Parsed config server hosts, as specified on the command line.
         ConnectionString _configServerConnectionString;

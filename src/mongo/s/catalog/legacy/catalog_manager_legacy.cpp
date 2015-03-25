@@ -32,11 +32,13 @@
 
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 
+#include <iomanip>
 #include <pcrecpp.h>
 #include <set>
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -46,6 +48,7 @@
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_database.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/mongoutils/str.h"
@@ -87,6 +90,151 @@ namespace {
         response->setOk(false);
 
         dassert(response->isValid(NULL));
+    }
+
+    StatusWith<string> isValidShard(const string& name,
+                                    const ConnectionString& shardConnectionString,
+                                    ScopedDbConnection& conn) {
+        if (conn->type() == ConnectionString::SYNC) {
+            return Status(ErrorCodes::BadValue,
+                          "can't use sync cluster as a shard; for a replica set, "
+                          "you have to use <setname>/<server1>,<server2>,...");
+        }
+
+        BSONObj resIsMongos;
+        // (ok == 0) implies that it is a mongos
+        if (conn->runCommand("admin", BSON("isdbgrid" << 1), resIsMongos)) {
+            return Status(ErrorCodes::BadValue,
+                          "can't add a mongos process as a shard");
+        }
+
+        BSONObj resIsMaster;
+        if (!conn->runCommand("admin", BSON("isMaster" << 1), resIsMaster)) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "failed running isMaster: " << resIsMaster);
+        }
+
+        // if the shard has only one host, make sure it is not part of a replica set
+        string setName = resIsMaster["setName"].str();
+        string commandSetName = shardConnectionString.getSetName();
+        if (commandSetName.empty() && !setName.empty()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "host is part of set " << setName << "; "
+                                        << "use replica set url format "
+                                        << "<setname>/<server1>,<server2>, ...");
+        }
+
+        if (!commandSetName.empty() && setName.empty()) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "host did not return a set name; "
+                                        << "is the replica set still initializing? "
+                                        << resIsMaster);
+        }
+
+        // if the shard is part of replica set, make sure it is the right one
+        if (!commandSetName.empty() && (commandSetName != setName)) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "host is part of a different set: " << setName);
+        }
+
+        if (setName.empty()) {
+            // check this isn't a --configsvr
+            BSONObj res;
+            bool ok = conn->runCommand("admin",
+                                       BSON("replSetGetStatus" << 1),
+                                       res);
+            if(!ok && res["info"].type() == String && res["info"].String() == "configsvr") {
+                return Status(ErrorCodes::BadValue,
+                              "the specified mongod is a --configsvr and "
+                              "should thus not be a shard server");
+            }
+        }
+
+        // if the shard is part of a replica set,
+        // make sure all the hosts mentioned in 'shardConnectionString' are part of
+        // the set. It is fine if not all members of the set are present in 'shardConnectionString'.
+        bool foundAll = true;
+        string offendingHost;
+        if (!commandSetName.empty()) {
+            set<string> hostSet;
+            BSONObjIterator iter(resIsMaster["hosts"].Obj());
+            while (iter.more()) {
+                hostSet.insert(iter.next().String()); // host:port
+            }
+            if (resIsMaster["passives"].isABSONObj()) {
+                BSONObjIterator piter(resIsMaster["passives"].Obj());
+                while (piter.more()) {
+                    hostSet.insert(piter.next().String()); // host:port
+                }
+            }
+            if (resIsMaster["arbiters"].isABSONObj()) {
+                BSONObjIterator piter(resIsMaster["arbiters"].Obj());
+                while (piter.more()) {
+                    hostSet.insert(piter.next().String()); // host:port
+                }
+            }
+
+            vector<HostAndPort> hosts = shardConnectionString.getServers();
+            for (size_t i = 0; i < hosts.size(); i++) {
+                if (!hosts[i].hasPort()) {
+                    hosts[i] = HostAndPort(hosts[i].host(), hosts[i].port());
+                }
+                string host = hosts[i].toString(); // host:port
+                if (hostSet.find(host) == hostSet.end()) {
+                    offendingHost = host;
+                    foundAll = false;
+                    break;
+                }
+            }
+        }
+        if (!foundAll) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "in seed list " << shardConnectionString.toString()
+                                        << ", host " << offendingHost
+                                        << " does not belong to replica set " << setName);
+        }
+
+        string shardName(name);
+        // shard name defaults to the name of the replica set
+        if (name.empty() && !setName.empty()) {
+            shardName = setName;
+        }
+
+        // disallow adding shard replica set with name 'config'
+        if (shardName == "config") {
+            return Status(ErrorCodes::BadValue,
+                          "use of shard replica set with name 'config' is not allowed");
+        }
+
+        return shardName;
+    }
+
+    // In order to be accepted as a new shard, that mongod must not have
+    // any database name that exists already in any other shards.
+    // If that test passes, the new shard's databases are going to be entered as
+    // non-sharded db's whose primary is the newly added shard.
+    StatusWith<vector<string>> getDBNames(const ConnectionString& shardConnectionString,
+                                          ScopedDbConnection& conn) {
+        vector<string> dbNames;
+
+        BSONObj resListDB;
+        if (!conn->runCommand("admin", BSON("listDatabases" << 1), resListDB)) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "failed listing "
+                                        << shardConnectionString.toString()
+                                        << "'s databases:" << resListDB);
+        }
+
+        BSONObjIterator i(resListDB["databases"].Obj());
+        while (i.more()) {
+            BSONObj dbEntry = i.next().Obj();
+            const string& dbName = dbEntry["name"].String();
+            if (!(dbName == "local" || dbName == "admin" || dbName == "config")) {
+                dbNames.push_back(dbName);
+            }
+        }
+
+        return dbNames;
     }
 
     // Whether the logChange call should attempt to create the changelog collection
@@ -237,6 +385,129 @@ namespace {
         }
     }
 
+    StatusWith<string> CatalogManagerLegacy::addShard(const string& name,
+                                                      const ConnectionString& shardConnectionString,
+                                                      const long long maxSize) {
+
+        string shardName;
+        ReplicaSetMonitorPtr rsMonitor;
+        vector<string> dbNames;
+
+        try {
+            ScopedDbConnection newShardConn(shardConnectionString);
+            newShardConn->getLastError();
+
+            StatusWith<string> validShard = isValidShard(name,
+                                                         shardConnectionString,
+                                                         newShardConn);
+            if (!validShard.isOK()) {
+                newShardConn.done();
+                return validShard.getStatus();
+            }
+            shardName = validShard.getValue();
+
+            StatusWith<vector<string>> shardDBNames = getDBNames(shardConnectionString,
+                                                                 newShardConn);
+            if (!shardDBNames.isOK()) {
+                newShardConn.done();
+                return shardDBNames.getStatus();
+            }
+            dbNames = shardDBNames.getValue();
+
+            if (newShardConn->type() == ConnectionString::SET) {
+                rsMonitor = ReplicaSetMonitor::get(shardConnectionString.getSetName());
+            }
+
+            newShardConn.done();
+        }
+        catch (const DBException& e) {
+            if (shardConnectionString.type() == ConnectionString::SET) {
+                ReplicaSetMonitor::remove(shardConnectionString.getSetName());
+            }
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "couldn't connect to new shard "
+                                        << e.what());
+        }
+
+        // check that none of the existing shard candidate's db's exist elsewhere
+        for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
+            StatusWith<DatabaseType> dbt = getDatabase(*it);
+            if (dbt.isOK()) {
+                return Status(ErrorCodes::OperationFailed,
+                              str::stream() << "can't add shard "
+                                            << "'" << shardConnectionString.toString() << "'"
+                                            << " because a local database '" << *it
+                                            << "' exists in another "
+                                            << dbt.getValue().getPrimary());
+            }
+        }
+
+        // if a name for a shard wasn't provided, pick one.
+        if (shardName.empty()) {
+            StatusWith<string> result = _getNewShardName();
+            if (!result.isOK()) {
+                return Status(ErrorCodes::OperationFailed,
+                              "error generating new shard name");
+            }
+            shardName = result.getValue();
+        }
+
+        // build the ConfigDB shard document
+        BSONObjBuilder b;
+        b.append(ShardType::name(), shardName);
+        b.append(ShardType::host(),
+                 rsMonitor ? rsMonitor->getServerAddress() : shardConnectionString.toString());
+        if (maxSize > 0) {
+            b.append(ShardType::maxSize(), maxSize);
+        }
+        BSONObj shardDoc = b.obj();
+
+        {
+            ScopedDbConnection conn(_configServerConnectionString, 30);
+
+            // check whether the set of hosts (or single host) is not an already a known shard
+            BSONObj old = conn->findOne(ShardType::ConfigNS,
+                                        BSON(ShardType::host(shardConnectionString.toString())));
+
+            if (!old.isEmpty()) {
+                conn.done();
+                return Status(ErrorCodes::OperationFailed, "host already used");
+            }
+        }
+
+        log() << "going to add shard: " << shardDoc;
+
+        Status result = insert(ShardType::ConfigNS, shardDoc, NULL);
+        if (!result.isOK()) {
+            log() << "error adding shard: " << shardDoc << " err: " << result.reason();
+            return result;
+        }
+
+        Shard::reloadShardInfo();
+
+        // add all databases of the new shard
+        for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
+            DatabaseType dbt;
+            dbt.setName(*it);
+            dbt.setPrimary(shardName);
+            dbt.setSharded(false);
+            Status status  = updateDatabase(*it, dbt);
+            if (!status.isOK()) {
+                log() << "adding shard " << shardConnectionString.toString()
+                      << " even though could not add database " << *it;
+            }
+        }
+
+        // Record in changelog
+        BSONObjBuilder shardDetails;
+        shardDetails.append("name", shardName);
+        shardDetails.append("host", shardConnectionString.toString());
+
+        logChange(NULL, "addShard", "", shardDetails.obj());
+
+        return shardName;
+    }
+
     Status CatalogManagerLegacy::updateDatabase(const std::string& dbName, const DatabaseType& db) {
         fassert(28616, db.validate());
 
@@ -385,6 +656,35 @@ namespace {
         }
 
         return Status::OK();
+    }
+
+    StatusWith<string> CatalogManagerLegacy::_getNewShardName() const {
+        BSONObj o;
+        {
+            ScopedDbConnection conn(_configServerConnectionString, 30);
+            o = conn->findOne(ShardType::ConfigNS,
+                              Query(fromjson("{" + ShardType::name() + ": /^shard/}"))
+                                  .sort(BSON(ShardType::name() << -1 )));
+            conn.done();
+        }
+
+        int count = 0;
+        if (!o.isEmpty()) {
+            string last = o[ShardType::name()].String();
+            std::istringstream is(last.substr(5));
+            is >> count;
+            count++;
+        }
+
+        // TODO fix so that we can have more than 10000 automatically generated shard names
+        if (count < 9999) {
+            std::stringstream ss;
+            ss << "shard" << std::setfill('0') << std::setw(4) << count;
+            return ss.str();
+        }
+
+        return Status(ErrorCodes::OperationFailed,
+                      "unable to generate new shard name");
     }
 
 } // namespace mongo
