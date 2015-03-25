@@ -35,14 +35,14 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 
 	usz = user_item->size;
 	tsz = tree_item->size;
-	len = remainder = WT_MIN(usz, tsz);
+	len = WT_MIN(usz, tsz);
 
 	userp = user_item->data;
 	treep = tree_item->data;
 
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
-		__m128i res_eq, res_less, u, t;
+		__m128i res_eq, u, t;
 
 		remainder = len % WT_VECTOR_SIZE;
 		len -= remainder;
@@ -66,25 +66,14 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
 			}
-
-		if (len != 0) {
-			uint8_t *val_res_eq, *val_res_less;
-			u_int i;
-
-			res_less = _mm_cmplt_epi8(u, t);
-			val_res_eq = (uint8_t *)&res_eq;
-			val_res_less = (uint8_t *)&res_less;
-			for (i = 0;; ++i)
-				if (val_res_eq[i] == 0)
-					return (val_res_less[i] == 0 ? 1 : -1);
-		}
+		len += remainder;
 	}
 #endif
 	/*
 	 * Use the non-vectorized version for the remaining bytes and for the
 	 * small key sizes.
 	 */
-	for (; remainder > 0; --remainder, ++userp, ++treep)
+	for (; len > 0; --len, ++userp, ++treep)
 		if (*userp != *treep)
 			return (*userp < *treep ? -1 : 1);
 
@@ -130,14 +119,14 @@ __wt_lex_compare_skip(
 
 	usz = user_item->size;
 	tsz = tree_item->size;
-	len = remainder = WT_MIN(usz, tsz) - *matchp;
+	len = WT_MIN(usz, tsz) - *matchp;
 
 	userp = (uint8_t *)user_item->data + *matchp;
 	treep = (uint8_t *)tree_item->data + *matchp;
 
 #ifdef __SSE2__
 	if (len >= WT_MIN_KEY_VECTORIZE) {
-		__m128i res_eq, res_less, u, t;
+		__m128i res_eq, u, t;
 
 		remainder = len % WT_VECTOR_SIZE;
 		len -= remainder;
@@ -163,25 +152,14 @@ __wt_lex_compare_skip(
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
 			}
-
-		if (len != 0) {
-			uint8_t *val_res_eq, *val_res_less;
-			u_int i;
-
-			res_less = _mm_cmplt_epi8(u, t);
-			val_res_eq = (uint8_t *)&res_eq;
-			val_res_less = (uint8_t *)&res_less;
-			for (i = 0;; ++i, ++*matchp)
-				if (val_res_eq[i] == 0)
-					return (val_res_less[i] == 0 ? 1 : -1);
-		}
+		len += remainder;
 	}
 #endif
 	/*
 	 * Use the non-vectorized version for the remaining bytes and for the
 	 * small key sizes.
 	 */
-	for (; remainder > 0; --remainder, ++userp, ++treep, ++*matchp)
+	for (; len > 0; --len, ++userp, ++treep, ++*matchp)
 		if (*userp != *treep)
 			return (*userp < *treep ? -1 : 1);
 
