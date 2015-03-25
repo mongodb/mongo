@@ -33,7 +33,6 @@
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/export_macros.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/net/message.h"
@@ -45,7 +44,7 @@ namespace mongo {
     /** for mock purposes only -- do not create variants of DBClientCursor, nor hang code here
         @see DBClientMockCursor
      */
-    class MONGO_CLIENT_API DBClientCursorInterface : boost::noncopyable {
+    class DBClientCursorInterface : boost::noncopyable {
     public:
         virtual ~DBClientCursorInterface() {}
         virtual bool more() = 0;
@@ -56,7 +55,7 @@ namespace mongo {
     };
 
     /** Queries return a cursor object */
-    class MONGO_CLIENT_API DBClientCursor : public DBClientCursorInterface {
+    class DBClientCursor : public DBClientCursorInterface {
     public:
         /** If true, safe to call next().  Requests more from server if necessary. */
         bool more();
@@ -259,7 +258,7 @@ namespace mongo {
 
     /** iterate over objects in current batch only - will not cause a network call
      */
-    class MONGO_CLIENT_API DBClientCursorBatchIterator {
+    class DBClientCursorBatchIterator {
     public:
         DBClientCursorBatchIterator( DBClientCursor &c ) : _c( c ), _n() {}
         bool moreInCurrentBatch() { return _c.moreInCurrentBatch(); }

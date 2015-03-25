@@ -39,7 +39,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/export_macros.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/shared_buffer.h"
@@ -87,7 +86,7 @@ namespace mongo {
      Code With Scope: <total size><String><Object>
      \endcode
      */
-    class MONGO_CLIENT_API BSONObj {
+    class BSONObj {
     public:
 
         /** Construct an empty BSONObj -- that is, {}. */

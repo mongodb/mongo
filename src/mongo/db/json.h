@@ -32,7 +32,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/base/status.h"
-#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -49,10 +48,10 @@ namespace mongo {
      * @throws MsgAssertionException if parsing fails.  The message included with
      * this assertion includes the character offset where parsing failed.
      */
-    MONGO_CLIENT_API BSONObj fromjson(const std::string& str);
+    BSONObj fromjson(const std::string& str);
 
     /** @param len will be size of JSON object in text chars. */
-    MONGO_CLIENT_API BSONObj fromjson(const char* str, int* len=NULL);
+    BSONObj fromjson(const char* str, int* len=NULL);
 
     /**
      * Tests whether the JSON string is an Array.
@@ -68,7 +67,7 @@ namespace mongo {
      *
      * @param obj The JSON string to test.
      */
-    MONGO_CLIENT_API bool isArray(StringData str);
+    bool isArray(StringData str);
 
     /**
      * Convert a BSONArray to a JSON string.
@@ -77,7 +76,7 @@ namespace mongo {
      * @param format The JSON format (JS, TenGen, Strict).
      * @param pretty Enables pretty output.
      */
-    MONGO_CLIENT_API std::string tojson(
+    std::string tojson(
         const BSONArray& arr,
         JsonStringFormat format = Strict,
         bool pretty = false
@@ -90,7 +89,7 @@ namespace mongo {
      * @param format The JSON format (JS, TenGen, Strict).
      * @param pretty Enables pretty output.
      */
-    MONGO_CLIENT_API std::string tojson(
+    std::string tojson(
         const BSONObj& obj,
         JsonStringFormat format = Strict,
         bool pretty = false

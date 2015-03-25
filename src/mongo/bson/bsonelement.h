@@ -37,7 +37,6 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
-#include "mongo/client/export_macros.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
@@ -67,7 +66,7 @@ namespace mongo {
         value()
         type()
     */
-    class MONGO_CLIENT_API BSONElement {
+    class BSONElement {
     public:
         /** These functions, which start with a capital letter, throw a MsgAssertionException if the
             element is not of the required type. Example:

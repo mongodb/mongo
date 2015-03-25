@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include "mongo/client/export_macros.h"
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/logger/log_manager.h"
 #include "mongo/logger/rotatable_file_manager.h"
@@ -43,7 +42,7 @@ namespace logger {
     /**
      * Gets a global singleton instance of LogManager.
      */
-    MONGO_CLIENT_API LogManager* globalLogManager();
+    LogManager* globalLogManager();
 
     /**
      * Gets the global MessageLogDomain associated for the global log manager.

@@ -33,7 +33,6 @@
 #include <sstream>
 #include <vector>
 
-#include "mongo/client/export_macros.h"
 #include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo {

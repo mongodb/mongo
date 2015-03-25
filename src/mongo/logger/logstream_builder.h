@@ -31,7 +31,6 @@
 #include <sstream>
 #include <string>
 
-#include "mongo/client/export_macros.h"
 #include "mongo/logger/labeled_level.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
@@ -46,7 +45,7 @@ namespace logger {
     /**
      * Stream-ish object used to build and append log messages.
      */
-    class MONGO_CLIENT_API LogstreamBuilder {
+    class LogstreamBuilder {
     public:
         static LogSeverity severityCast(int ll) { return LogSeverity::cast(ll); }
         static LogSeverity severityCast(LogSeverity ls) { return ls; }

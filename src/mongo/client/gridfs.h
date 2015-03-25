@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -41,7 +40,7 @@ namespace mongo {
     class GridFS;
     class GridFile;
 
-    class MONGO_CLIENT_API GridFSChunk {
+    class GridFSChunk {
     public:
         GridFSChunk( BSONObj data );
         GridFSChunk( BSONObj fileId , int chunkNumber , const char * data , int len );
@@ -66,7 +65,7 @@ namespace mongo {
       GridFS is for storing large file-style objects in MongoDB.
       @see http://dochub.mongodb.org/core/gridfsspec
      */
-    class MONGO_CLIENT_API GridFS {
+    class GridFS {
     public:
         /**
          * @param client - db connection
@@ -149,7 +148,7 @@ namespace mongo {
     /**
        wrapper for a file stored in the Mongo database
      */
-    class MONGO_CLIENT_API GridFile {
+    class GridFile {
     public:
         /**
          * @return whether or not this file exists

@@ -28,10 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/client/undef_macros.h"
 #include <boost/thread/tss.hpp>
-#include "mongo/client/redef_macros.h"
-
 
 namespace mongo { 
 

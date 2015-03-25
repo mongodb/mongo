@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
