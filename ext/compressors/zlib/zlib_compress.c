@@ -180,6 +180,48 @@ zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
 }
 
 /*
+ * zlib_decompress --
+ *	WiredTiger zlib decompression.
+ */
+static int
+zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    uint8_t *src, size_t src_len,
+    uint8_t *dst, size_t dst_len,
+    size_t *result_lenp)
+{
+	ZLIB_OPAQUE opaque;
+	z_stream zs;
+	int ret, tret;
+
+	memset(&zs, 0, sizeof(zs));
+	zs.zalloc = zalloc;
+	zs.zfree = zfree;
+	opaque.compressor = compressor;
+	opaque.session = session;
+	zs.opaque = &opaque;
+
+	if ((ret = inflateInit(&zs)) != Z_OK)
+		return (zlib_error(compressor, session, "inflateInit", ret));
+
+	zs.next_in = src;
+	zs.avail_in = (uint32_t)src_len;
+	zs.next_out = dst;
+	zs.avail_out = (uint32_t)dst_len;
+	while ((ret = inflate(&zs, Z_FINISH)) == Z_OK)
+		;
+	if (ret == Z_STREAM_END) {
+		*result_lenp = zs.total_out;
+		ret = Z_OK;
+	}
+
+	if ((tret = inflateEnd(&zs)) != Z_OK && ret == Z_OK)
+		ret = tret;
+
+	return (ret == Z_OK ?
+	    0 : zlib_error(compressor, session, "inflate", ret));
+}
+
+/*
  * zlib_compress_raw --
  *	Pack records into a specified on-disk page size.
  */
@@ -287,6 +329,27 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	}
 
 #if 0
+	/* Decompress the result and confirm it matches the original source. */
+	if (last_slot > 0) {
+		void *decomp;
+		size_t result_len;
+
+		if ((decomp =
+		    zalloc(&opaque, 1, (uint32_t)zs.total_in + 100)) == NULL)
+			return (ENOMEM);
+		if ((ret = zlib_decompress(compressor, session, dst,
+		    zs.total_out, decomp, zs.total_in + 100, &result_len)) == 0)
+			 if (memcmp(src, decomp, result_len) != 0)
+				ret = zlib_error(compressor, session,
+				    "deflate compare with original source",
+				    Z_DATA_ERROR);
+		zfree(&opaque, decomp);
+		if (ret != 0)
+			return (ret);
+	}
+#endif
+
+#if 0
 	fprintf(stderr,
 	    "zlib_compress_raw (%s): page_max %" PRIuMAX ", slots %" PRIu32
 	    ", take %" PRIu32 ": %" PRIu32 " -> %" PRIuMAX "\n",
@@ -294,48 +357,6 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    slots, last_slot, offsets[last_slot], (uintmax_t)*result_lenp);
 #endif
 	return (0);
-}
-
-/*
- * zlib_decompress --
- *	WiredTiger zlib decompression.
- */
-static int
-zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    uint8_t *dst, size_t dst_len,
-    size_t *result_lenp)
-{
-	ZLIB_OPAQUE opaque;
-	z_stream zs;
-	int ret, tret;
-
-	memset(&zs, 0, sizeof(zs));
-	zs.zalloc = zalloc;
-	zs.zfree = zfree;
-	opaque.compressor = compressor;
-	opaque.session = session;
-	zs.opaque = &opaque;
-
-	if ((ret = inflateInit(&zs)) != Z_OK)
-		return (zlib_error(compressor, session, "inflateInit", ret));
-
-	zs.next_in = src;
-	zs.avail_in = (uint32_t)src_len;
-	zs.next_out = dst;
-	zs.avail_out = (uint32_t)dst_len;
-	while ((ret = inflate(&zs, Z_FINISH)) == Z_OK)
-		;
-	if (ret == Z_STREAM_END) {
-		*result_lenp = zs.total_out;
-		ret = Z_OK;
-	}
-
-	if ((tret = inflateEnd(&zs)) != Z_OK && ret == Z_OK)
-		ret = tret;
-
-	return (ret == Z_OK ?
-	    0 : zlib_error(compressor, session, "inflate", ret));
 }
 
 /*

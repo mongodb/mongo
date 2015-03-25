@@ -31,7 +31,7 @@
 #
 
 import wiredtiger, wttest
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import check_scenarios
 
 class test_txn03(wttest.WiredTigerTestCase):
     tablename = 'test_txn03'
@@ -42,9 +42,9 @@ class test_txn03(wttest.WiredTigerTestCase):
     data_str2 = "TEST_VAL1" 
 
     nentries = 1000
-    scenarios = [
+    scenarios = check_scenarios([
         ('var', dict(create_params = "key_format=S,value_format=S")),
-    ]
+    ])
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):

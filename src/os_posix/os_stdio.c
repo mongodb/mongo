@@ -14,10 +14,10 @@
  */
 int
 __wt_fopen(WT_SESSION_IMPL *session,
-    const char *name, const char *mode, u_int flags, FILE **fpp)
+    const char *name, WT_FHANDLE_MODE mode_flag, u_int flags, FILE **fpp)
 {
 	WT_DECL_RET;
-	const char *path;
+	const char *mode, *path;
 	char *pathbuf;
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: fopen", name));
@@ -30,20 +30,19 @@ __wt_fopen(WT_SESSION_IMPL *session,
 		path = pathbuf;
 	}
 
-#ifdef _WIN32
-	{
-	char buf[10];
-	/*
-	 * Open in binary (untranslated) mode; translations involving
-	 * carriage-return and linefeed characters are suppressed.
-	 */
-	(void)snprintf(buf, sizeof(buf), "%s" "b", mode);
-
-	*fpp = fopen(path, buf);
+	mode = NULL;
+	switch (mode_flag) {
+	case WT_FHANDLE_APPEND:
+		mode = WT_FOPEN_APPEND;
+		break;
+	case WT_FHANDLE_READ:
+		mode = WT_FOPEN_READ;
+		break;
+	case WT_FHANDLE_WRITE:
+		mode = WT_FOPEN_WRITE;
+		break;
 	}
-#else
 	*fpp = fopen(path, mode);
-#endif
 	if (*fpp == NULL)
 		ret = __wt_errno();
 
@@ -105,7 +104,7 @@ __wt_fflush(WT_SESSION_IMPL *session, FILE *fp)
  *	Close a FILE handle.
  */
 int
-__wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, int iswrite)
+__wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, WT_FHANDLE_MODE mode_flag)
 {
 	FILE *fp;
 	WT_DECL_RET;
@@ -120,7 +119,7 @@ __wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, int iswrite)
 	 * If the handle was opened for writing, flush the file to the backing
 	 * OS buffers, then flush the OS buffers to the backing disk.
 	 */
-	if (iswrite) {
+	if (mode_flag == WT_FHANDLE_APPEND || mode_flag == WT_FHANDLE_WRITE) {
 		ret = __wt_fflush(session, fp);
 		if (fsync(fileno(fp)) != 0)
 			WT_TRET(__wt_errno());

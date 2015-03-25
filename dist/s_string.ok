@@ -919,6 +919,7 @@ qsort
 quartile
 qup
 rS
+rb
 rbrace
 rbracket
 rdlock
@@ -1165,6 +1166,7 @@ vtype
 vunpack
 vupdate
 walk's
+wb
 wiredtiger
 workFactor
 wrapup

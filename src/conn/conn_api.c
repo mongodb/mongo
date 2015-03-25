@@ -1494,7 +1494,8 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (exist)
 		return (0);
 
-	WT_RET(__wt_fopen(session, WT_BASECONFIG_SET, "w", 0, &fp));
+	WT_RET(__wt_fopen(session,
+	    WT_BASECONFIG_SET, WT_FHANDLE_WRITE, 0, &fp));
 
 	fprintf(fp, "%s\n\n",
 	    "# Do not modify this file.\n"
@@ -1551,7 +1552,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG));
 
 	/* Close any file handle left open, remove any temporary file. */
-err:	WT_TRET(__wt_fclose(session, &fp, 1));
+err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_WRITE));
 	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 
 	return (ret);

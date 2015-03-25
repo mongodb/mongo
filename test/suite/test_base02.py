@@ -32,18 +32,19 @@
 
 import json
 import wiredtiger, wttest
+from wtscenario import check_scenarios
 
 # Test configuration strings.
 class test_base02(wttest.WiredTigerTestCase):
     name = 'test_base02a'
     extra_config = ''
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
         ('lsm', dict(uri='lsm:')),
         ('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
-    ]
+    ])
 
     def create_and_drop(self, confstr):
         name = self.uri + self.name

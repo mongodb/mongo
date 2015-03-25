@@ -30,6 +30,7 @@ import os, time
 import wiredtiger, wttest
 from helper import confirm_does_not_exist, complex_populate, \
     complex_populate_index_name, simple_populate
+from wtscenario import check_scenarios
 
 # test_drop.py
 #    session level drop operation
@@ -37,12 +38,12 @@ class test_drop(wttest.WiredTigerTestCase):
     name = 'test_drop'
     extra_config = ''
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
         #Not yet: drop failing with an open cursor needs handle locking
         #('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
-    ]
+    ])
 
     # Populate an object, remove it and confirm it no longer exists.
     def drop(self, populate, with_cursor, close_session, drop_index):
