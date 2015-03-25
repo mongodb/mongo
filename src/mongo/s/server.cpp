@@ -34,6 +34,7 @@
 
 #include "mongo/s/server.h"
 
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 
@@ -289,9 +290,16 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     mongo::signalForkSuccess();
 #endif
 
-    if (serverGlobalParams.isHttpInterfaceEnabled)
-        boost::thread web( stdx::bind(&webServerThread,
-                                       new NoAdminAccess())); // takes ownership
+    if (serverGlobalParams.isHttpInterfaceEnabled) {
+        boost::shared_ptr<DbWebServer> dbWebServer(
+                                new DbWebServer(serverGlobalParams.bind_ip,
+                                                serverGlobalParams.port + 1000,
+                                                new NoAdminAccess()));
+        dbWebServer->setupSockets();
+
+        boost::thread web(stdx::bind(&webServerListenThread, dbWebServer));
+        web.detach();
+    }
 
     Status status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {

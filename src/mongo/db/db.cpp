@@ -34,6 +34,7 @@
 
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/shared_ptr.hpp>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -453,6 +454,14 @@ namespace mongo {
         // do not want connections to just hang if recovery takes a very long time.
         server->setupSockets();
 
+        boost::shared_ptr<DbWebServer> dbWebServer;
+        if (serverGlobalParams.isHttpInterfaceEnabled) {
+            dbWebServer.reset(new DbWebServer(serverGlobalParams.bind_ip,
+                                              serverGlobalParams.port + 1000,
+                                              new RestAdminAccess()));
+            dbWebServer->setupSockets();
+        }
+
         // Warn if we detect configurations for multiple registered storage engines in
         // the same configuration file/environment.
         if (serverGlobalParams.parsedOpts.hasField("storage")) {
@@ -560,7 +569,8 @@ namespace mongo {
         if (serverGlobalParams.isHttpInterfaceEnabled) {
             snapshotThread.go();
 
-            boost::thread web(stdx::bind(&webServerThread, new RestAdminAccess()));
+            invariant(dbWebServer);
+            boost::thread web(stdx::bind(&webServerListenThread, dbWebServer));
             web.detach();
         }
 
