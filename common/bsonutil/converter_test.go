@@ -329,8 +329,8 @@ func TestJSCodeBSONToJSON(t *testing.T) {
 				So(err, ShouldBeNil)
 				jObj, ok := _jObj.(json.JavaScript)
 				So(ok, ShouldBeTrue)
-
-				So(jObj, ShouldResemble, json.JavaScript{"function() { return x; }", bson.M{"x": 2}})
+				So(jObj.Scope.(bson.M)["x"], ShouldEqual, 2)
+				So(jObj.Code, ShouldEqual, "function() { return x; }")
 			})
 		})
 	})
