@@ -272,9 +272,6 @@ env.CppUnitTest(
         'range_arithmetic'
     ])
 
-env.Library('auth_helpers', ['client/auth_helpers.cpp'],
-            LIBDEPS=['clientdriver'])
-
 env.Library('global_optime', ['db/global_optime.cpp'])
 
 env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
@@ -453,8 +450,7 @@ env.Library("fail_point",
             LIBDEPS=["foundation", "bson"])
 
 env.Library('mongocommon', commonFiles,
-            LIBDEPS=['auth_helpers',
-                     'bson',
+            LIBDEPS=['bson',
                      'background_job',
                      'clientdriver',
                      'fail_point',

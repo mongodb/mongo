@@ -28,8 +28,7 @@ env.Library('authcore', ['action_set.cpp',
                          'user_management_commands_parser.cpp',
                          'user_name.cpp',
                          'user_set.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/auth_helpers',
-                     '$BUILD_DIR/mongo/base/base',
+            LIBDEPS=['$BUILD_DIR/mongo/base/base',
                      '$BUILD_DIR/mongo/bson',
                      '$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/db/ops/update_driver',
@@ -56,7 +55,10 @@ env.Library('saslauth',
              'sasl_plain_server_conversation.cpp',
              'sasl_scramsha1_server_conversation.cpp',
              'sasl_server_conversation.cpp'],
-             LIBDEPS=['authcore', '$BUILD_DIR/mongo/crypto/scramauth'])
+             LIBDEPS=[
+                'authcore',
+                '$BUILD_DIR/mongo/crypto/scramauth',
+                '$BUILD_DIR/mongo/network'])
 
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',

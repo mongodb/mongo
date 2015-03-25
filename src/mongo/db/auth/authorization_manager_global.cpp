@@ -30,7 +30,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
-#include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/server_parameters.h"
@@ -53,7 +52,7 @@ namespace {
                               MONGO_NO_PREREQUISITES,
                               ("BeginStartupOptionParsing"))(InitializerContext*) {
         new AuthzVersionParameter(ServerParameterSet::getGlobal(),
-                                  auth::schemaVersionServerParameter);
+                                  authSchemaVersionServerParameter);
         return Status::OK();
     }
 
@@ -75,7 +74,10 @@ namespace {
     Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
         return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
     }
+
 }  // namespace
+
+    const std::string authSchemaVersionServerParameter = "authSchemaVersion";
 
     void setGlobalAuthorizationManager(AuthorizationManager* authManager) {
         fassert(16841, globalAuthManager == NULL);

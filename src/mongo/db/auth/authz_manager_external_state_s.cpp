@@ -36,9 +36,9 @@
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
-#include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -56,6 +56,54 @@ namespace mongo {
     using std::endl;
     using std::vector;
 
+namespace {
+
+    ScopedDbConnection* getConnectionForAuthzCollection(const NamespaceString& ns) {
+        //
+        // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
+        // If the primary for the collection moves, this approach may throw rather than handle
+        // version exceptions.
+        //
+
+        DBConfigPtr config = grid.getDBConfig(ns.ns());
+        Shard s = config->getShard(ns.ns());
+
+        return new ScopedDbConnection(s.getConnString(), 30.0);
+    }
+
+    Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion) {
+        try {
+            BSONObj cmdResult;
+            conn->runCommand(
+                    "admin",
+                    BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1),
+                    cmdResult);
+            if (!cmdResult["ok"].trueValue()) {
+                std::string errmsg = cmdResult["errmsg"].str();
+                if (errmsg == "no option found to get" ||
+                    StringData(errmsg).startsWith("no such cmd")) {
+
+                    *outVersion = 1;
+                    return Status::OK();
+                }
+                int code = cmdResult["code"].numberInt();
+                if (code == 0) {
+                    code = ErrorCodes::UnknownError;
+                }
+                return Status(ErrorCodes::Error(code), errmsg);
+            }
+            BSONElement versionElement = cmdResult[authSchemaVersionServerParameter];
+            if (versionElement.eoo())
+                return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
+            *outVersion = versionElement.numberInt();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
+} // namespace
+
     AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() {}
 
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
@@ -64,27 +112,12 @@ namespace mongo {
         return Status::OK();
     }
 
-    namespace {
-        ScopedDbConnection* getConnectionForAuthzCollection(const NamespaceString& ns) {
-            //
-            // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
-            // If the primary for the collection moves, this approach may throw rather than handle
-            // version exceptions.
-            //
-
-            DBConfigPtr config = grid.getDBConfig(ns.ns());
-            Shard s = config->getShard(ns.ns());
-
-            return new ScopedDbConnection(s.getConnString(), 30.0);
-        }
-    }
-
     Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(
                                                 OperationContext* txn, int* outVersion) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
                     AuthorizationManager::usersCollectionNamespace));
-            Status status = auth::getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
+            Status status = getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
             conn->done();
             return status;
         }
