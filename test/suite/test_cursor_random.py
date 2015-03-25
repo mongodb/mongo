@@ -29,14 +29,15 @@
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate
 from helper import key_populate, value_populate
+from wtscenario import check_scenarios
 
 # test_cursor_random.py
 #    Cursor next_random operations
 class test_cursor_random(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(type='file:',fmt='S')),
         ('table', dict(type='table:',fmt='S'))
-        ]
+    ])
 
     # Check that opening a random cursor on a row-store returns not-supported
     # for every method except for next and reset, and next returns not-found.
@@ -124,10 +125,10 @@ class test_cursor_random(wttest.WiredTigerTestCase):
 
 # Check that opening a random cursor on column-store returns not-supported.
 class test_cursor_random_column(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:random',fmt='r')),
         ('table', dict(uri='table:random',fmt='r')),
-        ]
+    ])
 
     def test_cursor_random_column(self):
         self.session.create(

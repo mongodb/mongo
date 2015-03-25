@@ -969,7 +969,6 @@ static int
 __conn_config_file(WT_SESSION_IMPL *session,
     const char *filename, int is_user, const char **cfg, WT_ITEM *cbuf)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FH *fh;
 	size_t len;
@@ -977,21 +976,12 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	int exist, quoted;
 	char *p, *t;
 
-	conn = S2C(session);
 	fh = NULL;
 
 	/* Configuration files are always optional. */
 	WT_RET(__wt_exist(session, filename, &exist));
 	if (!exist)
 		return (0);
-
-	/*
-	 * The base configuration should not exist if we are creating this
-	 * database.
-	 */
-	if (!is_user && conn->is_new)
-		WT_RET_MSG(session, EINVAL,
-		    "%s exists before database creation", filename);
 
 	/* Open the configuration file. */
 	WT_RET(__wt_open(session, filename, 0, 0, 0, &fh));
@@ -1466,18 +1456,57 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __conn_write_config --
- *	Save the configuration used to create a database.
+ * __conn_write_base_config --
+ *	Save the base configuration used to create a database.
  */
 static int
-__conn_write_config(
-    WT_SESSION_IMPL *session, const char *filename, const char *cfg[])
+__conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	FILE *fp;
 	WT_CONFIG parser;
-	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
-	char *path;
+	int exist;
+
+	fp = NULL;
+
+	/*
+	 * Discard any base configuration setup file left-over from previous
+	 * runs.  This doesn't matter for correctness, it's just cleaning up
+	 * random files.
+	 */
+	WT_RET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
+
+	/* The base configuration file is optional, check the configuration. */
+	WT_RET(__wt_config_gets(session, cfg, "config_base", &cval));
+	if (!cval.val)
+		return (0);
+
+	/*
+	 * We don't test separately if we're creating the database in this run
+	 * as we might have crashed between creating the "WiredTiger" file and
+	 * creating the base configuration file. If configured, there's always
+	 * a base configuration file, and we rename it into place, so it can
+	 * only NOT exist if we crashed before it was created; in other words,
+	 * if the base configuration file exists, we're done.
+	 */
+	WT_RET(__wt_exist(session, WT_BASECONFIG, &exist));
+	if (exist)
+		return (0);
+
+	WT_RET(__wt_fopen(session,
+	    WT_BASECONFIG_SET, WT_FHANDLE_WRITE, 0, &fp));
+
+	fprintf(fp, "%s\n\n",
+	    "# Do not modify this file.\n"
+	    "#\n"
+	    "# WiredTiger created this file when the database was created,\n"
+	    "# to store persistent database settings.  Instead of changing\n"
+	    "# these settings, set a WIREDTIGER_CONFIG environment variable\n"
+	    "# or create a WiredTiger.config file to override them.");
+
+	fprintf(fp, "version=(major=%d,minor=%d)\n\n",
+	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 
 	/*
 	 * We were passed an array of configuration strings where slot 0 is all
@@ -1494,30 +1523,6 @@ __conn_write_config(
 	 * those problems, might as well include the application's configuration
 	 * file as well.
 	 *
-	 * If there is no configuration, don't bother creating an empty file.
-	 */
-	if (cfg[1] == NULL)
-		return (0);
-
-	WT_RET(__wt_filename(session, filename, &path));
-	if ((fp = fopen(path, "w")) == NULL)
-		ret = __wt_errno();
-	__wt_free(session, path);
-	if (fp == NULL)
-		return (ret);
-
-	fprintf(fp, "%s\n\n",
-	    "# Do not modify this file.\n"
-	    "#\n"
-	    "# WiredTiger created this file when the database was created,\n"
-	    "# to store persistent database settings.  Instead of changing\n"
-	    "# these settings, set a WIREDTIGER_CONFIG environment variable\n"
-	    "# or create a WiredTiger.config file to override them.");
-
-	fprintf(fp, "version=(major=%d,minor=%d)\n\n",
-	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
-
-	/*
 	 * We want the list of defaults that have been changed, that is, if the
 	 * application didn't somehow configure a setting, we don't write out a
 	 * default value, so future releases may silently migrate to new default
@@ -1542,11 +1547,13 @@ __conn_write_config(
 		WT_ERR_NOTFOUND_OK(ret);
 	}
 
-err:	WT_TRET(fclose(fp));
+	/* Flush the handle and rename the file into place. */
+	return (__wt_sync_and_rename_fp(
+	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG));
 
-	/* Don't leave a damaged file in place. */
-	if (ret != 0)
-		(void)__wt_remove(session, filename);
+	/* Close any file handle left open, remove any temporary file. */
+err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_WRITE));
+	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 
 	return (ret);
 }
@@ -1775,15 +1782,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_load_extensions(session, cfg));
 
 	/*
-	 * We've completed configuration, write the base configuration file if
-	 * we're creating the database.
+	 * Configuration completed; optionally write the base configuration file
+	 * if it doesn't already exist.
 	 */
-	if (conn->is_new) {
-		WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
-		if (cval.val)
-			WT_ERR(
-			    __conn_write_config(session, WT_BASECONFIG, cfg));
-	}
+	WT_ERR(__conn_write_base_config(session, cfg));
 
 	/*
 	 * Start the worker threads last.

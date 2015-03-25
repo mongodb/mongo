@@ -9,6 +9,42 @@
 #include "wt_internal.h"
 
 /*
+ * __sweep_remove_handles --
+ *	Remove closed dhandles from the connection list.
+ */
+static int
+__sweep_remove_handles(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle, *dhandle_next;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+	dhandle = SLIST_FIRST(&conn->dhlh);
+
+	for (; dhandle != NULL; dhandle = dhandle_next) {
+		dhandle_next = SLIST_NEXT(dhandle, l);
+		if (WT_IS_METADATA(dhandle))
+			continue;
+
+		/*
+		 * If there are no longer any references to the handle in any
+		 * sessions, attempt to discard it.
+		 */
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+		    dhandle->session_inuse != 0 || dhandle->session_ref != 0)
+			continue;
+
+		WT_WITH_DHANDLE(session, dhandle,
+		    ret = __wt_conn_dhandle_discard_single(session, 0));
+		WT_RET_BUSY_OK(ret);
+		WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
+	}
+
+	return (ret);
+}
+
+/*
  * __sweep --
  *	Close unused dhandles on the connection dhandle list.
  */
@@ -16,22 +52,26 @@ static int
 __sweep(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *dhandle_next;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	time_t now;
-	int locked;
+	int closed_handles;
 
 	conn = S2C(session);
+	closed_handles = 0;
 
 	/* Don't discard handles that have been open recently. */
 	WT_RET(__wt_seconds(session, &now));
 
 	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
-	dhandle = SLIST_FIRST(&conn->dhlh);
-	for (; dhandle != NULL; dhandle = dhandle_next) {
-		dhandle_next = SLIST_NEXT(dhandle, l);
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
+		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+		    dhandle->session_inuse == 0 && dhandle->session_ref == 0) {
+			++closed_handles;
+			continue;
+		}
 		if (dhandle->session_inuse != 0 ||
 		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
 			continue;
@@ -60,42 +100,31 @@ __sweep(WT_SESSION_IMPL *session)
 		if ((ret =
 		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
 			continue;
-		WT_RET(ret);
-		locked = 1;
 
 		/* If the handle is open, try to close it. */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_btree_sync_and_close(session, 0));
-			if (ret != 0)
-				goto unlock;
 
 			/* We closed the btree handle, bump the statistic. */
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
+			if (ret == 0)
+				WT_STAT_FAST_CONN_INCR(
+				    session, dh_conn_handles);
 		}
 
-		/*
-		 * If there are no longer any references to the handle in any
-		 * sessions, attempt to discard it.  The called function
-		 * re-checks that the handle is not in use, which is why we
-		 * don't do any special handling of EBUSY returns above.
-		 */
-		if (dhandle->session_inuse == 0 && dhandle->session_ref == 0) {
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __wt_conn_dhandle_discard_single(session, 0));
-			if (ret != 0)
-				goto unlock;
+		if (dhandle->session_inuse == 0 && dhandle->session_ref == 0)
+			++closed_handles;
 
-			/* If the handle was discarded, it isn't locked. */
-			locked = 0;
-		} else
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
-
-unlock:		if (locked)
-			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
-
+		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET_BUSY_OK(ret);
 	}
+
+	if (closed_handles) {
+		WT_WITH_DHANDLE_LOCK(session,
+		    ret = __sweep_remove_handles(session));
+		WT_RET(ret);
+	}
+
 	return (0);
 }
 

@@ -126,6 +126,7 @@ Filesystems
 FindFirstFile
 Fk
 FlushFileBuffers
+Fprintf
 FreeBSD
 FreeBSD's
 FreeLibrary
@@ -361,6 +362,7 @@ VLDB
 VMSG
 Vanishingly
 Vc
+Vfprintf
 Vixie
 Vo
 Vv
@@ -916,6 +918,7 @@ qsort
 quartile
 qup
 rS
+rb
 rbrace
 rbracket
 rdlock
@@ -1147,6 +1150,7 @@ variable's
 vcell
 verrx
 versa
+vfprintf
 vlcs
 vmsg
 vpack
@@ -1159,6 +1163,7 @@ vtype
 vunpack
 vupdate
 walk's
+wb
 wiredtiger
 workFactor
 wrapup

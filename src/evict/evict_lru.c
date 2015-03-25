@@ -1257,8 +1257,13 @@ fast:		/* If the page can't be evicted, give up. */
 	/*
 	 * If we happen to end up on the root page, clear it.  We have to track
 	 * hazard pointers, and the root page complicates that calculation.
+	 *
+	 * Also clear the walk if we land on a page requiring forced eviction.
+	 * The eviction server may go to sleep, and we want this page evicted
+	 * as quickly as possible.
 	 */
-	if ((ref = btree->evict_ref) != NULL && __wt_ref_is_root(ref)) {
+	if ((ref = btree->evict_ref) != NULL && (__wt_ref_is_root(ref) ||
+	    ref->page->read_gen == WT_READGEN_OLDEST)) {
 		btree->evict_ref = NULL;
 		__wt_page_release(session, ref, 0);
 	}

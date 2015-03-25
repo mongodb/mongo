@@ -166,10 +166,10 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		    sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 		for (i = 0,
 		    stats = WT_CURSOR_STATS(cursor); i <  max; ++i, ++stats)
-			WT_ERR_TEST((fprintf(conn->stat_fp,
+			WT_ERR(__wt_fprintf(session, conn->stat_fp,
 			    "%s %" PRIu64 " %s %s\n",
 			    conn->stat_stamp,
-			    stats->v, name, stats->desc) < 0), __wt_errno());
+			    stats->v, name, stats->desc));
 		WT_ERR(cursor->close(cursor));
 		break;
 	case EBUSY:
@@ -300,13 +300,11 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	if ((log_file = conn->stat_fp) == NULL ||
 	    path == NULL || strcmp(tmp->mem, path->mem) != 0) {
 		conn->stat_fp = NULL;
-		if (log_file != NULL)
-			WT_RET(fclose(log_file) == 0 ? 0 : __wt_errno());
-
+		WT_RET(__wt_fclose(session, &log_file, WT_FHANDLE_APPEND));
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
-		WT_RET_TEST((log_file =
-		    fopen(tmp->mem, "a")) == NULL, __wt_errno());
+		WT_RET(__wt_fopen(session,
+		    tmp->mem, WT_FHANDLE_APPEND, WT_FOPEN_FIXED, &log_file));
 	}
 	conn->stat_fp = log_file;
 
@@ -346,9 +344,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		WT_RET(__statlog_lsm_apply(session));
 
 	/* Flush. */
-	WT_RET(fflush(conn->stat_fp) == 0 ? 0 : __wt_errno());
-
-	return (0);
+	return (__wt_fflush(session, conn->stat_fp));
 }
 
 /*
@@ -533,10 +529,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 	conn->stat_session = NULL;
 	conn->stat_tid_set = 0;
 	conn->stat_format = NULL;
-	if (conn->stat_fp != NULL) {
-		WT_TRET(fclose(conn->stat_fp) == 0 ? 0 : __wt_errno());
-		conn->stat_fp = NULL;
-	}
+	WT_TRET(__wt_fclose(session, &conn->stat_fp, WT_FHANDLE_APPEND));
 	conn->stat_path = NULL;
 	conn->stat_sources = NULL;
 	conn->stat_stamp = NULL;

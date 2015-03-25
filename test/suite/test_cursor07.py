@@ -33,7 +33,7 @@
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open, stat
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import check_scenarios
 import wttest
 
 class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
@@ -42,10 +42,10 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     nkeys = 5
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('regular', dict(reopen=False)),
         ('reopen', dict(reopen=True))
-    ]
+    ])
 
     # Overrides WiredTigerTestCase - add logging
     def setUpConnectionOpen(self, dir):

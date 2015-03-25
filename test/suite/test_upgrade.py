@@ -29,16 +29,17 @@
 import os, time
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate
+from wtscenario import check_scenarios
 
 # test_upgrade.py
 #    session level upgrade operation
 class test_upgrade(wttest.WiredTigerTestCase):
     name = 'test_upgrade'
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
-        ]
+    ])
 
     # Populate an object, then upgrade it.
     def upgrade(self, populate, with_cursor):
