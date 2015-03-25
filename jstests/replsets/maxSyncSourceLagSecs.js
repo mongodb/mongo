@@ -44,6 +44,6 @@
             return (slaves[1].getDB("foo").bar.count() === 2);
         }, "slave should have caught up after syncing to primary.");
 
-    assert.commandWorked(slaves[0].getDB("admin").fsyncUnlock());
+    assert.commandWorked(slaves[0].getDB("admin").$cmd.sys.unlock.findOne());
     replTest.stopSet();
 }());

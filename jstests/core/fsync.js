@@ -36,14 +36,3 @@ assert.eq(2, fsyncLockDB.coll.count({}));
 
 // Ensure eval is not allowed to invoke fsyncLock
 assert(!db.eval('db.fsyncLock()').ok, "eval('db.fsyncLock()') should fail.");
-
-// Check that the fsyncUnlock pseudo-command (a lookup on cmd.$sys.unlock)
-// still has the same effect as a legitimate 'fsyncUnlock' command
-// TODO: remove this in in the release following MongoDB 3.2 when pseudo-commands
-// are removed
-var fsyncCommandRes = db.fsyncLock();
-assert(fsyncLockRes.ok, "fsyncLock command failed against admin DB");
-assert(db.currentOp().fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
-var fsyncPseudoCommandRes = db.getSiblingDB("admin").$cmd.sys.unlock.findOne();
-assert(fsyncPseudoCommandRes.ok, "fsyncUnlock pseudo-command failed");
-assert(db.currentOp().fsyncLock == null, "fsyncUnlock is not null in db.currentOp");

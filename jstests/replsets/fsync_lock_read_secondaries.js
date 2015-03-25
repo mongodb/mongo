@@ -53,7 +53,7 @@ for (var i=0; i<docNum; i++) {
 // this should work just fine.
 var slave0count = slaves[0].getDB("foo").bar.count();
 assert.eq(slave0count, 100, "Doc count in fsync lock wrong. Expected (=100), found " + slave0count);
-assert(slaves[0].getDB("admin").fsyncUnlock().ok);
+assert(slaves[0].getDB("admin").$cmd.sys.unlock.findOne().ok);
 
 // The secondary should have equal or more documents than what it had before.
 assert.soon(function() {

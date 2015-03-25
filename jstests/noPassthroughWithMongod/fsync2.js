@@ -40,7 +40,7 @@ function doTest() {
     // Uncomment once SERVER-4243 is fixed
     //assert.eq(1, m.getDB(db.getName()).fsync2.count());
     
-    assert( m.getDB("admin").fsyncUnlock().ok );
+    assert( m.getDB("admin").$cmd.sys.unlock.findOne().ok );
 
     assert.eq( 2, db.fsync2.count() );
     

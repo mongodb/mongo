@@ -26,24 +26,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/db/commands/fsync.h"
 
-#include <iostream>
-#include <memory>
-#include <sstream>
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/commands.h"
@@ -51,10 +43,11 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/client.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
+
 
 namespace mongo {
 
@@ -159,73 +152,7 @@ namespace mongo {
             }
             return 1;
         }
-    };
-
-    namespace {
-        bool unlockFsync();
-    }  // namespace
-
-    class FSyncUnlockCommand : public Command {
-    public:
-
-        FSyncUnlockCommand() : Command("fsyncUnlock") {}
-
-        bool isWriteCommandForConfigServer() const override { return false; }
-
-        bool slaveOk() const override { return true; }
-
-        bool adminOnly() const override { return true; }
-
-        Status checkAuthForCommand(ClientBasic* client,
-                                   const std::string& dbname,
-                                   const BSONObj& cmdObj) override {
-
-            bool isAuthorized = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(),
-                                    ActionType::unlock);
-
-            if (isAuthorized) {
-                audit::logFsyncUnlockAuthzCheck(client, ErrorCodes::OK);
-                return Status::OK();
-            }
-            else {
-                audit::logFsyncUnlockAuthzCheck(client, ErrorCodes::Unauthorized);
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-        }
-
-        bool run(OperationContext* txn,
-                         const std::string& db,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) override {
-
-            log() << "command: unlock requested";
-
-            if (unlockFsync()) {
-                result.append("info", "unlock completed");
-                return true;
-            }
-            else {
-                errmsg = "not locked";
-                return false;
-            }
-        }
-
-    };
-
-    namespace {
-        std::unique_ptr<FSyncCommand> fsyncCmd;
-        std::unique_ptr<FSyncUnlockCommand> fsyncUnlockCmd;
-    }  // namespace
-
-    MONGO_INITIALIZER(FSyncAndFsyncUnlock)(InitializerContext*) {
-        fsyncCmd = stdx::make_unique<FSyncCommand>();
-        fsyncUnlockCmd = stdx::make_unique<FSyncUnlockCommand>();
-        return Status::OK();
-    }
+    } fsyncCmd;
 
     SimpleMutex filesLockedFsync("filesLockedFsync");
 
@@ -236,17 +163,17 @@ namespace mongo {
         ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite global(txn.lockState()); // No WriteUnitOfWork needed
 
-        SimpleMutex::scoped_lock lk(fsyncCmd->m);
-
-        invariant(!fsyncCmd->locked);    // impossible to get here if locked is true
-        try {
+        SimpleMutex::scoped_lock lk(fsyncCmd.m);
+        
+        invariant(!fsyncCmd.locked);    // impossible to get here if locked is true
+        try { 
             getDur().syncDataAndTruncateJournal(&txn);
-        }
-        catch( std::exception& e ) {
+        } 
+        catch( std::exception& e ) { 
             error() << "error doing syncDataAndTruncateJournal: " << e.what() << endl;
-            fsyncCmd->err = e.what();
-            fsyncCmd->_threadSync.notify_one();
-            fsyncCmd->locked = false;
+            fsyncCmd.err = e.what();
+            fsyncCmd._threadSync.notify_one();
+            fsyncCmd.locked = false;
             return;
         }
 
@@ -256,49 +183,47 @@ namespace mongo {
             StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
             storageEngine->flushAllFiles(true);
         }
-        catch( std::exception& e ) {
+        catch( std::exception& e ) { 
             error() << "error doing flushAll: " << e.what() << endl;
-            fsyncCmd->err = e.what();
-            fsyncCmd->_threadSync.notify_one();
-            fsyncCmd->locked = false;
+            fsyncCmd.err = e.what();
+            fsyncCmd._threadSync.notify_one();
+            fsyncCmd.locked = false;
             return;
         }
 
-        invariant(!fsyncCmd->locked);
-        fsyncCmd->locked = true;
+        invariant(!fsyncCmd.locked);
+        fsyncCmd.locked = true;
+        
+        fsyncCmd._threadSync.notify_one();
 
-        fsyncCmd->_threadSync.notify_one();
-
-        while ( ! fsyncCmd->pendingUnlock ) {
-            fsyncCmd->_unlockSync.wait(fsyncCmd->m);
+        while ( ! fsyncCmd.pendingUnlock ) {
+            fsyncCmd._unlockSync.wait(fsyncCmd.m);
         }
-        fsyncCmd->pendingUnlock = false;
+        fsyncCmd.pendingUnlock = false;
+        
+        fsyncCmd.locked = false;
+        fsyncCmd.err = "unlocked";
 
-        fsyncCmd->locked = false;
-        fsyncCmd->err = "unlocked";
-
-        fsyncCmd->_unlockSync.notify_one();
+        fsyncCmd._unlockSync.notify_one();
     }
 
-    bool lockedForWriting() {
-        return fsyncCmd->locked;
+    bool lockedForWriting() { 
+        return fsyncCmd.locked; 
     }
     
-    namespace {
-        // @return true if unlocked
-        bool unlockFsync() {
-            SimpleMutex::scoped_lock lk( fsyncCmd->m );
-            if( !fsyncCmd->locked ) {
-                return false;
-            }
-            fsyncCmd->pendingUnlock = true;
-            fsyncCmd->_unlockSync.notify_one();
-            fsyncCmd->_threadSync.notify_one();
-
-            while ( fsyncCmd->locked ) {
-                fsyncCmd->_unlockSync.wait( fsyncCmd->m );
-            }
-            return true;
+    // @return true if unlocked
+    bool _unlockFsync() {
+        SimpleMutex::scoped_lock lk( fsyncCmd.m );
+        if( !fsyncCmd.locked ) { 
+            return false;
         }
-    }  // namespace
+        fsyncCmd.pendingUnlock = true;
+        fsyncCmd._unlockSync.notify_one();
+        fsyncCmd._threadSync.notify_one();
+        
+        while ( fsyncCmd.locked ) {
+            fsyncCmd._unlockSync.wait( fsyncCmd.m );
+        }
+        return true;
+    }
 }

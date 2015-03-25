@@ -46,5 +46,5 @@ print("result of gle:");
 printjson(result);
 
 // unlock and shut down
-printjson(locked.getDB("admin").fsyncUnlock());
+printjson(locked.getDB("admin").$cmd.sys.unlock.findOne());
 replTest.stopSet();

@@ -975,14 +975,7 @@ DB.prototype.fsyncLock = function() {
 }
 
 DB.prototype.fsyncUnlock = function() {
-    var res = this.adminCommand({fsyncUnlock: 1});
-    if (!res.ok &&
-        // handle both error messages for nonexistent command...
-        (res.errmsg.startsWith("no such cmd") || res.errmsg.startsWith("no such command"))) {
-        // fallback for old servers
-        res = this.getSiblingDB("admin").$cmd.sys.unlock.findOne();
-    }
-    return res;
+    return this.getSiblingDB("admin").$cmd.sys.unlock.findOne()
 }
 
 DB.autocomplete = function(obj){

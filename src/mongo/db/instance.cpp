@@ -180,6 +180,32 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
+    bool _unlockFsync();
+    static void unlockFsync(OperationContext* txn, const char *ns, Message& m, DbResponse &dbresponse) {
+        BSONObj obj;
+
+        const bool isAuthorized = txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::unlock);
+        audit::logFsyncUnlockAuthzCheck(
+                txn->getClient(), isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+        if (!isAuthorized) {
+            obj = fromjson("{\"err\":\"unauthorized\"}");
+        }
+        else if (strncmp(ns, "admin.", 6) != 0 ) {
+            obj = fromjson("{\"err\":\"unauthorized - this command must be run against the admin DB\"}");
+        }
+        else {
+            log() << "command: unlock requested" << endl;
+            if( _unlockFsync() ) {
+                obj = fromjson("{ok:1,\"info\":\"unlock completed\"}");
+            }
+            else {
+                obj = fromjson("{ok:0,\"errmsg\":\"not locked\"}");
+            }
+        }
+        replyToQuery(0, m, dbresponse, obj);
+    }
+
 namespace {
 
     void generateErrorResponse(const AssertionException* exception,
@@ -298,44 +324,6 @@ namespace {
         dbResponse.responseTo = responseTo;
     }
 
-namespace {
-
-    // In SERVER-7775 we reimplemented the pseudo-commands fsyncUnlock, inProg, and killOp
-    // as ordinary commands. To support old clients for another release, this helper serves
-    // to execute the real command from the legacy pseudo-command codepath.
-    // TODO: remove after MongoDB 3.2 is released
-    void receivedPseudoCommand(OperationContext* txn,
-                               const NamespaceString& nss,
-                               Client& client,
-                               DbResponse& dbResponse,
-                               Message& message,
-                               StringData realCommandName) {
-        Message interposed;
-
-        NamespaceString interposedNss(nss.db(), "$cmd");
-
-        BSONObjBuilder cmdBob;
-        cmdBob.append(realCommandName, 1);
-        auto cmd = cmdBob.done();
-
-        // TODO: use OP_COMMAND here instead of constructing
-        // a legacy OP_QUERY style command
-        BufBuilder cmdMsgBuf;
-        cmdMsgBuf.appendNum(DataView(message.header().data()).readLE<int32_t>()); // flags
-        cmdMsgBuf.appendStr(interposedNss.db(), false); // not including null byte
-        cmdMsgBuf.appendStr(".$cmd");
-        cmdMsgBuf.appendNum(0); // ntoskip
-        cmdMsgBuf.appendNum(1); // ntoreturn
-        cmdMsgBuf.appendBuf(cmd.objdata(), cmd.objsize());
-
-        interposed.setData(dbQuery, cmdMsgBuf.buf(), cmdMsgBuf.len());
-        interposed.header().setId(message.header().getId());
-
-        receivedCommand(txn, interposedNss, client, dbResponse, interposed);
-    }
-
-}  // namespace
-
     static void receivedQuery(OperationContext* txn,
                               const NamespaceString& nss,
                               Client& c,
@@ -420,7 +408,7 @@ namespace {
                     return;
                 }
                 if (nsString.coll() == "$cmd.sys.unlock") {
-                    receivedPseudoCommand(txn, nsString, c, dbresponse, m, "fsyncUnlock");
+                    unlockFsync(txn, ns, m, dbresponse);
                     return;
                 }
             }
