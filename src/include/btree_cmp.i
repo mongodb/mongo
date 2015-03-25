@@ -9,7 +9,8 @@
 #ifdef __SSE2__
 #include "3rdparty/sse/emmintrin.h"
 
-#define	WT_ALIGNED_16(p)	(!(p) & 0xff)	/* 2B alignment */
+						/* 16B alignment */
+#define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
 #define	WT_VECTOR_SIZE		16		/* chunk size */
 #define	WT_MIN_KEY_VECTORIZE	32		/* minimum vectorized key */
 #endif
