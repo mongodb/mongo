@@ -27,6 +27,15 @@ if (typeof getToolTest === 'undefined') {
   db.getSiblingDB('rs').createCollection('rs_test', { capped: true, size: 4 });
 
   // Add a bunch of operations to the fake oplog
+  
+  // Create a collection to drop
+  db.getSiblingDB('rs').rs_test.insert({
+    ts: new Timestamp(),
+    v: CURRENT_OPLOG_VERSION,
+    op: OPLOG_COMMAND_CODE,
+    ns: "foo.$cmd",
+    o: { create: "baz" }
+  });
 
   // Insert a doc
   db.getSiblingDB('rs').rs_test.insert({
@@ -50,6 +59,15 @@ if (typeof getToolTest === 'undefined') {
       dropDatabase: 1
     },
     ns: 'foo.$cmd'
+  });
+
+  // Create the collection
+  db.getSiblingDB('rs').rs_test.insert({
+    ts: new Timestamp(),
+    v: CURRENT_OPLOG_VERSION,
+    op: OPLOG_COMMAND_CODE,
+    ns: "foo.$cmd",
+    o: { create: "bar" }
   });
 
   // Insert 2 docs

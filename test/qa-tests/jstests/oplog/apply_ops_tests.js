@@ -10,6 +10,7 @@ if (typeof getToolTest === 'undefined') {
 (function() {
   var OPLOG_INSERT_CODE = 'i';
   var OPLOG_UPDATE_CODE = 'u';
+  var OPLOG_COMMAND_CODE = 'c';
   var CURRENT_OPLOG_VERSION = 2;
 
   // Oplog TS is in seconds since unix epoch
@@ -23,6 +24,8 @@ if (typeof getToolTest === 'undefined') {
 
   // Create capped collection
   db.createCollection('rs_test', { capped: true, max: 4 });
+  // Create test collection
+  db.createCollection('greatest_hits');
 
   // Add a bunch of operations to the fakeoplog
   var tracks = ['Welcome to the Jungle', 'Sweet Child O\' Mine', 'Patience',
@@ -102,6 +105,7 @@ if (typeof getToolTest === 'undefined') {
     });
 
     db.greatest_hits.drop();
+    db.createCollection('greatest_hits');
 
     // Running with `--seconds 25000` should apply last 3 operations, which
     // have timestamps T - 1, T - 10001, and T - 20001 (roughly)
@@ -118,6 +122,7 @@ if (typeof getToolTest === 'undefined') {
     });
 
     db.greatest_hits.drop();
+    db.createCollection('greatest_hits');
 
     // Running with `--seconds 0` should apply no operations
     var noOpsArgs = args.concat(['--seconds', 0]);
