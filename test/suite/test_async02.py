@@ -26,9 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import sys, threading, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open, WiredTigerError
-import sys, threading, wiredtiger, wttest
+from wtscenario import check_scenarios
 
 # TODO - tmp code
 def tty_pr(s):
@@ -124,7 +125,7 @@ class test_async02(wttest.WiredTigerTestCase, suite_subprocess):
     async_threads = 3
     current = {}
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file-col', dict(tablekind='col',uri='file')),
         ('file-fix', dict(tablekind='fix',uri='file')),
         ('file-row', dict(tablekind='row',uri='file')),
@@ -132,7 +133,7 @@ class test_async02(wttest.WiredTigerTestCase, suite_subprocess):
         ('table-col', dict(tablekind='col',uri='table')),
         ('table-fix', dict(tablekind='fix',uri='table')),
         ('table-row', dict(tablekind='row',uri='table')),
-    ]
+    ])
 
     # Overrides WiredTigerTestCase so that we can configure
     # async operations.

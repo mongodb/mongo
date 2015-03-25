@@ -29,21 +29,21 @@
 import wiredtiger, wttest
 from helper import key_populate, value_populate, simple_populate
 from helper import complex_value_populate, complex_populate
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import check_scenarios
 
 # test_cursor06.py
 #    Test cursor reconfiguration.
 class test_cursor06(wttest.WiredTigerTestCase):
     name = 'reconfigure'
-    scenarios = [
+    scenarios = check_scenarios([
         ('file-r', dict(type='file:',keyfmt='r',complex=0)),
         ('file-S', dict(type='file:',keyfmt='S',complex=0)),
         ('lsm-S', dict(type='lsm:',keyfmt='S',complex=0)),
         ('table-r', dict(type='table:',keyfmt='r',complex=0)),
         ('table-S', dict(type='table:',keyfmt='S',complex=0)),
-        ('table-r', dict(type='table:',keyfmt='r',complex=1)),
-        ('table-S', dict(type='table:',keyfmt='S',complex=1)),
-    ]
+        ('table-r-complex', dict(type='table:',keyfmt='r',complex=1)),
+        ('table-S-complex', dict(type='table:',keyfmt='S',complex=1)),
+    ])
 
     def pop(self, uri):
         if self.complex == 1:

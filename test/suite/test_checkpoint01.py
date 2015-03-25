@@ -28,6 +28,7 @@
 
 import wiredtiger, wttest
 from helper import key_populate, complex_populate_lsm, simple_populate
+from wtscenario import check_scenarios
 
 # test_checkpoint01.py
 #    Checkpoint tests
@@ -35,10 +36,10 @@ from helper import key_populate, complex_populate_lsm, simple_populate
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
 # including after other checkpoints are dropped.
 class test_checkpoint(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
-        ]
+    ])
 
     # Each checkpoint has a key range and a "is dropped" flag.
     checkpoints = {
@@ -140,10 +141,10 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 
 # Check some specific cursor checkpoint combinations.
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
-        ]
+    ])
 
     # Check that you cannot open a checkpoint that doesn't exist.
     def test_checkpoint_dne(self):
@@ -206,10 +207,10 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
 
 # Check that you can checkpoint targets.
 class test_checkpoint_target(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
-        ]
+    ])
 
     def update(self, uri, value):
         cursor = self.session.open_cursor(uri, None, "overwrite")
@@ -255,12 +256,12 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 
 # Check that you can't write checkpoint cursors.
 class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file-r', dict(uri='file:checkpoint',fmt='r')),
         ('file-S', dict(uri='file:checkpoint',fmt='S')),
         ('table-r', dict(uri='table:checkpoint',fmt='r')),
         ('table-S', dict(uri='table:checkpoint',fmt='S'))
-        ]
+    ])
 
     def test_checkpoint_cursor_update(self):
         simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
@@ -276,10 +277,10 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
 
 # Check that WiredTigerCheckpoint works as a checkpoint specifier.
 class test_checkpoint_last(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
-        ]
+    ])
 
     def test_checkpoint_last(self):
         # Create an object, change one record to an easily recognizable string,
@@ -344,10 +345,10 @@ class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):
 
 
 class test_checkpoint_empty(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:checkpoint')),
         ('table', dict(uri='table:checkpoint')),
-    ]
+    ])
 
     # Create an empty file, do one of 4 cases of checkpoint, then verify the
     # checkpoints exist.   The reason for the 4 cases is we must create all

@@ -32,7 +32,7 @@
 
 import wiredtiger, wttest
 from helper import key_populate, value_populate
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
 
 # Smoke test bulk-load.
 class test_bulk_load(wttest.WiredTigerTestCase):
@@ -72,10 +72,10 @@ class test_bulk_load(wttest.WiredTigerTestCase):
 class test_bulk_load_row_order(wttest.WiredTigerTestCase):
     name = 'test_bulk'
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(type='file:')),
         ('table', dict(type='table:'))
-    ]
+    ])
 
     def test_bulk_load_row_order_check(self):
         uri = self.type + self.name
@@ -114,10 +114,10 @@ class test_bulk_load_row_order(wttest.WiredTigerTestCase):
 class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
     name = 'test_bulk'
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(type='file:')),
         ('table', dict(type='table:'))
-    ]
+    ])
 
     def test_bulk_load_not_empty(self):
         uri = self.type + self.name
