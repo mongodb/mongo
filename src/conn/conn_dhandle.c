@@ -361,8 +361,7 @@ err:	__wt_free(session, metaconf);
  *	Open the current btree handle.
  */
 static int
-__conn_btree_open(
-	WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+__conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
