@@ -40,7 +40,7 @@ if (typeof getToolTest === 'undefined') {
     'mongodump should crash gracefully when remote server dies');
 
   var output = rawMongoProgramOutput();
-  var expectedError = 'error reading from db: EOF';
+  var expectedError = 'error reading from db';
   assert(output.indexOf(expectedError) !== -1,
     'mongodump crash should output the correct error message');
 
