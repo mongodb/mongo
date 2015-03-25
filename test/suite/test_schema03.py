@@ -29,6 +29,7 @@
 import os
 import suite_random
 import wiredtiger, wtscenario, wttest
+from wtscenario import check_scenarios
 
 try:
     # Windows does not getrlimit/setrlimit so we must catch the resource
@@ -245,7 +246,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     # but boost it up to this limit anyway.
     OPEN_FILE_LIMIT = 1000
 
-    restart_scenarios = [('table', dict(s_restart=['table'],P=0.3)),
+    restart_scenarios = check_scenarios([('table', dict(s_restart=['table'],P=0.3)),
                          ('colgroup0', dict(s_restart=['colgroup0'],P=0.3)),
                          ('index0', dict(s_restart=['index0'],P=0.3)),
                          ('colgroup1', dict(s_restart=['colgroup1'],P=0.3)),
@@ -254,7 +255,8 @@ class test_schema03(wttest.WiredTigerTestCase):
                          ('index2', dict(s_restart=['index2'],P=0.3)),
                          ('populate1', dict(s_restart=['populate1'],P=0.3)),
                          ('ipop', dict(s_restart=['index0','populate0'],P=0.3)),
-                         ('all', dict(s_restart=['table','colgroup0','index0','colgroup1','index1','populate0','index2','populate1'],P=1.0))]
+                         ('all', dict(s_restart=['table','colgroup0','index0','colgroup1','index1','populate0','index2','populate1'],P=1.0)),
+    ])
 
     ntable_scenarios = wtscenario.quick_scenarios('s_ntable',
         [1,2,5,8], [1.0,0.4,0.5,0.5])

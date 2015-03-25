@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import check_scenarios
 
 # test_schema02.py
 #    Columns, column groups, indexes
@@ -36,10 +37,10 @@ class test_schema02(wttest.WiredTigerTestCase):
     """
     nentries = 1000
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('normal', { 'idx_config' : '' }),
         ('lsm', { 'idx_config' : ',type=lsm' }),
-    ]
+    ])
 
     def expect_failure_colgroup(self, name, configstr, match):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
