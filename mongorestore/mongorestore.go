@@ -87,9 +87,6 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	}
 	if restore.isMongos {
 		log.Log(log.DebugLow, "restoring to a sharded system")
-		if restore.ToolOptions.DB == "" {
-			return fmt.Errorf("cannot do a full restore on a sharded system")
-		}
 	}
 
 	if restore.InputOptions.OplogLimit != "" {
@@ -198,6 +195,11 @@ func (restore *MongoRestore) Restore() error {
 		return fmt.Errorf("error scanning filesystem: %v", err)
 	}
 
+	if restore.isMongos && restore.manager.HasConfigDBIntent() && restore.ToolOptions.DB == "" {
+		return fmt.Errorf("cannot do a full restore on a sharded system - " +
+			"remove the 'config' directory from the dump directory first")
+	}
+
 	// If restoring users and roles, make sure we validate auth versions
 	if restore.ShouldRestoreUsersAndRoles() {
 		log.Log(log.Info, "comparing auth version of the dump directory and target server")
@@ -224,6 +226,7 @@ func (restore *MongoRestore) Restore() error {
 		// use legacy restoration order if we are single-threaded
 		restore.manager.Finalize(intents.Legacy)
 	}
+
 	err = restore.RestoreIntents()
 	if err != nil {
 		return fmt.Errorf("restore error: %v", err)
