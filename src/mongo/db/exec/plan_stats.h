@@ -364,7 +364,6 @@ namespace mongo {
         IndexScanStats() : indexVersion(0),
                            direction(1),
                            isMultiKey(false),
-                           yieldMovedCursor(0),
                            dupsTested(0),
                            dupsDropped(0),
                            seenInvalidated(0),
@@ -402,7 +401,6 @@ namespace mongo {
         // Whether this index is over a field that contain array values.
         bool isMultiKey;
 
-        size_t yieldMovedCursor;
         size_t dupsTested;
         size_t dupsDropped;
 

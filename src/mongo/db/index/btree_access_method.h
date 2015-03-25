@@ -38,7 +38,6 @@
 
 namespace mongo {
 
-    class IndexCursor;
     class IndexDescriptor;
 
     /**

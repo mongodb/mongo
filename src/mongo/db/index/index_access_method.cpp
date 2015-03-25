@@ -166,10 +166,10 @@ namespace mongo {
         }
     }
 
-    Status IndexAccessMethod::newCursor(OperationContext* txn, const CursorOptions& opts,
-                                        IndexCursor** out) const {
-        *out = new IndexCursor(_newInterface->newCursor(txn, opts.direction));
-        return Status::OK();
+    std::unique_ptr<SortedDataInterface::Cursor> IndexAccessMethod::newCursor(
+            OperationContext* txn,
+            bool isForward) const {
+        return _newInterface->newCursor(txn, isForward);
     }
 
     // Remove the provided doc from the index.
@@ -219,9 +219,9 @@ namespace mongo {
         BSONObjSet keys;
         getKeys(obj, &keys);
 
-        boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
+        std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn));
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            cursor->locate(*i, RecordId());
+            cursor->seekExact(*i);
         }
 
         return Status::OK();
@@ -233,22 +233,18 @@ namespace mongo {
     }
 
     RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
-        boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
-        cursor->locate(key, RecordId::min());
+        std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn));
+        const auto requestedInfo = kDebugBuild ? SortedDataInterface::Cursor::kKeyAndLoc
+                                               : SortedDataInterface::Cursor::kWantLoc;
+        if (auto kv = cursor->seekExact(key, requestedInfo)) {
+            // StorageEngine should guarantee these.
+            dassert(!kv->loc.isNull());
+            dassert(kv->key.woCompare(key, /*order*/BSONObj(), /*considerFieldNames*/false) == 0);
 
-        // A null bucket means the key wasn't found (nor was anything found after it).
-        if (cursor->isEOF()) {
-            return RecordId();
+            return kv->loc;
         }
 
-        // We found something but it could be a key after 'key'.  Examine what we're pointing at.
-        if (0 != key.woCompare(cursor->getKey(), BSONObj(), false)) {
-            // If the keys don't match, return "not found."
-            return RecordId();
-        }
-
-        // Return the RecordId found.
-        return cursor->getRecordId();
+        return RecordId();
     }
 
     Status IndexAccessMethod::validate(OperationContext* txn, bool full, int64_t* numKeys,

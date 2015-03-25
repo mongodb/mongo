@@ -36,12 +36,13 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
     class IndexAccessMethod;
-    class IndexCursor;
     class IndexDescriptor;
     class WorkingSet;
 
@@ -84,8 +85,8 @@ namespace mongo {
             // Need to initialize the underlying index traversal machinery.
             INITIALIZING,
 
-            // Skipping keys in order to check whether we have reached the end.
-            CHECKING_END,
+            // Skipping keys as directed by the _checker.
+            NEED_SEEK,
 
             // Retrieving the next key, and applying the filter if necessary.
             GETTING_NEXT,
@@ -121,23 +122,20 @@ namespace mongo {
 
     private:
         /**
-         * Initialize the underlying IndexCursor, grab information from the catalog for stats.
+         * Initialize the underlying index Cursor, returning first result if any.
          */
-        void initIndexScan();
-
-        /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
-        void checkEnd();
+        boost::optional<IndexKeyEntry> initIndexScan();
 
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
 
-        // The WorkingSet we annotate with results.  Not owned by us.
-        WorkingSet* _workingSet;
+        // The WorkingSet we fill with results.  Not owned by us.
+        WorkingSet* const _workingSet;
 
         // Index access.
-        const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
-        boost::scoped_ptr<IndexCursor> _indexCursor;
-        BSONObj _keyPattern;
+        const IndexAccessMethod* const _iam; // owned by Collection -> IndexCatalog
+        std::unique_ptr<SortedDataInterface::Cursor> _indexCursor;
+        const BSONObj _keyPattern;
 
         // Keeps track of what work we need to do next.
         ScanState _scanState;
@@ -145,50 +143,40 @@ namespace mongo {
         // Contains expressions only over fields in the index key.  We assume this is built
         // correctly by whomever creates this class.
         // The filter is not owned by us.
-        const MatchExpression* _filter;
+        const MatchExpression* const _filter;
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
         bool _shouldDedup;
         unordered_set<RecordId, RecordId::Hasher> _returned;
 
-        // For yielding.
-        BSONObj _savedKey;
-        RecordId _savedLoc;
-
-        IndexScanParams _params;
+        const bool _forward;
+        const IndexScanParams _params;
 
         // Stats
         CommonStats _commonStats;
         IndexScanStats _specificStats;
 
         //
-        // If we aren't doing a "simple" index scan, we make a decision to employ one of two
-        // different algorithms for determining when the index scan has reached the end:
+        // This class employs one of two different algorithms for determining when the index scan
+        // has reached the end:
         //
 
         //
-        // 1) If the index scan is not a single interval, then we use an IndexBoundsChecker to
-        //    determine when the index scan has reached the end.  In this case, _checker will be
-        //    non-NULL (and _endCursor will be NULL).
+        // 1) If the index scan is not a single contiguous interval, then we use an
+        //    IndexBoundsChecker to determine which keys to return and when to stop scanning.
+        //    In this case, _checker will be non-NULL.
         //
 
         boost::scoped_ptr<IndexBoundsChecker> _checker;
-        int _keyEltsToUse;
-        bool _movePastKeyElts;
-        std::vector<const BSONElement*> _keyElts;
-        std::vector<bool> _keyEltsInc;
+        IndexSeekPoint _seekPoint;
 
         //
-        // 2) If the index scan is a single interval, then the scan can execute faster by
-        //    checking for the end via comparison against an end cursor, rather than repeatedly
-        //    doing BSON compares against scanned keys.  In this case, _endCursor will be non-NULL
-        //    (and _checker will be NULL).
+        // 2) If the index scan is a single contiguous interval, then the scan can execute faster by
+        //    letting the index cursor tell us when it hits the end, rather than repeatedly doing
+        //    BSON compares against scanned keys. In this case _checker will be NULL.
         //
 
-        // The end cursor.
-        boost::scoped_ptr<IndexCursor> _endCursor;
-
-        // The key that the end cursor should point to.
+        // The key that the index cursor should stop on/after.
         BSONObj _endKey;
 
         // Is the end key included in the range?

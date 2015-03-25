@@ -181,14 +181,20 @@ namespace mongo {
             uint8_t _buf[1/*size*/ + kMaxBytesNeeded];
         };
 
+        enum Discriminator {
+            kInclusive, // Anything to be stored in an index must use this.
+            kExclusiveBefore,
+            kExclusiveAfter,
+        };
+
         KeyString() {}
 
         KeyString(const BSONObj& obj, Ordering ord, RecordId recordId) {
             resetToKey(obj, ord, recordId);
         }
 
-        KeyString(const BSONObj& obj, Ordering ord) {
-            resetToKey(obj, ord);
+        KeyString(const BSONObj& obj, Ordering ord, Discriminator discriminator = kInclusive) {
+            resetToKey(obj, ord, discriminator);
         }
 
         explicit KeyString(RecordId rid) {
@@ -222,7 +228,7 @@ namespace mongo {
         }
 
         void resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId);
-        void resetToKey(const BSONObj& obj, Ordering ord);
+        void resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator = kInclusive);
         void resetFromBuffer(const void* buffer, size_t size) {
             _buffer.reset();
             memcpy(_buffer.skip(size), buffer, size);
@@ -243,7 +249,8 @@ namespace mongo {
 
     private:
 
-        void _appendAllElementsForIndexing(const BSONObj& obj, Ordering ord);
+        void _appendAllElementsForIndexing(const BSONObj& obj, Ordering ord,
+                                           Discriminator discriminator);
 
         void _appendBool(bool val, bool invert);
         void _appendDate(Date_t val, bool invert);

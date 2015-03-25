@@ -30,21 +30,19 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    using boost::scoped_ptr;
-
     TEST( SortedDataInterface, InsertWithDups1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 2 ), true );
@@ -53,7 +51,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 6, 2 ), true );
@@ -62,7 +60,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
 
             long long x = 0;
@@ -72,11 +70,11 @@ namespace mongo {
     }
 
     TEST( SortedDataInterface, InsertWithDups2 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 18 ), true );
@@ -85,7 +83,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 20 ), true );
@@ -94,17 +92,17 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
         }
     }
 
     TEST( SortedDataInterface, InsertWithDups3AndRollback ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 18 ), true );
@@ -113,7 +111,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 20 ), true );
@@ -122,17 +120,17 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
     }
 
     TEST( SortedDataInterface, InsertNoDups1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 18 ), false );
@@ -141,7 +139,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 2 ), RecordId( 5, 20 ), false );
@@ -150,18 +148,18 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
         }
 
     }
 
     TEST( SortedDataInterface, InsertNoDups2 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 2 ), false );
@@ -170,7 +168,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 4 ), false );
@@ -179,18 +177,18 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
     }
 
     TEST( SortedDataInterface, Unindex1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 18 ), true );
@@ -199,12 +197,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->unindex( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 20 ), true );
@@ -214,12 +212,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->unindex( opCtx.get(), BSON( "" << 2 ), RecordId( 5, 18 ), true );
@@ -229,13 +227,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->unindex( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 18 ), true );
@@ -245,18 +243,18 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
     }
 
     TEST( SortedDataInterface, Unindex2Rollback ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 18 ), true );
@@ -265,12 +263,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->unindex( opCtx.get(), BSON( "" << 1 ), RecordId( 5, 18 ), true );
@@ -280,7 +278,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
@@ -288,12 +286,12 @@ namespace mongo {
 
 
     TEST( SortedDataInterface, CursorIterate1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         int N = 5;
         for ( int i = 0; i < N; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << i ), RecordId( 5, i * 2 ), true ) );
@@ -302,16 +300,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            cursor->locate( BSONObj(), RecordId::min() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
             int n = 0;
-            while ( !cursor->isEOF() ) {
-                RecordId loc = cursor->getRecordId();
-                ASSERT_EQUALS( RecordId(5, n * 2), loc );
-                ASSERT_EQUALS( BSON( "" << n ), cursor->getKey() );
+            for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
+                ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
                 n++;
-                cursor->advance();
             }
             ASSERT_EQUALS( N, n );
         }
@@ -320,12 +314,12 @@ namespace mongo {
     }
 
     TEST( SortedDataInterface, CursorIterate1WithSaveRestore ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         int N = 5;
         for ( int i = 0; i < N; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << i ), RecordId( 5, i * 2 ), true );
@@ -334,18 +328,14 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            cursor->locate( BSONObj(), RecordId::min() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
             int n = 0;
-            while ( !cursor->isEOF() ) {
-                RecordId loc = cursor->getRecordId();
-                ASSERT_EQUALS( RecordId(5, n * 2), loc );
-                ASSERT_EQUALS( BSON( "" << n ), cursor->getKey() );
+            for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
+                ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
                 n++;
-                cursor->advance();
-                cursor->savePosition();
-                cursor->restorePosition( opCtx.get() );
+                cursor->savePositioned();
+                cursor->restore( opCtx.get() );
             }
             ASSERT_EQUALS( N, n );
         }
@@ -353,13 +343,13 @@ namespace mongo {
     }
 
 
-    TEST( SortedDataInterface, CursorIterate2WithSaveRestore ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+    TEST( SortedDataInterface, CursorIterateAllDupKeysWithSaveRestore ) {
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         int N = 5;
         for ( int i = 0; i < N; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 sorted->insert( opCtx.get(), BSON( "" << 5 ), RecordId( 5, i * 2 ), true );
@@ -368,17 +358,14 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            cursor->locate( BSONObj(), RecordId::min() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
             int n = 0;
-            while ( !cursor->isEOF() ) {
-                RecordId loc = cursor->getRecordId();
-                ASSERT_EQUALS( RecordId(5, n * 2), loc );
+            for (auto entry = cursor->seek(BSONObj(), true); entry; entry = cursor->next()) {
+                ASSERT_EQ(entry, IndexKeyEntry(BSON("" << 5), RecordId(5, n * 2)));
                 n++;
-                cursor->advance();
-                cursor->savePosition();
-                cursor->restorePosition( opCtx.get() );
+                cursor->savePositioned();
+                cursor->restore( opCtx.get() );
             }
             ASSERT_EQUALS( N, n );
         }
@@ -387,20 +374,20 @@ namespace mongo {
 
 
     TEST( SortedDataInterface, Locate1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj key = BSON( "" << 1 );
         RecordId loc( 5, 16 );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( key, loc ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
+            ASSERT( !cursor->seek( key, true ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 Status res = sorted->insert( opCtx.get(), key, loc, true );
@@ -410,20 +397,18 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( cursor->locate( key, loc ) );
-            ASSERT_EQUALS( key, cursor->getKey() );
-            ASSERT_EQUALS( loc, cursor->getRecordId() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
+            ASSERT_EQ(cursor->seek(key, true), IndexKeyEntry(key, loc));
         }
     }
 
     TEST( SortedDataInterface, Locate2 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
@@ -435,28 +420,22 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( BSON( "a" << 2 ), RecordId::min() ) );
-            ASSERT( !cursor->isEOF()  );
-            ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
-            ASSERT_EQUALS( RecordId(1,4), cursor->getRecordId() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
+            ASSERT_EQ(cursor->seek(BSON("a" << 2), true),
+                      IndexKeyEntry(BSON("" << 2), RecordId(1, 4)));
 
-            cursor->advance();
-            ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
-            ASSERT_EQUALS( RecordId(1,6), cursor->getRecordId() );
-
-            cursor->advance();
-            ASSERT( cursor->isEOF() );
+            ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 3), RecordId(1, 6)));
+            ASSERT_EQ(cursor->next(), boost::none);
         }
     }
 
     TEST( SortedDataInterface, Locate2Empty ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
@@ -468,88 +447,69 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( BSONObj(), RecordId::min() ) );
-            ASSERT( !cursor->isEOF()  );
-            ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
-            ASSERT_EQUALS( RecordId(1,2), cursor->getRecordId() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
+            ASSERT_EQ(cursor->seek(BSONObj(), true), IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( BSONObj(), RecordId::min() ) );
-            ASSERT( cursor->isEOF()  );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
+            ASSERT_EQ(cursor->seek(BSONObj(), false), boost::none);
         }
 
     }
 
 
     TEST( SortedDataInterface, Locate3Descending ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+
+        auto buildEntry = [](int i) { return IndexKeyEntry(BSON("" << i), RecordId(1, i*2)); };
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             for ( int i = 0; i < 10; i++ ) {
                 if ( i == 6 )
                     continue;
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << i ), RecordId(1,i*2), true ) );
+                auto entry = buildEntry(i);
+                ASSERT_OK( sorted->insert( opCtx.get(), entry.key, entry.loc, true ) );
                 uow.commit();
             }
         }
 
-        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-        scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId::min() ) );
-        ASSERT( !cursor->isEOF()  );
-        ASSERT_EQUALS( BSON( "" << 5 ), cursor->getKey() );
-        cursor->advance();
-        ASSERT_EQUALS( BSON( "" << 7 ), cursor->getKey() );
+        const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get(), true));
+        ASSERT_EQ(cursor->seek(BSON("" << 5), true), buildEntry(5));
+        ASSERT_EQ(cursor->next(), buildEntry(7));
 
-        cursor.reset( sorted->newCursor( opCtx.get(), -1 ) );
-        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId::min() ) );
-        ASSERT( !cursor->isEOF()  );
-        ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
+        cursor = sorted->newCursor(opCtx.get(), /*forward*/false);
+        ASSERT_EQ(cursor->seek(BSON("" << 5), /*inclusive*/false), buildEntry(4));
 
-        cursor.reset( sorted->newCursor( opCtx.get(), -1 ) );
-        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId::max() ) );
-        ASSERT( !cursor->isEOF()  );
-        ASSERT_EQUALS( BSON( "" << 5 ), cursor->getKey() );
-        cursor->advance();
-        ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
+        cursor = sorted->newCursor(opCtx.get(), /*forward*/false);
+        ASSERT_EQ(cursor->seek(BSON("" << 5), /*inclusive*/true), buildEntry(5));
+        ASSERT_EQ(cursor->next(), buildEntry(4));
 
-        cursor.reset( sorted->newCursor( opCtx.get(), -1 ) );
-        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId::min() ) );
-        ASSERT( !cursor->isEOF()  );
-        ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
-        cursor->advance();
-        ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+        cursor = sorted->newCursor(opCtx.get(), /*forward*/false);
+        ASSERT_EQ(cursor->seek(BSON("" << 5), /*inclusive*/false), buildEntry(4));
+        ASSERT_EQ(cursor->next(), buildEntry(3));
 
-        cursor.reset( sorted->newCursor( opCtx.get(), -1 ) );
-        cursor->locate( BSON( "" << 6 ), RecordId::max() );
-        ASSERT( !cursor->isEOF()  );
-        ASSERT_EQUALS( BSON( "" << 5 ), cursor->getKey() );
-        cursor->advance();
-        ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
+        cursor = sorted->newCursor(opCtx.get(), /*forward*/false);
+        ASSERT_EQ(cursor->seek(BSON("" << 6), /*inclusive*/true), buildEntry(5));
+        ASSERT_EQ(cursor->next(), buildEntry(4));
 
-        cursor.reset( sorted->newCursor( opCtx.get(), -1 ) );
-        cursor->locate( BSON( "" << 500 ), RecordId::max() );
-        ASSERT( !cursor->isEOF()  );
-        ASSERT_EQUALS( BSON( "" << 9 ), cursor->getKey() );
-        cursor->advance();
-        ASSERT_EQUALS( BSON( "" << 8 ), cursor->getKey() );
-
+        cursor = sorted->newCursor(opCtx.get(), /*forward*/false);
+        ASSERT_EQ(cursor->seek(BSON("" << 500), /*inclusive*/true), buildEntry(9));
+        ASSERT_EQ(cursor->next(), buildEntry(8));
     }
 
     TEST( SortedDataInterface, Locate4 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
@@ -562,41 +522,26 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( BSON( "a" << 1 ), RecordId::min() ) );
-            ASSERT( !cursor->isEOF()  );
-            ASSERT_EQUALS( RecordId(1,2), cursor->getRecordId() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
+            ASSERT_EQ(cursor->seek(BSON("a" << 1), true),
+                      IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
 
-            cursor->advance();
-            ASSERT_EQUALS( RecordId(1,4), cursor->getRecordId() );
-
-            cursor->advance();
-            ASSERT_EQUALS( RecordId(1,6), cursor->getRecordId() );
-
-            cursor->advance();
-            ASSERT_EQUALS( RecordId(1,8), cursor->getRecordId() );
-
-            cursor->advance();
-            ASSERT( cursor->isEOF() );
+            ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 4)));
+            ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 6)));
+            ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 2), RecordId(1, 8)));
+            ASSERT_EQ(cursor->next(), boost::none);
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( BSON( "a" << 1 ), RecordId::max() ) );
-            ASSERT( !cursor->isEOF()  );
-            ASSERT( cursor->getDirection() == -1 );
-            ASSERT_EQUALS( RecordId(1,6), cursor->getRecordId() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
+            ASSERT_EQ(cursor->seek(BSON("a" << 1), true),
+                      IndexKeyEntry(BSON("" << 1), RecordId(1, 6)));
 
-            cursor->advance();
-            ASSERT_EQUALS( RecordId(1,4), cursor->getRecordId() );
-
-            cursor->advance();
-            ASSERT_EQUALS( RecordId(1,2), cursor->getRecordId() );
-
-            cursor->advance();
-            ASSERT( cursor->isEOF() );
+            ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 4)));
+            ASSERT_EQ(cursor->next(), IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
+            ASSERT_EQ(cursor->next(), boost::none);
         }
     }
 

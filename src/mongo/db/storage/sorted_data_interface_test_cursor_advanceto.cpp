@@ -30,32 +30,29 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    using boost::scoped_ptr;
-    using std::vector;
-
     // Insert multiple single-field keys and advance to each of them
     // using a forward cursor by specifying their exact key. When
     // advanceTo() is called on a duplicate key, the cursor is
-    // positioned at the next occurrence of that key in ascending
+    // positioned at the first occurrence of that key in ascending
     // order by RecordId.
     TEST( SortedDataInterface, AdvanceTo ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -68,73 +65,49 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
 
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key1;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = false;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
 
-                cursor->advanceTo( key1, 1, false, keyEnd, keyEndInclusive );
-                // SERVER-15489 forward cursor is positioned at first occurrence of key in index
-                //              when advanceTo() called on duplicate key
-                // ASSERT_EQUALS( key1, cursor->getKey() );
-                // ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
+            seekPoint.keyPrefix = key2;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            seekPoint.keyPrefix = key3;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
 
-                cursor->advanceTo( key2, 1, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc4, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key3, 1, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc5, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key4, 1, false, keyEnd, keyEndInclusive );
-                ASSERT( cursor->isEOF() );
-            }
+            seekPoint.keyPrefix = key4;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
         }
     }
 
     // Insert multiple single-field keys and advance to each of them
     // using a reverse cursor by specifying their exact key. When
     // advanceTo() is called on a duplicate key, the cursor is
-    // positioned at the next occurrence of that key in descending
-    // order by RecordId.
+    // positioned at the first occurrence of that key in descending
+    // order by RecordId (last occurrence in index order).
     TEST( SortedDataInterface, AdvanceToReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -147,71 +120,47 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
 
-            ASSERT( cursor->locate( key3, loc5 ) );
-            ASSERT_EQUALS( key3, cursor->getKey() );
-            ASSERT_EQUALS( loc5, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key3;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = false;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
 
-                cursor->advanceTo( key3, 1, false, keyEnd, keyEndInclusive );
-                // SERVER-15490 reverse cursor is positioned at last occurrence of key in index
-                //              when advanceTo() called on duplicate key
-                // ASSERT_EQUALS( key3, cursor->getKey() );
-                // ASSERT_EQUALS( loc4, cursor->getRecordId() );
-            }
+            seekPoint.keyPrefix = key2;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            seekPoint.keyPrefix = key1;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
 
-                cursor->advanceTo( key2, 1, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key1, 1, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key0, 1, false, keyEnd, keyEndInclusive );
-                ASSERT( cursor->isEOF() );
-            }
+            seekPoint.keyPrefix = key0;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
         }
     }
 
-    // Insert two single-field keys and advance to the larger one using
-    // a forward cursor positioned at the smaller one, by specifying a key
-    // before the current position of the cursor.
+    // Insert two single-field keys, then seek a forward cursor to the larger one then seek behind
+    // the smaller one.  Ending position is on the smaller one since a seek describes where to go
+    // and should not be effected by current position.
     TEST( SortedDataInterface, AdvanceToKeyBeforeCursorPosition ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -221,65 +170,41 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
 
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key0;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = false;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
 
-                cursor->advanceTo( key0, 1, false, keyEnd, keyEndInclusive );
-                // SERVER-15489 forward cursor is positioned at first key in index
-                //              when advanceTo() called with key smaller than any entry
-                // ASSERT_EQUALS( key2, cursor->getKey() );
-                // ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key0, 1, true, keyEnd, keyEndInclusive );
-                // SERVER-15489 forward cursor is positioned at first key in index
-                //              when advanceTo() called with key smaller than any entry
-                // ASSERT_EQUALS( key2, cursor->getKey() );
-                // ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
+            seekPoint.prefixExclusive = true;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
         }
     }
 
-    // Insert two single-field keys and advance to the smaller one using
-    // a reverse cursor positioned at the larger one, by specifying a key
-    // after the current position of the cursor.
+    // Insert two single-field keys, then seek a reverse cursor to the smaller one then seek behind
+    // the larger one.  Ending position is on the larger one since a seek describes where to go
+    // and should not be effected by current position.
     TEST( SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -289,67 +214,43 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
 
-            ASSERT( cursor->locate( key2, loc2 ) );
-            ASSERT_EQUALS( key2, cursor->getKey() );
-            ASSERT_EQUALS( loc2, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key2, true), IndexKeyEntry(key2, loc2));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key3;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = false;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
 
-                cursor->advanceTo( key3, 1, false, keyEnd, keyEndInclusive );
-                // SERVER-15490 reverse cursor is positioned at last key in index
-                //              when advanceTo() called with key larger than any entry
-                // ASSERT_EQUALS( key1, cursor->getKey() );
-                // ASSERT_EQUALS( loc1, cursor->getRecordId() );
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( cursor->locate( key2, loc2 ) );
-            ASSERT_EQUALS( key2, cursor->getKey() );
-            ASSERT_EQUALS( loc2, cursor->getRecordId() );
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key3, 1, true, keyEnd, keyEndInclusive );
-                // SERVER-15490 reverse cursor is positioned at last key in index
-                //              when advanceTo() called with key larger than any entry
-                // ASSERT_EQUALS( key1, cursor->getKey() );
-                // ASSERT_EQUALS( loc1, cursor->getRecordId() );
-            }
+            seekPoint.prefixExclusive = true;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
         }
     }
 
     // Insert a single-field key and advance to EOF using a forward cursor
-    // by specifying that exact key. When advanceTo() is called with the key
-    // where the cursor is positioned (and it is the last entry for that key),
-    // the cursor should advance to EOF regardless of whether it is in non-
-    // or inclusive mode.
+    // by specifying that exact key. When seek() is called with the key
+    // where the cursor is positioned (and it is the first entry for that key),
+    // the cursor should remain at its current position. An exclusive seek will
+    // position the cursor on the next position, which may be EOF.
     TEST( SortedDataInterface, AdvanceToKeyAtCursorPosition ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -358,63 +259,43 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
 
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key1;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = false;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
 
-                // SERVER-15483 forward cursor positioned at last entry in index should move
-                //              to EOF when advanceTo() is called with that particular key
-                // cursor->advanceTo( key1, 1, false, keyEnd, keyEndInclusive );
-                // ASSERT( cursor->isEOF() );
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key1, 1, true, keyEnd, keyEndInclusive );
-                ASSERT( cursor->isEOF() );
-            }
+            seekPoint.prefixExclusive = true;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
         }
     }
 
     // Insert a single-field key and advance to EOF using a reverse cursor
-    // by specifying that exact key. When advanceTo() is called with the key
+    // by specifying that exact key. When seek() is called with the key
     // where the cursor is positioned (and it is the first entry for that key),
-    // the cursor should advance to EOF regardless of whether it is in non-
-    // or inclusive mode.
+    // the cursor should remain at its current position. An exclusive seek will
+    // position the cursor on the next position, which may be EOF.
     TEST( SortedDataInterface, AdvanceToKeyAtCursorPositionReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -423,44 +304,24 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
 
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key1;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = false;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
 
-                // SERVER-15483 reverse cursor positioned at first entry in index should move
-                //              to EOF when advanceTo() is called with that particular key
-                // cursor->advanceTo( key1, 1, false, keyEnd, keyEndInclusive );
-                // ASSERT( cursor->isEOF() );
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key1, 1, true, keyEnd, keyEndInclusive );
-                ASSERT( cursor->isEOF() );
-            }
+            seekPoint.prefixExclusive = true;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
         }
     }
 
@@ -469,16 +330,16 @@ namespace mongo {
     // When advanceTo() is called in non-inclusive mode, the cursor is
     // positioned at the key that comes after the one specified.
     TEST( SortedDataInterface, AdvanceToExclusive ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -491,53 +352,30 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
 
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key1;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = true;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc4));
 
-                cursor->advanceTo( key1, 1, true, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc4, cursor->getRecordId() );
-            }
+            seekPoint.keyPrefix = key2;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc5));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            seekPoint.keyPrefix = key3;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
 
-                cursor->advanceTo( key2, 1, true, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc5, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key3, 1, true, keyEnd, keyEndInclusive );
-                ASSERT( cursor->isEOF() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                // SERVER-15449 forward cursor positioned at EOF should stay at EOF
-                //              when advanceTo() is called
-                // cursor->advanceTo( key4, 1, true, keyEnd, keyEndInclusive );
-                // ASSERT( cursor->isEOF() );
-            }
+            seekPoint.keyPrefix = key4;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
         }
     }
 
@@ -546,16 +384,16 @@ namespace mongo {
     // When advanceTo() is called in non-inclusive mode, the cursor is
     // positioned at the key that comes before the one specified.
     TEST( SortedDataInterface, AdvanceToExclusiveReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -568,53 +406,30 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
 
-            ASSERT( cursor->locate( key3, loc5 ) );
-            ASSERT_EQUALS( key3, cursor->getKey() );
-            ASSERT_EQUALS( loc5, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key3, true), IndexKeyEntry(key3, loc5));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.keyPrefix = key3;
+            seekPoint.prefixLen = 1;
+            seekPoint.prefixExclusive = true;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key2, loc2));
 
-                cursor->advanceTo( key3, 1, true, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
+            seekPoint.keyPrefix = key2;
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            seekPoint.keyPrefix = key1;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
 
-                cursor->advanceTo( key2, 1, true, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                cursor->advanceTo( key1, 1, true, keyEnd, keyEndInclusive );
-                ASSERT( cursor->isEOF() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                // SERVER-15449 reverse cursor positioned at EOF should stay at EOF
-                //              when advanceTo() is called
-                // cursor->advanceTo( key0, 1, true, keyEnd, keyEndInclusive );
-                // ASSERT( cursor->isEOF() );
-            }
+            seekPoint.keyPrefix = key0;
+            ASSERT_EQ(cursor->seek(seekPoint), boost::none);
         }
     }
 
@@ -622,18 +437,18 @@ namespace mongo {
     // each of them using a forward cursor by specifying a key between their
     // exact key and the current position of the cursor.
     TEST( SortedDataInterface, AdvanceToIndirect ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key6; // larger than any inserted key
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -644,43 +459,27 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
 
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.prefixLen = 0;
+            BSONElement suffix0;
+            seekPoint.keySuffix = {&suffix0};
+            seekPoint.suffixInclusive = {true};
 
-                const BSONElement end0 = key2.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = true;
+            suffix0 = key2.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
 
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                const BSONElement end0 = key4.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = true;
-
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key5, cursor->getKey() );
-                ASSERT_EQUALS( loc3, cursor->getRecordId() );
-            }
+            suffix0 = key4.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
         }
     }
 
@@ -688,18 +487,18 @@ namespace mongo {
     // each of them using a reverse cursor by specifying a key between their
     // exact key and the current position of the cursor.
     TEST( SortedDataInterface, AdvanceToIndirectReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key0; // smaller than any inserted key
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -710,43 +509,27 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
 
-            ASSERT( cursor->locate( key5, loc3 ) );
-            ASSERT_EQUALS( key5, cursor->getKey() );
-            ASSERT_EQUALS( loc3, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.prefixLen = 0;
+            BSONElement suffix0;
+            seekPoint.keySuffix = {&suffix0};
+            seekPoint.suffixInclusive = {true};
 
-                const BSONElement end0 = key4.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = true;
+            suffix0 = key4.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
 
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                const BSONElement end0 = key2.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = true;
-
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getRecordId() );
-            }
+            suffix0 = key2.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
         }
     }
 
@@ -756,18 +539,18 @@ namespace mongo {
     // is called in non-inclusive mode, the cursor is positioned at the key
     // that comes after the one specified.
     TEST( SortedDataInterface, AdvanceToIndirectExclusive ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key6; // larger than any inserted key
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -778,68 +561,32 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
 
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.prefixLen = 0;
+            BSONElement suffix0;
+            seekPoint.keySuffix = {&suffix0};
+            seekPoint.suffixInclusive = {false};
 
-                const BSONElement end0 = key2.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = false;
+            suffix0 = key2.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
 
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
+            suffix0 = key4.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            ASSERT_EQ(cursor->seek(key1, true), IndexKeyEntry(key1, loc1));
 
-                const BSONElement end0 = key4.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = false;
-
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key5, cursor->getKey() );
-                ASSERT_EQUALS( loc3, cursor->getRecordId() );
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getRecordId() );
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                const BSONElement end0 = key3.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = false;
-
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key5, cursor->getKey() );
-                ASSERT_EQUALS( loc3, cursor->getRecordId() );
-            }
+            suffix0 = key3.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key5, loc3));
         }
     }
 
@@ -849,18 +596,18 @@ namespace mongo {
     // is called in non-inclusive mode, the cursor is positioned at the key
     // that comes before the one specified.
     TEST( SortedDataInterface, AdvanceToIndirectExclusiveReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key0; // smaller than any inserted key
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
@@ -871,68 +618,32 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
 
-            ASSERT( cursor->locate( key5, loc3 ) );
-            ASSERT_EQUALS( key5, cursor->getKey() );
-            ASSERT_EQUALS( loc3, cursor->getRecordId() );
+            ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            IndexSeekPoint seekPoint;
+            seekPoint.prefixLen = 0;
+            BSONElement suffix0;
+            seekPoint.keySuffix = {&suffix0};
+            seekPoint.suffixInclusive = {false};
 
-                const BSONElement end0 = key4.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = false;
+            suffix0 = key4.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key3, loc2));
 
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getRecordId() );
-            }
+            suffix0 = key2.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
 
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
+            ASSERT_EQ(cursor->seek(key5, true), IndexKeyEntry(key5, loc3));
 
-                const BSONElement end0 = key2.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = false;
-
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getRecordId() );
-            }
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-
-            ASSERT( cursor->locate( key5, loc3 ) );
-            ASSERT_EQUALS( key5, cursor->getKey() );
-            ASSERT_EQUALS( loc3, cursor->getRecordId() );
-
-            {
-                vector<const BSONElement*> keyEnd( 1 );
-                vector<bool> keyEndInclusive( 1 );
-
-                const BSONElement end0 = key3.firstElement();
-                keyEnd[0] = &end0;
-                keyEndInclusive[0] = false;
-
-                cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
-                ASSERT( !cursor->isEOF() );
-                ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getRecordId() );
-            }
+            suffix0 = key3.firstElement();
+            ASSERT_EQ(cursor->seek(seekPoint), IndexKeyEntry(key1, loc1));
         }
     }
 

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <iosfwd>
+#include <tuple>
 #include <vector>
 
 #include "mongo/db/jsobj.h"
@@ -40,17 +42,98 @@ namespace mongo {
      * and a disk location.
      */
     struct IndexKeyEntry {
-        IndexKeyEntry(const BSONObj& key, RecordId loc) :key(key), loc(loc) {}
+        IndexKeyEntry(BSONObj key, RecordId loc) :key(std::move(key)), loc(std::move(loc)) {}
 
         BSONObj key;
         RecordId loc;
     };
 
+    std::ostream& operator<<(std::ostream& stream, const IndexKeyEntry& entry);
+
+    inline bool operator==(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
+        return std::tie(lhs.key, lhs.loc) == std::tie(rhs.key, rhs.loc);
+    }
+
+    inline bool operator!=(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
+        return std::tie(lhs.key, lhs.loc) != std::tie(rhs.key, rhs.loc);
+    }
+
+    /**
+     * Describes a query that can be compared against an IndexKeyEntry in a way that allows
+     * expressing exclusiveness on a prefix of the key. This is mostly used to express a location to
+     * seek to in an index that may not be representable as a valid key.
+     *
+     * The "key" used for comparison is the concatenation of the first 'prefixLen' elements of
+     * 'keyPrefix' followed by the last 'keySuffix.size() - prefixLen' elements of
+     * 'keySuffix'.
+     *
+     * The comparison is exclusive if either 'prefixExclusive' is true or if there are any false
+     * values in 'suffixInclusive' that are false at index >= 'prefixLen'.
+     *
+     * Portions of the key following the first exclusive part may be ignored.
+     *
+     * e.g.
+     *
+     *  Suppose that
+     *
+     *      keyPrefix = { "" : 1, "" : 2 }
+     *      prefixLen = 1
+     *      prefixExclusive = false
+     *      keySuffix = [ IGNORED, { "" : 5 } ]
+     *      suffixInclusive = [ IGNORED, false ]
+     *
+     *      ==> key is { "" : 1, "" : 5 }
+     *          with the comparison being done exclusively
+     *
+     *  Suppose that
+     *
+     *      keyPrefix = { "" : 1, "" : 2 }
+     *      prefixLen = 1
+     *      prefixExclusive = true
+     *      keySuffix = IGNORED
+     *      suffixInclusive = IGNORED
+     *
+     *      ==> represented key is { "" : 1 }
+     *          with the comparison being done exclusively
+     *
+     * 'prefixLen = 0' and 'prefixExclusive = true' are mutually incompatible.
+     *
+     * @see IndexEntryComparison::makeQueryObject
+     */
+    struct IndexSeekPoint {
+        BSONObj keyPrefix;
+
+        /**
+         * Use this many fields in 'keyPrefix'.
+         */
+        int prefixLen = 0;
+
+        /**
+         * If true, compare exclusively on just the fields on keyPrefix and ignore the suffix.
+         */
+        bool prefixExclusive = false;
+
+        /**
+         * Elements starting at index 'prefixLen' are logically appended to the prefix.
+         * The elements before index 'prefixLen' should be ignored.
+         */
+        std::vector<const BSONElement*> keySuffix;
+
+        /**
+         * If the ith element is false, ignore indexes > i in keySuffix and treat the
+         * concatenated key as exclusive.
+         * The elements before index 'prefixLen' should be ignored.
+         *
+         * Must have identical size as keySuffix.
+         */
+        std::vector<bool> suffixInclusive;
+    };
+
     /**
      * Compares two different IndexKeyEntry instances.
-     * The existense of compound indexes necessitates some complicated logic. This is meant to
-     * support the implementation of the SortedDataInterface::customLocate() and
-     * SortedDataInterface::advanceTo() methods, which require fine-grained control over whether the
+     * The existence of compound indexes necessitates some complicated logic. This is meant to
+     * support the comparisons of IndexKeyEntries (that are stored in an index) with IndexSeekPoints
+     * (that were encoded with makeQueryObject) to support fine-grained control over whether the
      * ranges of various keys comprising a compound index are inclusive or exclusive.
      */
     class IndexEntryComparison {
@@ -104,6 +187,15 @@ namespace mongo {
                                        const std::vector<const BSONElement*>& keySuffix,
                                        const std::vector<bool>& suffixInclusive,
                                        const int cursorDirection);
+
+        static BSONObj makeQueryObject(const IndexSeekPoint& seekPoint, bool isForward) {
+            return makeQueryObject(seekPoint.keyPrefix,
+                                   seekPoint.prefixLen,
+                                   seekPoint.prefixExclusive,
+                                   seekPoint.keySuffix,
+                                   seekPoint.suffixInclusive,
+                                   isForward ? 1 : -1);
+        }
 
     private:
         // Ordering is used in comparison() to compare BSONElements

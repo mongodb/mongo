@@ -36,9 +36,6 @@
 
 namespace mongo {
 
-    class IndexCursor;
-    struct S2IndexingParams;
-
     class S2AccessMethod : public IndexAccessMethod {
     public:
         S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);

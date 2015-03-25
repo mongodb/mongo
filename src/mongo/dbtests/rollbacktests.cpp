@@ -128,22 +128,16 @@ namespace {
         IndexDescriptor* desc = catalog->findIndexByName( txn, idxName, false );
 
         if ( desc ) {
-            CursorOptions cursorOptions;
-            cursorOptions.direction = CursorOptions::INCREASING;
+            auto cursor = catalog->getIndex(desc)->newCursor(txn);
 
-            IndexCursor *cursor;
-            ASSERT_OK( catalog->getIndex( desc )->newCursor( txn, cursorOptions, &cursor ) );
-            ASSERT_OK( cursor->seek( minKey ) );
-
-            while ( !cursor->isEOF() ) {
+            for (auto kv = cursor->seek(minKey, true); kv; kv = cursor->next()) {
                 numEntries++;
-                cursor->next();
             }
-            delete cursor;
         }
 
         return numEntries;
     }
+
     void dropIndex( OperationContext* txn, const NamespaceString& nss, const string& idxName ) {
         Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName( txn, idxName );

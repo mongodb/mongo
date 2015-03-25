@@ -31,7 +31,6 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -120,10 +119,10 @@ namespace mongo {
         Status update(OperationContext* txn, const UpdateTicket& ticket, int64_t* numUpdated);
 
         /**
-         * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of
-         * failure. If the latter, '*out' contains NULL.  See index_cursor.h for IndexCursor usage.
+         * Returns an unpositioned cursor over 'this' index.
          */
-        Status newCursor(OperationContext* txn, const CursorOptions& opts, IndexCursor** out) const;
+        std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+                                                               bool isForward = true) const;
 
         // ------ index level operations ------
 
@@ -177,7 +176,6 @@ namespace mongo {
          */
         long long getSpaceUsedBytes( OperationContext* txn ) const;
 
-        // XXX: consider migrating callers to use IndexCursor instead
         RecordId findSingle( OperationContext* txn, const BSONObj& key ) const;
 
         //

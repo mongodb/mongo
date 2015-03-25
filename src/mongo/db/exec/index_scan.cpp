@@ -37,7 +37,6 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/util/log.h"
@@ -55,9 +54,6 @@ namespace {
 
 namespace mongo {
 
-    using std::auto_ptr;
-    using std::vector;
-
     // static
     const char* IndexScan::kStageType = "IXSCAN";
 
@@ -67,16 +63,15 @@ namespace mongo {
                          const MatchExpression* filter)
         : _txn(txn),
           _workingSet(workingSet),
+          _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
+          _keyPattern(params.descriptor->keyPattern().getOwned()),
           _scanState(INITIALIZING),
           _filter(filter),
           _shouldDedup(true),
+          _forward(params.direction == 1),
           _params(params),
           _commonStats(kStageType),
-          _keyEltsToUse(0),
-          _movePastKeyElts(false),
           _endKeyInclusive(false) {
-        _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
-        _keyPattern = _params.descriptor->keyPattern().getOwned();
 
         // We can't always access the descriptor in the call to getStats() so we pull
         // any info we need for stats reporting out here.
@@ -86,44 +81,24 @@ namespace mongo {
         _specificStats.indexVersion = _params.descriptor->version();
     }
 
-    void IndexScan::initIndexScan() {
-        // This function transitions from the initializing state to CHECKING_END. If
-        // the initialization fails, however, then the state transitions to HIT_END.
-        invariant(INITIALIZING == _scanState);
-
-        // Perform the possibly heavy-duty initialization of the underlying index cursor.
+    boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         if (_params.doNotDedup) {
             _shouldDedup = false;
         }
         else {
+            // TODO it is incorrect to rely on this not changing. SERVER-17678
             _shouldDedup = _params.descriptor->isMultikey(_txn);
         }
 
-        // Set up the index cursor.
-        CursorOptions cursorOptions;
-
-        if (1 == _params.direction) {
-            cursorOptions.direction = CursorOptions::INCREASING;
-        }
-        else {
-            cursorOptions.direction = CursorOptions::DECREASING;
-        }
-
-        IndexCursor *cursor;
-        Status s = _iam->newCursor(_txn, cursorOptions, &cursor);
-        verify(s.isOK());
-        _indexCursor.reset(cursor);
+        // Perform the possibly heavy-duty initialization of the underlying index cursor.
+        _indexCursor = _iam->newCursor(_txn, _forward);
 
         if (_params.bounds.isSimpleRange) {
             // Start at one key, end at another.
-            Status status = _indexCursor->seek(_params.bounds.startKey);
-            if (!status.isOK()) {
-                warning() << "IndexCursor seek failed: " << status.toString();
-                _scanState = HIT_END;
-            }
-            if (!isEOF()) {
-                _specificStats.keysExamined = 1;
-            }
+            _endKey = _params.bounds.endKey;
+            _endKeyInclusive = _params.bounds.endKeyInclusive;
+            _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
+            return _indexCursor->seek(_params.bounds.startKey, /*inclusive*/true);
         }
         else {
             // For single intervals, we can use an optimized scan which checks against the position
@@ -136,45 +111,20 @@ namespace mongo {
                                                      &startKeyInclusive,
                                                      &_endKey,
                                                      &_endKeyInclusive)) {
-                // We want to point at the start key if it's inclusive, and we want to point past
-                // the start key if it's exclusive.
-                _indexCursor->seek(startKey, !startKeyInclusive);
 
-                IndexCursor* endCursor;
-                invariant(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
-                invariant(endCursor);
-                _endCursor.reset(endCursor);
-
-                // If the end key is inclusive, we want to point *past* it since that's the end.
-                _endCursor->seek(_endKey, _endKeyInclusive);
+                _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
+                return _indexCursor->seek(startKey, startKeyInclusive);
             }
             else {
                 _checker.reset(new IndexBoundsChecker(&_params.bounds,
                                                       _keyPattern,
                                                       _params.direction));
 
-                int nFields = _keyPattern.nFields();
-                vector<const BSONElement*> key;
-                vector<bool> inc;
-                key.resize(nFields);
-                inc.resize(nFields);
-                if (_checker->getStartKey(&key, &inc)) {
-                    _indexCursor->seek(key, inc);
-                    _keyElts.resize(nFields);
-                    _keyEltsInc.resize(nFields);
-                }
-                else {
-                    _scanState = HIT_END;
-                }
-            }
-        }
+                if (!_checker->getStartSeekPoint(&_seekPoint))
+                    return boost::none;
 
-        // This method may throw an exception while it's doing initialization. If we've gotten
-        // here, then we've done all the initialization without an exception being thrown. This
-        // means it is safe to transition to the CHECKING_END state. In error cases, we transition
-        // to HIT_END, so we should not change state again here.
-        if (HIT_END != _scanState) {
-            _scanState = CHECKING_END;
+                return _indexCursor->seek(_seekPoint);
+            }
         }
     }
 
@@ -184,120 +134,105 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        if (INITIALIZING == _scanState) {
-            invariant(NULL == _indexCursor.get());
-            try {
-                initIndexScan();
+        // Get the next kv pair from the index, if any.
+        boost::optional<IndexKeyEntry> kv;
+        try {
+            switch (_scanState) {
+            case INITIALIZING: kv = initIndexScan(); break;
+            case GETTING_NEXT: kv = _indexCursor->next(); break;
+            case NEED_SEEK: kv = _indexCursor->seek(_seekPoint); break;
+            case HIT_END: return PlanStage::IS_EOF;
             }
-            catch (const WriteConflictException& wce) {
-                // Release our owned cursors and try again next time.
-                _scanState = INITIALIZING;
-                _indexCursor.reset();
-                _endCursor.reset();
-                *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_YIELD;
+        }
+        catch (const WriteConflictException& wce) {
+            *out = WorkingSet::INVALID_ID;
+            return PlanStage::NEED_YIELD;
+        }
+
+        if (kv) {
+            // In debug mode, check that the cursor isn't lying to us.
+            if (kDebugBuild && !_endKey.isEmpty()) {
+                int cmp = kv->key.woCompare(_endKey,
+                                            Ordering::make(_params.descriptor->keyPattern()),
+                                            /*compareFieldNames*/false);
+                if (cmp == 0) dassert(_endKeyInclusive);
+                dassert(_forward ? cmp <= 0 : cmp >= 0);
+            }
+
+            ++_specificStats.keysExamined;
+            if (_params.maxScan && _specificStats.keysExamined >= _params.maxScan) {
+                kv = boost::none;
             }
         }
 
-        if (CHECKING_END == _scanState) {
-            try {
-                checkEnd();
-            }
-            catch (const WriteConflictException& wce) {
-                // checkEnd only fails in ways that is safe to call again after yielding.
-                _scanState = CHECKING_END;
-                *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_YIELD;
+        if (kv && _checker) {
+            switch (_checker->checkKey(kv->key, &_seekPoint)) {
+            case IndexBoundsChecker::VALID:
+                break;
+
+            case IndexBoundsChecker::DONE:
+                // This seems weird but it's the old definition of nscanned.
+                --_specificStats.keysExamined;
+                kv = boost::none;
+                break;
+
+            case IndexBoundsChecker::MUST_ADVANCE:
+                _scanState = NEED_SEEK;
+                _commonStats.needTime++;
+                return PlanStage::NEED_TIME;
             }
         }
 
-        if (isEOF()) {
+        if (!kv) {
+            _scanState = HIT_END;
             _commonStats.isEOF = true;
+            _indexCursor.reset();
             return PlanStage::IS_EOF;
         }
 
-        if (GETTING_NEXT == _scanState) {
-            // Grab the next (key, value) from the index.
-            BSONObj keyObj = _indexCursor->getKey();
-            RecordId loc = _indexCursor->getValue();
+        _scanState = GETTING_NEXT;
 
-            bool filterPasses = Filter::passes(keyObj, _keyPattern, _filter);
-            if ( filterPasses ) {
-                // We must make a copy of the on-disk data since it can mutate during the execution
-                // of this query.
-                keyObj = keyObj.getOwned();
-            }
-
-            _scanState = CHECKING_END;
-
-            // Move to the next result.
-            // The underlying IndexCursor points at the *next* thing we want to return.  We do this
-            // so that if we're scanning an index looking for docs to delete we don't continually
-            // clobber the thing we're pointing at.
-            try {
-                _indexCursor->next();
-            }
-            catch (const WriteConflictException& wce) {
-                // If next throws, it leaves us at the original position.
-                invariant(_indexCursor->getValue() == loc);
-                *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_YIELD;
-            }
-
-            if (_shouldDedup) {
-                ++_specificStats.dupsTested;
-                if (_returned.end() != _returned.find(loc)) {
-                    ++_specificStats.dupsDropped;
-                    ++_commonStats.needTime;
-                    return PlanStage::NEED_TIME;
-                }
-                else {
-                    _returned.insert(loc);
-                }
-            }
-
-            if (filterPasses) {
-                if (NULL != _filter) {
-                    ++_specificStats.matchTested;
-                }
-
-                // Fill out the WSM.
-                WorkingSetID id = _workingSet->allocate();
-                WorkingSetMember* member = _workingSet->get(id);
-                member->loc = loc;
-                member->keyData.push_back(IndexKeyDatum(_keyPattern, keyObj, _iam));
-                member->state = WorkingSetMember::LOC_AND_IDX;
-
-                if (_params.addKeyMetadata) {
-                    BSONObjBuilder bob;
-                    bob.appendKeys(_keyPattern, keyObj);
-                    member->addComputed(new IndexKeyComputedData(bob.obj()));
-                }
-
-                *out = id;
-                ++_commonStats.advanced;
-                return PlanStage::ADVANCED;
+        if (_shouldDedup) {
+            ++_specificStats.dupsTested;
+            if (!_returned.insert(kv->loc).second) {
+                // We've seen this RecordId before. Skip it this time.
+                ++_specificStats.dupsDropped;
+                ++_commonStats.needTime;
+                return PlanStage::NEED_TIME;
             }
         }
 
-        ++_commonStats.needTime;
-        return PlanStage::NEED_TIME;
+        if (_filter) {
+            if (!Filter::passes(kv->key, _keyPattern, _filter)) {
+                ++_commonStats.needTime;
+                return PlanStage::NEED_TIME;
+            }
+
+            ++_specificStats.matchTested;
+        }
+        
+        if (!kv->key.isOwned()) kv->key = kv->key.getOwned();
+
+        // We found something to return, so fill out the WSM.
+        WorkingSetID id = _workingSet->allocate();
+        WorkingSetMember* member = _workingSet->get(id);
+        member->loc = kv->loc;
+        member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, _iam));
+        member->state = WorkingSetMember::LOC_AND_IDX;
+
+        if (_params.addKeyMetadata) {
+            BSONObjBuilder bob;
+            bob.appendKeys(_keyPattern, kv->key);
+            member->addComputed(new IndexKeyComputedData(bob.obj()));
+        }
+
+        *out = id;
+        ++_commonStats.advanced;
+        return PlanStage::ADVANCED;
     }
 
     bool IndexScan::isEOF() {
-        if (INITIALIZING == _scanState) {
-            // Have to call work() at least once.
-            return false;
-        }
-
-        // If there's a limit on how many keys we can scan, we may be EOF when we hit that.
-        if (0 != _params.maxScan) {
-            if (_specificStats.keysExamined >= _params.maxScan) {
-                return true;
-            }
-        }
-
-        return HIT_END == _scanState || _indexCursor->isEOF();
+        return _commonStats.isEOF;
     }
 
     void IndexScan::saveState() {
@@ -308,17 +243,14 @@ namespace mongo {
 
         _txn = NULL;
         ++_commonStats.yields;
+        if (!_indexCursor) return;
 
-        if (HIT_END == _scanState || INITIALIZING == _scanState) { return; }
-        if (!_indexCursor->isEOF()) {
-            _savedKey = _indexCursor->getKey().getOwned();
-            _savedLoc = _indexCursor->getValue();
+        if (_scanState == NEED_SEEK) {
+            _indexCursor->saveUnpositioned();
+            return;
         }
-        _indexCursor->savePosition();
 
-        if (_endCursor) {
-            _endCursor->savePosition();
-        }
+        _indexCursor->savePositioned();
     }
 
     void IndexScan::restoreState(OperationContext* opCtx) {
@@ -326,61 +258,7 @@ namespace mongo {
         _txn = opCtx;
         ++_commonStats.unyields;
 
-        if (HIT_END == _scanState || INITIALIZING == _scanState) { return; }
-
-        // We can have a valid position before we check isEOF(), restore the position, and then be
-        // EOF upon restore.
-        if (!_indexCursor->restorePosition( opCtx ).isOK() || _indexCursor->isEOF()) {
-            _scanState = HIT_END;
-            return;
-        }
-
-        if (_endCursor) {
-            // Single interval case.
-            if (!_endCursor->restorePosition(opCtx).isOK()) {
-                _scanState = HIT_END;
-                return;
-            }
-
-            // If we were EOF when we yielded, we don't always want to have '_indexCursor' run until
-            // EOF. New documents may have been inserted after our end key, and our end marker may
-            // be before them.
-            //
-            // As an example, say we're counting from 5 to 10 and the index only has keys for 6, 7,
-            // 8, and 9. '_indexCursor' will point at key 6 at the start and '_endCursor' will be
-            // EOF. If we insert a document with key 11 during a yield, we need to relocate
-            // '_endCursor' to point at the new key as the end key of our scan.
-            _endCursor->seek(_endKey, _endKeyInclusive);
-
-            // It is possible that the re-positioning of the end cursor above will move the end
-            // cursor so that it is on the other side of the scanning cursor. If this happens, the
-            // scan is over, so we transition to HIT_END state.
-            //
-            // Example:
-            //   Suppose we're counting from 5 to 10 and the index has keys 6 and 15. The end
-            //   cursor will initially point at 15. Say that the scanning cursor advances, returning
-            //   key 6 and now points at 15. Then the index scan state is saved. While saved,
-            //   key 11 is inserted. The end cursor will seek to point at key 11. If we didn't have
-            //   the check below, then the scan could erroneously return key 15, which is not in the
-            //   desired range of [5, 10].
-            int cmp = _endKey.woCompare(_indexCursor->getKey(), _keyPattern);
-            const bool cursorPastEndKey = (_params.direction == 1 ? cmp < 0 : cmp > 0);
-            const bool cursorAtExclusiveEndKey = (cmp == 0 && !_endKeyInclusive);
-            if (cursorPastEndKey || cursorAtExclusiveEndKey) {
-                _scanState = HIT_END;
-                return;
-            }
-        }
-
-        if (!_savedKey.binaryEqual(_indexCursor->getKey())
-            || _savedLoc != _indexCursor->getValue()) {
-            // Our restored position isn't the same as the saved position.  When we call work()
-            // again we want to return where we currently point, not past it.
-            ++_specificStats.yieldMovedCursor;
-
-            // Our restored position might be past endKey, see if we've hit the end.
-            _scanState = CHECKING_END;
-        }
+        if (_indexCursor) _indexCursor->restore(opCtx);
     }
 
     void IndexScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
@@ -401,91 +279,13 @@ namespace mongo {
         }
     }
 
-    void IndexScan::checkEnd() {
-        if (isEOF()) {
-            _commonStats.isEOF = true;
-            return;
-        }
-
-        if (_params.bounds.isSimpleRange) {
-            _scanState = GETTING_NEXT;
-
-            // "Normal" start -> end scanning.
-            verify(NULL == _endCursor);
-            verify(NULL == _checker.get());
-
-            // If there is an empty endKey we will scan until we run out of index to scan over.
-            if (_params.bounds.endKey.isEmpty()) { return; }
-
-            int cmp = sgn(_params.bounds.endKey.woCompare(_indexCursor->getKey(), _keyPattern));
-
-            if ((cmp != 0 && cmp != _params.direction)
-                || (cmp == 0 && !_params.bounds.endKeyInclusive)) {
-                _scanState = HIT_END;
-            }
-            else {
-                ++_specificStats.keysExamined;
-            }
-        }
-        else if (_endCursor) {
-            // We're in the single interval case, and we have a cursor pointing to the end position.
-            // We can check whether the scan is over by seeing if our cursor points at the same
-            // thing as the end cursor.
-            _scanState = GETTING_NEXT;
-            invariant(!_checker);
-
-            if (_endCursor->pointsAt(*_indexCursor)) {
-                _scanState = HIT_END;
-            }
-            else {
-                ++_specificStats.keysExamined;
-            }
-        }
-        else {
-            verify(NULL != _indexCursor);
-            verify(NULL != _checker.get());
-
-            IndexBoundsChecker::KeyState keyState;
-            keyState = _checker->checkKey(_indexCursor->getKey(),
-                                          &_keyEltsToUse,
-                                          &_movePastKeyElts,
-                                          &_keyElts,
-                                          &_keyEltsInc);
-
-            if (IndexBoundsChecker::DONE == keyState) {
-                _scanState = HIT_END;
-                return;
-            }
-
-            // This seems weird but it's the old definition of nscanned.
-            ++_specificStats.keysExamined;
-
-            if (IndexBoundsChecker::VALID == keyState) {
-                _scanState = GETTING_NEXT;
-                return;
-            }
-
-            verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
-            _indexCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
-                               _keyElts, _keyEltsInc);
-
-            // Must check underlying cursor EOF after every cursor movement.
-            if (_indexCursor->isEOF()) {
-                _scanState = HIT_END;
-                return;
-            }
-        }
-    }
-
-    vector<PlanStage*> IndexScan::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
+    std::vector<PlanStage*> IndexScan::getChildren() const {
+        return {};
     }
 
     PlanStageStats* IndexScan::getStats() {
         // WARNING: this could be called even if the collection was dropped.  Do not access any
         // catalog information here.
-        _commonStats.isEOF = isEOF();
 
         // Add a BSON representation of the filter to the stats tree, if there is one.
         if (NULL != _filter) {
@@ -503,7 +303,7 @@ namespace mongo {
             _specificStats.direction = _params.direction;
         }
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
+        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
         ret->specific.reset(new IndexScanStats(_specificStats));
         return ret.release();
     }

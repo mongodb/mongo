@@ -36,7 +36,6 @@
 namespace mongo {
 
     class IndexCatalogEntry;
-    class IndexCursor;
     class IndexDescriptor;
     struct TwoDIndexingParams;
 

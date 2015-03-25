@@ -27,10 +27,16 @@
  */
 #include "mongo/platform/basic.h"
 
+#include <ostream>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 
 namespace mongo {
+
+    std::ostream& operator<<(std::ostream& stream, const IndexKeyEntry& entry) {
+        return stream << entry.key << '@' << entry.loc;
+    }
 
     // Due to the limitations of various APIs, we need to use the same type (IndexKeyEntry)
     // for both the stored data and the "query". We cheat and encode extra information in the

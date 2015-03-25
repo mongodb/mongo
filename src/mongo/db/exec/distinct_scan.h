@@ -41,7 +41,6 @@
 namespace mongo {
 
     class IndexAccessMethod;
-    class IndexCursor;
     class IndexDescriptor;
     class WorkingSet;
 
@@ -78,24 +77,6 @@ namespace mongo {
      */
     class DistinctScan : public PlanStage {
     public:
-        /**
-         * Keeps track of what this distinct scan is currently doing so that it
-         * can do the right thing on the next call to work().
-         */
-        enum ScanState {
-            // Need to initialize the underlying index traversal machinery.
-            INITIALIZING,
-
-            // Skipping keys in order to check whether we have reached the end.
-            CHECKING_END,
-
-            // Retrieving the next key, and applying the filter if necessary.
-            GETTING_NEXT,
-
-            // The index scan is finished.
-            HIT_END
-        };
-
         DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet);
         virtual ~DistinctScan() { }
 
@@ -118,14 +99,6 @@ namespace mongo {
         static const char* kStageType;
 
     private:
-        /**
-         * Initialize the underlying IndexCursor
-         */
-        void initIndexCursor();
-
-        /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
-        void checkEnd();
-
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
 
@@ -137,23 +110,13 @@ namespace mongo {
         const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
 
         // The cursor we use to navigate the tree.
-        boost::scoped_ptr<IndexCursor> _cursor;
-
-        // Keeps track of what work we need to do next.
-        ScanState _scanState;
-
-        // For yielding.
-        BSONObj _savedKey;
-        RecordId _savedLoc;
+        std::unique_ptr<SortedDataInterface::Cursor> _cursor;
 
         DistinctParams _params;
 
         // _checker gives us our start key and ensures we stay in bounds.
-        boost::scoped_ptr<IndexBoundsChecker> _checker;
-        int _keyEltsToUse;
-        bool _movePastKeyElts;
-        std::vector<const BSONElement*> _keyElts;
-        std::vector<bool> _keyEltsInc;
+        IndexBoundsChecker _checker;
+        IndexSeekPoint _seekPoint;
 
         // Stats
         CommonStats _commonStats;

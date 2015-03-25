@@ -26,12 +26,14 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/ordering.h"
-#include "mongo/db/catalog/head_manager.h"
+#include <boost/optional/optional.hpp>
+#include <boost/optional/optional_io.hpp>
+#include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 
 #pragma once
 
@@ -179,172 +181,161 @@ namespace mongo {
         }
 
         /**
-         * Navigation
+         * Navigates over the sorted data.
+         *
+         * A cursor is constructed with a direction flag with the following effects:
+         *      - The direction that next() moves.
+         *      - If a seek method hits an exact match on key, forward cursors will be positioned on
+         *        the first value for that key, reverse cursors on the last.
+         *      - If a seek method or restore does not hit an exact match, cursors will be
+         *        positioned on the closest position *after* the query in the direction of the
+         *        search.
+         *      - The end position is on the "far" side of the query. In a forward cursor that means
+         *        that it is the lowest value for the key if the end is exclusive or the first entry
+         *        past the key if the end is inclusive or there are no exact matches.
          *
          * A cursor is tied to a transaction, such as the OperationContext or a WriteUnitOfWork
          * inside that context. Any cursor acquired inside a transaction is invalid outside
-         * of that transaction, instead use the savePosition() and restorePosition() methods
-         * reestablish the cursor.
+         * of that transaction, instead use the save and restore methods to reestablish the cursor.
+         *
+         * Any method other than the save methods may throw WriteConflict exception. If that
+         * happens, the cursor may not be used again until it has been saved and successfully
+         * restored. If next() or restore() throw a WCE the cursor's position will be the same as
+         * before the call (strong exception guarantee). All other methods leave the cursor in a
+         * valid state but with an unspecified position (basic exception guarantee). All methods
+         * only provide the basic guarantee for exceptions other than WCE.
+         *
+         * Any returned unowned BSON is only valid until the next call to any method on this
+         * interface. The implementations must assume that passed-in unowned BSON is only valid for
+         * the duration of the call.
+         *
+         * Implementations may override any default implementation if they can provide a more
+         * efficient implementation.
          */
         class Cursor {
         public:
-            virtual ~Cursor() {}
 
             /**
-             * Return the direction of 'this' cursor.
+             * Tells methods that return an IndexKeyEntry what part of the data the caller is
+             * interested in.
              *
-             * @return +1 for a forward cursor or -1 for a reverse cursor
+             * Methods returning an engaged optional<T> will only return null RecordIds or empty
+             * BSONObjs if they have been explicitly left out of the request.
+             *
+             * Implementations are allowed to return more data than requested, but not less.
              */
-            virtual int getDirection() const = 0;
+            enum RequestedInfo {
+                // Only usable part of the return is whether it is engaged or not.
+                kJustExistance = 0,
+                // Key must be filled in.
+                kWantKey = 1,
+                // Loc must be fulled in.
+                kWantLoc = 2,
+                // Both must be returned.
+                kKeyAndLoc = kWantKey | kWantLoc,
+            };
+
+            virtual ~Cursor() = default;
+
 
             /**
-             * Return true if 'this' forward (reverse) cursor is positioned
-             * past the end (before the beginning) of the index, and false otherwise.
+             * Sets the position to stop scanning. An empty key unsets the end position.
+             *
+             * If next() hits this position, or a seek method attempts to seek past it they
+             * unposition the cursor and return boost::none.
+             *
+             * Setting the end position should be done before seeking since the current position, if
+             * any, isn't checked.
              */
-            virtual bool isEOF() const = 0;
+            virtual void setEndPosition(const BSONObj& key, bool inclusive) = 0;
 
             /**
-             * Return true if 'this' cursor and the 'other' cursor are positioned at
-             * the same key and RecordId, or if both cursors are at EOF. Otherwise,
-             * this function returns false.
-             *
-             * Implementations should prohibit the comparison of cursors associated
-             * with different indices.
+             * Moves forward and returns the new data or boost::none if there is no more data.
+             * If not positioned, returns boost::none.
              */
-             virtual bool pointsToSamePlaceAs(const Cursor& other) const = 0;
+            virtual boost::optional<IndexKeyEntry> next(RequestedInfo parts = kKeyAndLoc) = 0;
+
+            //
+            // Seeking
+            //
 
             /**
-             * Position 'this' forward (reverse) cursor either at the entry or
-             * immediately after (or immediately before) the specified key and RecordId.
-             * The cursor should be positioned at EOF if no such entry exists.
+             * Seeks to the provided key and returns current position.
              *
-             * @return true if the entry (key, RecordId) exists within the index,
-             *         and false otherwise
+             * TODO consider removing once IndexSeekPoint has been cleaned up a bit. In particular,
+             * need a way to specify use whole keyPrefix and nothing else and to support the
+             * combination of empty and exclusive. Should also make it easier to construct for the
+             * common cases.
              */
-            virtual bool locate(const BSONObj& key, const RecordId& loc) = 0;
+            virtual boost::optional<IndexKeyEntry> seek(const BSONObj& key,
+                                                        bool inclusive,
+                                                        RequestedInfo parts = kKeyAndLoc) = 0;
 
             /**
-             * Position 'this' forward (reverse) cursor either at the next
-             * (previous) occurrence of a particular key or immediately after
-             * (or immediately before).
+             * Seeks to the position described by seekPoint and returns the current position.
              *
-             * @see SortedDataInterface::customLocate
+             * NOTE: most implementations should just pass seekPoint to
+             * IndexEntryComparison::makeQueryObject().
              */
-            virtual void advanceTo(const BSONObj &keyPrefix,
-                                   int prefixLen,
-                                   bool prefixExclusive,
-                                   const std::vector<const BSONElement*>& keySuffix,
-                                   const std::vector<bool>& suffixInclusive) = 0;
+            virtual boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+                                                        RequestedInfo parts = kKeyAndLoc) = 0;
 
             /**
-             * Position 'this' forward (reverse) cursor either at the first
-             * (last) occurrence of a particular key or immediately after
-             * (or immediately before). The key is a typical BSONObj,
-             * represented by the specified parameters in the following way:
-             *
-             * The first 'prefixLen' elements of 'keyPrefix' followed by
-             * the last 'keySuffix.size() - prefixLen' elements of 'keySuffix'.
-             *
-             * e.g.
-             *
-             *  Suppose that
-             *
-             *      keyPrefix = { "" : 1, "" : 2 }
-             *      prefixLen = 1
-             *      prefixExclusive = false
-             *      keySuffix = [ IGNORED; { "" : 5 } ]
-             *      suffixInclusive = [ IGNORED; false ]
-             *
-             *      ==> represented key is { "" : 1, "" : 5 }
-             *          with the exclusive byte set on the second field
-             *
-             *  Suppose that
-             *
-             *      keyPrefix = { "" : 1, "" : 2 }
-             *      prefixLen = 1
-             *      prefixExclusive = true
-             *      keySuffix = IGNORED
-             *      suffixInclusive = IGNORED
-             *
-             *      ==> represented key is { "" : 1 }
-             *          with the exclusive byte set on the first field
-             *
-             * @param prefixExclusive true if 'this' forward (reverse) cursor
-             *        should be positioned immediately after (immediately
-             *        before) the represented key, and false otherwise
-             *
-             * @param suffixInclusive an element of the vector is false if
-             *        'this' forward (reverse) cursor should be positioned
-             *        immediately after (immediately before) the represented
-             *        key, and true otherwise
-             *
-             * Implementations should prohibit callers from specifying
-             * 'prefixLen = 0' when 'prefixExclusive = true'.
-             *
-             * @see IndexEntryComparison::makeQueryObject
+             * Seeks to a key with a hint to the implementation that you only want exact matches. If
+             * an exact match can't be found, boost::none will be returned and the resulting
+             * position of the cursor is unspecified.
              */
-            virtual void customLocate(const BSONObj& keyPrefix,
-                                      int prefixLen,
-                                      bool prefixExclusive,
-                                      const std::vector<const BSONElement*>& keySuffix,
-                                      const std::vector<bool>& suffixInclusive) = 0;
-
-            /**
-             * Return the key associated with the current position of 'this' cursor.
-             */
-            virtual BSONObj getKey() const = 0;
-
-            /**
-             * Return the RecordId associated with the current position of 'this' cursor.
-             */
-            virtual RecordId getRecordId() const = 0;
-
-            /**
-             * Position 'this' forward (reverse) cursor at the next (preceding) entry
-             * in the index. A cursor positioned at EOF should remain at EOF when advanced.
-             */
-            virtual void advance() = 0;
+            virtual boost::optional<IndexKeyEntry> seekExact(const BSONObj& key,
+                                                             RequestedInfo parts = kKeyAndLoc) {
+                auto kv = seek(key, true, kKeyAndLoc);
+                if (kv && kv->key.woCompare(key, BSONObj(), /*considerFieldNames*/false) == 0)
+                    return kv;
+                return {};
+            }
 
             //
             // Saving and restoring state
             //
 
             /**
-             * Save the entry in the index (i.e. its key and RecordId) of where
-             * 'this' cursor is currently positioned.
+             * Prepares for state changes in underlying data in a way that allows the cursor's
+             * current position to be restored.
              *
-             * Implementations can assume that no operations other than delete
-             * or restorePosition() will be called on 'this' cursor after its
-             * position has been saved.
+             * It is safe to call savePositioned multiple times in a row.
+             * No other method (excluding destructor) may be called until successfully restored.
              */
-            virtual void savePosition() = 0;
+            virtual void savePositioned() = 0;
 
             /**
-             * Restore 'this' cursor to the previously saved entry in the index.
+             * Prepares for state changes in underlying data without necessarily saving the current
+             * state.
              *
-             * Implementations should have the same behavior as calling locate()
-             * with the saved key and RecordId.
+             * The cursor's position when restored is unspecified. Caller is expected to seek
+             * following the restore.
+             *
+             * It is safe to call saveUnpositioned multiple times in a row.
+             * No other method (excluding destructor) may be called until successfully restored.
              */
-            virtual void restorePosition(OperationContext* txn) = 0;
+            virtual void saveUnpositioned() { savePositioned(); }
+
+            /**
+             * Recovers from potential state changes in underlying data.
+             *
+             * If the former position no longer exists, a following call to next() will return the
+             * next closest position in the direction of the scan, if any.
+             *
+             * This handles restoring after either savePositioned() or saveUnpositioned().
+             */
+            virtual void restore(OperationContext* txn) = 0;
         };
 
         /**
-         * Return a cursor over 'this' index. The cursor need not be positioned
-         * at any particular entry.
+         * Returns an unpositioned cursor over 'this' index.
          *
-         * Implementations can assume that locate() is called on the cursor
-         * before it gets used.
-         *
-         * Implementations can assume that 'this' index outlives all cursors
-         * it produces.
-         *
-         * @param txn the transaction to which the cursor is tied
-         * @param direction the direction of the cursor.
-         *        +1 for a forward cursor or -1 for a reverse cursor.
-         *
-         * @return caller takes ownership
+         * Implementations can assume that 'this' index outlives all cursors it produces.
          */
-        virtual Cursor* newCursor(OperationContext* txn, int direction) const = 0;
+        virtual std::unique_ptr<Cursor> newCursor(OperationContext* txn,
+                                                  bool isForward = true) const = 0;
 
         //
         // Index creation

@@ -216,8 +216,9 @@ namespace mongo {
 
         virtual bool isEmpty(OperationContext* txn) { return true; }
 
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
-            return NULL;
+        virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+                                                                       bool isForward) const {
+            return {};
         }
 
         virtual Status initAsEmpty(OperationContext* txn) { return Status::OK(); }

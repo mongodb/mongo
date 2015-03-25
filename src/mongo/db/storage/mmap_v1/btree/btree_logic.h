@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_ondisk.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
@@ -196,21 +197,13 @@ namespace mongo {
         void customLocate(OperationContext* txn,
                           DiskLoc* locInOut,
                           int* keyOfsInOut,
-                          const BSONObj& keyBegin,
-                          int keyBeginLen,
-                          bool afterKey,
-                          const std::vector<const BSONElement*>& keyEnd,
-                          const std::vector<bool>& keyEndInclusive,
+                          const IndexSeekPoint& seekPoint,
                           int direction) const;
 
         void advanceTo(OperationContext*,
                        DiskLoc* thisLocInOut,
                        int* keyOfsInOut,
-                       const BSONObj &keyBegin,
-                       int keyBeginLen,
-                       bool afterKey,
-                       const std::vector<const BSONElement*>& keyEnd,
-                       const std::vector<bool>& keyEndInclusive,
+                       const IndexSeekPoint& seekPoint,
                        int direction) const;
 
         void restorePosition(OperationContext* txn,
@@ -238,6 +231,12 @@ namespace mongo {
         SavedCursorRegistry* savedCursors() const { return _cursorRegistry; }
 
         static int lowWaterMark();
+        
+        Ordering ordering() const { return _ordering; }
+
+        int customBSONCmp(const BSONObj& inIndex_left,
+                          const IndexSeekPoint& seekPoint_right,
+                          int direction) const;
 
     private:
         friend class BtreeLogic::Builder;
@@ -348,11 +347,7 @@ namespace mongo {
         void customLocate(OperationContext* txn,
                           DiskLoc* locInOut,
                           int* keyOfsInOut,
-                          const BSONObj& keyBegin,
-                          int keyBeginLen,
-                          bool afterKey,
-                          const std::vector<const BSONElement*>& keyEnd,
-                          const std::vector<bool>& keyEndInclusive,
+                          const IndexSeekPoint& seekPoint,
                           int direction,
                           std::pair<DiskLoc, int>& bestParent) const;
 
@@ -367,12 +362,7 @@ namespace mongo {
         bool customFind(OperationContext* txn,
                         int low,
                         int high,
-                        const BSONObj& keyBegin,
-                        int keyBeginLen,
-                        bool afterKey,
-                        const std::vector<const BSONElement*>& keyEnd,
-                        const std::vector<bool>& keyEndInclusive,
-                        const Ordering& order,
+                        const IndexSeekPoint& seekPoint,
                         int direction,
                         DiskLoc* thisLocInOut,
                         int* keyOfsInOut,
@@ -381,11 +371,7 @@ namespace mongo {
         void advanceToImpl(OperationContext* txn,
                            DiskLoc* thisLocInOut,
                            int* keyOfsInOut,
-                           const BSONObj &keyBegin,
-                           int keyBeginLen,
-                           bool afterKey,
-                           const std::vector<const BSONElement*>& keyEnd,
-                           const std::vector<bool>& keyEndInclusive,
+                           const IndexSeekPoint& seekPoint,
                            int direction) const;
 
         bool wouldCreateDup(OperationContext* txn,
@@ -546,16 +532,6 @@ namespace mongo {
                      const DiskLoc& savedLoc,
                      BucketType* bucket,
                      int keyPos) const;
-
-        // TODO 'this' for _ordering(?)
-        int customBSONCmp(const BSONObj& l,
-                          const BSONObj& rBegin,
-                          int rBeginLen,
-                          bool rSup,
-                          const std::vector<const BSONElement*>& rEnd,
-                          const std::vector<bool>& rEndInclusive,
-                          const Ordering& o,
-                          int direction) const;
 
         /**
          * Tries to push key into bucket. Return false if it can't because key doesn't fit.

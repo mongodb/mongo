@@ -262,22 +262,24 @@ namespace mongo {
 
     void KeyString::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
         resetToEmpty();
-        _appendAllElementsForIndexing(obj, ord);
+        _appendAllElementsForIndexing(obj, ord, kInclusive);
         appendRecordId(recordId);
     }
 
-    void KeyString::resetToKey(const BSONObj& obj, Ordering ord) {
+    void KeyString::resetToKey(const BSONObj& obj, Ordering ord, Discriminator discriminator) {
         resetToEmpty();
-        _appendAllElementsForIndexing(obj, ord);
+        _appendAllElementsForIndexing(obj, ord, discriminator);
     }
 
     // ----------------------------------------------------------------------
     // -----------   APPEND CODE  -------------------------------------------
     // ----------------------------------------------------------------------
 
-    void KeyString::_appendAllElementsForIndexing(const BSONObj& obj, Ordering ord) {
+    void KeyString::_appendAllElementsForIndexing(const BSONObj& obj, Ordering ord,
+                                                  Discriminator discriminator) {
         int elemCount = 0;
-        BSONForEach(elem, obj) {
+        BSONObjIterator it(obj);
+        while (auto elem = it.next()) {
             const int elemIdx = elemCount++;
             const bool invert = (ord.get(elemIdx) == -1);
 
@@ -285,12 +287,30 @@ namespace mongo {
 
             dassert(elem.fieldNameSize() < 3); // fieldNameSize includes the NUL
 
-            // These are used in IndexEntryComparison::makeQueryObject()
-            switch (*elem.fieldName()) {
-            case 'l':  _append(kLess, false); break;
-            case 'g':  _append(kGreater, false); break;
+            // IndexEntryComparison::makeQueryObject() encodes a discriminator in the first byte of
+            // the field name. This discriminator overrides the passed in one. Normal elements only
+            // have the NUL byte terminator. Entries stored in an index are not allowed to have a
+            // discriminator.
+            if (char ch = *elem.fieldName()) {
+                // l for less / g for greater.
+                invariant(ch == 'l' || ch == 'g');
+                discriminator = ch == 'l' ? kExclusiveBefore : kExclusiveAfter;
+                invariant(!it.more());
             }
         }
+
+        // The discriminator forces this KeyString to compare Less/Greater than any KeyString with
+        // the same prefix of keys. As an example, this can be used to land on the first key in the
+        // index with the value "a" regardless of the RecordId. In compound indexes it can use a
+        // prefix of the full key to ignore the later keys.
+        switch (discriminator) {
+        case kExclusiveBefore: _append(kLess, false); break;
+        case kExclusiveAfter: _append(kGreater, false); break;
+        case kInclusive: break; // No discriminator byte.
+        }
+
+        // TODO consider omitting kEnd when using a discriminator byte. It is not a storage format
+        // change since keystrings with discriminators are not allowed to be stored.
         _append(kEnd, false);
     }
 

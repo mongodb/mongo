@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -224,238 +225,225 @@ namespace {
             return Status::OK();
         }
 
-        class ForwardCursor : public SortedDataInterface::Cursor {
+        class Cursor final : public SortedDataInterface::Cursor {
         public:
-            ForwardCursor(const IndexSet& data, OperationContext* txn)
+            Cursor(OperationContext* txn, const IndexSet& data, bool isForward)
                 : _txn(txn),
                   _data(data),
+                  _forward(isForward),
                   _it(data.end())
             {}
-
-            virtual int getDirection() const { return 1; }
-
-            virtual bool isEOF() const {
-                return _it == _data.end();
-            }
-
-            virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor& otherBase) const {
-                const ForwardCursor& other = static_cast<const ForwardCursor&>(otherBase);
-                invariant(&_data == &other._data); // iterators over same index
-                return _it == other._it;
-            }
-
-            virtual bool locate(const BSONObj& keyRaw, const RecordId& loc) {
-                const BSONObj key = stripFieldNames(keyRaw);
-                _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
-                if ( _it == _data.end() ) {
-                    return false;
+            
+            boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
+                if (_lastMoveWasRestore) {
+                    // Return current position rather than advancing.
+                    _lastMoveWasRestore = false;
+                }
+                else {
+                    advance();
+                    if (atEndPoint()) _isEOF = true;
                 }
 
-                if ( _it->key != key ) {
-                    return false;
+                if (_isEOF) return {};
+                return *_it;
+            }
+        
+            void setEndPosition(const BSONObj& key, bool inclusive) override {
+                if (key.isEmpty()) {
+                    // This means scan to end of index.
+                    _endState = {};
+                    return;
                 }
-
-                return _it->loc == loc;
+                
+                // NOTE: this uses the opposite min/max rules as a normal seek because a forward
+                // scan should land after the key if inclusive and before if exclusive.
+                _endState = EndState(stripFieldNames(key),
+                                     _forward == inclusive ? RecordId::max() : RecordId::min());
+                seekEndCursor();
             }
 
-            virtual void customLocate(const BSONObj& keyBegin,
-                                      int keyBeginLen,
-                                      bool afterKey,
-                                      const vector<const BSONElement*>& keyEnd,
-                                      const vector<bool>& keyEndInclusive) {
-                // makeQueryObject handles stripping of fieldnames for us.
-                _it = _data.lower_bound(IndexKeyEntry(IndexEntryComparison::makeQueryObject(
-                                                        keyBegin,
-                                                        keyBeginLen,
-                                                        afterKey,
-                                                        keyEnd,
-                                                        keyEndInclusive,
-                                                        1), // forward
-                                                   RecordId()));
+            boost::optional<IndexKeyEntry> seek(const BSONObj& key, bool inclusive,
+                                                RequestedInfo parts) override {
+                const BSONObj query = stripFieldNames(key);
+                locate(query, _forward == inclusive ? RecordId::min() : RecordId::max());
+                _lastMoveWasRestore = false;
+                if (_isEOF) return {};
+                dassert(inclusive ? compareKeys(_it->key, query) >= 0
+                                  : compareKeys(_it->key, query) > 0);
+                return *_it;
             }
 
-            void advanceTo(const BSONObj &keyBegin,
-                           int keyBeginLen,
-                           bool afterKey,
-                           const vector<const BSONElement*>& keyEnd,
-                           const vector<bool>& keyEndInclusive) {
-                // XXX I think these do the same thing????
-                customLocate(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
+            boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+                                                RequestedInfo parts) override {
+                // Query encodes exclusive case so it can be treated as an inclusive query.
+                const BSONObj query = IndexEntryComparison::makeQueryObject(seekPoint, _forward);
+                locate(query, _forward ? RecordId::min() : RecordId::max());
+                _lastMoveWasRestore = false;
+                if (_isEOF) return {};
+                dassert(compareKeys(_it->key, query) >= 0);
+                return *_it;
             }
 
-            virtual BSONObj getKey() const {
-                return _it->key;
-            }
+            void savePositioned() override {
+                // Keep original position if we haven't moved since the last restore.
+                _txn = nullptr;
+                if (_lastMoveWasRestore) return;
 
-            virtual RecordId getRecordId() const {
-                return _it->loc;
-            }
-
-            virtual void advance() {
-                if (_it != _data.end())
-                    ++_it;
-            }
-
-            virtual void savePosition() {
-                if (_it == _data.end()) {
-                    _savedAtEnd = true;
+                if (_isEOF) {
+                    saveUnpositioned();
                     return;
                 }
 
                 _savedAtEnd = false;
                 _savedKey = _it->key.getOwned();
                 _savedLoc = _it->loc;
+                // Doing nothing with end cursor since it will do full reseek on restore.
             }
 
-            virtual void restorePosition(OperationContext* txn) {
+            void saveUnpositioned() override {
+                _txn = nullptr;
+                _savedAtEnd = true;
+                // Doing nothing with end cursor since it will do full reseek on restore.
+            }
+
+            void restore(OperationContext* txn) override {
+                _txn = txn;
+
+                // Always do a full seek on restore. We cannot use our last position since index
+                // entries may have been inserted closer to our endpoint and we would need to move
+                // over them.
+                seekEndCursor();
+
                 if (_savedAtEnd) {
-                    _it = _data.end();
+                    _isEOF = true;
+                    return;
                 }
-                else {
-                    locate(_savedKey, _savedLoc);
-                }
+                
+                // Need to find our position from the root.
+                locate(_savedKey, _savedLoc);
+
+                _lastMoveWasRestore = _isEOF // We weren't EOF but now are.
+                                   || _data.value_comp().compare(*_it, {_savedKey, _savedLoc}) != 0;
             }
 
         private:
+            bool atEndPoint() const {
+                return _endState && _it == _endState->it;
+            }
+
+            // Advances once in the direction of the scan, updating _isEOF as needed.
+            // Does nothing if already _isEOF.
+            void advance() {
+                if (_isEOF) return;
+                if (_forward) {
+                    if (_it != _data.end()) ++_it;
+                    if (_it == _data.end() || atEndPoint()) _isEOF = true;
+                }
+                else {
+                    if (_it == _data.begin() || _data.empty()) {
+                        _isEOF = true;
+                    }
+                    else {
+                        --_it;
+                    }
+                    if (atEndPoint()) _isEOF = true;
+                }
+            }
+
+            bool atOrPastEndPointAfterSeeking() const {
+                if (_isEOF) return true;
+                if (!_endState) return false;
+               
+                const int cmp = _data.value_comp().compare(*_it, _endState->query);
+
+                // We set up _endState->query to be in between the last in-range value and the first
+                // out-of-range value. In particular, it is constructed to never equal any legal
+                // index key.
+                dassert(cmp != 0);
+
+                if (_forward) {
+                    // We may have landed after the end point.
+                    return cmp > 0;
+                }
+                else {
+                    // We may have landed before the end point.
+                    return cmp < 0;
+                }
+            }
+
+            void locate(const BSONObj& key, const RecordId& loc) {
+                _isEOF = false;
+                const auto query = IndexKeyEntry(key, loc);
+                _it = _data.lower_bound(query);
+                if (_forward) {
+                    if (_it == _data.end()) _isEOF = true;
+                }
+                else {
+                    // lower_bound lands us on or after query. Reverse cursors must be on or before.
+                    if (_it == _data.end() || _data.value_comp().compare(*_it, query) > 0)
+                        advance(); // sets _isEOF if there is nothing more to return.
+                }
+
+                if (atOrPastEndPointAfterSeeking()) _isEOF = true;
+            }
+
+            // Returns comparison relative to direction of scan. If rhs would be seen later, returns
+            // a positive value.
+            int compareKeys(const BSONObj& lhs, const BSONObj& rhs) const {
+                int cmp = _data.value_comp().compare({lhs, RecordId()}, {rhs, RecordId()});
+                return _forward ? cmp : -cmp;
+            }
+
+            void seekEndCursor() {
+                if (!_endState || _data.empty()) return;
+
+                auto it = _data.lower_bound(_endState->query);
+                if (!_forward) {
+                    // lower_bound lands us on or after query. Reverse cursors must be on or before.
+                    if (it == _data.end() || _data.value_comp().compare(*it,
+                                                                        _endState->query) > 0) {
+                        if (it == _data.begin()) {
+                            it = _data.end(); // all existing data in range.
+                        }
+                        else {
+                            --it;
+                        }
+                    }
+                }
+
+                if (it != _data.end()) dassert(compareKeys(it->key, _endState->query.key) >= 0);
+                _endState->it = it;
+            }
 
             OperationContext* _txn; // not owned
             const IndexSet& _data;
+            const bool _forward;
+            bool _isEOF = true;
             IndexSet::const_iterator _it;
+            
+            struct EndState {
+                EndState(BSONObj key, RecordId loc) : query(std::move(key), loc) {}
 
-            // For save/restorePosition since _it may be invalidated durring a yield.
-            bool _savedAtEnd;
-            BSONObj _savedKey;
-            RecordId _savedLoc;
+                IndexKeyEntry query;
+                IndexSet::const_iterator it;
+            };
+            boost::optional<EndState> _endState;
 
-        };
+            // Used by next to decide to return current position rather than moving. Should be reset
+            // to false by any operation that moves the cursor, other than subsequent save/restore
+            // pairs.
+            bool _lastMoveWasRestore = false;
 
-        // TODO see if this can share any code with ForwardIterator
-        class ReverseCursor : public SortedDataInterface::Cursor {
-        public:
-            ReverseCursor(const IndexSet& data, OperationContext* txn)
-                : _txn(txn),
-                  _data(data),
-                  _it(data.rend())
-            {}
-
-            virtual int getDirection() const { return -1; }
-
-            virtual bool isEOF() const {
-                return _it == _data.rend();
-            }
-
-            virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor& otherBase) const {
-                const ReverseCursor& other = static_cast<const ReverseCursor&>(otherBase);
-                invariant(&_data == &other._data); // iterators over same index
-                return _it == other._it;
-            }
-
-            virtual bool locate(const BSONObj& keyRaw, const RecordId& loc) {
-                const BSONObj key = stripFieldNames(keyRaw);
-                _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
-
-                if ( _it == _data.rend() ) {
-                    return false;
-                }
-
-
-                if ( _it->key != key ) {
-                    return false;
-                }
-
-                return _it->loc == loc;
-            }
-
-            virtual void customLocate(const BSONObj& keyBegin,
-                                      int keyBeginLen,
-                                      bool afterKey,
-                                      const vector<const BSONElement*>& keyEnd,
-                                      const vector<bool>& keyEndInclusive) {
-                // makeQueryObject handles stripping of fieldnames for us.
-                _it = lower_bound(IndexKeyEntry(IndexEntryComparison::makeQueryObject(
-                                                  keyBegin,
-                                                  keyBeginLen,
-                                                  afterKey,
-                                                  keyEnd,
-                                                  keyEndInclusive,
-                                                  -1), // reverse
-                                             RecordId()));
-            }
-
-            void advanceTo(const BSONObj &keyBegin,
-                           int keyBeginLen,
-                           bool afterKey,
-                           const vector<const BSONElement*>& keyEnd,
-                           const vector<bool>& keyEndInclusive) {
-                // XXX I think these do the same thing????
-                customLocate(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
-            }
-
-            virtual BSONObj getKey() const {
-                return _it->key;
-            }
-
-            virtual RecordId getRecordId() const {
-                return _it->loc;
-            }
-
-            virtual void advance() {
-                if (_it != _data.rend())
-                    ++_it;
-            }
-
-            virtual void savePosition() {
-                if (_it == _data.rend()) {
-                    _savedAtEnd = true;
-                    return;
-                }
-
-                _savedAtEnd = false;
-                _savedKey = _it->key.getOwned();
-                _savedLoc = _it->loc;
-            }
-
-            virtual void restorePosition(OperationContext* txn) {
-                if (_savedAtEnd) {
-                    _it = _data.rend();
-                }
-                else {
-                    locate(_savedKey, _savedLoc);
-                }
-            }
-
-        private:
-            /**
-             * Returns the first entry <= query. This is equivalent to ForwardCursors use of
-             * _data.lower_bound which returns the first entry >= query.
-             */
-            IndexSet::const_reverse_iterator lower_bound(const IndexKeyEntry& query) const {
-                // using upper_bound since we want to the right-most entry matching the query.
-                IndexSet::const_iterator it = _data.upper_bound(query);
-
-                // upper_bound returns the entry to the right of the one we want. Helpfully,
-                // converting to a reverse_iterator moves one to the left. This also correctly
-                // handles the case where upper_bound returns end() by converting to rbegin(),
-                // meaning that all data is to the right of the query.
-                return IndexSet::const_reverse_iterator(it);
-            }
-
-            OperationContext* _txn; // not owned
-            const IndexSet& _data;
-            IndexSet::const_reverse_iterator _it;
-
-            // For save/restorePosition since _it may be invalidated durring a yield.
-            bool _savedAtEnd;
+            // For save/restore since _it may be invalidated during a yield.
+            bool _savedAtEnd = false;
             BSONObj _savedKey;
             RecordId _savedLoc;
         };
 
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
-            if (direction == 1)
-                return new ForwardCursor(*_data, txn);
-
-            invariant(direction == -1);
-            return new ReverseCursor(*_data, txn);
+        virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(
+                OperationContext* txn,
+                bool isForward) const {
+            return stdx::make_unique<Cursor>(txn, *_data, isForward);
         }
 
         virtual Status initAsEmpty(OperationContext* txn) {
