@@ -265,7 +265,11 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 */
 #define	WT_ZLIB_RESERVED	24
 	zs.avail_out = (uint32_t)(page_max - extra - WT_ZLIB_RESERVED);
-	last_zs = zs;
+
+	/* Save the stream state in case the chosen data doesn't fit. */
+	if ((ret = deflateCopy(&last_zs, &zs)) != Z_OK)
+		return (zlib_error(
+		    compressor, session, "deflateCopy", ret));
 
 	/*
 	 * Strategy: take the available output size and compress that much
@@ -286,8 +290,6 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 			break;
 
 		zs.avail_in = offsets[curr_slot] - offsets[last_slot];
-		/* Save the stream state in case the chosen data doesn't fit. */
-		last_zs = zs;
 
 		while (zs.avail_in > 0 && zs.avail_out > 0)
 			if ((ret = deflate(&zs, Z_SYNC_FLUSH)) != Z_OK)
@@ -296,11 +298,29 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 		/* Roll back if the last deflate didn't complete. */
 		if (zs.avail_in > 0) {
-			zs = last_zs;
+			if ((ret = deflateEnd(&zs)) != Z_OK &&
+			    ret != Z_DATA_ERROR)
+				return (zlib_error(
+				    compressor, session, "deflateEnd", ret));
+			if ((ret = deflateCopy(&zs, &last_zs)) != Z_OK)
+				return (zlib_error(
+				    compressor, session, "deflateCopy", ret));
 			break;
-		} else
+		} else {
+			if ((ret = deflateEnd(&last_zs)) != Z_OK &&
+			    ret != Z_DATA_ERROR)
+				return (zlib_error(
+				    compressor, session, "deflateEnd", ret));
+			if ((ret = deflateCopy(&last_zs, &zs)) != Z_OK)
+				return (zlib_error(
+				    compressor, session, "deflateCopy", ret));
 			last_slot = curr_slot;
+		}
 	}
+
+	if ((ret = deflateEnd(&last_zs)) != Z_OK && ret != Z_DATA_ERROR)
+		return (zlib_error(
+		    compressor, session, "deflateEnd", ret));
 
 	zs.avail_out += WT_ZLIB_RESERVED;
 	ret = deflate(&zs, Z_FINISH);
