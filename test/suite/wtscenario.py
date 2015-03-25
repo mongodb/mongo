@@ -64,6 +64,13 @@ def log2chr(val):
     
 megabyte = 1024 * 1024
 
+def check_scenarios(scenes):
+    """
+    Make sure all scenarios have unique names
+    """
+    assert len(scenes) == len(dict(scenes))
+    return scenes
+
 def multiply_scenarios(sep, *args):
     """
     Create the cross product of two lists of scenarios
@@ -90,7 +97,7 @@ def multiply_scenarios(sep, *args):
                         tdict['P'] = P
                     total.append((name, tdict))
             result = total
-    return result
+    return check_scenarios(result)
 
 def prune_sorter_key(scene):
     """
@@ -161,7 +168,7 @@ def prune_scenarios(scenes, default_count = -1, long_count = -1):
         for scene in scenes:
             del scene[1]['_rand']
             del scene[1]['_order']
-        return scenes
+        return check_scenarios(scenes)
 
 def number_scenarios(scenes):
     """
@@ -173,7 +180,7 @@ def number_scenarios(scenes):
         scene[1]['scenario_name'] = scene[0]
         scene[1]['scenario_number'] = count
         count += 1
-    return scenes
+    return check_scenarios(scenes)
 
 def quick_scenarios(fieldname, values, probabilities):
     """

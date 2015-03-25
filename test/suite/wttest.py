@@ -177,6 +177,8 @@ class WiredTigerTestCase(unittest.TestCase):
         sys.stderr = WiredTigerTestCase._stderr
         
     def __init__(self, *args, **kwargs):
+        if hasattr(self, 'scenarios'):
+            assert(len(self.scenarios) == len(dict(self.scenarios)))
         unittest.TestCase.__init__(self, *args, **kwargs)
         if not self._globalSetup:
             WiredTigerTestCase.globalSetup()
