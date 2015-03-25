@@ -21,6 +21,9 @@ if (typeof getToolTest === 'undefined') {
   // Create capped collection on foo
   db.createCollection('rs_test', { capped: true, size: 4 });
 
+  // Create test collection
+  db.createCollection("baz");
+
   // Insert a doc
   db.rs_test.insert({
     ts: new Timestamp(),
@@ -43,6 +46,15 @@ if (typeof getToolTest === 'undefined') {
       dropDatabase: 1
     },
     ns: 'foo.$cmd'
+  });
+
+  // Recreate collection
+  db.rs_test.insert({
+    ts: new Timestamp(),
+    v: CURRENT_OPLOG_VERSION,
+    op: OPLOG_COMMAND_CODE,
+    ns: "foo.$cmd",
+    o: { create: "baz" }
   });
 
   // Insert another doc
