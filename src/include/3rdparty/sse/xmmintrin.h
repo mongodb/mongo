@@ -28,7 +28,7 @@
 #error "SSE instruction set not enabled"
 #else
 
-#include <3rdparty/sse/mmintrin.h>
+#include "mmintrin.h"
 
 typedef int __v4si __attribute__((__vector_size__(16)));
 typedef float __v4sf __attribute__((__vector_size__(16)));

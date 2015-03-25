@@ -28,7 +28,7 @@
 #error "SSE2 instruction set not enabled"
 #else
 
-#include <3rdparty/sse/xmmintrin.h>
+#include "xmmintrin.h"
 
 typedef double __m128d __attribute__((__vector_size__(16)));
 typedef long long __m128i __attribute__((__vector_size__(16)));
