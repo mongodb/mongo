@@ -84,7 +84,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		return (wt_lz4_error(compressor, session,
 		    "LZ4 compress buffer too small", 0));
 
-	/* Store the length of the compressed block in the first 8 bytes */
+	/* Store the length of the compressed block in the first 8 bytes. */
 	lz4buf = (char *)dst + sizeof(size_t);
 	lz4_len = (size_t)LZ4_compress((const char *)src, lz4buf, (int)src_len);
 
@@ -126,7 +126,7 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
 
-	/* Retrieve compressed length from start of the data buffer */
+	/* Retrieve compressed length from start of the data buffer. */
 	src_data_len = *(size_t *)src;
 	if (src_data_len + sizeof(size_t) > src_len) {
 		(void)wt_api->err_printf(wt_api,
@@ -135,15 +135,17 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		return (WT_ERROR);
 	}
 
-	/* Skip over the data size to the start of compressed data */
+	/* Skip over the data size to the start of compressed data. */
 	compressed_data = (char *)src + sizeof(size_t);
 
 	/*
 	 * The destination buffer length should always be sufficient because
-	 * wiredtiger keeps track of the byte count before compression
+	 * wiredtiger keeps track of the byte count before compression.  Use
+	 * safe decompression: we may be relying on decompression to detect
+	 * corruption.
 	 */
-	decoded =
-	    LZ4_decompress_fast(compressed_data, (char *)dst, (int)dst_len);
+	decoded = LZ4_decompress_safe(
+	    compressed_data, (char *)dst, (int)src_data_len, (int)dst_len);
 
 	if (decoded < 0)
 		return (wt_lz4_error(compressor, session,
