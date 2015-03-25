@@ -109,6 +109,17 @@ func NewIntentManager() *Manager {
 	}
 }
 
+// HasConfigDBIntent returns a bool indicating if any of the intents refer to the "config" database.
+// This can be used to check for possible unwanted conflicts before restoring to a sharded system.
+func (mgr *Manager) HasConfigDBIntent() bool {
+	for _, intent := range mgr.intentsByDiscoveryOrder {
+		if intent.DB == "config" {
+			return true
+		}
+	}
+	return false
+}
+
 // Put inserts an intent into the manager. Intents for the same collection
 // are merged together, so that BSON and metadata files for the same collection
 // are returned in the same intent.
