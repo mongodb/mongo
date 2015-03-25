@@ -317,6 +317,18 @@ namespace mutablebson {
                                                BSONObjBuilder* builder);
 
         /**
+         * Builds a getMore response object from the provided cursor identifiers and "nextBatch",
+         * and appends the response object to the provided builder under the field name "cursor".
+         *
+         * The response object has the following format:
+         *   { id: <NumberLong>, ns: <String>, nextBatch: <Array> }.
+         */
+        static void appendGetMoreResponseObject(long long cursorId,
+                                                StringData cursorNamespace,
+                                                BSONArray nextBatch,
+                                                BSONObjBuilder* builder);
+
+        /**
          * Helper for setting a writeConcernError field in the command result object if
          * a writeConcern error occurs.
          */
