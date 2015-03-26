@@ -6,9 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
-#ifdef __SSE2__
-#include "3rdparty/sse/emmintrin.h"
-
+#if defined(__GNUC__) && defined(__SSE2__)
+#include <emmintrin.h>
 						/* 16B alignment */
 #define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
 #define	WT_VECTOR_SIZE		16		/* chunk size */
@@ -40,7 +39,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	userp = user_item->data;
 	treep = tree_item->data;
 
-#ifdef __SSE2__
+#if defined(__GNUC__) && defined(__SSE2__)
 	if (len >= WT_MIN_KEY_VECTORIZE) {
 		__m128i res_eq, u, t;
 
@@ -124,7 +123,7 @@ __wt_lex_compare_skip(
 	userp = (uint8_t *)user_item->data + *matchp;
 	treep = (uint8_t *)tree_item->data + *matchp;
 
-#ifdef __SSE2__
+#if defined(__GNUC__) && defined(__SSE2__)
 	if (len >= WT_MIN_KEY_VECTORIZE) {
 		__m128i res_eq, u, t;
 
