@@ -60,10 +60,6 @@ namespace mongo {
             return _id;
         }
 
-        ClientInfo* getClientInfo() const {
-            return _clientInfo;
-        }
-
         void reply(Message & response, const std::string& fromServer);
 
         Message& m() { return _m; }
