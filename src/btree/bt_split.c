@@ -178,7 +178,13 @@ __split_should_deepen(
 
 	btree = S2BT(session);
 	page = ref->page;
-	pindex = WT_INTL_INDEX_COPY(page);
+
+	/*
+	 * Our caller is holding the parent page locked to single-thread splits,
+	 * which means we can safely look at the page's index without setting a
+	 * split generation.
+	 */
+	pindex = WT_INTL_INDEX_GET_SAFE(page);
 
 	/*
 	 * Deepen the tree if the page's memory footprint is larger than the
@@ -393,7 +399,12 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	parent_incr = parent_decr = 0;
 	panic = 0;
 
-	pindex = WT_INTL_INDEX_COPY(parent);
+	/*
+	 * Our caller is holding the parent page locked to single-thread splits,
+	 * which means we can safely look at the page's index without setting a
+	 * split generation.
+	 */
+	pindex = WT_INTL_INDEX_GET_SAFE(parent);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
@@ -491,7 +502,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 		 * to change.
 		 */
 		child_incr = 0;
-		child_pindex = WT_INTL_INDEX_COPY(child);
+		child_pindex = WT_INTL_INDEX_GET_SAFE(child);
 		for (child_refp = child_pindex->index, j = 0; j < slots; ++j) {
 			WT_ERR(__split_ref_deepen_move(session,
 			    parent, *parent_refp, &parent_decr, &child_incr));
@@ -505,11 +516,11 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	    parent_refp - pindex->index == pindex->entries - SPLIT_CORRECT_1);
 
 	/*
-	 * Update the parent's index; this is the update which splits the page,
-	 * making the change visible to threads descending the tree.  From now
-	 * on, we're committed to the split.  If any subsequent work fails, we
-	 * have to panic because we potentially have threads of control using
-	 * the new page index we just swapped in.
+	 * Confirm the parent page's index hasn't moved, then update it, which
+	 * makes the split visible to threads descending the tree. From this
+	 * point on, we're committed to the split.  If subsequent work fails,
+	 * we have to panic because we may have threads of control using the
+	 * new page index we swap in.
 	 *
 	 * A note on error handling: until this point, there's no problem with
 	 * unwinding on error.  We allocated a new page index, a new set of
@@ -518,7 +529,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	 * footprint.  From now on we've modified the parent page, attention
 	 * needs to be paid.
 	 */
-	WT_ASSERT(session, WT_INTL_INDEX_COPY(parent) == pindex);
+	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	panic = 1;
@@ -852,7 +863,11 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		hazard = 1;
 	}
 
-	pindex = WT_INTL_INDEX_COPY(parent);
+	/*
+	 * We've locked the parent above, which means it cannot split (which is
+	 * the only reason to worry about split generation values).
+	 */
+	pindex = WT_INTL_INDEX_GET_SAFE(parent);
 	parent_entries = pindex->entries;
 
 	/*
@@ -908,10 +923,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 	/*
-	 * Update the parent page's index: this update makes the split visible
-	 * to threads descending the tree.
+	 * Confirm the parent page's index hasn't moved then update it, which
+	 * makes the split visible to threads descending the tree.
 	 */
-	WT_ASSERT(session, WT_INTL_INDEX_COPY(parent) == pindex);
+	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	alloc_index = NULL;

@@ -412,8 +412,17 @@ struct __wt_page {
 	/*
 	 * Macros to copy/set the index because the name is obscured to ensure
 	 * the field isn't read multiple times.
+	 *
+	 * There are two versions of WT_INTL_INDEX_GET because the session split
+	 * generation is usually set, but it's not always required: for example,
+	 * if a page is locked for splitting, or being created or destroyed.
 	 */
-#define	WT_INTL_INDEX_COPY(page)	((page)->u.intl.__index)
+#define	WT_INTL_INDEX_GET_SAFE(page)					\
+	((page)->u.intl.__index)
+#define	WT_INTL_INDEX_GET(session, page, pindex) do {			\
+	WT_ASSERT(session, session->split_gen != 0);			\
+	(pindex) = WT_INTL_INDEX_GET_SAFE(page);			\
+} while (0)
 #define	WT_INTL_INDEX_SET(page, v) do {					\
 	WT_WRITE_BARRIER();						\
 	((page)->u.intl.__index) = (v);					\
@@ -426,9 +435,8 @@ struct __wt_page {
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
 	uint32_t __entries;						\
-	WT_ASSERT(session, session->split_gen != 0);			\
-	for (__pindex = WT_INTL_INDEX_COPY(page),			\
-	    __refp = __pindex->index,					\
+	WT_INTL_INDEX_GET(session, page, __pindex);			\
+	for (__refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
 #define	WT_INTL_FOREACH_END						\
