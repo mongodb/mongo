@@ -1227,13 +1227,13 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_btree_size_overflow --
- *	Check if the size of an in-memory tree with a single leaf page is over
+ * __wt_btree_lsm_size --
+ *	Return if the size of an in-memory tree with a single leaf page is over
  * a specified maximum.  If called on anything other than a simple tree with a
- * single leaf page, returns true so the calling code will switch to a new tree.
+ * single leaf page, returns true so our LSM caller will switch to a new tree.
  */
 static inline int
-__wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
+__wt_btree_lsm_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;
