@@ -25,7 +25,7 @@ AddOption("--enable-attach", dest="attach", action="store_true", default=False,
 AddOption("--enable-diagnostic", dest="diagnostic", action="store_true", default=False,
           help="Configure WiredTiger to perform various run-time diagnostic tests. DO NOT configure this option in production environments.")
 
-AddOption("--enable-lz4", dest="lz4", type="string", nargs=1, action="store",
+AddOption("--enable-lz4", dest="lz4", type="string", nargs=1, action="store_true", default=False,
           help="Use LZ4 compression")
 
 AddOption("--enable-python", dest="lang-python", type="string", nargs=1, action="store",
