@@ -52,7 +52,6 @@
 # include <sys/wait.h>
 #endif
 
-#include "mongo/client/clientOnly-private.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"

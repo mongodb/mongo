@@ -357,5 +357,8 @@ namespace mongo {
                 return false;
             }
         }
+
+
+        mongo::mutex &mongoProgramOutputMutex(*(new boost::mutex()));
     }
 }

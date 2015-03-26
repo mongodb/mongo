@@ -1,4 +1,6 @@
-/*    Copyright 2012 10gen Inc.
+// clientAndShell.cpp
+
+/*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,12 +27,54 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include <boost/thread/mutex.hpp>
+#include "mongo/platform/basic.h"
+
+#include "mongo/shell/shell_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
-    namespace shell_utils {
-        extern boost::mutex &mongoProgramOutputMutex;
+
+    using std::endl;
+    using std::string;
+    using std::vector;
+
+    class DBClientBase;
+    class OperationContext;
+
+
+    bool dbexitCalled = false;
+
+    void dbexit( ExitCode returnCode, const char *whyMsg ) {
+        {
+            boost::lock_guard<boost::mutex> lk( shell_utils::mongoProgramOutputMutex );
+            dbexitCalled = true;
+        }
+
+        log() << "dbexit called" << endl;
+
+        if (whyMsg) {
+            log() << " b/c " << whyMsg << endl;
+        }
+
+        log() << "exiting" << endl;
+        quickExit( returnCode );
     }
+
+    bool inShutdown() {
+        return dbexitCalled;
+    }
+
+    bool haveLocalShardingInfo( const string& ns ) {
+        return false;
+    }
+
+    DBClientBase* createDirectClient(OperationContext* txn) {
+        uassert( 10256 ,  "no createDirectClient in clientOnly" , 0 );
+        return 0;
+    }
+
 }

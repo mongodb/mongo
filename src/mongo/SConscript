@@ -1168,10 +1168,6 @@ env.Install(
             '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         ]))
 
-env.Library("clientandshell", ["client/clientAndShell.cpp"],
-                              LIBDEPS=["mongocommon",
-                                       "defaultversion"])
-
 # dbtests test binary options
 env.Library("framework_options", ["dbtests/framework_options.cpp"],
             LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser_init'])
@@ -1287,24 +1283,28 @@ env.JSHeader(
                 "shell/replsetbridge.js"
              ])
 
-coreShellFiles = [ "shell/bench.cpp",
-                   "shell/shell_utils.cpp",
-                   "shell/shell_utils_extended.cpp",
-                   "shell/shell_utils_launcher.cpp",
-                   "shell/mongo-server.cpp",
-                   "shell/linenoise.cpp",
-                   "shell/linenoise_utf8.cpp",
-                   "shell/mk_wcwidth.cpp",
-                   "shell/shell_options_init.cpp" ]
-
 if not has_option('noshell') and usev8:
-    env.Library("shell_core", coreShellFiles,
-                LIBDEPS=['clientandshell',
-                         'db/index/external_key_generator',
-                         'index_key_validate',
-                         'scripting',
-                         "signal_handlers",
-                         'mongocommon'])
+    env.Library("shell_core",
+                source=[
+                    "shell/bench.cpp",
+                    "shell/clientAndShell.cpp",
+                    "shell/linenoise.cpp",
+                    "shell/linenoise_utf8.cpp",
+                    "shell/mk_wcwidth.cpp",
+                    "shell/mongo-server.cpp",
+                    "shell/shell_utils.cpp",
+                    "shell/shell_utils_extended.cpp",
+                    "shell/shell_utils_launcher.cpp",
+                    "shell/shell_options_init.cpp"
+                ],
+                LIBDEPS=[
+                    'db/index/external_key_generator',
+                    'index_key_validate',
+                    'scripting',
+                    'signal_handlers',
+                    'mongocommon'
+                ])
+
     # mongo shell options
     env.Library("shell_options", ["shell/shell_options.cpp"],
                 LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser_init'])

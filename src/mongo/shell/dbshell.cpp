@@ -41,7 +41,6 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/client/clientOnly-private.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/client.h"
