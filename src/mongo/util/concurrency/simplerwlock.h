@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <boost/noncopyable.hpp>
 
 #include "mongo/base/string_data.h"
@@ -44,7 +46,7 @@ namespace mongo {
 #else
         RWLockBase m;
 #endif
-#if defined(_WIN32) && defined(_DEBUG)
+#if defined(_WIN32) && defined(MONGO_CONFIG_DEBUG_BUILD)
         AtomicUInt32 shares;
         ThreadLocalValue<int> s;
         unsigned tid;

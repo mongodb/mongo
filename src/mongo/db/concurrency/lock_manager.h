@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 

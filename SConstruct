@@ -844,6 +844,9 @@ isBuildingLatest = False
 def filterExists(paths):
     return filter(os.path.exists, paths)
 
+if debugBuild:
+    env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
+
 if darwin:
     pass
 elif linux:
@@ -1061,7 +1064,6 @@ if nix:
             env.Append( LINKFLAGS=["-fstack-protector"] )
             env.Append( SHLINKFLAGS=["-fstack-protector"] )
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
-        env.Append( CPPDEFINES=["_DEBUG"] );
 
 if has_option( "ssl" ):
     env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")

@@ -126,7 +126,7 @@ namespace PerfTests {
     static boost::shared_ptr<DBClientConnection> conn;
     static string _perfhostname;
     void pstatsConnect() {
-        // no writing to perf db if _DEBUG
+        // no writing to perf db if this is a debug build
         DEV return;
 
         const char *fn = "../../settings.py";
@@ -314,7 +314,7 @@ namespace PerfTests {
         int howLong() { 
             int hlm = howLongMillis();
             DEV {
-                // don't run very long with _DEBUG - not very meaningful anyway on that build
+                // don't run very long with in debug mode - not very meaningful anyway on that build
                 hlm = min(hlm, 500);
             }
             return hlm;
@@ -1117,7 +1117,7 @@ namespace PerfTests {
             c->findOne(ns(), q);
         }
         void post() {
-#if !defined(_DEBUG)
+#if !defined(MONGO_CONFIG_DEBUG_BUILD)
             verify( client()->count(ns()) > 50 );
 #endif
         }

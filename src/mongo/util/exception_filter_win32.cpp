@@ -30,6 +30,8 @@
 
 #ifdef _WIN32
 
+#include "mongo/config.h"
+
 #include <ostream>
 
 #include "mongo/platform/basic.h"
@@ -97,7 +99,7 @@ namespace mongo {
             aMiniDumpInfo.ClientPointers = FALSE;
 
             MINIDUMP_TYPE miniDumpType =
-    #ifdef _DEBUG
+    #ifdef MONGO_CONFIG_DEBUG_BUILD
                 MiniDumpWithFullMemory;
     #else
                 static_cast<MINIDUMP_TYPE>(

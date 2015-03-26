@@ -90,7 +90,7 @@ LIBRARY_FLAGS = {
       'CPPDEFINES':   ['V8_TARGET_ARCH_X64'],
     },
     'mode:debug': {
-      'CPPDEFINES':   ['_DEBUG', 'ENABLE_DISASSEMBLER', 'DEBUG'],
+      'CPPDEFINES':   ['ENABLE_DISASSEMBLER', 'DEBUG'],
     },
   }
 }

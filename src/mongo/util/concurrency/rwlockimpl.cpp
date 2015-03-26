@@ -29,6 +29,8 @@
 */
 
 
+#include "mongo/config.h"
+
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -55,8 +57,8 @@ namespace mongo {
     SimpleRWLock::SimpleRWLock(StringData p) : name(p.toString()) {
         InitializeSRWLock(&_lock);
     }
-# if defined(_DEBUG)
-    // the code below in _DEBUG build will check that we don't try to recursively lock, 
+# if defined(MONGO_CONFIG_DEBUG_BUILD)
+    // the code below in a debug build will check that we don't try to recursively lock, 
     // which is not supported by this class.  also checks that you don't unlock without 
     // having locked
     void SimpleRWLock::lock() {

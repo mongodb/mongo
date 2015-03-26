@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <boost/static_assert.hpp>
 #include <string>
 #include <limits>
@@ -202,14 +204,14 @@ namespace mongo {
 
         static uint64_t fullHash(ResourceType type, uint64_t hashId);
 
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         // Keep the complete namespace name for debugging purposes (TODO: this will be
         // removed once we are confident in the robustness of the lock manager).
         std::string _nsCopy;
 #endif
     };
 
-#ifndef _DEBUG
+#ifndef MONGO_CONFIG_DEBUG_BUILD
     // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
     // not spend too much time doing comparisons for hashing.
     BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));

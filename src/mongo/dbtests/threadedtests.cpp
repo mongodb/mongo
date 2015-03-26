@@ -31,6 +31,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include <boost/thread.hpp>
@@ -94,7 +96,7 @@ namespace ThreadedTests {
     const int nthr=135;
 #endif
     class MongoMutexTest : public ThreadedTest<nthr> {
-#if defined(_DEBUG)
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
         enum { N = 2000 };
 #else
         enum { N = 4000/*0*/ };
@@ -531,7 +533,7 @@ namespace ThreadedTests {
                         if( t.millis() > 20 ) {
 #endif
                             DEV {
-                                // a _DEBUG buildbot might be slow, try to avoid false positives
+                                // a debug buildbot might be slow, try to avoid false positives
                                 mongo::unittest::log() <<
                                     "warning lock upgrade was slow " << t.millis() << endl;
                             }

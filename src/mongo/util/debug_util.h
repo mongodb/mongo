@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-#if defined(_DEBUG)
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
     const bool kDebugBuild = true;
 #else
     const bool kDebugBuild = false;

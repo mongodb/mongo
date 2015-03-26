@@ -203,7 +203,7 @@ namespace mongo {
             storageGlobalParams.dur = true;
         }
 
-        DEV log() << "_DEBUG build" << endl;
+        DEV log() << "DEBUG build" << endl;
         if( sizeof(void*)==4 )
             log() << "32bit" << endl;
         log() << "random seed: " << frameworkGlobalParams.seed << endl;

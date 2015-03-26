@@ -199,11 +199,10 @@ namespace mongo {
             // This is outside of the if block to keep the object alive until the pipeline is finished.
             BSONObj parsed;
             if (kDebugBuild && !pPipeline->isExplain() && !pCtx->inShard) {
-                // Make sure all operations round-trip through Pipeline::toBson()
-                // correctly by reparsing every command on DEBUG builds. This is
-                // important because sharded aggregations rely on this ability.
-                // Skipping when inShard because this has already been through the
-                // transformation (and this unsets pCtx->inShard).
+                // Make sure all operations round-trip through Pipeline::toBson() correctly by
+                // reparsing every command in debug builds. This is important because sharded
+                // aggregations rely on this ability.  Skipping when inShard because this has
+                // already been through the transformation (and this unsets pCtx->inShard).
                 parsed = pPipeline->serialize().toBson();
                 pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
                 verify(pPipeline);

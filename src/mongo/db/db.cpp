@@ -508,7 +508,7 @@ namespace mongo {
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
 
-        DEV log(LogComponent::kControl) << "_DEBUG build (which is slower)" << endl;
+        DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
         logMongodStartupWarnings(storageGlobalParams);
 
 #if defined(_WIN32)

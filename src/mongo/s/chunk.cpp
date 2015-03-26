@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/chunk.h"
@@ -603,7 +605,7 @@ namespace {
                   << " shard: " << toString()
                   << " into " << (splitCount + 1)
                   << " (splitThreshold " << splitThreshold << ")"
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
                   << " size: " << getPhysicalSize() // slow - but can be useful when debugging
 #endif
                   << ( res["shouldMigrate"].eoo() ? "" : (string)" (migrate suggested" +

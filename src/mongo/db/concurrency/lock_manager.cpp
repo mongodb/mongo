@@ -28,9 +28,11 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include <vector>
+#include "mongo/config.h"
 
 #include "mongo/platform/basic.h"
+
+#include <vector>
 
 #include "mongo/db/concurrency/lock_manager.h"
 
@@ -1075,14 +1077,14 @@ namespace {
 
     ResourceId::ResourceId(ResourceType type, StringData ns)
         : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         _nsCopy = ns.toString();
 #endif
     }
 
     ResourceId::ResourceId(ResourceType type, const string& ns)
         : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         _nsCopy = ns;
 #endif
     }
@@ -1095,7 +1097,7 @@ namespace {
         ss << "{" << _fullHash << ": " << resourceTypeName(getType())
            << ", " << getHashId();
 
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         ss << ", " << _nsCopy;
 #endif
 

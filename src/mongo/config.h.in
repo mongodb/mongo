@@ -31,6 +31,9 @@
 // Define to target byte order (1234 vs 4321)
 @mongo_config_byte_order@
 
+// Define if building a debug build
+@mongo_config_debug_build@
+
 // Defined if __declspec(thread) is available
 @mongo_config_have___declspec_thread@
 

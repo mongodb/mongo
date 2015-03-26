@@ -126,7 +126,7 @@ namespace mongo {
     };
 #endif
 
-    /** This can be used instead of boost recursive mutex. The advantage is the _DEBUG checks
+    /** This can be used instead of boost recursive mutex. The advantage is the debug checks
      *  and ability to assertLocked(). This has not yet been tested for speed vs. the boost one.
      */
     class RecursiveMutex : boost::noncopyable {
