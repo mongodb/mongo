@@ -67,6 +67,7 @@ struct __wt_config_parser;
 struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
 struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
 struct __wt_data_source;    typedef struct __wt_data_source WT_DATA_SOURCE;
+struct __wt_encryptor;	    typedef struct __wt_encryptor WT_ENCRYPTOR;
 struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
 struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
 struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
@@ -1026,6 +1027,17 @@ struct __wt_session {
 	 * the Btree row-store leaf page value dictionary; see @ref
 	 * file_formats_compression for more information., an integer greater
 	 * than or equal to 0; default \c 0.}
+	 * @config{encryption = (, configure an encryptor for file blocks., a
+	 * set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;algorithm, Permitted values are \c
+	 * "none" or custom encryption engine name created with
+	 * WT_CONNECTION::add_encryptor.  See @ref encryption for more
+	 * information., a string; default \c none.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable encryption
+	 * algorithm., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;password, password key sent to
+	 * callback., a string; default empty.}
+	 * @config{ ),,}
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration., a boolean flag; default \c false.}
@@ -2001,8 +2013,15 @@ struct __wt_connection {
  * a string; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable
  * logging subsystem., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
- * integer between 100KB and 2GB; default \c 100MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;encryption_algorithm, Permitted values are \c
+ * "none" or custom encryption engine name created with
+ * WT_CONNECTION::add_encryptor.  See @ref encryption for more information., a
+ * string; default \c none.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;encryption_password, logging password key
+ * sent to encryption callback when operating on log records., a string; default
+ * empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log
+ * files., an integer between 100KB and 2GB; default \c 100MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
  * log files are written.  If the value is not an absolute path name\, the files
  * are created relative to the database home., a string; default empty.}
@@ -2955,7 +2974,7 @@ struct __wt_compressor {
 	 * discarded by WiredTiger.
 	 *
 	 * If not NULL, this callback is called before each call to
-	 * WT_COMPRESS::compress to determine the size of the destination
+	 * WT_COMPRESSOR::compress to determine the size of the destination
 	 * buffer to provide.  If the callback is NULL, the destination
 	 * buffer will be the same size as the source buffer.
 	 *
@@ -3093,6 +3112,194 @@ struct __wt_data_source {
 	 * @snippet ex_data_source.c WT_DATA_SOURCE terminate
 	 */
 	int (*terminate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session);
+};
+
+/*!
+ * XXX
+ * The interface implemented by applications to provide custom encryption.
+ *
+ * Encryptors must implement the WT_ENCRYPTOR interface: the
+ * WT_ENCRYPTOR::encrypt and WT_ENCRYPTOR::decrypt callbacks must be
+ * specified, and WT_ENCRYPTOR::pre_size is optional.  To build your own
+ * encryptor, use one of the encryptors in \c ext/encryptors as a template:
+ * \c ext/nop_encrypt is a simple encryptor that passes through data
+ * unchanged, and is a reasonable starting point.
+ *
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::add_encryptor.
+ *
+ * @snippet nop_encrypt.c WT_ENCRYPTOR initialization structure
+ * @snippet nop_encrypt.c WT_ENCRYPTOR initialization function
+ */
+struct __wt_encryptor {
+	/*!
+	 * Callback to encrypt a chunk of data.
+	 *
+	 * WT_ENCRYPTOR::encrypt takes a source buffer and a destination
+	 * buffer, by default of the same size.  If the callback can encrypt
+	 * the buffer to a smaller size in the destination, it does so, sets
+	 * the \c encryption_failed return to 0 and returns 0.  If encryption
+	 * does not produce a smaller result, the callback sets the
+	 * \c encryption_failed return to 1 and returns 0. If another
+	 * error occurs, it returns an errno or WiredTiger error code.
+	 *
+	 * On entry, \c src will point to memory, with the length of the memory
+	 * in \c src_len.  After successful completion, the callback should
+	 * return \c 0 and set \c result_lenp to the number of bytes required
+	 * for the encrypted representation.
+	 *
+	 * On entry, \c dst points to the destination buffer with a length
+	 * of \c dst_len.  If the WT_ENCRYPTOR::pre_size method is specified,
+	 * the destination buffer will be at least the size returned by that
+	 * method; otherwise, the destination buffer will be at least as large
+	 * as the length of the data to encrypt.
+	 *
+	 * If encryption would not shrink the data or the \c dst buffer is not
+	 * large enough to hold the encrypted data, the callback should set
+	 * \c encryption_failed to a non-zero value and return 0.
+	 *
+	 * @param[in] src the data to encrypt
+	 * @param[in] src_len the length of the data to encrypt
+	 * @param[in] dst the destination buffer
+	 * @param[in] dst_len the length of the destination buffer
+	 * @param[out] result_lenp the length of the encrypted data
+	 * @param[out] encryption_failed non-zero if encryption did not
+	 * decrease the length of the data (encryption may not have completed)
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR encrypt
+	 */
+	int (*encrypt)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+	    uint8_t *src, size_t src_len,
+	    uint8_t *dst, size_t dst_len,
+	    size_t *result_lenp, int *encryption_failed);
+
+	/*!
+	 * Callback to decrypt a chunk of data.
+	 *
+	 * WT_ENCRYPTOR::decrypt takes a source buffer and a destination
+	 * buffer.  The contents are switched from \c encrypt: the
+	 * source buffer is the encrypted value, and the destination buffer is
+	 * sized to be the original size.  If the callback successfully
+	 * decrypts the source buffer to the destination buffer, it returns
+	 * 0.  If an error occurs, it returns an errno or WiredTiger error code.
+	 * The source buffer that WT_ENCRYPTOR::decrypt takes may have a
+	 * size that is rounded up from the size originally produced by
+	 * WT_ENCRYPTOR::encrypt, with the remainder of the buffer set to
+	 * zeroes. Most encryptors do not care about this difference if the
+	 * size to be decrypted can be implicitly discovered from the
+	 * encrypted data.  If your encryptor cares, you may need to allocate
+	 * space for, and store, the actual size in the encrypted buffer.  See
+	 * the source code for the included snappy encryptor for an example.
+	 *
+	 * On entry, \c src will point to memory, with the length of the memory
+	 * in \c src_len.  After successful completion, the callback should
+	 * return \c 0 and set \c result_lenp to the number of bytes required
+	 * for the decrypted representation.
+	 *
+	 * If the \c dst buffer is not big enough to hold the decrypted
+	 * data, the callback should return an error.
+	 *
+	 * @param[in] src the data to decrypt
+	 * @param[in] src_len the length of the data to decrypt
+	 * @param[in] dst the destination buffer
+	 * @param[in] dst_len the length of the destination buffer
+	 * @param[out] result_lenp the length of the decrypted data
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR decrypt
+	 */
+	int (*decrypt)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+	    uint8_t *src, size_t src_len,
+	    uint8_t *dst, size_t dst_len,
+	    size_t *result_lenp);
+
+	/*!
+	 * Callback to size a destination buffer for decryption
+	 *
+	 * WT_ENCRYPTOR::post_size is an optional callback that, given the
+	 * source buffer and size, produces the size of the destination buffer
+	 * to be given to WT_ENCRYPTOR::decrypt.  This is useful for
+	 * encryptors that assume that the output buffer is sized for the
+	 * worst case and thus no overrun checks are made.  If your encryptor
+	 * works like this, WT_ENCRYPTOR::post_size will need to be defined.
+	 * However, if your encryptor detects and avoids overruns against its
+	 * target buffer, you will not need to define WT_ENCRYPTOR::post_size.
+	 * When WT_ENCRYPTOR::post_size is set to NULL, the destination buffer
+	 * is sized the same as the source buffer.
+	 *
+	 * If not NULL, this callback is called before each call to
+	 * WT_ENCRYPTOR::decrypt to determine the size of the destination
+	 * buffer to provide.  If the callback is NULL, the destination
+	 * buffer will be the same size as the source buffer.
+	 *
+	 * The callback should set \c result_lenp to a suitable buffer size
+	 * for decryption, typically the maximum length required by
+	 * WT_ENCRYPTOR::decrypt.
+	 *
+	 * This callback function is for encryptors that require an output
+	 * buffer larger than the source buffer (for example, that do not
+	 * check for buffer overflow during decryption).
+	 *
+	 * @param[in] src the data to decrypt
+	 * @param[in] src_len the length of the data to decrypt
+	 * @param[out] result_lenp the required destination buffer size
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR postsize
+	 */
+	int (*post_size)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+	    uint8_t *src, size_t src_len, size_t *result_lenp);
+
+	/*!
+	 * Callback to size a destination buffer for encryption
+	 *
+	 * WT_ENCRYPTOR::pre_size is an optional callback that, given the
+	 * source buffer and size, produces the size of the destination buffer
+	 * to be given to WT_ENCRYPTOR::encrypt.  This is useful for
+	 * encryptors that assume that the output buffer is sized for the
+	 * worst case and thus no overrun checks are made.  If your encryptor
+	 * works like this, WT_ENCRYPTOR::pre_size will need to be defined.
+	 * See the source code for the snappy encryptor for an example.
+	 * However, if your encryptor detects and avoids overruns against its
+	 * target buffer, you will not need to define WT_ENCRYPTOR::pre_size.
+	 * When WT_ENCRYPTOR::pre_size is set to NULL, the destination buffer
+	 * is sized the same as the source buffer.  This is always sufficient,
+	 * since a encryption result that is larger than the source buffer is
+	 * discarded by WiredTiger.
+	 *
+	 * If not NULL, this callback is called before each call to
+	 * WT_ENCRYPTOR::encrypt to determine the size of the destination
+	 * buffer to provide.  If the callback is NULL, the destination
+	 * buffer will be the same size as the source buffer.
+	 *
+	 * The callback should set \c result_lenp to a suitable buffer size
+	 * for encryption, typically the maximum length required by
+	 * WT_ENCRYPTOR::encrypt.
+	 *
+	 * This callback function is for encryptors that require an output
+	 * buffer larger than the source buffer (for example, that do not
+	 * check for buffer overflow during encryption).
+	 *
+	 * @param[in] src the data to encrypt
+	 * @param[in] src_len the length of the data to encrypt
+	 * @param[out] result_lenp the required destination buffer size
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR presize
+	 */
+	int (*pre_size)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+	    uint8_t *src, size_t src_len, size_t *result_lenp);
+
+	/*!
+	 * If non-NULL, a callback performed when the database is closed.
+	 *
+	 * The WT_ENCRYPTOR::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 *
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR terminate
+	 */
+	int (*terminate)(WT_ENCRYPTOR *encryptor, WT_SESSION *session);
 };
 
 /*!

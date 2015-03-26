@@ -55,6 +55,17 @@ struct __wt_named_data_source {
 };
 
 /*
+ * WT_NAMED_ENCRYPTOR --
+ *	An encryptor list entry
+ */
+struct __wt_named_encryptor {
+	const char *name;		/* Name of encryptor */
+	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
+					/* Linked list of encryptors */
+	TAILQ_ENTRY(__wt_named_encryptor) q;
+};
+
+/*
  * WT_NAMED_EXTRACTOR --
  *	An extractor list entry
  */
@@ -346,6 +357,9 @@ struct __wt_connection_impl {
 
 					/* Locked: data source list */
 	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
+
+					/* Locked: encryptor list */
+	TAILQ_HEAD(__wt_encrypt_qh, __wt_named_encryptor) encryptqh;
 
 					/* Locked: extractor list */
 	TAILQ_HEAD(__wt_extractor_qh, __wt_named_extractor) extractorqh;

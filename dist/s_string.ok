@@ -91,6 +91,7 @@ EINTR
 EINVAL
 EMSG
 EMail
+ENCRYPTOR
 ENOENT
 ENOMEM
 ENOSYS
@@ -103,6 +104,8 @@ ETIME
 ETIMEDOUT
 EXLOG
 EXTLIST
+Encryptor
+Encryptors
 Enqueue
 Env
 Eron
@@ -542,6 +545,9 @@ decl
 decr
 decrement
 decrementing
+decrypt
+decrypted
+decrypts
 deflateEnd
 deflateInit
 defno
@@ -581,6 +587,8 @@ dup
 eg
 emp
 encodings
+encryptor
+encryptors
 endian
 endif
 english
@@ -888,6 +896,7 @@ poptable
 pos
 posint
 posix
+postsize
 pragmas
 pre
 prealloc

@@ -560,6 +560,126 @@ __wt_conn_remove_data_source(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __encryptor_confchk --
+ *	Validate the encryptor.
+ */
+static int
+__encryptor_confchk(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_ENCRYPTOR **encryptorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_ENCRYPTOR *nenc;
+
+	if (encryptorp != NULL)
+		*encryptorp = NULL;
+
+	if (cval->len == 0 || WT_STRING_MATCH("none", cval->str, cval->len))
+		return (0);
+
+	conn = S2C(session);
+	TAILQ_FOREACH(nenc, &conn->encryptqh, q)
+		if (WT_STRING_MATCH(nenc->name, cval->str, cval->len)) {
+			if (encryptorp != NULL)
+				*encryptorp = nenc->encryptor;
+			return (0);
+		}
+	WT_RET_MSG(session, EINVAL,
+	    "unknown encryptor '%.*s'", (int)cval->len, cval->str);
+}
+
+/*
+ * __wt_encryptor_confchk --
+ *	Validate the encryptor (public).
+ */
+int
+__wt_encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
+{
+	return (__encryptor_confchk(session, cval, NULL));
+}
+
+/*
+ * __wt_encryptor_config --
+ *	Given a configuration, configure the encryptor.
+ */
+int
+__wt_encryptor_config(
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_ENCRYPTOR **encryptorp)
+{
+	return (__encryptor_confchk(session, cval, encryptorp));
+}
+
+/*
+ * __conn_add_encryptor --
+ *	WT_CONNECTION->add_encryptor method.
+ */
+static int
+__conn_add_encryptor(WT_CONNECTION *wt_conn,
+    const char *name, WT_ENCRYPTOR *encryptor, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_NAMED_ENCRYPTOR *nenc;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(name);
+	WT_UNUSED(encryptor);
+	nenc = NULL;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL(conn, session, add_encryptor, config, cfg);
+	WT_UNUSED(cfg);
+
+	if (WT_STREQ(name, "none"))
+		WT_ERR_MSG(session, EINVAL,
+		    "invalid name for an encryptor: %s", name);
+
+	WT_ERR(__wt_calloc_one(session, &nenc));
+	WT_ERR(__wt_strdup(session, name, &nenc->name));
+	nenc->encryptor = encryptor;
+
+	__wt_spin_lock(session, &conn->api_lock);
+	TAILQ_INSERT_TAIL(&conn->encryptqh, nenc, q);
+	nenc = NULL;
+	__wt_spin_unlock(session, &conn->api_lock);
+
+err:	if (nenc != NULL) {
+		__wt_free(session, nenc->name);
+		__wt_free(session, nenc);
+	}
+
+	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __wt_conn_remove_encryptor --
+ *	remove encryptor added by WT_CONNECTION->add_encryptor, only used
+ * internally.
+ */
+int
+__wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_NAMED_ENCRYPTOR *nenc;
+
+	conn = S2C(session);
+
+	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
+		/* Call any termination method. */
+		if (nenc->encryptor->terminate != NULL)
+			WT_TRET(nenc->encryptor->terminate(
+			    nenc->encryptor, (WT_SESSION *)session));
+
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->encryptqh, nenc, q);
+		__wt_free(session, nenc->name);
+		__wt_free(session, nenc);
+	}
+
+	return (ret);
+}
+
+/*
  * __conn_add_extractor --
  *	WT_CONNECTION->add_extractor method.
  */

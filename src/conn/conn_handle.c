@@ -31,6 +31,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	SLIST_INIT(&conn->fhlh);		/* File list */
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
+	TAILQ_INIT(&conn->encryptqh);		/* Encryptor list */
 	TAILQ_INIT(&conn->extractorqh);		/* Extractor list */
 
 	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */

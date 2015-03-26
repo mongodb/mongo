@@ -159,6 +159,21 @@ file_config = format_meta + [
         row-store leaf page value dictionary; see
         @ref file_formats_compression for more information''',
         min='0'),
+    Config('encryption', '', r'''
+        configure an encryptor for file blocks''',
+        type='category', subconfig=[
+        Config('enabled', 'false', r'''
+            enable encryption algorithm''',
+            type='boolean'),
+        Config('algorithm', 'none', r'''
+            Permitted values are \c "none"
+            or custom encryption engine name created with
+            WT_CONNECTION::add_encryptor.  
+            See @ref encryption for more information''',
+            func='__wt_encryptor_confchk'),
+        Config('password', '', r'''
+            password key sent to callback'''),
+        ]),
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
@@ -558,6 +573,15 @@ common_wiredtiger_open = [
         Config('enabled', 'false', r'''
             enable logging subsystem''',
             type='boolean'),
+        Config('encryption_algorithm', 'none', r'''
+            Permitted values are \c "none"
+            or custom encryption engine name created with
+            WT_CONNECTION::add_encryptor.  
+            See @ref encryption for more information''',
+            func='__wt_encryptor_confchk'),
+        Config('encryption_password', '', r'''
+            logging password key sent to encryption callback when operating
+            on log records'''),
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
             min='100KB', max='2GB'),
@@ -812,6 +836,7 @@ methods = {
 'connection.add_collator' : Method([]),
 'connection.add_compressor' : Method([]),
 'connection.add_data_source' : Method([]),
+'connection.add_encryptor' : Method([]),
 'connection.add_extractor' : Method([]),
 'connection.async_new_op' : Method([
     Config('append', 'false', r'''
