@@ -30,6 +30,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 
@@ -38,13 +39,23 @@ namespace mongo {
     class BatchedCommandRequest;
     class BatchedCommandResponse;
     class BSONObj;
+    class ChunkType;
     class ConnectionString;
     class DatabaseType;
     class OperationContext;
     class Status;
     template<typename T> class StatusWith;
 
-    
+    /**
+     * Used to indicate to the caller of the removeShard method whether draining of chunks for
+     * a particular shard has started, is ongoing, or has been completed.
+     */
+    enum ShardDrainingStatus {
+        STARTED,
+        ONGOING,
+        COMPLETED,
+    };
+
     /**
      * Abstracts reads and writes of the sharding catalog metadata.
      *
@@ -86,6 +97,17 @@ namespace mongo {
                                                  const long long maxSize) = 0;
 
         /**
+         * Tries to remove a shard. To completely remove a shard from a sharded cluster,
+         * the data residing in that shard must be moved to the remaining shards in the
+         * cluster by "draining" chunks from that shard.
+         *
+         * Because of the asynchronous nature of the draining mechanism, this method returns
+         * the current draining status. See ShardDrainingStatus enum definition for more details.
+         */
+        virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
+                                                            const std::string& name) = 0;
+
+        /**
          * Updates the metadata for a given database. Currently, if the specified DB entry does
          * not exist, it will be created.
          */
@@ -95,6 +117,20 @@ namespace mongo {
          * Retrieves the metadata for a given database.
          */
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName) = 0;
+
+        /**
+         * Retrieves all databases for a shard.
+         * Returns a !OK status if an error occurs.
+         */
+        virtual void getDatabasesForShard(const std::string& shardName,
+                                          std::vector<std::string>* dbs) = 0;
+
+        /**
+         * Gets all chunks (of type ChunkType) for a shard.
+         * Returns a !OK status if an error occurs.
+         */
+        virtual Status getChunksForShard(const std::string& shardName,
+                                         std::vector<ChunkType>* chunks) = 0;
 
         /**
          * Logs a diagnostic event locally and on the config server.

@@ -56,9 +56,18 @@ namespace mongo {
                                                  const ConnectionString& shardConnectionString,
                                                  const long long maxSize);
 
+        virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
+                                                            const std::string& name);
+
         virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db);
 
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName);
+
+        virtual void getDatabasesForShard(const std::string& shardName,
+                                          std::vector<std::string>* dbs);
+
+        virtual Status getChunksForShard(const std::string& shardName,
+                                         std::vector<ChunkType>* chunks);
 
         virtual void logChange(OperationContext* txn,
                                const std::string& what,

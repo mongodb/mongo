@@ -39,6 +39,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -46,7 +47,10 @@
 #include "mongo/s/catalog/legacy/config_coordinator.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/client/dbclient_multi_command.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/type_chunk.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -235,6 +239,14 @@ namespace {
         }
 
         return dbNames;
+    }
+
+    BSONObj buildRemoveLogEntry(const string& shardName, bool isDraining) {
+        BSONObjBuilder details;
+        details.append("shard", shardName);
+        details.append("isDraining", isDraining);
+
+        return details.obj();
     }
 
     // Whether the logChange call should attempt to create the changelog collection
@@ -515,6 +527,100 @@ namespace {
         return shardName;
     }
 
+    StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationContext* txn,
+                                                                 const std::string& name) {
+        ScopedDbConnection conn(_configServerConnectionString, 30);
+
+        if (conn->count(ShardType::ConfigNS,
+                        BSON(ShardType::name() << NE << name
+                             << ShardType::draining(true)))) {
+            conn.done();
+            return Status(ErrorCodes::ConflictingOperationInProgress,
+                          "Can't have more than one draining shard at a time");
+        }
+
+        if (conn->count(ShardType::ConfigNS,
+                        BSON(ShardType::name() << NE << name)) == 0) {
+            conn.done();
+            return Status(ErrorCodes::IllegalOperation,
+                          "Can't remove last shard");
+        }
+
+        BSONObj searchDoc = BSON(ShardType::name() << name);
+
+        // Case 1: start draining chunks
+        BSONObj drainingDoc =
+            BSON(ShardType::name() << name << ShardType::draining(true));
+        BSONObj shardDoc = conn->findOne(ShardType::ConfigNS, drainingDoc);
+        if (shardDoc.isEmpty()) {
+            log() << "going to start draining shard: " << name;
+            BSONObj newStatus = BSON("$set" << BSON(ShardType::draining(true)));
+
+            Status status = update(ShardType::ConfigNS, searchDoc, newStatus, false, false, NULL);
+            if (!status.isOK()) {
+                log() << "error starting removeShard: " << name
+                      << "; err: " << status.reason();
+                return status;
+            }
+
+            BSONObj primaryLocalDoc = BSON(DatabaseType::name("local") <<
+                                           DatabaseType::primary(name));
+            log() << "primaryLocalDoc: " << primaryLocalDoc;
+            if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
+                log() << "This shard is listed as primary of local db. Removing entry.";
+
+                Status status = remove(DatabaseType::ConfigNS,
+                                       BSON(DatabaseType::name("local")),
+                                       0,
+                                       NULL);
+                if (!status.isOK()) {
+                    log() << "error removing local db: "
+                          << status.reason();
+                    return status;
+                }
+            }
+
+            Shard::reloadShardInfo();
+            conn.done();
+
+            // Record start in changelog
+            logChange(txn, "removeShard.start", "", buildRemoveLogEntry(name, true));
+            return ShardDrainingStatus::STARTED;
+        }
+
+        // Case 2: all chunks drained
+        BSONObj shardIDDoc = BSON(ChunkType::shard(shardDoc[ShardType::name()].str()));
+        long long chunkCount = conn->count(ChunkType::ConfigNS, shardIDDoc);
+        long long dbCount = conn->count(DatabaseType::ConfigNS,
+                                        BSON(DatabaseType::name.ne("local")
+                                             << DatabaseType::primary(name)));
+        if (chunkCount == 0 && dbCount == 0) {
+            log() << "going to remove shard: " << name;
+            audit::logRemoveShard(ClientBasic::getCurrent(), name);
+
+            Status status = remove(ShardType::ConfigNS, searchDoc, 0, NULL);
+            if (!status.isOK()) {
+                log() << "Error concluding removeShard operation on: " << name
+                      << "; err: " << status.reason();
+                return status;
+            }
+
+            Shard::removeShard(name);
+            shardConnectionPool.removeHost(name);
+            ReplicaSetMonitor::remove(name, true);
+
+            Shard::reloadShardInfo();
+            conn.done();
+
+            // Record finish in changelog
+            logChange(txn, "removeShard", "", buildRemoveLogEntry(name, false));
+            return ShardDrainingStatus::COMPLETED;
+        }
+
+        // case 3: draining ongoing
+        return ShardDrainingStatus::ONGOING;
+    }
+
     Status CatalogManagerLegacy::updateDatabase(const std::string& dbName, const DatabaseType& db) {
         fassert(28616, db.validate());
 
@@ -595,6 +701,42 @@ namespace {
             warning() << "Error encountered while logging config change with ID "
                       << changeID << ": " << result;
         }
+    }
+
+    void CatalogManagerLegacy::getDatabasesForShard(const string& shardName,
+                                                    vector<string>* dbs) {
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+        BSONObj prim = BSON(DatabaseType::primary(shardName));
+        boost::scoped_ptr<DBClientCursor> cursor(conn->query(DatabaseType::ConfigNS, prim));
+
+        while (cursor->more()) {
+            BSONObj shard = cursor->nextSafe();
+            dbs->push_back(shard[DatabaseType::name()].str());
+        }
+
+        conn.done();
+    }
+
+    Status CatalogManagerLegacy::getChunksForShard(const string& shardName,
+                                                   vector<ChunkType>* chunks) {
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+        boost::scoped_ptr<DBClientCursor> cursor(conn->query(ChunkType::ConfigNS,
+                                                             BSON(ChunkType::shard(shardName))));
+        while (cursor->more()) {
+            BSONObj chunkObj = cursor->nextSafe();
+
+            StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(chunkObj);
+            if (!chunkRes.isOK()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "Failed to parse chunk BSONObj: "
+                                            << chunkRes.getStatus().reason());
+            }
+            ChunkType chunk = chunkRes.getValue();
+            chunks->push_back(chunk);
+        }
+        conn.done();
+
+        return Status::OK();
     }
 
     void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& request,

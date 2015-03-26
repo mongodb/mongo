@@ -31,16 +31,13 @@
 #include "mongo/platform/basic.h"
 
 #include <string>
+#include <vector>
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_write.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
@@ -51,17 +48,9 @@
 namespace mongo {
 
     using std::string;
+    using std::vector;
 
 namespace {
-
-    BSONObj buildRemoveLogEntry(Shard s, bool isDraining) {
-        BSONObjBuilder details;
-        details.append("shard", s.getName());
-        details.append("isDraining", isDraining);
-
-        return details.obj();
-    }
-
 
     class RemoveShardCmd : public Command {
     public:
@@ -112,159 +101,68 @@ namespace {
                                            Status(ErrorCodes::ShardNotFound, msg));
             }
 
-            ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-
-            if (conn->count(ShardType::ConfigNS,
-                            BSON(ShardType::name() << NE << s.getName()
-                                                   << ShardType::draining(true)))) {
-                conn.done();
-                errmsg = "Can't have more than one draining shard at a time";
-                return false;
+            StatusWith<ShardDrainingStatus> removeShardResult =
+                grid.catalogManager()->removeShard(txn, s.getName());
+            if (!removeShardResult.isOK()) {
+                return appendCommandStatus(result, removeShardResult.getStatus());
             }
 
-            if (conn->count(ShardType::ConfigNS,
-                            BSON(ShardType::name() << NE << s.getName())) == 0) {
-                conn.done();
-                errmsg = "Can't remove last shard";
-                return false;
-            }
+            vector<string> databases;
+            grid.catalogManager()->getDatabasesForShard(s.getName(), &databases);
 
-            BSONObj primaryDoc =
-                        BSON(DatabaseType::name.ne("local") << DatabaseType::primary(s.getName()));
-
-            BSONObj dbInfo; // appended at end of result on success
+            // Get BSONObj containing:
+            // 1) note about moving or dropping databases in a shard
+            // 2) list of databases (excluding 'local' database) that need to be moved
+            BSONObj dbInfo;
             {
-                boost::scoped_ptr<DBClientCursor> cursor(conn->query(DatabaseType::ConfigNS,
-                                                                     primaryDoc));
-                if (cursor->more()) {
-                    // Skip block and allocations if empty
-                    BSONObjBuilder dbInfoBuilder;
-                    dbInfoBuilder.append("note",
-                                         "you need to drop or movePrimary these databases");
-
-                    BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
-                    while (cursor->more()){
-                        BSONObj db = cursor->nextSafe();
-                        dbs.append(db[DatabaseType::name()]);
+                BSONObjBuilder dbInfoBuilder;
+                dbInfoBuilder.append("note",
+                                     "you need to drop or movePrimary these databases");
+                BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
+                for (vector<string>::const_iterator it = databases.begin();
+                     it != databases.end();
+                     it++) {
+                    if (*it != "local") {
+                        dbs.append(*it);
                     }
-                    dbs.doneFast();
-
-                    dbInfo = dbInfoBuilder.obj();
                 }
+                dbs.doneFast();
+                dbInfo = dbInfoBuilder.obj();
             }
 
-            // If the server is not yet draining chunks, put it in draining mode.
-            BSONObj searchDoc = BSON(ShardType::name() << s.getName());
-            BSONObj drainingDoc =
-                        BSON(ShardType::name() << s.getName() << ShardType::draining(true));
-
-            BSONObj shardDoc = conn->findOne(ShardType::ConfigNS, drainingDoc);
-            if (shardDoc.isEmpty()) {
-                log() << "going to start draining shard: " << s.getName();
-                BSONObj newStatus = BSON("$set" << BSON(ShardType::draining(true)));
-
-                Status status = grid.catalogManager()->update(ShardType::ConfigNS,
-                                                              searchDoc,
-                                                              newStatus,
-                                                              false,
-                                                              false,
-                                                              NULL);
-                if (!status.isOK()) {
-                    errmsg = status.reason();
-                    log() << "error starting remove shard: " << s.getName()
-                          << " err: " << errmsg;
-                    return false;
-                }
-
-                BSONObj primaryLocalDoc = BSON(DatabaseType::name("local") <<
-                                               DatabaseType::primary(s.getName()));
-                PRINT(primaryLocalDoc);
-
-                if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
-                    log() << "This shard is listed as primary of local db. Removing entry.";
-
-                    Status status = grid.catalogManager()->remove(
-                                                                DatabaseType::ConfigNS,
-                                                                BSON(DatabaseType::name("local")),
-                                                                0,
-                                                                NULL);
-                    if (!status.isOK()) {
-                        log() << "error removing local db: "
-                              << status.reason();
-                        return false;
-                    }
-                }
-
-                Shard::reloadShardInfo();
-
+            // TODO: Standardize/Seperate how we append to the result object
+            switch (removeShardResult.getValue()) {
+            case ShardDrainingStatus::STARTED:
                 result.append("msg", "draining started successfully");
                 result.append("state", "started");
                 result.append("shard", s.getName());
                 result.appendElements(dbInfo);
-
-                conn.done();
-
-                // Record start in changelog
-                grid.catalogManager()->logChange(txn,
-                                                 "removeShard.start",
-                                                 "",
-                                                 buildRemoveLogEntry(s, true));
-                return true;
-            }
-
-            // If the server has been completely drained, remove it from the ConfigDB. Check not
-            // only for chunks but also databases.
-            BSONObj shardIDDoc = BSON(ChunkType::shard(shardDoc[ShardType::name()].str()));
-            long long chunkCount = conn->count(ChunkType::ConfigNS, shardIDDoc);
-            long long dbCount = conn->count(DatabaseType::ConfigNS, primaryDoc);
-
-            if ((chunkCount == 0) && (dbCount == 0)) {
-                log() << "going to remove shard: " << s.getName();
-                audit::logRemoveShard(ClientBasic::getCurrent(), s.getName());
-
-                Status status = grid.catalogManager()->remove(ShardType::ConfigNS,
-                                                              searchDoc,
-                                                              0,
-                                                              NULL);
+                break;
+            case ShardDrainingStatus::ONGOING: {
+                vector<ChunkType> chunks;
+                Status status = grid.catalogManager()->getChunksForShard(s.getName(), &chunks);
                 if (!status.isOK()) {
-                    errmsg = status.reason();
-                    log() << "error concluding remove shard: " << s.getName()
-                          << " err: " << errmsg;
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
 
-                const string shardName = shardDoc[ShardType::name()].str();
-                Shard::removeShard(shardName);
-                shardConnectionPool.removeHost(shardName);
-                ReplicaSetMonitor::remove(shardName, true);
-
-                Shard::reloadShardInfo();
-
+                result.append("msg", "draining ongoing");
+                result.append("state", "ongoing");
+                {
+                    BSONObjBuilder inner;
+                    inner.append("chunks", static_cast<long long>(chunks.size()));
+                    inner.append("dbs", static_cast<long long>(databases.size()));
+                    BSONObj b = inner.obj();
+                    result.append("remaining", b);
+                }
+                result.appendElements(dbInfo);
+                break;
+            }
+            case ShardDrainingStatus::COMPLETED:
                 result.append("msg", "removeshard completed successfully");
                 result.append("state", "completed");
                 result.append("shard", s.getName());
-
-                conn.done();
-
-                // Record finish in changelog
-                grid.catalogManager()->logChange(txn,
-                                                 "removeShard",
-                                                 "",
-                                                 buildRemoveLogEntry(s, false));
-                return true;
             }
 
-            // If the server is already in draining mode, just report on its progress.
-            // Report on databases (not just chunks) that are left too.
-            result.append("msg", "draining ongoing");
-            result.append("state", "ongoing");
-            BSONObjBuilder inner;
-            inner.append("chunks", chunkCount);
-            inner.append("dbs", dbCount);
-            result.append("remaining", inner.obj());
-            result.appendElements(dbInfo);
-
-            conn.done();
             return true;
         }
 
