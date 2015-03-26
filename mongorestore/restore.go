@@ -29,6 +29,8 @@ func (restore *MongoRestore) RestoreIntents() error {
 	restore.progressManager.Start()
 	defer restore.progressManager.Stop()
 
+	log.Logf(log.DebugLow, "restoring up to %v collections in parallel", restore.OutputOptions.NumParallelCollections)
+
 	if restore.OutputOptions.NumParallelCollections > 0 {
 		resultChan := make(chan error)
 
@@ -219,12 +221,12 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	restore.progressManager.Attach(bar)
 	defer restore.progressManager.Detach(bar)
 
-	MaxInsertThreads := restore.OutputOptions.NumInsertionWorkers
+	maxInsertWorkers := restore.OutputOptions.NumInsertionWorkers
 	if restore.OutputOptions.MaintainInsertionOrder {
-		MaxInsertThreads = 1
+		maxInsertWorkers = 1
 	}
 	docChan := make(chan bson.Raw, insertBufferFactor)
-	resultChan := make(chan error, MaxInsertThreads)
+	resultChan := make(chan error, maxInsertWorkers)
 
 	go func() {
 		doc := bson.Raw{}
@@ -236,7 +238,9 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 		close(docChan)
 	}()
 
-	for i := 0; i < MaxInsertThreads; i++ {
+	log.Logf(log.DebugLow, "using %v insertion workers", maxInsertWorkers)
+
+	for i := 0; i < maxInsertWorkers; i++ {
 		go func() {
 			// get a session copy for each insert worker
 			s := session.Copy()
@@ -283,7 +287,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	}
 
 	// wait until all insert jobs finish
-	for done := 0; done < MaxInsertThreads; done++ {
+	for done := 0; done < maxInsertWorkers; done++ {
 		err := <-resultChan
 		if err != nil {
 			return fmt.Errorf("insertion error: %v", err)
