@@ -1700,6 +1700,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_add_data_source,
 		__conn_add_collator,
 		__conn_add_compressor,
+		__conn_add_encryptor,
 		__conn_add_extractor,
 		__conn_get_extension_api
 	};

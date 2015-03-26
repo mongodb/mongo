@@ -1743,6 +1743,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %ignore __wt_connection::add_compressor;
 %ignore __wt_data_source;
 %ignore __wt_connection::add_data_source;
+%ignore __wt_encryptor;
+%ignore __wt_connection::add_encryptor;
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
 %ignore __wt_connection::add_extractor;

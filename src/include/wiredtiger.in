@@ -1862,6 +1862,26 @@ struct __wt_connection {
 	    const char *name, WT_COMPRESSOR *compressor, const char *config);
 
 	/*!
+	 * Add an encryption function.
+	 *
+	 * The application must first implement the WT_ENCRYPTOR interface
+	 * and then register the implementation with WiredTiger:
+	 *
+	 * @snippet nop_encryption.c WT_ENCRYPTOR initialization structure
+	 *
+	 * @snippet nop_encryption.c WT_ENCRYPTOR initialization function
+	 *
+	 * @param connection the connection handle
+	 * @param name the name of the encryption function to be used in calls
+	 *	to WT_SESSION::create, may not be \c "none"
+	 * @param encryptor the application-supplied encryption handler
+	 * @configempty{connection.add_encryptor, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(add_encryptor)(WT_CONNECTION *connection,
+	    const char *name, WT_ENCRYPTOR *encryptor, const char *config);
+
+	/*!
 	 * Add a custom extractor for index keys or column groups.
 	 *
 	 * The application must first implement the WT_EXTRACTOR interface and
