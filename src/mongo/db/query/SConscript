@@ -105,6 +105,16 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="getmore_request_test",
+    source=[
+        "getmore_request_test.cpp"
+    ],
+    LIBDEPS=[
+        "getmore_request",
+    ],
+)
+
 env.Library(
     target="lite_parsed_query",
     source=[
