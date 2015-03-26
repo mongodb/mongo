@@ -11,6 +11,7 @@ noinst_PROGRAMS = \
 	ex_config_parse \
 	ex_cursor \
 	ex_data_source \
+	ex_encrypt \
 	ex_extending \
 	ex_extractor \
 	ex_hello \
