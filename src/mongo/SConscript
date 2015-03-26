@@ -1072,8 +1072,6 @@ mongodOnlyFiles = [ "db/db.cpp", "db/mongod_options_init.cpp" ]
 
 # ----- TARGETS ------
 
-env.Library("gridfs", "client/gridfs.cpp")
-
 env.Library(
     target='coreserver',
     source=[
@@ -1172,8 +1170,7 @@ env.Install(
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
                               LIBDEPS=["mongocommon",
-                                       "defaultversion",
-                                       "gridfs"])
+                                       "defaultversion"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 # dbtests test binary options
@@ -1210,7 +1207,6 @@ test = env.Install(
                        "coreserver",
                        "coredb",
                        "testframework",
-                       "gridfs",
                        "signal_handlers_synchronous",
                        "s/upgrade",
                        "s/cluster_ops",
@@ -1252,7 +1248,6 @@ if darwin or env["_HAVEPCAP"]:
 
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
                                               LIBDEPS = [
-                                                 "gridfs",
                                                  "serveronly",
                                                  "coreserver",
                                                  "coredb",
