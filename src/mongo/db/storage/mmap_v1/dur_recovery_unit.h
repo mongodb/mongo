@@ -26,6 +26,9 @@
  *    it in the license file.
  */
 
+#include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
@@ -56,15 +59,32 @@ namespace mongo {
         //  The recovery unit takes ownership of change.
         virtual void registerChange(Change* change);
 
-        virtual void* writingPtr(void* data, size_t len);
+        virtual void* writingPtr(void* addr, size_t len);
 
         virtual void setRollbackWritesDisabled();
 
         virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+
     private:
+        /**
+         * Marks writes for journaling, if enabled, and then commits all other Changes in order.
+         * Returns with empty _initialWrites, _mergedWrites, _changes and _preimageBuffer, but
+         * does not reset the _rollbackWritesDisabled or _mustRollback flags. This leaves the
+         * RecoveryUnit ready for more changes that may be committed or rolled back.
+         */
         void commitChanges();
-        void pushChangesToDurSubSystem();
-        void rollbackInnermostChanges();
+
+        /**
+         * Creates a list of write intents to be journaled, and hands it of to the active
+         * DurabilityInterface.
+         */
+        void markWritesForJournaling();
+
+        /**
+         * Restores state by rolling back all writes using the saved pre-images, and then
+         * rolling back all other Changes in LIFO order. Resets internal state.
+         */
+        void rollbackChanges();
 
         bool inAUnitOfWork() const { return !_startOfUncommittedChangesForLevel.empty(); }
 
@@ -72,41 +92,96 @@ namespace mongo {
             return _startOfUncommittedChangesForLevel.size() == 1;
         }
 
-        bool haveUncommitedChangesAtCurrentLevel() const {
-            return _writes.size() > _startOfUncommittedChangesForLevel.back().writeIndex
+        /**
+         * If true, ending a unit of work will cause rollback. Ending a (possibly nested) unit of
+         * work without committing and without making any changes will not cause rollback.
+         */
+        bool haveUncommittedChangesAtCurrentLevel() const {
+            return _writeCount > _startOfUncommittedChangesForLevel.back().writeCount
                 || _changes.size() > _startOfUncommittedChangesForLevel.back().changeIndex;
         }
+
+        /**
+         * Version of writingPtr that checks existing writes for overlap and only stores those
+         * changes not yet covered by an existing write intent and pre-image.
+         */
+        void mergingWritingPtr(char* data, size_t len);
+
+        /**
+         * Reset to a clean state without any uncommitted changes or write.
+         */
+        void resetChanges();
 
         // Changes are ordered from oldest to newest.
         typedef OwnedPointerVector<Change> Changes;
         Changes _changes;
 
-        // These are memory writes inside the mmapv1 mmaped files. Writes are ordered from oldest to
-        // newest. Overlapping and duplicate regions are allowed, since rollback undoes changes in
-        // reverse order.
-        std::string _preimageBuffer;
-        struct Write {
-            Write(char* addr, int len, int offset) : addr(addr), len(len), offset(offset) {}
 
-            bool operator < (const Write& rhs) const { return addr < rhs.addr; }
+        // Number of pending uncommitted writes. Incremented even if new write is fully covered by
+        // existing writes.
+        size_t _writeCount;
+        // Total size of the pending uncommitted writes.
+        size_t _writeBytes;
+
+        /**
+         * These are memory writes inside the mmapv1 mmap-ed files. A pointer past the end is just
+         * instead of a pointer to the beginning for the benefit of MergedWrites.
+         */
+        struct Write {
+            Write(char* addr, int len, int offset) : addr(addr), len(len), offset(offset) { }
+            Write(const Write& rhs) : addr(rhs.addr), len(rhs.len), offset(rhs.offset) { }
+            Write() : addr(0), len(0), offset(0) { }
+            bool operator< (const Write& rhs) const { return addr < rhs.addr; }
+
+            struct compareEnd {
+                bool operator() (const Write& lhs, const Write& rhs) const {
+                    return lhs.addr + lhs.len <  rhs.addr + rhs.len;
+                }
+            };
+
+            char* end() const {
+                return addr + len;
+            }
 
             char* addr;
             int len;
-            int offset; // index into _preimageBuffer;
+            int offset; // index into _preimageBuffer
         };
-        typedef std::vector<Write> Writes;
-        Writes _writes;
 
-        // Indexes of the first uncommitted Change/Write in _changes/_writes for each nesting level.
-        // Index 0 in this vector is always the outermost transaction and back() is always the
-        // innermost. The size() is the current nesting level.
+        /**
+         * Writes are ordered by ending address, so MergedWrites::upper_bound() can find the first
+         * overlapping write, if any. Overlapping and duplicate regions are forbidden, as rollback
+         * of MergedChanges undoes changes by address rather than LIFO order. In addition, empty
+         * regions are not allowed. Storing writes by age does not work well for large indexed
+         * arrays, as coalescing is needed to bound the size of the preimage buffer.
+         */
+        typedef std::set<Write, Write::compareEnd> MergedWrites;
+        MergedWrites _mergedWrites;
+
+        // Generally it's more efficient to just store pre-images unconditionally and then
+        // sort/eliminate duplicates at commit time. However, this can lead to excessive memory
+        // use in cases involving large indexes arrays, where the same memory is written many
+        // times. To keep the speed for the general case and bound memory use, the first few MB of
+        // pre-images are stored unconditionally, but once the threshold has been exceeded, the
+        // remainder is stored in a more space-efficient datastructure.
+        typedef std::vector<Write> InitialWrites;
+        InitialWrites _initialWrites;
+
+        std::string _preimageBuffer;
+
+        // Index of the first uncommitted Change in _changes and number of writes for each nesting
+        // level. Store the number of writes as maintained in _writeCount rather than the sum of
+        // _initialWrites and _mergedWrites, as coalescing might otherwise result in
+        // haveUncommittedChangesAtCurrent level missing merged writes when determining if rollback
+        // is necessary. Index 0 in this vector is always the outermost transaction and back() is
+        // always the innermost. The size() is the current nesting level.
         struct Indexes {
-            Indexes(size_t changeIndex, size_t writeIndex)
+            Indexes(size_t changeIndex, size_t writeCount)
                 : changeIndex(changeIndex)
-                , writeIndex(writeIndex)
+                , writeCount(writeCount)
             {}
             size_t changeIndex;
-            size_t writeIndex;
+            size_t writeCount;
         };
         std::vector<Indexes> _startOfUncommittedChangesForLevel;
 
@@ -114,10 +189,10 @@ namespace mongo {
         // outermost WUOW rolls back it reverts to false.
         bool _mustRollback;
 
-        // Default is false.  
+        // Default is false.
         // If true, no preimages are tracked.  If rollback is subsequently attempted, the process
         // will abort.
-        bool _rollbackDisabled;
+        bool _rollbackWritesDisabled;
     };
 
 }  // namespace mongo
