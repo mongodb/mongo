@@ -30,6 +30,7 @@
 
 #include "mongo/pch.h"
 
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
@@ -280,14 +281,28 @@ namespace mongo {
 
         MessageServer * server = createServer( options , new MyMessageHandler() );
         server->setAsTimeTracker();
-        // we must setupSockets prior to logStartup() to avoid getting too high
-        // a file descriptor for our calls to select()
+
+        // We must setupSockets for both the main server and the web server (if enabled) prior to
+        // calling logStartup() in order to avoid getting too high of a file descriptor for our
+        // calls to select (see SERVER-17653).
         server->setupSockets();
+
+        boost::shared_ptr<DbWebServer> dbWebServer;
+        if (serverGlobalParams.isHttpInterfaceEnabled) {
+            dbWebServer.reset(new DbWebServer(serverGlobalParams.bind_ip,
+                                              serverGlobalParams.port + 1000,
+                                              new RestAdminAccess()));
+            dbWebServer->setupSockets();
+        }
 
         logStartup();
         startReplication();
-        if (serverGlobalParams.isHttpInterfaceEnabled)
-            boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
+
+        if (serverGlobalParams.isHttpInterfaceEnabled) {
+            invariant(dbWebServer);
+            boost::thread web(boost::bind(&webServerListenThread,  dbWebServer));
+            web.detach();
+        }
 
 #if(TESTEXHAUST)
         boost::thread thr(testExhaust);

@@ -53,7 +53,6 @@
 #include "mongo/util/admin_access.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/html.h"
-#include "mongo/util/net/miniwebserver.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version_reporting.h"
@@ -64,6 +63,25 @@ namespace mongo {
     using namespace mongoutils::html;
     using namespace bson;
 
+namespace {
+
+    void doUnlockedStuff(stringstream& ss) {
+        /* this is in the header already ss << "port:      " << port << '\n'; */
+        ss << "<pre>";
+        ss << mongodVersion() << '\n';
+        ss << "git hash: " << gitVersion() << '\n';
+        ss << openSSLVersion("OpenSSL version: ", "\n");
+        ss << "sys info: " << sysInfo() << '\n';
+        ss << "uptime: " << time(0) - serverGlobalParams.started << " seconds\n";
+        ss << "</pre>";
+    }
+
+
+    bool prisort(const Prioritizable * a, const Prioritizable * b) {
+        return a->priority() < b->priority();
+    }
+
+
     struct Timing {
         Timing() {
             start = timeLocked = 0;
@@ -71,340 +89,25 @@ namespace mongo {
         unsigned long long start, timeLocked;
     };
 
-    class DbWebServer : public MiniWebServer {
-    public:
-        DbWebServer(const string& ip, int port, const AdminAccess* webUsers)
-            : MiniWebServer("admin web console", ip, port), _webUsers(webUsers) {
-            WebStatusPlugin::initAll();
-        }
-
-    private:
-        const AdminAccess* _webUsers; // not owned here
-
-        void doUnlockedStuff(stringstream& ss) {
-            /* this is in the header already ss << "port:      " << port << '\n'; */
-            ss << "<pre>";
-            ss << mongodVersion() << '\n';
-            ss << "git hash: " << gitVersion() << '\n';
-            ss << openSSLVersion("OpenSSL version: ", "\n");
-            ss << "sys info: " << sysInfo() << '\n';
-            ss << "uptime: " << time(0)-serverGlobalParams.started << " seconds\n";
-            ss << "</pre>";
-        }
-
-        void _authorizePrincipal(const UserName& userName) {
-            Status status = cc().getAuthorizationSession()->addAndAuthorizeUser(userName);
-            uassertStatusOK(status);
-        }
-
-        bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
-            if ( from.isLocalHost() || !_webUsers->haveAdminUsers() ) {
-                // TODO(spencer): should the above check use "&&" not "||"?  Currently this is much
-                // more permissive than the server's localhost auth bypass.
-                cc().getAuthorizationSession()->grantInternalAuthorization();
-                return true;
-            }
-
-            string auth = getHeader( rq , "Authorization" );
-
-            if ( auth.size() > 0 && auth.find( "Digest " ) == 0 ) {
-                auth = auth.substr( 7 ) + ", ";
-
-                map<string,string> parms;
-                pcrecpp::StringPiece input( auth );
-
-                string name, val;
-                pcrecpp::RE re("(\\w+)=\"?(.*?)\"?,\\s*");
-                while ( re.Consume( &input, &name, &val) ) {
-                    parms[name] = val;
-                }
-
-                // Only users in the admin DB are visible by the webserver
-                UserName userName(parms["username"], "admin");
-                User* user;
-                AuthorizationManager& authzManager =
-                        cc().getAuthorizationSession()->getAuthorizationManager();
-                Status status = authzManager.acquireUser(userName, &user);
-                if (!status.isOK()) {
-                    if (status.code() != ErrorCodes::UserNotFound) {
-                        uasserted(17051, status.reason());
-                    }
-                } else {
-                    uassert(17090,
-                            "External users don't have a password",
-                            !user->getCredentials().isExternal);
-                    string ha1 = user->getCredentials().password;
-                    authzManager.releaseUser(user);
-                    string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
-
-                    stringstream r;
-                    r << ha1 << ':' << parms["nonce"];
-                    if ( parms["nc"].size() && parms["cnonce"].size() && parms["qop"].size() ) {
-                        r << ':';
-                        r << parms["nc"];
-                        r << ':';
-                        r << parms["cnonce"];
-                        r << ':';
-                        r << parms["qop"];
-                    }
-                    r << ':';
-                    r << ha2;
-                    string r1 = md5simpledigest( r.str() );
-
-                    if ( r1 == parms["response"] ) {
-                        _authorizePrincipal(userName);
-                        return true;
-                    }
-                }
-            }
-
-            stringstream authHeader;
-            authHeader
-                    << "WWW-Authenticate: "
-                    << "Digest realm=\"mongo\", "
-                    << "nonce=\"abc\", "
-                    << "algorithm=MD5, qop=\"auth\" "
-                    ;
-
-            headers.push_back( authHeader.str() );
-            return 0;
-        }
-
-        virtual void doRequest(
-            const char *rq, // the full request
-            string url,
-            // set these and return them:
-            string& responseMsg,
-            int& responseCode,
-            vector<string>& headers, // if completely empty, content-type: text/html will be added
-            const SockAddr &from
-        ) {
-            if ( url.size() > 1 ) {
-
-                if ( ! allowed( rq , headers, from ) ) {
-                    responseCode = 401;
-                    headers.push_back( "Content-Type: text/plain;charset=utf-8" );
-                    responseMsg = "not allowed\n";
-                    return;
-                }
-
-                {
-                    BSONObj params;
-                    const size_t pos = url.find( "?" );
-                    if ( pos != string::npos ) {
-                        MiniWebServer::parseParams( params , url.substr( pos + 1 ) );
-                        url = url.substr(0, pos);
-                    }
-
-                    DbWebHandler * handler = DbWebHandler::findHandler( url );
-                    if ( handler ) {
-                        if (handler->requiresREST(url) && !serverGlobalParams.rest) {
-                            _rejectREST( responseMsg , responseCode , headers );
-                        }
-                        else {
-                            string callback = params.getStringField("jsonp");
-                            uassert(13453, "server not started with --jsonp",
-                                    callback.empty() || serverGlobalParams.jsonp);
-
-                            handler->handle( rq , url , params , responseMsg , responseCode , headers , from );
-
-                            if (responseCode == 200 && !callback.empty()) {
-                                responseMsg = callback + '(' + responseMsg + ')';
-                            }
-                        }
-                        return;
-                    }
-                }
-
-
-                if (!serverGlobalParams.rest) {
-                    _rejectREST( responseMsg , responseCode , headers );
-                    return;
-                }
-
-                responseCode = 404;
-                headers.push_back( "Content-Type: text/html;charset=utf-8" );
-                responseMsg = "<html><body>unknown url</body></html>\n";
-                return;
-            }
-
-            // generate home page
-
-            if ( ! allowed( rq , headers, from ) ) {
-                responseCode = 401;
-                headers.push_back( "Content-Type: text/plain;charset=utf-8" );
-                responseMsg = "not allowed\n";
-                return;
-            }
-
-            responseCode = 200;
-            stringstream ss;
-            string dbname;
-            {
-                stringstream z;
-                z << serverGlobalParams.binaryName << ' ' << prettyHostName();
-                dbname = z.str();
-            }
-            ss << start(dbname) << h2(dbname);
-            ss << "<p><a href=\"/_commands\">List all commands</a> | \n";
-            ss << "<a href=\"/_replSet\">Replica set status</a></p>\n";
-
-            //ss << "<a href=\"/_status\">_status</a>";
-            {
-                const map<string, Command*> *m = Command::webCommands();
-                if( m ) {
-                    ss <<
-                       a("",
-                         "These read-only context-less commands can be executed from the web interface. "
-                         "Results are json format, unless ?text=1 is appended in which case the result is output as text "
-                         "for easier human viewing",
-                         "Commands")
-                       << ": ";
-                    for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) {
-                        stringstream h;
-                        i->second->help(h);
-                        string help = h.str();
-                        ss << "<a href=\"/" << i->first << "?text=1\"";
-                        if( help != "no help defined" )
-                            ss << " title=\"" << help << '"';
-                        ss << ">" << i->first << "</a> ";
-                    }
-                    ss << '\n';
-                }
-            }
-            ss << '\n';
-            /*
-                ss << "HTTP <a "
-                    "title=\"click for documentation on this http interface\""
-                    "href=\"http://dochub.mongodb.org/core/httpinterface\">admin port</a>:" << _port << "<p>\n";
-            */
-
-            doUnlockedStuff(ss);
-
-            WebStatusPlugin::runAll( ss );
-
-            ss << "</body></html>\n";
-            responseMsg = ss.str();
-            headers.push_back( "Content-Type: text/html;charset=utf-8" );
-        }
-
-        void _rejectREST( string& responseMsg , int& responseCode, vector<string>& headers ) {
-            responseCode = 403;
-            stringstream ss;
-            ss << "REST is not enabled.  use --rest to turn on.\n";
-            ss << "check that port " << _port << " is secured for the network too.\n";
-            responseMsg = ss.str();
-            headers.push_back( "Content-Type: text/plain;charset=utf-8" );
-        }
-
-    };
-    // ---
-
-    bool prisort( const Prioritizable * a , const Prioritizable * b ) {
-        return a->priority() < b->priority();
-    }
-
-    // -- status framework ---
-    WebStatusPlugin::WebStatusPlugin( const string& secionName , double priority , const string& subheader )
-        : Prioritizable(priority), _name( secionName ) , _subHeading( subheader ) {
-        if ( ! _plugins )
-            _plugins = new vector<WebStatusPlugin*>();
-        _plugins->push_back( this );
-    }
-
-    void WebStatusPlugin::initAll() {
-        if ( ! _plugins )
-            return;
-
-        sort( _plugins->begin(), _plugins->end() , prisort );
-
-        for ( unsigned i=0; i<_plugins->size(); i++ )
-            (*_plugins)[i]->init();
-    }
-
-    void WebStatusPlugin::runAll( stringstream& ss ) {
-        if ( ! _plugins )
-            return;
-
-        for ( unsigned i=0; i<_plugins->size(); i++ ) {
-            WebStatusPlugin * p = (*_plugins)[i];
-            ss << "<hr>\n"
-               << "<b>" << p->_name << "</b>";
-
-            ss << " " << p->_subHeading;
-
-            ss << "<br>\n";
-
-            p->run(ss);
-        }
-
-    }
-
-    vector<WebStatusPlugin*> * WebStatusPlugin::_plugins = 0;
-
-    // -- basic status plugins --
 
     class LogPlugin : public WebStatusPlugin {
     public:
-        LogPlugin() : WebStatusPlugin( "Log" , 100 ), _log(0) {
-            _log = RamLog::get( "global" );
+        LogPlugin()
+            : WebStatusPlugin("Log", 100),
+              _log(RamLog::get("global")) {
+
         }
 
         virtual void init() {}
 
-        virtual void run( stringstream& ss ) {
-            _log->toHTML( ss );
+        virtual void run(stringstream& ss) {
+            _log->toHTML(ss);
         }
-        RamLog * _log;
+
+    private:
+        RamLog* const _log;
     };
 
-    MONGO_INITIALIZER(WebStatusLogPlugin)(InitializerContext*) {
-        if (serverGlobalParams.isHttpInterfaceEnabled) {
-            new LogPlugin;
-        }
-        return Status::OK();
-    }
-
-    // -- handler framework ---
-
-    DbWebHandler::DbWebHandler( const string& name , double priority , bool requiresREST )
-        : Prioritizable(priority), _name(name) , _requiresREST(requiresREST) {
-
-        {
-            // setup strings
-            _defaultUrl = "/";
-            _defaultUrl += name;
-
-            stringstream ss;
-            ss << name << " priority: " << priority << " rest: " << requiresREST;
-            _toString = ss.str();
-        }
-
-        {
-            // add to handler list
-            if ( ! _handlers )
-                _handlers = new vector<DbWebHandler*>();
-            _handlers->push_back( this );
-            sort( _handlers->begin() , _handlers->end() , prisort );
-        }
-    }
-
-    DbWebHandler * DbWebHandler::findHandler( const string& url ) {
-        if ( ! _handlers )
-            return 0;
-
-        for ( unsigned i=0; i<_handlers->size(); i++ ) {
-            DbWebHandler * h = (*_handlers)[i];
-            if ( h->handles( url ) )
-                return h;
-        }
-
-        return 0;
-    }
-
-    vector<DbWebHandler*> * DbWebHandler::_handlers = 0;
-
-    // --- basic handlers ---
 
     class FavIconHandler : public DbWebHandler {
     public:
@@ -419,6 +122,7 @@ namespace mongo {
         }
 
     } faviconHandler;
+
 
     class StatusHandler : public DbWebHandler {
     public:
@@ -472,6 +176,7 @@ namespace mongo {
 
     } statusHandler;
 
+
     class CommandListHandler : public DbWebHandler {
     public:
         CommandListHandler() : DbWebHandler( "_commands" , 1 , true ) {}
@@ -497,6 +202,7 @@ namespace mongo {
             responseMsg = ss.str();
         }
     } commandListHandler;
+
 
     class CommandsHandler : public DbWebHandler {
     public:
@@ -560,15 +266,301 @@ namespace mongo {
 
     } commandsHandler;
 
-    // --- external ----
 
-    void webServerThread(const AdminAccess* adminAccess) {
-        boost::scoped_ptr<const AdminAccess> adminAccessPtr(adminAccess); // adminAccess is owned here
+    MONGO_INITIALIZER(WebStatusLogPlugin)(InitializerContext*) {
+        if (serverGlobalParams.isHttpInterfaceEnabled) {
+            new LogPlugin();
+        }
+        return Status::OK();
+    }
+
+} // namespace
+
+
+    DbWebServer::DbWebServer(const string& ip, int port, const AdminAccess* webUsers)
+            : MiniWebServer("admin web console", ip, port),
+              _webUsers(webUsers) {
+
+        WebStatusPlugin::initAll();
+    }
+
+    bool DbWebServer::_allowed(const char * rq, vector<string>& headers, const SockAddr &from) {
+        if ( from.isLocalHost() || !_webUsers->haveAdminUsers() ) {
+            // TODO(spencer): should the above check use "&&" not "||"?  Currently this is much
+            // more permissive than the server's localhost auth bypass.
+            cc().getAuthorizationSession()->grantInternalAuthorization();
+            return true;
+        }
+
+        string auth = getHeader( rq , "Authorization" );
+
+        if ( auth.size() > 0 && auth.find( "Digest " ) == 0 ) {
+            auth = auth.substr( 7 ) + ", ";
+
+            map<string,string> parms;
+            pcrecpp::StringPiece input( auth );
+
+            string name, val;
+            pcrecpp::RE re("(\\w+)=\"?(.*?)\"?,\\s*");
+            while ( re.Consume( &input, &name, &val) ) {
+                parms[name] = val;
+            }
+
+            // Only users in the admin DB are visible by the webserver
+            UserName userName(parms["username"], "admin");
+            User* user;
+            AuthorizationManager& authzManager =
+                    cc().getAuthorizationSession()->getAuthorizationManager();
+            Status status = authzManager.acquireUser(userName, &user);
+            if (!status.isOK()) {
+                if (status.code() != ErrorCodes::UserNotFound) {
+                    uasserted(17051, status.reason());
+                }
+            } else {
+                uassert(17090,
+                        "External users don't have a password",
+                        !user->getCredentials().isExternal);
+                string ha1 = user->getCredentials().password;
+                authzManager.releaseUser(user);
+                string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
+
+                stringstream r;
+                r << ha1 << ':' << parms["nonce"];
+                if ( parms["nc"].size() && parms["cnonce"].size() && parms["qop"].size() ) {
+                    r << ':';
+                    r << parms["nc"];
+                    r << ':';
+                    r << parms["cnonce"];
+                    r << ':';
+                    r << parms["qop"];
+                }
+                r << ':';
+                r << ha2;
+                string r1 = md5simpledigest( r.str() );
+
+                if ( r1 == parms["response"] ) {
+                    Status status = cc().getAuthorizationSession()->addAndAuthorizeUser(userName);
+                    uassertStatusOK(status);
+
+                    return true;
+                }
+            }
+        }
+
+        stringstream authHeader;
+        authHeader
+                << "WWW-Authenticate: "
+                << "Digest realm=\"mongo\", "
+                << "nonce=\"abc\", "
+                << "algorithm=MD5, qop=\"auth\" "
+                ;
+
+        headers.push_back( authHeader.str() );
+        return 0;
+    }
+
+    void DbWebServer::doRequest(const char *rq,
+                                string url,
+                                string& responseMsg,
+                                int& responseCode,
+                                vector<string>& headers,
+                                const SockAddr &from) {
+        if ( url.size() > 1 ) {
+
+            if (!_allowed(rq, headers, from)) {
+                responseCode = 401;
+                headers.push_back( "Content-Type: text/plain;charset=utf-8" );
+                responseMsg = "not allowed\n";
+                return;
+            }
+
+            {
+                BSONObj params;
+                const size_t pos = url.find( "?" );
+                if ( pos != string::npos ) {
+                    MiniWebServer::parseParams( params , url.substr( pos + 1 ) );
+                    url = url.substr(0, pos);
+                }
+
+                DbWebHandler * handler = DbWebHandler::findHandler( url );
+                if ( handler ) {
+                    if (handler->requiresREST(url) && !serverGlobalParams.rest) {
+                        _rejectREST( responseMsg , responseCode , headers );
+                    }
+                    else {
+                        string callback = params.getStringField("jsonp");
+                        uassert(13453, "server not started with --jsonp",
+                                callback.empty() || serverGlobalParams.jsonp);
+
+                        handler->handle( rq , url , params , responseMsg , responseCode , headers , from );
+
+                        if (responseCode == 200 && !callback.empty()) {
+                            responseMsg = callback + '(' + responseMsg + ')';
+                        }
+                    }
+                    return;
+                }
+            }
+
+
+            if (!serverGlobalParams.rest) {
+                _rejectREST( responseMsg , responseCode , headers );
+                return;
+            }
+
+            responseCode = 404;
+            headers.push_back( "Content-Type: text/html;charset=utf-8" );
+            responseMsg = "<html><body>unknown url</body></html>\n";
+            return;
+        }
+
+        // generate home page
+
+        if (!_allowed(rq, headers, from)) {
+            responseCode = 401;
+            headers.push_back( "Content-Type: text/plain;charset=utf-8" );
+            responseMsg = "not allowed\n";
+            return;
+        }
+
+        responseCode = 200;
+        stringstream ss;
+        string dbname;
+        {
+            stringstream z;
+            z << serverGlobalParams.binaryName << ' ' << prettyHostName();
+            dbname = z.str();
+        }
+        ss << start(dbname) << h2(dbname);
+        ss << "<p><a href=\"/_commands\">List all commands</a> | \n";
+        ss << "<a href=\"/_replSet\">Replica set status</a></p>\n";
+
+        //ss << "<a href=\"/_status\">_status</a>";
+        {
+            const map<string, Command*> *m = Command::webCommands();
+            if( m ) {
+                ss <<
+                    a("",
+                        "These read-only context-less commands can be executed from the web interface. "
+                        "Results are json format, unless ?text=1 is appended in which case the result is output as text "
+                        "for easier human viewing",
+                        "Commands")
+                    << ": ";
+                for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) {
+                    stringstream h;
+                    i->second->help(h);
+                    string help = h.str();
+                    ss << "<a href=\"/" << i->first << "?text=1\"";
+                    if( help != "no help defined" )
+                        ss << " title=\"" << help << '"';
+                    ss << ">" << i->first << "</a> ";
+                }
+                ss << '\n';
+            }
+        }
+        ss << '\n';
+
+        doUnlockedStuff(ss);
+
+        WebStatusPlugin::runAll( ss );
+
+        ss << "</body></html>\n";
+        responseMsg = ss.str();
+        headers.push_back( "Content-Type: text/html;charset=utf-8" );
+    }
+
+    void DbWebServer::_rejectREST(string& responseMsg,
+                                  int& responseCode,
+                                  vector<string>& headers) {
+        responseCode = 403;
+        stringstream ss;
+        ss << "REST is not enabled.  use --rest to turn on.\n";
+        ss << "check that port " << _port << " is secured for the network too.\n";
+        responseMsg = ss.str();
+        headers.push_back("Content-Type: text/plain;charset=utf-8");
+    }
+    
+
+    WebStatusPlugin::WebStatusPlugin( const string& secionName , double priority , const string& subheader )
+        : Prioritizable(priority), _name( secionName ) , _subHeading( subheader ) {
+        if ( ! _plugins )
+            _plugins = new vector<WebStatusPlugin*>();
+        _plugins->push_back( this );
+    }
+
+    void WebStatusPlugin::initAll() {
+        if ( ! _plugins )
+            return;
+
+        sort( _plugins->begin(), _plugins->end() , prisort );
+
+        for ( unsigned i=0; i<_plugins->size(); i++ )
+            (*_plugins)[i]->init();
+    }
+
+    void WebStatusPlugin::runAll( stringstream& ss ) {
+        if ( ! _plugins )
+            return;
+
+        for ( unsigned i=0; i<_plugins->size(); i++ ) {
+            WebStatusPlugin * p = (*_plugins)[i];
+            ss << "<hr>\n"
+               << "<b>" << p->_name << "</b>";
+
+            ss << " " << p->_subHeading;
+
+            ss << "<br>\n";
+
+            p->run(ss);
+        }
+
+    }
+
+    vector<WebStatusPlugin*> * WebStatusPlugin::_plugins = 0;
+
+    DbWebHandler::DbWebHandler( const string& name , double priority , bool requiresREST )
+        : Prioritizable(priority), _name(name) , _requiresREST(requiresREST) {
+
+        {
+            // setup strings
+            _defaultUrl = "/";
+            _defaultUrl += name;
+
+            stringstream ss;
+            ss << name << " priority: " << priority << " rest: " << requiresREST;
+            _toString = ss.str();
+        }
+
+        {
+            // add to handler list
+            if ( ! _handlers )
+                _handlers = new vector<DbWebHandler*>();
+            _handlers->push_back( this );
+            sort( _handlers->begin() , _handlers->end() , prisort );
+        }
+    }
+
+    DbWebHandler * DbWebHandler::findHandler( const string& url ) {
+        if ( ! _handlers )
+            return 0;
+
+        for ( unsigned i=0; i<_handlers->size(); i++ ) {
+            DbWebHandler * h = (*_handlers)[i];
+            if ( h->handles( url ) )
+                return h;
+        }
+
+        return 0;
+    }
+
+    vector<DbWebHandler*> * DbWebHandler::_handlers = 0;
+
+
+    void webServerListenThread(boost::shared_ptr<DbWebServer> dbWebServer) {
         Client::initThread("websvr");
-        const int p = serverGlobalParams.port + 1000;
-        DbWebServer mini(serverGlobalParams.bind_ip, p, adminAccessPtr.get());
-        mini.setupSockets();
-        mini.initAndListen();
+
+        dbWebServer->initAndListen();
+
         cc().shutdown();
     }
 

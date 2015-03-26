@@ -270,8 +270,15 @@ static bool runMongosServer( bool doUpgrade ) {
     mongo::signalForkSuccess();
 #endif
 
-    if (serverGlobalParams.isHttpInterfaceEnabled)
-        boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
+    if (serverGlobalParams.isHttpInterfaceEnabled) {
+        boost::shared_ptr<DbWebServer> dbWebServer(
+                          new DbWebServer(serverGlobalParams.bind_ip,
+                                          serverGlobalParams.port + 1000,
+                                          new NoAdminAccess()));
+        dbWebServer->setupSockets();
+        boost::thread web(boost::bind(&webServerListenThread, dbWebServer));
+        web.detach();
+    }
 
     Status status = getGlobalAuthorizationManager()->initialize();
     if (!status.isOK()) {

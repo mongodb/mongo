@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/util/admin_access.h"
+#include "mongo/util/net/miniwebserver.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
@@ -95,7 +96,29 @@ namespace mongo {
 
     };
 
-    void webServerThread( const AdminAccess* admins );
+    class DbWebServer : public MiniWebServer {
+    public:
+        DbWebServer(const std::string& ip, int port, const AdminAccess* webUsers);
+
+    private:
+        virtual void doRequest(const char *rq,
+                               std::string url,
+                               std::string& responseMsg,
+                               int& responseCode,
+                               std::vector<std::string>& headers,
+                               const SockAddr &from);
+
+        bool _allowed(const char* rq, std::vector<std::string>& headers, const SockAddr& from);
+        void _rejectREST(std::string& responseMsg,
+                         int& responseCode,
+                         std::vector<std::string>& headers);
+
+
+        // not owned here
+        const AdminAccess* _webUsers;
+    };
+
+    void webServerListenThread(boost::shared_ptr<DbWebServer> dbWebServer);
     string prettyHostName();
 
 };
