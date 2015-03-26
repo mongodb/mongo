@@ -570,6 +570,11 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 		WT_WITH_PAGE_INDEX(session,
 		    __split_verify_intl_key_order(session, child));
 #endif
+		/*
+		 * We have the parent locked, but there's nothing to prevent
+		 * this child from splitting beneath us; ensure that reading
+		 * the child's page index structure is safe.
+		 */
 		WT_ENTER_PAGE_INDEX(session);
 		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
 			/*
