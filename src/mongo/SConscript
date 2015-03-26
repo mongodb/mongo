@@ -1171,7 +1171,6 @@ env.Install(
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
                               LIBDEPS=["mongocommon",
                                        "defaultversion"])
-env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 # dbtests test binary options
 env.Library("framework_options", ["dbtests/framework_options.cpp"],
