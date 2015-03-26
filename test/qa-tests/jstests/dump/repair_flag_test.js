@@ -5,6 +5,11 @@ if (typeof getToolTest === 'undefined') {
 load('jstests/common/check_version.js');
 
 (function() {
+  // skip tests requiring wiredTiger storage engine, since repair is not supported
+  if (TestData && TestData.storageEngine === 'wiredTiger') {
+    return;
+  }
+
   resetDbpath('dump');
   var toolTest = getToolTest('repairFlagTest');
   var commonToolArgs = getCommonToolArguments();
