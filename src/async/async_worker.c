@@ -279,10 +279,10 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 }
 
 /*
- * __async_worker --
+ * __wt_async_worker --
  *	The async worker threads.
  */
-WT_THREAD_RET /* Quiet style.py */
+WT_THREAD_RET
 __wt_async_worker(void *arg)
 {
 	WT_ASYNC *async;

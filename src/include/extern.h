@@ -8,7 +8,7 @@ extern int __wt_async_flush(WT_SESSION_IMPL *session);
 extern int __wt_async_new_op(WT_SESSION_IMPL *session, const char *uri, const char *config, const char *cfg[], WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP_IMPL **opp);
 extern int __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op);
 extern int __wt_async_op_init(WT_SESSION_IMPL *session);
-extern WT_THREAD_RET /*Quiet style.py */ __wt_async_worker(void *arg);
+extern WT_THREAD_RET __wt_async_worker(void *arg);
 extern int __wt_block_addr_to_buffer(WT_BLOCK *block, uint8_t **pp, wt_off_t offset, uint32_t size, uint32_t cksum);
 extern int __wt_block_buffer_to_addr(WT_BLOCK *block, const uint8_t *p, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump);
 extern int __wt_block_addr_valid(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int live);
