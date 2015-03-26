@@ -361,8 +361,7 @@ err:	__wt_free(session, metaconf);
  *	Open the current btree handle.
  */
 static int
-__conn_btree_open(
-	WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+__conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
@@ -745,7 +744,8 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 	 * Kludge: interrupt the eviction server in case it is holding the
 	 * handle list lock.
 	 */
-	F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
+	if (!F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED))
+		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
 
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_DHANDLE_LOCK(session,

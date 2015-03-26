@@ -27,13 +27,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import check_scenarios
 
 # Test session.create with the exclusive configuration.
 class test_create_excl(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(type='file:')),
         ('table', dict(type='table:'))
-        ]
+    ])
 
     # Create the object with "exclusive", then assert that creation with
     # "exclusive" fails.

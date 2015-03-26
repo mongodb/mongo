@@ -156,8 +156,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			}
 
 			if (WT_PAGE_IS_INTERNAL(page)) {
-				internal_bytes +=
-				    page->memory_footprint;
+				internal_bytes += page->memory_footprint;
 				++internal_pages;
 			} else {
 				leaf_bytes += page->memory_footprint;

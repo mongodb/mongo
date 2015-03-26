@@ -14,14 +14,14 @@
  */
 int
 __wt_thread_create(WT_SESSION_IMPL *session,
-    wt_thread_t *tidret, void *(*func)(void *), void *arg)
+    wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg)
 {
 	/* Spawn a new thread of control. */
-	*tidret = CreateThread(NULL, 0, func, arg, 0, NULL);
-	if (*tidret != NULL)
+	*tidret = (HANDLE)_beginthreadex(NULL, 0, func, arg, 0, NULL);
+	if (*tidret != 0)
 		return (0);
 
-	WT_RET_MSG(session, __wt_errno(), "CreateThread");
+	WT_RET_MSG(session, errno, "_beginthreadex");
 }
 
 /*

@@ -31,15 +31,16 @@
 
 import wiredtiger, wttest
 from helper import key_populate, value_populate
+from wtscenario import check_scenarios
 
 # Check that verify and salvage both raise exceptions if there is an open
 # cursor.
 class test_bug006(wttest.WiredTigerTestCase):
     name = 'test_bug006'
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:')),
-    ]
+    ])
 
     def test_bug006(self):
         uri = self.uri + self.name

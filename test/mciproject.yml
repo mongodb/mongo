@@ -57,6 +57,21 @@ tasks:
 
             ${test_env_vars|} python ./test/suite/run.py -v 2
 
+  - name: compile-windows-alt
+    commands:
+      - func: "fetch source"
+      - command: git.apply_patch
+        params:
+          directory: wiredtiger
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100" wiredtiger.dll libwiredtiger.lib
+
 buildvariants:
 - name: ubuntu1404
   display_name: Ubuntu 14.04
@@ -89,6 +104,7 @@ buildvariants:
     smp_command: -j$(grep -c ^processor /proc/cpuinfo)
   tasks:
     - name: compile-windows
+    - name: compile-windows-alt
 
 - name: osx-108
   display_name: OS X 10.8

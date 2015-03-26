@@ -300,11 +300,11 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	if ((log_file = conn->stat_fp) == NULL ||
 	    path == NULL || strcmp(tmp->mem, path->mem) != 0) {
 		conn->stat_fp = NULL;
-		WT_RET(__wt_fclose(session, &log_file, 1));
+		WT_RET(__wt_fclose(session, &log_file, WT_FHANDLE_APPEND));
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
-		WT_RET(__wt_fopen(
-		    session, tmp->mem, "a", WT_FOPEN_FIXED, &log_file));
+		WT_RET(__wt_fopen(session,
+		    tmp->mem, WT_FHANDLE_APPEND, WT_FOPEN_FIXED, &log_file));
 	}
 	conn->stat_fp = log_file;
 
@@ -380,7 +380,7 @@ err:	__wt_scr_free(session, &tmp);
  * __statlog_server --
  *	The statistics server thread.
  */
-static void *
+static WT_THREAD_RET
 __statlog_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -419,7 +419,7 @@ err:		WT_PANIC_MSG(session, ret, "statistics log server error");
 	}
 	__wt_buf_free(session, &path);
 	__wt_buf_free(session, &tmp);
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -529,7 +529,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 	conn->stat_session = NULL;
 	conn->stat_tid_set = 0;
 	conn->stat_format = NULL;
-	WT_TRET(__wt_fclose(session, &conn->stat_fp, 1));
+	WT_TRET(__wt_fclose(session, &conn->stat_fp, WT_FHANDLE_APPEND));
 	conn->stat_path = NULL;
 	conn->stat_sources = NULL;
 	conn->stat_stamp = NULL;

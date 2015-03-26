@@ -78,7 +78,8 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist));
 	if (!exist)
 		return (0);
-	WT_RET(__wt_fopen(session, WT_METADATA_BACKUP, "r", 0, &fp));
+	WT_RET(__wt_fopen(session,
+	    WT_METADATA_BACKUP, WT_FHANDLE_READ, 0, &fp));
 
 	/* Read line pairs and load them into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 512, &key));
@@ -95,7 +96,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 
 	F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
-err:	WT_TRET(__wt_fclose(session, &fp, 0));
+err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_READ));
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &value);
 	return (ret);
@@ -235,7 +236,8 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	if (!exist)
 		return (strcmp(key, WT_METAFILE_URI) == 0 ?
 		    __metadata_config(session, valuep) : WT_NOTFOUND);
-	WT_RET(__wt_fopen(session, WT_METADATA_TURTLE, "r", 0, &fp));
+	WT_RET(__wt_fopen(session,
+	    WT_METADATA_TURTLE, WT_FHANDLE_READ, 0, &fp));
 
 	/* Search for the key. */
 	WT_ERR(__wt_scr_alloc(session, 512, &buf));
@@ -257,7 +259,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	/* Copy the value for the caller. */
 	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
-err:	WT_TRET(__wt_fclose(session, &fp, 0));
+err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_READ));
 	__wt_scr_free(session, &buf);
 	return (ret);
 }

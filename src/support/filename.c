@@ -104,7 +104,7 @@ __wt_sync_and_rename_fp(
 	*fpp = NULL;
 
 	/* Flush to disk and close the handle. */
-	WT_RET(__wt_fclose(session, &fp, 1));
+	WT_RET(__wt_fclose(session, &fp, WT_FHANDLE_WRITE));
 
 	/* Rename the source file to the target. */
 	WT_RET(__wt_rename(session, from, to));
