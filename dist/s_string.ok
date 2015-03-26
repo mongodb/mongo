@@ -423,6 +423,7 @@ autoheader
 bInheritHandle
 basecfg
 bdb
+beginthreadex
 bigram
 bitcnt
 bitfield
@@ -542,6 +543,7 @@ decl
 decr
 decrement
 decrementing
+deflateCopy
 deflateEnd
 deflateInit
 defno

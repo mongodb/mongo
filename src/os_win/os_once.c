@@ -19,6 +19,8 @@ BOOL CALLBACK _wt_init_once_callback(
     )
 {
 	void(*init_routine)(void) = Parameter;
+	WT_UNUSED(InitOnce);
+	WT_UNUSED(Context);
 
 	init_routine();
 

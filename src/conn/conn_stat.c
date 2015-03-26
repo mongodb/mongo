@@ -380,7 +380,7 @@ err:	__wt_scr_free(session, &tmp);
  * __statlog_server --
  *	The statistics server thread.
  */
-static void *
+static WT_THREAD_RET
 __statlog_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -419,7 +419,7 @@ err:		WT_PANIC_MSG(session, ret, "statistics log server error");
 	}
 	__wt_buf_free(session, &path);
 	__wt_buf_free(session, &tmp);
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
