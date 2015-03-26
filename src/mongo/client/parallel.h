@@ -1,5 +1,3 @@
-// parallel.h
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -40,7 +38,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/shard.h"
-#include "mongo/util/concurrency/mvar.h"
 
 namespace mongo {
 
@@ -403,7 +400,6 @@ namespace mongo {
                                                        DBClientBase * conn = 0,
                                                        bool useShardConn = false );
     };
-
 
 }
 

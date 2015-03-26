@@ -35,9 +35,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/parallel.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -49,7 +47,6 @@
 #include "mongo/db/commands/mr.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -797,13 +794,8 @@ namespace mongo {
                 }
 
             }
-        };
-        MONGO_INITIALIZER(RegisterCopyDBCommand)(InitializerContext* context) {
-            // Leaked intentionally: a Command registers itself when constructed.
-            // NOTE: this initializer block cannot be removed due to SERVER-9167
-            new CopyDBCmd();
-            return Status::OK();
-        }
+
+        } clusterCopyDBCmd;
 
         class CollectionStats : public PublicGridCommand {
         public:

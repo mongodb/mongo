@@ -37,15 +37,14 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"

@@ -46,7 +46,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(ShardedClientCursor);
     public:
         ShardedClientCursor( QueryMessage& q , ParallelSortClusteredCursor * cursor );
-        virtual ~ShardedClientCursor();
+        ~ShardedClientCursor();
 
         long long getId();
 
