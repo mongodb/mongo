@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/util/net/miniwebserver.h"
 #include "mongo/util/net/sock.h"
 
@@ -54,6 +55,7 @@ namespace mongo {
     };
 
     class DbWebHandler : public Prioritizable {
+        MONGO_DISALLOW_COPYING(DbWebHandler);
     public:
         DbWebHandler( const std::string& name , double priority , bool requiresREST );
         virtual ~DbWebHandler() {}
@@ -107,7 +109,7 @@ namespace mongo {
 
     class DbWebServer : public MiniWebServer {
     public:
-        DbWebServer(const std::string& ip, int port, const AdminAccess* webUsers);
+        DbWebServer(const std::string& ip, int port, AdminAccess* webUsers);
 
     private:
         virtual void doRequest(const char *rq,
@@ -127,8 +129,7 @@ namespace mongo {
                          std::vector<std::string>& headers);
 
 
-        // not owned here
-        const AdminAccess* _webUsers;
+        const boost::scoped_ptr<AdminAccess> _webUsers;
     };
 
     void webServerListenThread(boost::shared_ptr<DbWebServer> dbWebServer);
