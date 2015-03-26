@@ -33,6 +33,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		if ((ret =
 		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
 			continue;
+		WT_RET(ret);
 
 		/*
 		 * If there are no longer any references to the handle in any
@@ -54,7 +55,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
 	}
 
-	return (ret);
+	return (ret == EBUSY ? 0 : ret);
 }
 
 /*
@@ -112,6 +113,7 @@ __sweep(WT_SESSION_IMPL *session)
 		if ((ret =
 		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
 			continue;
+		WT_RET(ret);
 
 		/* Only sweep clean trees where all updates are visible. */
 		btree = dhandle->handle;
