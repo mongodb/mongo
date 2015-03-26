@@ -703,6 +703,7 @@ env.Library(
         'db/service_context_noop.cpp',
     ],
     LIBDEPS=[
+        'util/decorable',
          ])
 
 # Memory-mapped files support.  Used by mongod and some tools.
@@ -1138,6 +1139,7 @@ env.Library(
     ],
     LIBDEPS=[
         'mongocommon',
+        'util/decorable',
     ],
 )
 

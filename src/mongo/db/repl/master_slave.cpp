@@ -61,6 +61,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -381,7 +382,7 @@ namespace repl {
                 return appendCommandStatus(result, status);
             }
 
-            txn->getClient()->setRemoteID(handshake.getRid());
+            ReplClientInfo::forClient(txn->getClient()).setRemoteID(handshake.getRid());
 
             status = getGlobalReplicationCoordinator()->processHandshake(txn, handshake);
             return appendCommandStatus(result, status);

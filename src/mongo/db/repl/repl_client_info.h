@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,50 +26,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/query/query_yield.h"
-
-#include "mongo/db/curop.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/record_fetcher.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/optime.h"
+#include "mongo/db/client.h"
 
 namespace mongo {
 
-    // static
-    void QueryYield::yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher) {
-        // Things have to happen here in a specific order:
-        //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
-        //   2) Release lock mgr locks
-        //   3) Go to sleep
-        //   4) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
-        //   5) Reacquire lock mgr locks
+    class BSONObjBuilder;
+    class Client;
 
-        Locker* locker = txn->lockState();
+namespace repl {
 
-        Locker::LockSnapshot snapshot;
+    class ReplClientInfo {
+    public:
+        static const Client::Decoration<ReplClientInfo> forClient;
 
-        if (fetcher) {
-            fetcher->setup();
-        }
+        void setLastOp(OpTime op) { _lastOp = op; }
+        OpTime getLastOp() const { return _lastOp; }
 
-        // Nothing was unlocked, just return, yielding is pointless.
-        if (!locker->saveLockStateAndUnlock(&snapshot)) {
-            return;
-        }
+        // Only used for master/slave
+        void setRemoteID(OID rid) { _remoteId = rid; }
+        OID getRemoteID() const { return _remoteId; }
 
-        // Top-level locks are freed, release any potential low-level (storage engine-specific
-        // locks). If we are yielding, we are at a safe place to do so.
-        txn->recoveryUnit()->commitAndRestart();
+    private:
+        OpTime _lastOp = OpTime();
+        OID _remoteId = OID();
+    };
 
-        // Track the number of yields in CurOp.
-        txn->getCurOp()->yielded();
-
-        if (fetcher) {
-            fetcher->fetch();
-        }
-
-        locker->restoreLockState(snapshot);
-    }
-
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

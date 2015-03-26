@@ -64,7 +64,6 @@ namespace mongo {
         _desc(desc),
         _connectionId(),
         _inDirectClient(false),
-        _lastOp(0),
         _shutdown(false) {
     }
     Client::~Client() {}

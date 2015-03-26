@@ -33,10 +33,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
@@ -127,7 +128,13 @@ namespace mongo {
 
             // Always append lastOp and connectionId
             Client& c = *txn->getClient();
-            c.appendLastOp( result );
+            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+                repl::ReplicationCoordinator::modeReplSet) {
+                const OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
+                if (!lastOp.isNull()) {
+                    result.append("lastOp", lastOp);
+                }
+            }
 
             // for sharding; also useful in general for debugging
             result.appendNumber( "connectionId" , c.getConnectionId() );
@@ -144,7 +151,7 @@ namespace mongo {
             bool lastOpTimePresent = extracted != FieldParser::FIELD_NONE;
             if (!lastOpTimePresent) {
                 // Use the client opTime if no wOpTime is specified
-                lastOpTime = c.getLastOp();
+                lastOpTime = repl::ReplClientInfo::forClient(c).getLastOp();
             }
             
             OID electionId;

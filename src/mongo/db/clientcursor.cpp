@@ -47,6 +47,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/exit.h"
@@ -189,7 +190,7 @@ namespace mongo {
 
         Client* c = curop.getClient();
         verify(c);
-        OID rid = c->getRemoteID();
+        OID rid = repl::ReplClientInfo::forClient(c).getRemoteID();
         if (!rid.isSet())
             return;
 

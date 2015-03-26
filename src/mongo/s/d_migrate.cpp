@@ -70,6 +70,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
@@ -2200,7 +2201,8 @@ namespace mongo {
                             repl::ReplicationCoordinator::StatusAndDuration replStatus =
                                     repl::getGlobalReplicationCoordinator()->awaitReplication(
                                             txn,
-                                            txn->getClient()->getLastOp(),
+                                            repl::ReplClientInfo::forClient(
+                                                    txn->getClient()).getLastOp(),
                                             writeConcern);
                             if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
                                 warning() << "secondaryThrottle on, but doc insert timed out; "
@@ -2221,7 +2223,8 @@ namespace mongo {
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
-            OpTime lastOpApplied = txn->getClient()->getLastOp();
+
+            OpTime lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
 
             {
                 // 4. do bulk of mods
@@ -2436,7 +2439,7 @@ namespace mongo {
                                   false /* god */,
                                   true /* fromMigrate */);
 
-                    *lastOpApplied = txn->getClient()->getLastOp();
+                    *lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
                     didAnything = true;
                 }
             }
@@ -2472,7 +2475,7 @@ namespace mongo {
                     // We are in write lock here, so sure we aren't killing
                     Helpers::upsert( txn, ns , updatedDoc , true );
 
-                    *lastOpApplied = txn->getClient()->getLastOp();
+                    *lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
                     didAnything = true;
                 }
             }

@@ -61,6 +61,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -292,11 +293,10 @@ namespace {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( _localOplogCollection->insertDocument( txn, &writer, false ) );
 
-        txn->getClient()->setLastOp( slot.first );
+        ReplClientInfo::forClient(txn->getClient()).setLastOp( slot.first );
     }
 
-    OpTime writeOpsToOplog(OperationContext* txn,
-                           const std::deque<BSONObj>& ops) {
+    OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         OpTime lastOptime = replCoord->getMyLastOptime();
         invariant(!ops.empty());

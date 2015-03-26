@@ -31,6 +31,8 @@
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
 
@@ -47,7 +49,8 @@ namespace mongo {
      * They should converge slowly
      * The idea is this has the basic api so that not all code has to be duplicated
      */
-    class ClientBasic : boost::noncopyable {
+    class ClientBasic : public Decorable<ClientBasic> {
+        MONGO_DISALLOW_COPYING(ClientBasic);
     public:
         virtual ~ClientBasic();
         AuthenticationSession* getAuthenticationSession();

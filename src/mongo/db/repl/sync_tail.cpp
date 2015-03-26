@@ -52,6 +52,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/util/exit.h"
@@ -307,7 +308,7 @@ namespace repl {
         if (mustAwaitCommit) {
             txn->recoveryUnit()->awaitCommit();
         }
-        txn->getClient()->setLastOp(lastOpTime);
+        ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOpTime);
         replCoord->setMyLastOptime(lastOpTime);
         setNewOptime(lastOpTime);
 

@@ -50,6 +50,7 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -391,7 +392,7 @@ namespace {
         ops.push_back(lastOp);
 
         OpTime lastOptime = writeOpsToOplog(&txn, ops);
-        txn.getClient()->setLastOp(lastOptime);
+        ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
         replCoord->setMyLastOptime(lastOptime);
         setNewOptime(lastOptime);
 

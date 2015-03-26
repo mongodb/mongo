@@ -47,6 +47,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
@@ -185,8 +186,11 @@ namespace mongo {
             }
 
             WriteConcernResult res;
-            Status waitStatus = waitForWriteConcern(txn, txn->getClient()->getLastOp(), &res);
-            appendCommandWCStatus(result, waitStatus);
+            wcResult = waitForWriteConcern(
+                    txn,
+                    repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                    &res);
+            appendCommandWCStatus(result, wcResult.getStatus());
 
             return ok;
         }

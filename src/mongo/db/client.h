@@ -39,7 +39,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "mongo/bson/optime.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/lasterror.h"
@@ -103,14 +102,10 @@ namespace mongo {
         std::string clientAddress(bool includePort = false) const;
         CurOp* curop() const { return _curOp; }
         const std::string& desc() const { return _desc; }
-        void setLastOp(OpTime op) { _lastOp = op; }
-        OpTime getLastOp() const { return _lastOp; }
 
         // Return a reference to the Locker for this client. Client retains ownership.
         Locker* getLocker();
 
-        /* report what the last operation was.  used by getlasterror */
-        void appendLastOp(BSONObjBuilder& b) const;
         void reportState(BSONObjBuilder& builder);
 
         // Ensures stability of the client's OperationContext. When the client is locked,
@@ -127,10 +122,6 @@ namespace mongo {
         // TODO(spencer): SERVER-10228 SERVER-14779 Remove this/move it fully into OperationContext.
         bool isInDirectClient() const { return _inDirectClient; }
         void setInDirectClient(bool newVal) { _inDirectClient = newVal; }
-
-        // Only used for master/slave
-        void setRemoteID(const OID& rid) { _remoteId = rid; }
-        OID getRemoteID() const { return _remoteId; }
 
         ConnectionId getConnectionId() const { return _connectionId; }
         bool isFromUserConnection() const { return _connectionId > 0; }
@@ -165,12 +156,6 @@ namespace mongo {
         // By having Client, rather than the OperationContext, own the Locker, setup cost such as
         // allocating OS resources can be amortized over multiple operations.
         boost::scoped_ptr<Locker> _locker;
-
-        // Used by replication
-        OpTime _lastOp;
-
-        // Only used by master-slave
-        OID _remoteId;
 
         // Tracks if Client::shutdown() gets called (TODO: Is this necessary?)
         bool _shutdown;

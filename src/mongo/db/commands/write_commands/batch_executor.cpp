@@ -61,6 +61,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
@@ -251,7 +252,10 @@ namespace mongo {
             _txn->getCurOp()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
-            Status status = waitForWriteConcern( _txn, _txn->getClient()->getLastOp(), &res );
+            Status status = waitForWriteConcern(
+                    _txn,
+                    repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(),
+                    &res);
 
             if ( !status.isOK() ) {
                 wcError.reset( toWriteConcernError( status, res ) );
@@ -350,7 +354,8 @@ namespace mongo {
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
             const repl::ReplicationCoordinator::Mode replMode = replCoord->getReplicationMode();
             if (replMode != repl::ReplicationCoordinator::modeNone) {
-                response->setLastOp( _txn->getClient()->getLastOp() );
+                response->setLastOp(
+                        repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp());
                 if (replMode == repl::ReplicationCoordinator::modeReplSet) {
                     response->setElectionId(replCoord->getElectionId());
                 }

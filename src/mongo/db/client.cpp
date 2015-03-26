@@ -55,7 +55,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
@@ -86,7 +85,6 @@ namespace {
     }
 
 } // namespace
-
 
     boost::mutex Client::clientsMutex;
     ClientSet Client::clients;
@@ -131,7 +129,6 @@ namespace {
           _connectionId(p ? p->connectionId() : 0),
           _inDirectClient(false),
           _txn(NULL),
-          _lastOp(0),
           _shutdown(false) {
 
         _curOp = new CurOp( this );
@@ -173,14 +170,6 @@ namespace {
         }
 
         return _locker.get();
-    }
-
-    void Client::appendLastOp( BSONObjBuilder& b ) const {
-        // _lastOp is never set if replication is off
-        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet || !_lastOp.isNull()) {
-            b.appendTimestamp( "lastOp" , _lastOp.asDate() );
-        }
     }
 
     void Client::reportState(BSONObjBuilder& builder) {

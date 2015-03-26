@@ -74,6 +74,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repair_database.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
@@ -1554,7 +1555,10 @@ namespace mongo {
         // For commands from mongos, append some info to help getLastError(w) work.
         if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
                 shardingState.enabled()) {
-            appendGLEHelperData(result, txn->getClient()->getLastOp(), replCoord->getElectionId());
+            appendGLEHelperData(
+                    result,
+                    repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                    replCoord->getElectionId());
         }
         return;
     }
