@@ -980,7 +980,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) &&
+	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
 
@@ -1023,7 +1023,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 
 	/*
 	 * If the page was recently split in-memory, don't force it out: we
-	 * hope eviction will find it first.
+	 * hope an eviction thread will find it first.
 	 */
 	if (check_splits &&
 	    !__wt_txn_visible_all(session, mod->inmem_split_txn))

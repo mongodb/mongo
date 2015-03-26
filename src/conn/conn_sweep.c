@@ -51,6 +51,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 static int
 __sweep(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -83,15 +84,13 @@ __sweep(WT_SESSION_IMPL *session)
 
 		/*
 		 * We have a candidate for closing; if it's open, acquire an
-		 * exclusive lock on the handle and close it. We might be
-		 * blocking opens for a long time (over disk I/O), but the
-		 * handle was quiescent for awhile.
+		 * exclusive lock on the handle and close it.
 		 *
-		 * The close can fail if an update cannot be written (updates
-		 * in a no-longer-referenced file might not yet be globally
-		 * visible if sessions have disjoint sets of files open).  If
-		 * the handle is busy, skip it, we'll retry the close the next
-		 * time, after the transaction state has progressed.
+		 * The close would require I/O if an update cannot be written
+		 * (updates in a no-longer-referenced file might not yet be
+		 * globally visible if sessions have disjoint sets of files
+		 * open).  In that case, skip it: we'll retry the close the
+		 * next time, after the transaction state has progressed.
 		 *
 		 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want
 		 * opens to block on us rather than returning an EBUSY error to
@@ -101,10 +100,16 @@ __sweep(WT_SESSION_IMPL *session)
 		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
 			continue;
 
+		/* Only sweep clean trees where all updates are visible. */
+		btree = dhandle->handle;
+		if (btree->modified ||
+		    !__wt_txn_visible_all(session, btree->rec_max_txn))
+			goto unlock;
+
 		/* If the handle is open, try to close it. */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __wt_conn_btree_sync_and_close(session, 0));
+			WT_WITH_DHANDLE(session, dhandle, ret =
+			    __wt_conn_btree_sync_and_close(session, 0, 0));
 
 			/* We closed the btree handle, bump the statistic. */
 			if (ret == 0)
@@ -115,7 +120,7 @@ __sweep(WT_SESSION_IMPL *session)
 		if (dhandle->session_inuse == 0 && dhandle->session_ref == 0)
 			++closed_handles;
 
-		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+unlock:		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET_BUSY_OK(ret);
 	}
 
