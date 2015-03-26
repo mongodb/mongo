@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <stdio.h>
 
 #ifndef _WIN32
@@ -57,7 +59,7 @@
 
 namespace mongo {
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
     class SSLManagerInterface;
     class SSLConnection;
 #endif
@@ -255,7 +257,7 @@ namespace mongo {
             return _awaitingHandshake;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         /** secures inline 
          *  ssl - Pointer to the global SSLManager.
          *  remoteHost - The hostname of the remote server.
@@ -310,7 +312,7 @@ namespace mongo {
         long long _bytesOut;
         time_t _lastValidityCheckAtSecs;
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         boost::scoped_ptr<SSLConnection> _sslConnection;
         SSLManagerInterface* _sslManager;
 #endif

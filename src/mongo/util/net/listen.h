@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
@@ -118,7 +120,7 @@ namespace mongo {
         // Boolean that indicates whether this Listener is ready to accept incoming network requests
         bool _ready;
         
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         SSLManagerInterface* _ssl;
 #endif
         

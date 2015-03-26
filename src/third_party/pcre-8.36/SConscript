@@ -3,7 +3,7 @@
 Import("env windows solaris")
 
 env = env.Clone()
-env.Append( CPPDEFINES=[ "HAVE_CONFIG_H" ] )
+env.Append( CPPDEFINES=[ "HAVE_CONFIG_H", "SUPPORT_UTF8" ] )
 
 def removeIfPresent(lst, item):
     try:

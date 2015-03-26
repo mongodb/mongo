@@ -27,6 +27,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_manager.h"
@@ -52,7 +54,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
 #include <openssl/evp.h>
 #include <openssl/x509v3.h>
 #endif
@@ -63,7 +65,7 @@ namespace mongo {
 
     SSLGlobalParams sslGlobalParams;
 
-#ifndef MONGO_SSL   
+#ifndef MONGO_CONFIG_SSL   
     const std::string getSSLVersion(const std::string &prefix, const std::string &suffix) {
         return "";
     }
@@ -561,9 +563,9 @@ namespace mongo {
 
     void SSLManager::_setupFIPS() {
         // Turn on FIPS mode if requested.
-        // OPENSSL_FIPS must be defined by the OpenSSL headers, plus MONGO_SSL_FIPS
+        // OPENSSL_FIPS must be defined by the OpenSSL headers, plus MONGO_CONFIG_SSL_FIPS
         // must be defined via a MongoDB build flag.
-#if defined(OPENSSL_FIPS) && defined(MONGO_SSL_FIPS)
+#if defined(OPENSSL_FIPS) && defined(MONGO_CONFIG_SSL_FIPS)
         int status = FIPS_mode_set(1);
         if (!status) {
             severe() << "can't activate FIPS mode: " << 
@@ -1081,5 +1083,5 @@ namespace mongo {
         }
         throw SocketException(SocketException::CONNECT_ERROR, "");
     }
-#endif // #ifdef MONGO_SSL
+#endif // #ifdef MONGO_CONFIG_SSL
 }

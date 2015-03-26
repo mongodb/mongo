@@ -307,15 +307,13 @@ namespace mongo {
     */
 #define MONGO_dassert(x) if (kDebugBuild) invariant(x)
 
-#ifdef MONGO_EXPOSE_MACROS
-# define dassert MONGO_dassert
-# define verify(expression) MONGO_verify(expression)
-# define invariant MONGO_invariant
-# define invariantOK MONGO_invariantOK
-# define uassert MONGO_uassert
-# define wassert MONGO_wassert
-# define massert MONGO_massert
-#endif
+#define dassert MONGO_dassert
+#define verify(expression) MONGO_verify(expression)
+#define invariant MONGO_invariant
+#define invariantOK MONGO_invariantOK
+#define uassert MONGO_uassert
+#define wassert MONGO_wassert
+#define massert MONGO_massert
 
     // some special ids that we want to duplicate
 

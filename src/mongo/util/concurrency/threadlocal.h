@@ -28,6 +28,8 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/config.h"
+
 #include <boost/thread/tss.hpp>
 
 namespace mongo { 
@@ -82,7 +84,7 @@ namespace mongo {
        a combination here, with the assumption that reset's are infrequent, so that 
        get's are fast.
     */
-#if defined(MONGO_HAVE___THREAD) || defined(MONGO_HAVE___DECLSPEC_THREAD)
+#if defined(MONGO_CONFIG_HAVE___THREAD) || defined(MONGO_CONFIG_HAVE___DECLSPEC_THREAD)
         
     template< class T >
     struct TSP {
@@ -98,7 +100,7 @@ namespace mongo {
         }
     };
 
-# if defined(MONGO_HAVE___DECLSPEC_THREAD)
+# if defined(MONGO_CONFIG_HAVE___DECLSPEC_THREAD)
 
 #  define TSP_DECLARE(T,p) extern TSP<T> p;
 

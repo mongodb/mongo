@@ -39,7 +39,6 @@
 
 #include "mongo/bson/inline_decls.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/heapcheck.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/time_support.h"
 

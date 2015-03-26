@@ -456,8 +456,6 @@ namespace mongo {
             env[0] = NULL;
             env[1] = NULL;
 
-            bool isMongos = ( _argv[0].find( "mongos" ) != string::npos );
-
             pid_t nativePid = fork();
             _pid = ProcessId::fromNative(nativePid);
             // Async signal unsafe functions should not be called in the child process.
@@ -472,18 +470,6 @@ namespace mongo {
                     // Async signal unsafe code reporting a terminal error condition.
                     cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
                     quickExit(-1); //do not pass go, do not call atexit handlers
-                }
-
-                // Heap-check for mongos only. 'argv[0]' must be in the path format.
-                if ( isMongos ) {
-#if defined(HEAP_CHECKING)
-                    env[0] = "HEAPCHECK=normal";
-                    env[1] = NULL;
-
-                    // NOTE execve is async signal safe, but it is not clear that execvpe is async
-                    // signal safe.
-                    execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
-#endif // HEAP_CHECKING
                 }
 
                 // NOTE execve is async signal safe, but it is not clear that execvp is async

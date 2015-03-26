@@ -49,7 +49,7 @@ if 'enterprise' in env['MONGO_MODULES']:
   upgrade_code = 'E7FE8DF3-00F1-4434-97DF-2721E7F712FA'
 # Community
 else:
-  if 'MONGO_SSL' in env['CPPDEFINES']:
+  if has_option('ssl'):
     msi_edition = 'SSL'
   else:
     msi_edition = 'Standard'

@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/listen.h"
@@ -126,7 +128,7 @@ namespace mongo {
     Listener::Listener(const string& name, const string &ip, int port, bool logConnect ) 
         : _port(port), _name(name), _ip(ip), _setupSocketsSuccessful(false),
           _logConnect(logConnect), _elapsedTime(0) {
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         _ssl = getSSLManager();
 #endif
     }
@@ -240,7 +242,7 @@ namespace mongo {
             return;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         _logListen(_port, _ssl);
 #else
         _logListen(_port, false);
@@ -340,7 +342,7 @@ namespace mongo {
                 }
                 
                 boost::shared_ptr<Socket> pnewSock( new Socket(s, from) );
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
                 if (_ssl) {
                     pnewSock->secureAccepted(_ssl);
                 }
@@ -415,7 +417,7 @@ namespace mongo {
             ListeningSockets::get()->add(_socks[i]);
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         _logListen(_port, _ssl);
 #else
         _logListen(_port, false);
@@ -557,7 +559,7 @@ namespace mongo {
             }
             
             boost::shared_ptr<Socket> pnewSock( new Socket(s, from) );
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             if (_ssl) {
                 pnewSock->secureAccepted(_ssl);
             }

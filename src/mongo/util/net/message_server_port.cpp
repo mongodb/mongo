@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include <boost/scoped_ptr.hpp>
@@ -254,7 +256,7 @@ namespace {
             }
 
             // Normal disconnect path.
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             SSLManagerInterface* manager = getSSLManager();
             if (manager)
                 manager->cleanupThreadLocals();

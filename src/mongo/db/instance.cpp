@@ -89,7 +89,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
-#include "mongo/util/gcov.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/quick_exit.h"
@@ -1277,8 +1276,6 @@ namespace {
     }
 
     NOINLINE_DECL void dbexit( ExitCode rc, const char *why ) {
-        flushForGcov();
-
         audit::logShutdown(currentClient.get());
 
         log(LogComponent::kControl) << "dbexit: " << why << " rc: " << rc;

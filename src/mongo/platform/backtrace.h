@@ -27,8 +27,10 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #if !defined(_WIN32)
-#if defined(__sun) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
+#if defined(__sun) || !defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
 namespace mongo {
     namespace pal {

@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 
@@ -1377,7 +1379,7 @@ namespace mongo {
         static AtomicInt32 _numConnections;
         static bool _lazyKillCursor; // lazy means we piggy back kill cursors on next op
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         SSLManagerInterface* sslManager();
 #endif
     };

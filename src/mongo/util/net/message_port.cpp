@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/message_port.h"
@@ -201,7 +203,7 @@ again:
             }
             // If responseTo is not 0 or -1 for first packet assume SSL
             else if (psock->isAwaitingHandshake()) {
-#ifndef MONGO_SSL
+#ifndef MONGO_CONFIG_SSL
                 if (header.constView().getResponseTo() != 0
                  && header.constView().getResponseTo() != -1) {
                     uasserted(17133,
@@ -220,7 +222,7 @@ again:
                 }
                 uassert(17189, "The server is configured to only allow SSL connections",
                         sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_requireSSL);
-#endif // MONGO_SSL
+#endif // MONGO_CONFIG_SSL
             }
             if ( static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
                  static_cast<size_t>(len) > MaxMessageSizeBytes ) {

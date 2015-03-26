@@ -27,9 +27,11 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <string>
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
@@ -39,7 +41,7 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#endif // #ifdef MONGO_SSL
+#endif // #ifdef MONGO_CONFIG_SSL
 
 namespace mongo {
     /*
@@ -48,7 +50,7 @@ namespace mongo {
     const std::string getSSLVersion(const std::string &prefix, const std::string &suffix); 
 }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
 namespace mongo {
 
     class SSLConnection {
@@ -149,4 +151,4 @@ namespace mongo {
 
     extern bool isSSLServer;
 }
-#endif // #ifdef MONGO_SSL
+#endif // #ifdef MONGO_CONFIG_SSL

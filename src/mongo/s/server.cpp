@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/server.h"
@@ -76,7 +78,6 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/gcov.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_server.h"
@@ -417,7 +418,7 @@ MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     return Status::OK();
 }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, 
                           MONGO_NO_PREREQUISITES, 
                           ("SSLManager"))(InitializerContext* context) {
@@ -514,6 +515,5 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
     log() << "dbexit: " << why
           << " rc:" << rc
           << endl;
-    flushForGcov();
     quickExit(rc);
 }

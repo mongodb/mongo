@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2014 MongoDB Inc.
+*    Copyright (C) 2015 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,41 +26,41 @@
 *    it in the license file.
 */
 
-#include "mongo/config.h"
+#pragma once
 
-#include "mongo/platform/basic.h"
+// Define to target byte order (1234 vs 4321)
+@mongo_config_byte_order@
 
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
-#include <unistd.h>
-#endif
+// Defined if __declspec(thread) is available
+@mongo_config_have___declspec_thread@
 
-// This will probably get us _exit on non-unistd platforms like Windows.
-#include <cstdlib>
+// Defined if GCC thread-local storage is available
+@mongo_config_have___thread@
 
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif
+// Defined if execinfo.h and backtrace are available
+@mongo_config_have_execinfo_backtrace@
 
-#if __has_feature(address_sanitizer)
-#include <sanitizer/lsan_interface.h>
-#endif
+// Defined if unitstd.h is available
+@mongo_config_have_header_unistd_h@
 
-#ifdef MONGO_GCOV
-extern "C" void __gcov_flush();
-#endif
+// Defined if a POSIX monotonic clock is available
+@mongo_config_have_posix_monotonic_clock@
 
-namespace mongo {
+// Defined if std::is_trivially_copyable is available
+@mongo_config_have_std_is_trivially_copyable@
 
-    void quickExit(int code) {
-#ifdef MONGO_GCOV
-        __gcov_flush();
-#endif
+// Defined if std::make_unique is available
+@mongo_config_have_std_make_unique@
 
-#if __has_feature(address_sanitizer)
-        __lsan_do_leak_check();
-#endif
+// Defined if building an optimized build
+@mongo_config_optimized_build@
 
-        ::_exit(code);
-    }
+// Defined if SSL support is enabled
+@mongo_config_ssl@
 
-} // namespace mongo
+// Defined if SSL FIPS mode is enabled
+@mongo_config_ssl_fips@
+
+// Defined if gdbserver support is enabled
+@mongo_config_use_gdbserver@
+

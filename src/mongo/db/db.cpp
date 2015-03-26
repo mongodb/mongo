@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
@@ -820,7 +822,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnviro
     return Status::OK();
 }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, 
                           MONGO_NO_PREREQUISITES, 
                           ("SSLManager"))(InitializerContext* context) {

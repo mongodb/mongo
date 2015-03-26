@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/config.h"
+
 #include <cmath>
 
 #include "mongo/platform/basic.h"
@@ -619,7 +621,7 @@ TEST(KeyStringTest, AllPermCompare) {
 
 TEST(KeyStringTest, AllPerm2Compare) {
     // This test can take over a minute without optimizations. Re-enable if you need to debug it.
-#if !defined(MONGO_OPTIMIZED_BUILD)
+#if !defined(MONGO_CONFIG_OPTIMIZED_BUILD)
     log() << "\t\t\tskipping test on non-optimized build";
     return;
 #endif

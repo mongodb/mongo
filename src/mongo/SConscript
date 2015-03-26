@@ -367,6 +367,33 @@ buildInfo = env.Substfile(
     ])
 env.NoCache(buildInfo)
 
+config_header_substs = (
+    ('@mongo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
+    ('@mongo_config_have___declspec_thread@', 'MONGO_CONFIG_HAVE___DECLSPEC_THREAD'),
+    ('@mongo_config_have___thread@', 'MONGO_CONFIG_HAVE___THREAD'),
+    ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
+    ('@mongo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
+    ('@mongo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
+    ('@mongo_config_have_std_is_trivially_copyable@', 'MONGO_CONFIG_HAVE_STD_IS_TRIVIALLY_COPYABLE'),
+    ('@mongo_config_have_std_make_unique@', 'MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
+    ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
+    ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
+    ('@mongo_config_ssl_fips@', 'MONGO_CONFIG_SSL_FIPS'),
+    ('@mongo_config_use_gdbserver@', 'MONGO_CONFIG_USE_GDBSERVER'),
+)
+
+def makeConfigHeaderDefine(self, key):
+    val = "// #undef {0}".format(key)
+    if key in self['CONFIG_HEADER_DEFINES']:
+        val = "#define {0} {1}".format(key, self['CONFIG_HEADER_DEFINES'][key])
+    return val
+env.AddMethod(makeConfigHeaderDefine)
+
+configHeaderFile = env.Substfile(
+    'config.h.in',
+    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
+)
+
 versionFile = env.Substfile(
     'util/version.cpp.in',
     SUBST_DICT=[
@@ -827,7 +854,10 @@ env.Library('stacktrace',
                      'version',
                      '$BUILD_DIR/mongo/base/base'])
 
-env.Library(target='quick_exit',
+quick_exit_env = env.Clone()
+if has_option('gcov'):
+    quick_exit_env.Append(CPPDEFINES=['MONGO_GCOV'])
+quick_exit_env.Library(target='quick_exit',
             source=[
                 'util/quick_exit.cpp',
             ])
@@ -1284,7 +1314,10 @@ env.JSHeader(
              ])
 
 if not has_option('noshell') and usev8:
-    env.Library("shell_core",
+    shell_core_env = env.Clone()
+    if has_option("safeshell"):
+        shell_core_env.Append(CPPDEFINES=["MONGO_SAFE_SHELL"])
+    shell_core_env.Library("shell_core",
                 source=[
                     "shell/bench.cpp",
                     "shell/clientAndShell.cpp",
@@ -1306,7 +1339,7 @@ if not has_option('noshell') and usev8:
                 ])
 
     # mongo shell options
-    env.Library("shell_options", ["shell/shell_options.cpp"],
+    shell_core_env.Library("shell_options", ["shell/shell_options.cpp"],
                 LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser_init'])
 
     shellEnv = env.Clone()

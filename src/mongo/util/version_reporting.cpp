@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/version_reporting.h"
@@ -59,7 +61,7 @@ namespace mongo {
     }
 
     void printOpenSSLVersion() {
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         log() << openSSLVersion("OpenSSL version: ") << endl;
 #endif
     }

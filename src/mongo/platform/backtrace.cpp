@@ -25,8 +25,10 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/config.h"
+
 #if !defined(_WIN32)
-#if defined(__sun) || !defined(MONGO_HAVE_EXECINFO_BACKTRACE)
+#if defined(__sun) || !defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
 #include "mongo/platform/backtrace.h"
 

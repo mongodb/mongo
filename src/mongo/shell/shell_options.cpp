@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/config.h"
+
 #include "mongo/shell/shell_options.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -107,7 +109,7 @@ namespace mongo {
                 "enable IPv6 support (disabled by default)");
 
         Status ret = Status::OK();
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         ret = addSSLClientOptions(options);
         if (!ret.isOK()) {
             return ret;
@@ -184,7 +186,7 @@ namespace mongo {
         if (params.count("quiet")) {
             mongo::serverGlobalParams.quiet = true;
         }
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         Status ret = storeSSLClientOptions(params);
         if (!ret.isOK()) {
             return ret;
@@ -313,7 +315,7 @@ namespace mongo {
     }
 
     Status validateMongoShellOptions(const moe::Environment& params) {
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         Status ret = validateSSLMongoShellOptions(params);
         if (!ret.isOK()) {
             return ret;

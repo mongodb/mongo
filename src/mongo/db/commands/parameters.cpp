@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include <set>
@@ -454,7 +456,7 @@ namespace mongo {
             }
 
             virtual Status setFromString(const std::string& str) {
-#ifndef MONGO_SSL
+#ifndef MONGO_CONFIG_SSL
                 return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
                                 "Unable to set sslMode, SSL support is not compiled into server");
 #endif
@@ -522,7 +524,7 @@ namespace mongo {
             }
 
             virtual Status setFromString(const std::string& str) {
-#ifndef MONGO_SSL
+#ifndef MONGO_CONFIG_SSL
                 return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
                                 "Unable to set clusterAuthMode, " <<
                                 "SSL support is not compiled into server");
@@ -546,7 +548,7 @@ namespace mongo {
                     }
                     serverGlobalParams.clusterAuthMode.store
                         (ServerGlobalParams::ClusterAuthMode_sendX509);
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
                     setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << 
                                               "MONGODB-X509" <<
                                               saslCommandUserDBFieldName << "$external" <<

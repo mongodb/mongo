@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/mongos_options.h"
@@ -72,7 +74,7 @@ namespace mongo {
         }
 #endif
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         moe::OptionSection ssl_options("SSL options");
 
         ret = addSSLServerOptions(&ssl_options);
@@ -116,7 +118,7 @@ namespace mongo {
 
         options->addSection(sharding_options);
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         options->addSection(ssl_options);
 #endif
 
@@ -177,7 +179,7 @@ namespace mongo {
             return ret;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         ret = canonicalizeSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;

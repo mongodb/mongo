@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -399,7 +401,7 @@ namespace mongo {
                                "\"createUser\" command requires a \"roles\" array"));
             }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             if (args.userName.getDB() == "$external" &&
                 getSSLManager() &&
                 getSSLManager()->getSSLConfiguration()

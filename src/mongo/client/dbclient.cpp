@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/util/bson_extract.h"
@@ -631,7 +633,7 @@ namespace mongo {
                     result.toString(),
                     _authMongoCR(db, user, password, &result, digestPassword));
         }
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         else if (mechanism == StringData("MONGODB-X509", StringData::LiteralTag())){
             std::string db;
             if (params.hasField(saslCommandUserSourceFieldName)) {
@@ -1073,7 +1075,7 @@ namespace mongo {
             LOG( 1 ) << "connected to server " << toString() << endl;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         int sslModeVal = sslGlobalParams.sslMode.load();
         if (sslModeVal == SSLGlobalParams::SSLMode_preferSSL ||
             sslModeVal == SSLGlobalParams::SSLMode_requireSSL) {
@@ -1653,7 +1655,7 @@ namespace mongo {
             say(m);
     }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
     static SimpleMutex s_mtx("SSLManager");
     static SSLManagerInterface* s_sslMgr(NULL);
 

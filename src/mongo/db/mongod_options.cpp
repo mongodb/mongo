@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
+#include "mongo/config.h"
+
 #include "mongo/db/mongod_options.h"
 
 #include <boost/filesystem.hpp>
@@ -82,7 +84,7 @@ namespace mongo {
         }
 #endif
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         moe::OptionSection ssl_options("SSL options");
 
         ret = addSSLServerOptions(&ssl_options);
@@ -418,7 +420,7 @@ namespace mongo {
         options->addSection(ms_options);
         options->addSection(rs_options);
         options->addSection(sharding_options);
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         options->addSection(ssl_options);
 #endif
         options->addSection(storage_options);
@@ -628,7 +630,7 @@ namespace mongo {
             return ret;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         ret = canonicalizeSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;

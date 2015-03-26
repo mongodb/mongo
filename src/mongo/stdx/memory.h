@@ -28,7 +28,9 @@
 
 #pragma once
 
-#if defined(MONGO_HAVE_STD_MAKE_UNIQUE)
+#include "mongo/config.h"
+
+#if defined(MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE)
 
 #include <memory>
 

@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/authentication_commands.h"
@@ -206,7 +208,7 @@ namespace mongo {
         if (mechanism == "MONGODB-CR") {
             return _authenticateCR(txn, user, cmdObj);
         }
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         if (mechanism == "MONGODB-X509") {
             return _authenticateX509(txn, user, cmdObj);
         }
@@ -304,7 +306,7 @@ namespace mongo {
         return Status::OK();
     }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
     void canonicalizeClusterDN(std::vector<std::string>* dn) {
         // remove all RDNs we don't care about
         for (size_t i=0; i<dn->size(); i++) {

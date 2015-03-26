@@ -252,7 +252,6 @@ else:
 add_option( "allocator" , "allocator to use (tcmalloc or system)" , 1 , True,
             default=defaultAllocator )
 add_option( "gdbserver" , "build in gdb server support" , 0 , True )
-add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 add_option( "gcov" , "compile with flags for gcov" , 0 , True )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
@@ -406,7 +405,8 @@ env_vars.Add('CFLAGS',
 
 env_vars.Add('CPPDEFINES',
     help='Sets pre-processor definitions for C and C++',
-    converter=variable_shlex_converter)
+    converter=variable_shlex_converter,
+    default=[])
 
 env_vars.Add('CPPPATH',
     help='Adds paths to the preprocessor search path',
@@ -581,6 +581,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                INSTALL_DIR=installDir,
                MONGO_GIT_VERSION=utils.getGitVersion(),
                MONGO_CODE_VERSION=getMongoCodeVersion(),
+               CONFIG_HEADER_DEFINES={},
                )
 
 env = Environment(variables=env_vars, **envDict)
@@ -594,6 +595,10 @@ unknown_vars = env_vars.UnknownVariables()
 if unknown_vars:
     print "Unknown variables specified: {0}".format(", ".join(unknown_vars.keys()))
     Exit(1)
+
+def set_config_header_define(env, varname, varval = 1):
+    env['CONFIG_HEADER_DEFINES'][varname] = varval
+env.AddMethod(set_config_header_define, 'SetConfigHeaderDefine')
 
 if has_option( "cc-use-shell-environment" ) and has_option( "cc" ):
     print("Cannot specify both --cc-use-shell-environment and --cc")
@@ -756,7 +761,7 @@ if has_option("cache"):
     env.CacheDir(str(env.Dir(cacheDir)))
 
 if optBuild:
-    env.Append( CPPDEFINES=["MONGO_OPTIMIZED_BUILD"] )
+    env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
 if has_option("propagate-shell-environment"):
     env['ENV'] = dict(os.environ);
@@ -782,9 +787,9 @@ if endian == "auto":
     endian = sys.byteorder
 
 if endian == "little":
-    env.Append( CPPDEFINES=[("MONGO_BYTE_ORDER", "1234")] )
+    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "1234")
 elif endian == "big":
-    env.Append( CPPDEFINES=[("MONGO_BYTE_ORDER", "4321")] )
+    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "4321")
 
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
 
@@ -825,14 +830,6 @@ elif env['PYSYSPLATFORM'] == 'darwin':
 elif env['PYSYSPLATFORM'].startswith('sunos'):
     env['LINK_LIBGROUP_START'] = '-z rescan'
     env['LINK_LIBGROUP_END'] = ''
-
-env.Prepend( CPPDEFINES=[ "MONGO_EXPOSE_MACROS" ,
-                          "PCRE_STATIC",  # for pcre on Windows
-                          "SUPPORT_UTF8" ],  # for pcre
-)
-
-if has_option( "safeshell" ):
-    env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
 
 if has_option( "durableDefaultOn" ):
     env.Append( CPPDEFINES=[ "_DURABLEDEFAULTON" ] )
@@ -876,6 +873,12 @@ elif windows:
     else:
         print("NOTE: Tool configuration did not find 'cl' compiler, falling back to os environment")
         env['ENV'] = dict(os.environ)
+
+    env.Append(CPPDEFINES=[
+    # This tells the Windows compiler not to link against the .lib files
+    # and to use boost as a bunch of header-only libraries
+        "BOOST_ALL_NO_LIB",
+    ])
 
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
@@ -1016,7 +1019,6 @@ if nix:
         if not has_option("disable-warnings-as-errors"):
             env.Append( CCFLAGS=["-Werror"] )
 
-    env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
     env.Append( LINKFLAGS=["-fPIC", "-pthread"] )
 
@@ -1046,7 +1048,6 @@ if nix:
 
     if linux and has_option( "gcov" ):
         env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
-        env.Append( CPPDEFINES=["MONGO_GCOV"] )
         env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
 
     if optBuild:
@@ -1063,7 +1064,7 @@ if nix:
         env.Append( CPPDEFINES=["_DEBUG"] );
 
 if has_option( "ssl" ):
-    env.Append( CPPDEFINES=["MONGO_SSL"] )
+    env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
     env.Append( MONGO_CRYPTO=["openssl"] )
     if windows:
         env.Append( LIBS=["libeay32"] )
@@ -1072,7 +1073,7 @@ if has_option( "ssl" ):
         env.Append( LIBS=["ssl"] )
         env.Append( LIBS=["crypto"] )
     if has_option("ssl-fips-capability"):
-        env.Append( CPPDEFINES=["MONGO_SSL_FIPS"] )
+        env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_FIPS")
 else:
     env.Append( MONGO_CRYPTO=["tom"] )
 
@@ -1132,7 +1133,6 @@ if not use_system_version_of_library("boost"):
     # Boost release numbers are x.y.z, where z is usually 0 which we do not include in
     # the internal-boost option
     boostSuffix = "-%s.0" % get_option( "internal-boost")
-    env.Prepend(CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules')
@@ -1523,6 +1523,7 @@ def doConfigure(myenv):
         'CheckPosixSystem' : CheckPosixSystem,
     })
     posix_system = conf.CheckPosixSystem()
+
     conf.Finish()
 
     # Check if we are on a system that support the POSIX clock_gettime function
@@ -1549,6 +1550,12 @@ def doConfigure(myenv):
             'CheckPosixMonotonicClock' : CheckPosixMonotonicClock,
         })
         posix_monotonic_clock = conf.CheckPosixMonotonicClock()
+
+        # On 32-bit systems, we need to define this in order to get access to
+        # the 64-bit versions of fseek, etc.
+        if not conf.CheckTypeSize('off_t', includes="#include <sys/types.h>", expect=8):
+            myenv.Append(CPPDEFINES=["_FILE_OFFSET_BITS=64"])
+
         conf.Finish()
 
     if has_option('sanitize'):
@@ -1721,7 +1728,7 @@ def doConfigure(myenv):
         haveDeclSpecThread = conf.CheckDeclspecThread()
         conf.Finish()
         if haveDeclSpecThread:
-            myenv.Append(CPPDEFINES=['MONGO_HAVE___DECLSPEC_THREAD'])
+            myenv.SetConfigHeaderDefine("MONGO_CONFIG_HAVE___DECLSPEC_THREAD")
     else:
         def CheckUUThread(context):
             test_body = """
@@ -1741,7 +1748,7 @@ def doConfigure(myenv):
         haveUUThread = conf.CheckUUThread()
         conf.Finish()
         if haveUUThread:
-            myenv.Append(CPPDEFINES=['MONGO_HAVE___THREAD'])
+            myenv.SetConfigHeaderDefine("MONGO_CONFIG_HAVE___THREAD")
 
     # not all C++11-enabled gcc versions have type properties
     def CheckCXX11IsTriviallyCopyable(context):
@@ -1780,7 +1787,7 @@ def doConfigure(myenv):
     })
 
     if conf.CheckCXX11IsTriviallyCopyable():
-        conf.env.Append(CPPDEFINES=['MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE'])
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STD_IS_TRIVIALLY_COPYABLE")
 
     myenv = conf.Finish()
 
@@ -1803,7 +1810,7 @@ def doConfigure(myenv):
     })
 
     if conf.CheckCXX14MakeUnique():
-        conf.env.Append(CPPDEFINES=['MONGO_HAVE_STD_MAKE_UNIQUE'])
+        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE')
 
     myenv = conf.Finish()
 
@@ -1829,6 +1836,8 @@ def doConfigure(myenv):
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
         conf.FindSysLibDep("pcrecpp", ["pcrecpp"])
+    else:
+        env.Prepend(CPPDEFINES=['PCRE_STATIC'])
 
     if use_system_version_of_library("snappy"):
         conf.FindSysLibDep("snappy", ["snappy"])
@@ -1872,19 +1881,19 @@ def doConfigure(myenv):
                     language='C++')
 
     if posix_system:
-        conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_HEADER_UNISTD_H")
         conf.CheckLib('rt')
         conf.CheckLib('dl')
 
     if posix_monotonic_clock:
-        conf.env.Append(CPPDEFINES=['MONGO_HAVE_POSIX_MONOTONIC_CLOCK'])
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
 
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols_fd', includes='#include <execinfo.h>')):
 
-        conf.env.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE")
 
     conf.env["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
@@ -1918,27 +1927,11 @@ def doConfigure(myenv):
     if get_option('allocator') == 'tcmalloc':
         if use_system_version_of_library('tcmalloc'):
             conf.FindSysLibDep("tcmalloc", ["tcmalloc"])
-        elif has_option("heapcheck"):
-            print ("--heapcheck does not work with the tcmalloc embedded in the mongodb source "
-                   "tree.  Use --use-system-tcmalloc.")
-            Exit(1)
     elif get_option('allocator') == 'system':
         pass
     else:
         print "Invalid --allocator parameter: \"%s\"" % get_option('allocator')
         Exit(1)
-
-    if has_option("heapcheck"):
-        if not debugBuild:
-            print( "--heapcheck needs --d or --dd" )
-            Exit( 1 )
-
-        if not conf.CheckCXXHeader( "google/heap-checker.h" ):
-            print( "--heapcheck neads header 'google/heap-checker.h'" )
-            Exit( 1 )
-
-        conf.env.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
-        conf.env.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
