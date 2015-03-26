@@ -1,6 +1,6 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_252 Upgrading to Version 2.5.2
+@section version_253 Upgrading to Version 2.5.3
 
 <dl>
 <dt>Configuration string case-sensitivity</dt>
@@ -29,6 +29,10 @@ to 4KB boundaries by default.  In the WiredTiger 2.5.2 release, alignment
 is only enforced when direct I/O is configured.
 </dd>
 </dl>
+
+@section version_252 Upgrading to Version 2.5.2
+
+There are no special upgrade steps required.
 
 @section version_251 Upgrading to Version 2.5.1
 
