@@ -1,0 +1,11 @@
+/*! @m_page{{c,java},encryption,Encryptors}
+
+WiredTiger does not currently offer any builtin support for
+any particular encryption algorithm.
+
+@section encryption_custom Custom encryption engines
+
+WiredTiger may be extended by adding custom encryption engines; see
+WT_ENCRYPTOR for more information.
+
+ */

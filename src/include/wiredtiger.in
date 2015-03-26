@@ -1867,9 +1867,9 @@ struct __wt_connection {
 	 * The application must first implement the WT_ENCRYPTOR interface
 	 * and then register the implementation with WiredTiger:
 	 *
-	 * @snippet nop_encryption.c WT_ENCRYPTOR initialization structure
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR initialization structure
 	 *
-	 * @snippet nop_encryption.c WT_ENCRYPTOR initialization function
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR initialization function
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the encryption function to be used in calls
@@ -3238,16 +3238,12 @@ struct __wt_encryptor {
 	 * Callback to size a destination buffer for decryption
 	 *
 	 * WT_ENCRYPTOR::post_size is an optional callback that, given the
-	 * source buffer and size, produces the size of the destination buffer
-	 * to be given to WT_ENCRYPTOR::decrypt.  This is useful for
-	 * encryptors that assume that the output buffer is sized for the
-	 * worst case and thus no overrun checks are made.  If your encryptor
-	 * works like this, WT_ENCRYPTOR::post_size will need to be defined.
-	 * However, if your encryptor detects and avoids overruns against its
-	 * target buffer, you will not need to define WT_ENCRYPTOR::post_size.
-	 * When WT_ENCRYPTOR::post_size is set to NULL, the destination buffer
-	 * is sized the same as the source buffer.
-	 *
+	 * source buffer and size, produces the size of the destination
+	 * buffer to be given to WT_ENCRYPTOR::decrypt.  This is most useful
+	 * for encryptors that generate ciphertext significantly larger than
+	 * the plaintext.  When WT_ENCRYPTOR::post_size is set to NULL, the
+	 * destination buffer is sized the same as the source buffer.
+         *
 	 * If not NULL, this callback is called before each call to
 	 * WT_ENCRYPTOR::decrypt to determine the size of the destination
 	 * buffer to provide.  If the callback is NULL, the destination
@@ -3274,19 +3270,13 @@ struct __wt_encryptor {
 	/*!
 	 * Callback to size a destination buffer for encryption
 	 *
-	 * WT_ENCRYPTOR::pre_size is an optional callback that, given the
+	 * WT_ENCRYPTOR::pre_size is an callback that, given the
 	 * source buffer and size, produces the size of the destination buffer
-	 * to be given to WT_ENCRYPTOR::encrypt.  This is useful for
-	 * encryptors that assume that the output buffer is sized for the
-	 * worst case and thus no overrun checks are made.  If your encryptor
-	 * works like this, WT_ENCRYPTOR::pre_size will need to be defined.
-	 * See the source code for the snappy encryptor for an example.
-	 * However, if your encryptor detects and avoids overruns against its
-	 * target buffer, you will not need to define WT_ENCRYPTOR::pre_size.
-	 * When WT_ENCRYPTOR::pre_size is set to NULL, the destination buffer
-	 * is sized the same as the source buffer.  This is always sufficient,
-	 * since a encryption result that is larger than the source buffer is
-	 * discarded by WiredTiger.
+	 * to be given to WT_ENCRYPTOR::encrypt.  This is always
+         * necessary, since encryptors typically generate encrypted
+         * text that is larger than the plain text input. Without
+         * such a call, WiredTiger would have no way to know the
+         * worst case for the encrypted buffer size.
 	 *
 	 * If not NULL, this callback is called before each call to
 	 * WT_ENCRYPTOR::encrypt to determine the size of the destination
