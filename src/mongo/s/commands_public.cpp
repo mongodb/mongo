@@ -2004,6 +2004,11 @@ namespace mongo {
                              string& errmsg,
                              BSONObjBuilder& result,
                              bool) {
+
+                RARELY {
+                    warning() << "the eval command is deprecated" << startupWarningsLog;
+                }
+
                 // $eval isn't allowed to access sharded collections, but we need to leave the
                 // shard to detect that.
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );

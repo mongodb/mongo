@@ -64,6 +64,10 @@ namespace {
                 BSONObjBuilder& result,
                 string& errmsg) {
 
+        RARELY {
+            warning() << "the eval command is deprecated" << startupWarningsLog;
+        }
+
         const BSONElement e = cmd.firstElement();
         uassert(10046,
                 "eval needs Code",
@@ -152,7 +156,8 @@ namespace {
         }
 
         virtual void help(stringstream &help) const {
-            help << "Evaluate javascript at the server.\n"
+            help << "DEPRECATED\n"
+                 << "Evaluate javascript at the server.\n"
                  << "http://dochub.mongodb.org/core/serversidecodeexecution";
         }
         virtual bool isWriteCommandForConfigServer() const { return false; }
