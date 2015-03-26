@@ -188,7 +188,7 @@ free:	trk->op = WT_ST_EMPTY;
  *	Turn off metadata operation tracking, unrolling on error.
  */
 int
-__wt_meta_track_off(WT_SESSION_IMPL *session, int sync, int unroll)
+__wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll)
 {
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
@@ -223,7 +223,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int sync, int unroll)
 	 * Also, if we don't have the metadata handle (e.g, we're in the
 	 * process of creating the metadata), we can't sync it.
 	 */
-	if (unroll || ret != 0 || !sync || session->meta_dhandle == NULL)
+	if (unroll || ret != 0 || !need_sync || session->meta_dhandle == NULL)
 		return (ret);
 
 	/* If we're logging, make sure the metadata update was flushed. */

@@ -425,7 +425,7 @@ extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_metadata_search( WT_SESSION_IMPL *session, const char *key, char **valuep);
 extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
-extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int sync, int unroll);
+extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll);
 extern int __wt_meta_track_sub_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_sub_off(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_checkpoint(WT_SESSION_IMPL *session);
