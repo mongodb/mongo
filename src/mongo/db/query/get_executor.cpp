@@ -33,6 +33,7 @@
 #include "mongo/db/query/get_executor.h"
 
 #include <limits>
+#include <memory>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/exec/group.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/subplan.h"
@@ -67,6 +69,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
@@ -468,6 +471,143 @@ namespace mongo {
         }
 
         return PlanExecutor::make(txn, ws, root, collection, yieldPolicy, out);
+    }
+
+    //
+    // Find
+    //
+
+namespace {
+
+    /**
+     * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
+     * Such predicates can be used for the oplog start hack.
+     */
+    bool isOplogTsPred(const mongo::MatchExpression* me) {
+        if (mongo::MatchExpression::GT != me->matchType()
+            && mongo::MatchExpression::GTE != me->matchType()) {
+            return false;
+        }
+
+        return mongoutils::str::equals(me->path().rawData(), "ts");
+    }
+
+    mongo::BSONElement extractOplogTsOptime(const mongo::MatchExpression* me) {
+        invariant(isOplogTsPred(me));
+        return static_cast<const mongo::ComparisonMatchExpression*>(me)->getData();
+    }
+
+    Status getOplogStartHack(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* cq,
+                             PlanExecutor** execOut) {
+        invariant(collection);
+        invariant(cq);
+        auto_ptr<CanonicalQuery> autoCq(cq);
+
+        // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over
+        // the "ts" field (the operation's timestamp). Find that predicate and pass it to
+        // the OplogStart stage.
+        MatchExpression* tsExpr = NULL;
+        if (MatchExpression::AND == cq->root()->matchType()) {
+            // The query has an AND at the top-level. See if any of the children
+            // of the AND are $gt or $gte predicates over 'ts'.
+            for (size_t i = 0; i < cq->root()->numChildren(); ++i) {
+                MatchExpression* me = cq->root()->getChild(i);
+                if (isOplogTsPred(me)) {
+                    tsExpr = me;
+                    break;
+                }
+            }
+        }
+        else if (isOplogTsPred(cq->root())) {
+            // The root of the tree is a $gt or $gte predicate over 'ts'.
+            tsExpr = cq->root();
+        }
+
+        if (NULL == tsExpr) {
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          "OplogReplay query does not contain top-level "
+                          "$gt or $gte over the 'ts' field.");
+        }
+
+        boost::optional<RecordId> startLoc = boost::none;
+
+        // See if the RecordStore supports the oplogStartHack
+        const BSONElement tsElem = extractOplogTsOptime(tsExpr);
+        if (tsElem.type() == Timestamp) {
+            StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem._opTime());
+            if (goal.isOK()) {
+                startLoc = collection->getRecordStore()->oplogStartHack(txn, goal.getValue());
+            }
+        }
+
+        if (startLoc) {
+            LOG(3) << "Using direct oplog seek";
+        }
+        else {
+            LOG(3) << "Using OplogStart stage";
+
+            // Fallback to trying the OplogStart stage.
+            WorkingSet* oplogws = new WorkingSet();
+            OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
+            PlanExecutor* rawExec;
+
+            // Takes ownership of oplogws and stage.
+            Status execStatus = PlanExecutor::make(txn, oplogws, stage, collection,
+                                                   PlanExecutor::YIELD_AUTO, &rawExec);
+            invariant(execStatus.isOK());
+            std::unique_ptr<PlanExecutor> exec(rawExec);
+
+            // The stage returns a RecordId of where to start.
+            startLoc = RecordId();
+            PlanExecutor::ExecState state = exec->getNext(NULL, startLoc.get_ptr());
+
+            // This is normal.  The start of the oplog is the beginning of the collection.
+            if (PlanExecutor::IS_EOF == state) {
+                return getExecutor(txn, collection, autoCq.release(), PlanExecutor::YIELD_AUTO,
+                                   execOut);
+            }
+
+            // This is not normal.  An error was encountered.
+            if (PlanExecutor::ADVANCED != state) {
+                return Status(ErrorCodes::InternalError,
+                              "quick oplog start location had error...?");
+            }
+        }
+
+        // Build our collection scan...
+        CollectionScanParams params;
+        params.collection = collection;
+        params.start = *startLoc;
+        params.direction = CollectionScanParams::FORWARD;
+        params.tailable = cq->getParsed().isTailable();
+
+        WorkingSet* ws = new WorkingSet();
+        CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
+        // Takes ownership of 'ws', 'cs', and 'cq'.
+        return PlanExecutor::make(txn, ws, cs, autoCq.release(), collection,
+                                  PlanExecutor::YIELD_AUTO, execOut);
+    }
+
+} // namespace
+
+    Status getExecutorFind(OperationContext* txn,
+                           Collection* collection,
+                           const NamespaceString& nss,
+                           CanonicalQuery* rawCanonicalQuery,
+                           PlanExecutor::YieldPolicy yieldPolicy,
+                           PlanExecutor** out) {
+        std::unique_ptr<CanonicalQuery> cq(rawCanonicalQuery);
+        if (NULL != collection && cq->getParsed().isOplogReplay()) {
+            return getOplogStartHack(txn, collection, cq.release(), out);
+        }
+
+        size_t options = QueryPlannerParams::DEFAULT;
+        if (shardingState.needCollectionMetadata(nss.ns())) {
+            options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        }
+        return getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, out, options);
     }
 
     //

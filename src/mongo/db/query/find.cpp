@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/keypattern.h"
@@ -53,7 +52,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
@@ -67,33 +65,9 @@ using std::auto_ptr;
 using std::endl;
 
 namespace mongo {
+
     // The .h for this in find_constants.h.
     const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
-}  // namespace mongo
-
-namespace {
-
-    /**
-     * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
-     * Such predicates can be used for the oplog start hack.
-     */
-    bool isOplogTsPred(const mongo::MatchExpression* me) {
-        if (mongo::MatchExpression::GT != me->matchType()
-            && mongo::MatchExpression::GTE != me->matchType()) {
-            return false;
-        }
-
-        return mongoutils::str::equals(me->path().rawData(), "ts");
-    }
-
-    mongo::BSONElement extractOplogTsOptime(const mongo::MatchExpression* me) {
-        invariant(isOplogTsPred(me));
-        return static_cast<const mongo::ComparisonMatchExpression*>(me)->getData();
-    }
-
-}  // namespace
-
-namespace mongo {
 
     // Failpoint for checking whether we've received a getmore.
     MONGO_FP_DECLARE(failReceivedGetmore);
@@ -528,102 +502,6 @@ namespace mongo {
         return qr;
     }
 
-    Status getOplogStartHack(OperationContext* txn,
-                             Collection* collection,
-                             CanonicalQuery* cq,
-                             PlanExecutor** execOut) {
-        invariant(cq);
-        auto_ptr<CanonicalQuery> autoCq(cq);
-
-        if ( collection == NULL )
-            return Status(ErrorCodes::InternalError,
-                          "getOplogStartHack called with a NULL collection" );
-
-        // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over
-        // the "ts" field (the operation's timestamp). Find that predicate and pass it to
-        // the OplogStart stage.
-        MatchExpression* tsExpr = NULL;
-        if (MatchExpression::AND == cq->root()->matchType()) {
-            // The query has an AND at the top-level. See if any of the children
-            // of the AND are $gt or $gte predicates over 'ts'.
-            for (size_t i = 0; i < cq->root()->numChildren(); ++i) {
-                MatchExpression* me = cq->root()->getChild(i);
-                if (isOplogTsPred(me)) {
-                    tsExpr = me;
-                    break;
-                }
-            }
-        }
-        else if (isOplogTsPred(cq->root())) {
-            // The root of the tree is a $gt or $gte predicate over 'ts'.
-            tsExpr = cq->root();
-        }
-
-        if (NULL == tsExpr) {
-            return Status(ErrorCodes::OplogOperationUnsupported,
-                          "OplogReplay query does not contain top-level "
-                          "$gt or $gte over the 'ts' field.");
-        }
-
-        boost::optional<RecordId> startLoc = boost::none;
-
-        // See if the RecordStore supports the oplogStartHack
-        const BSONElement tsElem = extractOplogTsOptime(tsExpr);
-        if (tsElem.type() == Timestamp) {
-            StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem._opTime());
-            if (goal.isOK()) {
-                startLoc = collection->getRecordStore()->oplogStartHack(txn, goal.getValue());
-            }
-        }
-
-        if (startLoc) {
-            LOG(3) << "Using direct oplog seek";
-        }
-        else {
-            LOG(3) << "Using OplogStart stage";
-
-            // Fallback to trying the OplogStart stage.
-            WorkingSet* oplogws = new WorkingSet();
-            OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
-            PlanExecutor* rawExec;
-
-            // Takes ownership of oplogws and stage.
-            Status execStatus = PlanExecutor::make(txn, oplogws, stage, collection,
-                                                   PlanExecutor::YIELD_AUTO, &rawExec);
-            invariant(execStatus.isOK());
-            scoped_ptr<PlanExecutor> exec(rawExec);
-
-            // The stage returns a RecordId of where to start.
-            startLoc = RecordId();
-            PlanExecutor::ExecState state = exec->getNext(NULL, startLoc.get_ptr());
-
-            // This is normal.  The start of the oplog is the beginning of the collection.
-            if (PlanExecutor::IS_EOF == state) {
-                return getExecutor(txn, collection, autoCq.release(), PlanExecutor::YIELD_AUTO,
-                                   execOut);
-            }
-
-            // This is not normal.  An error was encountered.
-            if (PlanExecutor::ADVANCED != state) {
-                return Status(ErrorCodes::InternalError,
-                              "quick oplog start location had error...?");
-            }
-        }
-
-        // Build our collection scan...
-        CollectionScanParams params;
-        params.collection = collection;
-        params.start = *startLoc;
-        params.direction = CollectionScanParams::FORWARD;
-        params.tailable = cq->getParsed().isTailable();
-
-        WorkingSet* ws = new WorkingSet();
-        CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
-        // Takes ownership of 'ws', 'cs', and 'cq'.
-        return PlanExecutor::make(txn, ws, cs, autoCq.release(), collection,
-                                  PlanExecutor::YIELD_AUTO, execOut);
-    }
-
     std::string runQuery(OperationContext* txn,
                          QueryMessage& q,
                          const NamespaceString& nss,
@@ -655,46 +533,25 @@ namespace mongo {
         LOG(2) << "Running query: " << cq->toStringShort();
 
         // Parse, canonicalize, plan, transcribe, and get a plan executor.
-        PlanExecutor* rawExec = NULL;
-
         AutoGetCollectionForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
 
         const int dbProfilingLevel = ctx.getDb() ? ctx.getDb()->getProfilingLevel() :
                                                    serverGlobalParams.defaultProfile;
 
-        // We'll now try to get the query executor that will execute this query for us. There
-        // are a few cases in which we know upfront which executor we should get and, therefore,
-        // we shortcut the selection process here.
-        //
-        // (a) If the query is over a collection that doesn't exist, we use an EOFStage.
-        //
-        // (b) if the query is a replication's initial sync one, we use a specifically designed
-        // stage that skips extents faster (see details in exec/oplogstart.h).
-        //
-        // Otherwise we go through the selection of which executor is most suited to the
-        // query + run-time context at hand.
-        Status status = Status::OK();
-        if (NULL != collection && cq->getParsed().isOplogReplay()) {
-            status = getOplogStartHack(txn, collection, cq.release(), &rawExec);
+        // We have a parsed query. Time to get the execution plan for it.
+        std::unique_ptr<PlanExecutor> exec;
+        {
+            PlanExecutor* rawExec;
+            Status execStatus = getExecutorFind(txn,
+                                                collection,
+                                                nss,
+                                                cq.release(),
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawExec);
+            uassertStatusOK(execStatus);
+            exec.reset(rawExec);
         }
-        else {
-            size_t options = QueryPlannerParams::DEFAULT;
-            if (shardingState.needCollectionMetadata(nss.ns())) {
-                options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-            }
-            status = getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec,
-                                 options);
-        }
-        invariant(cq.get() == NULL); // cq has been released above.
-
-        if (!status.isOK()) {
-            uasserted(17007, "Unable to execute query: " + status.reason());
-        }
-
-        verify(NULL != rawExec);
-        auto_ptr<PlanExecutor> exec(rawExec);
-
         const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
 
         // If it's actually an explain, do the explain and return rather than falling through
@@ -736,11 +593,11 @@ namespace mongo {
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
         bool slaveOK = pq.isSlaveOk() || pq.hasReadPref();
-        status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
+        Status serveReadsStatus = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
                 txn,
                 nss,
                 slaveOK);
-        uassertStatusOK(status);
+        uassertStatusOK(serveReadsStatus);
 
         // Run the query.
         // bb is used to hold query results

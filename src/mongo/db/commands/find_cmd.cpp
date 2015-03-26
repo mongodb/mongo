@@ -135,28 +135,15 @@ namespace mongo {
             std::unique_ptr<PlanExecutor> exec;
             {
                 PlanExecutor* rawExec;
-                Status execStatus = Status::OK();
-                if (cq->getParsed().isOplogReplay()) {
-                    execStatus = getOplogStartHack(txn, collection, cq.release(), &rawExec);
-                }
-                else {
-                    size_t options = QueryPlannerParams::DEFAULT;
-                    if (shardingState.needCollectionMetadata(cq->getParsed().ns())) {
-                        options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-                    }
-
-                    execStatus = getExecutor(txn,
-                                             collection,
-                                             cq.release(),
-                                             PlanExecutor::YIELD_AUTO,
-                                             &rawExec,
-                                             options);
-                }
-
+                Status execStatus = getExecutorFind(txn,
+                                                    collection,
+                                                    nss,
+                                                    cq.release(),
+                                                    PlanExecutor::YIELD_AUTO,
+                                                    &rawExec);
                 if (!execStatus.isOK()) {
                     return execStatus;
                 }
-
                 exec.reset(rawExec);
             }
 
@@ -181,7 +168,8 @@ namespace mongo {
          */
         virtual bool run(OperationContext* txn,
                          const std::string& dbname,
-                         BSONObj& cmdObj, int options,
+                         BSONObj& cmdObj,
+                         int options,
                          std::string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
@@ -228,28 +216,20 @@ namespace mongo {
                                                        serverGlobalParams.defaultProfile;
 
             // 3) Get the execution plan for the query.
-            //
-            // TODO: Do we need to handle oplog replay here?
             std::unique_ptr<PlanExecutor> execHolder;
             {
                 PlanExecutor* rawExec;
-                size_t options = QueryPlannerParams::DEFAULT;
-                if (shardingState.needCollectionMetadata(cq->getParsed().ns())) {
-                    options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-                }
-
                 // TODO (SERVER-17284): This can yield before creating a ClientCursor, which means
                 // that we have to throw an error if the shard version changes during yield.
-                Status execStatus = getExecutor(txn,
-                                                collection,
-                                                cq.release(),
-                                                PlanExecutor::YIELD_AUTO,
-                                                &rawExec,
-                                                options);
+                Status execStatus = getExecutorFind(txn,
+                                                    collection,
+                                                    nss,
+                                                    cq.release(),
+                                                    PlanExecutor::YIELD_AUTO,
+                                                    &rawExec);
                 if (!execStatus.isOK()) {
                     return appendCommandStatus(result, execStatus);
                 }
-
                 execHolder.reset(rawExec);
             }
 
