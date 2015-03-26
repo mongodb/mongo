@@ -34,10 +34,11 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"

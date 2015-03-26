@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -163,7 +164,7 @@ namespace mongo {
                     invariant(!txn->lockState()->saveLockStateAndUnlock(&lockSnapshot));
                 };
 
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
 
                 Status status(ErrorCodes::InternalError, "");
                 while (true) {

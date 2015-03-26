@@ -33,12 +33,13 @@
 #include "mongo/db/index_builder.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -91,7 +92,7 @@ namespace {
 
         ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock dlk(txn.lockState(), ns.db(), MODE_X);
-        Client::Context ctx(&txn, ns.getSystemIndexesCollection());
+        OldClientContext ctx(&txn, ns.getSystemIndexesCollection());
 
         Database* db = dbHolder().get(&txn, ns.db().toString());
 

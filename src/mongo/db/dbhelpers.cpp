@@ -38,14 +38,17 @@
 #include <fstream>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -56,11 +59,9 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage_options.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
@@ -237,7 +238,7 @@ namespace mongo {
         BSONObj id = e.wrap();
 
         OpDebug debug;
-        Client::Context context(txn, ns);
+        OldClientContext context(txn, ns);
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -255,7 +256,7 @@ namespace mongo {
 
     void Helpers::putSingleton(OperationContext* txn, const char *ns, BSONObj obj) {
         OpDebug debug;
-        Client::Context context(txn, ns);
+        OldClientContext context(txn, ns);
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -360,7 +361,7 @@ namespace mongo {
         while ( 1 ) {
             // Scoping for write lock.
             {
-                Client::WriteContext ctx(txn, ns);
+                OldClientWriteContext ctx(txn, ns);
                 Collection* collection = ctx.getCollection();
                 if ( !collection )
                     break;
@@ -578,7 +579,7 @@ namespace mongo {
 
 
     void Helpers::emptyCollection(OperationContext* txn, const char *ns) {
-        Client::Context context(txn, ns);
+        OldClientContext context(txn, ns);
         deleteObjects(txn, context.db(), ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
     }
 

@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/replication_coordinator_global.h"

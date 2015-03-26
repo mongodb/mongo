@@ -36,6 +36,7 @@
 #include "mongo/db/commands/write_commands/batch_executor.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/delete_request.h"
@@ -223,7 +224,7 @@ namespace mongo {
             AutoGetDb autoDb( txn, nsString.db(), MODE_IX );
             Lock::CollectionLock colLock( txn->lockState(), nsString.ns(), MODE_IX );
 
-            // We check the shard version explicitly here rather than using Client::Context,
+            // We check the shard version explicitly here rather than using OldClientContext,
             // as Context can do implicit database creation if the db does not exist. We want
             // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
             // or collections.
@@ -268,7 +269,7 @@ namespace mongo {
             AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-            // We check the shard version explicitly here rather than using Client::Context,
+            // We check the shard version explicitly here rather than using OldClientContext,
             // as Context can do implicit database creation if the db does not exist. We want
             // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
             // or collections.

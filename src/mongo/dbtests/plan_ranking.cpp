@@ -36,6 +36,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -75,7 +76,7 @@ namespace PlanRankingTests {
             // Run all tests with hash-based intersection enabled.
             internalQueryPlannerEnableHashIntersection = true;
 
-            Client::WriteContext ctx(&_txn, ns);
+            OldClientWriteContext ctx(&_txn, ns);
             _client.dropCollection(ns);
         }
 
@@ -86,7 +87,7 @@ namespace PlanRankingTests {
         }
 
         void insert(const BSONObj& obj) {
-            Client::WriteContext ctx(&_txn, ns);
+            OldClientWriteContext ctx(&_txn, ns);
             _client.insert(ns, obj);
         }
 

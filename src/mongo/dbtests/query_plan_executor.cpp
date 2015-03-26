@@ -29,9 +29,10 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
@@ -201,7 +202,7 @@ namespace QueryPlanExecutor {
     class DropCollScan : public PlanExecutorBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             insert(BSON("_id" << 1));
             insert(BSON("_id" << 2));
 
@@ -230,7 +231,7 @@ namespace QueryPlanExecutor {
     class DropIndexScan : public PlanExecutorBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             insert(BSON("_id" << 1 << "a" << 6));
             insert(BSON("_id" << 2 << "a" << 7));
             insert(BSON("_id" << 3 << "a" << 8));
@@ -259,7 +260,7 @@ namespace QueryPlanExecutor {
     class DropIndexScanAgg : public PlanExecutorBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             insert(BSON("_id" << 1 << "a" << 6));
             insert(BSON("_id" << 2 << "a" << 7));
@@ -355,7 +356,7 @@ namespace QueryPlanExecutor {
     class SnapshotControl : public SnapshotBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             setupCollection();
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
@@ -382,7 +383,7 @@ namespace QueryPlanExecutor {
     class SnapshotTest : public SnapshotBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             setupCollection();
             BSONObj indexSpec = BSON("_id" << 1);
             addIndex(indexSpec);
@@ -413,7 +414,7 @@ namespace QueryPlanExecutor {
         class Invalidate : public PlanExecutorBase {
         public:
             void run() {
-                Client::WriteContext ctx(&_txn, ns());
+                OldClientWriteContext ctx(&_txn, ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
@@ -439,7 +440,7 @@ namespace QueryPlanExecutor {
         class InvalidatePinned : public PlanExecutorBase {
         public:
             void run() {
-                Client::WriteContext ctx(&_txn, ns());
+                OldClientWriteContext ctx(&_txn, ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
                 Collection* collection = ctx.getCollection();
@@ -480,7 +481,7 @@ namespace QueryPlanExecutor {
         public:
             void run() {
                 {
-                    Client::WriteContext ctx(&_txn, ns());
+                    OldClientWriteContext ctx(&_txn, ns());
                     insert(BSON("a" << 1 << "b" << 1));
                 }
 

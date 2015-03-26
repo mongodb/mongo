@@ -31,6 +31,7 @@
 
 #include <iostream>
 
+#include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context_impl.h"

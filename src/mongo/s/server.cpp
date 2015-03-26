@@ -112,7 +112,6 @@ namespace mongo {
     static ExitCode initService();
 #endif
 
-    Database *database = 0;
     string mongosCommand;
     bool dbexitCalled = false;
 

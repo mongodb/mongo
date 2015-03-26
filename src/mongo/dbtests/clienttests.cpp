@@ -31,10 +31,10 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
-
 
 namespace ClientTests {
 
@@ -100,7 +100,7 @@ namespace ClientTests {
         void run() {
             OperationContextImpl txn;
 
-            Client::WriteContext ctx(&txn, ns());
+            OldClientWriteContext ctx(&txn, ns());
             DBDirectClient db(&txn);
 
             db.insert(ns(), BSON("x" << 1 << "y" << 2));

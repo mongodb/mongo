@@ -36,15 +36,16 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/projection.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/projection.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern.h"
@@ -144,7 +145,7 @@ namespace mongo {
                 // Take X lock so we can create collection, then re-run operation.
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-                Client::Context ctx(txn, ns, false /* don't check version */);
+                OldClientContext ctx(txn, ns, false /* don't check version */);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -227,7 +228,7 @@ namespace mongo {
 
             AutoGetOrCreateDb autoDb(txn, dbname, MODE_IX);
             Lock::CollectionLock collLock(txn->lockState(), ns, MODE_IX);
-            Client::Context ctx(txn, ns, autoDb.getDb(), autoDb.justCreated());
+            OldClientContext ctx(txn, ns, autoDb.getDb(), autoDb.justCreated());
 
             if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                 return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()

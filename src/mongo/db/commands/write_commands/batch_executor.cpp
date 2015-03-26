@@ -37,23 +37,25 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_create.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -63,7 +65,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
@@ -750,7 +751,7 @@ namespace mongo {
 
         // Context object on the target database.  Must appear after writeLock, so that it is
         // destroyed in proper order.
-        scoped_ptr<Client::Context> _context;
+        scoped_ptr<OldClientContext> _context;
 
         // Target collection.
         Collection* _collection;
@@ -972,7 +973,7 @@ namespace mongo {
     bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result,
                                                                  bool intentLock) {
         if (hasLock()) {
-            // TODO: Client::Context legacy, needs to be removed
+            // TODO: OldClientContext legacy, needs to be removed
             txn->getCurOp()->enter(_context->ns(),
                                    _context->db() ? _context->db()->getProfilingLevel() : 0);
             return true;
@@ -1010,7 +1011,7 @@ namespace mongo {
         }
 
         _context.reset();
-        _context.reset(new Client::Context(txn, nss, false));
+        _context.reset(new OldClientContext(txn, nss, false));
 
         Database* database = _context->db();
         dassert(database);
@@ -1232,7 +1233,7 @@ namespace mongo {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                     ScopedTransaction transaction(txn, MODE_IX);
                     Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
-                    Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
+                    OldClientContext ctx(txn, nsString.ns(), false /* don't check version */);
 
                     if (!checkIsMasterForDatabase(nsString, result)) {
                         return;
@@ -1291,7 +1292,7 @@ namespace mongo {
                 continue;
             }
 
-            Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
+            OldClientContext ctx(txn, nsString.ns(), false /* don't check version */);
             Collection* collection = db->getCollection(nsString.ns());
 
             if ( collection == NULL ) {
@@ -1415,7 +1416,7 @@ namespace mongo {
 
                 // Context once we're locked, to set more details in currentOp()
                 // TODO: better constructor?
-                Client::Context ctx(txn, nss.ns(), false /* don't check version */);
+                OldClientContext ctx(txn, nss.ns(), false /* don't check version */);
 
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorDelete(txn,

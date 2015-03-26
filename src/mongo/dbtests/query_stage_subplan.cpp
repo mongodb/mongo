@@ -28,6 +28,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/jsobj.h"
@@ -45,7 +46,7 @@ namespace QueryStageSubplan {
             : _client(&_txn) { }
 
         virtual ~QueryStageSubplanBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -75,7 +76,7 @@ namespace QueryStageSubplan {
     class QueryStageSubplanGeo2dOr : public QueryStageSubplanBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             addIndex(BSON("a" << "2d" << "b" << 1));
             addIndex(BSON("a" << "2d"));
 
@@ -108,7 +109,7 @@ namespace QueryStageSubplan {
     class QueryStageSubplanPlanFromCache : public QueryStageSubplanBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             addIndex(BSON("a" << 1 << "b" << 1));
             addIndex(BSON("a" << 1 << "c" << 1));

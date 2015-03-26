@@ -36,23 +36,24 @@
 #include <vector>
 
 #include "mongo/db/background.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/index_builder.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -158,7 +159,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::Context ctx(txn, toDeleteNs);
+            OldClientContext ctx(txn, toDeleteNs);
             stopIndexBuilds(txn, db, jsobj);
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
@@ -264,7 +265,7 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, toDeleteNs);
+            OldClientContext ctx(txn, toDeleteNs);
 
             Collection* collection = ctx.db()->getCollection( toDeleteNs );
 

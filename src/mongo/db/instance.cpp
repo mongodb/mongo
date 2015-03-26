@@ -43,6 +43,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
@@ -51,13 +52,14 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/currentop_command.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/global_optime.h"
+#include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
@@ -65,22 +67,21 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/catalog/index_create.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
@@ -683,13 +684,13 @@ namespace {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
                 if (dbHolder().get(txn, nsString.db()) == NULL) {
-                    //  If DB doesn't exist, don't implicitly create it in Client::Context
+                    //  If DB doesn't exist, don't implicitly create it in OldClientContext
                     break;
                 }
                 Lock::CollectionLock collLock(txn->lockState(),
                                               nsString.ns(),
                                               parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
-                Client::Context ctx(txn, nsString);
+                OldClientContext ctx(txn, nsString);
 
                 //  The common case: no implicit collection creation
                 if (!upsert || ctx.db()->getCollection(nsString) != NULL) {
@@ -729,7 +730,7 @@ namespace {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_X);
-            Client::Context ctx(txn, nsString);
+            OldClientContext ctx(txn, nsString);
             uassert(ErrorCodes::NotMaster,
                     str::stream() << "Not primary while performing update on " << nsString.ns(),
                     repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
@@ -806,7 +807,7 @@ namespace {
                 Lock::CollectionLock collLock(txn->lockState(),
                                               nsString.ns(),
                                               parsedDelete.isIsolated() ? MODE_X : MODE_IX);
-                Client::Context ctx(txn, nsString);
+                OldClientContext ctx(txn, nsString);
 
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorDelete(txn,
@@ -960,7 +961,7 @@ namespace {
     }
 
     void checkAndInsert(OperationContext* txn,
-                        Client::Context& ctx,
+                        OldClientContext& ctx,
                         const char *ns,
                         /*modifies*/BSONObj& js) {
 
@@ -998,7 +999,7 @@ namespace {
     }
 
     NOINLINE_DECL void insertMulti(OperationContext* txn,
-                                   Client::Context& ctx,
+                                   OldClientContext& ctx,
                                    bool keepGoing,
                                    const char *ns,
                                    vector<BSONObj>& objs,
@@ -1140,9 +1141,9 @@ namespace {
             uassert(notMasterCodeForInsert, "not master",
                     repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
-            // Client::Context may implicitly create a database, so check existence
+            // OldClientContext may implicitly create a database, so check existence
             if (dbHolder().get(txn, nsString.db()) != NULL) {
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
                 if (ctx.db()->getCollection(nsString)) {
                     if (multi.size() > 1) {
                         const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
@@ -1167,7 +1168,7 @@ namespace {
         uassert(notMasterCodeForInsert, "not master",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
-        Client::Context ctx(txn, ns);
+        OldClientContext ctx(txn, ns);
 
         if (multi.size() > 1) {
             const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;

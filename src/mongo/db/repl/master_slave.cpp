@@ -53,10 +53,12 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/handshake_args.h"
@@ -64,7 +66,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/sync.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
@@ -216,7 +217,7 @@ namespace repl {
         {
             OpDebug debug;
 
-            Client::Context ctx(txn, "local.sources");
+            OldClientContext ctx(txn, "local.sources");
 
             const NamespaceString requestNs("local.sources");
             UpdateRequest request(requestNs);
@@ -255,7 +256,7 @@ namespace repl {
     */
     void ReplSource::loadAll(OperationContext* txn, SourceVector &v) {
         const char* localSources = "local.sources";
-        Client::Context ctx(txn, localSources);
+        OldClientContext ctx(txn, localSources);
         SourceVector old = v;
         v.clear();
 
@@ -458,7 +459,7 @@ namespace repl {
 
     void ReplSource::resyncDrop( OperationContext* txn, const string& db ) {
         log() << "resync: dropping database " << db;
-        Client::Context ctx(txn, db);
+        OldClientContext ctx(txn, db);
         dropDatabase(txn, ctx.db());
     }
 
@@ -608,7 +609,7 @@ namespace repl {
             incompleteCloneDbs.erase(*i);
             addDbNextPass.erase(*i);
 
-            Client::Context ctx(txn, *i);
+            OldClientContext ctx(txn, *i);
             dropDatabase(txn, ctx.db());
         }
         
@@ -726,7 +727,7 @@ namespace repl {
         // This code executes on the slaves only, so it doesn't need to be sharding-aware since
         // mongos will not send requests there. That's why the last argument is false (do not do
         // version checking).
-        Client::Context ctx(txn, ns, false);
+        OldClientContext ctx(txn, ns, false);
         txn->getCurOp()->reset();
 
         bool empty = !ctx.db()->getDatabaseCatalogEntry()->hasUserData();
@@ -757,7 +758,7 @@ namespace repl {
                     log() << "An earlier initial clone of '" << clientName << "' did not complete, now resyncing." << endl;
                 }
                 save(txn);
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
                 nClonedThisPass++;
                 resync(txn, ctx.db()->name());
                 addDbNextPass.erase(clientName);
@@ -1388,7 +1389,7 @@ namespace repl {
                     BSONObjBuilder b;
                     b.append(_id);
                     BSONObj result;
-                    Client::Context ctx(&txn, ns);
+                    OldClientContext ctx(&txn, ns);
                     if( Helpers::findById(&txn, ctx.db(), ns, b.done(), result) )
                         _dummy_z += result.objsize(); // touch
                 }

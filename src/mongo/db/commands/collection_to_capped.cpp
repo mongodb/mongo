@@ -35,13 +35,14 @@
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/query/find.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
 
@@ -72,7 +73,7 @@ namespace {
 
         // create new collection
         {
-            Client::Context ctx(txn,  toNs );
+            OldClientContext ctx(txn,  toNs );
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", size );

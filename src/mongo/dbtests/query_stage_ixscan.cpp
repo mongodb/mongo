@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
@@ -141,7 +142,7 @@ namespace QueryStageIxscan {
 
         ScopedTransaction _scopedXact;
         Lock::DBLock _dbLock;
-        Client::Context _ctx;
+        OldClientContext _ctx;
         Collection* _coll;
 
         WorkingSet _ws;

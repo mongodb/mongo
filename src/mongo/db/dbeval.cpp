@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -179,7 +180,7 @@ namespace {
             ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
 
-            Client::Context ctx(txn, dbname);
+            OldClientContext ctx(txn, dbname);
 
             return dbEval(txn, dbname, cmdObj, result, errmsg);
         }

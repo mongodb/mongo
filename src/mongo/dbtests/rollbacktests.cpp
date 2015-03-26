@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"
@@ -57,7 +58,7 @@ namespace {
             dropDatabase( txn, db );
         }
     }
-    bool collectionExists( Client::Context* ctx, const string& ns ) {
+    bool collectionExists( OldClientContext* ctx, const string& ns ) {
         const DatabaseCatalogEntry* dbEntry = ctx->db()->getDatabaseCatalogEntry();
         list<string> names;
         dbEntry->getCollectionNamespaces( &names );
@@ -66,7 +67,7 @@ namespace {
     void createCollection( OperationContext* txn, const NamespaceString& nss ) {
         ScopedTransaction transaction( txn, MODE_IX );
         Lock::DBLock dbXLock( txn->lockState(), nss.db(), MODE_X );
-        Client::Context ctx( txn, nss.ns() );
+        OldClientContext ctx( txn, nss.ns() );
         {
             WriteUnitOfWork uow( txn );
             ASSERT( !collectionExists( &ctx, nss.ns() ) );
@@ -162,7 +163,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, ns );
+            OldClientContext ctx( &txn, ns );
             {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, ns ) );
@@ -192,7 +193,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, ns );
+            OldClientContext ctx( &txn, ns );
             {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, ns ) );
@@ -234,7 +235,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite globalWriteLock( txn.lockState() );
-            Client::Context ctx( &txn, source );
+            OldClientContext ctx( &txn, source );
 
             {
                 WriteUnitOfWork uow( &txn );
@@ -282,7 +283,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite globalWriteLock( txn.lockState() );
-            Client::Context ctx( &txn, source );
+            OldClientContext ctx( &txn, source );
 
             BSONObj sourceDoc = BSON( "_id" << "source" );
             BSONObj targetDoc = BSON( "_id" << "target" );
@@ -343,7 +344,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss );
+            OldClientContext ctx( &txn, nss );
 
             BSONObj oldDoc = BSON( "_id" << "old" );
             BSONObj newDoc = BSON( "_id" << "new" );
@@ -394,7 +395,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss );
+            OldClientContext ctx( &txn, nss );
 
             BSONObj doc = BSON( "_id" << "example string" );
 
@@ -429,7 +430,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss );
+            OldClientContext ctx( &txn, nss );
 
             BSONObj doc = BSON( "_id" << "foo" );
 
@@ -680,7 +681,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss.ns() );
+            OldClientContext ctx( &txn, nss.ns() );
 
             string idxNameA = "indexA";
             string idxNameB = "indexB";

@@ -34,15 +34,16 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer_context.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -74,7 +75,7 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn,  ns );
+            OldClientContext ctx(txn,  ns );
             Database* db = ctx.db();
 
             WriteUnitOfWork wunit(txn);
@@ -159,7 +160,7 @@ namespace mongo {
             int n = cmdObj.getIntField( "n" );
             bool inc = cmdObj.getBoolField( "inc" ); // inclusive range?
 
-            Client::WriteContext ctx(txn,  nss.ns() );
+            OldClientWriteContext ctx(txn,  nss.ns() );
             Collection* collection = ctx.getCollection();
             massert( 13417, "captrunc collection not found or empty", collection);
 

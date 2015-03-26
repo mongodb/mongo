@@ -35,10 +35,11 @@
 #include <set>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/client.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
@@ -96,7 +97,7 @@ namespace mongo {
                         return 0;
                     }
 
-                    Client::Context ctx(&txn, _ns, false);
+                    OldClientContext ctx(&txn, _ns, false);
                     WiredTigerRecordStore* rs =
                         checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
                     WriteUnitOfWork wuow(&txn);

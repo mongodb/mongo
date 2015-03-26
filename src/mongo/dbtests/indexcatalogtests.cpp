@@ -20,10 +20,10 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_impl.h"
-
 #include "mongo/dbtests/dbtests.h"
 
 namespace IndexCatalogTests {
@@ -36,7 +36,7 @@ namespace IndexCatalogTests {
             OperationContextImpl txn;
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            Client::Context ctx(&txn, _ns);
+            OldClientContext ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);
 
             _db = ctx.db();
@@ -49,7 +49,7 @@ namespace IndexCatalogTests {
             OperationContextImpl txn;
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            Client::Context ctx(&txn, _ns);
+            OldClientContext ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);
 
             _db->dropCollection(&txn, _ns);
@@ -58,7 +58,7 @@ namespace IndexCatalogTests {
 
         void run() {
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
+            OldClientWriteContext ctx(&txn, _ns);
 
             int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
 
@@ -103,7 +103,7 @@ namespace IndexCatalogTests {
             OperationContextImpl txn;
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            Client::Context ctx(&txn, _ns);
+            OldClientContext ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);
 
             _db = ctx.db();
@@ -116,7 +116,7 @@ namespace IndexCatalogTests {
             OperationContextImpl txn;
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
-            Client::Context ctx(&txn, _ns);
+            OldClientContext ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);
 
             _db->dropCollection(&txn, _ns);
@@ -125,7 +125,7 @@ namespace IndexCatalogTests {
 
         void run() {
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
+            OldClientWriteContext ctx(&txn, _ns);
             const std::string indexName = "x_1";
 
             ASSERT_OK(dbtests::createIndexFromSpec(&txn, _ns, BSON("name" << indexName <<

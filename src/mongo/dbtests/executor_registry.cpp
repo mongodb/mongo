@@ -34,6 +34,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 
-
 namespace ExecutorRegistry {
 
     using std::auto_ptr;
@@ -54,7 +54,7 @@ namespace ExecutorRegistry {
         ExecutorRegistryBase()
             : _client(&_opCtx)
         {
-            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
+            _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
             _client.dropCollection(ns());
 
             for (int i = 0; i < N(); ++i) {
@@ -115,7 +115,7 @@ namespace ExecutorRegistry {
 
         // Order of these is important for initialization
         OperationContextImpl _opCtx;
-        auto_ptr<Client::WriteContext> _ctx;
+        auto_ptr<OldClientWriteContext> _ctx;
         DBDirectClient _client;
     };
 
@@ -292,7 +292,7 @@ namespace ExecutorRegistry {
             // requires a "global write lock."
             _ctx.reset();
             _client.dropDatabase("somesillydb");
-            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
+            _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
 
             // Unregister and restore state.
             deregisterExecutor(run.get());
@@ -308,7 +308,7 @@ namespace ExecutorRegistry {
             // Drop our DB.  Once again, must give up the lock.
             _ctx.reset();
             _client.dropDatabase("unittests");
-            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
+            _ctx.reset(new OldClientWriteContext(&_opCtx, ns()));
 
             // Unregister and restore state.
             deregisterExecutor(run.get());

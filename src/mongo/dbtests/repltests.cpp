@@ -35,20 +35,20 @@
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/ops/update.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/util/log.h"
-
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/log.h"
 
 using namespace mongo::repl;
 
@@ -82,7 +82,7 @@ namespace ReplTests {
             setOplogCollectionName();
             createOplog(&_txn);
 
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             WriteUnitOfWork wuow(&_txn);
 
             Collection* c = ctx.db()->getCollection(ns());
@@ -139,7 +139,7 @@ namespace ReplTests {
         int count() const {
             ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  ns() );
+            OldClientContext ctx(&_txn,  ns() );
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns() );
             if ( !coll ) {
@@ -159,7 +159,7 @@ namespace ReplTests {
         int opCount() {
             ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  cllNS() );
+            OldClientContext ctx(&_txn,  cllNS() );
 
             Database* db = ctx.db();
             Collection* coll = db->getCollection( cllNS() );
@@ -182,7 +182,7 @@ namespace ReplTests {
             Lock::GlobalWrite lk(_txn.lockState());
             vector< BSONObj > ops;
             {
-                Client::Context ctx(&_txn,  cllNS() );
+                OldClientContext ctx(&_txn,  cllNS() );
                 Database* db = ctx.db();
                 Collection* coll = db->getCollection( cllNS() );
 
@@ -194,7 +194,7 @@ namespace ReplTests {
                 delete it;
             }
             {
-                Client::Context ctx(&_txn,  ns() );
+                OldClientContext ctx(&_txn,  ns() );
                 BSONObjBuilder b;
                 b.append("host", "localhost");
                 b.appendTimestamp("syncedTo", 0);
@@ -210,7 +210,7 @@ namespace ReplTests {
         void printAll( const char *ns ) {
             ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  ns );
+            OldClientContext ctx(&_txn,  ns );
 
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns );
@@ -232,7 +232,7 @@ namespace ReplTests {
         void deleteAll( const char *ns ) const {
             ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  ns );
+            OldClientContext ctx(&_txn,  ns );
             WriteUnitOfWork wunit(&_txn);
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns );
@@ -254,7 +254,7 @@ namespace ReplTests {
         void insert( const BSONObj &o ) const {
             ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  ns() );
+            OldClientContext ctx(&_txn,  ns() );
             WriteUnitOfWork wunit(&_txn);
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns() );
@@ -1425,7 +1425,7 @@ namespace ReplTests {
             try {
                 Sync badSource("localhost:123");
 
-                Client::Context ctx(&_txn, ns());
+                OldClientContext ctx(&_txn, ns());
                 badSource.getMissingDoc(&_txn, ctx.db(), o);
             }
             catch (DBException&) {

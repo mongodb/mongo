@@ -48,18 +48,19 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_environment_d.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -75,8 +76,8 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
@@ -201,7 +202,7 @@ namespace mongo {
                     // DB doesn't exist, so deem it a success.
                     return true;
                 }
-                Client::Context context(txn, dbname);
+                OldClientContext context(txn, dbname);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -288,7 +289,7 @@ namespace mongo {
             // TODO: SERVER-4328 Don't lock globally
             ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
-            Client::Context context(txn,  dbname );
+            OldClientContext context(txn,  dbname );
 
             log() << "repairDatabase " << dbname;
             std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, context.db(), cmdObj);
@@ -370,7 +371,7 @@ namespace mongo {
             // in the local database.
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, dbname);
+            OldClientContext ctx(txn, dbname);
 
             BSONElement e = cmdObj.firstElement();
             result.append("was", ctx.db()->getProfilingLevel());
@@ -431,7 +432,7 @@ namespace mongo {
             //
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, dbname);
+            OldClientContext ctx(txn, dbname);
 
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
             _diaglog.flush();
@@ -506,7 +507,7 @@ namespace mongo {
                     errmsg = "ns not found";
                     return false;
                 }
-                Client::Context context(txn, nsToDrop);
+                OldClientContext context(txn, nsToDrop);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -607,7 +608,7 @@ namespace mongo {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -1056,7 +1057,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::Context ctx(txn,  ns);
+            OldClientContext ctx(txn,  ns);
             if (!fromRepl &&
                 !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                 return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -1220,7 +1221,7 @@ namespace mongo {
 
             const string ns = parseNs(dbname, jsobj);
 
-            // TODO: Client::Context legacy, needs to be removed
+            // TODO: OldClientContext legacy, needs to be removed
             txn->getCurOp()->ensureStarted();
             txn->getCurOp()->setNS(dbname);
 
@@ -1250,7 +1251,7 @@ namespace mongo {
                 result.appendNumber("fileSize", 0);
             }
             else {
-                // TODO: Client::Context legacy, needs to be removed
+                // TODO: OldClientContext legacy, needs to be removed
                 txn->getCurOp()->enter(dbname.c_str(), db->getProfilingLevel());
 
                 db->getStats(txn, &result, scale);

@@ -33,7 +33,9 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -41,7 +43,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageFetch {
@@ -91,7 +92,7 @@ namespace QueryStageFetch {
     class FetchStageAlreadyFetched : public QueryStageFetchBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -153,7 +154,7 @@ namespace QueryStageFetch {
         void run() {
             ScopedTransaction transaction(&_txn, MODE_IX);
             Lock::DBLock lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X);
-            Client::Context ctx(&_txn, ns());
+            OldClientContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {

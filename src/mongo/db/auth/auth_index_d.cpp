@@ -40,6 +40,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

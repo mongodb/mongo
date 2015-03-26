@@ -35,9 +35,11 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -53,7 +55,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"

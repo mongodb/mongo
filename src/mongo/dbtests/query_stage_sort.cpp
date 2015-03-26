@@ -27,16 +27,17 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -220,7 +221,7 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -240,7 +241,7 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -269,7 +270,7 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 10000; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -290,7 +291,7 @@ namespace QueryStageSortTests {
         virtual int limit() const { return 10; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -396,7 +397,7 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 2000; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -493,7 +494,7 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {

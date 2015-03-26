@@ -44,28 +44,29 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/client/connpool.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/metadata_loader.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/util/queue.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
+#include "mongo/util/queue.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -1301,7 +1302,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, dbname);
+            OldClientContext ctx(txn, dbname);
 
             shardingState.appendInfo( result );
             return true;

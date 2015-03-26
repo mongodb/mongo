@@ -27,7 +27,9 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -35,7 +37,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -49,7 +50,7 @@ namespace QueryStageTests {
     class IndexScanBase {
     public:
         IndexScanBase() : _client(&_txn) {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 BSONObjBuilder bob;
@@ -64,7 +65,7 @@ namespace QueryStageTests {
         }
 
         virtual ~IndexScanBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -100,7 +101,7 @@ namespace QueryStageTests {
         }
 
         void makeGeoData() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 double lat = double(rand()) / RAND_MAX;

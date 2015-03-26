@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/btree_access_method.h"
 
 #include <vector>
@@ -38,11 +40,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
-
 
 namespace mongo {
 

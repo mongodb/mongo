@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -181,7 +182,7 @@ namespace DocumentSourceTests {
                 _source.reset();
                 _exec.reset();
 
-                Client::WriteContext ctx(&_opCtx, ns);
+                OldClientWriteContext ctx(&_opCtx, ns);
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
                 PlanExecutor* execBare;

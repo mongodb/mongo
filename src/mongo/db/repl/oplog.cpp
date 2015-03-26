@@ -41,12 +41,14 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/background.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/background.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -54,16 +56,15 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
-#include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage_options.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -247,7 +248,7 @@ namespace {
 
 
         if (_localOplogCollection == nullptr) {
-            Client::Context ctx(txn, _oplogCollectionName);
+            OldClientContext ctx(txn, _oplogCollectionName);
             _localDB = ctx.db();
             invariant(_localDB);
             _localOplogCollection = _localDB->getCollection(_oplogCollectionName);
@@ -296,7 +297,7 @@ namespace {
                 Lock::DBLock lk(txn->lockState(), "local", MODE_X);
 
                 if ( _localOplogCollection == 0 ) {
-                    Client::Context ctx(txn, rsOplogName);
+                    OldClientContext ctx(txn, rsOplogName);
 
                     _localDB = ctx.db();
                     verify( _localDB );
@@ -306,7 +307,7 @@ namespace {
                             _localOplogCollection);
                 }
 
-                Client::Context ctx(txn, rsOplogName, _localDB);
+                OldClientContext ctx(txn, rsOplogName, _localDB);
                 WriteUnitOfWork wunit(txn);
 
                 for (std::deque<BSONObj>::const_iterator it = ops.begin();
@@ -352,7 +353,7 @@ namespace {
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         bool rs = !replSettings.replSet.empty();
 
-        Client::Context ctx(txn, _oplogCollectionName);
+        OldClientContext ctx(txn, _oplogCollectionName);
         Collection* collection = ctx.db()->getCollection( _oplogCollectionName );
 
         if ( collection ) {

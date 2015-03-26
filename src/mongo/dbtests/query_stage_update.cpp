@@ -34,6 +34,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/eof.h"
@@ -60,13 +61,13 @@ namespace QueryStageUpdate {
             : _client(&_txn),
               _ns("unittests.QueryStageUpdate"),
               _nsString(StringData(ns())) {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
             _client.createCollection(ns());
         }
 
         virtual ~QueryStageUpdateBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -186,7 +187,7 @@ namespace QueryStageUpdate {
         void run() {
             // Run the update.
             {
-                Client::WriteContext ctx(&_txn, ns());
+                OldClientWriteContext ctx(&_txn, ns());
                 Client& c = cc();
                 CurOp& curOp = *c.curop();
                 OpDebug* opDebug = &curOp.debug();
@@ -248,7 +249,7 @@ namespace QueryStageUpdate {
         void run() {
             // Run the update.
             {
-                Client::WriteContext ctx(&_txn, ns());
+                OldClientWriteContext ctx(&_txn, ns());
 
                 // Populate the collection.
                 for (int i = 0; i < 10; ++i) {

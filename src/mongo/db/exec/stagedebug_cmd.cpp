@@ -26,13 +26,16 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -126,7 +129,7 @@ namespace mongo {
             //      execution trees.
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, dbname);
+            OldClientContext ctx(txn, dbname);
 
             // Make sure the collection is valid.
             Database* db = ctx.db();

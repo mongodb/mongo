@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
@@ -74,12 +75,12 @@ namespace QueryMultiPlanRunner {
     class MultiPlanRunnerBase {
     public:
         MultiPlanRunnerBase() : _client(&_txn) {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
         virtual ~MultiPlanRunnerBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -88,12 +89,12 @@ namespace QueryMultiPlanRunner {
         }
 
         void insert(const BSONObj& obj) {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.insert(ns(), obj);
         }
 
         void remove(const BSONObj& obj) {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.remove(ns(), obj);
         }
 

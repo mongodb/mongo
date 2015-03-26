@@ -38,6 +38,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"

@@ -57,20 +57,21 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -375,7 +376,7 @@ namespace mongo {
 
             if (op == 'u') {
                 BSONObj fullDoc;
-                Client::Context ctx(txn, _ns);
+                OldClientContext ctx(txn, _ns);
                 if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), idObj, fullDoc)) {
                     warning() << "logOpForSharding couldn't find: " << idObj
                               << " even though should have" << migrateLog;
@@ -1951,7 +1952,7 @@ namespace mongo {
 
             {
                 // 0. copy system.namespaces entry if collection doesn't already exist
-                Client::WriteContext ctx(txn,  ns );
+                OldClientWriteContext ctx(txn,  ns );
 
                 if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
                     nsToDatabaseSubstring(ns))) {
@@ -2000,7 +2001,7 @@ namespace mongo {
 
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), MODE_X);
-                Client::Context ctx(txn,  ns);
+                OldClientContext ctx(txn,  ns);
                 if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
                     nsToDatabaseSubstring(ns))) {
                     errmsg = str::stream() << "Not primary during migration: " << ns;
@@ -2160,7 +2161,7 @@ namespace mongo {
 
                         BSONObj docToClone = i.next().Obj();
                         {
-                            Client::WriteContext cx(txn, ns );
+                            OldClientWriteContext cx(txn, ns );
 
                             BSONObj localDoc;
                             if (willOverrideLocalId(txn,
@@ -2405,7 +2406,7 @@ namespace mongo {
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {
                     Lock::CollectionLock clk(txn->lockState(), ns, MODE_X);
-                    Client::Context ctx(txn, ns);
+                    OldClientContext ctx(txn, ns);
 
                     BSONObj id = i.next().Obj();
 
@@ -2441,7 +2442,7 @@ namespace mongo {
             if ( xfer["reload"].isABSONObj() ) {
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ) {
-                    Client::WriteContext cx(txn, ns);
+                    OldClientWriteContext cx(txn, ns);
 
                     BSONObj updatedDoc = i.next().Obj();
 

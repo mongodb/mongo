@@ -34,6 +34,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"

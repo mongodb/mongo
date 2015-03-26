@@ -31,11 +31,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/db.h"
-#include "mongo/db/json.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/json.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {
@@ -68,7 +69,7 @@ namespace PdfileTests {
             OperationContextImpl _txn;
             ScopedTransaction _scopedXact;
             Lock::GlobalWrite _lk;
-            Client::Context _context;
+            OldClientContext _context;
         };
 
         class InsertNoId : public Base {

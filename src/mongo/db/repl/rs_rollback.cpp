@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
@@ -259,7 +260,7 @@ namespace {
     void syncRollbackFindCommonPoint(OperationContext* txn, 
                                      DBClientConnection* them, 
                                      FixUpInfo& fixUpInfo) {
-        Client::Context ctx(txn, rsOplogName);
+        OldClientContext ctx(txn, rsOplogName);
 
         boost::scoped_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
@@ -539,7 +540,7 @@ namespace {
         }
 
         log() << "rollback 4.7";
-        Client::Context ctx(txn, rsOplogName);
+        OldClientContext ctx(txn, rsOplogName);
         Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
         uassert(13423,
                 str::stream() << "replSet error in rollback can't find " << rsOplogName,
@@ -575,7 +576,7 @@ namespace {
                     removeSaver.reset(new Helpers::RemoveSaver("rollback", "", doc.ns));
 
                 // todo: lots of overhead in context, this can be faster
-                Client::Context ctx(txn, doc.ns);
+                OldClientContext ctx(txn, doc.ns);
 
                 // Add the doc to our rollback file
                 BSONObj obj;

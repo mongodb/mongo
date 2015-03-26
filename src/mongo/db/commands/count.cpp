@@ -32,14 +32,15 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"

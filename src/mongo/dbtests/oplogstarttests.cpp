@@ -24,15 +24,16 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
 
 namespace OplogStartTests {
 
@@ -107,7 +108,7 @@ namespace OplogStartTests {
         ScopedTransaction _scopedXact;
         Lock::GlobalWrite _lk;
         WriteUnitOfWork _wunit;
-        Client::Context _context;
+        OldClientContext _context;
 
         DBDirectClient _client;
     };
