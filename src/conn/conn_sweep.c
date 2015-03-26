@@ -26,17 +26,30 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (WT_IS_METADATA(dhandle))
 			continue;
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			continue;
+
+		/* Make sure we get exclusive access. */
+		if ((ret =
+		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
+			continue;
 
 		/*
 		 * If there are no longer any references to the handle in any
 		 * sessions, attempt to discard it.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-		    dhandle->session_inuse != 0 || dhandle->session_ref != 0)
+		    dhandle->session_inuse != 0 || dhandle->session_ref != 0) {
+			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
 			continue;
+		}
 
 		WT_WITH_DHANDLE(session, dhandle,
 		    ret = __wt_conn_dhandle_discard_single(session, 0));
+
+		/* If the handle was not successfully discarded, unlock it. */
+		if (ret != 0)
+			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET_BUSY_OK(ret);
 		WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
 	}
