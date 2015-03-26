@@ -124,6 +124,7 @@ struct __wt_btree {
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
 	uint64_t checkpoint_gen;	/* Checkpoint generation */
+	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
 
 	WT_REF  *evict_ref;		/* Eviction thread's location */

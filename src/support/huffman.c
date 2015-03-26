@@ -96,8 +96,8 @@ typedef struct __indexed_byte {
 	uint32_t frequency;
 } INDEXED_SYMBOL;
 
-static int  indexed_freq_compare(const void *, const void *);
-static int  indexed_symbol_compare(const void *, const void *);
+static int WT_CDECL indexed_freq_compare(const void *, const void *);
+static int WT_CDECL indexed_symbol_compare(const void *, const void *);
 static void make_table(
 	WT_SESSION_IMPL *, uint8_t *, uint16_t, WT_HUFFMAN_CODE *, u_int);
 static void node_queue_close(WT_SESSION_IMPL *, NODE_QUEUE *);
@@ -117,7 +117,7 @@ static void set_codes(WT_FREQTREE_NODE *, WT_HUFFMAN_CODE *, uint16_t, uint8_t);
  * indexed_symbol_compare --
  *	Qsort comparator to order the table by symbol, lowest to highest.
  */
-static int
+static int WT_CDECL
 indexed_symbol_compare(const void *a, const void *b)
 {
 	return (((INDEXED_SYMBOL *)a)->symbol >
@@ -131,7 +131,7 @@ indexed_symbol_compare(const void *a, const void *b)
  *	Qsort comparator to order the table by frequency (the most frequent
  * symbols will be at the end of the array).
  */
-static int
+static int WT_CDECL
 indexed_freq_compare(const void *a, const void *b)
 {
 	return (((INDEXED_SYMBOL *)a)->frequency >

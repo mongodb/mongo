@@ -596,7 +596,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
  * __wt_cache_pool_server --
  *	Thread to manage cache pool among connections.
  */
-void *
+WT_THREAD_RET
 __wt_cache_pool_server(void *arg)
 {
 	WT_CACHE *cache;
@@ -642,5 +642,5 @@ __wt_cache_pool_server(void *arg)
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "cache pool manager server error");
 	}
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
