@@ -55,6 +55,11 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 		(void)WT_ATOMIC_ADD8(cache->bytes_dirty, size);
 		(void)WT_ATOMIC_ADD8(page->modify->bytes_dirty, size);
 	}
+	/* Track internal and overflow size in cache. */
+	if (WT_PAGE_IS_INTERNAL(page))
+		(void)WT_ATOMIC_ADD8(cache->bytes_internal, size);
+	else if (page->type == WT_PAGE_OVFL)
+		(void)WT_ATOMIC_ADD8(cache->bytes_overflow, size);
 }
 
 /* 
@@ -148,6 +153,11 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_CACHE_DECR(session, page->memory_footprint, size);
 	if (__wt_page_is_modified(page))
 		__wt_cache_page_byte_dirty_decr(session, page, size);
+	/* Track internal and overflow size in cache. */
+	if (WT_PAGE_IS_INTERNAL(page))
+		WT_CACHE_DECR(session, cache->bytes_internal, size);
+	else if (page->type == WT_PAGE_OVFL)
+		WT_CACHE_DECR(session, cache->bytes_overflow, size);
 }
 
 /*
@@ -970,7 +980,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) &&
+	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
 
@@ -991,6 +1001,20 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	/*
 	 * If we aren't (potentially) doing eviction that can restore updates
 	 * and the updates on this page are too recent, give up.
+	 *
+	 * Don't rely on new updates being skipped by the transaction used
+	 * for transaction reads: (1) there are paths that dirty pages for
+	 * artificial reasons; (2) internal pages aren't transactional; and
+	 * (3) if an update was skipped during the checkpoint (leaving the page
+	 * dirty), then rolled back, we could still successfully overwrite a
+	 * page and corrupt the checkpoint.
+	 *
+	 * Further, we can't race with the checkpoint's reconciliation of
+	 * an internal page as we evict a clean child from the page's subtree.
+	 * This works in the usual way: eviction locks the page and then checks
+	 * for existing hazard pointers, the checkpoint thread reconciling an
+	 * internal page acquires hazard pointers on child pages it reads, and
+	 * is blocked by the exclusive lock.
 	 */
 	if (page->read_gen != WT_READGEN_OLDEST &&
 	    !__wt_txn_visible_all(session, __wt_page_is_modified(page) ?
@@ -999,7 +1023,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 
 	/*
 	 * If the page was recently split in-memory, don't force it out: we
-	 * hope eviction will find it first.
+	 * hope an eviction thread will find it first.
 	 */
 	if (check_splits &&
 	    !__wt_txn_visible_all(session, mod->inmem_split_txn))
@@ -1113,6 +1137,13 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 {
 	WT_DECL_RET;
 	int acquired;
+
+	/*
+	 * In rare cases when walking the tree, we try to swap to the same
+	 * page.  Fast-path that to avoid thinking about error handling.
+	 */
+	if (held == want)
+		return (0);
 
 	/*
 	 * This function is here to simplify the error handling during hazard

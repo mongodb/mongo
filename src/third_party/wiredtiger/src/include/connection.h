@@ -242,7 +242,7 @@ struct __wt_connection_impl {
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
-	long		 ckpt_usecs;	/* Checkpoint period */
+	uint64_t	 ckpt_usecs;	/* Checkpoint period */
 
 	int compact_in_memory_pass;	/* Compaction serialization */
 
@@ -304,7 +304,7 @@ struct __wt_connection_impl {
 	char		*stat_path;	/* Statistics log path format */
 	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
-	long		 stat_usecs;	/* Statistics log period */
+	uint64_t	 stat_usecs;	/* Statistics log period */
 
 #define	WT_CONN_LOG_ARCHIVE	0x01	/* Archive is enabled */
 #define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */
@@ -335,6 +335,8 @@ struct __wt_connection_impl {
 	wt_thread_t	 sweep_tid;	/* Handle sweep thread */
 	int		 sweep_tid_set;	/* Handle sweep thread set */
 	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
+	time_t		 sweep_idle_time;/* Handle sweep idle time */
+	time_t		 sweep_interval;/* Handle sweep interval */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

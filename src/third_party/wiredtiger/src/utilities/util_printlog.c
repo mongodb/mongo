@@ -45,7 +45,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 
 	if (ret != 0) {
 		fprintf(stderr, "%s: printlog failed: %s\n",
-		    progname, wiredtiger_strerror(ret));
+		    progname, session->strerror(session, ret));
 		goto err;
 	}
 

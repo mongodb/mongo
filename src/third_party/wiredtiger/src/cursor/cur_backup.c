@@ -11,7 +11,6 @@
 static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, int);
-static int __backup_file_remove(WT_SESSION_IMPL *);
 static int __backup_list_all_append(WT_SESSION_IMPL *, const char *[]);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
@@ -249,10 +248,7 @@ __backup_start(
 		 * Close any hot backup file.
 		 * We're about to open the incremental backup file.
 		 */
-		if (cb->bfp != NULL) {
-			WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
-			cb->bfp = NULL;
-		}
+		WT_TRET(__wt_fclose(session, &cb->bfp, WT_FHANDLE_WRITE));
 		WT_ERR(__backup_file_create(session, cb, log_only));
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_INCREMENTAL_BACKUP));
@@ -270,10 +266,7 @@ __backup_start(
 	}
 
 err:	/* Close the hot backup file. */
-	if (cb->bfp != NULL) {
-		WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
-		cb->bfp = NULL;
-	}
+	WT_TRET(__wt_fclose(session, &cb->bfp, WT_FHANDLE_WRITE));
 	if (ret != 0) {
 		WT_TRET(__backup_cleanup_handles(session, cb));
 		WT_TRET(__backup_stop(session));
@@ -322,7 +315,7 @@ __backup_stop(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	/* Remove any backup specific file. */
-	ret = __backup_file_remove(session);
+	ret = __wt_backup_file_remove(session);
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
 	__wt_spin_lock(session, &conn->hot_backup_lock);
@@ -354,8 +347,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_ERR(cursor->get_key(cursor, &key));
 		WT_ERR(cursor->get_value(cursor, &value));
-		WT_ERR_TEST((fprintf(
-		    cb->bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
+		WT_ERR(__wt_fprintf(session, cb->bfp, "%s\n%s\n", key, value));
 
 		/*
 		 * While reading the metadata file, check there are no "sources"
@@ -462,37 +454,22 @@ static int
 __backup_file_create(
     WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, int incremental)
 {
-	WT_DECL_RET;
-	char *path;
-
-	/* Open the hot backup file. */
-	if (incremental)
-		WT_RET(__wt_filename(session, WT_INCREMENTAL_BACKUP, &path));
-	else
-		WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
-	WT_ERR_TEST((cb->bfp = fopen(path, "w")) == NULL, __wt_errno());
-
-err:	__wt_free(session, path);
-	return (ret);
+	return (__wt_fopen(session,
+	    incremental ? WT_INCREMENTAL_BACKUP : WT_METADATA_BACKUP,
+	    WT_FHANDLE_WRITE, 0, &cb->bfp));
 }
 
 /*
- * __backup_file_remove --
- *	Remove the meta-data backup file.
+ * __wt_backup_file_remove --
+ *	Remove the incremental and meta-data backup files.
  */
-static int
-__backup_file_remove(WT_SESSION_IMPL *session)
+int
+__wt_backup_file_remove(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	int exist;
 
-	WT_ERR(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist));
-	if (exist)
-		WT_ERR(__wt_remove(session, WT_INCREMENTAL_BACKUP));
-	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
-	if (exist)
-		WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));
-err:
+	WT_TRET(__wt_remove_if_exists(session, WT_INCREMENTAL_BACKUP));
+	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_BACKUP));
 	return (ret);
 }
 
@@ -518,8 +495,7 @@ __wt_backup_list_uri_append(
 
 	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_search(session, name, &value));
-	WT_RET_TEST(
-	    (fprintf(cb->bfp, "%s\n%s\n", name, value) < 0), __wt_errno());
+	WT_RET(__wt_fprintf(session, cb->bfp, "%s\n%s\n", name, value));
 	__wt_free(session, value);
 
 	/* Add file type objects to the list of files to be copied. */

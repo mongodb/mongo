@@ -185,15 +185,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval, metadata;
-	WT_CONNECTION_IMPL *conn;
-	WT_NAMED_COMPRESSOR *ncomp;
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
 	const char **cfg;
 
 	btree = S2BT(session);
-	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
 
 	/* Dump out format information. */
@@ -212,7 +209,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
-	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	WT_RET(__wt_struct_confchk(session, &cval));
 	if (WT_STRING_MATCH("r", cval.str, cval.len))
 		btree->type = BTREE_COL_VAR;
 	else
@@ -220,18 +217,19 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->key_format));
 
 	WT_RET(__wt_config_gets(session, cfg, "value_format", &cval));
-	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	WT_RET(__wt_struct_confchk(session, &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(
-		    __wt_config_gets(session, cfg, "app_metadata", &metadata));
 		WT_RET(__wt_config_gets_none(session, cfg, "collator", &cval));
-		if (cval.len != 0)
+		if (cval.len != 0) {
+			WT_RET(__wt_config_gets(
+			    session, cfg, "app_metadata", &metadata));
 			WT_RET(__wt_collator_config(
 			    session, btree->dhandle->name, &cval, &metadata,
 			    &btree->collator, &btree->collator_owned));
+		}
 
 		WT_RET(__wt_config_gets(session, cfg, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
@@ -307,17 +305,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	}
 
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
-	if (cval.len > 0) {
-		TAILQ_FOREACH(ncomp, &conn->compqh, q)
-			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
-				btree->compressor = ncomp->compressor;
-				break;
-			}
-		if (btree->compressor == NULL)
-			WT_RET_MSG(session, EINVAL,
-			    "unknown block compressor '%.*s'",
-			    (int)cval.len, cval.str);
-	}
+	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(
@@ -376,9 +364,9 @@ __wt_btree_tree_open(
 	 * the page steals it.
 	 */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
+	WT_ERR(__wt_page_inmem(session, NULL, dsk.data, dsk.memsize,
 	    WT_DATA_IN_ITEM(&dsk) ?
-	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED , &page));
+	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 	dsk.mem = NULL;
 
 	/* Finish initializing the root, root reference links. */
@@ -623,10 +611,10 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * When a page is forced to split, we want at least 50 entries on its
 	 * parent.
 	 *
-	 * Don't let pages grow to more than half the cache size.  Otherwise,
-	 * with very small caches, we can end up in a situation where nothing
-	 * can be evicted.  Take care getting the cache size: with a shared
-	 * cache, it may not have been set.
+	 * Don't let pages grow larger than a quarter of the cache, with too-
+	 * small caches, we can end up in a situation where nothing can be
+	 * evicted.  Take care getting the cache size: with a shared cache,
+	 * it may not have been set.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
 	btree->maxmempage =

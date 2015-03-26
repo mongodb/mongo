@@ -116,8 +116,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	 * underlying file-close code uses the mutex to guard lists of
 	 * open files.
 	 */
-	if (conn->lock_fh != NULL)
-		WT_TRET(__wt_close(session, conn->lock_fh));
+	WT_TRET(__wt_close(session, &conn->lock_fh));
 
 	/* Remove from the list of connections. */
 	__wt_spin_lock(session, &__wt_process.spinlock);

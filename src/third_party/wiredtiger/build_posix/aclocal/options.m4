@@ -13,6 +13,8 @@ no)	wt_cv_enable_attach=no;;
 esac
 AC_MSG_RESULT($wt_cv_enable_attach)
 
+AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_LZ4,
+	    [LZ4 support automatically loaded.])
 AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_SNAPPY,
 	    [Snappy support automatically loaded.])
 AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_ZLIB,
@@ -20,7 +22,7 @@ AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_ZLIB,
 AC_MSG_CHECKING(if --with-builtins option specified)
 AC_ARG_WITH(builtins,
 	[AS_HELP_STRING([--with-builtins],
-	    [builtin extension names (snappy, zlib).])],
+	    [builtin extension names (lz4, snappy, zlib).])],
 	    [with_builtins=$withval],
 	    [with_builtins=])
 
@@ -28,6 +30,8 @@ AC_ARG_WITH(builtins,
 builtin_list=`echo "$with_builtins"|tr -s , ' '`
 for builtin_i in $builtin_list; do
 	case "$builtin_i" in
+	lz4)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_LZ4)
+		wt_cv_with_builtin_extension_lz4=yes;;
 	snappy)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_SNAPPY)
 		wt_cv_with_builtin_extension_snappy=yes;;
 	zlib)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_ZLIB)
@@ -35,6 +39,8 @@ for builtin_i in $builtin_list; do
 	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
 	esac
 done
+AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_LZ4],
+    [test "$wt_cv_with_builtin_extension_lz4" = "yes"])
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_SNAPPY],
     [test "$wt_cv_with_builtin_extension_snappy" = "yes"])
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
@@ -167,6 +173,34 @@ if test "$wt_cv_enable_snappy" = "yes"; then
 	    [AC_MSG_ERROR([--enable-snappy requires snappy library])])
 fi
 AM_CONDITIONAL([SNAPPY], [test "$wt_cv_enable_snappy" = "yes"])
+
+AC_MSG_CHECKING(if --enable-lz4 option specified)
+AC_ARG_ENABLE(lz4,
+	[AS_HELP_STRING([--enable-lz4],
+	    [Build the lz4 compressor extension.])], r=$enableval, r=no)
+case "$r" in
+no)	if test "$wt_cv_with_builtin_extension_lz4" = "yes"; then
+		wt_cv_enable_lz4=yes
+	else
+		wt_cv_enable_lz4=no
+	fi
+	;;
+*)	if test "$wt_cv_with_builtin_extension_lz4" = "yes"; then
+		AC_MSG_ERROR(
+		   [Only one of --enable-lz4 --with-builtins=lz4 allowed])
+	fi
+	wt_cv_enable_lz4=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_lz4)
+if test "$wt_cv_enable_lz4" = "yes"; then
+	AC_LANG_PUSH([C++])
+	AC_CHECK_HEADER(lz4.h,,
+	    [AC_MSG_ERROR([--enable-lz4 requires lz4.h])])
+	AC_LANG_POP([C++])
+	AC_CHECK_LIB(lz4, LZ4_compress,,
+	    [AC_MSG_ERROR([--enable-lz4 requires lz4 library])])
+fi
+AM_CONDITIONAL([LZ4], [test "$wt_cv_enable_lz4" = "yes"])
 
 AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
 AC_MSG_CHECKING(if --with-spinlock option specified)

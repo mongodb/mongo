@@ -83,6 +83,10 @@ wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 
 	session = ps->pack.session;
 
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'U':
@@ -109,6 +113,10 @@ wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i)
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
 
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
@@ -139,6 +147,10 @@ wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s)
 
 	session = ps->pack.session;
 
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'S':
@@ -164,6 +176,10 @@ wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u)
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
 
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
@@ -197,6 +213,10 @@ wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
 
 	session = ps->pack.session;
 
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'U':
@@ -223,6 +243,10 @@ wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip)
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
 
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
@@ -252,6 +276,10 @@ wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp)
 
 	session = ps->pack.session;
 
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
+
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {
 	case 'S':
@@ -276,6 +304,10 @@ wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up)
 	WT_SESSION_IMPL *session;
 
 	session = ps->pack.session;
+
+	/* Lower-level packing routines treat a length of zero as unchecked. */
+	if (ps->p >= ps->end)
+		return (ENOMEM);
 
 	WT_RET(__pack_next(&ps->pack, &pv));
 	switch (pv.type) {

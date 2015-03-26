@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_srcdir)
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src/include
 
 JAVADEST = src/com/wiredtiger/db
 JAVADESTFULL = $(srcdir)/$(JAVADEST)

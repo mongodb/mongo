@@ -221,7 +221,7 @@ __wt_log_extract_lognum(
 	if (id == NULL || name == NULL)
 		return (WT_ERROR);
 	if ((p = strrchr(name, '.')) == NULL ||
-	    sscanf(++p, "%" PRIu32, id) != 1)
+	    sscanf(++p, "%" SCNu32, id) != 1)
 		WT_RET_MSG(session, WT_ERROR, "Bad log file name '%s'", name);
 	return (0);
 }
@@ -529,8 +529,7 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &from_path));
 	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-	WT_ERR(__log_filename(session,
-	    from_num, WT_LOG_PREPNAME, from_path));
+	WT_ERR(__log_filename(session, from_num, WT_LOG_PREPNAME, from_path));
 	WT_ERR(__log_filename(session, to_num, WT_LOG_FILENAME, to_path));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_alloc_prealloc: rename log %s to %s",
@@ -585,7 +584,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 	tmp_fh = log_fh;
 	log_fh = NULL;
 	WT_ERR(__wt_fsync(session, tmp_fh));
-	WT_ERR(__wt_close(session, tmp_fh));
+	WT_ERR(__wt_close(session, &tmp_fh));
 
 	/*
 	 * If we just want to truncate the current log, return and skip
@@ -609,11 +608,10 @@ __log_truncate(WT_SESSION_IMPL *session,
 			tmp_fh = log_fh;
 			log_fh = NULL;
 			WT_ERR(__wt_fsync(session, tmp_fh));
-			WT_ERR(__wt_close(session, tmp_fh));
+			WT_ERR(__wt_close(session, &tmp_fh));
 		}
 	}
-err:	if (log_fh != NULL)
-		WT_TRET(__wt_close(session, log_fh));
+err:	WT_TRET(__wt_close(session, &log_fh));
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
@@ -660,7 +658,7 @@ __wt_log_allocfile(
 	tmp_fh = log_fh;
 	log_fh = NULL;
 	WT_ERR(__wt_fsync(session, tmp_fh));
-	WT_ERR(__wt_close(session, tmp_fh));
+	WT_ERR(__wt_close(session, &tmp_fh));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_prealloc: rename %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
@@ -671,8 +669,7 @@ __wt_log_allocfile(
 
 err:	__wt_scr_free(session, &from_path);
 	__wt_scr_free(session, &to_path);
-	if (log_fh != NULL)
-		WT_TRET(__wt_close(session, log_fh));
+	WT_TRET(__wt_close(session, &log_fh));
 	return (ret);
 }
 
@@ -805,20 +802,20 @@ __wt_log_close(WT_SESSION_IMPL *session)
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing old log %s", log->log_close_fh->name));
 		WT_RET(__wt_fsync(session, log->log_close_fh));
-		WT_RET(__wt_close(session, log->log_close_fh));
+		WT_RET(__wt_close(session, &log->log_close_fh));
 	}
 	if (log->log_fh != NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log %s", log->log_fh->name));
 		WT_RET(__wt_fsync(session, log->log_fh));
-		WT_RET(__wt_close(session, log->log_fh));
+		WT_RET(__wt_close(session, &log->log_fh));
 		log->log_fh = NULL;
 	}
 	if (log->log_dir_fh != NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "closing log directory %s", log->log_dir_fh->name));
 		WT_RET(__wt_directory_sync_fh(session, log->log_dir_fh));
-		WT_RET(__wt_close(session, log->log_dir_fh));
+		WT_RET(__wt_close(session, &log->log_dir_fh));
 		log->log_dir_fh = NULL;
 	}
 	return (0);
@@ -1230,7 +1227,7 @@ __log_read_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	record->size = logrec->len;
 	WT_STAT_FAST_CONN_INCR(session, log_reads);
 err:
-	WT_TRET(__wt_close(session, log_fh));
+	WT_TRET(__wt_close(session, &log_fh));
 	return (ret);
 }
 
@@ -1353,7 +1350,7 @@ advance:
 			/*
 			 * If we read the last record, go to the next file.
 			 */
-			WT_ERR(__wt_close(session, log_fh));
+			WT_ERR(__wt_close(session, &log_fh));
 			log_fh = NULL;
 			eol = 1;
 			/*
@@ -1382,7 +1379,7 @@ advance:
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
 		/*
-		 * First 8 bytes is the real record length.  See if we
+		 * First 4 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
 		 * that we rarely will have to read more.  Most log records
 		 * will be fairly small.
@@ -1397,6 +1394,7 @@ advance:
 		 */
 		if (reclen == 0) {
 			/* This LSN is the end. */
+			eol = 1;
 			break;
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);
@@ -1480,8 +1478,7 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 		ret = WT_NOTFOUND;
 	if (ret == ENOENT)
 		ret = 0;
-	if (log_fh != NULL)
-		WT_TRET(__wt_close(session, log_fh));
+	WT_TRET(__wt_close(session, &log_fh));
 	return (ret);
 }
 

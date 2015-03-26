@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#define	WT_SIZET_FMT	"zu"			/* size_t format string */
+
 #define	WT_COMPILER_TYPE_ALIGN(x)
 
 #define	WT_PACKED_STRUCT_BEGIN(name)					\

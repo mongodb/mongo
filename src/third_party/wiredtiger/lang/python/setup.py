@@ -36,7 +36,7 @@ if not 'ARCHFLAGS' in os.environ:
     os.environ['ARCHFLAGS'] = ''
 
 # Suppress warnings building SWIG generated code
-extra_cflags = [ '-w' ]
+extra_cflags = [ '-w', '-I../../src/include']
 
 dir = os.path.dirname(__file__)
 
