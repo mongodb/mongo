@@ -46,7 +46,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 	DWORD milliseconds;
 	WT_DECL_RET;
 	uint64_t milliseconds64;
-	int lasterror, locked;
+	int locked;
 
 	locked = 0;
 
@@ -76,7 +76,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 		 */
 		if (milliseconds64 >= INFINITE)
 			milliseconds64 = INFINITE - 1;
-		milliseconds = milliseconds64;
+		milliseconds = (DWORD)milliseconds64;
 
 		/*
 		 * 0 would mean the CV sleep becomes a TryCV which we do not

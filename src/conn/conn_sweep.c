@@ -132,7 +132,7 @@ __sweep(WT_SESSION_IMPL *session)
  * __sweep_server --
  *	The handle sweep server thread.
  */
-static void *
+static WT_THREAD_RET
 __sweep_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -158,7 +158,7 @@ __sweep_server(void *arg)
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "handle sweep server error");
 	}
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*

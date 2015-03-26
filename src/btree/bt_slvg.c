@@ -124,7 +124,7 @@ static int  __slvg_col_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static void __slvg_col_trk_update_start(uint32_t, WT_STUFF *);
 static int  __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
-static int  __slvg_ovfl_compare(const void *, const void *);
+static int WT_CDECL __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_ref(WT_SESSION_IMPL *, WT_TRACK *, int);
@@ -140,9 +140,9 @@ static int  __slvg_row_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static int  __slvg_row_trk_update_start(
 		WT_SESSION_IMPL *, WT_ITEM *, uint32_t, WT_STUFF *);
-static int  __slvg_trk_compare_addr(const void *, const void *);
-static int  __slvg_trk_compare_gen(const void *, const void *);
-static int  __slvg_trk_compare_key(const void *, const void *);
+static int  WT_CDECL __slvg_trk_compare_addr(const void *, const void *);
+static int  WT_CDECL __slvg_trk_compare_gen(const void *, const void *);
+static int  WT_CDECL __slvg_trk_compare_key(const void *, const void *);
 static int  __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, int);
 static void __slvg_trk_free_addr(WT_SESSION_IMPL *, WT_TRACK *);
 static int  __slvg_trk_init(WT_SESSION_IMPL *, uint8_t *,
@@ -2098,7 +2098,7 @@ __slvg_row_ovfl(WT_SESSION_IMPL *session,
  * __slvg_trk_compare_addr --
  *	Compare two WT_TRACK array entries by address cookie.
  */
-static int
+static int WT_CDECL
 __slvg_trk_compare_addr(const void *a, const void *b)
 {
 	WT_DECL_RET;
@@ -2124,7 +2124,7 @@ __slvg_trk_compare_addr(const void *a, const void *b)
  * __slvg_ovfl_compare --
  *	Bsearch comparison routine for the overflow array.
  */
-static int
+static int WT_CDECL
 __slvg_ovfl_compare(const void *a, const void *b)
 {
 	WT_ADDR *addr;
@@ -2163,6 +2163,7 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	 * with the lowest LSNs until overflow pages are only referenced once.
 	 *
 	 * This requires sorting the page list by LSN, and the overflow array
+
 	 * by address cookie.
 	 */
 	qsort(ss->pages,
@@ -2246,7 +2247,7 @@ err:	__wt_free(session, slot);
  * __slvg_trk_compare_key --
  *	Compare two WT_TRACK array entries by key, and secondarily, by LSN.
  */
-static int
+static int WT_CDECL
 __slvg_trk_compare_key(const void *a, const void *b)
 {
 	WT_SESSION_IMPL *session;
@@ -2303,7 +2304,7 @@ __slvg_trk_compare_key(const void *a, const void *b)
  * __slvg_trk_compare_gen --
  *	Compare two WT_TRACK array entries by LSN.
  */
-static int
+static int WT_CDECL
 __slvg_trk_compare_gen(const void *a, const void *b)
 {
 	WT_TRACK *a_trk, *b_trk;

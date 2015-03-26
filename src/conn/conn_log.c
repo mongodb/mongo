@@ -273,7 +273,7 @@ err:
  * __log_close_server --
  *	The log close server thread.
  */
-static void *
+static WT_THREAD_RET
 __log_close_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -332,7 +332,7 @@ err:		__wt_err(session, ret, "log close server error");
 	}
 	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -347,7 +347,7 @@ typedef struct {
  * __log_wrlsn_cmp --
  *	The log wrlsn comparison function for qsort.
  */
-static int
+static int WT_CDECL
 __log_wrlsn_cmp(const void *a, const void *b)
 {
 	WT_LOG_WRLSN_ENTRY *ae, *be;
@@ -361,7 +361,7 @@ __log_wrlsn_cmp(const void *a, const void *b)
  * __log_wrlsn_server --
  *	The log wrlsn server thread.
  */
-static void *
+static WT_THREAD_RET
 __log_wrlsn_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -450,14 +450,14 @@ __log_wrlsn_server(void *arg)
 
 	if (0)
 err:		__wt_err(session, ret, "log wrlsn server error");
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
  * __log_server --
  *	The log server thread.
  */
-static void *
+static WT_THREAD_RET
 __log_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -502,7 +502,7 @@ err:		__wt_err(session, ret, "log server error");
 	}
 	if (locked)
 		(void)__wt_writeunlock(session, log->log_archive_lock);
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
