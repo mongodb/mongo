@@ -10,7 +10,7 @@
 
 static int __lsm_worker_general_op(
     WT_SESSION_IMPL *, WT_LSM_WORKER_ARGS *, int *);
-static void * __lsm_worker(void *);
+static WT_THREAD_RET __lsm_worker(void *);
 
 /*
  * __wt_lsm_worker_start --
@@ -82,7 +82,7 @@ err:	__wt_lsm_manager_free_work_unit(session, entry);
  * __lsm_worker --
  *	A thread that executes work units for all open LSM trees.
  */
-static void *
+static WT_THREAD_RET
 __lsm_worker(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -166,5 +166,5 @@ err:		__wt_lsm_manager_free_work_unit(session, entry);
 		WT_PANIC_MSG(session, ret,
 		    "Error in LSM worker thread %d", cookie->id);
 	}
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }

@@ -181,11 +181,13 @@ __async_config(WT_SESSION_IMPL *session,
 	*runp = cval.val != 0;
 
 	/*
-	 * Even if async is turned off, we want to parse and store the
-	 * default values so that reconfigure can just enable them.
+	 * Even if async is turned off, we want to parse and store the default
+	 * values so that reconfigure can just enable them.
+	 *
+	 * Bound the minimum maximum operations at 10.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "async.ops_max", &cval));
-	conn->async_size = (uint32_t)cval.val;
+	conn->async_size = (uint32_t)WT_MAX(cval.val, 10);
 
 	WT_RET(__wt_config_gets(session, cfg, "async.threads", &cval));
 	conn->async_workers = (uint32_t)cval.val;

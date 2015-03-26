@@ -72,16 +72,14 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(value);
 	WT_DECL_RET;
-	char *path;
-
-	path = NULL;
+	int exist;
 
 	/* Look for a hot backup file: if we find it, load it. */
-	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
-	fp = fopen(path, "r");
-	__wt_free(session, path);
-	if (fp == NULL)
+	WT_RET(__wt_exist(session, WT_METADATA_BACKUP, &exist));
+	if (!exist)
 		return (0);
+	WT_RET(__wt_fopen(session,
+	    WT_METADATA_BACKUP, WT_FHANDLE_READ, 0, &fp));
 
 	/* Read line pairs and load them into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 512, &key));
@@ -98,7 +96,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 
 	F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
-err:	WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_READ));
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &value);
 	return (ret);
@@ -166,9 +164,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * Discard any turtle setup file left-over from previous runs.  This
 	 * doesn't matter for correctness, it's just cleaning up random files.
 	 */
-	WT_RET(__wt_exist(session, WT_METADATA_TURTLE_SET, &exist));
-	if (exist)
-		WT_RET(__wt_remove(session, WT_METADATA_TURTLE_SET));
+	WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET));
 
 	/*
 	 * We could die after creating the turtle file and before creating the
@@ -209,12 +205,8 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	WT_RET(__metadata_config(session, &metaconf));
 	WT_ERR(__wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 
-	/* Remove the backup file if it exists, we'll never read it again. */
-	if (exist_incr)
-		WT_ERR(__wt_remove(session, WT_INCREMENTAL_BACKUP));
-	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
-	if (exist)
-		WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));
+	/* Remove the backup files, we'll never read them again. */
+	WT_ERR(__wt_backup_file_remove(session));
 
 err:	__wt_free(session, metaconf);
 	return (ret);
@@ -230,12 +222,9 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	FILE *fp;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	int match;
-	char *path;
+	int exist, match;
 
 	*valuep = NULL;
-
-	path = NULL;
 
 	/*
 	 * Open the turtle file; there's one case where we won't find the turtle
@@ -243,13 +232,12 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	 * the turtle file, and that means returning the default configuration
 	 * string for the metadata file.
 	 */
-	WT_RET(__wt_filename(session, WT_METADATA_TURTLE, &path));
-	if ((fp = fopen(path, "r")) == NULL)
-		ret = __wt_errno();
-	__wt_free(session, path);
-	if (fp == NULL)
+	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
+	if (!exist)
 		return (strcmp(key, WT_METAFILE_URI) == 0 ?
-		    __metadata_config(session, valuep) : ret);
+		    __metadata_config(session, valuep) : WT_NOTFOUND);
+	WT_RET(__wt_fopen(session,
+	    WT_METADATA_TURTLE, WT_FHANDLE_READ, 0, &fp));
 
 	/* Search for the key. */
 	WT_ERR(__wt_scr_alloc(session, 512, &buf));
@@ -271,7 +259,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	/* Copy the value for the caller. */
 	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
-err:	WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_READ));
 	__wt_scr_free(session, &buf);
 	return (ret);
 }
@@ -300,34 +288,22 @@ __wt_turtle_update(
 	    session, WT_METADATA_TURTLE_SET, 1, 1, WT_FILE_TYPE_TURTLE, &fh));
 
 	version = wiredtiger_version(&vmajor, &vminor, &vpatch);
-	WT_ERR(__wt_scr_alloc(session, 1000, &buf));
+	WT_ERR(__wt_scr_alloc(session, 2 * 1024, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s\n%s\n%s\n" "major=%d,minor=%d,patch=%d\n%s\n%s\n",
 	    WT_METADATA_VERSION_STR, version,
 	    WT_METADATA_VERSION, vmajor, vminor, vpatch,
 	    key, value));
-
 	WT_ERR(__wt_write(session, fh, 0, buf->size, buf->data));
 
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
-		WT_ERR(__wt_fsync(session, fh));
+	/* Flush the handle and rename the file into place. */
+	ret = __wt_sync_and_rename_fh(
+	    session, &fh, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
 
-	ret = __wt_close(session, fh);
-	fh = NULL;
-	WT_ERR(ret);
+	/* Close any file handle left open, remove any temporary file. */
+err:	WT_TRET(__wt_close(session, &fh));
+	WT_TRET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET));
 
-	WT_ERR(
-	    __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
-
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
-		WT_ERR(__wt_directory_sync(session, NULL));
-
-	if (0) {
-err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
-	}
-
-	if  (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
 	__wt_scr_free(session, &buf);
 	return (ret);
 }

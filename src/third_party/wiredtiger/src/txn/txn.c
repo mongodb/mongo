@@ -12,7 +12,7 @@
  * __wt_txnid_cmp --
  *	Compare transaction IDs for sorting / searching.
  */
-int
+int WT_CDECL
 __wt_txnid_cmp(const void *v1, const void *v2)
 {
 	uint64_t id1, id2;
@@ -142,15 +142,20 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+		/* Skip the checkpoint transaction; it is never read from. */
+		if (txn_global->checkpoint_id != WT_TXN_NONE &&
+		    s->id == txn_global->checkpoint_id)
+			continue;
+
 		/*
 		 * Build our snapshot of any concurrent transaction IDs.
 		 *
-		 * Ignore our own ID: we always read our own updates.
-		 *
-		 * Also ignore the ID if it is older than the oldest ID we saw.
-		 * This can happen if we race with a thread that is allocating
-		 * an ID -- the ID will not be used because the thread will
-		 * keep spinning until it gets a valid one.
+		 * Ignore:
+		 *  - Our own ID: we always read our own updates.
+		 *  - The ID if it is older than the oldest ID we saw. This
+		 *    can happen if we race with a thread that is allocating
+		 *    an ID -- the ID will not be used because the thread will
+		 *    keep spinning until it gets a valid one.
 		 */
 		if (s != txn_state &&
 		    (id = s->id) != WT_TXN_NONE &&
@@ -216,6 +221,14 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+			/*
+			 * Skip the checkpoint transaction; it is never read
+			 * from.
+			 */
+			if (txn_global->checkpoint_id != WT_TXN_NONE &&
+			    s->id == txn_global->checkpoint_id)
+				continue;
+
 			if ((id = s->id) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_id))
 				oldest_id = id;
@@ -499,13 +512,19 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	WT_TXN_GLOBAL *txn_global;
 	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS *stats;
+	uint64_t checkpoint_snap_min;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 	stats = &conn->stats;
+	checkpoint_snap_min = txn_global->checkpoint_snap_min;
 
 	WT_STAT_SET(stats, txn_pinned_range,
 	    txn_global->current - txn_global->oldest_id);
+
+	WT_STAT_SET(stats, txn_pinned_checkpoint_range,
+	    checkpoint_snap_min == WT_TXN_NONE ?
+	    0 : txn_global->current - checkpoint_snap_min);
 }
 
 /*

@@ -371,6 +371,8 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		cval.str++;
 		cval.len -= 2;
 	}
+	WT_ERR(__wt_config_check(session,
+	   WT_CONFIG_REF(session, session_create), cval.str, cval.len));
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->bloom_config));
 
@@ -728,7 +730,7 @@ __wt_lsm_tree_throttle(
 		timediff =
 		    WT_TIMEDIFF(last_chunk->create_ts, ondisk->create_ts);
 		lsm_tree->ckpt_throttle =
-		    (long)((in_memory - 2) * timediff / (20 * record_count));
+		    (in_memory - 2) * timediff / (20 * record_count);
 
 		/*
 		 * Get more aggressive as the number of in memory chunks
@@ -827,8 +829,8 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    nchunks + 1, &lsm_tree->chunk));
 
 	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-	    "Tree %s switch to: %" PRIu32 ", checkpoint throttle %ld, "
-	    "merge throttle %ld", lsm_tree->name,
+	    "Tree %s switch to: %" PRIu32 ", checkpoint throttle %" PRIu64
+	    ", merge throttle %" PRIu64, lsm_tree->name,
 	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle));
 
 	WT_ERR(__wt_calloc_one(session, &chunk));

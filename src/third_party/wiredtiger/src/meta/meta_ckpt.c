@@ -230,7 +230,7 @@ err:		__wt_free(session, namep);
  * __ckpt_compare_order --
  *	Qsort comparison routine for the checkpoint list.
  */
-static int
+static int WT_CDECL
 __ckpt_compare_order(const void *a, const void *b)
 {
 	WT_CKPT *ackpt, *bckpt;

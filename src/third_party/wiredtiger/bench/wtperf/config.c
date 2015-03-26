@@ -149,6 +149,9 @@ config_compress(CONFIG *cfg)
 	} else if (strcmp(s, "bzip") == 0) {
 		cfg->compress_ext = BZIP_EXT;
 		cfg->compress_table = BZIP_BLK;
+	} else if (strcmp(s, "lz4") == 0) {
+		cfg->compress_ext = LZ4_EXT;
+		cfg->compress_table = LZ4_BLK;
 	} else if (strcmp(s, "snappy") == 0) {
 		cfg->compress_ext = SNAPPY_EXT;
 		cfg->compress_table = SNAPPY_BLK;

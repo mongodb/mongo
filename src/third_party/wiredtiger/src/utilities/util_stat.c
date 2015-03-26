@@ -54,7 +54,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		objname = (char *)"";
 		break;
 	case 1:
-		if ((objname = util_name(*argv, "table")) == NULL)
+		if ((objname = util_name(session, *argv, "table")) == NULL)
 			return (1);
 		objname_free = 1;
 		break;
@@ -73,7 +73,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-		    progname, uri, wiredtiger_strerror(ret));
+		    progname, uri, session->strerror(session, ret));
 		goto err;
 	}
 
@@ -90,7 +90,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 
 	if (ret != 0) {
 		fprintf(stderr, "%s: cursor get(%s) failed: %s\n",
-		    progname, objname, wiredtiger_strerror(ret));
+		    progname, objname, session->strerror(session, ret));
 		goto err;
 	}
 

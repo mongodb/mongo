@@ -188,7 +188,7 @@ free:	trk->op = WT_ST_EMPTY;
  *	Turn off metadata operation tracking, unrolling on error.
  */
 int
-__wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
+__wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll)
 {
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
@@ -218,13 +218,28 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 		WT_TRET(__meta_track_apply(session, trk, unroll));
 
 	/*
-	 * If the operation succeeded and we aren't relying on the log for
-	 * durability, checkpoint the metadata.
+	 * Unroll operations don't need to flush the metadata.
+	 *
+	 * Also, if we don't have the metadata handle (e.g, we're in the
+	 * process of creating the metadata), we can't sync it.
 	 */
-	if (!unroll && ret == 0 && session->meta_dhandle != NULL &&
-	    !FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
+	if (unroll || ret != 0 || !need_sync || session->meta_dhandle == NULL)
+		return (ret);
+
+	/* If we're logging, make sure the metadata update was flushed. */
+	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
+		if (!FLD_ISSET(S2C(session)->txn_logsync,
+		    WT_LOG_DSYNC | WT_LOG_FSYNC))
+			WT_WITH_DHANDLE(session, session->meta_dhandle,
+			    ret = __wt_txn_checkpoint_log(session,
+			    0, WT_TXN_LOG_CKPT_SYNC, NULL));
+	} else {
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint(session, NULL));
+		WT_RET(ret);
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_checkpoint_sync(session, NULL));
+	}
 
 	return (ret);
 }

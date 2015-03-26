@@ -73,8 +73,6 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 static int
 __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 {
-	WT_PAGE_INDEX *pindex;
-
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
 	 * a count of the page type.
@@ -86,8 +84,6 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, btree_column_internal);
-		pindex = WT_INTL_INDEX_COPY(page);
-		WT_STAT_INCRV(stats, btree_entries, pindex->entries);
 		break;
 	case WT_PAGE_COL_VAR:
 		__stat_page_col_var(page, stats);
@@ -139,7 +135,10 @@ __stat_page_col_var(WT_PAGE *page, WT_DSRC_STATS *stats)
 		} else {
 			orig_deleted = 0;
 			__wt_cell_unpack(cell, unpack);
-			entry_cnt += __wt_cell_rle(unpack);
+			if (unpack->type == WT_CELL_ADDR_DEL)
+				orig_deleted = 1;
+			else
+				entry_cnt += __wt_cell_rle(unpack);
 			if (unpack->ovfl)
 				++ovfl_cnt;
 		}
@@ -165,7 +164,10 @@ __stat_page_col_var(WT_PAGE *page, WT_DSRC_STATS *stats)
 
 	/* Walk any append list. */
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
-		++entry_cnt;
+		if (WT_UPDATE_DELETED_ISSET(ins->upd))
+			++deleted_cnt;
+		else
+			++entry_cnt;
 
 	WT_STAT_INCRV(stats, btree_column_deleted, deleted_cnt);
 	WT_STAT_INCRV(stats, btree_entries, entry_cnt);
@@ -183,20 +185,12 @@ __stat_page_row_int(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
-	WT_PAGE_INDEX *pindex;
 	uint32_t i, ovfl_cnt;
 
 	btree = S2BT(session);
 	ovfl_cnt = 0;
 
 	WT_STAT_INCR(stats, btree_row_internal);
-
-	/*
-	 * The number of entries tells us the number of items on row-store
-	 * internal page.
-	 */
-	pindex = WT_INTL_INDEX_COPY(page);
-	WT_STAT_INCRV(stats, btree_entries, pindex->entries);
 
 	/*
 	 * Overflow keys are hard: we have to walk the disk image to count them,

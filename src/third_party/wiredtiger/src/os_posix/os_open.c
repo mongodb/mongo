@@ -207,13 +207,19 @@ err:		if (fh != NULL) {
  *	Close a file handle.
  */
 int
-__wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
+__wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FH *fh;
 	uint64_t bucket;
 
 	conn = S2C(session);
+
+	if (*fhp == NULL)
+		return (0);
+	fh = *fhp;
+	*fhp = NULL;
 
 	__wt_spin_lock(session, &conn->fh_lock);
 	if (fh == NULL || fh->ref == 0 || --fh->ref > 0) {

@@ -67,6 +67,9 @@ $(srcdir)/docs/man/man1/wt.1: $(srcdir)/docs/index.html
 $(srcdir)/docs/man/man3/wiredtiger.3: $(srcdir)/docs/index.html
 
 libwiredtiger_la_LIBADD =
+if HAVE_BUILTIN_EXTENSION_LZ4
+libwiredtiger_la_LIBADD += ext/compressors/lz4/libwiredtiger_lz4.la
+endif
 if HAVE_BUILTIN_EXTENSION_SNAPPY
 libwiredtiger_la_LIBADD += ext/compressors/snappy/libwiredtiger_snappy.la
 endif
