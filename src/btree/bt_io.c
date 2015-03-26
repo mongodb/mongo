@@ -133,15 +133,17 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_ITEM *ip;
-	WT_DECL_ITEM(tmp);
+	WT_DECL_ITEM(ctmp);
+	WT_DECL_ITEM(etmp);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
 	size_t len, src_len, dst_len, result_len, size;
-	int data_cksum, compression_failed;
+	int data_cksum, compression_failed, encrypted, encryption_failed;
 	uint8_t *src, *dst;
 
 	btree = S2BT(session);
 	bm = btree->bm;
+	encrypted = 0;
 
 	/* Checkpoint calls are different than standard calls. */
 	WT_ASSERT(session,
@@ -155,26 +157,26 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 */
 	dsk = buf->mem;
 	if (compressed) {
-		WT_ERR(__wt_scr_alloc(session, dsk->mem_size, &tmp));
+		WT_ERR(__wt_scr_alloc(session, dsk->mem_size, &ctmp));
 
-		memcpy(tmp->mem, buf->data, WT_BLOCK_COMPRESS_SKIP);
+		memcpy(ctmp->mem, buf->data, WT_BLOCK_COMPRESS_SKIP);
 		WT_ERR(btree->compressor->decompress(
 		    btree->compressor, &session->iface,
 		    (uint8_t *)buf->data + WT_BLOCK_COMPRESS_SKIP,
 		    buf->size - WT_BLOCK_COMPRESS_SKIP,
-		    (uint8_t *)tmp->data + WT_BLOCK_COMPRESS_SKIP,
-		    tmp->memsize - WT_BLOCK_COMPRESS_SKIP,
+		    (uint8_t *)ctmp->data + WT_BLOCK_COMPRESS_SKIP,
+		    ctmp->memsize - WT_BLOCK_COMPRESS_SKIP,
 		    &result_len));
 		WT_ASSERT(session,
 		    dsk->mem_size == result_len + WT_BLOCK_COMPRESS_SKIP);
-		tmp->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
-		ip = tmp;
+		ctmp->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
+		ip = ctmp;
 	} else {
 		WT_ASSERT(session, dsk->mem_size == buf->size);
 		ip = buf;
 	}
 	WT_ERR(__wt_verify_dsk(session, "[write-check]", ip));
-	__wt_scr_free(session, &tmp);
+	__wt_scr_free(session, &ctmp);
 #endif
 
 	/*
@@ -208,10 +210,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 		size = len + WT_BLOCK_COMPRESS_SKIP;
 		WT_ERR(bm->write_size(bm, session, &size));
-		WT_ERR(__wt_scr_alloc(session, size, &tmp));
+		WT_ERR(__wt_scr_alloc(session, size, &ctmp));
 
 		/* Skip the header bytes of the destination data. */
-		dst = (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP;
+		dst = (uint8_t *)ctmp->mem + WT_BLOCK_COMPRESS_SKIP;
 		dst_len = len;
 
 		compression_failed = 0;
@@ -244,9 +246,70 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			 * Copy in the skipped header bytes, set the final data
 			 * size.
 			 */
-			memcpy(tmp->mem, buf->mem, WT_BLOCK_COMPRESS_SKIP);
-			tmp->size = result_len;
-			ip = tmp;
+			memcpy(ctmp->mem, buf->mem, WT_BLOCK_COMPRESS_SKIP);
+			ctmp->size = result_len;
+			ip = ctmp;
+		}
+	}
+	/*
+	 * Optionally stream-compress the data, but don't compress blocks that
+	 * are already as small as they're going to get.
+	 */
+	if (btree->encryptor != NULL &&
+	    btree->encryptor->encrypt != NULL) {
+		/* Skip the header bytes of the source data. */
+		src = (uint8_t *)ip->mem + WT_BLOCK_COMPRESS_SKIP;
+		src_len = ip->size - WT_BLOCK_COMPRESS_SKIP;
+
+		/* TODO: ensure (when encryptor is added?)
+		 * that pre_size is set.
+		 */
+		/*
+		 * Compute the size needed for the destination buffer.
+		 */
+		WT_ERR(btree->encryptor->pre_size(btree->encryptor,
+		    &session->iface, src, src_len, &len));
+
+		size = len + WT_BLOCK_COMPRESS_SKIP;
+		WT_ERR(bm->write_size(bm, session, &size));
+		WT_ERR(__wt_scr_alloc(session, size, &etmp));
+
+		/* Skip the header bytes of the destination data. */
+		dst = (uint8_t *)etmp->mem + WT_BLOCK_COMPRESS_SKIP;
+		dst_len = len;
+
+		encryption_failed = 0;
+		WT_ERR(btree->encryptor->encrypt(btree->encryptor,
+		    &session->iface,
+		    src, src_len,
+		    dst, dst_len,
+		    &result_len, &encryption_failed));
+		result_len += WT_BLOCK_COMPRESS_SKIP;
+
+		/*
+		 * If encryption fails, there's not much we can do.
+		 * We cannot write the clear text, we can't ignore it,
+		 * so treat it like an IO failure.
+		 */
+		if (encryption_failed) {
+			ret = EIO;
+			__wt_err(session, ret,
+			    "%s encryption error: failed to encrypt %"
+			    WT_SIZET_FMT " bytes", btree->dhandle->name,
+			    src_len);
+			WT_ERR(ret);
+		} else {
+			/*TODO: stats*/
+			WT_STAT_FAST_DATA_INCR(session, compress_write);
+
+			encrypted = 1;
+			/*
+			 * Copy in the skipped header bytes, set the final data
+			 * size.
+			 */
+			memcpy(etmp->mem, ip->mem, WT_BLOCK_COMPRESS_SKIP);
+			etmp->size = result_len;
+			ip = etmp;
 		}
 	}
 	dsk = ip->mem;
@@ -254,6 +317,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	/* If the buffer is compressed, set the flag. */
 	if (compressed)
 		F_SET(dsk, WT_PAGE_COMPRESSED);
+	if (encrypted)
+		F_SET(dsk, WT_PAGE_ENCRYPTED);
 
 	/*
 	 * We increment the block's write generation so it's easy to identify
@@ -299,6 +364,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
 	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
 
-err:	__wt_scr_free(session, &tmp);
+err:	__wt_scr_free(session, &ctmp);
+	__wt_scr_free(session, &etmp);
 	return (ret);
 }
