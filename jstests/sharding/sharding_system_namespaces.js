@@ -23,7 +23,7 @@ var storageEngines = st.shard0.getDB("local").serverBuildInfo().storageEngines;
 
 print("Supported storage engines: " + storageEngines);
 
-if (storageEngines.indexOf("wiredTiger") >= 0) {
+if (Array.contains(storageEngines, "wiredTiger")) {
 
     function checkCollectionOptions(database) {
       var collectionsInfos = database.getCollectionInfos();
