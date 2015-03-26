@@ -42,7 +42,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablebase
     numfiles = 50
     numkv = 1000
-    ckpt=10
+    ckpt = 5
 
     types = [
         ('row', dict(tabletype='row',
@@ -103,12 +103,16 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         ref1 = stat_cursor[stat.conn.dh_conn_ref][2]
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
-        # Inactive time on a handle must be a minute or more.
-        # We've configured the sweep server to run every 2 seconds and idle
-        # time to be 6 seconds. It should take at most 8 seconds for a handle
-        # to be closed. Sleep for 12 seconds to be safe.
+
+        #
+        # We've configured checkpoints to run every 5 seconds, sweep server to
+        # run every 2 seconds and idle time to be 6 seconds. It should take
+        # about 8 seconds for a handle to be closed. Sleep for 12 seconds to be
+        # safe.
+        #
         uri = '%s.test' % self.uri
         self.session.create(uri, self.create_params)
+
         #
         # Keep inserting data to keep at least one handle active and give
         # checkpoint something to do.  Make sure checkpoint doesn't adjust
@@ -116,7 +120,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         #
         c = self.session.open_cursor(uri, None)
         k = 0
-        sleep=0
+        sleep = 0
         while sleep < 12:
             k = k+1
             c.set_key(k)
