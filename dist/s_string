@@ -28,8 +28,7 @@ check() {
 # List of files to spellchk.
 l=`(cd .. &&
     find examples ext src test -name '*.[chisy]' &&
-    find src -name '*.in') |
-    sed -e '/3rdparty/d'`
+    find src -name '*.in')`
 
 for f in $l; do
 	check $f

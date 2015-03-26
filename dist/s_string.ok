@@ -579,7 +579,6 @@ dumpcmp
 dumpfile
 dup
 eg
-emmintrin
 emp
 encodings
 endian
@@ -923,7 +922,6 @@ rb
 rbrace
 rbracket
 rdlock
-rdparty
 rduppo
 readlock
 readnear
@@ -997,7 +995,6 @@ sprintf
 src
 srch
 srvr
-sse
 sset
 ssize
 startup

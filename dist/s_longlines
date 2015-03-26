@@ -8,8 +8,7 @@ l=`(cd .. &&
     find bench/wtperf examples ext src test -name '*.[chisy]' &&
     find dist -name '*.py' &&
     find src -name '*.in') |
-    sed -e '/3rdparty/d' \
-	-e '/include\/extern\.h/d'\
+    sed -e '/include\/extern\.h/d'\
 	-e '/support\/stat\.c/d'`
 
 for f in $l ; do
