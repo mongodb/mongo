@@ -11,7 +11,6 @@
 						/* 16B alignment */
 #define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
 #define	WT_VECTOR_SIZE		16		/* chunk size */
-#define	WT_MIN_KEY_VECTORIZE	32		/* minimum vectorized key */
 #endif
 
 /*
@@ -40,7 +39,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	treep = tree_item->data;
 
 #if defined(__GNUC__) && defined(__SSE2__)
-	if (len >= WT_MIN_KEY_VECTORIZE) {
+	/* Use vector instructions if we'll execute at least 2 of them. */
+	if (len >= WT_VECTOR_SIZE * 2) {
 		__m128i res_eq, u, t;
 
 		remainder = len % WT_VECTOR_SIZE;
@@ -124,7 +124,8 @@ __wt_lex_compare_skip(
 	treep = (uint8_t *)tree_item->data + *matchp;
 
 #if defined(__GNUC__) && defined(__SSE2__)
-	if (len >= WT_MIN_KEY_VECTORIZE) {
+	/* Use vector instructions if we'll execute at least 2 of them. */
+	if (len >= WT_VECTOR_SIZE * 2) {
 		__m128i res_eq, u, t;
 
 		remainder = len % WT_VECTOR_SIZE;
