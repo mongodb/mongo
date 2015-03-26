@@ -137,6 +137,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_conn_remove_collator(session));
 	WT_TRET(__wt_conn_remove_compressor(session));
 	WT_TRET(__wt_conn_remove_data_source(session));
+	WT_TRET(__wt_conn_remove_encryptor(session));
 	WT_TRET(__wt_conn_remove_extractor(session));
 
 	/*
