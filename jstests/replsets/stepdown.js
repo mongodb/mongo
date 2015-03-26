@@ -53,7 +53,7 @@ assert.eq(r2.ismaster, false);
 assert.eq(r2.secondary, true);
 
 print("\nunlock");
-printjson(locked.getDB("admin").$cmd.sys.unlock.findOne());
+printjson(locked.getDB("admin").fsyncUnlock());
 
 print("\nreset stepped down time");
 master.getDB("admin").runCommand({replSetFreeze:0});
