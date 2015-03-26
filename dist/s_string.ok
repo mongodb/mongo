@@ -543,6 +543,7 @@ decl
 decr
 decrement
 decrementing
+deflateCopy
 deflateEnd
 deflateInit
 defno
