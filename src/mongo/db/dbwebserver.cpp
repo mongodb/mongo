@@ -283,7 +283,7 @@ namespace {
 } // namespace
 
 
-    DbWebServer::DbWebServer(const string& ip, int port, const AdminAccess* webUsers)
+    DbWebServer::DbWebServer(const string& ip, int port, AdminAccess* webUsers)
             : MiniWebServer("admin web console", ip, port),
               _webUsers(webUsers) {
 
