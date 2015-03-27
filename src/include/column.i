@@ -7,8 +7,53 @@
  */
 
 /*
+ * __col_insert_search_gt --
+ *	Search a column-store insert list for the next larger record.
+ */
+static inline WT_INSERT *
+__col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
+{
+	WT_INSERT **insp, *ret_ins;
+	uint64_t ins_recno;
+	int cmp, i;
+
+	/* If there's no insert chain to search, we're done. */
+	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL)
+		return (NULL);
+
+	/* Fast path the check for values at the end of the skiplist. */
+	if (recno >= WT_INSERT_RECNO(ret_ins))
+		return (NULL);
+
+	/*
+	 * The insert list is a skip list: start at the highest skip level, then
+	 * go as far as possible at each level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
+		if (*insp == NULL) {
+			--i;
+			--insp;
+			continue;
+		}
+
+		ins_recno = WT_INSERT_RECNO(*insp);
+		cmp = (recno == ins_recno) ? 0 : (recno < ins_recno) ? -1 : 1;
+
+		if (cmp == 0)		/* Match: keep going at this level */
+			insp = &(*insp)->next[i];
+		else if (cmp > 0) {	/* Greater than: drop down a level */
+			--i;
+			--insp;
+		} else			/* Less than: no larger records exist */
+			break;
+	}
+
+	return (NULL);
+}
+
+/*
  * __col_insert_search_match --
- *	Search an column-store insert list for an exact match.
+ *	Search a column-store insert list for an exact match.
  */
 static inline WT_INSERT *
 __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)

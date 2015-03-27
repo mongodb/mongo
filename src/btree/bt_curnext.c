@@ -165,9 +165,11 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
 	WT_ITEM *val;
+	WT_INSERT *ins;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	uint64_t rle;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
@@ -220,8 +222,25 @@ new_page:	/* Find the matching WT_COL slot. */
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
-			if (unpack.type == WT_CELL_DEL)
+			if (unpack.type == WT_CELL_DEL) {
+				/*
+				 * There can be huge gaps in the variable-length
+				 * column-store name space appearing as deleted
+				 * records. If more than one deleted record, do
+				 * the work of finding the next useful record.
+				 */
+				if ((rle = __wt_cell_rle(&unpack)) > 1) {
+					cbt->recno += rle;
+					ins = __col_insert_search_gt(
+					    cbt->ins_head, cbt->recno);
+					if (ins != NULL &&
+					    WT_INSERT_RECNO(ins) < cbt->recno)
+						cbt->recno =
+						    WT_INSERT_RECNO(ins);
+					--cbt->recno;
+				}
 				continue;
+			}
 			WT_RET(__wt_page_cell_data_ref(
 			    session, page, &unpack, &cbt->tmp));
 
