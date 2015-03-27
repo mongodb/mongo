@@ -1,4 +1,4 @@
-// The password package handles cleanly reading in a user's password from
+// Package password handles cleanly reading in a user's password from
 // the command line. This varies heavily between operating systems.
 package password
 
