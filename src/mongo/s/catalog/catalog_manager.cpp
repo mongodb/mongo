@@ -59,7 +59,7 @@ namespace {
             const WriteErrorDetail* errDetail = response.getErrDetails().front();
 
             return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                                                        errDetail->getErrMessage());
+                                                         errDetail->getErrMessage());
         }
 
         if (response.isWriteConcernErrorSet()) {

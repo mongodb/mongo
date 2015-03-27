@@ -50,7 +50,7 @@ namespace mongo {
         ShardingState();
 
         bool enabled();
-        const std::string& getConfigServer() const { return _configServer; }
+        std::string getConfigServer();
 
         // Initialize sharding state and begin authenticating outgoing connections and handling
         // shard versions.  If this is not run before sharded operations occur auth will not work
@@ -59,7 +59,7 @@ namespace mongo {
 
         void gotShardName( const std::string& name );
         bool setShardName( const std::string& name ); // Same as above, does not throw
-        std::string getShardName() { boost::lock_guard<boost::mutex> lk(_mutex); return _shardName; }
+        std::string getShardName();
 
         // Helpers for SetShardVersion which report the host name sent to this shard when the shard
         // name does not match.  Do not use in other places.
@@ -67,8 +67,10 @@ namespace mongo {
         void gotShardNameAndHost( const std::string& name, const std::string& host );
         bool setShardNameAndHost( const std::string& name, const std::string& host );
 
-        /** Reverts back to a state where this mongod is not sharded. */
-        void resetShardingState(); 
+        /**
+         * Clears the collection metadata cache after step down.
+         */
+        void clearCollectionMetadata();
 
         // versioning support
 
@@ -276,15 +278,14 @@ namespace mongo {
                                   bool useRequestedVersion,
                                   ChunkVersion* latestShardVersion );
 
-        std::string _configServer;
-
-        std::string _shardName;
-
         // protects state below
         mongo::mutex _mutex;
 
         // Whether ::initialize has been called
         bool _enabled;
+
+        // Sets the shard name for this host (comes through setShardVersion)
+        std::string _shardName;
 
         // protects accessing the config server
         // Using a ticket holder so we can have multiple redundant tries at any given time

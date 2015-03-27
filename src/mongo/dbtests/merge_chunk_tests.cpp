@@ -130,20 +130,6 @@ namespace mongo {
             ASSERT(!client.findOne(ChunkType::ConfigNS, query).isEmpty());
         }
 
-        string shardName() { return "shard0000"; }
-
-    protected:
-
-        virtual void setUp() {
-            ConfigServerFixture::setUp();
-            shardingState.initialize( configSvr().toString() );
-            shardingState.gotShardName( shardName() );
-        }
-
-        virtual void tearDown() {
-            shardingState.resetShardingState();
-            ConfigServerFixture::tearDown();
-        }
     };
 
     //

@@ -797,11 +797,9 @@ namespace mongo {
 
     /* --- ConfigServer ---- */
 
-    ConfigServer::ConfigServer() : DBConfig( "config" ) {
-        _shardingEnabled = false;
-    }
-
-    ConfigServer::~ConfigServer() {
+    const std::string& ConfigServer::modelServer() const {
+        uassert(10190, "ConfigServer not setup", _primary.ok());
+        return _primary.getConnString();
     }
 
     bool ConfigServer::init( const std::string& s ) {
@@ -852,14 +850,16 @@ namespace mongo {
         }
 
         string fullString;
-        joinStringDelim( configHosts, &fullString, ',' );
-        _primary = Shard(_primary.getName(),
-                         ConnectionString(fullString, ConnectionString::SYNC),
-                         _primary.getMaxSizeMB(),
-                         _primary.isDraining());
-        Shard::installShard(_primary.getName(), _primary);
+        joinStringDelim(configHosts, &fullString, ',');
 
-        LOG(1) << " config string : " << fullString << endl;
+        // This should be the first time we are trying to set up the primary shard (i.e. init
+        // should be called only once)
+        invariant(_primary == Shard::EMPTY);
+        _primary = Shard("config", ConnectionString(fullString, ConnectionString::SYNC), 0, false);
+
+        Shard::installShard("config", _primary);
+
+        LOG(1) << " config string : " << fullString;
 
         return true;
     }
@@ -1260,7 +1260,6 @@ namespace mongo {
         }
     }
 
-    DBConfigPtr configServerPtr (new ConfigServer());
-    ConfigServer& configServer = dynamic_cast<ConfigServer&>(*configServerPtr);
 
+    ConfigServer& configServer = dynamic_cast<ConfigServer&>(*(new ConfigServer()));
 }

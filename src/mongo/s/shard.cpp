@@ -52,7 +52,6 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
-#include "mongo/s/request.h"
 #include "mongo/s/scc_fast_query_handler.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/version_manager.h"

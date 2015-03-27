@@ -46,7 +46,6 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -120,12 +119,6 @@ namespace mongo {
             printSysInfo();
 
             getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
-
-            std::vector<std::string> configHosts;
-            configHosts.push_back("$dummy:10000");
-
-            configServer.init(configHosts);
-            invariant(grid.initCatalogManager(configHosts));
 
             TestWatchDog twd;
             twd.go();

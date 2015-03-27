@@ -80,10 +80,6 @@ namespace mongo {
 
     DBConfigPtr Grid::getDBConfig( StringData ns , bool create , const string& shardNameHint ) {
         string database = nsToDatabase( ns );
-
-        if ( database == "config" )
-            return configServerPtr;
-
         uassert( 15918,
                  str::stream() << "invalid database name: " << database,
                  NamespaceString::validDBName( database ) );
@@ -157,13 +153,11 @@ namespace mongo {
                         }
 
                         Shard primary;
-                        if ( database == "admin" ) {
+                        if (database == "admin" || database == "config") {
                             primary = configServer.getPrimary();
-
                         }
                         else if ( shardNameHint.empty() ) {
                             primary = Shard::pick();
-
                         }
                         else {
                             // use the shard name if provided

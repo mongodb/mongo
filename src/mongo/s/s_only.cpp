@@ -31,17 +31,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request.h"
-#include "mongo/s/shard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/concurrency/thread_name.h"
 
@@ -51,7 +47,6 @@
  */
 namespace mongo {
 
-    using std::endl;
     using std::string;
     using std::stringstream;
 

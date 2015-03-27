@@ -88,6 +88,13 @@ namespace mongo {
         return _enabled;
     }
 
+    string ShardingState::getConfigServer() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_enabled);
+
+        return configServer.getConnectionString().toString();
+    }
+
     void ShardingState::initialize(const string& server) {
         uassert(18509,
                 "Unable to obtain host name during sharding initialization.",
@@ -99,6 +106,11 @@ namespace mongo {
     // TODO: Consolidate and eliminate these various ways of setting / validating shard names
     bool ShardingState::setShardName( const string& name ) {
         return setShardNameAndHost( name, "" );
+    }
+
+    std::string ShardingState::getShardName() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _shardName;
     }
 
     bool ShardingState::setShardNameAndHost( const string& name, const string& host ) {
@@ -149,12 +161,8 @@ namespace mongo {
         msgasserted( 13298 , ss.str() );
     }
 
-    void ShardingState::resetShardingState() {
+    void ShardingState::clearCollectionMetadata() {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        
-        _enabled = false;
-        _configServer.clear();
-        _shardName.clear();
         _collMetadata.clear();
     }
 
@@ -462,13 +470,12 @@ namespace mongo {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         if (_enabled) {
+            // TODO: Do we need to throw exception if the config servers have changed from what we
+            // already have in place? How do we test for that?
             return;
         }
 
         ShardedConnectionInfo::addHook();
-
-        invariant(_configServer.empty());
-        _configServer = server;
 
         vector<string> configdbs;
         splitStringDelim(server, &configdbs, ',');
@@ -495,23 +502,18 @@ namespace mongo {
         //
 
         CollectionMetadataPtr beforeMetadata;
-        string shardName;
-        string configServer;
 
         {
             boost::lock_guard<boost::mutex> lk( _mutex );
 
             // We can't reload if sharding is not enabled - i.e. without a config server location
             if (!_enabled) {
-
                 string errMsg = str::stream() << "cannot refresh metadata for " << ns
                                               << " before sharding has been enabled";
 
                 warning() << errMsg;
                 return Status(ErrorCodes::NotYetInitialized, errMsg);
             }
-            // Checked when enabling sharding
-            dassert(!_configServer.empty());
 
             // We also can't reload if a shard name has not yet been set.
             if (_shardName.empty()) {
@@ -523,11 +525,10 @@ namespace mongo {
                 return Status(ErrorCodes::NotYetInitialized, errMsg);
             }
 
-            shardName = _shardName;
-            configServer = _configServer;
-
-            CollectionMetadataMap::iterator it = _collMetadata.find( ns );
-            if ( it != _collMetadata.end() ) beforeMetadata = it->second;
+            CollectionMetadataMap::iterator it = _collMetadata.find(ns);
+            if (it != _collMetadata.end()) {
+                beforeMetadata = it->second;
+            }
         }
 
         ChunkVersion beforeShardVersion;
@@ -566,15 +567,15 @@ namespace mongo {
                  << ", current metadata version is " << beforeCollVersion << endl;
 
         string errMsg;
-        ConnectionString configServerLoc = ConnectionString::parse( configServer, errMsg );
-        MetadataLoader mdLoader( configServerLoc );
+
+        MetadataLoader mdLoader(configServer.getConnectionString());
         CollectionMetadata* remoteMetadataRaw = new CollectionMetadata();
         CollectionMetadataPtr remoteMetadata( remoteMetadataRaw );
 
         Timer refreshTimer;
         Status status =
                 mdLoader.makeCollectionMetadata( ns,
-                                                 shardName,
+                                                 getShardName(),
                                                  ( fullReload ? NULL : beforeMetadata.get() ),
                                                  remoteMetadataRaw );
         long long refreshMillis = refreshTimer.millis();
@@ -628,33 +629,11 @@ namespace mongo {
 
             // Don't reload if our config server has changed or sharding is no longer enabled
             if (!_enabled) {
-
                 string errMsg = str::stream() << "could not refresh metadata for " << ns
                                               << ", sharding is no longer enabled";
 
                 warning() << errMsg;
                 return Status(ErrorCodes::NotYetInitialized, errMsg);
-            }
-
-            if (_configServer != configServer) {
-
-                string errMsg = str::stream() << "could not refresh metadata for " << ns
-                                              << ", server is now attached to cluster "
-                                              << _configServer << " instead of " << configServer;
-
-                warning() << errMsg;
-                return Status(ErrorCodes::IncompatibleShardingMetadata, errMsg);
-            }
-
-            // Don't reload if our shard name has changed
-            if (_shardName != shardName) {
-
-                string errMsg = str::stream() << "could not refresh metadata for " << ns
-                                              << ", shard name changed during reload from "
-                                              << _shardName << " to " << shardName;
-
-                warning() << errMsg;
-                return Status(ErrorCodes::IncompatibleShardingMetadata, errMsg);
             }
 
             CollectionMetadataMap::iterator it = _collMetadata.find( ns );
@@ -666,6 +645,7 @@ namespace mongo {
             }
 
             *latestShardVersion = afterShardVersion;
+
             //
             // Resolve newer pending chunks with the remote metadata, finish construction
             //
@@ -800,22 +780,25 @@ namespace mongo {
     }
 
     void ShardingState::appendInfo(BSONObjBuilder& builder) {
-
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         builder.appendBool("enabled", _enabled);
-        if (!_enabled)
+        if (!_enabled) {
             return;
+        }
 
-        builder.append("configServer", _configServer);
+        builder.append("configServer", configServer.getConnectionString().toString());
         builder.append("shardName", _shardName);
 
         BSONObjBuilder versionB(builder.subobjStart("versions"));
-        for (CollectionMetadataMap::iterator it = _collMetadata.begin(); it != _collMetadata.end();
-            ++it) {
+        for (CollectionMetadataMap::const_iterator it = _collMetadata.begin();
+             it != _collMetadata.end();
+             ++it) {
+
             CollectionMetadataPtr metadata = it->second;
             versionB.appendTimestamp(it->first, metadata->getShardVersion().toLong());
         }
+
         versionB.done();
     }
 
@@ -1257,27 +1240,38 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = cmdObj["getShardVersion"].valuestrsafe();
-            if ( ns.size() == 0 ) {
+            const string ns = cmdObj["getShardVersion"].valuestrsafe();
+            if (ns.size() == 0) {
                 errmsg = "need to specify full namespace";
                 return false;
             }
 
-            result.append( "configServer" , shardingState.getConfigServer() );
+            if (shardingState.enabled()) {
+                result.append("configServer", shardingState.getConfigServer());
+            }
+            else {
+                result.append("configServer", "");
+            }
 
-            result.appendTimestamp( "global" , shardingState.getVersion(ns).toLong() );
+            result.appendTimestamp("global", shardingState.getVersion(ns).toLong());
 
-            ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
-            result.appendBool( "inShardedMode" , info != 0 );
-            if ( info )
-                result.appendTimestamp( "mine" , info->getVersion(ns).toLong() );
-            else
-                result.appendTimestamp( "mine" , 0 );
+            ShardedConnectionInfo* const info = ShardedConnectionInfo::get(false);
+            result.appendBool("inShardedMode", info != NULL);
+            if (info) {
+                result.appendTimestamp("mine", info->getVersion(ns).toLong());
+            }
+            else {
+                result.appendTimestamp("mine", 0);
+            }
 
-            if ( cmdObj["fullMetadata"].trueValue() ) {
-                CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( ns );
-                if ( metadata ) result.append( "metadata", metadata->toBSON() );
-                else result.append( "metadata", BSONObj() );
+            if (cmdObj["fullMetadata"].trueValue()) {
+                CollectionMetadataPtr metadata = shardingState.getCollectionMetadata(ns);
+                if (metadata) {
+                    result.append("metadata", metadata->toBSON());
+                }
+                else {
+                    result.append("metadata", BSONObj());
+                }
             }
 
             return true;

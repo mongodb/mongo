@@ -49,7 +49,6 @@ namespace mongo {
 
     typedef boost::shared_ptr<DBConfig> DBConfigPtr;
 
-    extern DBConfigPtr configServerPtr;
     extern ConfigServer& configServer;
 
     /**
@@ -195,17 +194,15 @@ namespace mongo {
     };
 
 
-    class ConfigServer : public DBConfig {
+    class ConfigServer {
     public:
-        ConfigServer();
-        ~ConfigServer();
+        ConfigServer() = default;
 
         bool ok( bool checkConsistency = false );
 
-        std::string modelServer() {
-            uassert( 10190 ,  "ConfigServer not setup" , _primary.ok() );
-            return _primary.getConnString();
-        }
+        const std::string& modelServer() const;
+
+        const Shard& getPrimary() const { return _primary; }
 
         /**
            call at startup, this will initiate connection to the grid db
@@ -254,7 +251,9 @@ namespace mongo {
 
     private:
         std::string getHost( const std::string& name , bool withPort );
+
         std::vector<std::string> _config;
+        Shard _primary;
     };
 
 } // namespace mongo

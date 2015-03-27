@@ -93,17 +93,9 @@ namespace mongo {
          */
         void reset( const std::string& ident );
 
-        ConnectionString getAddress() const { return _cs; }
-
-        std::string getName() const {
-            verify( _name.size() );
-            return _name;
-        }
-
-        std::string getConnString() const {
-            verify( _addr.size() );
-            return _addr;
-        }
+        const ConnectionString& getAddress() const { return _cs; }
+        const std::string& getName() const { return _name; }
+        const std::string& getConnString() const { return _addr; }
 
         long long getMaxSizeMB() const {
             return _maxSizeMB;

@@ -244,6 +244,10 @@ namespace {
 
 
     Status CatalogManagerLegacy::init(const vector<string>& configHosts) {
+        // Initialization should not happen more than once
+        invariant(!_configServerConnectionString.isValid());
+        invariant(_configServers.empty());
+
         if (configHosts.empty()) {
             return Status(ErrorCodes::InvalidOptions, "No config server hosts specified");
         }
@@ -312,6 +316,9 @@ namespace {
         joinStringDelim(configHosts, &fullString, ',');
 
         LOG(1) << " config string : " << fullString;
+
+        // Now that the config hosts are verified, initialize the catalog manager. The code below
+        // should never fail.
 
         _configServerConnectionString = ConnectionString(fullString, ConnectionString::SYNC);
 

@@ -32,26 +32,15 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/connpool.h"
+#include "mongo/s/client_info.h"
+
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/s/write_ops/batch_downconvert.h"
-#include "mongo/s/client_info.h"
-#include "mongo/s/config.h"
-#include "mongo/s/chunk.h"
-#include "mongo/s/cursors.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 

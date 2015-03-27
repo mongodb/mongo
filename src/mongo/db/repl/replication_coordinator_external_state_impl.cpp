@@ -242,7 +242,7 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::clearShardingState() {
-        shardingState.resetShardingState();
+        shardingState.clearCollectionMetadata();
     }
 
     void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
