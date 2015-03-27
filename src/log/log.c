@@ -1534,7 +1534,9 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_COMPRESSOR *compressor;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(citem);
+	WT_DECL_ITEM(eitem);
 	WT_DECL_RET;
+	WT_ENCRYPTOR *encryptor;
 	WT_ITEM *ip;
 	WT_LOG *log;
 	WT_LOG_RECORD *complrp;
@@ -1623,9 +1625,45 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			complrp->mem_len = WT_STORE_SIZE(record->size);
 		}
 	}
+	if ((encryptor = conn->log_encryptor) != NULL) {
+		/* Skip the log header */
+		src = (uint8_t *)ip->mem + WT_LOG_COMPRESS_SKIP;
+		src_len = ip->size - WT_LOG_COMPRESS_SKIP;
+
+		WT_ERR(encryptor->pre_size(encryptor,
+		    &session->iface, src, src_len, &len));
+
+		size = len + WT_LOG_COMPRESS_SKIP;
+		WT_ERR(__wt_scr_alloc(session, size, &eitem));
+
+		/* Skip the header bytes of the destination data. */
+		dst = (uint8_t *)eitem->mem + WT_LOG_COMPRESS_SKIP;
+		dst_len = len;
+
+		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
+		    src, src_len, dst, dst_len, &result_len));
+		result_len += WT_LOG_COMPRESS_SKIP;
+
+		/* TODO: stats */
+
+		/*
+		 * Copy in the skipped header bytes, set the final data
+		 * size.
+		 */
+		memcpy(eitem->mem, ip->mem, WT_LOG_COMPRESS_SKIP);
+		eitem->size = result_len;
+		ip = eitem;
+		complrp = (WT_LOG_RECORD *)eitem->mem;
+		F_SET(complrp, WT_LOG_RECORD_ENCRYPTED);
+		WT_ASSERT(session, result_len < UINT32_MAX &&
+		    ip->size < UINT32_MAX);
+		complrp->len = WT_STORE_SIZE(result_len);
+		complrp->mem_len = WT_STORE_SIZE(ip->size);
+	}
 	ret = __log_write_internal(session, ip, lsnp, flags);
 
 err:	__wt_scr_free(session, &citem);
+	__wt_scr_free(session, &eitem);
 	return (ret);
 }
 
