@@ -235,7 +235,7 @@ new_page:	/* Find the matching WT_COL slot. */
 					if ((ins = __col_insert_search_gt(
 					    cbt->ins_head, cbt->recno)) == NULL)
 						cbt->recno += rle - 1;
-					else 
+					else
 						cbt->recno =
 						    WT_INSERT_RECNO(ins) - 1;
 				}
