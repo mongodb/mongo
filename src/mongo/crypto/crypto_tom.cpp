@@ -67,6 +67,10 @@ namespace crypto {
                   const size_t inputLen,
                   unsigned char* output,
                   unsigned int* outputLen) {
+        if (!key || !input || !output) {
+            return false;
+        }
+
         static int hashId = -1;
         if (hashId == -1) {
             register_hash (&sha1_desc);
