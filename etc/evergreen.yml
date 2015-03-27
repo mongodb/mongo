@@ -2162,6 +2162,8 @@ buildvariants:
   - name: audit_WT
   - name: auth
   - name: auth_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: failpoints_auth
   - name: jsCore_auth
   - name: mmap
@@ -2565,6 +2567,8 @@ buildvariants:
     - windows-64-vs2013-compile
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -2824,6 +2828,8 @@ buildvariants:
     - rhel55
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -2859,6 +2865,8 @@ buildvariants:
     - rhel62-build
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: mmap
   - name: jsCore_auth
   - name: replicasets_auth
@@ -2892,6 +2900,8 @@ buildvariants:
   - name: compile
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -3176,6 +3186,8 @@ buildvariants:
     - ubuntu1204-build
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -3211,6 +3223,8 @@ buildvariants:
     - ubuntu1404-build
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -3250,6 +3264,8 @@ buildvariants:
     - suse11-build
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore_auth
   - name: replicasets_auth
   - name: sasl
@@ -3418,6 +3434,8 @@ buildvariants:
     - debian71-build
   - name: audit
   - name: audit_WT
+  - name: dbtest
+  - name: dbtest_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
