@@ -2272,7 +2272,7 @@ namespace mongo {
         }
 
         if (found) {
-            static KeyHeaderType& header = getKeyHeader(bucket, pos);
+            KeyHeaderType& header = getKeyHeader(bucket, pos);
             if (header.isUnused()) {
                 LOG(4) << "btree _insert: reusing unused key" << endl;
                 massert(17433, "_insert: reuse key but lchild is not null", leftChild.isNull());
