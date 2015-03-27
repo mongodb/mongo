@@ -34,11 +34,6 @@
 
 #include "mongo/dbtests/framework.h"
 
-#ifndef _WIN32
-#include <cxxabi.h>
-#include <sys/file.h>
-#endif
-
 #include <string>
 #include <vector>
 
