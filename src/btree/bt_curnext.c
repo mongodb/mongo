@@ -228,16 +228,16 @@ new_page:	/* Find the matching WT_COL slot. */
 				 * column-store name space appearing as deleted
 				 * records. If more than one deleted record, do
 				 * the work of finding the next useful record.
+				 * Note adjustment for the increment done in the
+				 * outer loop.
 				 */
 				if ((rle = __wt_cell_rle(&unpack)) > 1) {
-					cbt->recno += rle;
-					ins = __col_insert_search_gt(
-					    cbt->ins_head, cbt->recno);
-					if (ins != NULL &&
-					    WT_INSERT_RECNO(ins) < cbt->recno)
+					if ((ins = __col_insert_search_gt(
+					    cbt->ins_head, cbt->recno)) == NULL)
+						cbt->recno += rle - 1;
+					else 
 						cbt->recno =
-						    WT_INSERT_RECNO(ins);
-					--cbt->recno;
+						    WT_INSERT_RECNO(ins) - 1;
 				}
 				continue;
 			}
