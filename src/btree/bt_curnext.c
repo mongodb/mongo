@@ -237,7 +237,8 @@ new_page:	/* Find the matching WT_COL slot. */
 						cbt->recno += rle - 1;
 					else
 						cbt->recno =
-						    WT_INSERT_RECNO(ins) - 1;
+						    WT_MIN(cbt->recno + rle,
+						    WT_INSERT_RECNO(ins)) - 1;
 				}
 				continue;
 			}
