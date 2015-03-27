@@ -28,23 +28,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/oid.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 namespace {
 
-    using std::string;
-    using mongo::BSONArray;
-    using mongo::BSONObj;
-    using mongo::ChunkType;
-    using mongo::Date_t;
-    using mongo::OID;
-    using mongo::ChunkVersion;
+    using namespace mongo;
 
-    TEST(Validity, MissingFields) {
+    using std::string;
+
+    TEST(Validity, MissingRequiredFields) {
         ChunkType chunk;
         BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
 
@@ -53,54 +51,34 @@ namespace {
                                 ChunkType::max(BSON("a" << 20)) <<
                                 ChunkType::version(version) <<
                                 ChunkType::shard("shard0001"));
-        string errMsg;
-        ASSERT(chunk.parseBSON(objModNS, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(objModNS);
+        ASSERT_FALSE(chunkRes.isOK());
 
         BSONObj objModName = BSON(ChunkType::ns("test.mycol") <<
                                   ChunkType::min(BSON("a" << 10 << "b" << 10)) <<
                                   ChunkType::max(BSON("a" << 20)) <<
                                   ChunkType::version(version) <<
                                   ChunkType::shard("shard0001"));
-
-        ASSERT(chunk.parseBSON(objModName, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
+        chunkRes = ChunkType::fromBSON(objModName);
+        ASSERT_FALSE(chunkRes.isOK());
 
         BSONObj objModKeys = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                                   ChunkType::ns("test.mycol") <<
                                   ChunkType::version(version) <<
                                   ChunkType::shard("shard0001"));
-
-        ASSERT(chunk.parseBSON(objModKeys, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
-
-        BSONObj objModVersion = BSON(ChunkType::name("test.mycol-a_MinKey") <<
-                                     ChunkType::ns("test.mycol") <<
-                                     ChunkType::min(BSON("a" << 10 << "b" << 10)) <<
-                                     ChunkType::max(BSON("a" << 20)) <<
-                                     ChunkType::shard("shard0001"));
-
-        ASSERT(chunk.parseBSON(objModVersion, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
+        chunkRes = ChunkType::fromBSON(objModKeys);
+        ASSERT_FALSE(chunkRes.isOK());
 
         BSONObj objModShard = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                                    ChunkType::ns("test.mycol") <<
                                    ChunkType::min(BSON("a" << 10 << "b" << 10)) <<
                                    ChunkType::max(BSON("a" << 20)) <<
-                                   ChunkType::version(version) <<
-                                   ChunkType::shard("shard0001"));
-
-        ASSERT(chunk.parseBSON(objModShard, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
+                                   ChunkType::version(version));
+        chunkRes = ChunkType::fromBSON(objModShard);
+        ASSERT_FALSE(chunkRes.isOK());
     }
 
     TEST(MinMaxValidity, DifferentNumberOfColumns) {
-        ChunkType chunk;
         BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
         BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                            ChunkType::ns("test.mycol") <<
@@ -108,14 +86,12 @@ namespace {
                            ChunkType::max(BSON("a" << 20)) <<
                            ChunkType::version(version) <<
                            ChunkType::shard("shard0001"));
-        string errMsg;
-        ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
+        ASSERT(chunkRes.isOK());
+        ASSERT_FALSE(chunkRes.getValue().validate().isOK());
     }
 
     TEST(MinMaxValidity, DifferentColumns) {
-        ChunkType chunk;
         BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
         BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                            ChunkType::ns("test.mycol") <<
@@ -123,14 +99,12 @@ namespace {
                            ChunkType::max(BSON("b" << 20)) <<
                            ChunkType::version(version) <<
                            ChunkType::shard("shard0001"));
-        string errMsg;
-        ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
+        ASSERT(chunkRes.isOK());
+        ASSERT_FALSE(chunkRes.getValue().validate().isOK());
     }
 
     TEST(MinMaxValidity, NotAscending) {
-        ChunkType chunk;
         BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
         BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                            ChunkType::ns("test.mycol") <<
@@ -138,10 +112,9 @@ namespace {
                            ChunkType::max(BSON("a" << 10)) <<
                            ChunkType::version(version) <<
                            ChunkType::shard("shard0001"));
-        string errMsg;
-        ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(chunk.isValid(NULL));
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
+        ASSERT(chunkRes.isOK());
+        ASSERT_FALSE(chunkRes.getValue().validate().isOK());
     }
 
     TEST(Compatibility, NewFormatVersion) {
@@ -154,9 +127,10 @@ namespace {
                            ChunkType::max(BSON("a" << 20)) <<
                            ChunkType::version(version) <<
                            ChunkType::shard("shard0001"));
-        string errMsg;
-        ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
+        ASSERT(chunkRes.isOK());
+        chunk = chunkRes.getValue();
+
         ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
         ASSERT_EQUALS(chunk.getNS(), "test.mycol");
         ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
@@ -165,7 +139,7 @@ namespace {
         ASSERT_EQUALS(fetchedVersion._combined, 1ULL);
         ASSERT_EQUALS(fetchedVersion._epoch, epoch);
         ASSERT_EQUALS(chunk.getShard(), "shard0001");
-        ASSERT_TRUE(chunk.isValid(NULL));
+        ASSERT_TRUE(chunk.validate().isOK());
     }
 
     TEST(Compatibility, OldFormatVersion) {
@@ -178,9 +152,10 @@ namespace {
                            ChunkType::DEPRECATED_lastmod(Date_t(1)) <<
                            ChunkType::DEPRECATED_epoch(epoch) <<
                            ChunkType::shard("shard0001"));
-        string errMsg;
-        ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT_EQUALS(errMsg, "");
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
+        ASSERT(chunkRes.isOK());
+        chunk = chunkRes.getValue();
+
         ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
         ASSERT_EQUALS(chunk.getNS(), "test.mycol");
         ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
@@ -189,14 +164,13 @@ namespace {
         ASSERT_EQUALS(fetchedVersion._combined, 1ULL);
         ASSERT_EQUALS(fetchedVersion._epoch, epoch);
         ASSERT_EQUALS(chunk.getShard(), "shard0001");
-        ASSERT_TRUE(chunk.isValid(NULL));
+        ASSERT_TRUE(chunk.validate().isOK());
     }
 
     TEST(Validity, BadType) {
-        ChunkType chunk;
         BSONObj obj = BSON(ChunkType::name() << 0);
-        string errMsg;
-        ASSERT((!chunk.parseBSON(obj, &errMsg)) && (errMsg != ""));
+        StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);
+        ASSERT_FALSE(chunkRes.isOK());
     }
 
 } // unnamed namespace

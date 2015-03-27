@@ -414,13 +414,13 @@ namespace mongo {
             while ( cursor->more() ) {
                 BSONObj chunkDoc = cursor->nextSafe().getOwned();
 
-                auto_ptr<ChunkType> chunk(new ChunkType());
-                string errmsg;
-                if (!chunk->parseBSON(chunkDoc, &errmsg)) {
+                StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(chunkDoc);
+                if (!chunkRes.isOK()) {
                     error() << "bad chunk format for " << chunkDoc
-                            << ": " << errmsg << endl;
+                            << ": " << chunkRes.getStatus().reason();
                     return;
                 }
+                auto_ptr<ChunkType> chunk(new ChunkType(chunkRes.getValue()));
 
                 allChunkMinimums.insert(chunk->getMin().getOwned());
                 OwnedPointerVector<ChunkType>*& chunkList =

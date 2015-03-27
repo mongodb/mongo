@@ -25,18 +25,21 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/type_chunk.h"
 
 #include <cstring>
 
-#include "mongo/db/field_parser.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-    using std::string;
-
-    using mongoutils::str::stream;
 
     const std::string ChunkType::ConfigNS = "config.chunks";
 
@@ -54,119 +57,60 @@ namespace mongo {
         clear();
     }
 
+    ChunkType::ChunkType(const ChunkType& chunk) {
+        chunk.cloneTo(this);
+    }
+
     ChunkType::~ChunkType() {
     }
 
-    bool ChunkType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
+    StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
+        ChunkType chunk;
+
+        {
+            std::string chunkName;
+            Status status = bsonExtractStringField(source, name.name(), &chunkName);
+            if (!status.isOK()) return status;
+            chunk._name = chunkName;
         }
 
-        // All the mandatory fields must be present.
-        if (!_isNameSet) {
-            *errMsg = stream() << "missing " << name.name() << " field";
-            return false;
-        }
-        if (!_isNsSet) {
-            *errMsg = stream() << "missing " << ns.name() << " field";
-            return false;
-        }
-        if (!_isMinSet) {
-            *errMsg = stream() << "missing " << min.name() << " field";
-            return false;
-        }
-        if (!_isMaxSet) {
-            *errMsg = stream() << "missing " << max.name() << " field";
-            return false;
-        }
-        if (!_isVersionSet) {
-            *errMsg = stream() << "missing " << version.name() << " field";
-            return false;
-        }
-        if (!_isShardSet) {
-            *errMsg = stream() << "missing " << shard.name() << " field";
-            return false;
+        {
+            std::string chunkNS;
+            Status status = bsonExtractStringField(source, ns.name(), &chunkNS);
+            if (!status.isOK()) return status;
+            chunk._ns = chunkNS;
         }
 
-        // NOTE: all the following semantic checks should eventually become the caller's
-        // responsibility, and should be moved out of this class completely
-
-        // 'min' and 'max' must share the same fields.
-        if (_min.nFields() != _max.nFields()) {
-            *errMsg = stream() << "min and max have a different number of keys";
-            return false;
-        }
-        BSONObjIterator minIt(_min);
-        BSONObjIterator maxIt(_max);
-        while (minIt.more() && maxIt.more()) {
-            BSONElement minElem = minIt.next();
-            BSONElement maxElem = maxIt.next();
-            if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
-                *errMsg = stream() << "min and max must have the same set of keys";
-                return false;
-            }
+        {
+            BSONElement chunkMinElement;
+            Status status = bsonExtractTypedField(source, min.name(), Object, &chunkMinElement);
+            if (!status.isOK()) return status;
+            chunk._min = chunkMinElement.Obj().getOwned();
         }
 
-        // 'max' should be greater than 'min'.
-        if (_min.woCompare(_max) >= 0) {
-            *errMsg = stream() << "max key must be greater than min key";
-            return false;
+        {
+            BSONElement chunkMaxElement;
+            Status status = bsonExtractTypedField(source, max.name(), Object, &chunkMaxElement);
+            if (!status.isOK()) return status;
+            chunk._max = chunkMaxElement.Obj().getOwned();
         }
 
-        return true;
-    }
-
-    BSONObj ChunkType::toBSON() const {
-        BSONObjBuilder builder;
-
-        if (_isNameSet) builder.append(name(), _name);
-        if (_isNsSet) builder.append(ns(), _ns);
-        if (_isMinSet) builder.append(min(), _min);
-        if (_isMaxSet) builder.append(max(), _max);
-
-        // For now, write both the deprecated *and* the new fields
-        if (_isVersionSet) {
-            _version.addToBSON(builder, version());
-            _version.addToBSON(builder, DEPRECATED_lastmod());
+        {
+            std::string chunkShard;
+            Status status = bsonExtractStringField(source, shard.name(), &chunkShard);
+            if (!status.isOK()) return status;
+            chunk._shard = chunkShard;
         }
 
-        if (_isShardSet) builder.append(shard(), _shard);
-        if (_isJumboSet) builder.append(jumbo(), _jumbo);
-
-        return builder.obj();
-    }
-
-    bool ChunkType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
-
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
-
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, name, &_name, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, ns, &_ns, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNsSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, min, &_min, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMinSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, max, &_max, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMaxSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, shard, &_shard, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isShardSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, jumbo, &_jumbo, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isJumboSet = fieldState == FieldParser::FIELD_SET;
+        {
+            bool chunkJumbo;
+            Status status = bsonExtractBooleanFieldWithDefault(source,
+                                                               jumbo.name(),
+                                                               false,
+                                                               &chunkJumbo);
+            if (!status.isOK()) return status;
+            chunk._jumbo = chunkJumbo;
+        }
 
         //
         // ChunkVersion backward compatibility logic contained in ChunkVersion
@@ -175,70 +119,151 @@ namespace mongo {
         // ChunkVersion is currently encoded as { 'version': [<TS>,<OID>] }
 
         if (ChunkVersion::canParseBSON(source, version())) {
-            _version = ChunkVersion::fromBSON(source, version());
-            _isVersionSet = true;
+            chunk._version = ChunkVersion::fromBSON(source, version());
         }
         else if (ChunkVersion::canParseBSON(source, DEPRECATED_lastmod())) {
-            _version = ChunkVersion::fromBSON(source, DEPRECATED_lastmod());
-            _isVersionSet = true;
+            chunk._version = ChunkVersion::fromBSON(source, DEPRECATED_lastmod());
         }
 
-        return true;
+        return chunk;
+    }
+
+    Status ChunkType::validate() const {
+
+        if (!_name.is_initialized() || _name->empty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << name.name() << " field");
+        }
+
+        if (!_ns.is_initialized() || _ns->empty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << ns.name() << " field");
+        }
+
+        if (!_min.is_initialized() || _min->isEmpty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << min.name() << " field");
+        }
+
+        if (!_max.is_initialized() || _max->isEmpty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << max.name() << " field");
+        }
+
+        if (!_version.is_initialized() || !_version->isSet()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << version.name() << " field");
+        }
+
+        if (!_shard.is_initialized() || _shard->empty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << shard.name() << " field");
+        }
+
+        // NOTE: all the following semantic checks should eventually become the caller's
+        // responsibility, and should be moved out of this class completely
+
+        // 'min' and 'max' must share the same fields.
+        if (_min->nFields() != _max->nFields()) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "min and max have a different number of keys");
+        }
+        BSONObjIterator minIt(getMin());
+        BSONObjIterator maxIt(getMax());
+        while (minIt.more() && maxIt.more()) {
+            BSONElement minElem = minIt.next();
+            BSONElement maxElem = maxIt.next();
+            if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "min and max must have the same set of keys");
+            }
+        }
+
+        // 'max' should be greater than 'min'.
+        if (_min->woCompare(getMax()) >= 0) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "max key must be greater than min key");
+        }
+
+        return Status::OK();
+    }
+
+    BSONObj ChunkType::toBSON() const {
+        BSONObjBuilder builder;
+        if (_name) builder.append(name.name(), getName());
+        if (_ns) builder.append(ns.name(), getNS());
+        if (_min) builder.append(min.name(), getMin());
+        if (_max) builder.append(max.name(), getMax());
+        if (_shard) builder.append(shard.name(), getShard());
+        if (_version) {
+            // For now, write both the deprecated *and* the new fields
+            _version->addToBSON(builder, version());
+            _version->addToBSON(builder, DEPRECATED_lastmod());
+        }
+        if (_jumbo) builder.append(jumbo.name(), getJumbo());
+
+        return builder.obj();
     }
 
     void ChunkType::clear() {
-
-        _name.clear();
-        _isNameSet = false;
-
-        _ns.clear();
-        _isNsSet = false;
-
-        _min = BSONObj();
-        _isMinSet = false;
-
-        _max = BSONObj();
-        _isMaxSet = false;
-
-        _version = ChunkVersion();
-        _isVersionSet = false;
-
-        _shard.clear();
-        _isShardSet = false;
-
-        _jumbo = false;
-        _isJumboSet = false;
-
+        _name.reset();
+        _ns.reset();
+        _min.reset();
+        _max.reset();
+        _version.reset();
+        _shard.reset();
+        _jumbo.reset();
     }
 
     void ChunkType::cloneTo(ChunkType* other) const {
+        invariant(other);
         other->clear();
 
         other->_name = _name;
-        other->_isNameSet = _isNameSet;
-
         other->_ns = _ns;
-        other->_isNsSet = _isNsSet;
-
-        other->_min = _min;
-        other->_isMinSet = _isMinSet;
-
-        other->_max = _max;
-        other->_isMaxSet = _isMaxSet;
-
+        other->_min = _min->getOwned();
+        other->_max = _max->getOwned();
         other->_version = _version;
-        other->_isVersionSet = _isVersionSet;
-
         other->_shard = _shard;
-        other->_isShardSet = _isShardSet;
-
         other->_jumbo = _jumbo;
-        other->_isJumboSet = _isJumboSet;
-
     }
 
     std::string ChunkType::toString() const {
         return toBSON().toString();
+    }
+
+    void ChunkType::setName(const std::string& name) {
+        invariant(!name.empty());
+        _name = name;
+    }
+
+    void ChunkType::setNS(const std::string& ns) {
+        invariant(!ns.empty());
+        _ns = ns;
+    }
+
+    void ChunkType::setMin(const BSONObj& min) {
+        invariant(!min.isEmpty());
+        _min = min;
+    }
+
+    void ChunkType::setMax(const BSONObj& max) {
+        invariant(!max.isEmpty());
+        _max = max;
+    }
+
+    void ChunkType::setVersion(const ChunkVersion& version) {
+        invariant(version.isSet());
+        _version = version;
+    }
+
+    void ChunkType::setShard(const std::string& shard) {
+        invariant(!shard.empty());
+        _shard = shard;
+    }
+
+    void ChunkType::setJumbo(const bool jumbo) {
+        _jumbo = jumbo;
     }
 
 } // namespace mongo

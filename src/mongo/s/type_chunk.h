@@ -28,15 +28,17 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
+
+    class BSONObj;
+    class Status;
+    template<typename T> class StatusWith;
 
     /**
      * This class represents the layout and contents of documents contained in the
@@ -51,21 +53,16 @@ namespace mongo {
      *     exampleDoc = conn->findOne(ChunkType::ConfigNS, query);
      *
      *     // Process the response.
-     *     ChunkType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
+     *     StatusWith<ChunkType> exampleResult = ChunkType::fromBSON(exampleDoc);
+     *     if (!exampleResult.isOK()) {
+     *         // handle error -- exampleResult.getStatus()
      *     }
+     *     ChunkType exampleType = exampleResult.getValue();
      *     // use 'exampleType'
      *
      */
     class ChunkType {
-        MONGO_DISALLOW_COPYING(ChunkType);
     public:
-
-        //
-        // schema declarations
-        //
 
         // Name of the chunks collection in the config server.
         static const std::string ConfigNS;
@@ -81,29 +78,26 @@ namespace mongo {
         static const BSONField<Date_t> DEPRECATED_lastmod;
         static const BSONField<OID> DEPRECATED_epoch;
 
-        //
-        // chunks type methods
-        //
-
         ChunkType();
+        ChunkType(const ChunkType& chunk);
         ~ChunkType();
 
         /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
+         * Constructs a new ChunkType object from BSON.
+         * Also does validation of the contents.
          */
-        bool isValid(std::string* errMsg) const;
+        static StatusWith<ChunkType> fromBSON(const BSONObj& source);
+
+        /**
+         * Returns OK if all fields have been set. Otherwise returns NoSuchKey
+         * and information about the first field that is missing.
+         */
+        Status validate() const;
 
         /**
          * Returns the BSON representation of the entry.
          */
         BSONObj toBSON() const;
-
-        /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
 
         /**
          * Clears the internal state.
@@ -120,140 +114,52 @@ namespace mongo {
          */
         std::string toString() const;
 
-        //
-        // individual field accessors
-        //
+        const bool isNameSet() const { return _name.is_initialized(); }
+        const std::string& getName() const { return _name.get(); }
+        void setName(const std::string& name);
 
-        // Mandatory Fields
-        void setName(StringData name) {
-            _name = name.toString();
-            _isNameSet = true;
-        }
+        const bool isNSSet() const { return _ns.is_initialized(); }
+        const std::string& getNS() const { return _ns.get(); }
+        void setNS(const std::string& name);
 
-        void unsetName() { _isNameSet = false; }
+        const bool isMinSet() const { return _min.is_initialized(); }
+        const BSONObj& getMin() const { return _min.get(); }
+        void setMin(const BSONObj& min);
 
-        bool isNameSet() const { return _isNameSet; }
+        const bool isMaxSet() const { return _max.is_initialized(); }
+        const BSONObj& getMax() const { return _max.get(); }
+        void setMax(const BSONObj& max);
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string getName() const {
-            dassert(_isNameSet);
-            return _name;
-        }
+        const bool isVersionSet() const { return _version.is_initialized(); }
+        const ChunkVersion& getVersion() const { return _version.get(); }
+        void setVersion(const ChunkVersion& version);
 
-        void setNS(StringData ns) {
-            _ns = ns.toString();
-            _isNsSet = true;
-        }
+        const bool isShardSet() const { return _shard.is_initialized(); }
+        const std::string& getShard() const { return _shard.get(); }
+        void setShard(const std::string& shard);
 
-        void unsetNS() { _isNsSet = false; }
-
-        bool isNSSet() const { return _isNsSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string getNS() const {
-            dassert(_isNsSet);
-            return _ns;
-        }
-
-        void setMin(const BSONObj& min) {
-            _min = min.getOwned();
-            _isMinSet = true;
-        }
-
-        void unsetMin() { _isMinSet = false; }
-
-        bool isMinSet() const { return _isMinSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const BSONObj getMin() const {
-            dassert(_isMinSet);
-            return _min;
-        }
-
-        void setMax(const BSONObj& max) {
-            _max = max.getOwned();
-            _isMaxSet = true;
-        }
-
-        void unsetMax() { _isMaxSet = false; }
-
-        bool isMaxSet() const { return _isMaxSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const BSONObj getMax() const {
-            dassert(_isMaxSet);
-            return _max;
-        }
-
-        void setVersion(const ChunkVersion& version) {
-            _version = version;
-            _isVersionSet = true;
-        }
-
-        void unsetVersion() { _isVersionSet = false; }
-
-        bool isVersionSet() const { return _isVersionSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const ChunkVersion& getVersion() const {
-            dassert(_isVersionSet);
-            return _version;
-        }
-
-        void setShard(StringData shard) {
-            _shard = shard.toString();
-            _isShardSet = true;
-        }
-
-        void unsetShard() { _isShardSet = false; }
-
-        bool isShardSet() const { return _isShardSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string getShard() const {
-            dassert(_isShardSet);
-            return _shard;
-        }
-
-        // Optional Fields
-        void setJumbo(bool jumbo) {
-            _jumbo = jumbo;
-            _isJumboSet = true;
-        }
-
-        void unsetJumbo() { _isJumboSet = false; }
-
-        bool isJumboSet() const {
-            return _isJumboSet || jumbo.hasDefault();
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getJumbo() const {
-            if (_isJumboSet) {
-                return _jumbo;
-            } else {
-                dassert(jumbo.hasDefault());
-                return jumbo.getDefault();
-            }
-        }
+        const bool isJumboSet() const { return _jumbo.is_initialized(); }
+        const bool getJumbo() const { return _jumbo.get(); }
+        void setJumbo(const bool);
 
     private:
+
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _name;     // (M)  chunk's id
-        bool _isNameSet;
-        std::string _ns;     // (M)  collection this chunk is in
-        bool _isNsSet;
-        BSONObj _min;     // (M)  first key of the range, inclusive
-        bool _isMinSet;
-        BSONObj _max;     // (M)  last key of the range, non-inclusive
-        bool _isMaxSet;
-        ChunkVersion _version;     // (M)  version of this chunk
-        bool _isVersionSet;
-        std::string _shard;     // (M)  shard this chunk lives in
-        bool _isShardSet;
-        bool _jumbo;     // (O)  too big to move?
-        bool _isJumboSet;
+
+        // (M)  chunk's id
+        boost::optional<std::string> _name;
+        // (M)  collection this chunk is in
+        boost::optional<std::string> _ns;
+        // (M)  first key of the range, inclusive
+        boost::optional<BSONObj> _min;
+        // (M)  last key of the range, non-inclusive
+        boost::optional<BSONObj> _max;
+        // (M)  version of this chunk
+        boost::optional<ChunkVersion> _version;
+        // (M)  shard this chunk lives in
+        boost::optional<std::string> _shard;
+        // (O)  too big to move?
+        boost::optional<bool> _jumbo;
     };
 
 } // namespace mongo

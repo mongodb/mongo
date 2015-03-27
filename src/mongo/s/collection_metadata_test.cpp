@@ -98,7 +98,7 @@ namespace {
             chunkType.setMax( BSON( "a" << MAXKEY ) );
             chunkType.setVersion( ChunkVersion( 1, 0, epoch ) );
             chunkType.setName( OID::gen().toString() );
-            ASSERT( chunkType.isValid( &errMsg ) );
+            ASSERT(chunkType.validate().isOK());
 
             _dummyConfig->insert( ChunkType::ConfigNS, chunkType.toBSON() );
 
