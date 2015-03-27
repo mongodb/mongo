@@ -40,7 +40,6 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/client_basic.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -53,7 +52,6 @@ namespace mongo {
     class CurOp;
     class Collection;
     class AbstractMessagingPort;
-    class Locker;
 
     TSP_DECLARE(Client, currentClient)
 
@@ -103,9 +101,6 @@ namespace mongo {
         CurOp* curop() const { return _curOp; }
         const std::string& desc() const { return _desc; }
 
-        // Return a reference to the Locker for this client. Client retains ownership.
-        Locker* getLocker();
-
         void reportState(BSONObjBuilder& builder);
 
         // Ensures stability of the client's OperationContext. When the client is locked,
@@ -152,10 +147,6 @@ namespace mongo {
 
         // Changes, based on what operation is running. Some of this should be in OperationContext.
         CurOp* _curOp;
-
-        // By having Client, rather than the OperationContext, own the Locker, setup cost such as
-        // allocating OS resources can be amortized over multiple operations.
-        boost::scoped_ptr<Locker> _locker;
 
         // Tracks if Client::shutdown() gets called (TODO: Is this necessary?)
         bool _shutdown;

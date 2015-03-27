@@ -49,7 +49,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/instance.h"
@@ -70,21 +69,6 @@ namespace mongo {
     using std::stringstream;
 
     using logger::LogComponent;
-
-namespace {
-
-    /**
-     * Create an appropriate new locker for the storage engine in use. Caller owns the return.
-     */
-    Locker* newLocker() {
-        if (isMMAPV1()) {
-            return new MMAPV1LockerImpl();
-        }
-
-        return new LockerImpl<false>();
-    }
-
-} // namespace
 
     boost::mutex Client::clientsMutex;
     ClientSet Client::clients;
@@ -162,14 +146,6 @@ namespace {
         }
 
         return false;
-    }
-
-    Locker* Client::getLocker() {
-        if (!_locker) {
-            _locker.reset(newLocker());
-        }
-
-        return _locker.get();
     }
 
     void Client::reportState(BSONObjBuilder& builder) {

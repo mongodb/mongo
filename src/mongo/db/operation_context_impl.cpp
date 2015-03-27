@@ -32,6 +32,8 @@
 
 #include "mongo/db/operation_context_impl.h"
 
+#include <memory>
+
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
@@ -40,16 +42,40 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/random.h"
-#include "mongo/util/log.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+namespace {
+    std::unique_ptr<Locker> newLocker() {
+        if (isMMAPV1()) return stdx::make_unique<MMAPV1LockerImpl>();
+        return stdx::make_unique<DefaultLockerImpl>();
+    }
+
+    class ClientOperationInfo {
+    public:
+        Locker* getLocker() {
+            if (!_locker) {
+                _locker = newLocker();
+            }
+            return _locker.get();
+        }
+
+    private:
+        std::unique_ptr<Locker> _locker;
+    };
+
+    const auto clientOperationInfoDecoration = Client::declareDecoration<ClientOperationInfo>();
+
+}  // namespace
 
     using std::string;
 
     OperationContextImpl::OperationContextImpl()
         : _client(currentClient.get()),
-          _locker(_client->getLocker()) {
+          _locker(clientOperationInfoDecoration(_client).getLocker()) {
 
         invariant(_locker);
 
