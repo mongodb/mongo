@@ -141,8 +141,6 @@ namespace mongo {
         bool _isValid;
     };
 
-    extern SockAddr unknownAddress; // ( "0.0.0.0", 0 )
-
     /** this is not cache and does a syscall */
     std::string getHostName();
     

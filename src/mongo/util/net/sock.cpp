@@ -359,8 +359,6 @@ namespace mongo {
         return false;        
     }
 
-    SockAddr unknownAddress( "0.0.0.0", 0 );
-
     string makeUnixSockPath(int port) {
         return mongoutils::str::stream() << serverGlobalParams.socket << "/mongodb-" << port
                                          << ".sock";
