@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
 #include <unistd.h>
@@ -50,7 +51,6 @@
 #endif
 
 static const char * const home = NULL;
-static int global_error = 0;
 
 /*! [encryption example callback implementation] */
 typedef struct {
@@ -112,9 +112,9 @@ do_rot13(uint8_t *buf, size_t len)
 	for (i = 0; i < len; i++) {
 		if (isalpha(buf[i])) {
 			if (tolower(buf[i]) < 'n')
-				s[i] += 13;
+				buf[i] += 13;
 			else
-				s[i] -= 13;
+				buf[i] -= 13;
 		}
 	}
 }
@@ -127,7 +127,7 @@ static int
 rot13_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
-    size_t *result_lenp, int *encryption_failed)
+    size_t *result_lenp)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 	uint32_t i;
@@ -135,16 +135,14 @@ rot13_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;		/* Unused */
 	++ex_encryptor->num_calls;
 
-	*encryption_failed = 0;
 	if (src == NULL)
 		return (0);
 	/*
 	 * Make sure it is big enough.
 	 */
-	if (dst_len < src_len - CHKSUM_LEN - IV_LEN) {
-		*encryption_failed = 1;
-		return (0);
-	}
+	if (dst_len < src_len - CHKSUM_LEN - IV_LEN)
+		return (ENOMEM);
+
 	/*
 	 * !!! Most implementations would verify the checksum here.
 	 */
@@ -174,7 +172,7 @@ static int
 rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
-    size_t *result_lenp, int *encryption_failed)
+    size_t *result_lenp)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 	uint32_t i;
@@ -182,13 +180,11 @@ rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;		/* Unused */
 	++ex_encryptor->num_calls;
 
-	*encryption_failed = 0;
 	if (src == NULL)
 		return (0);
-	if (dst_len < src_len + CHKSUM_LEN + IV_LEN) {
-		*encryption_failed = 1;
-		return (0);
-	}
+	if (dst_len < src_len + CHKSUM_LEN + IV_LEN)
+		return (ENOMEM);
+
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[i], &src[0], src_len);
 	/*
@@ -282,7 +278,7 @@ do_bitwisenot(uint8_t *buf, size_t len)
 	 * Now bitwise not
 	 */
 	for (i = 0; i < len; i++)
-		s[i] = ~s[i];
+		buf[i] = ~buf[i];
 }
 
 /*
@@ -293,7 +289,7 @@ static int
 not_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
-    size_t *result_lenp, int *encryption_failed)
+    size_t *result_lenp)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 	uint32_t i;
@@ -301,16 +297,14 @@ not_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;		/* Unused */
 	++ex_encryptor->num_calls;
 
-	*encryption_failed = 0;
 	if (src == NULL)
 		return (0);
 	/*
 	 * Make sure it is big enough.
 	 */
-	if (dst_len < src_len - CHKSUM_LEN - IV_LEN) {
-		*encryption_failed = 1;
-		return (0);
-	}
+	if (dst_len < src_len - CHKSUM_LEN - IV_LEN)
+		return (ENOMEM);
+
 	/*
 	 * Most implementations would verify the checksum now.
 	 */
@@ -337,7 +331,7 @@ static int
 not_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
-    size_t *result_lenp, int *encryption_failed)
+    size_t *result_lenp)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 	uint32_t i;
@@ -345,13 +339,11 @@ not_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;		/* Unused */
 	++ex_encryptor->num_calls;
 
-	*encryption_failed = 0;
 	if (src == NULL)
 		return (0);
-	if (dst_len < src_len + CHKSUM_LEN + IV_LEN) {
-		*encryption_failed = 1;
-		return (0);
-	}
+	if (dst_len < src_len + CHKSUM_LEN + IV_LEN)
+		return (ENOMEM);
+
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[i], &src[0], src_len);
 	/*
@@ -493,14 +485,15 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "log=(enabled=true,encryption_algorithm=not,encryption_password=xyz)", &conn);
+	    "log=(enabled=true,encryption_algorithm=not,"
+	    "encryption_password=xyz)", &conn);
 
-	ret = add_my_encryptors();
+	ret = add_my_encryptors(conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->create(
-	    session, "table:crypto",
-	    "encryption=(enabled=true,algorithm=rot13,password=abc123),key_format=S,value_format=S");
+	ret = session->create(session, "table:crypto",
+	    "encryption=(enabled=true,algorithm=rot13,"
+	    "password=abc123),key_format=S,value_format=S");
 	ret = session->create(
 	    session, "table:nocrypto",
 	    "key_format=S,value_format=S");
