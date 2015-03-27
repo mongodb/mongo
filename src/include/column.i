@@ -49,7 +49,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * confirmed such a record exists before searching.
 	 */
 	while (recno >= WT_INSERT_RECNO(ins))
-		ins = ins->next;
+		ins = WT_SKIP_NEXT(ins);
 	return (ins);
 }
 
