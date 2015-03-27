@@ -2415,12 +2415,27 @@ namespace mongo {
         class CmdListCollections : public PublicGridCommand {
         public:
             CmdListCollections() : PublicGridCommand( "listCollections" ) {}
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::listCollections);
-                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+                AuthorizationSession* authzSession = client->getAuthorizationSession();
+
+                // Check for the listCollections ActionType on the database
+                // or find on system.namespaces for pre 3.0 systems.
+                if (authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(dbname),
+                        ActionType::listCollections) ||
+                    authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(
+                            NamespaceString(dbname, "system.namespaces")),
+                        ActionType::find)) {
+                    return Status::OK();
+                }
+
+                return Status(ErrorCodes::Unauthorized,
+                            str::stream() << "Not authorized to create users on db: " <<
+                            dbname);
             }
 
             bool run(OperationContext* txn, const string& dbName,
