@@ -107,7 +107,7 @@ do_rot13(uint8_t *buf, size_t len)
 {
 	uint32_t i;
 	/*
-	 * Now rot13 
+	 * Now rot13
 	 */
 	for (i = 0; i < len; i++) {
 		if (isalpha(buf[i])) {
@@ -137,7 +137,7 @@ rot13_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	*encryption_failed = 0;
 	if (src == NULL)
-	        return (0);
+		return (0);
 	/*
 	 * Make sure it is big enough.
 	 */
@@ -184,7 +184,7 @@ rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	*encryption_failed = 0;
 	if (src == NULL)
-	        return (0);
+		return (0);
 	if (dst_len < src_len + CHKSUM_LEN + IV_LEN) {
 		*encryption_failed = 1;
 		return (0);
@@ -279,7 +279,7 @@ do_bitwisenot(uint8_t *buf, size_t len)
 {
 	uint32_t i;
 	/*
-	 * Now bitwise not 
+	 * Now bitwise not
 	 */
 	for (i = 0; i < len; i++)
 		s[i] = ~s[i];
@@ -303,7 +303,7 @@ not_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	*encryption_failed = 0;
 	if (src == NULL)
-	        return (0);
+		return (0);
 	/*
 	 * Make sure it is big enough.
 	 */
@@ -347,7 +347,7 @@ not_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	*encryption_failed = 0;
 	if (src == NULL)
-	        return (0);
+		return (0);
 	if (dst_len < src_len + CHKSUM_LEN + IV_LEN) {
 		*encryption_failed = 1;
 		return (0);
@@ -477,7 +477,6 @@ add_my_encryptors(WT_CONNECTION *connection)
 	return (connection->add_encryptor(
 	    connection, "rot13", (WT_ENCRYPTOR *)rot13_encryptor, NULL));
 }
-
 
 #define	MAX_KEYS	100
 

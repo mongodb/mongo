@@ -3243,7 +3243,7 @@ struct __wt_encryptor {
 	 * for encryptors that generate ciphertext significantly larger than
 	 * the plaintext.  When WT_ENCRYPTOR::post_size is set to NULL, the
 	 * destination buffer is sized the same as the source buffer.
-         *
+	 *
 	 * If not NULL, this callback is called before each call to
 	 * WT_ENCRYPTOR::decrypt to determine the size of the destination
 	 * buffer to provide.  If the callback is NULL, the destination
@@ -3273,10 +3273,10 @@ struct __wt_encryptor {
 	 * WT_ENCRYPTOR::pre_size is an callback that, given the
 	 * source buffer and size, produces the size of the destination buffer
 	 * to be given to WT_ENCRYPTOR::encrypt.  This is always
-         * necessary, since encryptors typically generate encrypted
-         * text that is larger than the plain text input. Without
-         * such a call, WiredTiger would have no way to know the
-         * worst case for the encrypted buffer size.
+	 * necessary, since encryptors typically generate encrypted
+	 * text that is larger than the plain text input. Without
+	 * such a call, WiredTiger would have no way to know the
+	 * worst case for the encrypted buffer size.
 	 *
 	 * If not NULL, this callback is called before each call to
 	 * WT_ENCRYPTOR::encrypt to determine the size of the destination
