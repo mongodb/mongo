@@ -138,7 +138,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
 	size_t len, src_len, dst_len, result_len, size;
-	int data_cksum, compression_failed, encrypted, encryption_failed;
+	int data_cksum, compression_failed, encrypted;
 	uint8_t *src, *dst;
 
 	btree = S2BT(session);
@@ -278,39 +278,29 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		dst = (uint8_t *)etmp->mem + WT_BLOCK_COMPRESS_SKIP;
 		dst_len = len;
 
-		encryption_failed = 0;
-		WT_ERR(btree->encryptor->encrypt(btree->encryptor,
+		if ((ret = btree->encryptor->encrypt(btree->encryptor,
 		    &session->iface,
 		    src, src_len,
 		    dst, dst_len,
-		    &result_len, &encryption_failed));
-		result_len += WT_BLOCK_COMPRESS_SKIP;
-
-		/*
-		 * If encryption fails, there's not much we can do.
-		 * We cannot write the clear text, we can't ignore it,
-		 * so treat it like an IO failure.
-		 */
-		if (encryption_failed) {
-			ret = EIO;
-			__wt_err(session, ret,
+		    &result_len)) != 0)
+			WT_ERR_MSG(session, ret,
 			    "%s encryption error: failed to encrypt %"
 			    WT_SIZET_FMT " bytes", btree->dhandle->name,
 			    src_len);
-			WT_ERR(ret);
-		} else {
-			/*TODO: stats*/
-			WT_STAT_FAST_DATA_INCR(session, compress_write);
 
-			encrypted = 1;
-			/*
-			 * Copy in the skipped header bytes, set the final data
-			 * size.
-			 */
-			memcpy(etmp->mem, ip->mem, WT_BLOCK_COMPRESS_SKIP);
-			etmp->size = result_len;
-			ip = etmp;
-		}
+		result_len += WT_BLOCK_COMPRESS_SKIP;
+
+		/*TODO: stats*/
+		WT_STAT_FAST_DATA_INCR(session, compress_write);
+
+		encrypted = 1;
+		/*
+		 * Copy in the skipped header bytes, set the final data
+		 * size.
+		 */
+		memcpy(etmp->mem, ip->mem, WT_BLOCK_COMPRESS_SKIP);
+		etmp->size = result_len;
+		ip = etmp;
 	}
 	dsk = ip->mem;
 

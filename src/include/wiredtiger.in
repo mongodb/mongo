@@ -3183,8 +3183,6 @@ struct __wt_encryptor {
 	 * @param[in] dst the destination buffer
 	 * @param[in] dst_len the length of the destination buffer
 	 * @param[out] result_lenp the length of the encrypted data
-	 * @param[out] encryption_failed non-zero if encryption did not
-	 * decrease the length of the data (encryption may not have completed)
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
 	 * @snippet nop_encrypt.c WT_ENCRYPTOR encrypt
@@ -3192,7 +3190,7 @@ struct __wt_encryptor {
 	int (*encrypt)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	    uint8_t *src, size_t src_len,
 	    uint8_t *dst, size_t dst_len,
-	    size_t *result_lenp, int *encryption_failed);
+	    size_t *result_lenp);
 
 	/*!
 	 * Callback to decrypt a chunk of data.
@@ -3240,9 +3238,9 @@ struct __wt_encryptor {
 	 * WT_ENCRYPTOR::post_size is an optional callback that, given the
 	 * source buffer and size, produces the size of the destination
 	 * buffer to be given to WT_ENCRYPTOR::decrypt.  This is most useful
-	 * for encryptors that generate ciphertext significantly larger than
-	 * the plaintext.  When WT_ENCRYPTOR::post_size is set to NULL, the
-	 * destination buffer is sized the same as the source buffer.
+	 * for encryptors that generate encrypted text significantly larger
+	 * than the plain text.  When WT_ENCRYPTOR::post_size is set to NULL,
+	 * the destination buffer is sized the same as the source buffer.
 	 *
 	 * If not NULL, this callback is called before each call to
 	 * WT_ENCRYPTOR::decrypt to determine the size of the destination
