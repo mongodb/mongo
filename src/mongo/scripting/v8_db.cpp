@@ -884,8 +884,8 @@ namespace mongo {
         string tmpBase64 = base64::decode(*utf);
         // length property stores the decoded length
         it->ForceSet(scope->v8StringData("len"), v8::Number::New(tmpBase64.length()),
-                     v8::PropertyAttribute::ReadOnly);
-        it->ForceSet(scope->v8StringData("type"), type, v8::PropertyAttribute::ReadOnly);
+                     v8::ReadOnly);
+        it->ForceSet(scope->v8StringData("type"), type, v8::ReadOnly);
         it->SetInternalField(0, args[1]);
 
         return it;
