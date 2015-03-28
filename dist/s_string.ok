@@ -417,6 +417,7 @@ args
 argv
 async
 asyncopp
+asyncops
 autockpt
 autocommit
 autoheader
@@ -432,6 +433,7 @@ bitpos
 bitstr
 bitstring
 bitwise
+blk
 bm
 bnd
 bool
@@ -568,6 +570,8 @@ dll
 dlopen
 dlsym
 dmsg
+doxgen
+doxygen
 ds
 dsk
 dsrc
@@ -704,6 +708,7 @@ inflateInit
 init
 initn
 initsize
+initval
 inline
 inlined
 inmem
@@ -768,6 +773,7 @@ logsize
 logtest
 lookup
 lookups
+lossy
 lpthread
 lr
 lrt
@@ -880,6 +886,7 @@ ovfl
 ownp
 packv
 parens
+pareto
 parserp
 patchp
 pathname
@@ -887,6 +894,7 @@ pathnames
 perf
 pfx
 poptable
+popthreads
 pos
 posint
 posix
@@ -951,6 +959,7 @@ ret
 retp
 rf
 rle
+rmw
 rng
 rpc
 rref
@@ -1025,6 +1034,7 @@ strncmp
 strncpy
 strndup
 strsep
+strtok
 strtoll
 strtouq
 struct
@@ -1070,6 +1080,7 @@ toklen
 tokname
 tokstart
 toktype
+totalsec
 toverflow
 tparent
 tprintlog
@@ -1107,6 +1118,7 @@ txnidp
 txnmin
 typedef
 uB
+uS
 uid
 uint
 uintmax
@@ -1137,6 +1149,7 @@ update's
 upg
 uri
 uri's
+uris
 usecs
 usedp
 usercfg
@@ -1165,6 +1178,7 @@ vtype
 vunpack
 vupdate
 walk's
+warmup
 wb
 wiredtiger
 workFactor
