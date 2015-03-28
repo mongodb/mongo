@@ -175,6 +175,8 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	page = cbt->ref->page;
 	val = &cbt->iface.value;
 
+	rle_start = 0;			/* -Werror=maybe-uninitialized */
+
 	/* Initialize for each new page. */
 	if (newpage) {
 		cbt->last_standard_recno = __col_var_last_recno(page);
