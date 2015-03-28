@@ -54,7 +54,7 @@ static int
 nop_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
-    size_t *result_lenp, int *encryption_failed)
+    size_t *result_lenp)
 {
 	NOP_ENCRYPTOR *nop_encryptor = (NOP_ENCRYPTOR *)encryptor;
 
@@ -62,11 +62,8 @@ nop_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	++nop_encryptor->nop_calls;		/* Call count */
 
-	*encryption_failed = 0;
-	if (dst_len < src_len) {
-		*encryption_failed = 1;
-		return (0);
-	}
+	if (dst_len < src_len)
+		return (EINVAL);
 
 	memcpy(dst, src, src_len);
 	*result_lenp = src_len;
