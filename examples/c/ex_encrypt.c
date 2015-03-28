@@ -485,10 +485,9 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
+	    "extensions=[local=(entry=add_my_encryptors)],"
 	    "log=(enabled=true,encryption_algorithm=not,"
 	    "encryption_password=xyz)", &conn);
-
-	ret = add_my_encryptors(conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(session, "table:crypto",
