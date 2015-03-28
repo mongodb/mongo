@@ -56,12 +56,17 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	*runp = cval.val != 0;
 
 	/*
-	 * Setup a log path and compression even if logging is disabled in
-	 * case we are going to print a log.
+	 * Setup a log path, compression and encryption even if logging is
+	 * disabled in case we are going to print a log.
 	 */
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &conn->log_compressor));
+
+	conn->log_encryptor = NULL;
+	WT_RET(__wt_config_gets_none(session, cfg, "log.encryption_algorithm",
+	    &cval));
+	WT_RET(__wt_encryptor_config(session, &cval, &conn->log_encryptor));
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
