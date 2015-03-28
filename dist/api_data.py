@@ -577,8 +577,7 @@ common_wiredtiger_open = [
             Permitted values are \c "none"
             or custom encryption engine name created with
             WT_CONNECTION::add_encryptor.  
-            See @ref encryption for more information''',
-            func='__wt_encryptor_confchk'),
+            See @ref encryption for more information'''),
         Config('encryption_password', '', r'''
             logging password key sent to encryption callback when operating
             on log records'''),
