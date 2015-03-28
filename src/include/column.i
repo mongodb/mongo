@@ -28,26 +28,29 @@ __col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
+	ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;)
-		if (*insp != NULL && recno <= WT_INSERT_RECNO(*insp)) {
-			ins = *insp;
+		if (*insp != NULL && recno > WT_INSERT_RECNO(*insp)) {
+			ins = *insp;	/* GTE: keep going at this level */
 			insp = &(*insp)->next[i];
 		} else {
-			--i;
+			--i;		/* LT: drop down a level */
 			--insp;
 		}
 
 	/*
-	 * If the skiplist consisted of a single record larger than the target,
-	 * we never updated ins and it references that record. Otherwise, ins
-	 * references a record less-than-or-equal to the target, move to a
-	 * record after it, that is, the subsequent record that's greater than
-	 * the target. Because inserts happen concurrently, additional records
-	 * may be inserted after the searched-for record that are still smaller
-	 * than the target, continue to move forward until reaching a record
-	 * larger than the target. There isn't any safety testing because we
-	 * confirmed such a record exists before searching.
+	 * If we didn't find any records smaller than the target, we never set
+	 * the return value, set it to the first record in the list. Otherwise,
+	 * it references a record less-than-or-equal to the target, move to a
+	 * later record, that is, a subsequent record greater than the target.
+	 * Because inserts happen concurrently, additional records might be
+	 * inserted after the searched-for record that are still smaller than
+	 * the target, continue to move forward until reaching a record larger
+	 * than the target. There isn't any safety testing because we confirmed
+	 * such a record exists before searching.
 	 */
+	if (ins == NULL)
+		ins = WT_SKIP_FIRST(inshead);
 	while (recno >= WT_INSERT_RECNO(ins))
 		ins = WT_SKIP_NEXT(ins);
 	return (ins);
@@ -77,10 +80,10 @@ __col_insert_search_lt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;)
 		if (*insp != NULL && recno < WT_INSERT_RECNO(*insp)) {
-			ins = *insp;
+			ins = *insp;	/* LT: keep going at this level */
 			insp = &(*insp)->next[i];
 		} else  {
-			--i;
+			--i;		/* GTE: drop down a level */
 			--insp;
 		}
 
@@ -235,7 +238,7 @@ __col_fix_last_recno(WT_PAGE *page)
  *	Search a variable-length column-store page for a record.
  */
 static inline WT_COL *
-__col_var_search(WT_PAGE *page, uint64_t recno)
+__col_var_search(WT_PAGE *page, uint64_t recno, uint64_t *start_recnop)
 {
 	WT_COL_RLE *repeat;
 	uint64_t start_recno;
@@ -255,8 +258,11 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 
 		repeat = page->pg_var_repeats + indx;
 		if (recno >= repeat->recno &&
-		    recno < repeat->recno + repeat->rle)
+		    recno < repeat->recno + repeat->rle) {
+			if (start_recnop != NULL)
+				*start_recnop = repeat->recno;
 			return (page->pg_var_d + repeat->indx);
+		}
 		if (recno < repeat->recno)
 			continue;
 		base = indx + 1;

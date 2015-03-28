@@ -169,7 +169,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	uint64_t rle;
+	uint64_t rle, rle_start;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
@@ -191,7 +191,8 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 		__cursor_set_recno(cbt, cbt->recno + 1);
 
 new_page:	/* Find the matching WT_COL slot. */
-		if ((cip = __col_var_search(page, cbt->recno)) == NULL)
+		if ((cip =
+		    __col_var_search(page, cbt->recno, &rle_start)) == NULL)
 			return (WT_NOTFOUND);
 		cbt->slot = WT_COL_SLOT(page, cip);
 
@@ -223,23 +224,38 @@ new_page:	/* Find the matching WT_COL slot. */
 				continue;
 			__wt_cell_unpack(cell, &unpack);
 			if (unpack.type == WT_CELL_DEL) {
+				if ((rle = __wt_cell_rle(&unpack)) == 1)
+					continue;
+
 				/*
 				 * There can be huge gaps in the variable-length
 				 * column-store name space appearing as deleted
 				 * records. If more than one deleted record, do
-				 * the work of finding the next useful record.
-				 * Note adjustment for the increment done in the
-				 * outer loop.
+				 * the work of finding the next record to return
+				 * instead of looping through the records.
+				 *
+				 * First, find the smallest record in the update
+				 * list that's larger than the current record.
 				 */
-				if ((rle = __wt_cell_rle(&unpack)) > 1) {
-					if ((ins = __col_insert_search_gt(
-					    cbt->ins_head, cbt->recno)) == NULL)
-						cbt->recno += rle - 1;
-					else
-						cbt->recno =
-						    WT_MIN(cbt->recno + rle,
-						    WT_INSERT_RECNO(ins)) - 1;
-				}
+				ins = __col_insert_search_gt(
+				    cbt->ins_head, cbt->recno);
+
+				/*
+				 * Second, for records with RLEs greater than 1,
+				 * the above call to __col_var_search located
+				 * this record in the page's list of repeating
+				 * records, and returned the starting record.
+				 * The starting record plus the RLE is the
+				 * record to which we could skip, if there was
+				 * no smaller record in the update list.
+				 */
+				cbt->recno = rle_start + rle;
+				if (ins != NULL &&
+				    WT_INSERT_RECNO(ins) < cbt->recno)
+					cbt->recno = WT_INSERT_RECNO(ins);
+
+				/* Adjust for the outer loop increment. */
+				--cbt->recno;
 				continue;
 			}
 			WT_RET(__wt_page_cell_data_ref(

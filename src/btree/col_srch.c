@@ -133,7 +133,7 @@ leaf_only:
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);
 	} else
-		if ((cip = __col_var_search(page, recno)) == NULL) {
+		if ((cip = __col_var_search(page, recno, NULL)) == NULL) {
 			cbt->recno = __col_var_last_recno(page);
 			goto past_end;
 		} else {
