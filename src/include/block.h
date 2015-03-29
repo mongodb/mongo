@@ -330,13 +330,15 @@ struct __wt_block_header {
 	((void *)((uint8_t *)(dsk) + WT_BLOCK_HEADER_BYTE_SIZE))
 
 /*
- * Don't compress the block's WT_PAGE_HEADER and WT_BLOCK_HEADER structures.
- * We need the WT_PAGE_HEADER in-memory size, and the WT_BLOCK_HEADER checksum
- * and on-disk size to be immediately available without decompression.  We use
- * the on-disk size and checksum during salvage to figure out where the blocks
- * are, and the in-memory size tells us how large a buffer we need to decompress
- * the block.  We could skip less than 64B, but a 64B boundary may offer better
- * alignment for the underlying compression engine, and skipping 64B won't make
- * a difference in terms of compression efficiency.
+ * Don't compress or encrypt the block's WT_PAGE_HEADER and WT_BLOCK_HEADER
+ * structures.  We need the WT_PAGE_HEADER in-memory size, and the
+ * WT_BLOCK_HEADER checksum and on-disk size to be immediately available
+ * without decompression.  We use the on-disk size and checksum during
+ * salvage to figure out where the blocks are, and the in-memory size tells
+ * us how large a buffer we need to decompress the block.  We could skip
+ * less than 64B, but a 64B boundary may offer better alignment for the
+ * underlying compression engine, and skipping 64B won't make a difference
+ * in terms of compression efficiency.
  */
 #define	WT_BLOCK_COMPRESS_SKIP	64
+#define	WT_BLOCK_ENCRYPT_SKIP	64

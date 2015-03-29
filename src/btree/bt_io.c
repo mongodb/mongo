@@ -258,8 +258,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	if (btree->encryptor != NULL &&
 	    btree->encryptor->encrypt != NULL) {
 		/* Skip the header bytes of the source data. */
-		src = (uint8_t *)ip->mem + WT_BLOCK_COMPRESS_SKIP;
-		src_len = ip->size - WT_BLOCK_COMPRESS_SKIP;
+		src = (uint8_t *)ip->mem + WT_BLOCK_ENCRYPT_SKIP;
+		src_len = ip->size - WT_BLOCK_ENCRYPT_SKIP;
 
 		/* TODO: ensure (when encryptor is added?)
 		 * that pre_size is set.
@@ -270,12 +270,12 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		WT_ERR(btree->encryptor->pre_size(btree->encryptor,
 		    &session->iface, src, src_len, &len));
 
-		size = len + WT_BLOCK_COMPRESS_SKIP;
+		size = len + WT_BLOCK_ENCRYPT_SKIP;
 		WT_ERR(bm->write_size(bm, session, &size));
 		WT_ERR(__wt_scr_alloc(session, size, &etmp));
 
 		/* Skip the header bytes of the destination data. */
-		dst = (uint8_t *)etmp->mem + WT_BLOCK_COMPRESS_SKIP;
+		dst = (uint8_t *)etmp->mem + WT_BLOCK_ENCRYPT_SKIP;
 		dst_len = len;
 
 		if ((ret = btree->encryptor->encrypt(btree->encryptor,
@@ -288,7 +288,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			    WT_SIZET_FMT " bytes", btree->dhandle->name,
 			    src_len);
 
-		result_len += WT_BLOCK_COMPRESS_SKIP;
+		result_len += WT_BLOCK_ENCRYPT_SKIP;
 
 		/*TODO: stats*/
 		WT_STAT_FAST_DATA_INCR(session, compress_write);
@@ -298,7 +298,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		 * Copy in the skipped header bytes, set the final data
 		 * size.
 		 */
-		memcpy(etmp->mem, ip->mem, WT_BLOCK_COMPRESS_SKIP);
+		memcpy(etmp->mem, ip->mem, WT_BLOCK_ENCRYPT_SKIP);
 		etmp->size = result_len;
 		ip = etmp;
 	}

@@ -15,6 +15,7 @@ static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
     uint32_t);
 
 #define	WT_LOG_COMPRESS_SKIP (offsetof(WT_LOG_RECORD, record))
+#define	WT_LOG_ENCRYPT_SKIP (offsetof(WT_LOG_RECORD, record))
 
 /*
  * __wt_log_ckpt --
@@ -1627,22 +1628,22 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	}
 	if ((encryptor = conn->log_encryptor) != NULL) {
 		/* Skip the log header */
-		src = (uint8_t *)ip->mem + WT_LOG_COMPRESS_SKIP;
-		src_len = ip->size - WT_LOG_COMPRESS_SKIP;
+		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
+		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;
 
 		WT_ERR(encryptor->pre_size(encryptor,
 		    &session->iface, src, src_len, &len));
 
-		size = len + WT_LOG_COMPRESS_SKIP;
+		size = len + WT_LOG_ENCRYPT_SKIP;
 		WT_ERR(__wt_scr_alloc(session, size, &eitem));
 
 		/* Skip the header bytes of the destination data. */
-		dst = (uint8_t *)eitem->mem + WT_LOG_COMPRESS_SKIP;
+		dst = (uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP;
 		dst_len = len;
 
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
-		result_len += WT_LOG_COMPRESS_SKIP;
+		result_len += WT_LOG_ENCRYPT_SKIP;
 
 		/* TODO: stats */
 
@@ -1650,7 +1651,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * Copy in the skipped header bytes, set the final data
 		 * size.
 		 */
-		memcpy(eitem->mem, ip->mem, WT_LOG_COMPRESS_SKIP);
+		memcpy(eitem->mem, ip->mem, WT_LOG_ENCRYPT_SKIP);
 		eitem->size = result_len;
 		ip = eitem;
 		complrp = (WT_LOG_RECORD *)eitem->mem;
