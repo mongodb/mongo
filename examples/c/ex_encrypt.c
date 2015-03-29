@@ -478,15 +478,15 @@ add_my_encryptors(WT_CONNECTION *connection)
  * results in non-portable naming.
  */
 #ifndef __DARWIN_C_ANSI
-#define DLSYM_LOCAL_USCORE
+#define	DLSYM_LOCAL_USCORE
 #else
 /* #undef DLSYM_LOCAL_USCORE */
 #endif
 
 #ifdef DLSYM_LOCAL_USCORE
-#define EXTENSION_NAME  "local=(entry=_add_my_encryptors)"
+#define	EXTENSION_NAME  "local=(entry=_add_my_encryptors)"
 #else
-#define EXTENSION_NAME  "local=(entry=add_my_encryptors)"
+#define	EXTENSION_NAME  "local=(entry=add_my_encryptors)"
 #endif
 
 int
