@@ -50,7 +50,7 @@
 #define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
 #endif
 
-static const char * const home = NULL;
+static const char *home = NULL;
 
 /*! [encryption example callback implementation] */
 typedef struct {
@@ -472,6 +472,23 @@ add_my_encryptors(WT_CONNECTION *connection)
 
 #define	MAX_KEYS	100
 
+/*
+ * Choose a name that dlsym can find.  To keep this example in
+ * a single file, we use a locally defined symbol, which unfortunately
+ * results in non-portable naming.
+ */
+#ifndef __DARWIN_C_ANSI
+#define DLSYM_LOCAL_USCORE
+#else
+/* #undef DLSYM_LOCAL_USCORE */
+#endif
+
+#ifdef DLSYM_LOCAL_USCORE
+#define EXTENSION_NAME  "local=(entry=_add_my_encryptors)"
+#else
+#define EXTENSION_NAME  "local=(entry=add_my_encryptors)"
+#endif
+
 int
 main(void)
 {
@@ -479,13 +496,24 @@ main(void)
 	WT_SESSION *session;
 	WT_CURSOR *c1, *c2;
 	int i, ret;
-	char k[16], v[16];
+	char keybuf[16], valbuf[16];
+	char *key, *val;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
 
 	srandom((unsigned int)getpid());
 
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[local=(entry=add_my_encryptors)],"
+	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true,encryption_algorithm=not,"
 	    "encryption_password=xyz)", &conn);
 
@@ -502,13 +530,13 @@ main(void)
 	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &c2);
 
 	for (i = 0; i < MAX_KEYS; i++) {
-		snprintf(k, sizeof(k), "key%d", i);
-		c1->set_key(c1, k);
-		c2->set_key(c2, k);
+		snprintf(keybuf, sizeof(keybuf), "key%d", i);
+		c1->set_key(c1, keybuf);
+		c2->set_key(c2, keybuf);
 
-		snprintf(v, sizeof(v), "value%d", i);
-		c1->set_value(c1, v);
-		c2->set_value(c2, v);
+		snprintf(valbuf, sizeof(valbuf), "value%d", i);
+		c1->set_value(c1, valbuf);
+		c2->set_value(c2, valbuf);
 
 		ret = c1->insert(c1);
 		ret = c2->insert(c2);
@@ -517,10 +545,10 @@ main(void)
 	c1->reset(c1);
 	c2->reset(c2);
 	while (c1->next(c1) == 0) {
-		ret = c1->get_key(c1, &k);
-		ret = c1->get_value(c1, &v);
+		ret = c1->get_key(c1, &key);
+		ret = c1->get_value(c1, &val);
 
-		printf("Read key %s; value %s\n", k, v);
+		printf("Read key %s; value %s\n", key, val);
 	}
 	ret = conn->close(conn, NULL);
 
