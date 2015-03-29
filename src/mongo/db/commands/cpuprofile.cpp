@@ -47,7 +47,7 @@
  *     scons --release --use-cpu-profiler 
  */
 
-#include "third_party/gperftools-2.2/src/gperftools/profiler.h"
+#include "gperftools/profiler.h"
 
 #include <string>
 #include <vector>

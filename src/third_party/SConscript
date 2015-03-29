@@ -13,7 +13,7 @@ thirdPartyIncludePathList = [
 
 if not use_system_version_of_library('tcmalloc'):
     thirdPartyIncludePathList.append(
-        ('gperftools', '#/src/third_party/gperftools-2.2'))
+        ('gperftools', '#/src/third_party/gperftools-2.2/src'))
 
 if not use_system_version_of_library('pcre'):
     thirdPartyIncludePathList.append(

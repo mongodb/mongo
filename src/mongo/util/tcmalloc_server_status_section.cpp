@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <third_party/gperftools-2.2/src/gperftools/malloc_extension.h>
+#include "gperftools/malloc_extension.h"
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
@@ -57,6 +57,7 @@ namespace {
             return;
         }
 
+#if MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE
         size_t threadCacheSizeBytes = MallocExtension::instance()->GetThreadCacheSize();
 
         static const size_t kMaxThreadCacheSizeBytes = 0x10000;
@@ -69,6 +70,7 @@ namespace {
 
         LOG(1) << "thread over memory limit, cleaning up, current: "
                << (threadCacheSizeBytes/1024) << "k";
+#endif
 
         // We synchronize as the tcmalloc central list uses a spinlock, and we can cause a really
         // terrible runaway if we're not careful.

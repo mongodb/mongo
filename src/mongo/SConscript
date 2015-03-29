@@ -12,6 +12,7 @@ Import("has_option")
 Import("get_option")
 Import("serverJs")
 Import("usev8")
+Import("use_system_version_of_library")
 Import("v8suffix")
 Import("wiredtiger")
 
@@ -513,7 +514,20 @@ env.CppUnitTest(
 )
 
 if get_option('allocator') == 'tcmalloc':
-    env.Library('tcmalloc_set_parameter',
+    tcmspEnv = env.Clone()
+
+    if not use_system_version_of_library('tcmalloc'):
+
+        # Add in the include path for our vendored tcmalloc.
+        tcmspEnv.InjectThirdPartyIncludePaths('gperftools')
+
+        # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
+        # level configure check, though its effects should still be scoped just to these files.
+        tcmspEnv.Append(
+            CPPDEFINES=['MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE']
+        )
+
+    tcmspEnv.Library('tcmalloc_set_parameter',
                 [
                     'util/tcmalloc_server_status_section.cpp',
                     'util/tcmalloc_set_parameter.cpp',
@@ -946,6 +960,14 @@ env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],
 if has_option( 'use-cpu-profiler' ):
     serverOnlyFiles.append( 'db/commands/cpuprofile.cpp' )
     env.Append(LIBS=['unwind'])
+    # If we are building with our internal gperftools, add the necessary include path.
+    #
+    # NOTE: This is pretty bad because it will spam this include path into many files that
+    # don't require it, but because of the way things are currently set up, it is not easy to
+    # scope it more narrowly. Better would be if the commands were a library, and could be
+    # conditionally made to depend on this file, as a library and then we could easily scope
+    # just to this file.
+    env.InjectThirdPartyIncludePaths('tcmalloc')
 
 env.Library("defaultversion", "s/default_version.cpp")
 
