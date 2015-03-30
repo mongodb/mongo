@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/util"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"strconv"
 	"time"
@@ -284,6 +285,61 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			return binary, nil
 		}
 
+		if jsonValue, ok := doc["$ref"]; ok {
+			dbRef := mgo.DBRef{}
+
+			switch data := jsonValue.(type) {
+			case string:
+				dbRef.Collection = data
+			default:
+				return nil, errors.New("expected string for $ref field")
+			}
+			if jsonValue, ok = doc["$id"]; ok {
+				switch v2 := jsonValue.(type) {
+				case map[string]interface{}:
+					x, err := ParseSpecialKeys(v2)
+					if err != nil {
+						return nil, fmt.Errorf("error parsing $id field: %v", err)
+					}
+					dbRef.Id = x
+				default:
+					dbRef.Id = v2
+				}
+				return dbRef, nil
+			}
+		}
+	case 3:
+		if jsonValue, ok := doc["$ref"]; ok {
+			dbRef := mgo.DBRef{}
+
+			switch data := jsonValue.(type) {
+			case string:
+				dbRef.Collection = data
+			default:
+				return nil, errors.New("expected string for $ref field")
+			}
+			if jsonValue, ok = doc["$id"]; ok {
+				switch v2 := jsonValue.(type) {
+				case map[string]interface{}:
+					x, err := ParseSpecialKeys(v2)
+					if err != nil {
+						return nil, fmt.Errorf("error parsing $id field: %v", err)
+					}
+					dbRef.Id = x
+				default:
+					dbRef.Id = v2
+				}
+				if dbValue, ok := doc["$db"]; ok {
+					switch v3 := dbValue.(type) {
+					case string:
+						dbRef.Database = v3
+					default:
+						return nil, errors.New("expected string for $db field")
+					}
+					return dbRef, nil
+				}
+			}
+		}
 	}
 
 	// Did not match any special ('$') keys, so convert all sub-values.
