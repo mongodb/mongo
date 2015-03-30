@@ -62,8 +62,10 @@ no_scale_per_second_list = [
     'session: open cursor count',
 ]
 no_clear_list = [
+    'async: maximum work queue length',
     'cache: bytes currently in the cache',
     'cache: maximum bytes configured',
+    'cache: maximum page size at eviction',
     'cache: pages currently held in the cache',
     'cache: percentage overhead',
     'cache: tracked bytes belonging to internal pages in the cache',
