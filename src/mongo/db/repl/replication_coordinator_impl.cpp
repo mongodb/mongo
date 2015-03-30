@@ -787,6 +787,7 @@ namespace {
         if (slaveInfo->opTime < args.ts) {
             _updateSlaveInfoOptime_inlock(slaveInfo, args.ts);
         }
+        _updateLastCommittedOpTime_inlock();
         return Status::OK();
     }
 
@@ -831,7 +832,7 @@ namespace {
         if (!writeConcern.wMode.empty()) {
             StringData patternName;
             if (writeConcern.wMode == "majority") {
-                patternName = "$majority";
+                patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
             }
             else {
                 patternName = writeConcern.wMode;
@@ -2338,6 +2339,40 @@ namespace {
         fassert(18906, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return shouldChange;
+    }
+
+    void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
+        if (!_getMemberState_inlock().primary()) {
+            return;
+        }
+        StatusWith<ReplicaSetTagPattern> tagPattern =
+            _rsConfig.findCustomWriteMode(ReplicaSetConfig::kMajorityWriteConcernModeName);
+        invariant(tagPattern.isOK());
+        ReplicaSetTagMatch matcher{tagPattern.getValue()};
+
+        std::vector<OpTime> votingNodesOpTimes;
+
+        for (const auto& sI : _slaveInfo) {
+            auto memberConfig = _rsConfig.findMemberByID(sI.memberId);
+            invariant(memberConfig);
+            for (auto tagIt = memberConfig->tagsBegin();
+                 tagIt != memberConfig->tagsEnd(); ++tagIt) {
+                if (matcher.update(*tagIt)) {
+                    votingNodesOpTimes.push_back(sI.opTime);
+                    break;
+                }
+            }
+        }
+        invariant(votingNodesOpTimes.size() > 0);
+        std::sort(votingNodesOpTimes.begin(), votingNodesOpTimes.end());
+
+        // Use the index of the minimum quorum in the vector of nodes.
+        _lastCommittedOpTime = votingNodesOpTimes[(votingNodesOpTimes.size() - 1) / 2];
+    }
+
+    OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        return _lastCommittedOpTime;
     }
 
 } // namespace repl

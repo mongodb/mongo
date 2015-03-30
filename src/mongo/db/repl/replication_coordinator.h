@@ -549,6 +549,13 @@ namespace repl {
          */
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) = 0;
 
+        /**
+         * Returns the OpTime of the latest replica set-committed op known to this server.
+         * Committed means a majority of the voting nodes of the config are known to have the
+         * operation in their oplogs.  This implies such ops will never be rolled back.
+         */
+        virtual OpTime getLastCommittedOpTime() const = 0;
+
     protected:
 
         ReplicationCoordinator();

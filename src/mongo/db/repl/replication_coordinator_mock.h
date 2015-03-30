@@ -180,6 +180,7 @@ namespace repl {
 
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
+        virtual OpTime getLastCommittedOpTime() const;
     private:
 
         const ReplSettings _settings;

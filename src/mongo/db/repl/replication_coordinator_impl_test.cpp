@@ -1902,6 +1902,50 @@ namespace {
         ASSERT_OK(getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
     }
 
+    TEST_F(ReplCoordTest, LastCommittedOpTime) {
+        // Test that the commit level advances properly.
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" <<
+                                                  "_id" << 3 <<
+                                                  "votes" << 0) <<
+                                             BSON("host" << "node5:12345" <<
+                                                  "_id" << 4 <<
+                                                  "arbiterOnly" << true))),
+                HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        OpTime zero(0, 0);
+        OpTime time(100, 0);
+        getReplCoord()->setMyLastOptime(time);
+        simulateSuccessfulElection();
+
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time));
+        ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 3, time));
+        ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time));
+        ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
+
+
+        // Set a new, later OpTime.
+        OpTime newTime = OpTime(100, 1);
+        getReplCoord()->setMyLastOptime(newTime);
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 3, newTime));
+        ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, newTime));
+        // Reached majority of voting nodes with newTime.
+        ASSERT_EQUALS(newTime, getReplCoord()->getLastCommittedOpTime());
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, newTime));
+        ASSERT_EQUALS(newTime, getReplCoord()->getLastCommittedOpTime());
+    }
+
     // TODO(schwerin): Unit test election id updating
 
 }  // namespace

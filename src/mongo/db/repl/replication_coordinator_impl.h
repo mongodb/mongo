@@ -226,6 +226,8 @@ namespace repl {
 
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
+        virtual OpTime getLastCommittedOpTime() const;
+
 
         // ================== Test support API ===================
 
@@ -749,6 +751,12 @@ namespace repl {
                                      ReplSetHeartbeatResponse* response,
                                      Status* outStatus);
 
+        /**
+         * Scan the SlaveInfoVector and determine the highest OplogEntry present on a majority of
+         * servers; set _lastCommittedOpTime to this new entry, if greater than the current entry.
+         */
+        void _updateLastCommittedOpTime_inlock();
+
         //
         // All member variables are labeled with one of the following codes indicating the
         // synchronization rules for accessing them.
@@ -878,6 +886,9 @@ namespace repl {
         // providing the prior value for a limited period of time is acceptable.  Also unlike
         // _canAcceptNonLocalWrites, its value is only meaningful on replica set secondaries.
         AtomicUInt32 _canServeNonLocalReads;                                              // (S)
+
+        // OpTime of the latest committed operation. Matches the concurrency level of _slaveInfo.
+        OpTime _lastCommittedOpTime;                                                          // (M)
     };
 
 } // namespace repl

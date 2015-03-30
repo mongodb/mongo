@@ -295,5 +295,9 @@ namespace repl {
         invariant(false);
     }
 
+    OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {
+        return OpTime();
+    }
+
 } // namespace repl
 } // namespace mongo
