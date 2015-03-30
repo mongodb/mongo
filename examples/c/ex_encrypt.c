@@ -470,7 +470,53 @@ add_my_encryptors(WT_CONNECTION *connection)
 	    connection, "rot13", (WT_ENCRYPTOR *)rot13_encryptor, NULL));
 }
 
-#define	MAX_KEYS	100
+static void
+print_record(WT_LSN *lsn, uint32_t opcount,
+   uint32_t rectype, uint32_t optype, uint64_t txnid, uint32_t fileid,
+   WT_ITEM *key, WT_ITEM *value)
+{
+	printf(
+	    "LSN [%" PRIu32 "][%" PRIu64 "].%" PRIu32
+	    ": record type %" PRIu32 " optype %" PRIu32
+	    " txnid %" PRIu64 " fileid %" PRIu32,
+	    lsn->file, (uint64_t)lsn->offset, opcount,
+	    rectype, optype, txnid, fileid);
+	printf(" key size %zu value size %zu\n", key->size, value->size);
+	if (rectype == WT_LOGREC_MESSAGE)
+		printf("Application Record: %s\n", (char *)value->data);
+}
+
+/*
+ * simple_walk_log --
+ *	A simple walk of the log.
+ */
+static int
+simple_walk_log(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	WT_LSN lsn;
+	WT_ITEM logrec_key, logrec_value;
+	uint64_t txnid;
+	uint32_t fileid, opcount, optype, rectype;
+	int ret;
+
+	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
+		ret = cursor->get_value(cursor, &txnid,
+		    &rectype, &optype, &fileid, &logrec_key, &logrec_value);
+
+		print_record(&lsn, opcount,
+		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	ret = cursor->close(cursor);
+	return (ret);
+}
+
+#define	MAX_KEYS	20
 
 /*
  * Choose a name that dlsym can find.  To keep this example in
@@ -541,9 +587,9 @@ main(void)
 		ret = c1->insert(c1);
 		ret = c2->insert(c2);
 	}
+	ret = session->log_printf(session, "Wrote %d records", i);
+	simple_walk_log(session);
 
-	c1->reset(c1);
-	c2->reset(c2);
 	while (c1->next(c1) == 0) {
 		ret = c1->get_key(c1, &key);
 		ret = c1->get_value(c1, &val);
@@ -551,6 +597,24 @@ main(void)
 		printf("Read key %s; value %s\n", key, val);
 	}
 	ret = conn->close(conn, NULL);
+#if 0
+	ret = wiredtiger_open(home, NULL,
+	    "create,cache_size=100MB,"
+	    "extensions=[" EXTENSION_NAME "],"
+	    "log=(enabled=true,encryption_algorithm=not,"
+	    "encryption_password=test_password1)", &conn);
 
+	ret = conn->open_session(conn, NULL, NULL, &session);
+	ret = session->open_cursor(session, "table:crypto", NULL, NULL, &c1);
+
+	printf("REOPEN: Read key %s; value %s\n", key, val);
+	while (c1->next(c1) == 0) {
+		ret = c1->get_key(c1, &key);
+		ret = c1->get_value(c1, &val);
+
+		printf("Read key %s; value %s\n", key, val);
+	}
+	ret = conn->close(conn, NULL);
+#endif
 	return (ret);
 }

@@ -367,6 +367,58 @@ err:	return (ret);
 }
 
 /*
+ * __log_decrypt --
+ *	Decrypt a log record.  The result is put into a scratch
+ *	buffer that the caller must free.
+ */
+static int
+__log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_ENCRYPTOR *encryptor;
+	WT_LOG_RECORD *logrec;
+	size_t decrypted_size, result_len, skip;
+
+	conn = S2C(session);
+	logrec = (WT_LOG_RECORD *)in->mem;
+	skip = WT_LOG_ENCRYPT_SKIP;
+	encryptor = conn->log_encryptor;
+	if (encryptor == NULL || encryptor->decrypt == NULL)
+		WT_ERR_MSG(session, WT_ERROR,
+		    "log_read: Encrypted record with "
+		    "no configured decrypt method");
+	if (encryptor->post_size == NULL)
+		decrypted_size = logrec->mem_len;
+	else
+		WT_ERR(encryptor->post_size(encryptor, &session->iface, in->mem,
+		    logrec->mem_len - skip, &decrypted_size));
+
+	__wt_errx(session, "\tLOG_DECRYPT: Record %lu, mem %lu, decrypted %lu",
+	    in->size, logrec->mem_len - skip, decrypted_size);
+	WT_ERR(__wt_scr_alloc(session, 0, out));
+	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size));
+	memcpy((*out)->mem, in->mem, skip);
+	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
+	    (uint8_t *)in->mem + skip, in->size - skip,
+	    (uint8_t *)(*out)->mem + skip,
+	    decrypted_size, &result_len));
+
+	/*
+	 * If checksums were turned off because we're depending on the
+	 * decryption to fail on any corrupted data, we'll end up
+	 * here after corruption happens.  If we're salvaging the file,
+	 * it's OK, otherwise it's really, really bad.
+	 */
+	if (ret != 0 || result_len != decrypted_size) {
+		__wt_errx(session, "ret %d, result_len %lu dec %lu - %lu",
+		    ret, result_len, decrypted_size, WT_LOG_ENCRYPT_SKIP);
+		WT_ERR(WT_ERROR);
+	}
+err:	return (ret);
+}
+
+/*
  * __log_fill --
  *	Copy a thread's log records into the assigned slot.
  */
@@ -1140,6 +1192,7 @@ int
 __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
+	WT_DECL_ITEM(decryptitem);
 	WT_DECL_ITEM(uncitem);
 	WT_DECL_RET;
 	WT_LOG_RECORD *logrec;
@@ -1147,6 +1200,18 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	WT_ERR(__log_read_internal(session, record, lsnp, flags));
 	logrec = (WT_LOG_RECORD *)record->mem;
+	/*
+	 * We swap around the WT_ITEM pointers so that no matter what
+	 * combination of encryption or compression we have, the caller
+	 * can free the one returned record.
+	 */
+	if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
+		WT_ERR(__log_decrypt(session, record, &decryptitem));
+
+		swap = *record;
+		*record = *decryptitem;
+		*decryptitem = swap;
+	}
 	if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
 		WT_ERR(__log_decompress(session, record, &uncitem));
 
@@ -1155,7 +1220,8 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		*uncitem = swap;
 	}
 
-err:	__wt_scr_free(session, &uncitem);
+err:	__wt_scr_free(session, &decryptitem);
+	__wt_scr_free(session, &uncitem);
 	return (ret);
 }
 
@@ -1242,10 +1308,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     WT_ITEM *record, WT_LSN *lsnp, void *cookie, int firstrecord), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(decryptitem);
 	WT_DECL_ITEM(uncitem);
 	WT_DECL_RET;
 	WT_FH *log_fh;
-	WT_ITEM buf;
+	WT_ITEM buf, swap;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, rd_lsn, start_lsn;
@@ -1442,15 +1509,26 @@ advance:
 		 */
 		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
 		if (rd_lsn.offset != 0) {
+			if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
+				__wt_errx(session, "\tLOG_DECRYPT: [%d][%lu]",
+				rd_lsn.file, rd_lsn.offset);
+				WT_ERR(__log_decrypt(session,
+				    &buf, &decryptitem));
+				swap = buf;
+				buf = *decryptitem;
+				*decryptitem = swap;
+			}
 			if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
 				WT_ERR(__log_decompress(session, &buf,
 				    &uncitem));
-				WT_ERR((*func)(session, uncitem, &rd_lsn,
-				    cookie, firstrecord));
-				__wt_scr_free(session, &uncitem);
-			} else
-				WT_ERR((*func)(session, &buf, &rd_lsn, cookie,
-				    firstrecord));
+				swap = buf;
+				buf = *uncitem;
+				*uncitem = swap;
+			}
+			WT_ERR((*func)(session,
+			    &buf, &rd_lsn, cookie, firstrecord));
+			__wt_scr_free(session, &decryptitem);
+			__wt_scr_free(session, &uncitem);
 
 			firstrecord = 0;
 
@@ -1470,6 +1548,7 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	__wt_buf_free(session, &buf);
+	__wt_scr_free(session, &decryptitem);
 	__wt_scr_free(session, &uncitem);
 	/*
 	 * If the caller wants one record and it is at the end of log,
@@ -1643,6 +1722,9 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
+		__wt_errx(session,
+		    "LOG_ENCRYPT: Record %lu, encrypted %lu result %lu whole %lu",
+		    src_len, len, result_len, result_len + WT_LOG_ENCRYPT_SKIP);
 		result_len += WT_LOG_ENCRYPT_SKIP;
 
 		/* TODO: stats */
@@ -1720,7 +1802,11 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_STAT_FAST_CONN_INCR(session, log_writes);
 
 	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE)) {
-		ret = __log_direct_write(session, record, lsnp, flags);
+		ret = __log_direct_write(session, record, &lsn, flags);
+		if (ret == 0 && lsnp != NULL)
+			*lsnp = lsn;
+		__wt_errx(session, "\tLOG_WRITE: wrote at LSN [%d][%lu]",
+		    lsn.file, lsn.offset);
 		if (ret == 0)
 			return (0);
 		if (ret != EAGAIN)
@@ -1790,6 +1876,8 @@ err:
 		__wt_spin_unlock(session, &log->log_slot_lock);
 	if (ret == 0 && lsnp != NULL)
 		*lsnp = lsn;
+	__wt_errx(session, "\tLOG_WRITE: wrote at LSN [%d][%lu]",
+	    lsn.file, lsn.offset);
 	/*
 	 * If we're synchronous and some thread had an error, we don't know
 	 * if our write made it out to the file or not.  The error could be
