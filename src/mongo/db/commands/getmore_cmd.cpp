@@ -34,7 +34,6 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/cursor_manager.h"
@@ -93,14 +92,10 @@ namespace mongo {
             if (!parseStatus.isOK()) {
                 return parseStatus.getStatus();
             }
-
             const GetMoreRequest& request = parseStatus.getValue();
 
-            Status authzStatus = client->getAuthorizationSession()->checkAuthForGetMore(
-                request.nss, request.cursorid);
-            audit::logGetMoreAuthzCheck(client, request.nss, request.cursorid, authzStatus.code());
-
-            return authzStatus;
+            return client->getAuthorizationSession()->checkAuthForGetMore(request.nss,
+                                                                          request.cursorid);
         }
 
         /**
