@@ -236,8 +236,12 @@ namespace mongo {
 
 
 
-    void SyncSourceFeedback::updateMap(const mongo::OID& rid, const OpTime& ot) {
+    void SyncSourceFeedback::updateMap(const mongo::OID& rid, const OpTime& ot, bool self) {
         boost::unique_lock<boost::mutex> lock(_mtx);
+        // ensure the member has not been removed
+        if (!self && _members.find(rid) == _members.end()) {
+            return;
+        }
         // only update if ot is newer than what we have already
         if (ot > _slaveMap[rid]) {
             _slaveMap[rid] = ot;

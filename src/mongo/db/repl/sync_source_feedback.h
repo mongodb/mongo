@@ -60,7 +60,7 @@ namespace mongo {
         void forwardSlaveHandshake();
 
         void updateSelfInMap(const OpTime& ot) {
-            updateMap(_me["_id"].OID(), ot);
+            updateMap(_me["_id"].OID(), ot, true);
         }
 
         /// Connect to sync target and create OplogReader if needed.
@@ -86,7 +86,7 @@ namespace mongo {
         void percolate(const mongo::OID& rid, const OpTime& ot);
 
         /// Updates the _slaveMap to be forwarded to the sync target.
-        void updateMap(const mongo::OID& rid, const OpTime& ot);
+        void updateMap(const mongo::OID& rid, const OpTime& ot, bool self=false);
 
         std::string name() const { return "SyncSourceFeedbackThread"; }
 
