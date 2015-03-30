@@ -4,7 +4,9 @@
 function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     'use strict';
 
-    var rst = new ReplSetTest({nodes: 1});
+    // Create a replica set with one data-bearing node and one arbiter to
+    // ensure availability when the added node fasserts later in the test
+    var rst = new ReplSetTest({nodes: {n0: {}, arbiter: {}}});
     rst.startSet();
     rst.initiate();
 
@@ -48,7 +50,9 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
 function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     'use strict';
 
-    var rst = new ReplSetTest({nodes: 1});
+    // Create a replica set with one data-bearing node and one arbiter to
+    // ensure availability when the added node fasserts later in the test
+    var rst = new ReplSetTest({nodes: {n0: {}, arbiter: {}}});
     rst.startSet();
     rst.initiate();
 
