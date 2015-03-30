@@ -159,21 +159,14 @@ file_config = format_meta + [
         row-store leaf page value dictionary; see
         @ref file_formats_compression for more information''',
         min='0'),
-    Config('encryption', '', r'''
-        configure an encryptor for file blocks''',
-        type='category', subconfig=[
-        Config('enabled', 'false', r'''
-            enable encryption algorithm''',
-            type='boolean'),
-        Config('algorithm', 'none', r'''
-            Permitted values are \c "none"
-            or custom encryption engine name created with
-            WT_CONNECTION::add_encryptor.  
-            See @ref encryption for more information''',
-            func='__wt_encryptor_confchk'),
-        Config('password', '', r'''
-            password key sent to callback'''),
-        ]),
+    Config('encryption_algorithm', 'none', r'''
+        Permitted values are \c "none"
+        or custom encryption engine name created with
+        WT_CONNECTION::add_encryptor.  
+        See @ref encryption for more information''',
+        func='__wt_encryptor_confchk'),
+    Config('encryption_password', '', r'''
+        password key sent to callback'''),
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),

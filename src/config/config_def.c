@@ -136,13 +136,6 @@ static const WT_CONFIG_CHECK confchk_cursor_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
-static const WT_CONFIG_CHECK confchk_encryption_subconfigs[] = {
-	{ "algorithm", "string", __wt_encryptor_confchk, NULL, NULL },
-	{ "enabled", "boolean", NULL, NULL, NULL },
-	{ "password", "string", NULL, NULL, NULL },
-	{ NULL, NULL, NULL, NULL, NULL }
-};
-
 static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "allocation_size", "int", NULL, "min=512B,max=128MB", NULL },
 	{ "app_metadata", "string", NULL, NULL, NULL },
@@ -161,9 +154,10 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "dictionary", "int", NULL, "min=0", NULL },
-	{ "encryption", "category",
-	    NULL, NULL,
-	    confchk_encryption_subconfigs },
+	{ "encryption_algorithm", "string",
+	    __wt_encryptor_confchk, NULL,
+	    NULL },
+	{ "encryption_password", "string", NULL, NULL, NULL },
 	{ "format", "string", NULL, "choices=[\"btree\"]", NULL },
 	{ "huffman_key", "string", __wt_huffman_confchk, NULL, NULL },
 	{ "huffman_value", "string",
@@ -265,9 +259,10 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "collator", "string", __wt_collator_confchk, NULL, NULL },
 	{ "columns", "list", NULL, NULL, NULL },
 	{ "dictionary", "int", NULL, "min=0", NULL },
-	{ "encryption", "category",
-	    NULL, NULL,
-	    confchk_encryption_subconfigs },
+	{ "encryption_algorithm", "string",
+	    __wt_encryptor_confchk, NULL,
+	    NULL },
+	{ "encryption_password", "string", NULL, NULL, NULL },
 	{ "exclusive", "boolean", NULL, NULL, NULL },
 	{ "extractor", "string", __wt_extractor_confchk, NULL, NULL },
 	{ "format", "string", NULL, "choices=[\"btree\"]", NULL },
@@ -701,7 +696,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
 	  "block_compressor=,cache_resident=0,checkpoint=,checkpoint_lsn=,"
 	  "checksum=uncompressed,collator=,columns=,dictionary=0,"
-	  "encryption=(algorithm=,enabled=0,password=),format=btree,"
+	  "encryption_algorithm=,encryption_password=,format=btree,"
 	  "huffman_key=,huffman_value=,id=,internal_item_max=0,"
 	  "internal_key_max=0,internal_key_truncate=,internal_page_max=4KB,"
 	  "key_format=u,key_gap=10,leaf_item_max=0,leaf_key_max=0,"
@@ -740,19 +735,18 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "session.create",
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
 	  "block_compressor=,cache_resident=0,checksum=uncompressed,"
-	  "colgroups=,collator=,columns=,dictionary=0,"
-	  "encryption=(algorithm=,enabled=0,password=),exclusive=0,"
-	  "extractor=,format=btree,huffman_key=,huffman_value=,immutable=0,"
-	  "internal_item_max=0,internal_key_max=0,internal_key_truncate=,"
-	  "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	  "leaf_key_max=0,leaf_page_max=32KB,leaf_value_max=0,"
-	  "lsm=(auto_throttle=,bloom=,bloom_bit_count=16,bloom_config=,"
-	  "bloom_hash_count=8,bloom_oldest=0,chunk_count_limit=0,"
-	  "chunk_max=5GB,chunk_size=10MB,merge_max=15,merge_min=0),"
-	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
-	  "prefix_compression=0,prefix_compression_min=4,source=,"
-	  "split_deepen_min_child=0,split_deepen_per_child=0,split_pct=75,"
-	  "type=file,value_format=u",
+	  "colgroups=,collator=,columns=,dictionary=0,encryption_algorithm="
+	  ",encryption_password=,exclusive=0,extractor=,format=btree,"
+	  "huffman_key=,huffman_value=,immutable=0,internal_item_max=0,"
+	  "internal_key_max=0,internal_key_truncate=,internal_page_max=4KB,"
+	  "key_format=u,key_gap=10,leaf_item_max=0,leaf_key_max=0,"
+	  "leaf_page_max=32KB,leaf_value_max=0,lsm=(auto_throttle=,bloom=,"
+	  "bloom_bit_count=16,bloom_config=,bloom_hash_count=8,"
+	  "bloom_oldest=0,chunk_count_limit=0,chunk_max=5GB,chunk_size=10MB"
+	  ",merge_max=15,merge_min=0),memory_page_max=5MB,"
+	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=0,"
+	  "prefix_compression_min=4,source=,split_deepen_min_child=0,"
+	  "split_deepen_per_child=0,split_pct=75,type=file,value_format=u",
 	  confchk_session_create
 	},
 	{ "session.drop",

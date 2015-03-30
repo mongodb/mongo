@@ -291,7 +291,6 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		result_len += WT_BLOCK_ENCRYPT_SKIP;
 
 		/*TODO: stats*/
-		WT_STAT_FAST_DATA_INCR(session, compress_write);
 
 		encrypted = 1;
 		/*

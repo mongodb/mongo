@@ -62,12 +62,12 @@ typedef struct {
 #define	IV_LEN		16
 
 /*
- * make_chksum --
+ * make_cksum --
  *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put random values in it.
  */
 static int
-make_chksum(uint8_t *dst)
+make_cksum(uint8_t *dst)
 {
 	int i;
 	/*
@@ -197,7 +197,7 @@ rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Checksum the encrypted buffer and add the IV.
 	 */
 	i = 0;
-	make_chksum(&dst[i]);
+	make_cksum(&dst[i]);
 	i += CHKSUM_LEN;
 	make_iv(&dst[i]);
 	*result_lenp = dst_len;
@@ -356,7 +356,7 @@ not_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Checksum the encrypted buffer and add the IV.
 	 */
 	i = 0;
-	make_chksum(&dst[i]);
+	make_cksum(&dst[i]);
 	i += CHKSUM_LEN;
 	make_iv(&dst[i]);
 	*result_lenp = dst_len;
@@ -515,12 +515,12 @@ main(void)
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true,encryption_algorithm=not,"
-	    "encryption_password=xyz)", &conn);
+	    "encryption_password=test_password1)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(session, "table:crypto",
-	    "encryption=(enabled=true,algorithm=rot13,"
-	    "password=abc123),key_format=S,value_format=S");
+	    "encryption_algorithm=rot13,encryption_password=test_password2,"
+	    "key_format=S,value_format=S");
 	ret = session->create(
 	    session, "table:nocrypto",
 	    "key_format=S,value_format=S");

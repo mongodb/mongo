@@ -307,6 +307,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
+	WT_RET(__wt_config_gets_none(session,
+	    cfg, "encryption_algorithm", &cval));
+	WT_RET(__wt_encryptor_config(session, &cval, &btree->encryptor));
+
+	 /* XXX retrieve and do something with encryption_password */
+
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(
 	    session, &btree->ovfl_lock, "btree overflow lock"));

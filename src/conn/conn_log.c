@@ -68,6 +68,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	    &cval));
 	WT_RET(__wt_encryptor_config(session, &cval, &conn->log_encryptor));
 
+	/* XXX retrieve and do something with encryption_password */
+
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 

@@ -341,4 +341,4 @@ struct __wt_block_header {
  * in terms of compression efficiency.
  */
 #define	WT_BLOCK_COMPRESS_SKIP	64
-#define	WT_BLOCK_ENCRYPT_SKIP	64
+#define	WT_BLOCK_ENCRYPT_SKIP	WT_BLOCK_HEADER_BYTE_SIZE
