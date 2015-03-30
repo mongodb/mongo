@@ -62,7 +62,7 @@ namespace mongo {
             MONGO_DISALLOW_COPYING( Tokenizer );
         public:
 
-            Tokenizer( const FTSLanguage* language, StringData str );
+            Tokenizer( const FTSLanguage& language, StringData str );
 
             bool more() const;
             Token next();

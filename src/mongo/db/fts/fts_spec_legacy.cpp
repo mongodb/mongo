@@ -73,7 +73,7 @@ namespace mongo {
 
             unsigned numTokens = 0;
 
-            Tokenizer i( &tools.language, raw );
+            Tokenizer i( tools.language, raw );
             while ( i.more() ) {
                 Token t = i.next();
                 if ( t.type != Token::TEXT )
@@ -162,8 +162,8 @@ namespace mongo {
 
             const FTSLanguage& language = _getLanguageToUseV1( obj );
 
-            Stemmer stemmer(&language);
-            Tools tools(language, &stemmer, StopWords::getStopWords( &language ));
+            Stemmer stemmer(language);
+            Tools tools(language, &stemmer, StopWords::getStopWords( language ));
 
             if ( wildcard() ) {
                 // if * is specified for weight, we can recurse over all fields.

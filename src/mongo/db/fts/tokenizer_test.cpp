@@ -36,12 +36,12 @@ namespace mongo {
     namespace fts {
 
         TEST( Tokenizer, Empty1 ) {
-            Tokenizer i( &languageEnglishV2, "" );
+            Tokenizer i( languageEnglishV2, "" );
             ASSERT( !i.more() );
         }
 
         TEST( Tokenizer, Basic1 ) {
-            Tokenizer i( &languageEnglishV2, "blue red green" );
+            Tokenizer i( languageEnglishV2, "blue red green" );
 
             ASSERT( i.more() );
             ASSERT_EQUALS( i.next().data.toString(), "blue" );
@@ -56,7 +56,7 @@ namespace mongo {
         }
 
         TEST( Tokenizer, Basic2 ) {
-            Tokenizer i( &languageEnglishV2, "blue-red" );
+            Tokenizer i( languageEnglishV2, "blue-red" );
 
             Token a = i.next();
             Token b = i.next();
@@ -78,7 +78,7 @@ namespace mongo {
         }
 
         TEST( Tokenizer, Basic3 ) {
-            Tokenizer i( &languageEnglishV2, "blue -red" );
+            Tokenizer i( languageEnglishV2, "blue -red" );
 
             Token a = i.next();
             Token b = i.next();
@@ -105,7 +105,7 @@ namespace mongo {
         }
 
         TEST( Tokenizer, Quote1English ) {
-            Tokenizer i( &languageEnglishV2, "eliot's car" );
+            Tokenizer i( languageEnglishV2, "eliot's car" );
 
             Token a = i.next();
             Token b = i.next();
@@ -115,7 +115,7 @@ namespace mongo {
         }
 
         TEST( Tokenizer, Quote1French ) {
-            Tokenizer i( &languageFrenchV2, "eliot's car" );
+            Tokenizer i( languageFrenchV2, "eliot's car" );
 
             Token a = i.next();
             Token b = i.next();

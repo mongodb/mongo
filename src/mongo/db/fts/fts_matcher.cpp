@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/fts/fts_matcher.h"
-#include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_element_iterator.h"
 #include "mongo/platform/strcasestr.h"
 
@@ -97,13 +96,15 @@ namespace mongo {
 
         bool FTSMatcher::_hasPositiveTerm_string( const FTSLanguage* language,
                                                   const string& raw ) const {
-            std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-
-            tokenizer->reset(raw.c_str(), _query.getCaseSensitive());
-
-            while (tokenizer->moveNext()) {
-                string word = tokenizer->get().toString();
-                if (_query.getPositiveTerms().count(word) > 0) {
+            Tokenizer i( *language, raw );
+            Stemmer stemmer( *language );
+            while ( i.more() ) {
+                Token t = i.next();
+                if ( t.type != Token::TEXT ) {
+                    continue;
+                }
+                string word = stemmer.stem( _query.normalizeString( t.data ) );
+                if ( _query.getPositiveTerms().count( word ) > 0 ) {
                     return true;
                 }
             }
@@ -129,12 +130,14 @@ namespace mongo {
 
         bool FTSMatcher::_hasNegativeTerm_string( const FTSLanguage* language,
                                                   const string& raw ) const {
-            std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-
-            tokenizer->reset(raw.c_str(), _query.getCaseSensitive());
-
-            while (tokenizer->moveNext()) {
-                string word = tokenizer->get().toString();
+            Tokenizer i( *language, raw );
+            Stemmer stemmer( *language );
+            while ( i.more() ) {
+                Token t = i.next();
+                if ( t.type != Token::TEXT ) {
+                    continue;
+                }
+                string word = stemmer.stem( _query.normalizeString( t.data ) );
                 if ( _query.getNegatedTerms().count( word ) > 0 ) {
                     return true;
                 }

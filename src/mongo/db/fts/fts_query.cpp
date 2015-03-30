@@ -33,7 +33,6 @@
 #include "mongo/db/fts/fts_query.h"
 
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
@@ -60,14 +59,15 @@ namespace mongo {
             _language = swl.getValue();
             _caseSensitive = caseSensitive;
 
-            std::unique_ptr<FTSTokenizer> tokenizer(_language->createTokenizer());
+            const StopWords& stopWords = *StopWords::getStopWords( *_language );
+            Stemmer stemmer( *_language );
 
             bool inNegation = false;
             bool inPhrase = false;
 
             unsigned quoteOffset = 0;
 
-            Tokenizer i( _language, query );
+            Tokenizer i( *_language, query );
             while ( i.more() ) {
                 Token t = i.next();
 
@@ -78,7 +78,7 @@ namespace mongo {
                         // don't add term
                     }
                     else {
-                        _addTerm( tokenizer.get(), s, inNegation );
+                        _addTerm( stopWords, stemmer, s, inNegation );
                     }
 
                     if ( inNegation && !inPhrase )
@@ -122,52 +122,44 @@ namespace mongo {
             return Status::OK();
         }
 
-        void FTSQuery::_addTerm( FTSTokenizer* tokenizer,
+        void FTSQuery::_addTerm( const StopWords& sw,
+                                 const Stemmer& stemmer,
                                  const string& token,
                                  bool negated ) {
-            tokenizer->reset(token.c_str(), false);
-
-            auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
-
-            // First, get all the terms for indexing, ie, lower cased words
-            // If we are case-insensitive, we can also used this for positive, and negative terms
-            // Some terms may be expanded into multiple words in some non-English languages
-            while (tokenizer->moveNext()) {
-
-                string word = tokenizer->get().toString();
-
-                if (!negated) {
-                    _termsForBounds.insert(word);
-                }
-
-                // Compute the string corresponding to 'token' that will be used for the matcher.
-                // For case-insensitive queries, this is the same string as 'boundsTerm' computed
-                // above.
-                if (!_caseSensitive) {
-                    activeTerms.insert(word);
-                }
-            }
-
-            if (!_caseSensitive) {
+            // Compute the string corresponding to 'token' that will be used for index bounds
+            // generation.
+            string boundsTerm = tolowerString( token );
+            if ( sw.isStopWord( boundsTerm ) ) {
                 return;
             }
+            boundsTerm = stemmer.stem( boundsTerm );
 
-            tokenizer->reset(token.c_str(), true);
+            // If the lowercased version of 'token' is a not a stop word, 'token' itself should also
+            // not be.
+            dassert( !sw.isStopWord( token ) );
+            if ( !negated ) {
+                _termsForBounds.insert( boundsTerm );
+            }
 
-            // If we want case-sensitivity, get the case-sensitive token
-            while (tokenizer->moveNext()) {
-
-                string word = tokenizer->get().toString();
-
-                activeTerms.insert(word);
+            // Compute the string corresponding to 'token' that will be used for the matcher.  For
+            // case-insensitive queries, this is the same string as 'boundsTerm' computed above.
+            // However, for case-sensitive queries we need to re-stem the original token, since
+            // 'boundsTerm' is already lowercased but we need the original casing for an exact
+            // match.
+            const string& matcherTerm = _caseSensitive ? stemmer.stem( token ) : boundsTerm;
+            if ( negated ) {
+                _negatedTerms.insert( matcherTerm );
+            }
+            else {
+                _positiveTerms.insert( matcherTerm );
             }
         }
 
-        string FTSQuery::normalizeString(StringData str) const {
-            if (_caseSensitive) {
+        string FTSQuery::normalizeString( StringData str ) const {
+            if ( _caseSensitive ) {
                 return str.toString();
             }
-            return tolowerString(str);
+            return tolowerString( str );
         }
 
         namespace {
