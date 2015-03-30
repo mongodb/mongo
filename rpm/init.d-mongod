@@ -57,7 +57,7 @@ start()
   ulimit -v unlimited
   ulimit -n 64000
   ulimit -m unlimited
-  ulimit -u 32000
+  ulimit -u 64000
 
   echo -n $"Starting mongod: "
   daemon --user "$MONGO_USER" --check $mongod "$NUMACTL $mongod $OPTIONS >/dev/null 2>&1"
