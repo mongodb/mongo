@@ -13,9 +13,10 @@
 #define	WT_EVICT_INT_SKEW  (1<<20)	/* Prefer leaf pages over internal
 					   pages by this many increments of the
 					   read generation. */
-#define	WT_EVICT_WALK_PER_FILE	10	/* Pages to visit per file */
-#define	WT_EVICT_WALK_BASE     300	/* Pages tracked across file visits */
-#define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
+#define	WT_EVICT_WALK_PER_FILE	 10	/* Pages to queue per file */
+#define	WT_EVICT_MAX_PER_FILE	100	/* Max pages to visit per file */
+#define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
+#define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
 
 #define	WT_EVICT_PASS_AGGRESSIVE	0x01
 #define	WT_EVICT_PASS_ALL		0x02
@@ -56,6 +57,8 @@ struct __wt_cache {
 	 */
 	uint64_t bytes_inmem;		/* Bytes/pages in memory */
 	uint64_t pages_inmem;
+	uint64_t bytes_internal;	/* Bytes of internal pages */
+	uint64_t bytes_overflow;	/* Bytes of overflow pages */
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
 	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
@@ -81,6 +84,8 @@ struct __wt_cache {
 	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */
 	u_int eviction_dirty_target;    /* Percent to allow dirty */
+
+	u_int overhead_pct;	        /* Cache percent adjustment */
 
 	/*
 	 * LRU eviction list information.
@@ -115,9 +120,10 @@ struct __wt_cache {
 	 */
 #define	WT_CACHE_POOL_MANAGER	0x01	/* The active cache pool manager */
 #define	WT_CACHE_POOL_RUN	0x02	/* Cache pool thread running */
-#define	WT_EVICT_CLEAR_WALKS	0x04	/* Clear eviction walks */
-#define	WT_EVICT_STUCK		0x08	/* Eviction server is stuck */
-#define	WT_EVICT_WOULD_BLOCK	0x10	/* Pages that would block apps */
+#define	WT_CACHE_CLEAR_WALKS	0x04	/* Clear eviction walks */
+#define	WT_CACHE_STUCK		0x08	/* Eviction server is stuck */
+#define	WT_CACHE_WALK_REVERSE	0x10	/* Scan backwards for candidates */
+#define	WT_CACHE_WOULD_BLOCK	0x20	/* Pages that would block apps */
 	uint32_t flags;
 };
 

@@ -38,7 +38,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#if defined(__freebsd__)
+#if defined(__FreeBSD__)
 #   include <sys/param.h>
 #   include <sys/mount.h>
 #endif
@@ -117,9 +117,7 @@ namespace mongo {
         return parent;
     }
 
-    FileAllocator::FileAllocator()
-        : _pendingMutex("FileAllocator"), _failed() {
-    }
+    FileAllocator::FileAllocator() : _failed() {}
 
 
     void FileAllocator::start() {
@@ -127,7 +125,7 @@ namespace mongo {
     }
 
     void FileAllocator::requestAllocation( const string &name, long &size ) {
-        scoped_lock lk( _pendingMutex );
+        boost::lock_guard<boost::mutex> lk( _pendingMutex );
         if ( _failed )
             return;
         long oldSize = prevSize( name );
@@ -141,7 +139,7 @@ namespace mongo {
     }
 
     void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
-        scoped_lock lk( _pendingMutex );
+        boost::unique_lock<boost::mutex> lk( _pendingMutex );
 
         // In case the allocator is in failed state, check once before starting so that subsequent
         // requests for the same database would fail fast after the first one has failed.
@@ -166,7 +164,7 @@ namespace mongo {
         _pendingUpdated.notify_all();
         while( inProgress( name ) ) {
             checkFailure();
-            _pendingUpdated.wait( lk.boost() );
+            _pendingUpdated.wait(lk);
         }
 
     }
@@ -174,15 +172,15 @@ namespace mongo {
     void FileAllocator::waitUntilFinished() const {
         if ( _failed )
             return;
-        scoped_lock lk( _pendingMutex );
+        boost::unique_lock<boost::mutex> lk( _pendingMutex );
         while( _pending.size() != 0 )
-            _pendingUpdated.wait( lk.boost() );
+            _pendingUpdated.wait(lk);
     }
 
     // TODO: pull this out to per-OS files once they exist
     static bool useSparseFiles(int fd) {
 
-#if defined(__linux__) || defined(__freebsd__)
+#if defined(__linux__) || defined(__FreeBSD__)
         struct statfs fs_stats;
         int ret = fstatfs(fd, &fs_stats);
         uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
@@ -197,13 +195,13 @@ namespace mongo {
             || (fs_stats.f_type == TMPFS_MAGIC)
             ;
 
-#elif defined(__freebsd__)
+#elif defined(__FreeBSD__)
 
         return (str::equals(fs_stats.f_fstypename, "zfs") ||
             str::equals(fs_stats.f_fstypename, "nfs") ||
             str::equals(fs_stats.f_fstypename, "oldnfs"));
 
-#elif defined(__sunos__)
+#elif defined(__sun)
         // assume using ZFS which is copy-on-write so no benefit to zero-filling
         // TODO: check which fs we are using like we do elsewhere
         return true;
@@ -361,15 +359,15 @@ namespace mongo {
         }
         while( 1 ) {
             {
-                scoped_lock lk( fa->_pendingMutex );
+                boost::unique_lock<boost::mutex> lk( fa->_pendingMutex );
                 if ( fa->_pending.size() == 0 )
-                    fa->_pendingUpdated.wait( lk.boost() );
+                    fa->_pendingUpdated.wait(lk);
             }
             while( 1 ) {
                 string name;
                 long size = 0;
                 {
-                    scoped_lock lk( fa->_pendingMutex );
+                    boost::lock_guard<boost::mutex> lk( fa->_pendingMutex );
                     if ( fa->_pending.size() == 0 )
                         break;
                     name = fa->_pending.front();
@@ -441,7 +439,7 @@ namespace mongo {
                     }
 
                     {
-                        scoped_lock lk(fa->_pendingMutex);
+                        boost::lock_guard<boost::mutex> lk(fa->_pendingMutex);
                         fa->_failed = true;
 
                         // TODO: Should we remove the file from pending?
@@ -454,7 +452,7 @@ namespace mongo {
                 }
 
                 {
-                    scoped_lock lk( fa->_pendingMutex );
+                    boost::lock_guard<boost::mutex> lk( fa->_pendingMutex );
                     fa->_pendingSize.erase( name );
                     fa->_pending.pop_front();
                     fa->_pendingUpdated.notify_all();

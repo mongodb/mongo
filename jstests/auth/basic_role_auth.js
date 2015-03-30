@@ -237,8 +237,9 @@ var testOps = function(db, allowedActions) {
     if (!isMongos){
         checkErr(allowedActions.hasOwnProperty('fsync_unlock'), function() {
             var res = db.fsyncUnlock();
+            var errorCodeUnauthorized = 13;
 
-            if (res.err == 'unauthorized') {
+            if (res.code == errorCodeUnauthorized) {
                 throw Error("unauthorized unauthorized fsyncUnlock");
             }
         });

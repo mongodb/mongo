@@ -31,7 +31,6 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -108,7 +107,7 @@ namespace mongo {
 
         virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_DISTINCT; }
+        virtual StageType stageType() const { return STAGE_DISTINCT_SCAN; }
 
         virtual PlanStageStats* getStats();
 
@@ -138,7 +137,7 @@ namespace mongo {
         const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
 
         // The cursor we use to navigate the tree.
-        boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
+        boost::scoped_ptr<IndexCursor> _cursor;
 
         // Keeps track of what work we need to do next.
         ScanState _scanState;

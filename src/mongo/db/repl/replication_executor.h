@@ -494,6 +494,10 @@ namespace repl {
     class ReplicationExecutor::NetworkInterface {
         MONGO_DISALLOW_COPYING(NetworkInterface);
     public:
+
+        // A flag to keep replication MessagingPorts open when all other sockets are disconnected.
+        static const unsigned int kMessagingPortKeepOpen = 1;
+
         typedef RemoteCommandResponse Response;
         typedef stdx::function<void (const ResponseStatus&)> RemoteCommandCompletionFn;
 

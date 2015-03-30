@@ -30,11 +30,16 @@
 
 #pragma once
 
-#include "mongo/db/fts/fts_spec.h"
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_util.h"
 
 namespace mongo {
 
     namespace fts {
+
+        class FTSSpec;
 
         class FTSIndexFormat {
         public:
@@ -43,7 +48,7 @@ namespace mongo {
                                  const BSONObj& document,
                                  BSONObjSet* keys );
 
-            /*
+            /**
              * Helper method to get return entry from the FTSIndex as a BSONObj
              * @param weight, the weight of the term in the entry
              * @param term, the std::string term in the entry
@@ -56,7 +61,7 @@ namespace mongo {
                                         TextIndexVersion textIndexVersion );
 
         private:
-            /*
+            /**
              * Helper method to get return entry from the FTSIndex as a BSONObj
              * @param b, reference to the BSONOBjBuilder
              * @param weight, the weight of the term in the entry

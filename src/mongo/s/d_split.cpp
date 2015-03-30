@@ -40,21 +40,24 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/s/chunk.h" // for static genID only
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/log.h"
@@ -825,7 +828,8 @@ namespace mongo {
             if ( newChunks.size() == 2 ) {
                 appendShortVersion(logDetail.subobjStart("left"), *newChunks[0]);
                 appendShortVersion(logDetail.subobjStart("right"), *newChunks[1]);
-                configServer.logChange( "split" , ns , logDetail.obj() );
+
+                grid.catalogManager()->logChange(txn, "split", ns, logDetail.obj());
             }
             else {
                 BSONObj beforeDetailObj = logDetail.obj();
@@ -838,16 +842,24 @@ namespace mongo {
                     chunkDetail.append( "number", i+1 );
                     chunkDetail.append( "of" , newChunksSize );
                     appendShortVersion(chunkDetail.subobjStart("chunk"), *newChunks[i]);
-                    configServer.logChange( "multi-split" , ns , chunkDetail.obj() );
+
+                    grid.catalogManager()->logChange(txn, "multi-split", ns, chunkDetail.obj());
                 }
             }
 
             dassert(newChunks.size() > 1);
 
             {
+                // Select chunk to move out for "top chunk optimization".
+                KeyPattern shardKeyPattern(collMetadata->getKeyPattern());
+
                 AutoGetCollectionForRead ctx(txn, ns);
                 Collection* collection = ctx.getCollection();
-                invariant(collection);
+                if (!collection) {
+                    warning() << "will not perform top-chunk checking since " << ns
+                              << " does not exist after splitting";
+                    return true;
+                }
 
                 // Allow multiKey based on the invariant that shard keys must be
                 // single-valued. Therefore, any multi-key index prefixed by shard
@@ -862,16 +874,17 @@ namespace mongo {
                 const ChunkType* backChunk = newChunks.vector().back();
                 const ChunkType* frontChunk = newChunks.vector().front();
 
-                if (checkIfSingleDoc(txn, collection, idx, backChunk)) {
+                if (shardKeyPattern.globalMax().woCompare(backChunk->getMax()) == 0 &&
+                    checkIfSingleDoc(txn, collection, idx, backChunk)) {
                     result.append("shouldMigrate",
                                   BSON("min" << backChunk->getMin()
                                        << "max" << backChunk->getMax()));
                 }
-                else if (checkIfSingleDoc(txn, collection, idx, frontChunk)) {
+                else if (shardKeyPattern.globalMin().woCompare(frontChunk->getMin()) == 0 &&
+                    checkIfSingleDoc(txn, collection, idx, frontChunk)) {
                     result.append("shouldMigrate",
                                   BSON("min" << frontChunk->getMin()
                                        << "max" << frontChunk->getMax()));
-
                 }
             }
 

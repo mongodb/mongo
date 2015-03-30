@@ -27,16 +27,17 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/merge_sort.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -56,7 +57,7 @@ namespace QueryStageMergeSortTests {
         }
 
         virtual ~QueryStageMergeSortTestBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -113,8 +114,8 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortPrefixIndex : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -182,8 +183,8 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortDups : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -250,8 +251,8 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortDupsNoDedup : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -319,8 +320,8 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortPrefixIndexReverse : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -389,8 +390,8 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortOneStageEOF : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -457,8 +458,8 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortManyShort : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -515,8 +516,8 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortInvalidation : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);

@@ -58,9 +58,9 @@ namespace dur {
         // Declare write intents. Use these methods to declare "i'm about to write to x and it
         // should be logged for redo."
         //
-        // Failure to call writing...() is checked in _DEBUG mode by using a read only mapped view
-        // (i.e., you'll segfault if the code is covered in that situation).  The _DEBUG check
-        // doesn't verify that your length is correct though.
+        // Failure to call writing...() is checked in MONGO_CONFIG_DEBUG_BUILD mode by using a
+        // read only mapped view (i.e., you'll segfault if the code is covered in that
+        // situation).  The debug check doesn't verify that your length is correct though.
 
         /**
          * Declare intent to write to x for up to len.

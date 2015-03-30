@@ -593,4 +593,240 @@ namespace {
         ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
     }
 
+    // Descriptive test. Should future index versions recursively index nested arrays?
+    TEST(BtreeKeyGeneratorTest, GetKeys2DArray) {
+        BSONObj keyPattern = fromjson("{a: 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[2]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': [2]}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. Should parallel indexed arrays be allowed? If not, should empty
+    // or single-element arrays be considered for the parallel array check?
+    TEST(BtreeKeyGeneratorTest, GetKeysParallelEmptyArrays) {
+        BSONObj keyPattern = fromjson("{a: 1, b: 1}");
+        BSONObj genKeysFrom = fromjson("{a: [], b: []}");
+        BSONObjSet expectedKeys;
+        ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    }
+
+    TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmpty) {
+        BSONObj keyPattern = fromjson("{a: 1, b: 1}");
+        BSONObj genKeysFrom = fromjson("{a: [], b: [1, 2, 3]}");
+        BSONObjSet expectedKeys;
+        ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    }
+
+    TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmptyNested) {
+        BSONObj keyPattern = fromjson("{'a.b.c': 1, 'a.b.d': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [{b: [{c: [1, 2, 3], d: []}]}]}");
+        BSONObjSet expectedKeys;
+        ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    }
+
+    // Descriptive test. The semantics for key generation are odd for positional key patterns.
+    TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternMissingElement) {
+        BSONObj keyPattern = fromjson("{'a.2': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [{'2': 5}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 5}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. The semantics for key generation are odd for positional key patterns.
+    TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray) {
+        BSONObj keyPattern = fromjson("{'a.2': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. The semantics for key generation are odd for positional key patterns.
+    TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray2) {
+        BSONObj keyPattern = fromjson("{'a.2': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5], [3, 4, 6], [0, 1, 2]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': [0, 1, 2]}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. The semantics for key generation are odd for positional key patterns.
+    TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray3) {
+        BSONObj keyPattern = fromjson("{'a.2': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [{'0': 1, '1': 2, '2': 5}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 5}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. The semantics for key generation are odd for positional key patterns.
+    TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray4) {
+        BSONObj keyPattern = fromjson("{'a.b.2': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [{b: [[1, 2, 5]]}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. The semantics for key generation are odd for positional key patterns.
+    TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray5) {
+        BSONObj keyPattern = fromjson("{'a.2': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5], {'2': 6}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null}"));
+        expectedKeys.insert(fromjson("{'': 6}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, GetNullKeyNestedArray) {
+        BSONObj keyPattern = fromjson("{'a.b': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, GetKeysUnevenNestedArrays) {
+        BSONObj keyPattern = fromjson("{a: 1, 'a.b': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [1, {b: [2, 3, 4]}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 1, '': null}"));
+        expectedKeys.insert(fromjson("{'': {b:[2,3,4]}, '': 2}"));
+        expectedKeys.insert(fromjson("{'': {b:[2,3,4]}, '': 3}"));
+        expectedKeys.insert(fromjson("{'': {b:[2,3,4]}, '': 4}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. Should we define better semantics for future index versions in the case of
+    // repeated field names?
+    TEST(BtreeKeyGeneratorTest, GetKeysRepeatedFieldName) {
+        BSONObj keyPattern = fromjson("{a: 1}");
+        BSONObj genKeysFrom = fromjson("{a: 2, a: 3}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 2}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. Future index versions may want different or at least more consistent
+    // handling of empty path components.
+    TEST(BtreeKeyGeneratorTest, GetKeysEmptyPathPiece) {
+        BSONObj keyPattern = fromjson("{'a..c': 1}");
+        BSONObj genKeysFrom = fromjson("{a: {'': [{c: 1}, {c: 2}]}}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 1}"));
+        expectedKeys.insert(fromjson("{'': 2}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test. Future index versions may want different or at least more consistent
+    // handling of empty path components.
+    TEST(BtreeKeyGeneratorTest, GetKeysLastPathPieceEmpty) {
+        BSONObj keyPattern = fromjson("{'a.': 1}");
+
+        BSONObj genKeysFrom = fromjson("{a: 2}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 2}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+
+        genKeysFrom = fromjson("{a: {'': 2}}");
+        expectedKeys.clear();
+        expectedKeys.insert(fromjson("{'': {'': 2}}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty) {
+        BSONObj keyPattern = fromjson("{'.a': 1}");
+        BSONObj genKeysFrom = fromjson("{a: 2}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty2) {
+        BSONObj keyPattern = fromjson("{'.a': 1}");
+        BSONObj genKeysFrom = fromjson("{'': [{a: [1, 2, 3]}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 1}"));
+        expectedKeys.insert(fromjson("{'': 2}"));
+        expectedKeys.insert(fromjson("{'': 3}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternParallelArrays) {
+        BSONObj keyPattern = fromjson("{a: 1, 'b.0': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [1], b: [2]}");
+        BSONObjSet expectedKeys;
+        ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    }
+
+    // Descriptive test.
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays) {
+        BSONObj keyPattern = fromjson("{'a.0.b': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[{b: 1}]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 1}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test.
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays2) {
+        BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[{b: 1}]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 1}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test.
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays3) {
+        BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[[ {b: 1} ]]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 1}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test.
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays4) {
+        BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [[[[ {b: 1} ]]]]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays5) {
+        BSONObj keyPattern = fromjson("{'a.b.1': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [{b: [1, 2]}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': 2}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test.
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays6) {
+        BSONObj keyPattern = fromjson("{'a': 1, 'a.b': 1, 'a.0.b':1, 'a.b.0': 1, 'a.0.b.0': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [{b: [1,2]}, {b: 3}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': {b:3}, '': 3, '': 1, '': null, '': 1}"));
+        expectedKeys.insert(fromjson("{'': {b:3}, '': 3, '': 2, '': null, '': 1}"));
+        expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"));
+        expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    // Descriptive test.
+    TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays7) {
+        BSONObj keyPattern = fromjson("{'a': 1, 'a.b': 1, 'a.0.b':1, 'a.b.0': 1, 'a.0.b.0': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [{b: [1,2]}, {b: {'0': 3}}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': {b:{'0':3}}, '': {'0':3}, '': 1, '': 3, '': 1}"));
+        expectedKeys.insert(fromjson("{'': {b:{'0':3}}, '': {'0':3}, '': 2, '': 3, '': 1}"));
+        expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"));
+        expectedKeys.insert(fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
 } // namespace

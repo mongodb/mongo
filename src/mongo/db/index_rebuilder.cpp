@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context_impl.h"
@@ -70,7 +71,7 @@ namespace {
             // for this namespace.
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
-            Client::Context ctx(txn, ns);
+            OldClientContext ctx(txn, ns);
 
             Collection* collection = ctx.db()->getCollection(ns);
             if ( collection == NULL )

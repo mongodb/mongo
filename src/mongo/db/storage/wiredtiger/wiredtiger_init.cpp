@@ -82,7 +82,7 @@ namespace mongo {
             }
 
             virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
-                return Status::OK();
+                return WiredTigerRecordStore::parseOptionsField(options).getStatus();
             }
 
             virtual Status validateIndexStorageOptions(const BSONObj& options) const {

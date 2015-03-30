@@ -56,26 +56,23 @@ namespace mongo {
         typedef size_t (*getSizeFunc)(const T& t);
     public:
         BlockingQueue() :
-            _lock("BlockingQueue"),
             _maxSize(std::numeric_limits<std::size_t>::max()),
             _currentSize(0),
             _getSize(&_getSizeDefault) {}
         BlockingQueue(size_t size) :
-            _lock("BlockingQueue(bounded)"),
             _maxSize(size),
             _currentSize(0),
             _getSize(&_getSizeDefault) {}
         BlockingQueue(size_t size, getSizeFunc f) :
-            _lock("BlockingQueue(custom size)"),
             _maxSize(size),
             _currentSize(0),
             _getSize(f) {}
 
         void push(T const& t) {
-            scoped_lock l( _lock );
+            boost::unique_lock<boost::mutex> l( _lock );
             size_t tSize = _getSize(t);
             while (_currentSize + tSize > _maxSize) {
-                _cvNoLongerFull.wait( l.boost() );
+                _cvNoLongerFull.wait( l );
             }
             _queue.push( t );
             _currentSize += tSize;
@@ -83,7 +80,7 @@ namespace mongo {
         }
 
         bool empty() const {
-            scoped_lock l( _lock );
+            boost::lock_guard<boost::mutex> l( _lock );
             return _queue.empty();
         }
 
@@ -91,7 +88,7 @@ namespace mongo {
          * The size as measured by the size function. Default to counting each item
          */
         size_t size() const {
-            scoped_lock l( _lock );
+            boost::lock_guard<boost::mutex> l( _lock );
             return _currentSize;
         }
 
@@ -106,19 +103,19 @@ namespace mongo {
          * The number/count of items in the queue ( _queue.size() )
          */
         size_t count() const {
-            scoped_lock l( _lock );
+            boost::lock_guard<boost::mutex> l( _lock );
             return _queue.size();
         }
 
         void clear() {
-            scoped_lock l(_lock);
+            boost::lock_guard<boost::mutex> l(_lock);
             _queue = std::queue<T>();
             _currentSize = 0;
             _cvNoLongerFull.notify_one();
         }
 
         bool tryPop( T & t ) {
-            scoped_lock l( _lock );
+            boost::lock_guard<boost::mutex> l( _lock );
             if ( _queue.empty() )
                 return false;
 
@@ -132,9 +129,9 @@ namespace mongo {
 
         T blockingPop() {
 
-            scoped_lock l( _lock );
+            boost::unique_lock<boost::mutex> l( _lock );
             while( _queue.empty() )
-                _cvNoLongerEmpty.wait( l.boost() );
+                _cvNoLongerEmpty.wait( l );
 
             T t = _queue.front();
             _queue.pop();
@@ -158,9 +155,9 @@ namespace mongo {
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += maxSecondsToWait;
 
-            scoped_lock l( _lock );
+            boost::unique_lock<boost::mutex> l( _lock );
             while( _queue.empty() ) {
-                if ( ! _cvNoLongerEmpty.timed_wait( l.boost() , xt ) )
+                if ( ! _cvNoLongerEmpty.timed_wait( l , xt ) )
                     return false;
             }
 
@@ -180,9 +177,9 @@ namespace mongo {
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += maxSecondsToWait;
 
-            scoped_lock l( _lock );
+            boost::unique_lock<boost::mutex> l( _lock );
             while( _queue.empty() ) {
-                if ( ! _cvNoLongerEmpty.timed_wait( l.boost() , xt ) )
+                if ( ! _cvNoLongerEmpty.timed_wait( l , xt ) )
                     return false;
             }
 
@@ -194,7 +191,7 @@ namespace mongo {
         // only one consumer
         bool peek(T& t) {
 
-            scoped_lock l( _lock );
+            boost::unique_lock<boost::mutex> l( _lock );
             if (_queue.empty()) {
                 return false;
             }

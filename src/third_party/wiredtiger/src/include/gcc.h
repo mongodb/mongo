@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#define	WT_SIZET_FMT	"zu"			/* size_t format string */
+
 /* Add GCC-specific attributes to types and function declarations. */
 #define	WT_COMPILER_TYPE_ALIGN(x)	__attribute__((aligned(x)))
 

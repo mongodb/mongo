@@ -51,6 +51,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -261,6 +262,15 @@ namespace mongo {
         }
     }
 
+    void Command::appendCommandWCStatus(BSONObjBuilder& result, const Status& status) {
+        if (!status.isOK()) {
+            WCErrorDetail wcError;
+            wcError.setErrCode(status.code());
+            wcError.setErrMessage(status.reason());
+            result.append("writeConcernError", wcError.toBSON());
+        }
+    }
+
     Status Command::getStatusFromCommandResult(const BSONObj& result) {
         return mongo::getStatusFromCommandResult(result);
     }
@@ -315,6 +325,17 @@ namespace mongo {
         cursorObj.append("id", cursorId);
         cursorObj.append("ns", cursorNamespace);
         cursorObj.append("firstBatch", firstBatch);
+        cursorObj.done();
+    }
+
+    void Command::appendGetMoreResponseObject(long long cursorId,
+                                              StringData cursorNamespace,
+                                              BSONArray nextBatch,
+                                              BSONObjBuilder* builder) {
+        BSONObjBuilder cursorObj(builder->subobjStart("cursor"));
+        cursorObj.append("id", cursorId);
+        cursorObj.append("ns", cursorNamespace);
+        cursorObj.append("nextBatch", nextBatch);
         cursorObj.done();
     }
 

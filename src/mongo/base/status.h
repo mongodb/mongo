@@ -27,11 +27,11 @@
 
 #pragma once
 
+#include <boost/config.hpp>
 #include <iosfwd>
 #include <string>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/client/export_macros.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
@@ -59,7 +59,7 @@ namespace mongo {
      * TODO: generate base/error_codes.h out of a description file
      * TODO: check 'location' duplicates against assert numbers
      */
-    class MONGO_CLIENT_API Status {
+    class Status {
     public:
         // Short-hand for returning an OK status.
         static inline Status OK();
@@ -75,10 +75,8 @@ namespace mongo {
         inline Status(const Status& other);
         inline Status& operator=(const Status& other);
 
-#if __cplusplus >= 201103L
-        inline Status(Status&& other) noexcept;
-        inline Status& operator=(Status&& other) noexcept;
-#endif // __cplusplus >= 201103L
+        inline Status(Status&& other) BOOST_NOEXCEPT;
+        inline Status& operator=(Status&& other) BOOST_NOEXCEPT;
 
         inline ~Status();
 
@@ -146,16 +144,16 @@ namespace mongo {
         static inline void unref(ErrorInfo* error);
     };
 
-    MONGO_CLIENT_API inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
+    inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
 
-    MONGO_CLIENT_API inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
+    inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
 
     //
     // Convenience method for unittest code. Please use accessors otherwise.
     //
 
-    MONGO_CLIENT_API std::ostream& operator<<(std::ostream& os, const Status& status);
-    MONGO_CLIENT_API std::ostream& operator<<(std::ostream& os, ErrorCodes::Error);
+    std::ostream& operator<<(std::ostream& os, const Status& status);
+    std::ostream& operator<<(std::ostream& os, ErrorCodes::Error);
 
 }  // namespace mongo
 

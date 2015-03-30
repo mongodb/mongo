@@ -32,7 +32,6 @@
 
 #include "mongo/db/operation_context.h"
 
-
 namespace mongo {
 
     class OperationContextImpl : public OperationContext  {
@@ -53,8 +52,6 @@ namespace mongo {
                                           const std::string& name,
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween);
-
-        virtual bool isGod() const;
 
         virtual std::string getNS() const;
 

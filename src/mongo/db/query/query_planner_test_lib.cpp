@@ -36,7 +36,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -283,6 +282,13 @@ namespace mongo {
             BSONElement languageElt = textObj["language"];
             if (!languageElt.eoo()) {
                 if (languageElt.String() != node->language) {
+                    return false;
+                }
+            }
+
+            BSONElement caseSensitiveElt = textObj["caseSensitive"];
+            if (!caseSensitiveElt.eoo()) {
+                if (caseSensitiveElt.trueValue() != node->caseSensitive) {
                     return false;
                 }
             }

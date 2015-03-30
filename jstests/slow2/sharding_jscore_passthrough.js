@@ -121,7 +121,6 @@ files.forEach(function(x) {
         'indexStatsCommand|' +
         'storageDetailsCommand|' +
         'reversecursor|' +
-        'block_check_supported|' +
         'stages.*|' +
         'top|' +
         'repair_cursor1|' +

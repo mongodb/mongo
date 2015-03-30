@@ -46,16 +46,16 @@ namespace {
     }
 
     TEST(VersionTest, RcCase) {
-        ASSERT_EQUALS( toVersionArray("1.2.3-rc0"), BSON_ARRAY(1 << 2 << 3 << -10) );
-        ASSERT_EQUALS( toVersionArray("1.2.0-rc1"), BSON_ARRAY(1 << 2 << 0 << -9) );
-        ASSERT_EQUALS( toVersionArray("2.0.0-rc2"), BSON_ARRAY(2 << 0 << 0 << -8) );
+        ASSERT_EQUALS( toVersionArray("1.2.3-rc0"), BSON_ARRAY(1 << 2 << 3 << -50) );
+        ASSERT_EQUALS( toVersionArray("1.2.0-rc1"), BSON_ARRAY(1 << 2 << 0 << -49) );
+        ASSERT_EQUALS( toVersionArray("2.0.0-rc2"), BSON_ARRAY(2 << 0 << 0 << -48) );
     }
 
     TEST(VersionTest, RcPreCase) {
         // Note that the pre of an rc is the same as the rc itself
-        ASSERT_EQUALS( toVersionArray("1.2.3-rc3-pre-"), BSON_ARRAY(1 << 2 << 3 << -7) );
-        ASSERT_EQUALS( toVersionArray("1.2.0-rc4-pre-"), BSON_ARRAY(1 << 2 << 0 << -6) );
-        ASSERT_EQUALS( toVersionArray("2.0.0-rc5-pre-"), BSON_ARRAY(2 << 0 << 0 << -5) );
+        ASSERT_EQUALS( toVersionArray("1.2.3-rc3-pre-"), BSON_ARRAY(1 << 2 << 3 << -47) );
+        ASSERT_EQUALS( toVersionArray("1.2.0-rc4-pre-"), BSON_ARRAY(1 << 2 << 0 << -46) );
+        ASSERT_EQUALS( toVersionArray("2.0.0-rc5-pre-"), BSON_ARRAY(2 << 0 << 0 << -45) );
     }
 
 } // namespace

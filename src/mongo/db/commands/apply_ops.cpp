@@ -42,11 +42,14 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
@@ -161,18 +164,15 @@ namespace mongo {
                     invariant(!txn->lockState()->saveLockStateAndUnlock(&lockSnapshot));
                 };
 
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
 
-                bool failed;
+                Status status(ErrorCodes::InternalError, "");
                 while (true) {
                     try {
                         // We assume that in the WriteConflict retry case, either the op rolls back
                         // any changes it makes or is otherwise safe to rerun.
-                        failed = repl::applyOperation_inlock(txn,
-                                                             ctx.db(),
-                                                             temp,
-                                                             false,
-                                                             alwaysUpsert);
+                        status =
+                            repl::applyOperation_inlock(txn, ctx.db(), temp, false, alwaysUpsert);
                         break;
                     }
                     catch (const WriteConflictException& wce) {
@@ -182,13 +182,16 @@ namespace mongo {
                     }
                 }
 
-                ab.append(!failed);
-                if ( failed )
+                ab.append(status.isOK());
+                if (!status.isOK()) {
                     errors++;
+                }
 
                 num++;
 
-                logOpForDbHash(ns.c_str());
+                WriteUnitOfWork wuow(txn);
+                logOpForDbHash(txn, ns.c_str());
+                wuow.commit();
             }
 
             result.append( "applied" , num );
@@ -221,7 +224,9 @@ namespace mongo {
                 while (true) {
                     try {
                         WriteUnitOfWork wunit(txn);
-                        repl::logOp(txn, "c", tempNS.c_str(), cmdRewritten);
+                        getGlobalEnvironment()->getOpObserver()->onApplyOps(txn,
+                                                                            tempNS,
+                                                                            cmdRewritten);
                         wunit.commit();
                         break;
                     }

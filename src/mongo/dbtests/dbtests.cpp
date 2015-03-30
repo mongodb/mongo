@@ -39,12 +39,12 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/framework.h"
-#include "mongo/util/gcov.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/startup_test.h"
@@ -129,7 +129,6 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = dbtestsMain(argc, argv, envp);
-    flushForGcov();
     quickExit(exitCode);
 }
 #endif

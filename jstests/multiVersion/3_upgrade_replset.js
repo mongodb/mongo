@@ -58,7 +58,7 @@ var joinFindInsert =
 
 jsTest.log( "Upgrading replica set..." )
 
-rst.upgradeSet( "latest" )
+rst.upgradeSet({ binVersion: "latest" });
 
 jsTest.log( "Replica set upgraded." )
 

@@ -99,8 +99,7 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 		return (__wt_scr_alloc(session, 512, &ds->msg));
 
 	/* If we're using a file, flush on each line. */
-	if ((ds->fp = fopen(ofile, "w")) == NULL)
-		WT_RET_MSG(session, __wt_errno(), "%s", ofile);
+	WT_RET(__wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &ds->fp));
 
 	(void)setvbuf(ds->fp, NULL, _IOLBF, 0);
 	return (0);
@@ -132,8 +131,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	}
 
 	/* Close any file we opened. */
-	if (ds->fp != NULL)
-		(void)fclose(ds->fp);
+	(void)__wt_fclose(session, &ds->fp, WT_FHANDLE_WRITE);
 }
 
 /*

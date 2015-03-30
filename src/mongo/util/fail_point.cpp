@@ -80,12 +80,7 @@ namespace {
         failPointPrng.getMake()->resetSeed(seed);
     }
 
-    FailPoint::FailPoint():
-            _fpInfo(0),
-            _mode(off),
-            _timesOrPeriod(0),
-            _modMutex("failPointMutex") {
-    }
+    FailPoint::FailPoint() : _fpInfo(0), _mode(off), _timesOrPeriod(0) {}
 
     void FailPoint::shouldFailCloseBlock() {
         _fpInfo.subtractAndFetch(1);
@@ -100,7 +95,7 @@ namespace {
          * 3. Sets the new mode.
          */
 
-        scoped_lock scoped(_modMutex);
+        boost::lock_guard<boost::mutex> scoped(_modMutex);
 
         // Step 1
         disableFailPoint();
@@ -193,7 +188,7 @@ namespace {
     BSONObj FailPoint::toBSON() const {
         BSONObjBuilder builder;
 
-        scoped_lock scoped(_modMutex);
+        boost::lock_guard<boost::mutex> scoped(_modMutex);
         builder.append("mode", _mode);
         builder.append("data", _data);
 

@@ -70,8 +70,7 @@ namespace mongo {
     void assembleResponse( OperationContext* txn,
                            Message& m,
                            DbResponse& dbresponse,
-                           const HostAndPort &client,
-                           bool fromDBDirectClient = false );
+                           const HostAndPort &client );
 
     void maybeCreatePidFile();
 

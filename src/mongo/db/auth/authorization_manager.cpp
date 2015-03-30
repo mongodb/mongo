@@ -43,7 +43,6 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/auth_helpers.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
@@ -254,6 +253,7 @@ namespace mongo {
 
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
             _authEnabled(false),
+            _privilegeDocsExist(false),
             _externalState(externalState),
             _version(schemaVersionInvalid),
             _isFetchPhaseBusy(false) {
@@ -305,8 +305,22 @@ namespace mongo {
         return _authEnabled;
     }
 
-    bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) const {
-        return _externalState->hasAnyPrivilegeDocuments(txn);
+    bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) {
+        boost::unique_lock<boost::mutex> lk(_privilegeDocsExistMutex);
+        if (_privilegeDocsExist) {
+            // If we know that a user exists, don't re-check.
+            return true;
+        }
+
+        lk.unlock();
+        bool privDocsExist = _externalState->hasAnyPrivilegeDocuments(txn);
+        lk.lock();
+
+        if (privDocsExist) {
+            _privilegeDocsExist = true;
+        }
+
+        return _privilegeDocsExist;
     }
 
     Status AuthorizationManager::writeAuthSchemaVersionIfNeeded(OperationContext* txn,
@@ -769,11 +783,13 @@ namespace {
         BSONElement mongoCRElement = credentialsObj["MONGODB-CR"];
         BSONElement scramElement = credentialsObj["SCRAM-SHA-1"];
 
-        // Ignore any user documents that already have SCRAM credentials. This should only
-        // occur if a previous authSchemaUpgrade was interrupted halfway.
-        if (!scramElement.eoo()) {
-            return;
-        }
+        // Ignore any user documents that already have SCRAM credentials.
+        uassert(28613,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
+                        "with existing SCRAM credentials :"
+                        << userDoc.toString(),
+                scramElement.eoo());
 
         uassert(18744,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "
@@ -993,13 +1009,13 @@ namespace {
     }
 
     void AuthorizationManager::logOp(
+            OperationContext* txn,
             const char* op,
             const char* ns,
             const BSONObj& o,
-            BSONObj* o2,
-            bool* b) {
+            BSONObj* o2) {
 
-        _externalState->logOp(op, ns, o, o2, b);
+        _externalState->logOp(txn, op, ns, o, o2);
         if (appliesToAuthzData(op, ns, o)) {
             _invalidateRelevantCacheData(op, ns, o, o2);
         }

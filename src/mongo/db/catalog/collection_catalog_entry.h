@@ -98,6 +98,13 @@ namespace mongo {
         virtual void updateTTLSetting( OperationContext* txn,
                                        StringData idxName,
                                        long long newExpireSeconds ) = 0;
+
+        /**
+         * Sets the flags field of CollectionOptions to newValue.
+         * Subsequent calls to getCollectionOptions should have flags==newValue and flagsSet==true.
+         */
+        virtual void updateFlags(OperationContext* txn, int newValue) = 0;
+
     private:
         NamespaceString _ns;
     };

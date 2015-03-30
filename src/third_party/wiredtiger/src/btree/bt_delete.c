@@ -221,9 +221,6 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	int skip;
 
-	if (ref->state != WT_REF_DELETED)
-		return (0);
-
 	/*
 	 * Deleted pages come from two sources: either it's a fast-delete as
 	 * described above, or the page has been emptied by other operations
@@ -267,6 +264,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *page;
 	WT_PAGE_DELETED *page_del;
 	WT_UPDATE **upd_array, *upd;
+	size_t size;
 	uint32_t i;
 
 	btree = S2BT(session);
@@ -326,7 +324,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * structures, fill in the per-page update array with references to
 	 * deleted items.
 	 */
-	for (i = 0; i < page->pg_row_entries; ++i) {
+	for (i = 0, size = 0; i < page->pg_row_entries; ++i) {
 		WT_ERR(__wt_calloc_one(session, &upd));
 		WT_UPDATE_DELETED_SET(upd);
 
@@ -339,10 +337,11 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 
 		upd->next = upd_array[i];
 		upd_array[i] = upd;
+
+		size += sizeof(WT_UPDATE *) + WT_UPDATE_MEMSIZE(upd);
 	}
 
-	__wt_cache_page_inmem_incr(session, page,
-	    page->pg_row_entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
+	__wt_cache_page_inmem_incr(session, page, size);
 
 	return (0);
 

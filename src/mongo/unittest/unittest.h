@@ -39,6 +39,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/config.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
@@ -440,11 +441,7 @@ namespace mongo {
             TestAssertionFailure(
                     const std::string& file, unsigned line, const std::string& message);
             TestAssertionFailure(const TestAssertionFailure& other);
-#if __cplusplus < 201103
-            ~TestAssertionFailure();
-#else
-            ~TestAssertionFailure() noexcept(false);
-#endif
+            ~TestAssertionFailure() BOOST_NOEXCEPT_IF(false);
 
             TestAssertionFailure& operator=(const TestAssertionFailure& other);
 

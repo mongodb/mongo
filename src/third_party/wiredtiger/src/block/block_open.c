@@ -28,10 +28,16 @@ __wt_block_manager_truncate(
 	WT_ERR(__wt_ftruncate(session, fh, (wt_off_t)0));
 
 	/* Write out the file's meta-data. */
-	ret = __wt_desc_init(session, fh, allocsize);
+	WT_ERR(__wt_desc_init(session, fh, allocsize));
+
+	/*
+	 * Ensure the truncated file has made it to disk, then the upper-level
+	 * is never surprised.
+	 */
+	WT_ERR(__wt_fsync(session, fh));
 
 	/* Close the file handle. */
-err:	WT_TRET(__wt_close(session, fh));
+err:	WT_TRET(__wt_close(session, &fh));
 
 	return (ret);
 }
@@ -55,13 +61,13 @@ __wt_block_manager_create(
 	ret = __wt_desc_init(session, fh, allocsize);
 
 	/*
-	 * Ensure the new file has made it to disk. Otherwise a crash
-	 * after log records exist for the file can lead to a recovery failure.
+	 * Ensure the truncated file has made it to disk, then the upper-level
+	 * is never surprised.
 	 */
 	WT_TRET(__wt_fsync(session, fh));
 
 	/* Close the file handle. */
-	WT_TRET(__wt_close(session, fh));
+	WT_TRET(__wt_close(session, &fh));
 
 	/*
 	 * If checkpoint syncing is enabled, some filesystems require that we
@@ -99,13 +105,32 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		__wt_free(session, block->name);
 
 	if (block->fh != NULL)
-		WT_TRET(__wt_close(session, block->fh));
+		WT_TRET(__wt_close(session, &block->fh));
 
 	__wt_spin_destroy(session, &block->live_lock);
 
 	__wt_overwrite_and_free(session, block);
 
 	return (ret);
+}
+
+/*
+ * __wt_block_configure_first_fit --
+ *	Configure first-fit allocation.
+ */
+void
+__wt_block_configure_first_fit(WT_BLOCK *block, int on)
+{
+	/*
+	 * Switch to first-fit allocation so we rewrite blocks at the start of
+	 * the file; use atomic instructions because checkpoints also configure
+	 * first-fit allocation, and this way we stay on first-fit allocation
+	 * as long as any operation wants it.
+	 */
+	if (on)
+		(void)WT_ATOMIC_ADD4(block->allocfirst, 1);
+	else
+		(void)WT_ATOMIC_SUB4(block->allocfirst, 1);
 }
 
 /*

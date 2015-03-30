@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
@@ -55,7 +56,11 @@ namespace QueryStageIxscan {
             _ctx.db()->dropCollection(&_txn, ns());
             _coll = _ctx.db()->createCollection(&_txn, ns());
 
-            ASSERT_OK(dbtests::createIndex(&_txn, ns(), BSON("x" << 1)));
+            ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
+                        &_txn,
+                        BSON("ns" << ns()
+                          << "key" << BSON("x" << 1)
+                          << "name" << DBClientBase::genIndexName(BSON("x" << 1)))));
 
             wunit.commit();
         }
@@ -137,7 +142,7 @@ namespace QueryStageIxscan {
 
         ScopedTransaction _scopedXact;
         Lock::DBLock _dbLock;
-        Client::Context _ctx;
+        OldClientContext _ctx;
         Collection* _coll;
 
         WorkingSet _ws;

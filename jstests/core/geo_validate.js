@@ -86,3 +86,14 @@ assert.commandFailed(db.runCommand({geoNear: coll.getName(),
 // NaN is interpreted as limit 0
 assert.commandWorked(db.runCommand({geoNear: coll.getName(),
                                     near: [0,0], spherical: true, num: NaN}));
+
+
+//
+// SERVER-17241 Polygon has no loop
+assert.writeError(coll.insert({ geo : { type: 'Polygon', coordinates: [] } }));
+
+//
+// SERVER-17486 Loop has less then 3 vertices.
+assert.writeError(coll.insert({geo: {type: 'Polygon', coordinates: [[]]}}));
+assert.writeError(coll.insert({geo: {type: 'Polygon', coordinates: [[[0,0]]]}}));
+assert.writeError(coll.insert({geo: {type: 'Polygon', coordinates: [[[0,0], [0,0], [0,0], [0,0]]]}}));

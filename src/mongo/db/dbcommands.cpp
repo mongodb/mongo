@@ -48,17 +48,19 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_d.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -66,6 +68,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -73,14 +76,12 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
-#include "mongo/server.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
@@ -201,7 +202,7 @@ namespace mongo {
                     // DB doesn't exist, so deem it a success.
                     return true;
                 }
-                Client::Context context(txn, dbname);
+                OldClientContext context(txn, dbname);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -218,7 +219,7 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
 
                 if (!fromRepl) {
-                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+                    getGlobalEnvironment()->getOpObserver()->onDropDatabase(txn, dbname + ".$cmd");
                 }
 
                 wunit.commit();
@@ -288,7 +289,7 @@ namespace mongo {
             // TODO: SERVER-4328 Don't lock globally
             ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
-            Client::Context context(txn,  dbname );
+            OldClientContext context(txn,  dbname );
 
             log() << "repairDatabase " << dbname;
             std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, context.db(), cmdObj);
@@ -370,7 +371,7 @@ namespace mongo {
             // in the local database.
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, dbname);
+            OldClientContext ctx(txn, dbname);
 
             BSONElement e = cmdObj.firstElement();
             result.append("was", ctx.db()->getProfilingLevel());
@@ -431,7 +432,7 @@ namespace mongo {
             //
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, dbname);
+            OldClientContext ctx(txn, dbname);
 
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
             _diaglog.flush();
@@ -506,7 +507,7 @@ namespace mongo {
                     errmsg = "ns not found";
                     return false;
                 }
-                Client::Context context(txn, nsToDrop);
+                OldClientContext context(txn, nsToDrop);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -528,7 +529,9 @@ namespace mongo {
                 }
 
                 if ( !fromRepl ) {
-                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                    getGlobalEnvironment()->getOpObserver()->onDropCollection(
+                            txn,
+                            NamespaceString(nsToDrop));
                 }
                 wunit.commit();
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", nsToDrop);
@@ -605,7 +608,7 @@ namespace mongo {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -685,13 +688,13 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] << "n" << GTE << n );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            CanonicalQuery* cq;
-            if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
-                uasserted(17240, "Can't canonicalize query " + query.toString());
-                return 0;
-            }
-
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                CanonicalQuery* cq;
+                if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
+                    uasserted(17240, "Can't canonicalize query " + query.toString());
+                    return 0;
+                }
+
                 // Check shard version at startup.
                 // This will throw before we've done any work if shard version is outdated
                 // We drop and re-acquire these locks every document because md5'ing is expensive
@@ -1054,7 +1057,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::Context ctx(txn,  ns);
+            OldClientContext ctx(txn,  ns);
             if (!fromRepl &&
                 !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                 return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -1126,17 +1129,39 @@ namespace mongo {
                     }
                 }
                 else {
-                    Status s = coll->getRecordStore()->setCustomOption( txn, e, &result );
-                    if ( s.isOK() ) {
-                        // no-op
-                    }
-                    else if ( s.code() == ErrorCodes::InvalidOptions ) {
-                        errmsg = str::stream() << "unknown option to collMod: " << e.fieldName();
+                    // As of SERVER-17312 we only support these two options. When SERVER-17320 is
+                    // resolved this will need to be enhanced to handle other options.
+                    typedef CollectionOptions CO;
+                    const StringData name = e.fieldNameStringData();
+                    const int flag = (name == "usePowerOf2Sizes") ? CO::Flag_UsePowerOf2Sizes :
+                                     (name == "noPadding") ? CO::Flag_NoPadding :
+                                     0;
+                    if (!flag) {
+                        errmsg = str::stream() << "unknown option to collMod: " << name;
                         ok = false;
+                        continue;
                     }
-                    else {
-                        return appendCommandStatus( result, s );
-                    }
+
+                    CollectionCatalogEntry* cce = coll->getCatalogEntry();
+
+                    const int oldFlags = cce->getCollectionOptions(txn).flags;
+                    const bool oldSetting = oldFlags & flag;
+                    const bool newSetting = e.trueValue();
+
+                    result.appendBool( name.toString() + "_old", oldSetting );
+                    result.appendBool( name.toString() + "_new", newSetting );
+
+                    const int newFlags = newSetting
+                                       ? (oldFlags | flag) // set flag
+                                       : (oldFlags & ~flag); // clear flag
+
+                    // NOTE we do this unconditionally to ensure that we note that the user has
+                    // explicitly set flags, even if they are just setting the default.
+                    cce->updateFlags(txn, newFlags);
+
+                    const CollectionOptions newOptions = cce->getCollectionOptions(txn);
+                    invariant(newOptions.flags == newFlags);
+                    invariant(newOptions.flagsSet);
                 }
             }
 
@@ -1145,7 +1170,9 @@ namespace mongo {
             }
 
             if (!fromRepl) {
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                getGlobalEnvironment()->getOpObserver()->onCollMod(txn,
+                                                                   (dbname + ".$cmd").c_str(),
+                                                                   jsobj);
             }
 
             wunit.commit();
@@ -1194,7 +1221,7 @@ namespace mongo {
 
             const string ns = parseNs(dbname, jsobj);
 
-            // TODO: Client::Context legacy, needs to be removed
+            // TODO: OldClientContext legacy, needs to be removed
             txn->getCurOp()->ensureStarted();
             txn->getCurOp()->setNS(dbname);
 
@@ -1224,7 +1251,7 @@ namespace mongo {
                 result.appendNumber("fileSize", 0);
             }
             else {
-                // TODO: Client::Context legacy, needs to be removed
+                // TODO: OldClientContext legacy, needs to be removed
                 txn->getCurOp()->enter(dbname.c_str(), db->getProfilingLevel());
 
                 db->getStats(txn, &result, scale);
@@ -1448,7 +1475,12 @@ namespace mongo {
 
         if ( ! canRunHere ) {
             result.append( "note" , "from execCommand" );
-            appendCommandStatus(result, false, "not master");
+            if ( c->slaveOverrideOk() ) {
+                appendCommandStatus(result, false, "not master and slaveOk=false");
+            }
+            else {
+                appendCommandStatus(result, false, "not master");
+            }
             return;
         }
 
@@ -1524,7 +1556,6 @@ namespace mongo {
         return;
     }
 
-
     /* TODO make these all command objects -- legacy stuff here
 
        usage:
@@ -1598,6 +1629,31 @@ namespace mongo {
         BSONObj x = anObjBuilder.done();
         b.appendBuf(x.objdata(), x.objsize());
 
+        return true;
+    }
+
+    bool runCommands(OperationContext* txn,
+                     const char* ns,
+                     BSONObj& jsobj,
+                     CurOp& curop,
+                     BufBuilder& b,
+                     BSONObjBuilder& anObjBuilder,
+                     bool fromRepl,
+                     int queryOptions) {
+        try {
+            return _runCommands(txn, ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
+        }
+        catch (const SendStaleConfigException&){
+            throw;
+        }
+        catch (const AssertionException& e) {
+            verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
+
+            Command::appendCommandStatus(anObjBuilder, e.toStatus());
+            curop.debug().exceptionInfo = e.getInfo();
+        }
+        BSONObj x = anObjBuilder.done();
+        b.appendBuf(x.objdata(), x.objsize());
         return true;
     }
 

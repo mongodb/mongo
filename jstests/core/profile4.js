@@ -1,4 +1,3 @@
-if (0) { // TODO SERVER-16799 reenable
 // Check debug information recorded for a query.
 
 // special db so that it can be run in parallel tests
@@ -50,26 +49,19 @@ try {
                   [ "nreturned", 0 ],
                   [ "responseLength", 20 ] ] );
     
-    t.save( {} );
-
     // check write lock stats are set
+    t.save( {} );
     o = lastOp();
     assert.eq('insert', o.op);
-
-    printjson( o );
-    assert.eq( 0, o.lockStats.timeLockedMicros.r );
-    assert.lt( 0, o.lockStats.timeLockedMicros.w );
-    assert.eq( 0, o.lockStats.timeAcquiringMicros.r );
-    assert.lte( 0, o.lockStats.timeAcquiringMicros.w );
+    printjson(o.locks);
+    assert.lt( 0, Object.keys(o.locks).length );
 
     // check read lock stats are set
     t.find();
     o = lastOp();
     assert.eq('query', o.op);
-    assert.lt( 0, o.lockStats.timeLockedMicros.r );
-    assert.eq( 0, o.lockStats.timeLockedMicros.w );
-    assert.lte( 0, o.lockStats.timeAcquiringMicros.r );
-    assert.lte( 0, o.lockStats.timeAcquiringMicros.w );
+    printjson(o.locks);
+    assert.lt( 0, Object.keys(o.locks).length );
 
     t.save( {} );
     t.save( {} );
@@ -118,5 +110,4 @@ try {
 finally {
     db.setProfilingLevel(0);
     db = stddb;
-}
 }

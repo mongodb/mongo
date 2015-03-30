@@ -95,10 +95,6 @@ namespace mongo {
         return getCurOp()->getNS();
     }
 
-    bool OperationContextImpl::isGod() const {
-        return getClient()->isGod();
-    }
-
     Client* OperationContextImpl::getClient() const {
         return _client;
     }

@@ -34,7 +34,6 @@
 #include <utility>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/export_macros.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -52,7 +51,7 @@ namespace mongo {
        On a failover situation, expect at least one operation to return an error (throw
        an exception) before the failover is complete.  Operations are not retried.
     */
-    class MONGO_CLIENT_API DBClientReplicaSet : public DBClientBase {
+    class DBClientReplicaSet : public DBClientBase {
     public:
         using DBClientBase::query;
         using DBClientBase::update;
@@ -310,7 +309,7 @@ namespace mongo {
     /**
      * A simple object for representing the list of tags requested by a $readPreference.
      */
-    class MONGO_CLIENT_API TagSet {
+    class TagSet {
     public:
         /**
          * Creates a TagSet that matches any nodes.
@@ -339,7 +338,7 @@ namespace mongo {
         BSONArray _tags;
     };
 
-    struct MONGO_CLIENT_API ReadPreferenceSetting {
+    struct ReadPreferenceSetting {
         /**
          * @parm pref the read preference mode.
          * @param tag the tag set. Note that this object will have the

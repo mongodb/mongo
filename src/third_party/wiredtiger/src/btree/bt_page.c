@@ -32,17 +32,11 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		return (0);
 
 	/* Leaf pages only. */
-	if (page->type != WT_PAGE_COL_FIX &&
-	    page->type != WT_PAGE_COL_VAR &&
-	    page->type != WT_PAGE_ROW_LEAF)
+	if (WT_PAGE_IS_INTERNAL(page))
 		return (0);
 
-	/*
-	 * Eviction may be turned off (although that's rare), or we may be in
-	 * the middle of a checkpoint.
-	 */
-	if (LF_ISSET(WT_READ_NO_EVICT) ||
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->checkpointing)
+	/* Eviction may be turned off. */
+	if (LF_ISSET(WT_READ_NO_EVICT) || F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
 	/*
@@ -52,17 +46,11 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	if (page->modify == NULL)
 		return (0);
 
-	/*
-	 * If the page was recently split in-memory, don't force it out: we
-	 * hope eviction will find it first.
-	 */
-	if (!__wt_txn_visible_all(session, page->modify->first_dirty_txn))
-		return (0);
-
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
 
-	return (1);
+	/* If eviction cannot succeed, don't try. */
+	return (__wt_page_can_evict(session, page, 1));
 }
 
 /*
@@ -141,15 +129,24 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    __evict_force_check(session, page, flags)) {
 				++force_attempts;
 				ret = __wt_page_release_evict(session, ref);
+				/* If forced eviction fails, stall. */
 				if (ret == EBUSY) {
-					/* If forced eviction fails, stall. */
 					ret = 0;
 					wait_cnt += 1000;
+					WT_STAT_FAST_CONN_INCR(session,
+					    page_forcible_evict_blocked);
+					break;
 				} else
 					WT_RET(ret);
-				WT_STAT_FAST_CONN_INCR(
-				    session, page_forcible_evict_blocked);
-				break;
+
+				/*
+				 * The result of a successful forced eviction
+				 * is a page-state transition (potentially to
+				 * an in-memory page we can use, or a restart
+				 * return for our caller), continue the outer
+				 * page-acquisition loop.
+				 */
+				continue;
 			}
 
 			/* Check if we need an autocommit transaction. */
@@ -168,6 +165,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
 				__wt_page_evict_soon(page);
 			else if (!LF_ISSET(WT_READ_NO_GEN) &&
+			    page->read_gen != WT_READGEN_OLDEST &&
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
 				    __wt_cache_read_gen_set(session);
@@ -306,8 +304,8 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep)
+__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
+    const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -374,9 +372,10 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 
 	/*
 	 * Track the memory allocated to build this page so we can update the
-	 * cache statistics in a single call.
+	 * cache statistics in a single call. If the disk image is in allocated
+	 * memory, start with that.
 	 */
-	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? dsk->mem_size : 0;
+	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? memsize : 0;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -614,7 +613,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
 			WT_ERR(__wt_row_ikey_incr(session, page,
 			    WT_PAGE_DISK_OFFSET(page, cell),
-			    current->data, current->size, &ref->key.ikey));
+			    current->data, current->size, ref));
 
 			*sizep += sizeof(WT_IKEY) + current->size;
 			break;

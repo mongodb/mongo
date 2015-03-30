@@ -125,6 +125,12 @@ namespace repl {
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
 
         /**
+         * Removes a single entry "host" from the list of potential sync sources which we
+         * have blacklisted, if it is supposed to be unblacklisted by "now".
+         */
+        virtual void unblacklistSyncSource(const HostAndPort& host, Date_t now) = 0;
+
+        /**
          * Clears the list of potential sync sources we have blacklisted.
          */
         virtual void clearSyncSourceBlacklist() = 0;
@@ -133,8 +139,10 @@ namespace repl {
          * Determines if a new sync source should be chosen, if a better candidate sync source is
          * available.  If the current sync source's last optime is more than _maxSyncSourceLagSecs
          * behind any syncable source, this function returns true.
+         *
+         * "now" is used to skip over currently blacklisted sync sources.
          */
-        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const = 0;
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource, Date_t now) const = 0;
 
         /**
          * Checks whether we are a single node set and we are not in a stepdown period.  If so,

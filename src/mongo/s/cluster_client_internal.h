@@ -57,50 +57,10 @@ namespace mongo {
     Status checkClusterMongoVersions(const ConnectionString& configLoc,
                                      const std::string& minMongoVersion);
 
-    /**
-     * Returns all collections in the cluster, found at this moment.
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status findAllCollections(const ConnectionString& configLoc,
-                              OwnedPointerMap<std::string, CollectionType>* collections);
-
-    /**
-     * Returns all collections in the cluster, but does not throw an error if epochs are not
-     * set for the collections.
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status findAllCollectionsV3(const ConnectionString& configLoc,
-                                OwnedPointerMap<std::string, CollectionType>* collections);
-
-    /**
-     * Returns all chunks for a collection in the cluster.
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status findAllChunks(const ConnectionString& configLoc,
-                         const std::string& ns,
-                         OwnedPointerVector<ChunkType>* chunks);
-
-    /**
-     * Logs to the config.changelog collection
-     *
-     * Returns OK if loaded successfully, error Status if not.
-     */
-    Status logConfigChange(const ConnectionString& configLoc,
-                           const std::string& clientHost,
-                           const std::string& ns,
-                           const std::string& description,
-                           const BSONObj& details);
-
     //
     // Needed to normalize exception behavior of connections and cursors
     // TODO: Remove when we refactor the client connection interface to something more consistent.
     //
-
-    // Helper function which throws on bad GLEs for non-SCC config servers
-    void _checkGLE(ScopedDbConnection& conn);
 
     // Helper function which throws for invalid cursor initialization.
     // Note: cursor ownership will be passed to this function.

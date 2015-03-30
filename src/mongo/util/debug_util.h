@@ -32,19 +32,14 @@
 
 namespace mongo {
 
-#if defined(_DEBUG)
-    enum {DEBUG_BUILD = 1};
-    const bool debug=true;
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+    const bool kDebugBuild = true;
 #else
-    enum {DEBUG_BUILD = 0};
-    const bool debug=false;
+    const bool kDebugBuild = false;
 #endif
 
-#define MONGO_DEV if( DEBUG_BUILD )
+#define MONGO_DEV if (kDebugBuild)
 #define DEV MONGO_DEV
-
-#define MONGO_DEBUGGING if( 0 )
-#define DEBUGGING MONGO_DEBUGGING
 
 // The following declare one unique counter per enclosing function.
 // NOTE The implementation double-increments on a match, but we don't really care.

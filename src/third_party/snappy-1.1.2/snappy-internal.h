@@ -47,7 +47,7 @@ class WorkingMemory {
   uint16* GetHashTable(size_t input_size, int* table_size);
 
  private:
-  uint16 small_table_[1<<10];    // 2KB
+  uint16 small_table_[1<<14];    // 32KB
   uint16* large_table_;          // Allocated only when needed
 
   DISALLOW_COPY_AND_ASSIGN(WorkingMemory);

@@ -42,9 +42,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -161,8 +162,10 @@ namespace mongo {
                     collection = db->createCollection( txn, ns.ns() );
                     invariant( collection );
                     if (!fromRepl) {
-                        repl::logOp(txn, "c", (dbname + ".$cmd").c_str(),
-                                    BSON("create" << ns.coll()));
+                        getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                                txn,
+                                ns,
+                                CollectionOptions());
                     }
                     wunit.commit();
                 } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
@@ -215,6 +218,7 @@ namespace mongo {
                         << "Not primary while creating background indexes in " << ns.ns()));
                 }
             }
+
             try {
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 uassertStatusOK(indexer.insertAllDocumentsInCollection());
@@ -229,6 +233,16 @@ namespace mongo {
                         // that day, to avoid data corruption due to lack of index cleanup.
                         txn->recoveryUnit()->commitAndRestart();
                         dbLock.relockWithMode(MODE_X);
+                        if (!fromRepl &&
+                            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                                dbname)) {
+                            return appendCommandStatus(
+                                result,
+                                Status(ErrorCodes::NotMaster, str::stream()
+                                    << "Not primary while creating background indexes in "
+                                    << ns.ns() << ": cleaning up index build failure due to "
+                                    << e.toString()));
+                        }
                     }
                     catch (...) {
                         std::terminate();
@@ -240,6 +254,12 @@ namespace mongo {
             if (indexer.getBuildInBackground()) {
                 txn->recoveryUnit()->commitAndRestart();
                 dbLock.relockWithMode(MODE_X);
+                uassert(ErrorCodes::NotMaster,
+                        str::stream() << "Not primary while completing index build in " << dbname,
+                        fromRepl ||
+                        repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                            dbname));
+
                 Database* db = dbHolder().get(txn, ns.db());
                 uassert(28551, "database dropped during index build", db);
                 uassert(28552, "collection dropped during index build",
@@ -254,7 +274,9 @@ namespace mongo {
                 if ( !fromRepl ) {
                     for ( size_t i = 0; i < specs.size(); i++ ) {
                         std::string systemIndexes = ns.getSystemIndexesCollection();
-                        repl::logOp(txn, "i", systemIndexes.c_str(), specs[i]);
+                        getGlobalEnvironment()->getOpObserver()->onCreateIndex(txn,
+                                                                               systemIndexes,
+                                                                               specs[i]);
                     }
                 }
 

@@ -1,5 +1,3 @@
-// parallel.h
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -36,12 +34,10 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/client/export_macros.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/shard.h"
-#include "mongo/util/concurrency/mvar.h"
 
 namespace mongo {
 
@@ -50,7 +46,7 @@ namespace mongo {
     /**
      * holder for a server address and a query to run
      */
-    class MONGO_CLIENT_API ServerAndQuery {
+    class ServerAndQuery {
     public:
         ServerAndQuery( const std::string& server , BSONObj extra = BSONObj() , BSONObj orderObject = BSONObj() ) :
             _server( server ) , _extra( extra.getOwned() ) , _orderObject( orderObject.getOwned() ) {
@@ -85,7 +81,7 @@ namespace mongo {
     class ParallelConnectionMetadata;
     class DBClientCursorHolder;
 
-    class MONGO_CLIENT_API CommandInfo {
+    class CommandInfo {
     public:
         std::string versionedNS;
         BSONObj cmdFilter;
@@ -102,12 +98,10 @@ namespace mongo {
         }
     };
 
-    typedef boost::shared_ptr<ShardConnection> ShardConnectionPtr;
-
     class DBClientCursor;
     typedef boost::shared_ptr<DBClientCursor> DBClientCursorPtr;
 
-    class MONGO_CLIENT_API ParallelConnectionState {
+    class ParallelConnectionState {
     public:
 
         ParallelConnectionState() :
@@ -136,7 +130,7 @@ namespace mongo {
     typedef ParallelConnectionState PCState;
     typedef boost::shared_ptr<PCState> PCStatePtr;
 
-    class MONGO_CLIENT_API ParallelConnectionMetadata {
+    class ParallelConnectionMetadata {
     public:
 
         ParallelConnectionMetadata() :
@@ -180,7 +174,7 @@ namespace mongo {
      * There is a deprecated legacy mode as well which effectively does a merge-sort across a number
      * of servers, but does not correctly enforce versioning (used only in mapreduce).
      */
-    class MONGO_CLIENT_API ParallelSortClusteredCursor {
+    class ParallelSortClusteredCursor {
     public:
 
         ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo() );
@@ -306,7 +300,7 @@ namespace mongo {
      * TODO:  Choose one set of ownership semantics so that this isn't needed - merge sort via
      * mapreduce is the main issue since it has no metadata and this holder owns the cursors.
      */
-    class MONGO_CLIENT_API DBClientCursorHolder {
+    class DBClientCursorHolder {
     public:
 
         DBClientCursorHolder() {}
@@ -339,7 +333,7 @@ namespace mongo {
      * right now uses underlying sync network ops and uses another thread
      * should be changed to use non-blocking io
      */
-    class MONGO_CLIENT_API Future {
+    class Future {
     public:
         class CommandResult {
         public:
@@ -406,7 +400,6 @@ namespace mongo {
                                                        DBClientBase * conn = 0,
                                                        bool useShardConn = false );
     };
-
 
 }
 

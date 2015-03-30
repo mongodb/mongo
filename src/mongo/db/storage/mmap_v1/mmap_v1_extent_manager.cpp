@@ -657,7 +657,7 @@ namespace mongo {
     }
 
     void MmapV1ExtentManager::FilesArray::push_back(DataFile* val) {
-        scoped_lock lk(_writersMutex);
+        boost::lock_guard<boost::mutex> lk(_writersMutex);
         const int n = _size.load();
         invariant(n < DiskLoc::MaxFiles);
         // Note ordering: _size update must come after updating the _files array

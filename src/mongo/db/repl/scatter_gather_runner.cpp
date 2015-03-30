@@ -106,7 +106,7 @@ namespace repl {
             _callbacks.push_back(cbh.getValue());
         }
 
-        if (_callbacks.empty()) {
+        if (_callbacks.empty() || _algorithm->hasReceivedSufficientResponses()) {
             invariant(_algorithm->hasReceivedSufficientResponses());
             _signalSufficientResponsesReceived(executor);
         }

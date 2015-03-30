@@ -98,6 +98,21 @@ namespace mongo {
                        size_t plannerOptions = 0);
 
     /**
+     * Get a plan executor for a .find() operation. Takes ownership of 'rawCanonicalQuery'.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK()
+     * and populates *out with the PlanExecutor.
+     *
+     * If the query cannot be executed, returns a Status indicating why.
+     */
+    Status getExecutorFind(OperationContext* txn,
+                           Collection* collection,
+                           const NamespaceString& nss,
+                           CanonicalQuery* rawCanonicalQuery,
+                           PlanExecutor::YieldPolicy yieldPolicy,
+                           PlanExecutor** out);
+
+    /**
      * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
      * to provide results for the distinct command.
      *

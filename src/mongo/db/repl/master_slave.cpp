@@ -42,7 +42,6 @@
 
 #include "mongo/db/repl/master_slave.h"
 
-#include <iostream>
 #include <pcrecpp.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
@@ -54,15 +53,19 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/sync.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
@@ -214,7 +217,7 @@ namespace repl {
         {
             OpDebug debug;
 
-            Client::Context ctx(txn, "local.sources");
+            OldClientContext ctx(txn, "local.sources");
 
             const NamespaceString requestNs("local.sources");
             UpdateRequest request(requestNs);
@@ -253,7 +256,7 @@ namespace repl {
     */
     void ReplSource::loadAll(OperationContext* txn, SourceVector &v) {
         const char* localSources = "local.sources";
-        Client::Context ctx(txn, localSources);
+        OldClientContext ctx(txn, localSources);
         SourceVector old = v;
         v.clear();
 
@@ -349,6 +352,43 @@ namespace repl {
         replAllDead = 0;
     }
 
+    class HandshakeCmd : public Command {
+    public:
+        void help(stringstream& h) const { h << "internal"; }
+        HandshakeCmd() : Command("handshake") {}
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+            const BSONObj& cmdObj,
+            std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::internal);
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        }
+
+        virtual bool run(OperationContext* txn,
+                         const string& ns,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            HandshakeArgs handshake;
+            Status status = handshake.initialize(cmdObj);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            txn->getClient()->setRemoteID(handshake.getRid());
+
+            status = getGlobalReplicationCoordinator()->processHandshake(txn, handshake);
+            return appendCommandStatus(result, status);
+        }
+
+    } handshakeCmd;
+
     bool replHandshake(DBClientConnection *conn, const OID& myRID) {
         string myname = getHostName();
 
@@ -358,7 +398,7 @@ namespace repl {
         BSONObj res;
         bool ok = conn->runCommand( "admin" , cmd.obj() , res );
         // ignoring for now on purpose for older versions
-        LOG( ok ? 1 : 0 ) << "replHandshake res not: " << ok << " res: " << res << endl;
+        LOG( ok ? 1 : 0 ) << "replHandshake result: " << res << endl;
         return true;
     }
 
@@ -419,7 +459,7 @@ namespace repl {
 
     void ReplSource::resyncDrop( OperationContext* txn, const string& db ) {
         log() << "resync: dropping database " << db;
-        Client::Context ctx(txn, db);
+        OldClientContext ctx(txn, db);
         dropDatabase(txn, ctx.db());
     }
 
@@ -569,7 +609,7 @@ namespace repl {
             incompleteCloneDbs.erase(*i);
             addDbNextPass.erase(*i);
 
-            Client::Context ctx(txn, *i);
+            OldClientContext ctx(txn, *i);
             dropDatabase(txn, ctx.db());
         }
         
@@ -580,13 +620,13 @@ namespace repl {
 
     void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONObj& op) {
         try {
-            bool failedUpdate = applyOperation_inlock( txn, db, op );
-            if (failedUpdate) {
+            Status status = applyOperation_inlock( txn, db, op );
+            if (!status.isOK()) {
                 Sync sync(hostName);
                 if (sync.shouldRetry(txn, op)) {
                     uassert(15914,
                             "Failure retrying initial sync update",
-                            !applyOperation_inlock(txn, db, op));
+                            applyOperation_inlock(txn, db, op).isOK());
                 }
             }
         }
@@ -687,8 +727,8 @@ namespace repl {
         // This code executes on the slaves only, so it doesn't need to be sharding-aware since
         // mongos will not send requests there. That's why the last argument is false (do not do
         // version checking).
-        Client::Context ctx(txn, ns, false);
-        ctx.getClient()->curop()->reset();
+        OldClientContext ctx(txn, ns, false);
+        txn->getCurOp()->reset();
 
         bool empty = !ctx.db()->getDatabaseCatalogEntry()->hasUserData();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
@@ -718,7 +758,7 @@ namespace repl {
                     log() << "An earlier initial clone of '" << clientName << "' did not complete, now resyncing." << endl;
                 }
                 save(txn);
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
                 nClonedThisPass++;
                 resync(txn, ctx.db()->name());
                 addDbNextPass.erase(clientName);
@@ -1243,7 +1283,9 @@ namespace repl {
                 toSleep = 10;
 
                 try {
-                    logKeepalive(&txn);
+                    WriteUnitOfWork wuow(&txn);
+                    getGlobalEnvironment()->getOpObserver()->onOpMessage(&txn, BSONObj());
+                    wuow.commit();
                 }
                 catch (...) {
                     log() << "caught exception in replMasterThread()" << endl;
@@ -1286,8 +1328,6 @@ namespace repl {
     }
 
     void startMasterSlave(OperationContext* txn) {
-
-        oldRepl();
 
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if( !replSettings.slave && !replSettings.master )
@@ -1349,7 +1389,7 @@ namespace repl {
                     BSONObjBuilder b;
                     b.append(_id);
                     BSONObj result;
-                    Client::Context ctx(&txn, ns);
+                    OldClientContext ctx(&txn, ns);
                     if( Helpers::findById(&txn, ctx.db(), ns, b.done(), result) )
                         _dummy_z += result.objsize(); // touch
                 }

@@ -54,7 +54,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // restart B, which should rollback and log a message about not rolling back usePowerOf2Sizes
 replTest.restart(BID);
-var msg = RegExp("replSet not rolling back change of usePowerOf2Sizes: ");
+var msg = RegExp("not rolling back change of usePowerOf2Sizes: ");
 assert.soon(function() {
     try {
         var log = b_conn.getDB("admin").adminCommand({getLog: "global"}).log;

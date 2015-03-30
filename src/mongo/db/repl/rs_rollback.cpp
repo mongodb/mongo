@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
@@ -259,12 +260,12 @@ namespace {
     void syncRollbackFindCommonPoint(OperationContext* txn, 
                                      DBClientConnection* them, 
                                      FixUpInfo& fixUpInfo) {
-        Client::Context ctx(txn, rsoplog);
+        OldClientContext ctx(txn, rsOplogName);
 
         boost::scoped_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
-                                                rsoplog,
-                                                ctx.db()->getCollection(rsoplog),
+                                                rsOplogName,
+                                                ctx.db()->getCollection(rsOplogName),
                                                 InternalPlanner::BACKWARD));
 
         BSONObj ourObj;
@@ -277,10 +278,10 @@ namespace {
         const Query query = Query().sort(reverseNaturalObj);
         const BSONObj fields = BSON("ts" << 1 << "h" << 1);
 
-        //auto_ptr<DBClientCursor> u = us->query(rsoplog, query, 0, 0, &fields, 0, 0);
+        //auto_ptr<DBClientCursor> u = us->query(rsOplogName, query, 0, 0, &fields, 0, 0);
 
         fixUpInfo.rbid = getRBID(them);
-        auto_ptr<DBClientCursor> oplogCursor = them->query(rsoplog, query, 0, 0, &fields, 0, 0);
+        auto_ptr<DBClientCursor> oplogCursor = them->query(rsOplogName, query, 0, 0, &fields, 0, 0);
 
         if (oplogCursor.get() == NULL || !oplogCursor->more())
             throw RSFatalException("remote oplog empty or unreadable");
@@ -418,7 +419,7 @@ namespace {
                     goodVersions.push_back(pair<DocID, BSONObj>(doc,good));
                 }
             }
-            newMinValid = oplogreader->getLastOp(rsoplog);
+            newMinValid = oplogreader->getLastOp(rsOplogName);
             if (newMinValid.isEmpty()) {
                 error() << "rollback error newMinValid empty?";
                 return;
@@ -493,7 +494,7 @@ namespace {
 
             string err;
             try {
-                newMinValid = oplogreader->getLastOp(rsoplog);
+                newMinValid = oplogreader->getLastOp(rsOplogName);
                 if (newMinValid.isEmpty()) {
                     err = "can't get minvalid from sync source";
                 }
@@ -539,10 +540,10 @@ namespace {
         }
 
         log() << "rollback 4.7";
-        Client::Context ctx(txn, rsoplog);
-        Collection* oplogCollection = ctx.db()->getCollection(rsoplog);
+        OldClientContext ctx(txn, rsOplogName);
+        Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
         uassert(13423,
-                str::stream() << "replSet error in rollback can't find " << rsoplog,
+                str::stream() << "replSet error in rollback can't find " << rsOplogName,
                 oplogCollection);
 
         map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
@@ -575,7 +576,7 @@ namespace {
                     removeSaver.reset(new Helpers::RemoveSaver("rollback", "", doc.ns));
 
                 // todo: lots of overhead in context, this can be faster
-                Client::Context ctx(txn, doc.ns);
+                OldClientContext ctx(txn, doc.ns);
 
                 // Add the doc to our rollback file
                 BSONObj obj;
@@ -584,7 +585,8 @@ namespace {
                     removeSaver->goingToDelete(obj);
                 }
                 else {
-                    error() << "rollback cannot find object by id";
+                    error() << "rollback cannot find object: " << pattern
+                            << " in namespace " << doc.ns;
                 }
 
                 if (it->second.isEmpty()) {
@@ -780,6 +782,14 @@ namespace {
         }
         catch (...) {
             replCoord->incrementRollbackID();
+
+            if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+                warning() << "Failed to transition into " <<
+                    MemberState(MemberState::RS_RECOVERING) << "; expected to be in state " <<
+                    MemberState(MemberState::RS_ROLLBACK) << "but found self in " <<
+                    replCoord->getMemberState();
+            }
+
             throw;
         }
         replCoord->incrementRollbackID();

@@ -7,7 +7,7 @@
 #  define OS_LINUX
 #elif defined _WIN32
 #  define OS_WINDOWS
-#elif defined __freebsd__ || defined __openbsd__
+#elif defined __FreeBSD__ || defined __OpenBSD__
 #  define OS_FREEBSD
 #endif
 

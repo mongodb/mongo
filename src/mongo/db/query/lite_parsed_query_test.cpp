@@ -284,7 +284,8 @@ namespace {
                                    "filter: {a: 3},"
                                    "sort: {a: 1},"
                                    "projection: {_id: 0, a: 1},"
-                                   "options: {showDiskLoc: true, maxScan: 1000}}");
+                                   "showDiskLoc: true,"
+                                   "maxScan: 1000}}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -293,7 +294,7 @@ namespace {
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
         // Make sure the values from the command BSON are reflected in the LPQ.
-        ASSERT(lpq->getOptions().showDiskLoc);
+        ASSERT(lpq->showDiskLoc());
         ASSERT_EQUALS(1000, lpq->getMaxScan());
     }
 
@@ -336,15 +337,13 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandAllFlagsTrue) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "options: {"
-                                       "tailable: true,"
-                                       "slaveOk: true,"
-                                       "oplogReplay: true,"
-                                       "noCursorTimeout: true,"
-                                       "awaitData: true,"
-                                       "exhaust: true,"
-                                       "partial: true"
-                                  "}}");
+                                   "tailable: true,"
+                                   "slaveOk: true,"
+                                   "oplogReplay: true,"
+                                   "noCursorTimeout: true,"
+                                   "awaitData: true,"
+                                   "exhaust: true,"
+                                   "partial: true}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -353,22 +352,20 @@ namespace {
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
         // Test that all the flags got set to true.
-        ASSERT(lpq->getOptions().tailable);
-        ASSERT(lpq->getOptions().slaveOk);
-        ASSERT(lpq->getOptions().oplogReplay);
-        ASSERT(lpq->getOptions().noCursorTimeout);
-        ASSERT(lpq->getOptions().awaitData);
-        ASSERT(lpq->getOptions().exhaust);
-        ASSERT(lpq->getOptions().partial);
+        ASSERT(lpq->isTailable());
+        ASSERT(lpq->isSlaveOk());
+        ASSERT(lpq->isOplogReplay());
+        ASSERT(lpq->isNoCursorTimeout());
+        ASSERT(lpq->isAwaitData());
+        ASSERT(lpq->isExhaust());
+        ASSERT(lpq->isPartial());
     }
 
     TEST(LiteParsedQueryTest, ParseFromCommandCommentWithValidMinMax) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "options: {"
-                                       "comment: 'the comment',"
-                                       "min: {a: 1},"
-                                       "max: {a: 2}"
-                                  "}}");
+                                   "comment: 'the comment',"
+                                   "min: {a: 1},"
+                                   "max: {a: 2}}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -376,7 +373,7 @@ namespace {
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
-        ASSERT_EQUALS("the comment", lpq->getOptions().comment);
+        ASSERT_EQUALS("the comment", lpq->getComment());
         BSONObj expectedMin = BSON("a" << 1);
         ASSERT_EQUALS(0, expectedMin.woCompare(lpq->getMin()));
         BSONObj expectedMax = BSON("a" << 2);
@@ -487,22 +484,10 @@ namespace {
         ASSERT_NOT_OK(status);
     }
 
-    TEST(LiteParsedQueryTest, ParseFromCommandOptionsWrongType) {
-        BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "filter:  {a: 1},"
-                                   "options: [{snapshot: true}],"
-                                   "projection: {a: 1}}");
-
-        LiteParsedQuery* rawLpq;
-        bool isExplain = false;
-        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
-        ASSERT_NOT_OK(status);
-    }
-
     TEST(LiteParsedQueryTest, ParseFromCommandCommentWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {comment: 1}}");
+                                   "comment: 1}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -513,7 +498,8 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandMaxScanWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {maxScan: true, comment: 'foo'}}");
+                                   "maxScan: true,"
+                                   "comment: 'foo'}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -524,7 +510,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandMaxTimeMSWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {maxTimeMS: true}}");
+                                   "maxTimeMS: true}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -535,7 +521,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandMaxWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {max: 3}}");
+                                   "max: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -546,7 +532,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandMinWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {min: 3}}");
+                                   "min: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -557,7 +543,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandReturnKeyWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {returnKey: 3}}");
+                                   "returnKey: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -569,7 +555,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandShowDiskLocWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {showDiskLoc: 3}}");
+                                   "showDiskLoc: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -580,7 +566,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandSnapshotWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {snapshot: 3}}");
+                                   "snapshot: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -591,7 +577,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandTailableWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {tailable: 3}}");
+                                   "tailable: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -602,7 +588,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandSlaveOkWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {slaveOk: 3}}");
+                                   "slaveOk: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -613,7 +599,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandOplogReplayWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {oplogReplay: 3}}");
+                                   "oplogReplay: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -624,7 +610,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandNoCursorTimeoutWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {noCursorTimeout: 3}}");
+                                   "noCursorTimeout: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -635,7 +621,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandAwaitDataWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {awaitData: 3}}");
+                                   "awaitData: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -646,7 +632,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandExhaustWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {exhaust: 3}}");
+                                   "exhaust: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -657,7 +643,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandPartialWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
-                                   "options: {exhaust: 3}}");
+                                   "exhaust: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -708,7 +694,8 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandMinMaxDifferentFieldsError) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "options: {min: {a: 3}, max: {b: 4}}}");
+                                   "min: {a: 3},"
+                                   "max: {b: 4}}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -719,7 +706,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandSnapshotPlusSortError) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "sort: {a: 3},"
-                                   "options: {snapshot: true}}");
+                                   "snapshot: true}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -729,7 +716,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandSnapshotPlusHintError) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "options: {snapshot: true},"
+                                   "snapshot: true,"
                                    "hint: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
@@ -784,7 +771,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandForbidExtraField) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "options: {snapshot: true},"
+                                   "snapshot: true,"
                                    "foo: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
@@ -795,7 +782,8 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandForbidExtraOption) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "options: {snapshot: true, foo: true}}");
+                                   "snapshot: true,"
+                                   "foo: true}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;

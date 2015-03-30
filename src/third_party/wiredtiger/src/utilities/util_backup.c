@@ -19,7 +19,7 @@ static char *cbuf;
  *	Build a list of comma-separated targets.
  */
 static int
-append_target(const char *target, char **bufp)
+append_target(WT_SESSION *session, const char *target, char **bufp)
 {
 	static int first = 1;
 	static size_t len = 0, remain = 0;
@@ -30,7 +30,7 @@ append_target(const char *target, char **bufp)
 		len += strlen(target) + 512;
 		remain += strlen(target) + 512;
 		if ((buf = realloc(buf, len)) == NULL)
-			return (util_err(errno, NULL));
+			return (util_err(session, errno, NULL));
 		*bufp = buf;
 	}
 	if (first) {
@@ -59,7 +59,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 	while ((ch = __wt_getopt(progname, argc, argv, "t:")) != EOF)
 		switch (ch) {
 		case 't':
-			if (append_target(__wt_optarg, &config))
+			if (append_target(session, __wt_optarg, &config))
 				return (1);
 			break;
 		case '?':
@@ -78,7 +78,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 	if ((ret = session->open_cursor(
 	    session, "backup:", NULL, config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(backup:) failed: %s\n",
-		    progname, wiredtiger_strerror(ret));
+		    progname, session->strerror(session, ret));
 		goto err;
 	}
 
@@ -93,7 +93,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 
 	if (ret != 0) {
 		fprintf(stderr, "%s: cursor next(backup:) failed: %s\n",
-		    progname, wiredtiger_strerror(ret));
+		    progname, session->strerror(session, ret));
 		goto err;
 	}
 

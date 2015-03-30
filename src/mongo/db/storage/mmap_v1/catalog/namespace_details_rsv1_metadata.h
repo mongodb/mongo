@@ -46,9 +46,7 @@ namespace mongo {
      */
     class NamespaceDetailsRSV1MetaData : public RecordStoreV1MetaData {
     public:
-        explicit NamespaceDetailsRSV1MetaData( StringData ns,
-                                               NamespaceDetails* details,
-                                               RecordStore* namespaceRecordStore );
+        explicit NamespaceDetailsRSV1MetaData( StringData ns, NamespaceDetails* details);
 
         virtual ~NamespaceDetailsRSV1MetaData(){}
 
@@ -101,9 +99,6 @@ namespace mongo {
         virtual long long maxCappedDocs() const;
 
     private:
-
-        void _syncUserFlags( OperationContext* txn );
-
         std::string _ns;
         NamespaceDetails* _details;
         RecordStore* _namespaceRecordStore;

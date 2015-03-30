@@ -251,7 +251,7 @@ namespace {
             _replCoord->signalUpstreamUpdater();
         }
 
-        _syncSourceReader.tailingQueryGTE(rsoplog, lastOpTimeFetched);
+        _syncSourceReader.tailingQueryGTE(rsOplogName.c_str(), lastOpTimeFetched);
 
         // if target cut connections between connecting and querying (for
         // example, because it stepped down) we might not have a cursor
@@ -396,7 +396,7 @@ namespace {
 
         if (!r.more()) {
             try {
-                BSONObj theirLastOp = r.getLastOp(rsoplog);
+                BSONObj theirLastOp = r.getLastOp(rsOplogName.c_str());
                 if (theirLastOp.isEmpty()) {
                     error() << "empty query result from " << hn << " oplog";
                     sleepsecs(2);
@@ -497,7 +497,7 @@ namespace {
         try {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-            bool success = Helpers::getLast(txn, rsoplog, oplogEntry);
+            bool success = Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry);
             if (!success) {
                 // This can happen when we are to do an initial sync.  lastHash will be set
                 // after the initial sync is complete.
@@ -505,18 +505,18 @@ namespace {
             }
         }
         catch (const DBException& ex) {
-            severe() << "Problem reading " << rsoplog << ": " << ex.toStatus();
+            severe() << "Problem reading " << rsOplogName << ": " << ex.toStatus();
             fassertFailed(18904);
         }
         BSONElement hashElement = oplogEntry[hashFieldName];
         if (hashElement.eoo()) {
-            severe() << "Most recent entry in " << rsoplog << " missing \"" << hashFieldName <<
+            severe() << "Most recent entry in " << rsOplogName << " missing \"" << hashFieldName <<
                 "\" field";
             fassertFailed(18902);
         }
         if (hashElement.type() != NumberLong) {
             severe() << "Expected type of \"" << hashFieldName << "\" in most recent " << 
-                rsoplog << " entry to have type NumberLong, but found " << 
+                rsOplogName << " entry to have type NumberLong, but found " << 
                 typeName(hashElement.type());
             fassertFailed(18903);
         }

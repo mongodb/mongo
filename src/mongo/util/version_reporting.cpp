@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/version_reporting.h"
@@ -38,6 +40,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
@@ -58,29 +61,29 @@ namespace mongo {
     }
 
     void printOpenSSLVersion() {
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         log() << openSSLVersion("OpenSSL version: ") << endl;
 #endif
     }
 
-#ifndef _SCONS
-#if defined(_WIN32)
-    string sysInfo() {
-        stringstream ss;
-        ss << "not-scons win";
-        ss << " mscver:" << _MSC_FULL_VER << " built:" << __DATE__;
-        ss << " boostver:" << BOOST_VERSION;
-#if( !defined(_MT) )
-#error _MT is not defined
-#endif
-        ss << (sizeof(char *) == 8 ? " 64bit" : " 32bit");
-        return ss.str();
-    }
-#else
-    string sysInfo() { return ""; }
+    BSONArray storageEngineList() {
+        if (!hasGlobalEnvironment())
+            return BSONArray();
 
-#endif
-#endif
+        boost::scoped_ptr<StorageFactoriesIterator> sfi(
+            getGlobalEnvironment()->makeStorageFactoriesIterator());
+
+        if (!sfi)
+            return BSONArray();
+
+        BSONArrayBuilder engineArrayBuilder;
+
+        while (sfi->more()) {
+            engineArrayBuilder.append(sfi->next()->getCanonicalName());
+        }
+
+        return engineArrayBuilder.arr();
+    }
 
 #if defined(_WIN32)
     std::string targetMinOS() {
@@ -121,12 +124,13 @@ namespace mongo {
               << "loaderFlags" << loaderFlags()
               << "compilerFlags" << compilerFlags()
               << "allocator" << allocator()
+              << "storageEngines" << storageEngineList()
               << "versionArray" << versionArray
               << "javascriptEngine" << compiledJSEngine()
 /*TODO: add this back once the module system is in place -- maybe once we do something like serverstatus with callbacks*/
 //              << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
               << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
-       result.appendBool( "debug" , debug );
+       result.appendBool( "debug" , kDebugBuild );
        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
     }
 }

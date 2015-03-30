@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/miniwebserver.h"
@@ -135,7 +137,7 @@ namespace mongo {
         char buf[4096];
         int len = 0;
         try {
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             psock->doSSLHandshake();
 #endif
             psock->setTimeout(8);

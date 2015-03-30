@@ -27,16 +27,24 @@
 
     // Run compact repeatedly while simultaneously creating and dropping a collection in a
     // different database.
-    var dropCollectionShell = startParallelShell(function() {
-        var t = db.getSiblingDB('test_compact_keeps_indexes_drop').testcoll;
-        t.drop();
-        for (var i=0; i<100; i++) {
-            t.save({a: 1});
+    // Skip this test case in master/slave mode because of database cloning behavior in slaves.
+    // The test uses a single collection in the database test_compact_keeps_indexes_drop
+    // which triggers a series of slow resync operations in the slave as the collection is
+    // repeatedly created and dropped.
+    var isMasterSlave = testingReplication &&
+                        !assert.commandWorked(db.isMaster()).hasOwnProperty('setName');
+    if (!isMasterSlave) {
+        var dropCollectionShell = startParallelShell(function() {
+            var t = db.getSiblingDB('test_compact_keeps_indexes_drop').testcoll;
             t.drop();
+            for (var i=0; i<100; i++) {
+                t.save({a: 1});
+                t.drop();
+            }
+        });
+        for (var i=0; i<10; i++) {
+           coll.runCommand('compact');
         }
-    });
-    for (var i=0; i<10; i++) {
-       coll.runCommand('compact');
+        dropCollectionShell();
     }
-    dropCollectionShell();
 }())

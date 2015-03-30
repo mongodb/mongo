@@ -67,7 +67,6 @@ namespace mongo {
     public:
         DeadlineMonitor() :
             _tasks(),
-            _deadlineMutex("DeadlineMonitor"),
             _newDeadlineAvailable(),
             _nearestDeadlineWallclock(kMaxDeadline),
             _monitorThread(&mongo::DeadlineMonitor<_Task>::deadlineMonitorThread, this) {
@@ -88,7 +87,7 @@ namespace mongo {
          */
         void startDeadline(_Task* const task, uint64_t timeoutMs) {
             uint64_t now = curTimeMillis64();
-            scoped_lock lk(_deadlineMutex);
+            boost::lock_guard<boost::mutex> lk(_deadlineMutex);
 
             // insert or update the deadline
             std::pair<typename TaskDeadlineMap::iterator, bool> inserted =
@@ -110,7 +109,7 @@ namespace mongo {
          * @return true  if the task was found and erased
          */
         bool stopDeadline(_Task* const task) {
-            scoped_lock lk(_deadlineMutex);
+            boost::lock_guard<boost::mutex> lk(_deadlineMutex);
             return _tasks.erase(task);
         }
 
@@ -121,7 +120,7 @@ namespace mongo {
          * _Task::kill() is invoked.
          */
         void deadlineMonitorThread() {
-            scoped_lock lk(_deadlineMutex);
+            boost::unique_lock<boost::mutex> lk(_deadlineMutex);
             while (true) {
 
                 // get the next interval to wait
@@ -131,11 +130,11 @@ namespace mongo {
                 while (_nearestDeadlineWallclock > now) {
                     uint64_t nearestDeadlineMs;
                     if (_nearestDeadlineWallclock == kMaxDeadline) {
-                        _newDeadlineAvailable.wait(lk.boost());
+                        _newDeadlineAvailable.wait(lk);
                     }
                     else {
                         nearestDeadlineMs = _nearestDeadlineWallclock - now;
-                        _newDeadlineAvailable.timed_wait(lk.boost(),
+                        _newDeadlineAvailable.timed_wait(lk,
                                 boost::posix_time::milliseconds(nearestDeadlineMs));
                     }
                     now = curTimeMillis64();

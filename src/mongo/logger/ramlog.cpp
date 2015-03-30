@@ -206,10 +206,10 @@ namespace {
     RamLog* RamLog::get(const std::string& name) {
         if (!_namedLock) {
             // Guaranteed to happen before multi-threaded operation.
-            _namedLock = new mongo::mutex("RamLog::_namedLock");
+            _namedLock = new mongo::mutex();
         }
 
-        scoped_lock lk( *_namedLock );
+        boost::lock_guard<boost::mutex> lk( *_namedLock );
         if (!_named) {
             // Guaranteed to happen before multi-threaded operation.
             _named = new RM();
@@ -226,7 +226,7 @@ namespace {
     RamLog* RamLog::getIfExists(const std::string& name) {
         if (!_named)
             return NULL;
-        scoped_lock lk(*_namedLock);
+        boost::lock_guard<boost::mutex> lk(*_namedLock);
         return mapFindWithDefault(*_named, name, static_cast<RamLog*>(NULL));
     }
 
@@ -234,7 +234,7 @@ namespace {
         if ( ! _named )
             return;
 
-        scoped_lock lk( *_namedLock );
+        boost::lock_guard<boost::mutex> lk( *_namedLock );
         for ( RM::iterator i=_named->begin(); i!=_named->end(); ++i ) {
             if ( i->second->n )
                 names.push_back( i->first );
@@ -251,7 +251,7 @@ namespace {
                 return Status(ErrorCodes::InternalError,
                               "Inconsistent intiailization of RamLogCatalog.");
             }
-            _namedLock = new mongo::mutex("RamLog::_namedLock");
+            _namedLock = new mongo::mutex();
             _named = new RM();
         }
 

@@ -162,11 +162,11 @@ namespace mongo {
             BSONObj _args;
             BSONObj _returnData;
             void setErrored(bool value) {
-                boost::mutex::scoped_lock lck(_erroredMutex);
+                boost::lock_guard<boost::mutex> lck(_erroredMutex);
                 _errored = value;
             }
             bool getErrored() {
-                boost::mutex::scoped_lock lck(_erroredMutex);
+                boost::lock_guard<boost::mutex> lck(_erroredMutex);
                 return _errored;
             }
         private:
@@ -255,7 +255,7 @@ namespace mongo {
         };
 
         boost::shared_ptr<Latch> get(int32_t desc) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            boost::lock_guard<boost::mutex> lock(_mutex);
             Map::iterator iter = _latches.find(desc);
             jsassert(iter != _latches.end(), "not a valid CountDownLatch descriptor");
             return iter->second;

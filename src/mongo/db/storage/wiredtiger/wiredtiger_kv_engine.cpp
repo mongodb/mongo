@@ -58,60 +58,15 @@ namespace mongo {
     using std::set;
     using std::string;
 
-    namespace {
-        int mdb_handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session,
-                             int errorCode, const char *message) {
-            try {
-                error() << "WiredTiger (" << errorCode << ") " << message;
-                fassert( 28558, errorCode != WT_PANIC );
-            }
-            catch (...) {
-                std::terminate();
-            }
-            return 0;
-        }
-
-        int mdb_handle_message( WT_EVENT_HANDLER *handler, WT_SESSION *session,
-                                const char *message) {
-            try {
-                log() << "WiredTiger " << message;
-            }
-            catch (...) {
-                std::terminate();
-            }
-            return 0;
-        }
-
-        int mdb_handle_progress( WT_EVENT_HANDLER *handler, WT_SESSION *session,
-                                 const char *operation, uint64_t progress) {
-            try {
-                log() << "WiredTiger progress " << operation << " " << progress;
-            }
-            catch (...) {
-                std::terminate();
-            }
-
-            return 0;
-        }
-
-        int mdb_handle_close( WT_EVENT_HANDLER *handler, WT_SESSION *session,
-                              WT_CURSOR *cursor) {
-            return 0;
-        }
-    }
 
     WiredTigerKVEngine::WiredTigerKVEngine( const std::string& path,
                                             const std::string& extraOpenOptions,
                                             bool durable,
                                             bool repair )
-        : _path( path ),
+        : _eventHandler(WiredTigerUtil::defaultEventHandlers()),
+          _path( path ),
           _durable( durable ),
           _sizeStorerSyncTracker( 100000, 60 * 1000 ) {
-
-        _eventHandler.handle_error = mdb_handle_error;
-        _eventHandler.handle_message = mdb_handle_message;
-        _eventHandler.handle_progress = mdb_handle_progress;
-        _eventHandler.handle_close = mdb_handle_close;
 
         size_t cacheSizeGB = wiredTigerGlobalOptions.cacheSizeGB;
         if (cacheSizeGB == 0) {
@@ -176,9 +131,8 @@ namespace mongo {
                 log() << "Repairing size cache";
                 fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
             }
-            WiredTigerSizeStorer* ss = new WiredTigerSizeStorer();
-            ss->loadFrom( &session, _sizeStorerUri );
-            _sizeStorer.reset( ss );
+            _sizeStorer.reset(new WiredTigerSizeStorer(_conn, _sizeStorerUri));
+            _sizeStorer->fillCache();
         }
     }
 
@@ -188,8 +142,6 @@ namespace mongo {
             cleanShutdown();
         }
 
-        _sizeStorer.reset( NULL );
-
         _sessionCache.reset( NULL );
     }
 
@@ -197,7 +149,8 @@ namespace mongo {
         log() << "WiredTigerKVEngine shutting down";
         syncSizeInfo(true);
         if (_conn) {
-            // this must be the last thing we do before _conn->close();
+            // these must be the last things we do before _conn->close();
+            _sizeStorer.reset( NULL );
             _sessionCache->shuttingDown();
 
 #if !__has_feature(address_sanitizer)
@@ -215,9 +168,9 @@ namespace mongo {
                                            StringData toNS,
                                            StringData ident,
                                            const RecordStore* originalRecordStore ) const {
-        _sizeStorer->store( _uri( ident ),
-                            originalRecordStore->numRecords( opCtx ),
-                            originalRecordStore->dataSize( opCtx ) );
+        _sizeStorer->storeToCache(_uri( ident ),
+                                  originalRecordStore->numRecords( opCtx ),
+                                  originalRecordStore->dataSize( opCtx ) );
         syncSizeInfo(true);
         return Status::OK();
     }
@@ -276,14 +229,10 @@ namespace mongo {
             return;
 
         try {
-            WiredTigerSession session(_conn);
-            WT_SESSION* s = session.getSession();
-            invariantWTOK( s->begin_transaction( s, sync ? "sync=true" : NULL ) );
-            _sizeStorer->storeInto( &session, _sizeStorerUri );
-            invariantWTOK( s->commit_transaction( s, NULL ) );
+            _sizeStorer->syncCache(sync);
         }
         catch (const WriteConflictException&) {
-            // ignore, it means someone else is doing it
+            // ignore, we'll try again later.
         }
     }
 
@@ -388,7 +337,7 @@ namespace mongo {
         if ( ret == EBUSY ) {
             // this is expected, queue it up
             {
-                boost::mutex::scoped_lock lk( _identToDropMutex );
+                boost::lock_guard<boost::mutex> lk( _identToDropMutex );
                 _identToDrop.insert( uri );
             }
             _sessionCache->closeAll();
@@ -404,14 +353,14 @@ namespace mongo {
             _sizeStorerSyncTracker.resetLastTime();
             syncSizeInfo(false);
         }
-        boost::mutex::scoped_lock lk( _identToDropMutex );
+        boost::lock_guard<boost::mutex> lk( _identToDropMutex );
         return !_identToDrop.empty();
     }
 
     void WiredTigerKVEngine::dropAllQueued() {
         set<string> mine;
         {
-            boost::mutex::scoped_lock lk( _identToDropMutex );
+            boost::lock_guard<boost::mutex> lk( _identToDropMutex );
             mine = _identToDrop;
         }
 
@@ -439,7 +388,7 @@ namespace mongo {
         }
 
         {
-            boost::mutex::scoped_lock lk( _identToDropMutex );
+            boost::lock_guard<boost::mutex> lk( _identToDropMutex );
             for ( set<string>::const_iterator it = deleted.begin(); it != deleted.end(); ++it ) {
                 _identToDrop.erase( *it );
             }

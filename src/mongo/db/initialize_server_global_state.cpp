@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/initialize_server_global_state.h"
@@ -364,7 +366,7 @@ namespace mongo {
             getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
 
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509 ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendX509) {

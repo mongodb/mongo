@@ -26,8 +26,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/ops/delete.h"
 
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_delete.h"

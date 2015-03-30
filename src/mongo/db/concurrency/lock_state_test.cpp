@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include <boost/shared_ptr.hpp>
@@ -256,7 +258,7 @@ namespace {
 
     // These two tests exercise single-threaded performance of uncontended lock acquisition. It
     // is not practical to run them on debug builds.
-#ifndef _DEBUG
+#ifndef MONGO_CONFIG_DEBUG_BUILD
 
     TEST(Locker, PerformanceBoostSharedMutex) {
         for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
@@ -314,6 +316,6 @@ namespace {
         }
     }
 
-#endif  // _DEBUG
+#endif  // MONGO_CONFIG_DEBUG_BUILD
 
 } // namespace mongo

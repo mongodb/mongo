@@ -43,9 +43,10 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
@@ -335,7 +336,7 @@ namespace mongo {
             map<string,CollectionOptions> namespacesToCopy;
             {
                 string ns = dbName + ".system.namespaces";
-                Client::Context ctx(txn,  ns );
+                OldClientContext ctx(txn,  ns );
                 Collection* coll = originalDatabase->getCollection( ns );
                 if ( coll ) {
                     scoped_ptr<RecordIterator> it( coll->getIterator(txn) );
@@ -380,7 +381,7 @@ namespace mongo {
                     wunit.commit();
                 }
 
-                Client::Context readContext(txn, ns, originalDatabase);
+                OldClientContext readContext(txn, ns, originalDatabase);
                 Collection* originalCollection = originalDatabase->getCollection( ns );
                 invariant( originalCollection );
 

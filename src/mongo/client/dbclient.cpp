@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/util/bson_extract.h"
@@ -44,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -112,7 +115,7 @@ namespace mongo {
         _string = ss.str();
     }
 
-    mutex ConnectionString::_connectHookMutex( "ConnectionString::_connectHook" );
+    mutex ConnectionString::_connectHookMutex;
     ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
 
     DBClientBase* ConnectionString::connect( string& errmsg, double socketTimeout ) const {
@@ -154,7 +157,7 @@ namespace mongo {
         case CUSTOM: {
 
             // Lock in case other things are modifying this at the same time
-            scoped_lock lk( _connectHookMutex );
+            boost::lock_guard<boost::mutex> lk( _connectHookMutex );
 
             // Allow the replacement of connections with other connections - useful for testing.
 
@@ -630,7 +633,7 @@ namespace mongo {
                     result.toString(),
                     _authMongoCR(db, user, password, &result, digestPassword));
         }
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         else if (mechanism == StringData("MONGODB-X509", StringData::LiteralTag())){
             std::string db;
             if (params.hasField(saslCommandUserSourceFieldName)) {
@@ -959,6 +962,8 @@ namespace mongo {
         string ns = db + ".system.namespaces";
         auto_ptr<DBClientCursor> c = query(
                 ns.c_str(), fallbackFilter.obj(), 0, 0, 0, QueryOption_SlaveOk);
+        uassert(28611, str::stream() << "listCollections failed querying " << ns, c.get());
+
         while ( c->more() ) {
             BSONObj obj = c->nextSafe();
             string ns = obj["name"].valuestr();
@@ -1070,7 +1075,7 @@ namespace mongo {
             LOG( 1 ) << "connected to server " << toString() << endl;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         int sslModeVal = sslGlobalParams.sslMode.load();
         if (sslModeVal == SSLGlobalParams::SSLMode_preferSSL ||
             sslModeVal == SSLGlobalParams::SSLMode_requireSSL) {
@@ -1410,6 +1415,8 @@ namespace mongo {
         // TODO(spencer): Remove fallback behavior after 3.0
         auto_ptr<DBClientCursor> cursor = query(NamespaceString(ns).getSystemIndexesCollection(),
                                                 BSON("ns" << ns), 0, 0, 0, options);
+        uassert(28612, str::stream() << "listIndexes failed querying " << ns, cursor.get());
+
         while ( cursor->more() ) {
             BSONObj spec = cursor->nextSafe();
             specs.push_back( spec.getOwned() );
@@ -1530,15 +1537,11 @@ namespace mongo {
     }
 
     /* -- DBClientCursor ---------------------------------------------- */
-
-#ifdef _DEBUG
-#define CHECK_OBJECT( o , msg ) massert( 10337 ,  (string)"object not valid" + (msg) , (o).isValid() )
-#else
-#define CHECK_OBJECT( o , msg )
-#endif
-
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
-        CHECK_OBJECT( query , "assembleRequest query" );
+        if (kDebugBuild) {
+            massert( 10337 ,  (string)"object not valid assembleRequest query" , query.isValid() );
+        }
+
         // see query.h for the protocol we are using here.
         BufBuilder b;
         int opts = queryOptions;
@@ -1652,7 +1655,7 @@ namespace mongo {
             say(m);
     }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
     static SimpleMutex s_mtx("SSLManager");
     static SSLManagerInterface* s_sslMgr(NULL);
 

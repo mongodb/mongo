@@ -47,6 +47,8 @@ namespace mongo {
     private:
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
+        virtual bool maintenanceOk() const { return false; }
+
         virtual bool slaveOk() const { return false; }
 
         virtual bool slaveOverrideOk() const { return true; }

@@ -104,9 +104,7 @@ namespace {
 
         class Job : public BackgroundJob {
         public:
-            Job()
-                : _mutex("BackgroundJobLifeCycle::Go")
-                , _hasRun(false) {}
+            Job() : _hasRun(false) {}
 
             virtual std::string name() const {
                 return "BackgroundLifeCycle::CannotCallGoAgain";
@@ -114,7 +112,7 @@ namespace {
 
             virtual void run() {
                 {
-                    mongo::scoped_lock lock( _mutex );
+                    boost::lock_guard<boost::mutex> lock( _mutex );
                     ASSERT_FALSE( _hasRun );
                     _hasRun = true;
                 }

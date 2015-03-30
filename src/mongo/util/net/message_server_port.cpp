@@ -29,6 +29,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include <boost/scoped_ptr.hpp>
@@ -129,7 +131,7 @@ namespace {
                 if (limits.rlim_cur > STACK_SIZE) {
                     size_t stackSizeToSet = STACK_SIZE;
 #if !__has_feature(address_sanitizer)
-                    if (DEBUG_BUILD)
+                    if (kDebugBuild)
                         stackSizeToSet /= 2;
 #endif
                     pthread_attr_setstacksize(&attrs, stackSizeToSet);
@@ -254,7 +256,7 @@ namespace {
             }
 
             // Normal disconnect path.
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             SSLManagerInterface* manager = getSSLManager();
             if (manager)
                 manager->cleanupThreadLocals();

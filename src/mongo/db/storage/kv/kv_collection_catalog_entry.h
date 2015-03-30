@@ -76,6 +76,8 @@ namespace mongo {
                                        StringData idxName,
                                        long long newExpireSeconds );
 
+        virtual void updateFlags(OperationContext* txn, int newValue);
+
         RecordStore* getRecordStore() { return _recordStore.get(); }
         const RecordStore* getRecordStore() const { return _recordStore.get(); }
 

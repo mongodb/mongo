@@ -41,7 +41,7 @@ namespace mongo {
         TextMatchExpression() : LeafMatchExpression( TEXT ) {}
         virtual ~TextMatchExpression() {}
 
-        Status init( const std::string& query, const std::string& language );
+        Status init( const std::string& query, const std::string& language, bool caseSensitive );
 
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
@@ -55,9 +55,11 @@ namespace mongo {
 
         const std::string& getQuery() const { return _query; }
         const std::string& getLanguage() const { return _language; }
+        bool getCaseSensitive() const { return _caseSensitive; }
     private:
         std::string _query;
         std::string _language;
+        bool _caseSensitive;
     };
 
 } // namespace mongo

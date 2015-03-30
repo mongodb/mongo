@@ -32,7 +32,6 @@
 #include <set>
 #include <string>
 
-#include "mongo/s/range_arithmetic.h"
 #include "mongo/db/range_deleter.h"
 
 namespace mongo {

@@ -34,6 +34,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
@@ -178,13 +179,13 @@ namespace repl {
             BSONObjBuilder result;
             result.append("latestOptime", replCoord->getMyLastOptime());
 
-            const char* oplogNS =
+            const std::string& oplogNS =
                 replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet ?
-                    rsoplog : "local.oplog.$main";
+                    rsOplogName : masterSlaveOplogName;
             BSONObj o;
             uassert(17347,
                     "Problem reading earliest entry from oplog",
-                    Helpers::getSingleton(txn, oplogNS, o));
+                    Helpers::getSingleton(txn, oplogNS.c_str(), o));
             result.append("earliestOptime", o["ts"]._opTime());
             return result.obj();
         }

@@ -37,78 +37,150 @@ namespace mongo {
 
         TEST( FTSQuery, Basic1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "this is fun", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q.parse( "this is fun", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
 
-            ASSERT_EQUALS( 1U, q.getTerms().size() );
-            ASSERT_EQUALS( "fun", q.getTerms()[0] );
+            ASSERT_EQUALS( false, q.getCaseSensitive() );
+            ASSERT_EQUALS( 1U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( "fun", *q.getPositiveTerms().begin() );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
-            ASSERT_EQUALS( 0U, q.getPhr().size() );
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
             ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+            ASSERT_TRUE( q.getTermsForBounds() == q.getPositiveTerms() );
         }
 
         TEST( FTSQuery, Neg1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "this is -really fun", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q.parse( "this is -really fun", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
 
-            ASSERT_EQUALS( 1U, q.getTerms().size() );
-            ASSERT_EQUALS( "fun", q.getTerms()[0] );
+            ASSERT_EQUALS( 1U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( "fun", *q.getPositiveTerms().begin() );
             ASSERT_EQUALS( 1U, q.getNegatedTerms().size() );
             ASSERT_EQUALS( "realli", *q.getNegatedTerms().begin() );
+            ASSERT_TRUE( q.getTermsForBounds() == q.getPositiveTerms() );
         }
 
         TEST( FTSQuery, Phrase1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "doing a \"phrase test\" for fun", "english",
+            ASSERT( q.parse( "doing a \"phrase test\" for fun", "english", false,
                              TEXT_INDEX_VERSION_2 ).isOK() );
 
-            ASSERT_EQUALS( 3U, q.getTerms().size() );
+            ASSERT_EQUALS( 3U, q.getPositiveTerms().size() );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
-            ASSERT_EQUALS( 1U, q.getPhr().size() );
+            ASSERT_EQUALS( 1U, q.getPositivePhr().size() );
             ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+            ASSERT_TRUE( q.getTermsForBounds() == q.getPositiveTerms() );
 
-            ASSERT_EQUALS( "phrase test", q.getPhr()[0] );
+            ASSERT_EQUALS( "phrase test", q.getPositivePhr()[0] );
             ASSERT_EQUALS( "fun|phrase|test||||phrase test||", q.debugString() );
         }
 
         TEST( FTSQuery, Phrase2 ) {
             FTSQuery q;
-            ASSERT( q.parse( "doing a \"phrase-test\" for fun", "english",
+            ASSERT( q.parse( "doing a \"phrase-test\" for fun", "english", false,
                              TEXT_INDEX_VERSION_2 ).isOK() );
-            ASSERT_EQUALS( 1U, q.getPhr().size() );
-            ASSERT_EQUALS( "phrase-test", q.getPhr()[0] );
+            ASSERT_EQUALS( 1U, q.getPositivePhr().size() );
+            ASSERT_EQUALS( "phrase-test", q.getPositivePhr()[0] );
         }
 
         TEST( FTSQuery, NegPhrase1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "doing a -\"phrase test\" for fun", "english",
+            ASSERT( q.parse( "doing a -\"phrase test\" for fun", "english", false,
                              TEXT_INDEX_VERSION_2 ).isOK() );
             ASSERT_EQUALS( "fun||||||phrase test", q.debugString() );
         }
 
+        TEST( FTSQuery, CaseSensitiveOption ) {
+            FTSQuery q;
+            ASSERT( q.parse( "this is fun", "english", true, TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT_EQUALS( true, q.getCaseSensitive() );
+        }
+
+        TEST( FTSQuery, CaseSensitivePositiveTerms ) {
+            FTSQuery q;
+            ASSERT( q.parse( "This is Positively fun", "english", true,
+                             TEXT_INDEX_VERSION_2 ).isOK() );
+
+            ASSERT_EQUALS( 2U, q.getTermsForBounds().size() );
+            ASSERT_EQUALS( 1, std::count( q.getTermsForBounds().begin(),
+                                          q.getTermsForBounds().end(),
+                                          "posit" ) );
+            ASSERT_EQUALS( 1, std::count( q.getTermsForBounds().begin(),
+                                          q.getTermsForBounds().end(),
+                                          "fun" ) );
+            ASSERT_EQUALS( 2U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( 1, std::count( q.getPositiveTerms().begin(),
+                                          q.getPositiveTerms().end(),
+                                          "Posit" ) );
+            ASSERT_EQUALS( 1, std::count( q.getPositiveTerms().begin(),
+                                          q.getPositiveTerms().end(),
+                                          "fun" ) );
+            ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
+            ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+        }
+
+        TEST( FTSQuery, CaseSensitiveNegativeTerms ) {
+            FTSQuery q;
+            ASSERT( q.parse( "-This -is -Negatively -miserable", "english", true,
+                             TEXT_INDEX_VERSION_2 ).isOK() );
+
+            ASSERT_EQUALS( 0U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( 0U, q.getTermsForBounds().size() );
+            ASSERT_EQUALS( 2U, q.getNegatedTerms().size() );
+            ASSERT_EQUALS( 1, std::count( q.getNegatedTerms().begin(),
+                                          q.getNegatedTerms().end(),
+                                          "Negat" ) );
+            ASSERT_EQUALS( 1, std::count( q.getNegatedTerms().begin(),
+                                          q.getNegatedTerms().end(),
+                                          "miser" ) );
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
+            ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+        }
+
+        TEST( FTSQuery, CaseSensitivePositivePhrases ) {
+            FTSQuery q;
+            ASSERT( q.parse( "doing a \"Phrase Test\" for fun", "english", true,
+                             TEXT_INDEX_VERSION_2 ).isOK() );
+
+            ASSERT_EQUALS( 1U, q.getPositivePhr().size() );
+            ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+            ASSERT_EQUALS( "Phrase Test", q.getPositivePhr()[0] );
+        }
+
+        TEST( FTSQuery, CaseSensitiveNegativePhrases ) {
+            FTSQuery q;
+            ASSERT( q.parse( "doing a -\"Phrase Test\" for fun", "english", true,
+                             TEXT_INDEX_VERSION_2 ).isOK() );
+
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
+            ASSERT_EQUALS( 1U, q.getNegatedPhr().size() );
+            ASSERT_EQUALS( "Phrase Test", q.getNegatedPhr()[0] );
+        }
+
         TEST( FTSQuery, Mix1 ) {
             FTSQuery q;
-            ASSERT( q.parse( "\"industry\" -Melbourne -Physics", "english",
+            ASSERT( q.parse( "\"industry\" -Melbourne -Physics", "english", false,
                              TEXT_INDEX_VERSION_2 ).isOK() );
             ASSERT_EQUALS( "industri||melbourn|physic||industry||", q.debugString() );
         }
 
         TEST( FTSQuery, NegPhrase2) {
             FTSQuery q1, q2, q3;
-            ASSERT( q1.parse( "foo \"bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
-            ASSERT( q2.parse( "foo \"-bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
-            ASSERT( q3.parse( "foo \" -bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q1.parse( "foo \"bar\"", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q2.parse( "foo \"-bar\"", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q3.parse( "foo \" -bar\"", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
 
-            ASSERT_EQUALS( 2U, q1.getTerms().size() );
-            ASSERT_EQUALS( 2U, q2.getTerms().size() );
-            ASSERT_EQUALS( 2U, q3.getTerms().size() );
+            ASSERT_EQUALS( 2U, q1.getPositiveTerms().size() );
+            ASSERT_EQUALS( 2U, q2.getPositiveTerms().size() );
+            ASSERT_EQUALS( 2U, q3.getPositiveTerms().size() );
 
             ASSERT_EQUALS( 0U, q1.getNegatedTerms().size() );
             ASSERT_EQUALS( 0U, q2.getNegatedTerms().size() );
             ASSERT_EQUALS( 0U, q3.getNegatedTerms().size() );
 
-            ASSERT_EQUALS( 1U, q1.getPhr().size() );
-            ASSERT_EQUALS( 1U, q2.getPhr().size() );
-            ASSERT_EQUALS( 1U, q3.getPhr().size() );
+            ASSERT_EQUALS( 1U, q1.getPositivePhr().size() );
+            ASSERT_EQUALS( 1U, q2.getPositivePhr().size() );
+            ASSERT_EQUALS( 1U, q3.getPositivePhr().size() );
 
             ASSERT_EQUALS( 0U, q1.getNegatedPhr().size() );
             ASSERT_EQUALS( 0U, q2.getNegatedPhr().size() );
@@ -117,21 +189,21 @@ namespace mongo {
 
         TEST( FTSQuery, NegPhrase3) {
             FTSQuery q1, q2, q3;
-            ASSERT( q1.parse( "foo -\"bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
-            ASSERT( q2.parse( "foo -\"-bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
-            ASSERT( q3.parse( "foo -\" -bar\"", "english", TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q1.parse( "foo -\"bar\"", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q2.parse( "foo -\"-bar\"", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
+            ASSERT( q3.parse( "foo -\" -bar\"", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
 
-            ASSERT_EQUALS( 1U, q1.getTerms().size() );
-            ASSERT_EQUALS( 1U, q2.getTerms().size() );
-            ASSERT_EQUALS( 1U, q3.getTerms().size() );
+            ASSERT_EQUALS( 1U, q1.getPositiveTerms().size() );
+            ASSERT_EQUALS( 1U, q2.getPositiveTerms().size() );
+            ASSERT_EQUALS( 1U, q3.getPositiveTerms().size() );
 
             ASSERT_EQUALS( 0U, q1.getNegatedTerms().size() );
             ASSERT_EQUALS( 0U, q2.getNegatedTerms().size() );
             ASSERT_EQUALS( 0U, q3.getNegatedTerms().size() );
 
-            ASSERT_EQUALS( 0U, q1.getPhr().size() );
-            ASSERT_EQUALS( 0U, q2.getPhr().size() );
-            ASSERT_EQUALS( 0U, q3.getPhr().size() );
+            ASSERT_EQUALS( 0U, q1.getPositivePhr().size() );
+            ASSERT_EQUALS( 0U, q2.getPositivePhr().size() );
+            ASSERT_EQUALS( 0U, q3.getPositivePhr().size() );
 
             ASSERT_EQUALS( 1U, q1.getNegatedPhr().size() );
             ASSERT_EQUALS( 1U, q2.getNegatedPhr().size() );
@@ -142,11 +214,11 @@ namespace mongo {
         // stemmer and stopword list.
         TEST( FTSQuery, TextIndexVersion1LanguageEnglish ) {
             FTSQuery q;
-            ASSERT( q.parse( "the running", "english", TEXT_INDEX_VERSION_1 ).isOK() );
-            ASSERT_EQUALS( 1U, q.getTerms().size() );
-            ASSERT_EQUALS( "run", q.getTerms()[0] );
+            ASSERT( q.parse( "the running", "english", false, TEXT_INDEX_VERSION_1 ).isOK() );
+            ASSERT_EQUALS( 1U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( "run", *q.getPositiveTerms().begin() );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
-            ASSERT_EQUALS( 0U, q.getPhr().size() );
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
             ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
         }
 
@@ -154,12 +226,16 @@ namespace mongo {
         // no stopword list.
         TEST( FTSQuery, TextIndexVersion1LanguageEng ) {
             FTSQuery q;
-            ASSERT( q.parse( "the running", "eng", TEXT_INDEX_VERSION_1 ).isOK() );
-            ASSERT_EQUALS( 2U, q.getTerms().size() );
-            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
-            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "run" ) );
+            ASSERT( q.parse( "the running", "eng", false, TEXT_INDEX_VERSION_1 ).isOK() );
+            ASSERT_EQUALS( 2U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( 1, std::count( q.getPositiveTerms().begin(),
+                                          q.getPositiveTerms().end(),
+                                          "the" ) );
+            ASSERT_EQUALS( 1, std::count( q.getPositiveTerms().begin(),
+                                          q.getPositiveTerms().end(),
+                                          "run" ) );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
-            ASSERT_EQUALS( 0U, q.getPhr().size() );
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
             ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
         }
 
@@ -167,12 +243,16 @@ namespace mongo {
         // and no stopword list will be used.
         TEST( FTSQuery, TextIndexVersion1LanguageInvalid ) {
             FTSQuery q;
-            ASSERT( q.parse( "the running", "invalid", TEXT_INDEX_VERSION_1 ).isOK() );
-            ASSERT_EQUALS( 2U, q.getTerms().size() );
-            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "the" ) );
-            ASSERT_EQUALS( 1, std::count( q.getTerms().begin(), q.getTerms().end(), "running" ) );
+            ASSERT( q.parse( "the running", "invalid", false, TEXT_INDEX_VERSION_1 ).isOK() );
+            ASSERT_EQUALS( 2U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( 1, std::count( q.getPositiveTerms().begin(),
+                                          q.getPositiveTerms().end(),
+                                          "the" ) );
+            ASSERT_EQUALS( 1, std::count( q.getPositiveTerms().begin(),
+                                          q.getPositiveTerms().end(),
+                                          "running" ) );
             ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
-            ASSERT_EQUALS( 0U, q.getPhr().size() );
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
             ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
         }
 

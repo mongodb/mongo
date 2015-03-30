@@ -34,16 +34,15 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/range_arithmetic.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/range_arithmetic.h"
 #include "mongo/s/type_chunk.h"
 
 namespace mongo {
 
     class MetadataLoader;
-
-    // For now, we handle lifecycle of CollectionManager via shared_ptrs
     class CollectionMetadata;
+
     typedef boost::shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
 
     /**
@@ -59,7 +58,7 @@ namespace mongo {
      * This class is immutable once constructed.
      */
     class CollectionMetadata {
-    MONGO_DISALLOW_COPYING(CollectionMetadata);
+        MONGO_DISALLOW_COPYING(CollectionMetadata);
     public:
 
         ~CollectionMetadata();

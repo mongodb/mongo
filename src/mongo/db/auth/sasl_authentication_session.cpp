@@ -42,13 +42,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
     SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn
-        SaslAuthenticationSession::create = NULL;
+        SaslAuthenticationSession::create;
 
     // Mechanism name constants.
     const char SaslAuthenticationSession::mechanismCRAMMD5[] = "CRAM-MD5";

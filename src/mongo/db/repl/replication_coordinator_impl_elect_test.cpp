@@ -135,7 +135,6 @@ namespace {
      */
     TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
         OperationContextReplMock txn;
-        startCapturingLogMessages();
         assertStartSuccess(
             BSON("_id" << "mySet" <<
                  "version" << 1 <<

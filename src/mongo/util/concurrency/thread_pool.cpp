@@ -102,7 +102,7 @@ namespace mongo {
         };
 
         ThreadPool::ThreadPool(int nThreads, const std::string& threadNamePrefix)
-            : _mutex("ThreadPool"), _tasksRemaining(0)
+            : _tasksRemaining(0)
             , _nThreads(nThreads)
             , _threadNamePrefix(threadNamePrefix) {
             startThreads();
@@ -111,13 +111,13 @@ namespace mongo {
         ThreadPool::ThreadPool(const DoNotStartThreadsTag&,
                                int nThreads,
                                const std::string& threadNamePrefix)
-            : _mutex("ThreadPool"), _tasksRemaining(0)
+            : _tasksRemaining(0)
             , _nThreads(nThreads)
             , _threadNamePrefix(threadNamePrefix) {
         }
 
         void ThreadPool::startThreads() {
-            scoped_lock lock(_mutex);
+            boost::lock_guard<boost::mutex> lock(_mutex);
             for (int i = 0; i < _nThreads; ++i) {
                 const std::string threadName(_threadNamePrefix.empty() ?
                                                         _threadNamePrefix :
@@ -145,14 +145,14 @@ namespace mongo {
         }
 
         void ThreadPool::join() {
-            scoped_lock lock(_mutex);
+            boost::unique_lock<boost::mutex> lock(_mutex);
             while(_tasksRemaining) {
-                _condition.wait(lock.boost());
+                _condition.wait(lock);
             }
         }
 
         void ThreadPool::schedule(Task task) {
-            scoped_lock lock(_mutex);
+            boost::lock_guard<boost::mutex> lock(_mutex);
 
             _tasksRemaining++;
 
@@ -167,7 +167,7 @@ namespace mongo {
 
         // should only be called by a worker from the worker thread
         void ThreadPool::task_done(Worker* worker) {
-            scoped_lock lock(_mutex);
+            boost::lock_guard<boost::mutex> lock(_mutex);
 
             if (!_tasks.empty()) {
                 worker->set_task(_tasks.front());

@@ -45,14 +45,15 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -184,7 +185,7 @@ namespace repl {
                                                   nsToDatabaseSubstring(ns), MODE_X));
                 }
 
-                Client::Context ctx(txn, ns);
+                OldClientContext ctx(txn, ns);
 
                 if ( createCollection == 0 &&
                      !isIndexBuild &&
@@ -197,9 +198,10 @@ namespace repl {
 
                 // For non-initial-sync, we convert updates to upserts
                 // to suppress errors when replaying oplog entries.
-                bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
+                Status status =
+                    applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
                 opsAppliedStats.increment();
-                return ok;
+                return status.isOK();
             }
             catch (const WriteConflictException&) {
                 log() << "WriteConflictException while doing oplog application on: " << ns

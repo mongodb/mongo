@@ -48,34 +48,6 @@ using namespace mongoutils;
 using std::endl;
 using std::string;
 
-namespace mongo {
-    struct LogfileTest : public StartupTest {
-        LogfileTest() { }
-        void run() {
-            if( 0 && debug ) {
-                try {
-                    LogFile f("logfile_test");
-                    void *p = mongoMalloc(16384);
-                    char *buf = (char*) p;
-                    buf += 4095;
-                    buf = (char*) (((size_t)buf)&(~0xfff));
-                    memset(buf, 'z', 8192);
-                    buf[8190] = '\n';
-                    buf[8191] = 'B';
-                    buf[0] = 'A';
-                    f.synchronousAppend(buf, 8192);
-                    f.synchronousAppend(buf, 8192);
-                    free(p);
-                }
-                catch(DBException& e ) {
-                    log() << "logfile.cpp test failed : " << e.what() << endl;
-                    throw;
-                }
-            }
-        }
-    } __test;
-}
-
 #if defined(_WIN32)
 
 namespace mongo {

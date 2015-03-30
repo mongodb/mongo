@@ -48,7 +48,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 clearRawMongoProgramOutput();
 replTest.restart(BID);
 assert.soon(function() {
-    return rawMongoProgramOutput().match("replSet error rollback : can't rollback drop database full resync will be required");
+    return rawMongoProgramOutput().match("rollback : can't rollback drop database full resync will be required");
 }, "B failed to fassert");
 
 replTest.stopSet();

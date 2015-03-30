@@ -229,11 +229,11 @@ namespace mongo {
         virtual void releaseAuthzUpdateLock() = 0;
 
         virtual void logOp(
+                OperationContext* txn,
                 const char* op,
                 const char* ns,
                 const BSONObj& o,
-                BSONObj* o2,
-                bool* b) {}
+                BSONObj* o2) {}
 
 
     protected:

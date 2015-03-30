@@ -52,59 +52,55 @@ namespace mongo {
     }
 
     RangeDeleterMockEnv::RangeDeleterMockEnv():
-        _deleteListMutex("delList"),
-        _cursorMapMutex("cursorMap"),
-        _pauseDeleteMutex("pauseDelete"),
         _pauseDelete(false),
         _pausedCount(0),
-        _envStatMutex("envStat"),
         _getCursorsCallCount(0) {
 
         setGlobalEnvironment(new GlobalEnvironmentNoop());
     }
 
     void RangeDeleterMockEnv::addCursorId(StringData ns, CursorId id) {
-        scoped_lock sl(_cursorMapMutex);
+        boost::lock_guard<boost::mutex> sl(_cursorMapMutex);
         _cursorMap[ns.toString()].insert(id);
     }
 
     void RangeDeleterMockEnv::removeCursorId(StringData ns, CursorId id) {
-        scoped_lock sl(_cursorMapMutex);
+        boost::lock_guard<boost::mutex> sl(_cursorMapMutex);
         _cursorMap[ns.toString()].erase(id);
     }
 
     void RangeDeleterMockEnv::pauseDeletes() {
-        scoped_lock sl(_pauseDeleteMutex);
+        boost::lock_guard<boost::mutex> sl(_pauseDeleteMutex);
         _pauseDelete = true;
     }
 
     void RangeDeleterMockEnv::resumeOneDelete() {
-        scoped_lock sl(_pauseDeleteMutex);
+        boost::lock_guard<boost::mutex> sl(_pauseDeleteMutex);
         _pauseDelete = false;
         _pausedCV.notify_one();
     }
 
     void RangeDeleterMockEnv::waitForNthGetCursor(uint64_t nthCall) {
-        scoped_lock sl(_envStatMutex);
+        boost::unique_lock<boost::mutex> sl(_envStatMutex);
         while (_getCursorsCallCount < nthCall) {
-            _cursorsCallCountUpdatedCV.wait(sl.boost());
+            _cursorsCallCountUpdatedCV.wait(sl);
         }
     }
 
     void RangeDeleterMockEnv::waitForNthPausedDelete(uint64_t nthPause) {
-        scoped_lock sl(_pauseDeleteMutex);
+        boost::unique_lock<boost::mutex> sl(_pauseDeleteMutex);
         while(_pausedCount < nthPause) {
-            _pausedDeleteChangeCV.wait(sl.boost());
+            _pausedDeleteChangeCV.wait(sl);
         }
     }
 
     bool RangeDeleterMockEnv::deleteOccured() const {
-        scoped_lock sl(_deleteListMutex);
+        boost::lock_guard<boost::mutex> sl(_deleteListMutex);
         return !_deleteList.empty();
     }
 
     DeletedRange RangeDeleterMockEnv::getLastDelete() const {
-        scoped_lock sl(_deleteListMutex);
+        boost::lock_guard<boost::mutex> sl(_deleteListMutex);
         return _deleteList.back();
     }
 
@@ -114,7 +110,7 @@ namespace mongo {
                                           string* errMsg) {
 
         {
-            scoped_lock sl(_pauseDeleteMutex);
+            boost::unique_lock<boost::mutex> sl(_pauseDeleteMutex);
             bool wasInitiallyPaused = _pauseDelete;
 
             if (_pauseDelete) {
@@ -123,14 +119,14 @@ namespace mongo {
             }
 
             while (_pauseDelete) {
-                _pausedCV.wait(sl.boost());
+                _pausedCV.wait(sl);
             }
 
             _pauseDelete = wasInitiallyPaused;
         }
 
         {
-            scoped_lock sl(_deleteListMutex);
+            boost::lock_guard<boost::mutex> sl(_deleteListMutex);
 
             DeletedRange entry;
             entry.ns = taskDetails.options.range.ns;
@@ -147,13 +143,13 @@ namespace mongo {
     void RangeDeleterMockEnv::getCursorIds(
                     OperationContext* txn, StringData ns, set<CursorId>* in) {
         {
-            scoped_lock sl(_cursorMapMutex);
+            boost::lock_guard<boost::mutex> sl(_cursorMapMutex);
             const set<CursorId>& _cursors = _cursorMap[ns.toString()];
             std::copy(_cursors.begin(), _cursors.end(), inserter(*in, in->begin()));
         }
 
         {
-            scoped_lock sl(_envStatMutex);
+            boost::lock_guard<boost::mutex> sl(_envStatMutex);
             _getCursorsCallCount++;
             _cursorsCallCountUpdatedCV.notify_one();
         }

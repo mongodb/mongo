@@ -37,17 +37,18 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/storage_options.h"
@@ -129,12 +130,17 @@ namespace mongo {
             // cursor (for use by future getmore ops).
             cursor->setLeftoverMaxTimeMicros( txn->getCurOp()->getRemainingMaxTimeMicros() );
 
-            // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
-            // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
-            txn->recoveryUnit()->commitAndRestart();
-            cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
+            if (txn->getClient()->isInDirectClient()) {
+                cursor->setUnownedRecoveryUnit(txn->recoveryUnit());
+            }
+            else {
+                // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
+                // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
+                txn->recoveryUnit()->commitAndRestart();
+                cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
+            }
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State
             // will be restored in getMore().
@@ -190,20 +196,17 @@ namespace mongo {
             if (!pPipeline.get())
                 return false;
 
-#if _DEBUG
             // This is outside of the if block to keep the object alive until the pipeline is finished.
             BSONObj parsed;
-            if (!pPipeline->isExplain() && !pCtx->inShard) {
-                // Make sure all operations round-trip through Pipeline::toBson()
-                // correctly by reparsing every command on DEBUG builds. This is
-                // important because sharded aggregations rely on this ability.
-                // Skipping when inShard because this has already been through the
-                // transformation (and this unsets pCtx->inShard).
+            if (kDebugBuild && !pPipeline->isExplain() && !pCtx->inShard) {
+                // Make sure all operations round-trip through Pipeline::toBson() correctly by
+                // reparsing every command in debug builds. This is important because sharded
+                // aggregations rely on this ability.  Skipping when inShard because this has
+                // already been through the transformation (and this unsets pCtx->inShard).
                 parsed = pPipeline->serialize().toBson();
                 pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
                 verify(pPipeline);
             }
-#endif
 
             PlanExecutor* exec = NULL;
             scoped_ptr<ClientCursorPin> pin; // either this OR the execHolder will be non-null
@@ -261,7 +264,6 @@ namespace mongo {
                 }
 
                 if (collection) {
-                    // XXX
                     const bool isAggCursor = true; // enable special locking behavior
                     ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
                                                             execHolder.release(),

@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include "mongo/config.h"
+
 #include <climits>
 #include <cstring>
 #include <boost/static_assert.hpp>
@@ -116,7 +118,7 @@
 # define MONGO_UINT64_SWAB(v) endian::bswap_slow64(v)
 #endif
 
-#if MONGO_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
 # define htobe16(v) MONGO_UINT16_SWAB(v)
 # define htobe32(v) MONGO_UINT32_SWAB(v)
 # define htobe64(v) MONGO_UINT64_SWAB(v)
@@ -129,7 +131,7 @@
 # define le16toh(v) (v)
 # define le32toh(v) (v)
 # define le64toh(v) (v)
-#elif MONGO_BYTE_ORDER == MONGO_BIG_ENDIAN
+#elif MONGO_CONFIG_BYTE_ORDER == MONGO_BIG_ENDIAN
 # define htobe16(v) (v)
 # define htobe32(v) (v)
 # define htobe64(v) (v)
@@ -144,7 +146,7 @@
 # define le64toh(v) MONGO_UINT64_SWAB(v)
 #else
 # error "The endianness of target architecture is unknown. " \
-        "Please define MONGO_BYTE_ORDER"
+        "Please define MONGO_CONFIG_BYTE_ORDER"
 #endif
 
 namespace mongo {

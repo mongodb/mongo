@@ -77,8 +77,8 @@ namespace repl {
         BSONObj findOne(const char *ns, const Query& q) {
             return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
         }
-        BSONObj getLastOp(const char *ns) {
-            return findOne(ns, Query().sort(reverseNaturalObj));
+        BSONObj getLastOp(const std::string& ns) {
+            return findOne(ns.c_str(), Query().sort(reverseNaturalObj));
         }
 
         /* SO_TIMEOUT (send/recv time out) for our DBClientConnections */

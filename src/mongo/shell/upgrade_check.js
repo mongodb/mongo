@@ -1,6 +1,9 @@
 (function() {
 "use strict";
 
+/**
+ * Check a document 
+ */
 var documentUpgradeCheck = function(indexes, doc) {
     var goodSoFar = true;
     var invalidForStorage = Object.invalidForStorage(doc);
@@ -30,31 +33,42 @@ var indexUpgradeCheck = function(index) {
     return goodSoFar;
 };
 
-var collUpgradeCheck = function(collObj) {
+var collUpgradeCheck = function(collObj, checkDocs) {
     var fullName = collObj.getFullName();
     var collName = collObj.getName();
     var dbName = collObj.getDB().getName();
-    print("\nChecking collection " + fullName);
+    print("\nChecking collection " + fullName + " (db:" + dbName + " coll:" + collName + ")");
     var dbObj = collObj.getDB();
     var goodSoFar = true;
 
     // check for _id index if and only if it should be present
     // no $, not oplog, not system, not config db
-    var indexColl = dbObj.getSiblingDB(dbName).system.indexes;
-    if (collName.indexOf('$') === -1 && 
-        collName.indexOf("system.") !== 0 &&
-        dbName !== "config" &&
-        (dbName !== "local" || (collName.indexOf("oplog.") !== 0 && collName !== "startup_log"))) {
-        var idIdx = indexColl.find({ns: fullName, name:"_id_"}).addOption(DBQuery.Option.noTimeout);
-        if (!idIdx.hasNext()) {
-            print("Collection Error: lack of _id index on collection: " + fullName);
-            goodSoFar = false;
+    var checkIdIdx = true;
+    if (dbName == "config") {
+        checkIdIdx = false;
+    }
+    else if (dbName == "local") {
+        if (    collName == "oplog.rs" || 
+                collName == "oplog.$main" || 
+                collName == "startup_log" || 
+                collName == "me") {
+            checkIdIdx = false;
         }
     }
+    
+    if (collName.indexOf('$') !== -1 || collName.indexOf("system.") === 0) {
+        checkIdIdx = false;
+    }
+    var indexes = collObj.getIndexes();
+    var foundIdIndex = false;
 
-    var indexes = [];
     // run index level checks on each index on the collection
-    indexColl.find({ns: fullName}).addOption(DBQuery.Option.noTimeout).forEach( function(index) {
+    indexes.forEach(function(index) {
+    
+        if (index.name == "_id_") {
+            foundIdIndex = true;
+        }
+        
         if (!indexUpgradeCheck(index)) {
             goodSoFar = false;
         }
@@ -70,55 +84,61 @@ var collUpgradeCheck = function(collObj) {
         }
     });
 
+    // If we need to validate the _id_ index, see if we found it.
+    if (checkIdIdx && !foundIdIndex) {
+        print("Collection Error: lack of _id index on collection: " + fullName);
+        goodSoFar = false;
+    }
     // do not validate the documents in system collections
     if (collName.indexOf("system.") === 0) {
-        return goodSoFar;
+        checkDocs = false;
     }
     // do not validate the documents in config dbs
-    if (dbName === "config") {
-        return goodSoFar;
+    if (dbName == "config") {
+        checkDocs = false;
+    }
+    // do not validate docs in local db for some collections
+    else if (dbName === "local") {
+        if (    collName == "oplog.rs" || //skip document validation for oplogs
+                collName == "oplog.$main" ||
+                collName == "replset.minvalid" // skip document validation for minvalid coll
+                ) {
+            checkDocs = false;
+        }
     }
 
-    // do not validate the documents in the oplog collection
-    if (dbName === "local" && collName.indexOf("oplog.") === 0) {
-        return goodSoFar;
+    if (checkDocs) {
+        var lastAlertTime = Date.now();
+        var alertInterval = 10 * 1000; // 10 seconds
+        var numDocs = 0;
+        // run document level checks on each document in the collection
+        var theColl = dbObj.getSiblingDB(dbName).getCollection(collName);
+        theColl.find().addOption(DBQuery.Option.noTimeout).sort({$natural: 1}).forEach(
+            function(doc) {
+                numDocs++;
+    
+                if (!documentUpgradeCheck(indexes, doc)) {
+                    goodSoFar = false;
+                    lastAlertTime = Date.now();
+                }
+                var nowTime = Date.now();
+                if (nowTime - lastAlertTime > alertInterval) {
+                    print(numDocs + " documents processed");
+                    lastAlertTime = nowTime;
+                }
+        });
     }
-
-    // do not validate the documents in the minvalid collection
-    if (dbName === "local" && collName.indexOf("replset.minvalid") === 0) {
-        return goodSoFar;
-    }
-
-    var lastAlertTime = Date.now();
-    var alertInterval = 10 * 1000; // 10 seconds
-    var numDocs = 0;
-    // run document level checks on each document in the collection
-    var theColl = dbObj.getSiblingDB(dbName).getCollection(collName);
-    theColl.find().addOption(DBQuery.Option.noTimeout).sort({$natural: 1}).forEach(
-        function(doc) {
-            numDocs++;
-
-            if (!documentUpgradeCheck(indexes, doc)) {
-                goodSoFar = false;
-                lastAlertTime = Date.now();
-            }
-            var nowTime = Date.now();
-            if (nowTime - lastAlertTime > alertInterval) {
-                print(numDocs + " documents processed");
-                lastAlertTime = nowTime;
-            }
-    });
-
+    
     return goodSoFar;
 };
 
-var dbUpgradeCheck = function(dbObj) {
+var dbUpgradeCheck = function(dbObj, checkDocs) {
     print("\nChecking database " + dbObj.getName());
     var goodSoFar = true;
 
     // run collection level checks on each collection in the db
     dbObj.getCollectionNames().forEach(function(collName) {
-        if (!collUpgradeCheck(dbObj.getCollection(collName))) {
+        if (!collUpgradeCheck(dbObj.getCollection(collName)), checkDocs) {
             goodSoFar = false;
         }
     });
@@ -126,7 +146,7 @@ var dbUpgradeCheck = function(dbObj) {
     return goodSoFar;
 };
 
-DB.prototype.upgradeCheck = function(obj) { 
+DB.prototype.upgradeCheck = function(obj, checkDocs) { 
     var self = this;
     // parse args if there are any
     if (obj) {
@@ -158,7 +178,7 @@ DB.prototype.upgradeCheck = function(obj) {
     }
 
     print("database '" + self.getName() + "' for 2.6 upgrade compatibility");
-    if (dbUpgradeCheck(self)) {
+    if (dbUpgradeCheck(self, checkDocs)) {
         print("Everything in '" + self.getName() + "' is ready for the upgrade!");
         return true;
     }
@@ -167,7 +187,7 @@ DB.prototype.upgradeCheck = function(obj) {
     return false;
 };
 
-DB.prototype.upgradeCheckAllDBs = function() {
+DB.prototype.upgradeCheckAllDBs = function(checkDocs) {
     var self = this;
     if (self.getName() !== "admin") {
         throw Error("db.upgradeCheckAllDBs() can only be run from the admin database");
@@ -178,7 +198,7 @@ DB.prototype.upgradeCheckAllDBs = function() {
 
     // run db level checks on each db
     dbs.databases.forEach(function(dbObj) {
-        if (!dbUpgradeCheck(self.getSiblingDB(dbObj.name))) {
+        if (!dbUpgradeCheck(self.getSiblingDB(dbObj.name)), checkDocs) {
             goodSoFar = false;
         }
     });

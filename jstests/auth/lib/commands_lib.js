@@ -1144,6 +1144,23 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "fsyncUnlock",
+            command: {fsyncUnlock: 1},
+            skipSharded: true, // TODO: remove when fsyncUnlock is implemented in mongos
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["unlock"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
             testname: "geoNear",
             command: {geoNear: "x", near: [50, 50], num: 1},
             setup: function (db) {
@@ -1469,6 +1486,16 @@ var authCommandsLib = {
                         {
                             resource: {db: firstDbName, collection: ""},
                             actions: ["listCollections"]
+                        }
+                    ]
+                },
+                // test legacy (pre 3.0) way of authorizing listCollections
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: "system.namespaces"},
+                            actions: ["find"]
                         }
                     ]
                 }

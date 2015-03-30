@@ -13,19 +13,18 @@
  *	Move to the next/previous page in the tree.
  */
 int
-__wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
+__wt_tree_walk(WT_SESSION_IMPL *session,
+    WT_REF **refp, uint64_t *walkcntp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
-	WT_REF *couple, *ref;
-	WT_TXN_STATE *txn_state;
-	int descending, prev, skip;
+	WT_REF *couple, *couple_orig, *ref;
+	int prev, skip;
 	uint32_t slot;
 
 	btree = S2BT(session);
-	descending = 0;
 
 	/*
 	 * Tree walks are special: they look inside page structures that splits
@@ -42,16 +41,6 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 		LF_CLR(WT_READ_TRUNCATE);
 
 	prev = LF_ISSET(WT_READ_PREV) ? 1 : 0;
-
-	/*
-	 * Pin a transaction ID, required to safely look at page index
-	 * structures, if our caller has not already done so.
-	 */
-	txn_state = WT_SESSION_TXN_STATE(session);
-	if (txn_state->snap_min == WT_TXN_NONE)
-		txn_state->snap_min = S2C(session)->txn_global.last_running;
-	else
-		txn_state = NULL;
 
 	/*
 	 * There are multiple reasons and approaches to walking the in-memory
@@ -89,17 +78,14 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 	 * here.  We check when discarding pages that we're not discarding that
 	 * page, so this clear must be done before the page is released.
 	 */
-	couple = ref = *refp;
+	couple = couple_orig = ref = *refp;
 	*refp = NULL;
 
 	/* If no page is active, begin a walk from the start of the tree. */
 	if (ref == NULL) {
 		ref = &btree->root;
-		if (ref->page == NULL) {
-			if (txn_state != NULL)
-				txn_state->snap_min = WT_TXN_NONE;
+		if (ref->page == NULL)
 			goto done;
-		}
 		goto descend;
 	}
 
@@ -114,32 +100,6 @@ ascend:	/*
 
 	/* Figure out the current slot in the WT_REF array. */
 	__wt_page_refp(session, ref, &pindex, &slot);
-
-	if (0) {
-restart:	/*
-		 * The page we're moving to might have split, in which case find
-		 * the last position we held.
-		 *
-		 * If we were starting a tree walk, begin again.
-		 *
-		 * If we were in the process of descending, repeat the descent.
-		 * If we were moving within a single level of the tree, repeat
-		 * the last move.
-		 */
-		ref = couple;
-		if (ref == &btree->root) {
-			ref = &btree->root;
-			if (ref->page == NULL) {
-				if (txn_state != NULL)
-					txn_state->snap_min = WT_TXN_NONE;
-				goto done;
-			}
-			goto descend;
-		}
-		__wt_page_refp(session, ref, &pindex, &slot);
-		if (descending)
-			goto descend;
-	}
 
 	for (;;) {
 		/*
@@ -168,14 +128,11 @@ restart:	/*
 				/*
 				 * Locate the reference to our parent page then
 				 * swap our child hazard pointer for the parent.
-				 * We don't handle a restart return because it
-				 * would require additional complexity in the
-				 * restart code (ascent code somewhat like the
-				 * descent code already there), and it's not a
-				 * possible return: we're moving to the parent
-				 * of the current child, not another child of
-				 * the same parent, there's no way our parent
-				 * split.
+				 * We don't handle restart or not-found returns.
+				 * It would require additional complexity and is
+				 * not a possible return: we're moving to the
+				 * parent of the current child page, our parent
+				 * reference can't have split or been evicted.
 				 */
 				__wt_page_refp(session, ref, &pindex, &slot);
 				if ((ret = __wt_page_swap(
@@ -195,7 +152,10 @@ restart:	/*
 		else
 			++slot;
 
-		for (descending = 0;;) {
+		if (walkcntp != NULL)
+			++*walkcntp;
+
+		for (;;) {
 			ref = pindex->index[slot];
 
 			if (LF_ISSET(WT_READ_CACHE)) {
@@ -211,7 +171,8 @@ restart:	/*
 				 * Avoid pulling a deleted page back in to try
 				 * to delete it again.
 				 */
-				if (__wt_delete_page_skip(session, ref))
+				if (ref->state == WT_REF_DELETED &&
+				    __wt_delete_page_skip(session, ref))
 					break;
 				/*
 				 * If deleting a range, try to delete the page
@@ -245,26 +206,67 @@ restart:	/*
 				}
 			} else {
 				/*
-				 * If iterating a cursor, try to skip deleted
-				 * pages that are visible to us.
+				 * Try to skip deleted pages visible to us.
 				 */
-				if (__wt_delete_page_skip(session, ref))
+				if (ref->state == WT_REF_DELETED &&
+				    __wt_delete_page_skip(session, ref))
 					break;
 			}
 
 			ret = __wt_page_swap(session, couple, ref, flags);
+
+			/*
+			 * Not-found is an expected return when only walking
+			 * in-cache pages.
+			 */
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
 				break;
 			}
-			if (ret == WT_RESTART)
-				goto restart;
+
+			/*
+			 * The page we're moving to might have split, in which
+			 * case move to the last position we held.
+			 */
+			if (ret == WT_RESTART) {
+				ret = 0;
+
+				/*
+				 * If a new walk that never coupled from the
+				 * root to a new saved position in the tree,
+				 * restart the walk.
+				 */
+				if (couple == &btree->root) {
+					ref = &btree->root;
+					if (ref->page == NULL)
+						goto done;
+					goto descend;
+				}
+
+				/*
+				 * If restarting from some original position,
+				 * repeat the increment or decrement we made at
+				 * that time. Otherwise, couple is an internal
+				 * page we've acquired after moving from that
+				 * starting position and we can treat it as a
+				 * new page. This works because we never acquire
+				 * a hazard pointer on a leaf page we're not
+				 * going to return to our caller, this will quit
+				 * working if that ever changes.
+				 */
+				WT_ASSERT(session,
+				    couple == couple_orig ||
+				    WT_PAGE_IS_INTERNAL(couple->page));
+				ref = couple;
+				__wt_page_refp(session, ref, &pindex, &slot);
+				if (couple == couple_orig)
+					break;
+			}
 			WT_ERR(ret);
 
 			/*
-			 * Entering a new page: configure for traversal of any
-			 * internal page's children, else return (or optionally
-			 * skip), the leaf page.
+			 * A new page: configure for traversal of any internal
+			 * page's children, else return the leaf page.
 			 */
 descend:		couple = ref;
 			page = ref->page;
@@ -272,10 +274,7 @@ descend:		couple = ref;
 			    page->type == WT_PAGE_COL_INT) {
 				pindex = WT_INTL_INDEX_COPY(page);
 				slot = prev ? pindex->entries - 1 : 0;
-				descending = 1;
-			} else if (LF_ISSET(WT_READ_SKIP_LEAF))
-				goto ascend;
-			else {
+			} else {
 				*refp = ref;
 				goto done;
 			}
@@ -283,9 +282,6 @@ descend:		couple = ref;
 	}
 
 done:
-err:	if (txn_state != NULL)
-		txn_state->snap_min = WT_TXN_NONE;
-
-	WT_LEAVE_PAGE_INDEX(session);
+err:	WT_LEAVE_PAGE_INDEX(session);
 	return (ret);
 }

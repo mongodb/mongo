@@ -40,6 +40,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/util/log.h"
@@ -48,7 +49,10 @@ namespace mongo {
 
     using std::stringstream;
 
-    void inProgCmd(OperationContext* txn, Message &message, DbResponse &dbresponse) {
+    void inProgCmd(OperationContext* txn,
+                   const NamespaceString& nss,
+                   Message &message,
+                   DbResponse &dbresponse) {
         DbMessage d(message);
         QueryMessage q(d);
 
@@ -86,13 +90,12 @@ namespace mongo {
             filter = b.obj();
         }
 
-        const NamespaceString nss(d.getns());
         const WhereCallbackReal whereCallback(txn, nss.db());
         const Matcher matcher(filter, whereCallback);
 
         BSONArrayBuilder inprogBuilder(retVal.subarrayStart("inprog"));
 
-        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
 
         ClientSet::const_iterator it = Client::clients.begin();
         for ( ; it != Client::clients.end(); it++) {

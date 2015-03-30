@@ -37,7 +37,7 @@ jsTest.log("Starting parallel operations during downgrade..");
 var joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
 
 jsTest.log("Downgrading replica set..");
-rst.upgradeSet(oldVersion);
+rst.upgradeSet({ binVersion: oldVersion });
 jsTest.log("Downgrade complete.");
 
 primary = rst.getPrimary();

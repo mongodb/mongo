@@ -102,14 +102,14 @@ namespace {
                 << _filespec << ' ' << errnoWithDescription(errorcode)
                 << " Is a mongod instance already running?");
         }
-#if !defined(__sunos__)
+#if !defined(__sun)
         int ret = ::flock(lockFile, LOCK_EX | LOCK_NB);
 #else
         struct flock fileLockInfo = {0};
         fileLockInfo.l_type = F_WRLCK;
         fileLockInfo.l_whence = SEEK_SET;
         int ret = ::fcntl(lockFile, F_SETLK, &fileLockInfo);
-#endif  // !defined(__sunos__)
+#endif  // !defined(__sun)
         if (ret != 0) {
             int errorcode = errno;
             ::close(lockFile);
@@ -179,14 +179,14 @@ namespace {
             int errorcode = errno;
             log() << "couldn't remove fs lock " << errnoWithDescription(errorcode);
         }
-#if !defined(__sunos__)
+#if !defined(__sun)
         ::flock(_lockFileHandle->_fd, LOCK_UN);
 #else
         struct flock fileLockInfo = {0};
         fileLockInfo.l_type = F_UNLCK;
         fileLockInfo.l_whence = SEEK_SET;
         ::fcntl(_lockFileHandle->_fd, F_SETLK, &fileLockInfo);
-#endif  // !defined(__sunos__)
+#endif  // !defined(__sun)
     }
 
 }  // namespace mongo

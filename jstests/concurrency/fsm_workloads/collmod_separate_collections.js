@@ -25,7 +25,7 @@ var $config = extendWorkload($config, function($config, $super) {
         init: { collMod: 1 }
     }, $super.transitions);
 
-    $config.setup = function setup(db, collName) {
+    $config.setup = function setup(db, collName, cluster) {
         // no-op: since the init state is used to setup
         // the separate collections on a per-thread basis.
     };

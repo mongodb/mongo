@@ -143,7 +143,7 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.avail_out = (uint32_t)dst_len;
 	if (deflate(&zs, Z_FINISH) == Z_STREAM_END) {
 		*compression_failed = 0;
-		*result_lenp = zs.total_out;
+		*result_lenp = (size_t)zs.total_out;
 	} else
 		*compression_failed = 1;
 
@@ -158,7 +158,7 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
  *	Find the slot containing the target offset (binary search).
  */
 static inline uint32_t
-zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
+zlib_find_slot(uint64_t target, uint32_t *offsets, uint32_t slots)
 {
 	uint32_t base, indx, limit;
 
@@ -177,123 +177,6 @@ zlib_find_slot(uint32_t target, uint32_t *offsets, uint32_t slots)
 		}
 
 	return (indx);
-}
-
-/*
- * zlib_compress_raw --
- *	Pack records into a specified on-disk page size.
- */
-static int
-zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    size_t page_max, int split_pct, size_t extra,
-    uint8_t *src, uint32_t *offsets, uint32_t slots,
-    uint8_t *dst, size_t dst_len, int final,
-    size_t *result_lenp, uint32_t *result_slotsp)
-{
-	ZLIB_COMPRESSOR *zlib_compressor;
-	ZLIB_OPAQUE opaque;
-	z_stream last_zs, zs;
-	uint32_t curr_slot, last_slot;
-	int ret;
-
-	curr_slot = last_slot = 0;
-	(void)split_pct;
-	(void)dst_len;
-	(void)final;
-
-	zlib_compressor = (ZLIB_COMPRESSOR *)compressor;
-
-	memset(&zs, 0, sizeof(zs));
-	zs.zalloc = zalloc;
-	zs.zfree = zfree;
-	opaque.compressor = compressor;
-	opaque.session = session;
-	zs.opaque = &opaque;
-
-	if ((ret = deflateInit(&zs,
-	    zlib_compressor->zlib_level)) != Z_OK)
-		return (zlib_error(compressor, session, "deflateInit", ret));
-
-	zs.next_in = src;
-	zs.next_out = dst;
-	/*
-	 * Experimentally derived, reserve this many bytes for zlib to finish
-	 * up a buffer.  If this isn't sufficient, we don't fail but we will be
-	 * inefficient.
-	 */
-#define	WT_ZLIB_RESERVED	24
-	zs.avail_out = (uint32_t)(page_max - extra - WT_ZLIB_RESERVED);
-	last_zs = zs;
-
-	/*
-	 * Strategy: take the available output size and compress that much
-	 * input.  Continue until there is no input small enough or the
-	 * compression fails to fit.
-	 *
-	 * Don't let the compression ratio become insanely good (which can
-	 * happen with synthetic workloads).  Once we hit a limit, stop so that
-	 * the in-memory size of pages isn't totally different to the on-disk
-	 * size.  Otherwise we can get into trouble where every update to a
-	 * page results in forced eviction based on in-memory size, even though
-	 * the data fits into a single on-disk block.
-	 */
-	while (zs.avail_out > 0 && zs.total_in <= zs.total_out * 20) {
-		/* Find the slot we will try to compress up to. */
-		if ((curr_slot = zlib_find_slot(
-		    zs.total_in + zs.avail_out, offsets, slots)) <= last_slot)
-			break;
-
-		zs.avail_in = offsets[curr_slot] - offsets[last_slot];
-		/* Save the stream state in case the chosen data doesn't fit. */
-		last_zs = zs;
-
-		while (zs.avail_in > 0 && zs.avail_out > 0)
-			if ((ret = deflate(&zs, Z_SYNC_FLUSH)) != Z_OK)
-				return (zlib_error(
-				    compressor, session, "deflate", ret));
-
-		/* Roll back if the last deflate didn't complete. */
-		if (zs.avail_in > 0) {
-			zs = last_zs;
-			break;
-		} else
-			last_slot = curr_slot;
-	}
-
-	zs.avail_out += WT_ZLIB_RESERVED;
-	ret = deflate(&zs, Z_FINISH);
-
-	/*
-	 * If the end marker didn't fit, report that we got no work done.  WT
-	 * will compress the (possibly large) page image using ordinary
-	 * compression instead.
-	 */
-	if (ret == Z_OK || ret == Z_BUF_ERROR)
-		last_slot = 0;
-	else if (ret != Z_STREAM_END)
-		return (
-		    zlib_error(compressor, session, "deflate end block", ret));
-
-	if ((ret = deflateEnd(&zs)) != Z_OK && ret != Z_DATA_ERROR)
-		return (zlib_error(compressor, session, "deflateEnd", ret));
-
-	if (last_slot > 0) {
-		*result_slotsp = last_slot;
-		*result_lenp = zs.total_out;
-	} else {
-		/* We didn't manage to compress anything: don't retry. */
-		*result_slotsp = 0;
-		*result_lenp = 1;
-	}
-
-#if 0
-	fprintf(stderr,
-	    "zlib_compress_raw (%s): page_max %" PRIuMAX ", slots %" PRIu32
-	    ", take %" PRIu32 ": %" PRIu32 " -> %" PRIuMAX "\n",
-	    final ? "final" : "not final", (uintmax_t)page_max,
-	    slots, last_slot, offsets[last_slot], (uintmax_t)*result_lenp);
-#endif
-	return (0);
 }
 
 /*
@@ -327,7 +210,7 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	while ((ret = inflate(&zs, Z_FINISH)) == Z_OK)
 		;
 	if (ret == Z_STREAM_END) {
-		*result_lenp = zs.total_out;
+		*result_lenp = (size_t)zs.total_out;
 		ret = Z_OK;
 	}
 
@@ -336,6 +219,172 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	return (ret == Z_OK ?
 	    0 : zlib_error(compressor, session, "inflate", ret));
+}
+
+/*
+ * zlib_compress_raw --
+ *	Pack records into a specified on-disk page size.
+ */
+static int
+zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    size_t page_max, int split_pct, size_t extra,
+    uint8_t *src, uint32_t *offsets, uint32_t slots,
+    uint8_t *dst, size_t dst_len, int final,
+    size_t *result_lenp, uint32_t *result_slotsp)
+{
+	ZLIB_COMPRESSOR *zlib_compressor;
+	ZLIB_OPAQUE opaque;
+	z_stream *best_zs, last_zs, zs;
+	uint32_t curr_slot, last_slot;
+	int ret;
+
+	curr_slot = last_slot = 0;
+	(void)split_pct;
+	(void)dst_len;
+	(void)final;
+
+	zlib_compressor = (ZLIB_COMPRESSOR *)compressor;
+
+	memset(&zs, 0, sizeof(zs));
+	zs.zalloc = zalloc;
+	zs.zfree = zfree;
+	opaque.compressor = compressor;
+	opaque.session = session;
+	zs.opaque = &opaque;
+
+	if ((ret = deflateInit(&zs, zlib_compressor->zlib_level)) != Z_OK)
+		return (zlib_error(compressor, session, "deflateInit", ret));
+
+	zs.next_in = src;
+	zs.next_out = dst;
+	/*
+	 * Experimentally derived, reserve this many bytes for zlib to finish
+	 * up a buffer.  If this isn't sufficient, we don't fail but we will be
+	 * inefficient.
+	 */
+#define	WT_ZLIB_RESERVED	24
+	zs.avail_out = (uint32_t)(page_max - (extra + WT_ZLIB_RESERVED));
+
+	/* Save the stream state in case the chosen data doesn't fit. */
+	if ((ret = deflateCopy(&last_zs, &zs)) != Z_OK)
+		return (zlib_error(
+		    compressor, session, "deflateCopy", ret));
+
+	/*
+	 * Strategy: take the available output size and compress that much
+	 * input.  Continue until there is no input small enough or the
+	 * compression fails to fit.
+	 */
+	for (best_zs = NULL;;) {
+		/* Find the next slot we will try to compress up to. */
+		if ((curr_slot = zlib_find_slot(
+		    zs.total_in + zs.avail_out, offsets, slots)) > last_slot) {
+			zs.avail_in = offsets[curr_slot] - offsets[last_slot];
+			while (zs.avail_in > 0 && zs.avail_out > 0)
+				if ((ret = deflate(&zs, Z_SYNC_FLUSH)) != Z_OK)
+					return (zlib_error(compressor,
+					    session, "deflate", ret));
+		}
+
+		/*
+		 * We didn't do a deflate, or it didn't work: use the last saved
+		 * position.
+		 */
+		if (curr_slot <= last_slot || zs.avail_in > 0) {
+			if ((ret = deflateEnd(&zs)) != Z_OK &&
+			    ret != Z_DATA_ERROR)
+				return (zlib_error(
+				    compressor, session, "deflateEnd", ret));
+
+			best_zs = &last_zs;
+			break;
+		}
+
+		/* The last deflation succeeded, discard the saved one. */
+		if ((ret = deflateEnd(&last_zs)) != Z_OK && ret != Z_DATA_ERROR)
+			return (zlib_error(
+			    compressor, session, "deflateEnd", ret));
+
+		/*
+		 * If there's more compression to do, save a snapshot and keep
+		 * going, otherwise, use the current compression.
+		 *
+		 * Don't let the compression ratio become insanely good (which
+		 * can happen with synthetic workloads).  Once we hit a limit,
+		 * stop so the in-memory size of pages isn't hugely larger than
+		 * the on-disk size, otherwise we can get into trouble where
+		 * every update to a page results in forced eviction based on
+		 * the in-memory size, even though the data fits into a single
+		 * on-disk block.
+		 */
+		last_slot = curr_slot;
+		if (zs.avail_out > 0 && zs.total_in <= zs.total_out * 20) {
+			if ((ret = deflateCopy(&last_zs, &zs)) != Z_OK)
+				return (zlib_error(
+				    compressor, session, "deflateCopy", ret));
+			continue;
+		}
+
+		best_zs = &zs;
+		break;
+	}
+
+	best_zs->avail_out += WT_ZLIB_RESERVED;
+	ret = deflate(best_zs, Z_FINISH);
+
+	/*
+	 * If the end marker didn't fit, report that we got no work done,
+	 * WiredTiger will compress the (possibly large) page image using
+	 * ordinary compression instead.
+	 */
+	if (ret == Z_OK || ret == Z_BUF_ERROR)
+		last_slot = 0;
+	else if (ret != Z_STREAM_END)
+		return (
+		    zlib_error(compressor, session, "deflate end block", ret));
+
+	if ((ret = deflateEnd(best_zs)) != Z_OK && ret != Z_DATA_ERROR)
+		return (zlib_error(compressor, session, "deflateEnd", ret));
+
+	if (last_slot > 0) {
+		*result_slotsp = last_slot;
+		*result_lenp = (size_t)best_zs->total_out;
+	} else {
+		/* We didn't manage to compress anything: don't retry. */
+		*result_slotsp = 0;
+		*result_lenp = 1;
+	}
+
+#if 0
+	/* Decompress the result and confirm it matches the original source. */
+	if (last_slot > 0) {
+		void *decomp;
+		size_t result_len;
+
+		if ((decomp = zalloc(
+		    &opaque, 1, (uint32_t)best_zs->total_in + 100)) == NULL)
+			return (ENOMEM);
+		if ((ret = zlib_decompress(
+		    compressor, session, dst, (size_t)best_zs->total_out,
+		    decomp, (size_t)best_zs->total_in + 100, &result_len)) == 0)
+			 if (memcmp(src, decomp, result_len) != 0)
+				ret = zlib_error(compressor, session,
+				    "deflate compare with original source",
+				    Z_DATA_ERROR);
+		zfree(&opaque, decomp);
+		if (ret != 0)
+			return (ret);
+	}
+#endif
+
+#if 0
+	fprintf(stderr,
+	    "zlib_compress_raw (%s): page_max %" PRIuMAX ", slots %" PRIu32
+	    ", take %" PRIu32 ": %" PRIu32 " -> %" PRIuMAX "\n",
+	    final ? "final" : "not final", (uintmax_t)page_max,
+	    slots, last_slot, offsets[last_slot], (uintmax_t)*result_lenp);
+#endif
+	return (0);
 }
 
 /*

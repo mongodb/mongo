@@ -76,7 +76,7 @@
 		}							\
 	}								\
 	break;								\
-} while (ret == 0)
+} while (1)
 
 /* End a transactional API call, retry on deadlock. */
 #define	TXN_API_END(s, ret)	TXN_API_END_RETRY(s, ret, 1)

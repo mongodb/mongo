@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/sorter/sorter.h"
@@ -341,7 +343,7 @@ namespace mongo {
 
                 // The debug builds are too slow to run these tests.
                 // Among other things, MSVC++ makes all heap functions O(N) not O(logN).
-#if !defined(_DEBUG)
+#if !defined(MONGO_CONFIG_DEBUG_BUILD)
                 { // merge all data ASC
                     boost::shared_ptr<IWSorter> sorters[] = {
                         makeSorter(opts, IWComparator(ASC)),

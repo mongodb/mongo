@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
+#include "mongo/config.h"
+
 #include "mongo/db/server_options_helpers.h"
 
 #ifdef _WIN32
@@ -471,7 +473,7 @@ namespace {
         }
 #endif
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         Status ret = validateSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;
@@ -942,7 +944,7 @@ namespace {
                 (ServerGlobalParams::ClusterAuthMode_keyFile);
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         ret = storeSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;

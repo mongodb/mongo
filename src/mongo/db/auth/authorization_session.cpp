@@ -447,7 +447,7 @@ namespace {
         return size;
     }
 
-    bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) {
+    bool AuthorizationSession::isAuthorizedToChangeAsUser(const UserName& userName, ActionType actionType) {
         User* user = lookupUser(userName);
         if (!user) {
             return false;
@@ -461,24 +461,15 @@ namespace {
         for (int i = 0; i < resourceSearchListLength; ++i) {
             actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
         }
-        return actions.contains(ActionType::changeOwnPassword);
+        return actions.contains(actionType);
+    }
+
+    bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) {
+        return AuthorizationSession::isAuthorizedToChangeAsUser(userName, ActionType::changeOwnPassword);
     }
 
     bool AuthorizationSession::isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) {
-        User* user = lookupUser(userName);
-        if (!user) {
-            return false;
-        }
-        ResourcePattern resourceSearchList[resourceSearchListCapacity];
-        const int resourceSearchListLength =
-                buildResourceSearchList(ResourcePattern::forDatabaseName(userName.getDB()),
-                                        resourceSearchList);
-
-        ActionSet actions;
-        for (int i = 0; i < resourceSearchListLength; ++i) {
-            actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
-        }
-        return actions.contains(ActionType::changeOwnCustomData);
+        return AuthorizationSession::isAuthorizedToChangeAsUser(userName, ActionType::changeOwnCustomData);
     }
 
     bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleName) {

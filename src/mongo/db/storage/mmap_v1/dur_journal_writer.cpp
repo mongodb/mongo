@@ -39,6 +39,7 @@
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

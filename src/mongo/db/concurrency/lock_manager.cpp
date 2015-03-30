@@ -28,9 +28,11 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include <vector>
+#include "mongo/config.h"
 
 #include "mongo/platform/basic.h"
+
+#include <vector>
 
 #include "mongo/db/concurrency/lock_manager.h"
 
@@ -117,6 +119,22 @@ namespace {
     // Ensure we do not add new types without updating the names array
     BOOST_STATIC_ASSERT(
         (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
+
+
+    /**
+     * Maps the LockRequest status to a human-readable string.
+     */
+    static const char* LockRequestStatusNames[] = {
+        "new",
+        "granted",
+        "waiting",
+        "converting",
+    };
+
+    // Ensure we do not add new status types without updating the names array
+    BOOST_STATIC_ASSERT(
+        (sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0]))
+                                                                == LockRequest::StatusCount);
 
 } // namespace
 
@@ -1059,14 +1077,14 @@ namespace {
 
     ResourceId::ResourceId(ResourceType type, StringData ns)
         : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         _nsCopy = ns.toString();
 #endif
     }
 
     ResourceId::ResourceId(ResourceType type, const string& ns)
         : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         _nsCopy = ns;
 #endif
     }
@@ -1079,7 +1097,7 @@ namespace {
         ss << "{" << _fullHash << ": " << resourceTypeName(getType())
            << ", " << getHashId();
 
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         ss << ", " << _nsCopy;
 #endif
 
@@ -1130,6 +1148,10 @@ namespace {
 
     const char* resourceTypeName(ResourceType resourceType) {
         return ResourceTypeNames[resourceType];
+    }
+
+    const char* lockRequestStatusName(LockRequest::Status status) {
+        return LockRequestStatusNames[status];
     }
 
 } // namespace mongo

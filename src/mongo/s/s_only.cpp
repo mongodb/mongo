@@ -55,11 +55,6 @@ namespace mongo {
     using std::string;
     using std::stringstream;
 
-    void* remapPrivateView(void *oldPrivateAddr) {
-        log() << "remapPrivateView called in mongos, aborting" << endl;
-        fassertFailed(16462);
-    }
-
     /** When this callback is run, we record a shard that we've used for useful work
      *  in an operation to be read later by getLastError()
     */
@@ -73,7 +68,7 @@ namespace mongo {
         ClientBasic(p),
         _desc(desc),
         _connectionId(),
-        _god(0),
+        _inDirectClient(false),
         _lastOp(0),
         _shutdown(false) {
     }

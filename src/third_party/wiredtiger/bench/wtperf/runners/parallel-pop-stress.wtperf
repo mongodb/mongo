@@ -1,0 +1,9 @@
+# wtperf options file: Run populate multi-threaded with a btree. This can
+# uncover conditions where pages are too busy for eviction to work as
+# expected
+conn_config="cache_size=1GB"
+table_config="type=file"
+icount=10000000
+report_interval=5
+populate_threads=20
+run_time=0

@@ -239,6 +239,7 @@ namespace mongo {
         BSONObj  indexKeyPattern;
         std::string query;
         std::string language;
+        bool caseSensitive;
 
         // "Prefix" fields of a text index can handle equality predicates.  We group them with the
         // text node while creating the text leaf node and convert them into a BSONObj index prefix
@@ -678,7 +679,7 @@ namespace mongo {
         DistinctNode() { }
         virtual ~DistinctNode() { }
 
-        virtual StageType getType() const { return STAGE_DISTINCT; }
+        virtual StageType getType() const { return STAGE_DISTINCT_SCAN; }
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         // This stage is created "on top" of normal planning and as such the properties

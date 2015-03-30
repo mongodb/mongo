@@ -208,7 +208,7 @@ namespace mongo {
          */
         class FilesArray {
         public:
-            FilesArray() : _writersMutex("MmapV1ExtentManager"), _size(0) { }
+            FilesArray() : _size(0) { }
             ~FilesArray();
 
             /**

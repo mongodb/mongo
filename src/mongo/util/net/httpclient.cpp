@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/httpclient.h"
@@ -120,7 +122,7 @@ namespace mongo {
             return -1;
         
         if ( ssl ) {
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             // pointer to global singleton instance
             SSLManagerInterface* mgr = getSSLManager();
 

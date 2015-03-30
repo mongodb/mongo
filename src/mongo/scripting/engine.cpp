@@ -42,6 +42,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -56,7 +57,7 @@ namespace mongo {
     using std::set;
     using std::string;
 
-    long long Scope::_lastVersion = 1;
+    AtomicInt64 Scope::_lastVersion(1);
 
 namespace {
     // 2 GB is the largest support Javascript file size.
@@ -187,8 +188,16 @@ namespace {
         return exec(code, filename, printResult, reportError, timeoutMs);
     }
 
-    void Scope::storedFuncMod() {
-        _lastVersion++;
+    class Scope::StoredFuncModLogOpHandler : public RecoveryUnit::Change {
+    public:
+        void commit() {
+            _lastVersion.fetchAndAdd(1);
+        }
+        void rollback() { }
+    };
+
+    void Scope::storedFuncMod(OperationContext* txn) {
+        txn->recoveryUnit()->registerChange(new StoredFuncModLogOpHandler());
     }
 
     void Scope::validateObjectIdString(const string& str) {
@@ -204,10 +213,11 @@ namespace {
             uassert(10208,  "need to have locallyConnected already", _localDBName.size());
         }
 
-        if (_loadedVersion == _lastVersion)
+        int64_t lastVersion = _lastVersion.load();
+        if (_loadedVersion == lastVersion)
             return;
 
-        _loadedVersion = _lastVersion;
+        _loadedVersion = lastVersion;
         string coll = _localDBName + ".system.js";
 
         scoped_ptr<DBClientBase> directDBClient(createDirectClient(txn));
@@ -305,10 +315,8 @@ namespace {
 namespace {
     class ScopeCache {
     public:
-        ScopeCache() : _mutex("ScopeCache") {}
-
         void release(const string& poolName, const boost::shared_ptr<Scope>& scope) {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             if (scope->hasOutOfMemoryException()) {
                 // make some room
@@ -334,7 +342,7 @@ namespace {
         }
 
         boost::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
                 if (it->poolName == poolName) {

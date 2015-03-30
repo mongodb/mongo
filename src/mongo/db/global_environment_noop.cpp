@@ -31,6 +31,7 @@
 #include "mongo/db/global_environment_noop.h"
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/op_observer.h"
 
 namespace mongo {
 
@@ -55,7 +56,12 @@ namespace mongo {
     }
 
     StorageFactoriesIterator* GlobalEnvironmentNoop::makeStorageFactoriesIterator() {
-        return NULL;
+        class EmptySFI : public StorageFactoriesIterator {
+        public:
+            virtual bool more() const { return false; }
+            virtual const StorageEngine::Factory* next() { invariant(false); }
+        };
+        return new EmptySFI();
     }
 
     void GlobalEnvironmentNoop::setKillAllOperations() { }
@@ -79,4 +85,10 @@ namespace mongo {
         return new OperationContextNoop();
     }
 
+    void GlobalEnvironmentNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+    }
+
+    OpObserver* GlobalEnvironmentNoop::getOpObserver() {
+        return nullptr;
+    }
 }  // namespace mongo

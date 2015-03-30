@@ -86,7 +86,7 @@ namespace {
         static void _processAllClients(std::stringstream& ss) {
             using namespace html;
 
-            boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+            boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
 
             ClientSet::const_iterator it = Client::clients.begin();
             for (; it != Client::clients.end(); it++) {
@@ -198,7 +198,7 @@ namespace {
         static BSONArray _processAllClients(MatchExpression* matcher) {
             BSONArrayBuilder array;
 
-            boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+            boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
 
             ClientSet::const_iterator it = Client::clients.begin();
             for (; it != Client::clients.end(); it++) {

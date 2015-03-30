@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -81,14 +82,28 @@ namespace mongo {
             /**
              * Validates creation options for a collection in the StorageEngine.
              * Returns an error if the creation options are not valid.
+             *
+             * Default implementation only accepts empty objects (no options).
              */
-            virtual Status validateCollectionStorageOptions(const BSONObj& options) const = 0;
+            virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
+                if (options.isEmpty()) return Status::OK();
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream() << "storage engine " << getCanonicalName()
+                                            << " does not support any collection storage options");
+            }
 
             /**
              * Validates creation options for an index in the StorageEngine.
              * Returns an error if the creation options are not valid.
+             *
+             * Default implementation only accepts empty objects (no options).
              */
-             virtual Status validateIndexStorageOptions(const BSONObj& options) const = 0;
+            virtual Status validateIndexStorageOptions(const BSONObj& options) const {
+                if (options.isEmpty()) return Status::OK();
+                return Status(ErrorCodes::InvalidOptions,
+                              str::stream() << "storage engine " << getCanonicalName()
+                                            << " does not support any index storage options");
+            }
 
              /**
               * Validates existing metadata in the data directory against startup options.

@@ -55,8 +55,9 @@ namespace mongo {
     }
 
     bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
-        // TODO(spencer): get "isGod" from OperationContext
-        return cc().isGod() || AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
+        // TODO(spencer): get "isInDirectClient" from OperationContext
+        return cc().isInDirectClient() ||
+               AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
     }
 
 } // namespace mongo

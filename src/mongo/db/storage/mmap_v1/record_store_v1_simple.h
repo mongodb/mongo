@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
@@ -70,7 +71,9 @@ namespace mongo {
 
     protected:
         virtual bool isCapped() const { return false; }
-        virtual bool shouldPadInserts() const { return !_details->isUserFlagSet(Flag_NoPadding); }
+        virtual bool shouldPadInserts() const {
+            return !_details->isUserFlagSet(CollectionOptions::Flag_NoPadding);
+        }
 
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,

@@ -35,9 +35,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/parallel.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -49,7 +47,6 @@
 #include "mongo/db/commands/mr.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -58,7 +55,8 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_explain.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/distlock.h"
@@ -89,39 +87,6 @@ namespace mongo {
     namespace dbgrid_pub_cmds {
 
         namespace {
-
-            /**
-             * Utility function to compute a single error code from a vector of command results.  If
-             * there is an error code common to all of the error results, returns that error code;
-             * otherwise, returns 0.
-             */
-            int getUniqueCode( const vector<Strategy::CommandResult>& results ) {
-                int commonErrCode = -1;
-                for ( vector<Strategy::CommandResult>::const_iterator it = results.begin();
-                      it != results.end();
-                      it++ ) {
-                    // Only look at shards with errors.
-                    if ( !it->result["ok"].trueValue() ) {
-                        int errCode = it->result["code"].numberInt();
-                        if ( commonErrCode == -1 ) {
-                            commonErrCode = errCode;
-                        }
-                        else if ( commonErrCode != errCode ) {
-                            // At least two shards with errors disagree on the error code.
-                            commonErrCode = 0;
-                        }
-                    }
-                }
-
-                // If no error encountered or shards with errors disagree on the error code, return
-                // 0.
-                if ( commonErrCode == -1 || commonErrCode == 0 ) {
-                    return 0;
-                }
-
-                // Otherwise, shards with errors agree on the error code; return that code.
-                return commonErrCode;
-            }
 
             /**
              * Utility function to parse a cursor command response and save the cursor in the
@@ -178,17 +143,15 @@ namespace mongo {
         protected:
 
             bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
-                return _passthrough(conf->getName(), conf, cmdObj, 0, result);
+                return _passthrough(conf->name(), conf, cmdObj, 0, result);
             }
+
             bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , BSONObjBuilder& result ) {
                 return _passthrough("admin", conf, cmdObj, 0, result);
             }
 
             bool passthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
-                return _passthrough(conf->getName(), conf, cmdObj, options, result);
-            }
-            bool adminPassthrough( DBConfigPtr conf, const BSONObj& cmdObj , int options, BSONObjBuilder& result ) {
-                return _passthrough("admin", conf, cmdObj, options, result);
+                return _passthrough(conf->name(), conf, cmdObj, options, result);
             }
 
         private:
@@ -742,7 +705,7 @@ namespace mongo {
                     return passthrough( conf , cmdObj , result );
                 }
 
-                cm->drop( cm );
+                cm->drop();
 
                 if( ! conf->removeSharding( fullns ) ){
                     warning() << "collection " << fullns
@@ -753,74 +716,6 @@ namespace mongo {
                 return 1;
             }
         } dropCmd;
-
-        class DropDBCmd : public PublicGridCommand {
-        public:
-            DropDBCmd() : PublicGridCommand( "dropDatabase" ) {}
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::dropDatabase);
-                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-            }
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                // disallow dropping the config database from mongos
-                if( dbName == "config" ) {
-                    errmsg = "Cannot drop 'config' database via mongos";
-                    return false;
-                }
-
-                BSONElement e = cmdObj.firstElement();
-
-                if ( ! e.isNumber() || e.number() != 1 ) {
-                    errmsg = "invalid params";
-                    return 0;
-                }
-
-                DBConfigPtr conf = grid.getDBConfig( dbName, false );
-
-                log() << "DROP DATABASE: " << dbName << endl;
-
-                if ( ! conf ) {
-                    result.append( "info" , "database didn't exist" );
-                    return true;
-                }
-
-                //
-                // Reload the database configuration so that we're sure a database entry exists
-                // TODO: This won't work with parallel dropping
-                //
-
-                grid.removeDBIfExists( *conf );
-                grid.getDBConfig( dbName );
-
-                // TODO: Make dropping logic saner and more tolerant of partial drops.  This is
-                // particularly important since a database drop can be aborted by *any* collection
-                // with a distributed namespace lock taken (migrates/splits)
-
-                //
-                // Create a copy of the DB config object to drop, so that no one sees a weird
-                // intermediate version of the info
-                //
-
-                DBConfig confCopy( conf->getName() );
-                if( ! confCopy.load() ){
-                    errmsg = "could not load database info to drop";
-                    return false;
-                }
-
-                // Enable sharding so we can correctly retry failed drops
-                // This will re-drop old sharded entries if they exist
-                confCopy.enableSharding( false );
-
-                if ( ! confCopy.dropDatabase( errmsg ) )
-                    return false;
-
-                result.append( "dropped" , dbName );
-                return true;
-            }
-        } dropDBCmd;
 
         class RenameCollectionCmd : public PublicGridCommand {
         public:
@@ -899,188 +794,8 @@ namespace mongo {
                 }
 
             }
-        };
-        MONGO_INITIALIZER(RegisterCopyDBCommand)(InitializerContext* context) {
-            // Leaked intentionally: a Command registers itself when constructed.
-            // NOTE: this initializer block cannot be removed due to SERVER-9167
-            new CopyDBCmd();
-            return Status::OK();
-        }
 
-        class CountCmd : public PublicGridCommand {
-        public:
-            CountCmd() : PublicGridCommand( "count" ) { }
-            virtual bool passOptions() const { return true; }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::find);
-                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-            }
-            long long applySkipLimit( long long num , const BSONObj& cmd ) {
-                BSONElement s = cmd["skip"];
-                BSONElement l = cmd["limit"];
-
-                if ( s.isNumber() ) {
-                    num = num - s.numberLong();
-                    if ( num < 0 ) {
-                        num = 0;
-                    }
-                }
-
-                if ( l.isNumber() ) {
-                    long long limit = l.numberLong();
-                    if( limit < 0 ){
-                        limit = -limit;
-                    }
-
-                    if ( limit < num && limit != 0 ) { // 0 limit means no limit
-                        num = limit;
-                    }
-                }
-
-                return num;
-            }
-            bool run(OperationContext* txn, const string& dbName,
-                    BSONObj& cmdObj,
-                    int options,
-                    string& errmsg,
-                    BSONObjBuilder& result,
-                    bool ){
-
-                long long skip = 0;
-                if( cmdObj["skip"].isNumber() ){
-                    skip = cmdObj["skip"].numberLong();
-                    if( skip < 0 ){
-                        errmsg = "skip value is negative in count query";
-                        return false;
-                    }
-                }
-                else if( cmdObj["skip"].ok() ){
-                    errmsg = "skip value is not a valid number";
-                    return false;
-                }
-
-                const string collection = cmdObj.firstElement().valuestrsafe();
-                const string fullns = dbName + "." + collection;
-
-                BSONObjBuilder countCmdBuilder;
-                countCmdBuilder.append( "count", collection );
-
-                BSONObj filter;
-                if( cmdObj["query"].isABSONObj() ){
-                    countCmdBuilder.append( "query", cmdObj["query"].Obj() );
-                    filter = cmdObj["query"].Obj();
-                }
-
-                if( cmdObj["limit"].isNumber() ){
-                    long long limit = cmdObj["limit"].numberLong();
-
-                    /* We only need to factor in the skip value when sending to
-                     * the shards if we have a value for limit, otherwise, we
-                     * apply it only once we have collected all counts.
-                     */
-                    if( limit != 0 && cmdObj["skip"].isNumber() ){
-                        if ( limit > 0 )
-                            limit += skip;
-                        else
-                            limit -= skip;
-                    }
-
-                    countCmdBuilder.append( "limit", limit );
-                }
-
-                if (cmdObj.hasField("hint")) {
-                    countCmdBuilder.append(cmdObj["hint"]);
-                }
-
-                if (cmdObj.hasField("$queryOptions")) {
-                    countCmdBuilder.append(cmdObj["$queryOptions"]);
-                }
-
-                if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
-                    countCmdBuilder.append(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
-                }
-
-                vector<Strategy::CommandResult> countResult;
-
-                STRATEGY->commandOp( dbName, countCmdBuilder.done(),
-                            options, fullns, filter, &countResult );
-
-                long long total = 0;
-                BSONObjBuilder shardSubTotal( result.subobjStart( "shards" ));
-
-                for( vector<Strategy::CommandResult>::const_iterator iter = countResult.begin();
-                        iter != countResult.end(); ++iter ){
-                    const string& shardName = iter->shardTarget.getName();
-
-                    if( iter->result["ok"].trueValue() ){
-                        long long shardCount = iter->result["n"].numberLong();
-
-                        shardSubTotal.appendNumber( shardName, shardCount );
-                        total += shardCount;
-                    }
-                    else {
-                        shardSubTotal.doneFast();
-                        errmsg = "failed on : " + shardName;
-                        result.append( "cause", iter->result );
-                        // Add "code" to the top-level response, if the failure of the sharded
-                        // command can be accounted to a single error.
-                        int code = getUniqueCode( countResult );
-                        if ( code != 0 ) {
-                            result.append( "code", code );
-                        }
-                        return false;
-                    }
-                }
-
-                shardSubTotal.doneFast();
-                total = applySkipLimit( total , cmdObj );
-                result.appendNumber( "n" , total );
-
-                return true;
-            }
-
-            Status explain(OperationContext* txn,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           ExplainCommon::Verbosity verbosity,
-                           BSONObjBuilder* out) const {
-                const string fullns = parseNs(dbname, cmdObj);
-
-                // Extract the targeting query.
-                BSONObj targetingQuery;
-                if (Object == cmdObj["query"].type()) {
-                    targetingQuery = cmdObj["query"].Obj();
-                }
-
-                BSONObjBuilder explainCmdBob;
-                ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
-
-                // We will time how long it takes to run the commands on the shards.
-                Timer timer;
-
-                vector<Strategy::CommandResult> shardResults;
-                STRATEGY->commandOp(dbname,
-                                    explainCmdBob.obj(),
-                                    0,
-                                    fullns,
-                                    targetingQuery,
-                                    &shardResults);
-
-                long long millisElapsed = timer.millis();
-
-                const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults,
-                                                                                    cmdObj);
-
-                return ClusterExplain::buildExplainResult(shardResults,
-                                                          mongosStageName,
-                                                          millisElapsed,
-                                                          out);
-            }
-
-        } countCmd;
+        } clusterCopyDBCmd;
 
         class CollectionStats : public PublicGridCommand {
         public:
@@ -1288,7 +1003,7 @@ namespace mongo {
                 ChunkPtr chunk = cm->findIntersectingChunk(shardKey);
                 ShardConnection conn( chunk->getShard() , fullns );
                 BSONObj res;
-                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                bool ok = conn->runCommand( conf->name() , cmdObj , res );
                 conn.done();
 
                 if (!ok && res.getIntField("code") == RecvStaleConfigCode) { // code for RecvStaleConfigException
@@ -1360,7 +1075,7 @@ namespace mongo {
                 for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
                     ScopedDbConnection conn(i->getConnString());
                     BSONObj res;
-                    bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                    bool ok = conn->runCommand( conf->name() , cmdObj , res );
                     conn.done();
 
                     if ( ! ok ) {
@@ -1530,7 +1245,7 @@ namespace mongo {
                 for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
                     ShardConnection conn( *i , fullns );
                     BSONObj res;
-                    bool ok = conn->runCommand( conf->getName() , cmdObj , res, options );
+                    bool ok = conn->runCommand( conf->name() , cmdObj , res, options );
                     conn.done();
 
                     if ( ! ok ) {
@@ -1660,7 +1375,7 @@ namespace mongo {
                             return false;
                         }
 
-                        uassert(16246, "Shard " + conf->getName() + " is too old to support GridFS sharded by {files_id:1, n:1}",
+                        uassert(16246, "Shard " + conf->name() + " is too old to support GridFS sharded by {files_id:1, n:1}",
                                 res.hasField("md5state"));
 
                         lastResult = res;
@@ -2008,31 +1723,7 @@ namespace mongo {
                 bool ok = true;
 
                 {
-                    // take distributed lock to prevent split / migration
-                    /*
-                    ConnectionString config = configServer.getConnectionString();
-                    DistributedLock lockSetup( config , fullns );
-                    dist_lock_try dlk;
-
-
-                    if (shardedInput) {
-                        try{
-                            int tryc = 0;
-                            while ( !dlk.got() ) {
-                                dlk = dist_lock_try( &lockSetup , (string)"mr-parallel" );
-                                if ( ! dlk.got() ) {
-                                    if ( ++tryc % 100 == 0 )
-                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
-                                    sleepmillis(100);
-                                }
-                            }
-                        }
-                        catch( LockException& e ){
-                            errmsg = str::stream() << "error locking distributed lock for mapreduce " << causedBy( e );
-                            return false;
-                        }
-                    }
-                    */
+                    // TODO: take distributed lock to prevent split / migration?
 
                     try {
                         STRATEGY->commandOp( dbName, shardedCommand, 0, fullns, q, &results );
@@ -2082,7 +1773,7 @@ namespace mongo {
                     errmsg += singleResult.toString();
                     // Add "code" to the top-level response, if the failure of the sharded command
                     // can be accounted to a single error.
-                    int code = getUniqueCode( results );
+                    int code = getUniqueCodeFromCommandResults( results );
                     if ( code != 0 ) {
                         result.append( "code", code );
                     }
@@ -2162,25 +1853,15 @@ namespace mongo {
 
                     map<BSONObj, int> chunkSizes;
                     {
-                        // take distributed lock to prevent split / migration
-                        ConnectionString config = configServer.getConnectionString();
-                        DistributedLock lockSetup( config , finalColLong );
-                        dist_lock_try dlk;
+                        // take distributed lock to prevent split / migration.
+                        ScopedDistributedLock nsLock(configServer.getConnectionString(),
+                                                     finalColLong);
+                        nsLock.setLockMessage("mr-post-process");
+                        nsLock.setLockTryIntervalMillis(100);
 
-                        try{
-                            int tryc = 0;
-                            while ( !dlk.got() ) {
-                                dlk = dist_lock_try( &lockSetup , (string)"mr-post-process" );
-                                if ( ! dlk.got() ) {
-                                    if ( ++tryc % 100 == 0 )
-                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
-                                    sleepmillis(100);
-                                }
-                            }
-                        }
-                        catch( LockException& e ){
-                            errmsg = str::stream() << "error locking distributed lock for mapreduce " << causedBy( e );
-                            return false;
+                        Status lockStatus = nsLock.acquire(-1 /* retry indefinitely */);
+                        if (!lockStatus.isOK()) {
+                            return appendCommandStatus(result, lockStatus);
                         }
 
                         BSONObj finalCmdObj = finalCmd.obj();
@@ -2580,7 +2261,7 @@ namespace mongo {
                         // If the failure of the sharded command can be accounted to a single error,
                         // throw a UserException with that error code; otherwise, throw with a
                         // location uassert code.
-                        int errCode = getUniqueCode( shardResults );
+                        int errCode = getUniqueCodeFromCommandResults( shardResults );
                         if ( errCode == 0 ) {
                             errCode = 17022;
                         }
@@ -2720,7 +2401,7 @@ namespace mongo {
             // Temporary hack. See comment on declaration for details.
 
             ShardConnection conn( conf->getPrimary() , "" );
-            BSONObj result = aggRunCommand(conn.get(), conf->getName(), cmd, queryOptions);
+            BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
             conn.done();
 
             bool ok = result["ok"].trueValue();
@@ -2734,12 +2415,27 @@ namespace mongo {
         class CmdListCollections : public PublicGridCommand {
         public:
             CmdListCollections() : PublicGridCommand( "listCollections" ) {}
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::listCollections);
-                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+                AuthorizationSession* authzSession = client->getAuthorizationSession();
+
+                // Check for the listCollections ActionType on the database
+                // or find on system.namespaces for pre 3.0 systems.
+                if (authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(dbname),
+                        ActionType::listCollections) ||
+                    authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(
+                            NamespaceString(dbname, "system.namespaces")),
+                        ActionType::find)) {
+                    return Status::OK();
+                }
+
+                return Status(ErrorCodes::Unauthorized,
+                            str::stream() << "Not authorized to create users on db: " <<
+                            dbname);
             }
 
             bool run(OperationContext* txn, const string& dbName,

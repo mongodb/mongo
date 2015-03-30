@@ -30,7 +30,8 @@
 
 namespace mongo {
 
-    // Thanks, Wikipedia.
+    // Equatorial radius of earth.
+    // Source: http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
     const double kRadiusOfEarthInMeters = (6378.1 * 1000);
 
 }  // namespace mongo

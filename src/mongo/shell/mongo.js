@@ -252,7 +252,32 @@ Mongo.prototype.writeMode = function() {
     return this._writeMode;
 };
 
+//
+// Whether to use find command versus OP_QUERY style find.
+//
 
+Mongo.prototype.useFindCommand = function() {
+    return (this.readMode() === "commands");
+}
+
+Mongo.prototype.readMode = function() {
+    if ("_readMode" in this) {
+        // We already have determined our read mode. Just return it.
+        return this._readMode;
+    }
+
+    // Determine read mode based on shell params.
+    //
+    // TODO: Detect what to use based on wire protocol version.
+    if (_readMode) {
+        this._readMode = _readMode();
+    }
+    else {
+        this._readMode = "compatibility";
+    }
+
+    return this._readMode;
+}
 
 //
 // Write Concern can be set at the connection level, and is used for all write operations unless

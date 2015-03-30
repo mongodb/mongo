@@ -32,14 +32,15 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
@@ -228,96 +229,5 @@ namespace mongo {
         }
 
     } cmdCount;
-
-
-    static long long applySkipLimit(long long num, const BSONObj& cmd) {
-        BSONElement s = cmd["skip"];
-        BSONElement l = cmd["limit"];
-
-        if (s.isNumber()) {
-            num = num - s.numberLong();
-            if (num < 0) {
-                num = 0;
-            }
-        }
-
-        if (l.isNumber()) {
-            long long limit = l.numberLong();
-            if (limit < 0) {
-                limit = -limit;
-            }
-
-            // 0 means no limit.
-            if (limit < num && limit != 0) {
-                num = limit;
-            }
-        }
-
-        return num;
-    }
-
-    long long runCount(OperationContext* txn,
-                       const string& ns,
-                       const BSONObj &cmd,
-                       string &err,
-                       int &errCode) {
-
-        AutoGetCollectionForRead ctx(txn, ns);
-
-        Collection* collection = ctx.getCollection();
-        if (NULL == collection) {
-            err = "ns missing";
-            return -1;
-        }
-
-        const NamespaceString nss(ns);
-
-        CountRequest request;
-        CmdCount* countComm = static_cast<CmdCount*>(Command::findCommand("count"));
-        Status parseStatus = countComm->parseRequest(nss.db().toString(), cmd, &request);
-        if (!parseStatus.isOK()) {
-            err = parseStatus.reason();
-            errCode = parseStatus.code();
-            return -1;
-        }
-
-        if (request.query.isEmpty()) {
-            return applySkipLimit(collection->numRecords(txn), cmd);
-        }
-
-        PlanExecutor* rawExec;
-        Status getExecStatus = getExecutorCount(txn,
-                                                collection,
-                                                request,
-                                                PlanExecutor::YIELD_AUTO,
-                                                &rawExec);
-        if (!getExecStatus.isOK()) {
-            err = getExecStatus.reason();
-            errCode = getExecStatus.code();
-            return -1;
-        }
-
-        scoped_ptr<PlanExecutor> exec(rawExec);
-
-        // Store the plan summary string in CurOp.
-        if (NULL != txn->getCurOp()) {
-            txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
-        }
-
-        Status execPlanStatus = exec->executePlan();
-        if (!execPlanStatus.isOK()) {
-            err = execPlanStatus.reason();
-            errCode = execPlanStatus.code();
-            return -2;
-        }
-
-        // Plan is done executing. We just need to pull the count out of the root stage.
-        invariant(STAGE_COUNT == exec->getRootStage()->stageType());
-        CountStage* countStage = static_cast<CountStage*>(exec->getRootStage());
-        const CountStats* countStats =
-            static_cast<const CountStats*>(countStage->getSpecificStats());
-
-        return countStats->nCounted;
-    }
 
 } // namespace mongo

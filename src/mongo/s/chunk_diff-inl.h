@@ -101,7 +101,7 @@ namespace mongo {
 
             // Open a cursor for the diff chunks
             std::auto_ptr<DBClientCursor> cursor = conn->query(
-                    ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( DEBUG_BUILD ? 2 : 1000000 ) );
+                    ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( kDebugBuild ? 2 : 1000000 ) );
             verify( cursor.get() );
 
             int diff = calculateConfigDiff( *cursor.get() );

@@ -48,7 +48,7 @@ namespace mongo {
      * wrapped request object once constructed.
      */
     class BatchedCommandRequest : public BSONSerializable {
-    MONGO_DISALLOW_COPYING(BatchedCommandRequest);
+        MONGO_DISALLOW_COPYING(BatchedCommandRequest);
     public:
 
         // Maximum number of write ops supported per batch

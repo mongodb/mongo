@@ -35,7 +35,9 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -162,7 +163,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashInvalidation : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -265,7 +266,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashInvalidateLookahead : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -353,7 +354,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashTwoLeaf : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -403,7 +404,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashTwoLeafFirstChildLargeKeys : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -456,7 +457,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashTwoLeafLastChildLargeKeys : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -508,7 +509,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashThreeLeaf : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -570,7 +571,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashThreeLeafMiddleChildLargeKeys : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -630,7 +631,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashWithNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -690,7 +691,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashProducesNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -739,7 +740,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashWithMatcher : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -792,7 +793,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashFirstChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -851,7 +852,7 @@ namespace QueryStageAnd {
     class QueryStageAndHashSecondChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -915,7 +916,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedInvalidation : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -1033,7 +1034,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedThreeLeaf : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -1087,7 +1088,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedWithNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -1132,7 +1133,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedProducesNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -1181,7 +1182,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedWithMatcher : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -1227,7 +1228,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedByLastChild : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -1290,7 +1291,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedFirstChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {
@@ -1344,7 +1345,7 @@ namespace QueryStageAnd {
     class QueryStageAndSortedSecondChildFetched : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             Database* db = ctx.db();
             Collection* coll = ctx.getCollection();
             if (!coll) {

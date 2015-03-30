@@ -184,7 +184,6 @@ header_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -195,7 +194,7 @@ namespace mongo {
      * Do not update this file directly. Update src/mongo/base/error_codes.err instead.
      */
 
-    class MONGO_CLIENT_API ErrorCodes {
+    class ErrorCodes {
     public:
         enum Error {
             %(error_code_enum_declarations)s,

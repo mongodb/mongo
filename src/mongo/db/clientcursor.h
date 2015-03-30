@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
+    typedef boost::lock_guard<boost::recursive_mutex> recursive_scoped_lock;
     class ClientCursor;
     class Collection;
     class CurOp;
@@ -130,13 +130,6 @@ namespace mongo {
         void setLeftoverMaxTimeMicros( uint64_t leftoverMaxTimeMicros ) {
             _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
         }
-
-        //
-        // Sharding-specific data.  TODO: Document.
-        //
-
-        void setCollMetadata( CollectionMetadataPtr metadata ){ _collMetadata = metadata; }
-        CollectionMetadataPtr getCollMetadata(){ return _collMetadata; }
 
         //
         // Replication-related stuff.  TODO: Document and clean.

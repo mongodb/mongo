@@ -46,7 +46,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
@@ -176,9 +175,7 @@ namespace mongo {
             info = statusWithInfo.getValue();
 
             IndexToBuild index;
-            index.block = boost::make_shared<IndexCatalog::IndexBuildBlock>(_txn,
-                                                                            _collection,
-                                                                            info);
+            index.block.reset(new IndexCatalog::IndexBuildBlock(_txn, _collection, info));
             status = index.block->init();
             if ( !status.isOK() )
                 return status;
@@ -191,7 +188,7 @@ namespace mongo {
             if (!_buildInBackground) {
                 // Bulk build process requires foreground building as it assumes nothing is changing
                 // under it.
-                index.bulk.reset(index.real->initiateBulk(_txn));
+                index.bulk = index.real->initiateBulk();
             }
 
             const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
@@ -209,7 +206,7 @@ namespace mongo {
             // TODO SERVER-14888 Suppress this in cases we don't want to audit.
             audit::logCreateIndex(_txn->getClient(), &info, descriptor->indexName(), ns);
 
-            _indexes.push_back( index );
+            _indexes.push_back(std::move(index));
         }
 
         // this is so that operations examining the list of indexes know there are more keys to look
@@ -254,6 +251,9 @@ namespace mongo {
             invariant(_allowInterruption);
             exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
         }
+        else {
+            exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
+        }
 
         BSONObj objToIndex;
         RecordId loc;
@@ -289,6 +289,12 @@ namespace mongo {
         }
 
         if (state != PlanExecutor::IS_EOF) {
+            // If the plan executor was killed, this means the DB/collection was dropped and so it
+            // is not safe to cleanup the in-progress indexes.
+            if (state == PlanExecutor::DEAD) {
+                abortWithoutCleanup();
+            }
+
             uasserted(28550, 
                       "Unable to complete index build as the collection is no longer readable");
         }
@@ -308,11 +314,14 @@ namespace mongo {
     Status MultiIndexBlock::insert(const BSONObj& doc, const RecordId& loc) {
         for ( size_t i = 0; i < _indexes.size(); i++ ) {
             int64_t unused;
-            Status idxStatus = _indexes[i].forInsert()->insert( _txn,
-                                                               doc,
-                                                               loc,
-                                                               _indexes[i].options,
-                                                               &unused );
+            Status idxStatus(ErrorCodes::InternalError, "");
+            if (_indexes[i].bulk) {
+                idxStatus = _indexes[i].bulk->insert(_txn, doc, loc, _indexes[i].options, &unused);
+            }
+            else {
+                idxStatus = _indexes[i].real->insert(_txn, doc, loc, _indexes[i].options, &unused);
+            }
+
             if ( !idxStatus.isOK() )
                 return idxStatus;
         }
@@ -325,7 +334,8 @@ namespace mongo {
                 continue;
             LOG(1) << "\t bulk commit starting for index: "
                    << _indexes[i].block->getEntry()->descriptor()->indexName();
-            Status status = _indexes[i].real->commitBulk( _indexes[i].bulk.get(),
+            Status status = _indexes[i].real->commitBulk( _txn,
+                                                          std::move(_indexes[i].bulk),
                                                           _allowInterruption,
                                                           _indexes[i].options.dupsAllowed,
                                                           dupsOut );

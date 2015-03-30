@@ -73,12 +73,12 @@ var $config = (function() {
         dropDB: { count: 0.95, dropDB: 0.05 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         var myDB = db.getSiblingDB(this.dbName);
         populateData(myDB, collName);
     }
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         var myDB = db.getSiblingDB(this.dbName);
 
         // We can't assert anything about the dropDatabase return value because

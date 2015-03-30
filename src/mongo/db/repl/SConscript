@@ -114,6 +114,11 @@ env.CppUnitTest('replica_set_config_checks_test',
                     'replmocks'
                 ])
 
+env.CppUnitTest('scatter_gather_test',
+                'scatter_gather_test.cpp',
+                LIBDEPS=['repl_coordinator_impl',
+                         'replmocks'])
+
 env.CppUnitTest('check_quorum_for_config_change_test',
                 'check_quorum_for_config_change_test.cpp',
                 LIBDEPS=[
@@ -148,8 +153,7 @@ env.CppUnitTest('repl_coordinator_impl_reconfig_test',
 
 env.Library('repl_coordinator_interface',
             ['replication_coordinator.cpp',
-             'replication_coordinator_external_state.cpp',
-             'repl_set_seed_list.cpp'],
+             'replication_coordinator_external_state.cpp'],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/hostandport',
             ])
@@ -168,6 +172,7 @@ env.Library('replmocks',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/concurrency/lock_manager',
                 'repl_coordinator_interface',
+                'replica_set_messages',
                 'replication_executor',
             ])
 
@@ -204,5 +209,6 @@ env.CppUnitTest('isself_test',
                     '$BUILD_DIR/mongo/serveronly',
                     '$BUILD_DIR/mongo/coreserver',
                     '$BUILD_DIR/mongo/coredb',
+                    "$BUILD_DIR/mongo/ntservice_mock",
                 ],
                 NO_CRUTCH = True)

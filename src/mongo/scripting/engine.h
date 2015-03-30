@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
     typedef unsigned long long ScriptingFunction;
@@ -148,7 +149,7 @@ namespace mongo {
          * if any changes are made to .system.js, call this
          * right now its just global - slightly inefficient, but a lot simpler
          */
-        static void storedFuncMod();
+        static void storedFuncMod(OperationContext *txn);
 
         static void validateObjectIdString(const std::string& str);
 
@@ -177,14 +178,21 @@ namespace mongo {
 
     protected:
         friend class PooledScope;
+
+        /**
+         * RecoveryUnit::Change subclass used to commit work for
+         * Scope::storedFuncMod logOp listener.
+         */
+        class StoredFuncModLogOpHandler;
+
         virtual FunctionCacheMap& getFunctionCache() { return _cachedFunctions; }
         virtual ScriptingFunction _createFunction(const char* code,
                                                   ScriptingFunction functionNumber = 0) = 0;
 
         std::string _localDBName;
-        long long _loadedVersion;
+        int64_t _loadedVersion;
         std::set<std::string> _storedNames;
-        static long long _lastVersion;
+        static AtomicInt64 _lastVersion;
         FunctionCacheMap _cachedFunctions;
         int _numTimesUsed;
         bool _lastRetIsNativeCode; // v8 only: set to true if eval'd script returns a native func

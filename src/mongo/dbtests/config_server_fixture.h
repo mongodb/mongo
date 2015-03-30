@@ -111,12 +111,6 @@ namespace mongo {
         void clearServer();
 
         void clearVersion();
-        void clearShards();
-        void clearDatabases();
-        void clearCollections();
-        void clearChunks();
-        void clearPings();
-        void clearChangelog();
 
         /**
          * Dumps the contents of the config server to the log.

@@ -35,6 +35,7 @@
 namespace mongo {
 
     class OperationContext;
+    class OpObserver;
 
     /**
      * Classes that implement this interface can receive notification on killOp.
@@ -61,8 +62,7 @@ namespace mongo {
     public:
         virtual ~StorageFactoriesIterator() { }
         virtual bool more() const = 0;
-        virtual const StorageEngine::Factory* const & next() = 0;
-        virtual const StorageEngine::Factory* const & get() const = 0;
+        virtual const StorageEngine::Factory* next() = 0;
     protected:
         StorageFactoriesIterator() { }
     };
@@ -92,6 +92,8 @@ namespace mongo {
         /**
          * Produce an iterator over all registered storage engine factories.
          * Caller owns the returned object and is responsible for deleting when finished.
+         *
+         * Never returns nullptr.
          */
         virtual StorageFactoriesIterator* makeStorageFactoriesIterator() = 0;
 
@@ -155,6 +157,20 @@ namespace mongo {
          * Returns a new OperationContext.  Caller owns pointer.
          */
         virtual OperationContext* newOpCtx() = 0;
+
+        //
+        // Global OpObserver.
+        //
+
+        /**
+         * Set the OpObserver.
+         */
+        virtual void setOpObserver(std::unique_ptr<OpObserver> opObserver) = 0;
+
+        /**
+         * Return the OpObserver instance we're using.
+         */
+        virtual OpObserver* getOpObserver() = 0;
 
     protected:
         GlobalEnvironmentExperiment() { }

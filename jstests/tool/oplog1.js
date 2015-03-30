@@ -11,6 +11,8 @@ output = db.output
 
 doc = { _id : 5 , x : 17 };
 
+assert.commandWorked(db.createCollection(output.getName()));
+
 db.oplog.insert( { ts : new Timestamp() , "op" : "i" , "ns" : output.getFullName() , "o" : doc } );
 
 assert.eq( 0 , output.count() , "before" )

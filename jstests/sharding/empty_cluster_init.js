@@ -89,8 +89,8 @@ jsTest.log("Mongoses stopped...");
 
 printjson(version);
 
-assert.eq(version.minCompatibleVersion, 5);
-assert.eq(version.currentVersion, 6);
+assert.eq(version.minCompatibleVersion, 6);
+assert.eq(version.currentVersion, 7);
 assert(version.clusterId);
 assert.eq(version.excluding, undefined);
 

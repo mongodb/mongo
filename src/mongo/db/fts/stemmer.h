@@ -47,8 +47,9 @@ namespace mongo {
          * running/Running -> run/Run
          */
         class Stemmer {
+            MONGO_DISALLOW_COPYING( Stemmer );
         public:
-            Stemmer( const FTSLanguage& language );
+            Stemmer( const FTSLanguage* language );
             ~Stemmer();
 
             std::string stem( StringData word ) const;

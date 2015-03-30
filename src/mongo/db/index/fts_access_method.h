@@ -30,22 +30,21 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/btree_based_access_method.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class FTSAccessMethod : public BtreeBasedAccessMethod {
+    class FTSAccessMethod : public IndexAccessMethod {
     public:
-        FTSAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree );
-        virtual ~FTSAccessMethod() { }
+        FTSAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
 
         const fts::FTSSpec& getSpec() const { return _ftsSpec; }
 
     private:
         // Implemented:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         fts::FTSSpec _ftsSpec;
     };

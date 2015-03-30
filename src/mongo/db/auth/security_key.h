@@ -30,8 +30,6 @@
 
 #include <string>
 
-#include "mongo/client/dbclientinterface.h"
-
 namespace mongo {
     /**
      * This method checks the validity of filename as a security key, hashes its

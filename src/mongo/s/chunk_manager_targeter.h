@@ -28,19 +28,24 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include <map>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/chunk.h"
-#include "mongo/s/shard.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/ns_targeter.h"
 
 namespace mongo {
 
-    struct TargeterStats;
+    class ChunkManager;
+    struct ChunkVersion;
+    class Shard;
+
+    struct TargeterStats {
+        // Map of chunk shard minKey -> approximate delta. This is used for deciding
+        // whether a chunk might need splitting or not.
+        std::map<BSONObj, int> chunkSizeDelta;
+    };
 
     /**
      * NSTargeter based on a ChunkManager implementation.  Wraps all exception codepaths and
@@ -50,8 +55,7 @@ namespace mongo {
      */
     class ChunkManagerTargeter : public NSTargeter {
     public:
-
-        ChunkManagerTargeter();
+        ChunkManagerTargeter(const NamespaceString& nss);
 
         /**
          * Initializes the ChunkManagerTargeter with the latest targeting information for the
@@ -59,7 +63,7 @@ namespace mongo {
          *
          * Returns !OK if the information could not be initialized.
          */
-        Status init( const NamespaceString& nss );
+        Status init();
 
         const NamespaceString& getNS() const;
 
@@ -99,9 +103,7 @@ namespace mongo {
         const TargeterStats* getStats() const;
 
     private:
-
         // Different ways we can refresh metadata
-        // TODO: Improve these ways.
         enum RefreshType {
             // No refresh is needed
             RefreshType_None,
@@ -110,6 +112,9 @@ namespace mongo {
             // The collection may have been dropped, so we need to reload the db
             RefreshType_ReloadDatabase
         };
+
+        typedef std::map<std::string, ChunkVersion> ShardVersionMap;
+
 
         /**
          * Performs an actual refresh from the config server.
@@ -140,28 +145,22 @@ namespace mongo {
                               long long estDataSize,
                               ShardEndpoint** endpoint) const;
 
-        NamespaceString _nss;
-
-        // Zero or one of these are filled at all times
-        // If sharded, _manager, if unsharded, _primary, on error, neither
-        ChunkManagerPtr _manager;
-        ShardPtr _primary;
-
-        // Map of shard->remote shard version reported from stale errors
-        typedef std::map<std::string, ChunkVersion> ShardVersionMap;
-        ShardVersionMap _remoteShardVersions;
+        // Full namespace of the collection for this targeter
+        const NamespaceString _nss;
 
         // Stores whether we need to check the remote server on refresh
         bool _needsTargetingRefresh;
 
         // Represents only the view and not really part of the targeter state.
-        mutable boost::scoped_ptr<TargeterStats> _stats;
-    };
+        mutable TargeterStats _stats;
 
-    struct TargeterStats {
-        // Map of chunk shard minKey -> approximate delta. This is used for deciding
-        // whether a chunk might need splitting or not.
-        std::map<BSONObj, int> chunkSizeDelta;
+        // Zero or one of these are filled at all times
+        // If sharded, _manager, if unsharded, _primary, on error, neither
+        boost::shared_ptr<ChunkManager> _manager;
+        boost::shared_ptr<Shard> _primary;
+
+        // Map of shard->remote shard version reported from stale errors
+        ShardVersionMap _remoteShardVersions;
     };
 
 } // namespace mongo

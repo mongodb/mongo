@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/index/btree_based_access_method.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 
@@ -54,12 +54,9 @@ namespace mongo {
      *   bucketSize specifies the dimension of the square bucket for the data in pos.
      * ALL fields are mandatory.
      */
-    class HaystackAccessMethod : public BtreeBasedAccessMethod {
+    class HaystackAccessMethod : public IndexAccessMethod {
     public:
-        using BtreeBasedAccessMethod::_descriptor;
-
         HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
-        virtual ~HaystackAccessMethod() { }
 
     protected:
         friend class GeoHaystackSearchCommand;
@@ -68,7 +65,7 @@ namespace mongo {
                            BSONObjBuilder* result, unsigned limit);
 
     private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         std::string _geoField;
         std::vector<std::string> _otherFields;

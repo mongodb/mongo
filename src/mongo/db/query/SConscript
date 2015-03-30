@@ -21,6 +21,7 @@ env.Library(
     ],
     LIBDEPS=[
         "explain_common",
+        "getmore_request",
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
@@ -61,6 +62,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
         "$BUILD_DIR/mongo/mocklib",
+        "$BUILD_DIR/mongo/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -75,7 +77,6 @@ env.Library(
         "interval.cpp",
     ],
     LIBDEPS=[
-        "query_logger",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions_geo",
         "$BUILD_DIR/mongo/index_names",
@@ -91,6 +92,26 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson",
+    ],
+)
+
+env.Library(
+    target="getmore_request",
+    source=[
+        "getmore_request.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson",
+    ],
+)
+
+env.CppUnitTest(
+    target="getmore_request_test",
+    source=[
+        "getmore_request_test.cpp"
+    ],
+    LIBDEPS=[
+        "getmore_request",
     ],
 )
 
@@ -111,16 +132,6 @@ env.Library(
     ],
     LIBDEPS=[
         "query_planner",
-    ],
-)
-
-env.Library(
-    target="query_logger",
-    source=[
-        "qlog.cpp"
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 
@@ -247,6 +258,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
         "$BUILD_DIR/mongo/mocklib",
+        "$BUILD_DIR/mongo/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )

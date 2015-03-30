@@ -33,16 +33,15 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/index/btree_based_bulk_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/platform/cstdint.h"
-
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/platform/cstdint.h"
 
 namespace IndexUpdateTests {
 
@@ -121,7 +120,7 @@ namespace IndexUpdateTests {
         }
 
         OperationContextImpl _txn;
-        Client::WriteContext _ctx;
+        OldClientWriteContext _ctx;
         DBDirectClient _client;
     };
 
@@ -346,7 +345,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -384,7 +383,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -419,7 +418,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             RecordId loc1;
             RecordId loc2;
@@ -468,7 +467,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -502,7 +501,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -535,7 +534,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -573,7 +572,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);

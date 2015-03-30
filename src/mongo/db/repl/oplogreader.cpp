@@ -188,7 +188,7 @@ namespace repl {
             }
             // Read the first (oldest) op and confirm that it's not newer than our last
             // fetched op. Otherwise, we have fallen off the back of that source's oplog.
-            BSONObj remoteOldestOp(findOne(rsoplog, Query()));
+            BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));
             BSONElement tsElem(remoteOldestOp["ts"]);
             if (tsElem.type() != Timestamp) {
                 // This member's got a bad op in its oplog.

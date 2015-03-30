@@ -38,7 +38,12 @@ namespace mongo {
 
     class PlanYieldPolicy {
     public:
-        explicit PlanYieldPolicy(PlanExecutor* exec);
+        /**
+         * If policy == WRITE_CONFLICT_RETRY_ONLY, shouldYield will only return true after
+         * forceYield has been called, and yield will only commitAndRestart without releasing any
+         * locks.
+         */
+        PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
 
         /**
          * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
@@ -65,15 +70,27 @@ namespace mongo {
          */
         bool yield(RecordFetcher* fetcher = NULL);
 
-    private:
-        // Default constructor disallowed in order to ensure initialization of '_planYielding'.
-        PlanYieldPolicy();
+        /**
+         * All calls to shouldYield will return true until the next call to yield.
+         */
+        void forceYield() {
+            dassert(allowedToYield());
+            _forceYield = true;
+        }
 
+        bool allowedToYield() const { return _policy != PlanExecutor::YIELD_MANUAL; }
+
+        void setPolicy(PlanExecutor::YieldPolicy policy) { _policy = policy; }
+
+    private:
+        PlanExecutor::YieldPolicy _policy;
+
+        bool _forceYield;
         ElapsedTracker _elapsedTracker;
 
         // The plan executor which this yield policy is responsible for yielding. Must
         // not outlive the plan executor.
-        PlanExecutor* _planYielding;
+        PlanExecutor* const _planYielding;
     };
 
 } // namespace mongo

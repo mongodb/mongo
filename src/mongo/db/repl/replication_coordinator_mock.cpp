@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -170,8 +171,9 @@ namespace repl {
         return true;
     }
 
-    void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommandHandshakes(
-            std::vector<BSONObj>* handshakes) {}
+    ReplicaSetConfig ReplicationCoordinatorMock::getConfig() const {
+        return ReplicaSetConfig();
+    }
 
     void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result) {
         // TODO
@@ -239,12 +241,12 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorMock::processReplSetUpdatePosition(
-            const UpdatePositionArgs& updates) {
+            const UpdatePositionArgs& updates, long long* configVersion) {
         // TODO
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processHandshake(OperationContext* txn,
+    Status ReplicationCoordinatorMock::processHandshake(OperationContext* txn,  
                                                         const HandshakeArgs& handshake) {
         return Status::OK();
     }

@@ -45,8 +45,9 @@ static int json_data(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *, uint32_t);
 static int json_expect(WT_SESSION *, JSON_INPUT_STATE *, int);
 static int json_peek(WT_SESSION *, JSON_INPUT_STATE *);
 static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, const char **);
-static int json_kvraw_append(JSON_INPUT_STATE *, const char *, size_t);
-static int json_strdup(JSON_INPUT_STATE *, char **);
+static int json_kvraw_append(
+	       WT_SESSION *, JSON_INPUT_STATE *, const char *, size_t);
+static int json_strdup(WT_SESSION *, JSON_INPUT_STATE *, char **);
 static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *, uint32_t);
 
 #define	JSON_STRING_MATCH(ins, match)					\
@@ -66,8 +67,8 @@ static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *, uint32_t);
  *	Parse a column group or index entry from JSON input.
  */
 static int
-json_column_group_index(WT_SESSION *session, JSON_INPUT_STATE *ins,
-    CONFIG_LIST *clp, int idx)
+json_column_group_index(WT_SESSION *session,
+    JSON_INPUT_STATE *ins, CONFIG_LIST *clp, int idx)
 {
 	WT_DECL_RET;
 	char *config, *p, *uri;
@@ -85,8 +86,8 @@ json_column_group_index(WT_SESSION *session, JSON_INPUT_STATE *ins,
 		JSON_EXPECT(session, ins, ':');
 		JSON_EXPECT(session, ins, 's');
 
-		if ((ret = json_strdup(ins, &p)) != 0) {
-			ret = util_err(ret, NULL);
+		if ((ret = json_strdup(session, ins, &p)) != 0) {
+			ret = util_err(session, ret, NULL);
 			goto err;
 		}
 		if (isconfig)
@@ -102,8 +103,8 @@ json_column_group_index(WT_SESSION *session, JSON_INPUT_STATE *ins,
 		JSON_EXPECT(session, ins, ':');
 		JSON_EXPECT(session, ins, 's');
 
-		if ((ret = json_strdup(ins, &p)) != 0) {
-			ret = util_err(ret, NULL);
+		if ((ret = json_strdup(session, ins, &p)) != 0) {
+			ret = util_err(session, ret, NULL);
 			goto err;
 		}
 		if (isconfig)
@@ -113,12 +114,12 @@ json_column_group_index(WT_SESSION *session, JSON_INPUT_STATE *ins,
 		JSON_EXPECT(session, ins, '}');
 		if ((idx && strncmp(uri, "index:", 6) != 0) ||
 		    (!idx && strncmp(uri, "colgroup:", 9) != 0)) {
-			ret = util_err(EINVAL,
+			ret = util_err(session, EINVAL,
 			    "%s: misplaced colgroup or index", uri);
 			goto err;
 		}
-		if ((ret = config_list_add(clp, uri)) != 0 ||
-		    (ret = config_list_add(clp, config)) != 0)
+		if ((ret = config_list_add(session, clp, uri)) != 0 ||
+		    (ret = config_list_add(session, clp, config)) != 0)
 			goto err;
 
 		if (json_peek(session, ins) != ',')
@@ -139,7 +140,9 @@ err:		if (ret == 0)
  *	Append to the kvraw buffer, which is used to collect all the
  *	raw key/value pairs from JSON input.
  */
-static int json_kvraw_append(JSON_INPUT_STATE *ins, const char *str, size_t len)
+static int
+json_kvraw_append(WT_SESSION *session,
+    JSON_INPUT_STATE *ins, const char *str, size_t len)
 {
 	char *tmp;
 	size_t needsize;
@@ -147,7 +150,7 @@ static int json_kvraw_append(JSON_INPUT_STATE *ins, const char *str, size_t len)
 	if (len > 0) {
 		needsize = strlen(ins->kvraw) + len + 2;
 		if ((tmp = malloc(needsize)) == NULL)
-			return (util_err(errno, NULL));
+			return (util_err(session, errno, NULL));
 		snprintf(tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str);
 		free(ins->kvraw);
 		ins->kvraw = tmp;
@@ -161,7 +164,7 @@ static int json_kvraw_append(JSON_INPUT_STATE *ins, const char *str, size_t len)
  *	JSON string at the current input position.
  */
 static int
-json_strdup(JSON_INPUT_STATE *ins, char **resultp)
+json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 {
 	WT_DECL_RET;
 	char *result, *resultcpy;
@@ -173,12 +176,12 @@ json_strdup(JSON_INPUT_STATE *ins, char **resultp)
 	src = ins->tokstart + 1;  /*strip "" from token */
 	srclen = ins->toklen - 2;
 	if ((resultlen = __wt_json_strlen(src, srclen)) < 0) {
-		ret = util_err(EINVAL, "Invalid config string");
+		ret = util_err(session, EINVAL, "Invalid config string");
 		goto err;
 	}
 	resultlen += 1;
 	if ((result = (char *)malloc((size_t)resultlen)) == NULL) {
-		ret = util_err(errno, NULL);
+		ret = util_err(session, errno, NULL);
 		goto err;
 	}
 	*resultp = result;
@@ -186,7 +189,7 @@ json_strdup(JSON_INPUT_STATE *ins, char **resultp)
 	if ((ret = __wt_json_strncpy(&resultcpy, (size_t)resultlen, src,
 	    srclen))
 	    != 0) {
-		ret = util_err(ret, NULL);
+		ret = util_err(session, ret, NULL);
 		goto err;
 	}
 
@@ -206,8 +209,8 @@ err:		if (ret == 0)
  *	values.
  */
 static int
-json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
-    uint32_t flags)
+json_data(WT_SESSION *session,
+    JSON_INPUT_STATE *ins, CONFIG_LIST *clp, uint32_t flags)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -222,7 +225,7 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 	uri = NULL;
 
 	/* Reorder and check the list. */
-	if ((ret = config_reorder(clp->list)) != 0)
+	if ((ret = config_reorder(session, clp->list)) != 0)
 		goto err;
 
 	/* Update config based on command-line configuration. */
@@ -240,7 +243,7 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 	    LF_ISSET(LOAD_JSON_NO_OVERWRITE) ? ",overwrite=false" : "");
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0) {
-		ret = util_err(ret, "%s: session.open", uri);
+		ret = util_err(session, ret, "%s: session.open", uri);
 		goto err;
 	}
 	keyformat = cursor->key_format;
@@ -255,7 +258,7 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 		JSON_EXPECT(session, ins, '{');
 		if (ins->kvraw == NULL) {
 			if ((ins->kvraw = (char *)malloc(1)) == NULL) {
-				ret = util_err(errno, NULL);
+				ret = util_err(session, errno, NULL);
 				goto err;
 			}
 		}
@@ -274,14 +277,14 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 				gotnolen = (endp - ins->tokstart);
 				if (recno != gotno ||
 				    ins->toklen != (size_t)gotnolen) {
-					ret = util_err(0,
+					ret = util_err(session, 0,
 					    "%s: recno out of order", uri);
 					goto err;
 				}
 			}
 			if (++nfield == nkeys) {
 				size_t curpos = JSON_INPUT_POS(ins);
-				if ((ret = json_kvraw_append(ins,
+				if ((ret = json_kvraw_append(session, ins,
 				    (char *)ins->line.mem + ins->kvrawstart,
 				    curpos - ins->kvrawstart)) != 0)
 					goto err;
@@ -294,7 +297,8 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 			if (json_peek(session, ins) != 's')
 				goto err;
 		}
-		if (json_kvraw_append(ins, ins->line.mem, JSON_INPUT_POS(ins)))
+		if (json_kvraw_append(
+		    session, ins, ins->line.mem, JSON_INPUT_POS(ins)))
 			goto err;
 
 		ins->kvraw[keystrlen] = '\0';
@@ -303,7 +307,7 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 		/* skip over inserted space and comma */
 		cursor->set_value(cursor, &ins->kvraw[keystrlen+2]);
 		if ((ret = cursor->insert(cursor)) != 0) {
-			ret = util_err(ret, "%s: cursor.insert", uri);
+			ret = util_err(session, ret, "%s: cursor.insert", uri);
 			goto err;
 		}
 
@@ -324,7 +328,7 @@ err:		if (ret == 0)
 	 * the close succeed, it's better to fail early when loading files.
 	 */
 	if (cursor != NULL && (tret = cursor->close(cursor)) != 0) {
-		tret = util_err(tret, "%s: cursor.close", uri);
+		tret = util_err(session, tret, "%s: cursor.close", uri);
 		if (ret == 0)
 			ret = tret;
 	}
@@ -371,13 +375,16 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 			if (JSON_STRING_MATCH(ins, "config")) {
 				JSON_EXPECT(session, ins, ':');
 				JSON_EXPECT(session, ins, 's');
-				if ((ret = json_strdup(ins, &config)) != 0) {
-					ret = util_err(ret, NULL);
+				if ((ret =
+				    json_strdup(session, ins, &config)) != 0) {
+					ret = util_err(session, ret, NULL);
 					goto err;
 				}
-				if ((ret = config_list_add(&cl, tableuri)) != 0)
+				if ((ret = config_list_add(
+				    session, &cl, tableuri)) != 0)
 					goto err;
-				if ((ret = config_list_add(&cl, config)) != 0)
+				if ((ret = config_list_add(
+				    session, &cl, config)) != 0)
 					goto err;
 				tableuri = NULL;
 			} else if (JSON_STRING_MATCH(ins, "colgroups")) {
@@ -448,7 +455,7 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 			if (*ins->p)
 				break;
 			if (ins->kvraw != NULL) {
-				if (json_kvraw_append(ins,
+				if (json_kvraw_append(session, ins,
 				    (char *)ins->line.mem + ins->kvrawstart,
 				    strlen(ins->line.mem) - ins->kvrawstart)) {
 					ret = -1;
@@ -456,8 +463,8 @@ json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
 				}
 				ins->kvrawstart = 0;
 			}
-			if (util_read_line(&ins->line, 1,
-			    &ins->ateof)) {
+			if (util_read_line(
+			    session, &ins->line, 1, &ins->ateof)) {
 				ins->toktype = -1;
 				ret = -1;
 				goto err;
@@ -527,7 +534,7 @@ json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 		for (match = matches; *match != NULL; match++)
 			if ((hit = strstr(ins->p, *match)) != NULL)
 				goto out;
-		if (util_read_line(&ins->line, 1, &ins->ateof)) {
+		if (util_read_line(session, &ins->line, 1, &ins->ateof)) {
 			ins->toktype = -1;
 			return (1);
 		}
@@ -558,7 +565,7 @@ util_load_json(WT_SESSION *session, const char *filename, uint32_t flags)
 
 	memset(&instate, 0, sizeof(instate));
 	instate.session = session;
-	if (util_read_line(&instate.line, 0, &instate.ateof))
+	if (util_read_line(session, &instate.line, 0, &instate.ateof))
 		return (1);
 	instate.p = (const char *)instate.line.mem;
 	instate.linenum = 1;

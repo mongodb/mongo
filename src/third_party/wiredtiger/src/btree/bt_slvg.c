@@ -124,7 +124,7 @@ static int  __slvg_col_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static void __slvg_col_trk_update_start(uint32_t, WT_STUFF *);
 static int  __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
-static int  __slvg_ovfl_compare(const void *, const void *);
+static int WT_CDECL __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_ref(WT_SESSION_IMPL *, WT_TRACK *, int);
@@ -140,9 +140,9 @@ static int  __slvg_row_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static int  __slvg_row_trk_update_start(
 		WT_SESSION_IMPL *, WT_ITEM *, uint32_t, WT_STUFF *);
-static int  __slvg_trk_compare_addr(const void *, const void *);
-static int  __slvg_trk_compare_gen(const void *, const void *);
-static int  __slvg_trk_compare_key(const void *, const void *);
+static int  WT_CDECL __slvg_trk_compare_addr(const void *, const void *);
+static int  WT_CDECL __slvg_trk_compare_gen(const void *, const void *);
+static int  WT_CDECL __slvg_trk_compare_key(const void *, const void *);
 static int  __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, int);
 static void __slvg_trk_free_addr(WT_SESSION_IMPL *, WT_TRACK *);
 static int  __slvg_trk_init(WT_SESSION_IMPL *, uint8_t *,
@@ -612,7 +612,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * on every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, &page));
+		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, 0, &page));
 		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->pg_row_d[0], &trk->row_start));
 		WT_ERR(__wt_row_leaf_key_copy(session, page,
@@ -1744,7 +1744,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->trk_size, &dsk));
 	WT_ERR(__wt_bt_read(session, dsk, trk->trk_addr, trk->trk_addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, dsk->mem, 0, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, dsk->mem, 0, 0, &page));
 
 	/*
 	 * Walk the page, looking for a key sorting greater than the specified
@@ -1858,8 +1858,7 @@ __slvg_row_build_internal(
 			WT_ERR(__slvg_row_build_leaf(session, trk, ref, ss));
 		} else {
 			WT_ERR(__wt_row_ikey_incr(session, page, 0,
-			    trk->row_start.data, trk->row_start.size,
-			    &ref->key.ikey));
+			    trk->row_start.data, trk->row_start.size, ref));
 
 			WT_ERR(__slvg_ovfl_ref_all(session, trk));
 		}
@@ -1981,8 +1980,8 @@ __slvg_row_build_leaf(
 	 */
 	rip = page->pg_row_d + skip_start;
 	WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
-	WT_ERR(__wt_row_ikey_incr(session,
-	    ref->home, 0, key->data, key->size, &ref->key.ikey));
+	WT_ERR(__wt_row_ikey_incr(
+	    session, ref->home, 0, key->data, key->size, ref));
 
 	/* Set the referenced flag on overflow pages we're using. */
 	if (trk->trk_ovfl_cnt != 0)
@@ -2099,7 +2098,7 @@ __slvg_row_ovfl(WT_SESSION_IMPL *session,
  * __slvg_trk_compare_addr --
  *	Compare two WT_TRACK array entries by address cookie.
  */
-static int
+static int WT_CDECL
 __slvg_trk_compare_addr(const void *a, const void *b)
 {
 	WT_DECL_RET;
@@ -2125,7 +2124,7 @@ __slvg_trk_compare_addr(const void *a, const void *b)
  * __slvg_ovfl_compare --
  *	Bsearch comparison routine for the overflow array.
  */
-static int
+static int WT_CDECL
 __slvg_ovfl_compare(const void *a, const void *b)
 {
 	WT_ADDR *addr;
@@ -2164,6 +2163,7 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	 * with the lowest LSNs until overflow pages are only referenced once.
 	 *
 	 * This requires sorting the page list by LSN, and the overflow array
+
 	 * by address cookie.
 	 */
 	qsort(ss->pages,
@@ -2247,7 +2247,7 @@ err:	__wt_free(session, slot);
  * __slvg_trk_compare_key --
  *	Compare two WT_TRACK array entries by key, and secondarily, by LSN.
  */
-static int
+static int WT_CDECL
 __slvg_trk_compare_key(const void *a, const void *b)
 {
 	WT_SESSION_IMPL *session;
@@ -2304,7 +2304,7 @@ __slvg_trk_compare_key(const void *a, const void *b)
  * __slvg_trk_compare_gen --
  *	Compare two WT_TRACK array entries by LSN.
  */
-static int
+static int WT_CDECL
 __slvg_trk_compare_gen(const void *a, const void *b)
 {
 	WT_TRACK *a_trk, *b_trk;

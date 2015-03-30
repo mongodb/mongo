@@ -95,12 +95,13 @@
  *       class MONGO_COMPILER_API_EXPORT ExportedType { ... };
  *       MONGO_COMPILER_API_EXPORT SomeType exportedFunction(...);
  *
- *   NOTE: Rather than using this macro directly, one typically declares another macro named for the
- *   library, which is conditionally defined to either MONGO_COMIPLER_API_EXPORT or
- *   MONGO_COMPILER_API_IMPORT based on whether the compiler is currently building the library or
- *   building an object that depends on the library, respectively.  For example, MONGO_CLIENT_API
- *   might be defined to MONGO_COMPILER_API_EXPORT when building the MongoDB shared library, and to
- *   MONGO_COMPILER_API_IMPORT when building an application that links against the shared library.
+ *   NOTE: Rather than using this macro directly, one typically declares another macro named
+ *   for the library, which is conditionally defined to either MONGO_COMIPLER_API_EXPORT or
+ *   MONGO_COMPILER_API_IMPORT based on whether the compiler is currently building the library
+ *   or building an object that depends on the library, respectively.  For example,
+ *   MONGO_FOO_API might be defined to MONGO_COMPILER_API_EXPORT when building the MongoDB
+ *   libfoo shared library, and to MONGO_COMPILER_API_IMPORT when building an application that
+ *   links against that shared library.
  *
  *
  * MONGO_COMPILER_API_IMPORT

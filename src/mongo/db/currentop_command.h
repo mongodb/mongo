@@ -35,13 +35,17 @@ namespace mongo {
     class BSONObjBuilder;
     struct DbResponse;
     class Message;
+    class NamespaceString;
     class OperationContext;
 
     /**
      * Executes the db.currentOp() command. Currently not an actual "command" object, but should
      * be converted to one at some point.
      */
-    void inProgCmd(OperationContext* txn, Message &m, DbResponse &dbresponse);
+    void inProgCmd(OperationContext* txn,
+                   const NamespaceString& nss,
+                   Message &m,
+                   DbResponse &dbresponse);
 
     /**
      * Constructs a human-readable BSON from the specified LockerInfo structure.

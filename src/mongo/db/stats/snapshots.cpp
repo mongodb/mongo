@@ -73,14 +73,14 @@ namespace mongo {
     }
 
     Snapshots::Snapshots(int n)
-        : _lock("Snapshots"), _n(n)
+        : _n(n)
         , _snapshots(new SnapshotData[n])
         , _loc(0)
         , _stored(0)
     {}
 
     const SnapshotData* Snapshots::takeSnapshot() {
-        scoped_lock lk(_lock);
+        boost::lock_guard<boost::mutex> lk(_lock);
         _loc = ( _loc + 1 ) % _n;
         _snapshots[_loc].takeSnapshot();
         if ( _stored < _n )
@@ -89,7 +89,7 @@ namespace mongo {
     }
 
     auto_ptr<SnapshotDelta> Snapshots::computeDelta( int numBack ) {
-        scoped_lock lk(_lock);
+        boost::lock_guard<boost::mutex> lk(_lock);
         auto_ptr<SnapshotDelta> p;
         if ( numBack < numDeltas() )
             p.reset( new SnapshotDelta( getPrev(numBack+1) , getPrev(numBack) ) );

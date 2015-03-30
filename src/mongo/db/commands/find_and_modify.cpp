@@ -36,14 +36,19 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/projection.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/projection.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -111,6 +116,13 @@ namespace mongo {
                 return false;
             }
 
+            StatusWith<WriteConcernOptions> wcResult = extractWriteConcern(cmdObj);
+            if (!wcResult.isOK()) {
+                return appendCommandStatus(result, wcResult.getStatus());
+            }
+            txn->setWriteConcern(wcResult.getValue());
+            setupSynchronousCommit(txn);
+
             bool ok = false;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 errmsg = "";
@@ -134,7 +146,7 @@ namespace mongo {
                 // Take X lock so we can create collection, then re-run operation.
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-                Client::Context ctx(txn, ns, false /* don't check version */);
+                OldClientContext ctx(txn, ns, false /* don't check version */);
                 if (!fromRepl &&
                     !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -148,11 +160,13 @@ namespace mongo {
                     // but that's ok, we'll just do nothing and error out
                 }
                 else {
-                    WriteUnitOfWork wuow(txn);
-                    uassertStatusOK( userCreateNS( txn, db,
-                                                   ns, BSONObj(),
-                                                   !fromRepl ) );
-                    wuow.commit();
+                    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                        WriteUnitOfWork wuow(txn);
+                        uassertStatusOK( userCreateNS( txn, db,
+                                                       ns, BSONObj(),
+                                                       !fromRepl ) );
+                        wuow.commit();
+                    } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", ns);
                 }
 
                 errmsg = "";
@@ -169,6 +183,10 @@ namespace mongo {
                              result,
                              errmsg);
             }
+
+            WriteConcernResult res;
+            Status waitStatus = waitForWriteConcern(txn, txn->getClient()->getLastOp(), &res);
+            appendCommandWCStatus(result, waitStatus);
 
             return ok;
         }
@@ -208,7 +226,7 @@ namespace mongo {
 
             AutoGetOrCreateDb autoDb(txn, dbname, MODE_IX);
             Lock::CollectionLock collLock(txn->lockState(), ns, MODE_IX);
-            Client::Context ctx(txn, ns, autoDb.getDb(), autoDb.justCreated());
+            OldClientContext ctx(txn, ns, autoDb.getDb(), autoDb.justCreated());
 
             if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                 return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
@@ -368,6 +386,14 @@ namespace mongo {
                 if ( found ) {
                     deleteObjects(txn, ctx.db(), ns, queryModified, PlanExecutor::YIELD_MANUAL,
                                   true, true);
+
+                    // Committing the WUOW can close the current snapshot. Until this happens, the
+                    // snapshot id should not have changed.
+                    invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
+
+                    // Must commit the write before doing anything that could throw.
+                    wuow.commit();
+
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
@@ -375,17 +401,78 @@ namespace mongo {
             }
             else {
                 // update
-                if ( ! found && ! upsert ) {
-                    // didn't have it, and am not upserting
-                    _appendHelper(result, doc, found, fields, whereCallback);
+                if (!found) {
+                    if (!upsert) {
+                        // Didn't have it, and not upserting.
+                        _appendHelper(result, doc, found, fields, whereCallback);
+                    }
+                    else {
+                        // Do an insert.
+                        BSONObj newDoc;
+                        {
+                            CanonicalQuery* rawCq;
+                            uassertStatusOK(CanonicalQuery::canonicalize(ns, queryModified, &rawCq,
+                                                                         WhereCallbackNoop()));
+                            boost::scoped_ptr<CanonicalQuery> cq(rawCq);
+
+                            UpdateDriver::Options opts;
+                            UpdateDriver driver(opts);
+                            uassertStatusOK(driver.parse(update));
+
+                            mutablebson::Document doc(newDoc,
+                                                      mutablebson::Document::kInPlaceDisabled);
+
+                            const bool ignoreVersion = false;
+                            UpdateLifecycleImpl updateLifecycle(ignoreVersion, collection->ns());
+
+                            UpdateStats stats;
+                            const bool isInternalRequest = false;
+
+                            uassertStatusOK(UpdateStage::applyUpdateOpsForInsert(cq.get(),
+                                                                                 queryModified,
+                                                                                 &driver,
+                                                                                 &updateLifecycle,
+                                                                                 &doc,
+                                                                                 isInternalRequest,
+                                                                                 &stats,
+                                                                                 &newDoc));
+                        }
+
+                        const bool enforceQuota = true;
+                        uassertStatusOK(collection->insertDocument(txn, newDoc, enforceQuota)
+                                        .getStatus());
+
+                        // This is the last thing we do before the WriteUnitOfWork commits (except
+                        // for some BSON manipulation).
+                        getGlobalEnvironment()->getOpObserver()->onInsert(txn,
+                                                                          collection->ns().ns(),
+                                                                          newDoc); 
+
+                        // Must commit the write and logOp() before doing anything that could throw.
+                        wuow.commit();
+
+                        // The third argument indicates whether or not we have something for the
+                        // 'value' field returned by a findAndModify command.
+                        //
+                        // Since we did an insert, we have a doc only if the user asked us to
+                        // return the new copy. We return a value of 'null' if we inserted and
+                        // the user asked for the old copy.
+                        _appendHelper(result, newDoc, returnNew, fields, whereCallback);
+
+                        BSONObjBuilder le(result.subobjStart("lastErrorObject"));
+                        le.appendBool("updatedExisting", false);
+                        le.appendNumber("n", 1);
+                        le.appendAs(newDoc["_id"], kUpsertedFieldName);
+                        le.done();
+                    }
                 }
                 else {
                     // we found it or we're updating
-                    
+
                     if ( ! returnNew ) {
                         _appendHelper(result, doc, found, fields, whereCallback);
                     }
-                    
+
                     const NamespaceString requestNs(ns);
                     UpdateRequest request(requestNs);
 
@@ -406,21 +493,17 @@ namespace mongo {
                                                      request,
                                                      &txn->getCurOp()->debug());
 
-                    if (!found && res.existing) {
-                        // No match was found during the read part of this find and modify, which
-                        // means that we're here doing an upsert. But the update also told us that
-                        // we modified an *already existing* document. This probably means that
-                        // the query reported EOF based on an out-of-date snapshot. This should be
-                        // a rare event, so we handle it by throwing a write conflict.
-                        throw WriteConflictException();
-                    }
+                    invariant(collection);
+                    invariant(res.existing);
+                    LOG(3) << "update result: "  << res;
 
-                    if ( !collection ) {
-                        // collection created by an upsert
-                        collection = ctx.db()->getCollection(ns);
-                    }
+                    // Committing the WUOW can close the current snapshot. Until this happens, the
+                    // snapshot id should not have changed.
+                    invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
 
-                    LOG(3) << "update result: "  << res ;
+                    // Must commit the write before doing anything that could throw.
+                    wuow.commit();
+
                     if (returnNew) {
                         dassert(!res.newObj.isEmpty());
                         _appendHelper(result, res.newObj, true, fields, whereCallback);
@@ -435,13 +518,6 @@ namespace mongo {
                     le.done();
                 }
             }
-
-            // Committing the WUOW can close the current snapshot. Until this happens, the
-            // snapshot id should not have changed.
-            if (found) {
-                invariant(txn->recoveryUnit()->getSnapshotId() == snapshotDoc.snapshotId());
-            }
-            wuow.commit();
 
             return true;
         }

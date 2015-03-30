@@ -48,8 +48,13 @@ namespace mongo {
         }
 
         virtual void registerChange(Change* change) {
-            change->commit();
-            delete change;
+            try {
+                change->commit();
+                delete change;
+            }
+            catch (...) {
+                std::terminate();
+            }
         }
 
         virtual void* writingPtr(void* data, size_t len) {

@@ -42,33 +42,6 @@ namespace {
 
     using std::string;
 
-    TEST(SimpleRecordStoreV1, ChangeNoPaddingSetting) {
-        OperationContextNoop txn;
-        DummyExtentManager em;
-        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
-
-        string myns = "test.foo";
-        SimpleRecordStoreV1 rs(&txn, myns, md, &em, false);
-
-        BSONObjBuilder info;
-
-        ASSERT_FALSE(md->isUserFlagSet(RecordStoreV1Base::Flag_NoPadding));
-
-        ASSERT_OK(rs.setCustomOption(&txn, BSON("noPadding" << true).firstElement(), &info));
-        ASSERT_TRUE(md->isUserFlagSet(RecordStoreV1Base::Flag_NoPadding));
-
-        ASSERT_OK(rs.setCustomOption(&txn, BSON("noPadding" << false).firstElement(), &info));
-        ASSERT_FALSE(md->isUserFlagSet(RecordStoreV1Base::Flag_NoPadding));
-
-        // duplicate names are expected since we reused the same builder.
-        const BSONObj expectedInfo = BSON("noPadding_old" << false
-                                       << "noPadding_new" << true
-                                       << "noPadding_old" << true
-                                       << "noPadding_new" << false
-                                       );
-        ASSERT_EQUALS(info.done(), expectedInfo);
-    }
-
     TEST( SimpleRecordStoreV1, quantizeAllocationSpaceSimple ) {
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(33), 64);
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(1000), 1024);
@@ -157,7 +130,7 @@ namespace {
         OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
-        md->setUserFlag(&txn, RecordStoreV1Base::Flag_NoPadding);
+        md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
 
         string myns = "test.AllocQuantized";
         SimpleRecordStoreV1 rs( &txn, myns, md, &em, false );
@@ -174,7 +147,7 @@ namespace {
         OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
-        md->setUserFlag(&txn, RecordStoreV1Base::Flag_NoPadding);
+        md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
 
         string myns = "test.AllocQuantized";
         SimpleRecordStoreV1 rs( &txn, myns, md, &em, false );

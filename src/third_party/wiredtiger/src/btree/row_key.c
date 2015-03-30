@@ -439,7 +439,7 @@ next:		switch (direction) {
 		(void)__wt_row_leaf_key_info(
 		    page, copy, &ikey, &cell, NULL, NULL);
 		if (ikey == NULL) {
-			WT_ERR(__wt_row_ikey(session,
+			WT_ERR(__wt_row_ikey_alloc(session,
 			    WT_PAGE_DISK_OFFSET(page, cell),
 			    keyb->data, keyb->size, &ikey));
 
@@ -462,15 +462,37 @@ err:	__wt_scr_free(session, &tmp);
 }
 
 /*
+ * __wt_row_ikey_alloc --
+ *	Instantiate a key in a WT_IKEY structure.
+ */
+int
+__wt_row_ikey_alloc(WT_SESSION_IMPL *session,
+    uint32_t cell_offset, const void *key, size_t size, WT_IKEY **ikeyp)
+{
+	WT_IKEY *ikey;
+
+	/*
+	 * Allocate memory for the WT_IKEY structure and the key, then copy
+	 * the key into place.
+	 */
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_IKEY) + size, &ikey));
+	ikey->size = WT_STORE_SIZE(size);
+	ikey->cell_offset = cell_offset;
+	memcpy(WT_IKEY_DATA(ikey), key, size);
+	*ikeyp = ikey;
+	return (0);
+}
+
+/*
  * __wt_row_ikey_incr --
  *	Instantiate a key in a WT_IKEY structure and increment the page's
  * memory footprint.
  */
 int
 __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page,
-    uint32_t cell_offset, const void *key, size_t size, void *ikeyp)
+    uint32_t cell_offset, const void *key, size_t size, WT_REF *ref)
 {
-	WT_RET(__wt_row_ikey(session, cell_offset, key, size, ikeyp));
+	WT_RET(__wt_row_ikey(session, cell_offset, key, size, ref));
 
 	__wt_cache_page_inmem_incr(session, page, sizeof(WT_IKEY) + size);
 
@@ -483,19 +505,30 @@ __wt_row_ikey_incr(WT_SESSION_IMPL *session, WT_PAGE *page,
  */
 int
 __wt_row_ikey(WT_SESSION_IMPL *session,
-    uint32_t cell_offset, const void *key, size_t size, void *ikeyp)
+    uint32_t cell_offset, const void *key, size_t size, WT_REF *ref)
 {
 	WT_IKEY *ikey;
 
-	/*
-	 * Allocate memory for the WT_IKEY structure and the key, then copy
-	 * the key into place.
-	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_IKEY) + size, &ikey));
-	ikey->size = WT_STORE_SIZE(size);
-	ikey->cell_offset = cell_offset;
-	memcpy(WT_IKEY_DATA(ikey), key, size);
+	WT_RET(__wt_row_ikey_alloc(session, cell_offset, key, size, &ikey));
 
-	*(WT_IKEY **)ikeyp = ikey;
+#ifdef HAVE_DIAGNOSTIC
+	{
+	uintptr_t oldv;
+
+	oldv = (uintptr_t)ref->key.ikey;
+	WT_DIAGNOSTIC_YIELD;
+
+	/*
+	 * We should never overwrite an instantiated key, and we should
+	 * never instantiate a key after a split.
+	 */
+	WT_ASSERT(session, oldv == 0 || (oldv & WT_IK_FLAG) != 0);
+	WT_ASSERT(session, ref->state != WT_REF_SPLIT);
+	WT_ASSERT(session,
+	    WT_ATOMIC_CAS8(ref->key.ikey, (WT_IKEY *)oldv, ikey));
+	}
+#else
+	ref->key.ikey = ikey;
+#endif
 	return (0);
 }

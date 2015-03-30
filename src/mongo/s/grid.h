@@ -35,10 +35,12 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/concurrency/mutex.h"
 
-#include "mongo/s/config.h"  // DBConfigPtr
-#include "mongo/s/type_settings.h"
+#include "mongo/s/config.h"
 
 namespace mongo {
+
+    class CatalogManager;
+    class SettingsType;
 
     /**
      * stores meta-information about the grid
@@ -46,7 +48,15 @@ namespace mongo {
      */
     class Grid {
     public:
-        Grid() : _lock( "Grid" ) , _allowLocalShard( true ) { }
+        Grid();
+
+        /**
+         * Called at startup time so the catalog manager can be set.
+         *
+         * Returns whether the catalog manager has been initialized successfully. Must be called
+         * only once.
+         */
+        bool initCatalogManager(const std::vector<std::string>& configHosts);
 
         /**
          * gets the config the db.
@@ -88,21 +98,6 @@ namespace mongo {
         void setAllowLocalHost( bool allow );
 
         /**
-         *
-         * addShard will create a new shard in the grid. It expects a mongod process to be running
-         * on the provided address. Adding a shard that is a replica set is supported.
-         *
-         * @param name is an optional std::string with the name of the shard. if omitted, grid will
-         *        generate one and update the parameter.
-         * @param servers is the connection std::string of the shard being added
-         * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
-         *        space usage
-         * @param errMsg is the error description in case the operation failed.
-         * @return true if shard was successfully added.
-         */
-        bool addShard( std::string* name , const ConnectionString& servers , long long maxSize , std::string& errMsg );
-
-        /**
          * @return true if the config database knows about a host 'name'
          */
         bool knowAboutShard( const std::string& name ) const;
@@ -132,6 +127,8 @@ namespace mongo {
          */
         bool getCollShouldBalance(const std::string& ns) const;
 
+        CatalogManager* catalogManager() const { return _catalogManager.get(); }
+
         /**
          * 
          * Obtain grid configuration and settings data.
@@ -155,10 +152,6 @@ namespace mongo {
         static bool _inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now );
 
     private:
-        mongo::mutex              _lock;            // protects _databases; TODO: change to r/w lock ??
-        std::map<std::string, DBConfigPtr > _databases;       // maps ns to DBConfig's
-        bool                      _allowLocalShard; // can 'localhost' be used in shard addresses?
-
         /**
          * @param name is the chose name for the shard. Parameter is mandatory.
          * @return true if it managed to generate a shard name. May return false if (currently)
@@ -170,6 +163,16 @@ namespace mongo {
          * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
          */
         static bool _isSpecialLocalDB( const std::string& dbName );
+
+
+        // Databases catalog map and mutex to protect it
+        mongo::mutex _lock;
+        std::map<std::string, DBConfigPtr> _databases;
+
+        boost::scoped_ptr<CatalogManager> _catalogManager;
+
+        // can 'localhost' be used in shard addresses?
+        bool _allowLocalShard;
     };
 
     extern Grid grid;

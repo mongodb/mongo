@@ -45,6 +45,8 @@
  * Do this once for each unique set of parameters to MONGO_CREATE_SORTER.
  */
 
+#include "mongo/config.h"
+
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -90,7 +92,7 @@ namespace mongo {
 
         template<typename Data, typename Comparator>
         void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
-#if defined(_DEBUG) && !defined(_MSC_VER)
+#if defined(MONGO_CONFIG_DEBUG_BUILD) && !defined(_MSC_VER)
             // MSVC++ already does similar verification in debug mode in addition to using
             // algorithms that do more comparisons. Doing our own verification in addition makes
             // debug builds considerably slower without any additional safety.

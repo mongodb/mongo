@@ -29,10 +29,8 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-#include <memory>
-
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 

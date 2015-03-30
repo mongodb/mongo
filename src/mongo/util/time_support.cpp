@@ -50,10 +50,12 @@
 // NOTE(schwerin): MSVC's _snprintf is not a drop-in replacement for C99's snprintf().  In
 // particular, when the target buffer is too small, behaviors differ.  Consult the documentation
 // from MSDN and form the BSD or Linux man pages before using.
+#if _MSC_VER < 1900
 #define snprintf _snprintf
 #endif
+#endif
 
-#ifdef __sunos__
+#ifdef __sun
 // Some versions of Solaris do not have timegm defined, so fall back to our implementation when
 // building on Solaris.  See SERVER-13446.
 extern "C" time_t

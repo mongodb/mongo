@@ -62,7 +62,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // restart B, which should rollback and log a message about not rolling back empty o'd oplog entry
 replTest.restart(BID);
-var msg = RegExp("replSet warning ignoring op on rollback : ");
+var msg = RegExp("ignoring op on rollback : ");
 assert.soon(function() {
     try {
         var log = b_conn.getDB("admin").adminCommand({getLog: "global"}).log;

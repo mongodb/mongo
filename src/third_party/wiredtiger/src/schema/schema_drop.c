@@ -18,7 +18,7 @@ __drop_file(
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int exist, remove_files;
+	int remove_files;
 	const char *filename;
 
 	WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
@@ -38,16 +38,11 @@ __drop_file(
 	if (!remove_files)
 		return (ret);
 
-	/* Remove the underlying physical file. */
-	exist = 0;
-	WT_TRET(__wt_exist(session, filename, &exist));
-	if (exist) {
-		/*
-		 * There is no point tracking this operation: there is no going
-		 * back from here.
-		 */
-		WT_TRET(__wt_remove(session, filename));
-	}
+	/*
+	 * Remove the underlying physical file. There is no point tracking this
+	 * operation: there is no going back from here.
+	 */
+	WT_TRET(__wt_remove_if_exists(session, filename));
 
 	return (ret);
 }
@@ -197,7 +192,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;
 
-	WT_TRET(__wt_meta_track_off(session, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, 1, ret != 0));
 
 	return (ret);
 }

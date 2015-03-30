@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournal
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -57,6 +59,7 @@
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h" // getelapsedtimemillis
+#include "mongo/util/paths.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
 
@@ -77,7 +80,7 @@ namespace mongo {
         // work.  (and should as-is)
         // --smallfiles makes the limit small.
 
-#if defined(_DEBUG)
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
         unsigned long long DataLimitPerJournalFile = 128 * 1024 * 1024;
 #elif defined(__APPLE__)
         // assuming a developer box if OS X
@@ -158,9 +161,9 @@ namespace mongo {
 
         namespace {
             SecureRandom* mySecureRandom = NULL;
-            mongo::mutex mySecureRandomMutex( "JHeader-SecureRandom" );
+            mongo::mutex mySecureRandomMutex;
             int64_t getMySecureRandomNumber() {
-                scoped_lock lk( mySecureRandomMutex );
+                boost::lock_guard<boost::mutex> lk( mySecureRandomMutex );
                 if ( ! mySecureRandom )
                     mySecureRandom = SecureRandom::create();
                 return mySecureRandom->nextInt64();
@@ -391,11 +394,12 @@ namespace mongo {
                 boost::filesystem::path filepath = preallocPath(i);
 
                 unsigned long long limit = DataLimitPerJournalFile;
-                if( debug && i == 1 ) { 
-                    // moving 32->64, the prealloc files would be short.  that is "ok", but we want to exercise that 
-                    // case, so we force exercising here when _DEBUG is set by arbitrarily stopping prealloc at a low 
-                    // limit for a file.  also we want to be able to change in the future the constant without a lot of
-                    // work anyway.
+                if( kDebugBuild && i == 1 ) { 
+                    // moving 32->64, the prealloc files would be short.  that is "ok", but we
+                    // want to exercise that case, so we force exercising here when
+                    // MONGO_CONFIG_DEBUG_BUILD is set by arbitrarily stopping prealloc at a
+                    // low limit for a file.  also we want to be able to change in the future
+                    // the constant without a lot of work anyway.
                     limit = 16 * 1024 * 1024;
                 }
                 preallocateFile(filepath, limit);

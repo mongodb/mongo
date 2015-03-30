@@ -37,9 +37,11 @@
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
@@ -73,9 +75,14 @@ namespace mongo {
 
     Balancer balancer;
 
-    Balancer::Balancer() : _balancedLastTime(0), _policy( new BalancerPolicy() ) {}
+    Balancer::Balancer()
+        : _balancedLastTime(0),
+          _policy(new BalancerPolicy()) {
+
+    }
 
     Balancer::~Balancer() {
+
     }
 
     int Balancer::_moveChunks(const vector<CandidateChunkPtr>* candidateChunks,
@@ -85,11 +92,33 @@ namespace mongo {
         int movedCount = 0;
 
         for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
-            const CandidateChunk& chunkInfo = *it->get();
 
-            // Changes to metadata, borked metadata, and connectivity problems should cause us to
-            // abort this chunk move, but shouldn't cause us to abort the entire round of chunks.
+            // If the balancer was disabled since we started this round, don't start new
+            // chunks moves.
+            SettingsType balancerConfig;
+            std::string errMsg;
+
+            if (!grid.getBalancerSettings(&balancerConfig, &errMsg)) {
+                warning() << errMsg;
+                // No point in continuing the round if the config servers are unreachable.
+                return movedCount;
+            }
+
+            if ((balancerConfig.isKeySet() && // balancer config doc exists
+                    !grid.shouldBalance(balancerConfig)) ||
+                    MONGO_FAIL_POINT(skipBalanceRound)) {
+                LOG(1) << "Stopping balancing round early as balancing was disabled";
+                return movedCount;
+            }
+
+            // Changes to metadata, borked metadata, and connectivity problems between shards should
+            // cause us to abort this chunk move, but shouldn't cause us to abort the entire round
+            // of chunks.
+            // TODO(spencer): We probably *should* abort the whole round on issues communicating
+            // with the config servers, but its impossible to distinguish those types of failures
+            // at the moment.
             // TODO: Handle all these things more cleanly, since they're expected problems
+            const CandidateChunk& chunkInfo = *it->get();
             try {
 
                 DBConfigPtr cfg = grid.getDBConfig( chunkInfo.ns );
@@ -157,17 +186,17 @@ namespace mongo {
         return movedCount;
     }
 
-    void Balancer::_ping( bool waiting ) {
-        clusterUpdate( MongosType::ConfigNS,
-                       BSON( MongosType::name( _myid )),
-                       BSON( "$set" << BSON( MongosType::ping(jsTime()) <<
-                                             MongosType::up(static_cast<int>(time(0)-_started)) <<
-                                             MongosType::waiting(waiting) <<
-                                             MongosType::mongoVersion(versionString) )),
-                       true, // upsert
-                       false, // multi
-                       WriteConcernOptions::Unacknowledged,
-                       NULL );
+    void Balancer::_ping(bool waiting) {
+        grid.catalogManager()->update(
+                        MongosType::ConfigNS,
+                        BSON(MongosType::name(_myid)),
+                        BSON("$set" << BSON(MongosType::ping(jsTime()) <<
+                                            MongosType::up(static_cast<int>(time(0) - _started)) <<
+                                            MongosType::waiting(waiting) <<
+                                            MongosType::mongoVersion(versionString))),
+                        true,
+                        false,
+                        NULL);
     }
 
      /* 
@@ -240,11 +269,9 @@ namespace mongo {
                 createActionlog = true;
             }
 
-            Status result = clusterInsert( ActionLogType::ConfigNS,
-                                           actionLog.toBSON(),
-                                           WriteConcernOptions::AllConfigs,
-                                           NULL );
-
+            Status result = grid.catalogManager()->insert(ActionLogType::ConfigNS,
+                                                          actionLog.toBSON(),
+                                                          NULL);
             if ( !result.isOK() ) {
                 log() << "Error encountered while logging action from balancer "
                       << result.reason();
@@ -424,18 +451,6 @@ namespace mongo {
 
             DistributionStatus status(shardInfo, shardToChunksMap.map());
 
-            // load tags
-            Status result = clusterCreateIndex(TagsType::ConfigNS,
-                                               BSON(TagsType::ns() << 1 << TagsType::min() << 1),
-                                               true, // unique
-                                               WriteConcernOptions::AllConfigs,
-                                               NULL);
-
-            if ( !result.isOK() ) {
-                warning() << "could not create index tags_1_min_1: " << result.reason() << endl;
-                continue;
-            }
-
             cursor = conn.query(TagsType::ConfigNS,
                                 QUERY(TagsType::ns(ns)).sort(TagsType::min()));
 
@@ -558,7 +573,6 @@ namespace mongo {
         // getConnectioString and dist lock constructor does not throw, which is what we expect on while
         // on the balancer thread
         ConnectionString config = configServer.getConnectionString();
-        DistributedLock balanceLock( config , "balancer" );
 
         while ( ! inShutdown() ) {
 
@@ -610,9 +624,12 @@ namespace mongo {
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
                 {
-                    dist_lock_try lk( &balanceLock , "doing balance round" );
-                    if ( ! lk.got() ) {
-                        LOG(1) << "skipping balancing round because another balancer is active" << endl;
+                    ScopedDistributedLock balancerLock(config, "balancer");
+                    balancerLock.setLockMessage("doing balance round");
+
+                    Status lockStatus = balancerLock.tryAcquire();
+                    if (!lockStatus.isOK()) {
+                        LOG(1) << "skipping balancing round" << causedBy(lockStatus);
 
                         // Ping again so scripts can determine if we're active without waiting
                         _ping( true );
@@ -642,7 +659,7 @@ namespace mongo {
                             writeConcern.reset(extractStatus.getValue());
                         }
                         else {
-                            warning() << extractStatus.toString();
+                            warning() << extractStatus.getStatus().toString();
                         }
                     }
 

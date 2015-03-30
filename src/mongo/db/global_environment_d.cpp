@@ -34,13 +34,15 @@
 #include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -157,24 +159,16 @@ namespace mongo {
         _curr(begin), _end(end) {
     }
 
-
-    StorageFactoriesIteratorMongoD::~StorageFactoriesIteratorMongoD() {
-    }
-
     bool StorageFactoriesIteratorMongoD::more() const {
         return _curr != _end;
     }
 
-    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::next() {
+    const StorageEngine::Factory* StorageFactoriesIteratorMongoD::next() {
         return _curr++->second;
     }
 
-    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::get() const {
-        return _curr->second;
-    }
-
     void GlobalEnvironmentMongoD::setKillAllOperations() {
-        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
         _globalKill = true;
         for (size_t i = 0; i < _killOpListeners.size(); i++) {
             try {
@@ -215,7 +209,7 @@ namespace mongo {
     }
 
     bool GlobalEnvironmentMongoD::killOperation(unsigned int opId) {
-        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
 
         for(ClientSet::const_iterator j = Client::clients.begin();
                 j != Client::clients.end(); ++j) {
@@ -232,7 +226,7 @@ namespace mongo {
     }
 
     void GlobalEnvironmentMongoD::killAllUserOperations(const OperationContext* txn) {
-        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
         for (ClientSet::const_iterator i = Client::clients.begin();
                 i != Client::clients.end(); i++) {
 
@@ -249,7 +243,10 @@ namespace mongo {
 
             bool found = _killOperationsAssociatedWithClientAndOpId_inlock(
                     client, client->curop()->opNum());
-            invariant(found);
+            if (!found) {
+                warning() << "Attempted to kill operation " << client->curop()->opNum()
+                          << " but the opId changed";
+            }
         }
     }
 
@@ -258,12 +255,20 @@ namespace mongo {
     }
 
     void GlobalEnvironmentMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
-        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
         _killOpListeners.push_back(listener);
     }
 
     OperationContext* GlobalEnvironmentMongoD::newOpCtx() {
         return new OperationContextImpl();
+    }
+
+    void GlobalEnvironmentMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+        _opObserver.reset(opObserver.get());
+    }
+
+    OpObserver* GlobalEnvironmentMongoD::getOpObserver() {
+        return _opObserver.get();
     }
 
 }  // namespace mongo

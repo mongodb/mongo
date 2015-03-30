@@ -117,14 +117,13 @@ namespace repl {
 
         virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
-        virtual void prepareReplSetUpdatePositionCommandHandshakes(
-                std::vector<BSONObj>* handshakes);
-
         virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual void fillIsMasterForReplSet(IsMasterResponse* result);
 
         virtual void appendSlaveInfoData(BSONObjBuilder* result);
+
+        virtual ReplicaSetConfig getConfig() const;
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
@@ -158,7 +157,8 @@ namespace repl {
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates);
+        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
+                                                    long long* configVersion);
 
         virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake);
 

@@ -171,6 +171,13 @@ namespace mongo {
         _catalog->putMetaData( txn, ns().toString(), md );
     }
 
+    void KVCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {
+        MetaData md = _getMetaData( txn );
+        md.options.flags = newValue;
+        md.options.flagsSet = true;
+        _catalog->putMetaData( txn, ns().toString(), md );
+    }
+
     BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData( OperationContext* txn ) const {
         return _catalog->getMetaData( txn, ns().toString() );
     }

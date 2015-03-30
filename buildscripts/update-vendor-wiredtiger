@@ -41,8 +41,9 @@ mkdir -p wiredtiger
 
 tar -x --strip-components 1 \
     --exclude '*/api' --exclude '*/dist/package' --exclude '*/examples' \
-    --exclude '*/src/docs' --exclude '*/test' --exclude '*/tools/3rdparty' \
-    --exclude '*/tools/template' \
+    --exclude '*/src/docs' --exclude '*/test' \
+    --exclude '*/tools/wtperf_stats' \
+    --exclude '*/tools/wtstats/template' \
     -C wiredtiger -f ${TARBALL}
 
 git add wiredtiger

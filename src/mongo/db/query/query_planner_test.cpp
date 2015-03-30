@@ -2165,6 +2165,19 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1, a: '2dsphere'}}}}}");
     }
 
+    // SERVER-14723
+    TEST_F(QueryPlannerTest, GeoNearMultipleRelevantIndicesButOnlyOneCompatible) {
+        addIndex(BSON("a" << "2dsphere"));
+        addIndex(BSON("b" << 1 << "a" << "2dsphere"));
+
+        runQuery(fromjson("{a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0,0]}}},"
+                          " b: {$exists: false}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{geoNear2dsphere: {a: '2dsphere'}}}}");
+    }
+
     // SERVER-3984, $or 2d index
     TEST_F(QueryPlannerTest, Or2DNonNear) {
         addIndex(BSON("a" << "2d"));

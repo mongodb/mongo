@@ -39,7 +39,6 @@
 
 #include "mongo/bson/inline_decls.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/heapcheck.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/time_support.h"
 
@@ -75,57 +74,7 @@ namespace mongo {
         ~StaticObserver() { _destroyingStatics = true; }
     };
 
-    /** On pthread systems, it is an error to destroy a mutex while held (boost mutex 
-     *    may use pthread).  Static global mutexes may be held upon shutdown in our 
-     *    implementation, and this way we avoid destroying them.
-     *  NOT recursive.
-     */
-    class mutex : boost::noncopyable {
-    public:
-        const char * const _name;
-        // NOINLINE so that 'mutex::mutex' is always in the frame, this makes
-        // it easier for us to suppress the leaks caused by the static observer.
-        NOINLINE_DECL mutex(const char *name) : _name(name)
-        {
-            _m = new boost::timed_mutex();
-            IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m
-        }
-        ~mutex() {
-            if( !StaticObserver::_destroyingStatics ) {
-                UNIGNORE_OBJECT( _m );
-                delete _m;
-            }
-        }
-
-        class try_lock : boost::noncopyable {
-        public:
-            try_lock( mongo::mutex &m , int millis = 0 )
-                : _l( m.boost() , incxtimemillis( millis ) ) ,
-                  ok( _l.owns_lock() )
-            { }
-        private:
-            boost::timed_mutex::scoped_timed_lock _l;
-        public:
-            const bool ok;
-        };
-
-        class scoped_lock : boost::noncopyable {
-        public:
-            scoped_lock( mongo::mutex &m ) : 
-            _l( m.boost() ) {
-            }
-            ~scoped_lock() {
-            }
-            boost::timed_mutex::scoped_lock &boost() { return _l; }
-        private:
-            boost::timed_mutex::scoped_lock _l;
-        };
-    private:
-        boost::timed_mutex &boost() { return *_m; }
-        boost::timed_mutex *_m;
-    };
-
-    typedef mongo::mutex::scoped_lock scoped_lock;
+    using mutex = boost::mutex;
 
     /** The concept with SimpleMutex is that it is a basic lock/unlock with no 
           special functionality (such as try and try timeout).  Thus it can be 
@@ -177,7 +126,7 @@ namespace mongo {
     };
 #endif
 
-    /** This can be used instead of boost recursive mutex. The advantage is the _DEBUG checks
+    /** This can be used instead of boost recursive mutex. The advantage is the debug checks
      *  and ability to assertLocked(). This has not yet been tested for speed vs. the boost one.
      */
     class RecursiveMutex : boost::noncopyable {

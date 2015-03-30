@@ -1,6 +1,7 @@
 var conn = MongoRunner.runMongod({auth : "", port : 31001});
 
 var admin = conn.getDB("admin");
+var errorCodeUnauthorized = 13;
 
 admin.createUser({user:"foo",pwd: "bar", roles: jsTest.adminUserRoles});
 
@@ -16,7 +17,7 @@ assert.eq(x.err, "unauthorized", tojson(x));
 
 x = admin.fsyncUnlock();
 assert(x.errmsg != "not locked", tojson(x));
-assert.eq(x.err, "unauthorized", tojson(x));
+assert.eq(x.code, errorCodeUnauthorized, tojson(x));
 
 conn.getDB("admin").auth("foo","bar");
 

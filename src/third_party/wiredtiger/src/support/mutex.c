@@ -194,27 +194,24 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			continue;
 		}
 
-		WT_RET_TEST((fprintf(conn->stat_fp,
+		WT_RET(__wt_fprintf(session, conn->stat_fp,
 		    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
 		    conn->stat_stamp,
 		    spin->counter <= ignore ? 0 : spin->counter,
-		    tag, spin->name) < 0),
-		    __wt_errno());
+		    tag, spin->name));
 		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 			spin->counter = 0;
 	}
-	WT_RET_TEST((fprintf(conn->stat_fp,
+	WT_RET(__wt_fprintf(session, conn->stat_fp,
 	    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
 	    conn->stat_stamp,
 	    block_manager <= ignore ? 0 : block_manager,
-	    tag, "block manager") < 0),
-	    __wt_errno());
-	WT_RET_TEST((fprintf(conn->stat_fp,
+	    tag, "block manager"));
+	WT_RET(__wt_fprintf(session, conn->stat_fp,
 	    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
 	    conn->stat_stamp,
 	    btree_page <= ignore ? 0 : btree_page,
-	    tag, "btree page") < 0),
-	    __wt_errno());
+	    tag, "btree page"));
 
 	/*
 	 * Output the number of times each location acquires its spinlock and
@@ -225,12 +222,12 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		if (p->name == NULL)
 			continue;
 
-		WT_RET_TEST((fprintf(conn->stat_fp,
+		WT_RET(__wt_fprintf(session, conn->stat_fp,
 		    "%s %d %s spinlock %s acquired by %s(%d)\n",
 		    conn->stat_stamp,
 		    p->total <= ignore ? 0 : p->total,
 		    tag,
-		    p->name, p->file, p->line) < 0), __wt_errno());
+		    p->name, p->file, p->line));
 		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 			p->total = 0;
 
@@ -239,13 +236,13 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			if (t->name == NULL)
 				continue;
 
-			WT_RET_TEST((fprintf(conn->stat_fp,
+			WT_RET(__wt_fprintf(session, conn->stat_fp,
 			    "%s %d %s spinlock %s: %s(%d) blocked by %s(%d)\n",
 			    conn->stat_stamp,
 			    p->blocked[j] <= ignore ? 0 : p->blocked[j],
 			    tag,
 			    p->name, p->file, p->line,
-			    t->file, t->line) < 0), __wt_errno());
+			    t->file, t->line));
 			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 				p->blocked[j] = 0;
 		}

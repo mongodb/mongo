@@ -32,7 +32,7 @@ root_dir = dirname(File('SConscript').rfile().abspath)
 sys.path.insert(0, join(root_dir, 'tools'))
 import js2c
 
-Import("env windows linux darwin solaris freebsd debugBuild openbsd")
+Import("env debugBuild")
 
 # pared-down copies of the equivalent structures in v8's SConstruct/SConscript:
 LIBRARY_FLAGS = {
@@ -87,7 +87,7 @@ LIBRARY_FLAGS = {
       'CPPDEFINES':   ['V8_TARGET_ARCH_X64'],
     },
     'mode:debug': {
-      'CPPDEFINES':   ['_DEBUG', 'ENABLE_DISASSEMBLER', 'DEBUG'],
+      'CPPDEFINES':   ['ENABLE_DISASSEMBLER', 'DEBUG'],
     },
   }
 }
@@ -283,29 +283,25 @@ def get_flags(flag, toolchain, options):
     return ret
 
 def get_options():
-    processor = env['PROCESSOR_ARCHITECTURE']
+    processor = env['TARGET_ARCH']
     if processor == 'i386':
         arch_string = 'arch:ia32'
-    elif processor == 'i686':
-        arch_string = 'arch:ia32'
     elif processor == 'x86_64':
-        arch_string = 'arch:x64'
-    elif processor == 'amd64':
         arch_string = 'arch:x64'
     else:
         assert False, "Unsupported architecture: " + processor
 
-    if linux:
+    if env.TargetOSIs('linux'):
         os_string = 'os:linux'
-    elif darwin:
+    elif env.TargetOSIs('osx'):
         os_string = 'os:macos'
-    elif windows:
+    elif env.TargetOSIs('windows'):
         os_string = 'os:win32'
-    elif freebsd:
+    elif env.TargetOSIs('freebsd'):
         os_string = 'os:freebsd'
-    elif solaris:
+    elif env.TargetOSIs('solaris'):
         os_string = 'os:solaris'
-    elif openbsd:
+    elif env.TargetOSIs('openbsd'):
         os_string = 'os:openbsd'
     else:
         os_string = 'os:nullos'
@@ -334,7 +330,7 @@ def get_sources(options):
     return sources
 
 def get_toolchain():
-    if windows:
+    if env.ToolchainIs('MSVC'):
         return 'msvc'
     else:
         return 'gcc'

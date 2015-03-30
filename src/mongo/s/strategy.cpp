@@ -26,11 +26,11 @@
  *    then also delete it in the license file.
  */
 
-// strategy_sharded.cpp
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
+
+#include "mongo/s/strategy.h"
 
 #include <boost/scoped_ptr.hpp>
 
@@ -50,13 +50,13 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/chunk_manager_targeter.h"
+#include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/dbclient_shard_resolver.h"
-#include "mongo/s/dbclient_multi_command.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/stale_exception.h"
@@ -213,7 +213,7 @@ namespace mongo {
             BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
             int docCount = 0;
             const int startFrom = cc->getTotalSent();
-            bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
+            bool hasMore = cc->sendNextBatch(q.ntoreturn, buffer, docCount);
 
             if ( hasMore ) {
                 LOG(5) << "storing cursor : " << cc->getId() << endl;
@@ -472,9 +472,9 @@ namespace mongo {
         // Note that this implementation will not handle targeting retries and does not completely
         // emulate write behavior
 
-        ChunkManagerTargeter targeter;
-        Status status =
-            targeter.init(NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
+        ChunkManagerTargeter targeter(NamespaceString(
+                                        targetingBatchItem.getRequest()->getTargetingNS()));
+        Status status = targeter.init();
         if (!status.isOK())
             return status;
 
@@ -661,7 +661,7 @@ namespace mongo {
             BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
             int docCount = 0;
             const int startFrom = cursor->getTotalSent();
-            bool hasMore = cursor->sendNextBatch( r, ntoreturn, buffer, docCount );
+            bool hasMore = cursor->sendNextBatch(ntoreturn, buffer, docCount);
 
             if ( hasMore ) {
                 // still more data

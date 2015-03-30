@@ -53,7 +53,9 @@ namespace mongo {
          * 1) If the metadata file exists, ensure that the information in the file
          *    is consistent with the current storage engine. Otherwise, raise an error.
          *    Returns the metadata object on successful validation.
-         * 2) If the metadata file exists but is not readable (eg. corrupted), raise an error.
+         * 2) If the metadata file exists but is not readable (eg. corrupted),
+         *    return NULL. This allows the startup process to overwrite the corrupted
+         *    metadata file with a valid copy.
          * 3) If the metadata file does not exist, look for local.ns or local/local.ns
          *    in the data directory. If we detect either file, raise an error
          *    only if the current storage engine is not 'mmapv1'.

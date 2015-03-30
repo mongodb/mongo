@@ -75,6 +75,9 @@ namespace mongo {
 
         OperationContext* newOpCtx();
 
+        void setOpObserver(std::unique_ptr<OpObserver> opObserver);
+
+        OpObserver* getOpObserver();
 
     private:
 
@@ -90,6 +93,9 @@ namespace mongo {
         // logically owned here, but never deleted by anyone.
         StorageEngine* _storageEngine;
 
+        // logically owned here.
+        std::unique_ptr<OpObserver> _opObserver;
+
         // All possible storage engines are registered here through MONGO_INIT.
         FactoryMap _storageFactories;
     };
@@ -101,10 +107,8 @@ namespace mongo {
         StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin,
                                        const FactoryMapIterator& end);
 
-        virtual ~StorageFactoriesIteratorMongoD();
         virtual bool more() const;
-        virtual const StorageEngine::Factory* const & next();
-        virtual const StorageEngine::Factory* const & get() const;
+        virtual const StorageEngine::Factory* next();
 
     private:
         FactoryMapIterator _curr;

@@ -71,7 +71,7 @@ namespace mongo {
 
     template<typename T, typename U>
     T checked_cast(const U& u) {
-        return checked_cast_impl<debug>::cast<T>(u);
+        return checked_cast_impl<kDebugBuild>::cast<T>(u);
     };
 
 } // namespace mongo

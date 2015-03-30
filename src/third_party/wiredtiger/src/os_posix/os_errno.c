@@ -24,46 +24,32 @@ __wt_errno(void)
 
 /*
  * __wt_strerror --
- *	POSIX implementation of wiredtiger_strerror.
+ *	POSIX implementation of WT_SESSION.strerror and wiredtiger_strerror.
  */
 const char *
-__wt_strerror(int error)
+__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
 {
 	const char *p;
 
 	/*
-	 * POSIX errors are non-negative integers; check for 0 explicitly
-	 * in-case the underlying strerror doesn't handle 0, some don't.
+	 * Check for a WiredTiger or POSIX constant string, no buffer needed.
 	 */
-	if (error == 0)
-		return ("Successful return: 0");
-	if (error > 0 && (p = strerror(error)) != NULL)
+	if ((p = __wt_wiredtiger_error(error)) != NULL)
 		return (p);
-	return (NULL);
-}
-
-/*
- * __wt_strerror_r --
- *	POSIX implementation of wiredtiger_strerror_r.
- */
-int
-__wt_strerror_r(int error, char *buf, size_t buflen)
-{
-	const char *p;
-
-	/* Require at least 2 bytes, printable character and trailing nul. */
-	if (buflen < 2)
-		return (ENOMEM);
 
 	/*
-	 * Check for POSIX errors then fallback to something generic.  Copy the
-	 * string into the user's buffer, return success if anything printed.
+	 * When called from wiredtiger_strerror, write a passed-in buffer.
+	 * When called from WT_SESSION.strerror, write the session's buffer.
+	 *
+	 * Fallback to a generic message.
 	 */
-	p = __wt_strerror(error);
-	if (p != NULL && snprintf(buf, buflen, "%s", p) > 0)
-		return (0);
+	if (session == NULL &&
+	    snprintf(errbuf, errlen, "error return: %d", error) > 0)
+		return (errbuf);
+	if (session != NULL && __wt_buf_fmt(
+	    session, &session->err, "error return: %d", error) == 0)
+		return (session->err.data);
 
-	/* Fallback to a generic message, then guess it's a memory problem. */
-	return (
-	    snprintf(buf, buflen, "error return: %d", error) > 0 ? 0 : ENOMEM);
+	/* Defeated. */
+	return ("Unable to return error string");
 }

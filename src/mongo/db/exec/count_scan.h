@@ -31,7 +31,6 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -110,11 +109,11 @@ namespace mongo {
         const IndexDescriptor* _descriptor;
         const IndexAccessMethod* _iam;
 
-        // Our start cursor is _btreeCursor.
-        boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
+        // Our start cursor.
+        boost::scoped_ptr<IndexCursor> _cursor;
 
         // Our end marker.
-        boost::scoped_ptr<BtreeIndexCursor> _endCursor;
+        boost::scoped_ptr<IndexCursor> _endCursor;
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
         unordered_set<RecordId, RecordId::Hasher> _returned;

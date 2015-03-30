@@ -113,6 +113,8 @@ namespace mongo {
 
         virtual bool unique() const = 0;
 
+        Status dupKeyError(const BSONObj& key);
+
     protected:
 
         virtual Status _insert( WT_CURSOR* c,
@@ -132,6 +134,8 @@ namespace mongo {
         const Ordering _ordering;
         std::string _uri;
         uint64_t _instanceId;
+        std::string _collectionNamespace;
+        std::string _indexName;
     };
 
 

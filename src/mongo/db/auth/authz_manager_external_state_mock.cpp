@@ -152,14 +152,16 @@ namespace {
             toInsert = document.copy();
         }
         _documents[collectionName].push_back(toInsert);
+
         if (_authzManager) {
             _authzManager->logOp(
+                    txn,
                     "i",
                     collectionName.ns().c_str(),
                     toInsert,
-                    NULL,
                     NULL);
         }
+
         return Status::OK();
     }
 
@@ -190,14 +192,16 @@ namespace {
             BSONObj newObj = document.getObject().copy();
             *iter = newObj;
             BSONObj idQuery = driver.makeOplogEntryQuery(newObj, false);
+
             if (_authzManager) {
                 _authzManager->logOp(
+                        txn,
                         "u",
                         collectionName.ns().c_str(),
                         logObj,
-                        &idQuery,
-                        NULL);
+                        &idQuery);
             }
+
             return Status::OK();
         }
         else if (status == ErrorCodes::NoMatchingDocument && upsert) {
@@ -243,14 +247,16 @@ namespace {
             BSONObj idQuery = (*iter)["_id"].wrap();
             _documents[collectionName].erase(iter);
             ++n;
+
             if (_authzManager) {
                 _authzManager->logOp(
+                        txn,
                         "d",
                         collectionName.ns().c_str(),
                         idQuery,
-                        NULL,
                         NULL);
             }
+
         }
         *numRemoved = n;
         return Status::OK();

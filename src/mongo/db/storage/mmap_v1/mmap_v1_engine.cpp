@@ -61,7 +61,7 @@ namespace mongo {
 
 namespace {
 
-#if !defined(__sunos__)
+#if !defined(__sun)
     // if doingRepair is true don't consider unclean shutdown an error
     void acquirePathLock(MMAPV1Engine* storageEngine,
                          bool doingRepair,
@@ -153,7 +153,7 @@ namespace {
             uasserted(13618, "can't start without --journal enabled when journal/ files are present");
         }
     }
-#endif  //  !defined(__sunos__)
+#endif  //  !defined(__sun)
 
 
     /// warn if readahead > 256KB (gridfs chunk size)
@@ -253,7 +253,7 @@ namespace {
     DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                  StringData db ) {
         {
-            boost::mutex::scoped_lock lk(_entryMapMutex);
+            boost::lock_guard<boost::mutex> lk(_entryMapMutex);
             EntryMap::const_iterator iter = _entryMap.find(db.toString());
             if (iter != _entryMap.end()) {
                 return iter->second;
@@ -271,7 +271,7 @@ namespace {
                                            storageGlobalParams.directoryperdb,
                                            false);
 
-        boost::mutex::scoped_lock lk(_entryMapMutex);
+        boost::lock_guard<boost::mutex> lk(_entryMapMutex);
 
         // Sanity check that we are not overwriting something
         invariant(_entryMap.insert(EntryMap::value_type(db.toString(), entry)).second);
@@ -285,7 +285,7 @@ namespace {
         // global journal entries occur, which happen to have write intents for the removed files.
         getDur().syncDataAndTruncateJournal(txn);
 
-        boost::mutex::scoped_lock lk( _entryMapMutex );
+        boost::lock_guard<boost::mutex> lk( _entryMapMutex );
         MMAPV1DatabaseCatalogEntry* entry = _entryMap[db.toString()];
         delete entry;
         _entryMap.erase( db.toString() );

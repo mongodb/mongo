@@ -31,6 +31,7 @@
 #include "mongo/db/write_concern.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
@@ -51,6 +52,56 @@ namespace mongo {
     static Counter64 gleWtimeouts;
     static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
                                                                   &gleWtimeouts );
+
+    void setupSynchronousCommit(OperationContext* txn) {
+        const WriteConcernOptions& writeConcern = txn->getWriteConcern();
+
+        if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL ||
+             writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
+            txn->recoveryUnit()->goingToAwaitCommit();
+        }
+    }
+
+    StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
+        // The default write concern if empty is w : 1
+        // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
+        WriteConcernOptions writeConcern = repl::getGlobalReplicationCoordinator()
+                ->getGetLastErrorDefault();
+        if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
+            writeConcern.wNumNodes = 1;
+        }
+
+        BSONElement writeConcernElement;
+        Status wcStatus = bsonExtractTypedField(cmdObj,
+                                                "writeConcern",
+                                                Object,
+                                                &writeConcernElement);
+        if (!wcStatus.isOK()) {
+            if (wcStatus == ErrorCodes::NoSuchKey) {
+                // Return default write concern if no write concern is given.
+                return writeConcern;
+            }
+            return wcStatus;
+        }
+
+        BSONObj writeConcernObj = writeConcernElement.Obj();
+        // Empty write concern is interpreted to default.
+        if (writeConcernObj.isEmpty()) {
+            return writeConcern;
+        }
+
+        wcStatus = writeConcern.parse(writeConcernObj);
+        if (!wcStatus.isOK()) {
+            return wcStatus;
+        }
+
+        wcStatus = validateWriteConcern(writeConcern);
+        if (!wcStatus.isOK()) {
+            return wcStatus;
+        }
+
+        return writeConcern;
+    }
 
     Status validateWriteConcern( const WriteConcernOptions& writeConcern ) {
         const bool isJournalEnabled = getGlobalEnvironment()->getGlobalStorageEngine()->isDurable();
@@ -140,9 +191,10 @@ namespace mongo {
     }
 
     Status waitForWriteConcern( OperationContext* txn,
-                                const WriteConcernOptions& writeConcern,
                                 const OpTime& replOpTime,
                                 WriteConcernResult* result ) {
+
+        const WriteConcernOptions& writeConcern = txn->getWriteConcern();
 
         // We assume all options have been validated earlier, if not, programming error
         dassert( validateWriteConcern( writeConcern ).isOK() );

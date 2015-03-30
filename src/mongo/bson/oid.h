@@ -139,8 +139,8 @@ namespace mongo {
         /** Set to the min/max OID that could be generated at given timestamp. */
         void init( Date_t date, bool max=false );
 
-        time_t asTimeT();
-        Date_t asDateT() { return asTimeT() * 1000LL; }
+        time_t asTimeT() const;
+        Date_t asDateT() const { return asTimeT() * 1000LL; }
 
         // True iff the OID is not empty
         bool isSet() const {

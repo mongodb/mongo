@@ -1,0 +1,24 @@
+Import("env")
+Import("has_option")
+
+env.Library(
+    target= 'intrusive_counter',
+    source= [
+        'intrusive_counter.cpp',
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/foundation',
+        ]
+    )
+
+debuggerEnv = env.Clone()
+if has_option("gdbserver"):
+    debuggerEnv.Append(CPPDEFINES=["USE_GDBSERVER"])
+
+debuggerEnv.Library(
+    target= 'debugger',
+    source= [
+        'debugger.cpp',
+        ],
+    LIBDEPS= []
+    )

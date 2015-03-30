@@ -77,7 +77,7 @@ namespace mongo {
         ExportedServerParameter<bool> TraceWCExceptionsSetting(ServerParameterSet::getGlobal(),
                                                                "traceWriteConflictExceptions",
                                                                &WriteConflictException::trace,
-                                                               false, // allowedToChangeAtStartup
+                                                               true, // allowedToChangeAtStartup
                                                                true); // allowedToChangeAtRuntime
     }
 

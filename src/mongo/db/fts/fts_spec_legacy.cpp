@@ -29,6 +29,7 @@
 #include "mongo/db/fts/fts_spec.h"
 
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -72,14 +73,13 @@ namespace mongo {
 
             unsigned numTokens = 0;
 
-            Tokenizer i( tools.language, raw );
+            Tokenizer i( &tools.language, raw );
             while ( i.more() ) {
                 Token t = i.next();
                 if ( t.type != Token::TEXT )
                     continue;
 
-                string term = t.data.toString();
-                makeLower( &term );
+                string term = tolowerString( t.data );
                 if ( tools.stopwords->isStopWord( term ) )
                     continue;
                 term = tools.stemmer->stem( term );
@@ -162,8 +162,8 @@ namespace mongo {
 
             const FTSLanguage& language = _getLanguageToUseV1( obj );
 
-            Stemmer stemmer(language);
-            Tools tools(language, &stemmer, StopWords::getStopWords( language ));
+            Stemmer stemmer(&language);
+            Tools tools(language, &stemmer, StopWords::getStopWords( &language ));
 
             if ( wildcard() ) {
                 // if * is specified for weight, we can recurse over all fields.

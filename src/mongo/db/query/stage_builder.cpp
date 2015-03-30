@@ -264,7 +264,9 @@ namespace mongo {
                                            ? fam->getSpec().defaultLanguage().str()
                                            : node->language);
 
-            Status parseStatus = params.query.parse(node->query, language,
+            Status parseStatus = params.query.parse(node->query,
+                                                    language,
+                                                    node->caseSensitive,
                                                     fam->getSpec().getTextIndexVersion());
             if (!parseStatus.isOK()) {
                 warning() << "Can't parse text search query";
@@ -286,7 +288,7 @@ namespace mongo {
             if (NULL == childStage) { return NULL; }
             return new KeepMutationsStage(km->filter.get(), ws, childStage);
         }
-        else if (STAGE_DISTINCT == root->getType()) {
+        else if (STAGE_DISTINCT_SCAN == root->getType()) {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
             if (NULL == collection) {

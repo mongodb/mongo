@@ -64,6 +64,15 @@ for f in \
 		cat $t
 	fi
 
+	if ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
+	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
+	   ! expr "$f" : 'src/include/extern.h' > /dev/null &&
+	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
+	   grep '__wt_errno' $f > $t; then
+		echo "$f: upper-level code should not call __wt_errno"
+		cat $t
+	fi
+
 	if ! expr "$f" : 'examples/c/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null &&
 	   ! expr "$f" : 'src/include/os.h' > /dev/null &&

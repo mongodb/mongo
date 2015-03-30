@@ -67,7 +67,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	/* Only start the server if wait time is non-zero */
 	*runp = (cval.val == 0) ? 0 : 1;
-	conn->stat_usecs = (long)cval.val * 1000000;
+	conn->stat_usecs = (uint64_t)cval.val * 1000000;
 
 	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.on_close", &cval));
@@ -166,10 +166,10 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		    sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 		for (i = 0,
 		    stats = WT_CURSOR_STATS(cursor); i <  max; ++i, ++stats)
-			WT_ERR_TEST((fprintf(conn->stat_fp,
+			WT_ERR(__wt_fprintf(session, conn->stat_fp,
 			    "%s %" PRIu64 " %s %s\n",
 			    conn->stat_stamp,
-			    stats->v, name, stats->desc) < 0), __wt_errno());
+			    stats->v, name, stats->desc));
 		WT_ERR(cursor->close(cursor));
 		break;
 	case EBUSY:
@@ -193,6 +193,7 @@ static int
 __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
 	char **p;
 
 	WT_UNUSED(cfg);
@@ -201,8 +202,11 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Check for a match on the set of sources. */
 	for (p = S2C(session)->stat_sources; *p != NULL; ++p)
-		if (WT_PREFIX_MATCH(dhandle->name, *p))
-			return (__statlog_dump(session, dhandle->name, 0));
+		if (WT_PREFIX_MATCH(dhandle->name, *p)) {
+			WT_WITHOUT_DHANDLE(session,
+			    ret = __statlog_dump(session, dhandle->name, 0));
+			return (ret);
+		}
 	return (0);
 }
 
@@ -296,13 +300,11 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	if ((log_file = conn->stat_fp) == NULL ||
 	    path == NULL || strcmp(tmp->mem, path->mem) != 0) {
 		conn->stat_fp = NULL;
-		if (log_file != NULL)
-			WT_RET(fclose(log_file) == 0 ? 0 : __wt_errno());
-
+		WT_RET(__wt_fclose(session, &log_file, WT_FHANDLE_APPEND));
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
-		WT_RET_TEST((log_file =
-		    fopen(tmp->mem, "a")) == NULL, __wt_errno());
+		WT_RET(__wt_fopen(session,
+		    tmp->mem, WT_FHANDLE_APPEND, WT_FOPEN_FIXED, &log_file));
 	}
 	conn->stat_fp = log_file;
 
@@ -342,9 +344,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		WT_RET(__statlog_lsm_apply(session));
 
 	/* Flush. */
-	WT_RET(fflush(conn->stat_fp) == 0 ? 0 : __wt_errno());
-
-	return (0);
+	return (__wt_fflush(session, conn->stat_fp));
 }
 
 /*
@@ -380,7 +380,7 @@ err:	__wt_scr_free(session, &tmp);
  * __statlog_server --
  *	The statistics server thread.
  */
-static void *
+static WT_THREAD_RET
 __statlog_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -406,12 +406,12 @@ __statlog_server(void *arg)
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS)) {
-		if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
-			WT_ERR(__statlog_log_one(session, &path, &tmp));
-
 		/* Wait until the next event. */
 		WT_ERR(
 		    __wt_cond_wait(session, conn->stat_cond, conn->stat_usecs));
+
+		if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_NONE))
+			WT_ERR(__statlog_log_one(session, &path, &tmp));
 	}
 
 	if (0) {
@@ -419,7 +419,7 @@ err:		WT_PANIC_MSG(session, ret, "statistics log server error");
 	}
 	__wt_buf_free(session, &path);
 	__wt_buf_free(session, &tmp);
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -529,10 +529,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 	conn->stat_session = NULL;
 	conn->stat_tid_set = 0;
 	conn->stat_format = NULL;
-	if (conn->stat_fp != NULL) {
-		WT_TRET(fclose(conn->stat_fp) == 0 ? 0 : __wt_errno());
-		conn->stat_fp = NULL;
-	}
+	WT_TRET(__wt_fclose(session, &conn->stat_fp, WT_FHANDLE_APPEND));
 	conn->stat_path = NULL;
 	conn->stat_sources = NULL;
 	conn->stat_stamp = NULL;

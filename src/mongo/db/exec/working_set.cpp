@@ -173,7 +173,7 @@ namespace mongo {
     // WorkingSetMember
     //
 
-    WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }
+    WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID), isSuspicious(false) { }
 
     WorkingSetMember::~WorkingSetMember() { }
 

@@ -448,7 +448,7 @@ namespace mongo {
     TEST( MatchExpressionParserLeafTest, Regex3 ) {
         BSONObj query = BSON( "x" << BSON( "$options" << "i" << "$regex" << "abc" ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
-        log() << "result: " << result << endl;
+        log() << "result: " << result.getStatus() << endl;
         ASSERT_TRUE( result.isOK() );
         boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 

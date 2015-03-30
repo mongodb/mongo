@@ -214,6 +214,10 @@ namespace mongo {
             return BSON("" << shellGlobalParams.writeMode);
         }
 
+        BSONObj readMode(const BSONObj&, void*) {
+            return BSON("" << shellGlobalParams.readMode);
+        }
+
         BSONObj interpreterVersion(const BSONObj& a, void* data) {
             uassert( 16453, "interpreterVersion accepts no arguments", a.nFields() == 0 );
             return BSON( "" << globalScriptEngine->getInterpreterVersionString() );
@@ -243,6 +247,7 @@ namespace mongo {
             // Need to define this method before JSFiles::utils is executed.
             scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
             scope.injectNative("_writeMode", writeMode);
+            scope.injectNative("_readMode", readMode);
             scope.externalSetup();
             mongo::shell_utils::installShellUtils( scope );
             scope.execSetup(JSFiles::servers);
@@ -286,22 +291,20 @@ namespace mongo {
             return _confirmed = matchedY;
         }
 
-        ConnectionRegistry::ConnectionRegistry() :
-            _mutex( "connectionRegistryMutex" ) {
-        }
-        
+        ConnectionRegistry::ConnectionRegistry() = default;
+
         void ConnectionRegistry::registerConnection( DBClientWithCommands &client ) {
             BSONObj info;
             if ( client.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
                 string connstr = dynamic_cast<DBClientBase&>( client ).getServerAddress();
-                mongo::mutex::scoped_lock lk( _mutex );
+                boost::lock_guard<boost::mutex> lk( _mutex );
                 _connectionUris[ connstr ].insert( info[ "you" ].str() );
             }            
         }
 
         void ConnectionRegistry::killOperationsOnAllConnections( bool withPrompt ) const {
             Prompter prompter( "do you want to kill the current op(s) on the server?" );
-            mongo::mutex::scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             for( map<string,set<string> >::const_iterator i = _connectionUris.begin();
                 i != _connectionUris.end(); ++i ) {
                 string errmsg;
@@ -354,5 +357,8 @@ namespace mongo {
                 return false;
             }
         }
+
+
+        mongo::mutex &mongoProgramOutputMutex(*(new boost::mutex()));
     }
 }

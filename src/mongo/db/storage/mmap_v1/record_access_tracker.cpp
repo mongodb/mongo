@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/record_access_tracker.h"
@@ -275,12 +277,12 @@ namespace mongo {
     }
 
     // These need to be outside the ps namespace due to the way they are defined
-#if defined(MONGO_HAVE___THREAD)
+#if defined(MONGO_CONFIG_HAVE___THREAD)
     __thread PointerTable::Data _pointerTableData;
     PointerTable::Data* PointerTable::getData() {
         return &_pointerTableData;
     }
-#elif defined(MONGO_HAVE___DECLSPEC_THREAD)
+#elif defined(MONGO_CONFIG_HAVE___DECLSPEC_THREAD)
     __declspec( thread ) PointerTable::Data _pointerTableData;
     PointerTable::Data* PointerTable::getData() {
         return &_pointerTableData;

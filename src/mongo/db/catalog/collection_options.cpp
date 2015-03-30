@@ -57,7 +57,9 @@ namespace mongo {
         initialNumExtents = 0;
         initialExtentSizes.clear();
         autoIndexId = DEFAULT;
-        flags = 0;
+        // For compatibility with previous versions if the user sets no flags,
+        // we set Flag_UsePowerOf2Sizes in case the user downgrades.
+        flags = Flag_UsePowerOf2Sizes;
         flagsSet = false;
         temp = false;
         storageEngine = BSONObj();
@@ -142,16 +144,8 @@ namespace mongo {
                 if (e.type() != mongo::Object) {
                     return Status(ErrorCodes::BadValue, "'storageEngine' has to be a document.");
                 }
-                BSONObjIterator j(e.Obj());
-                if (!j.more()) {
-                    return Status(ErrorCodes::BadValue,
-                                  "Empty 'storageEngine' options are invalid. "
-                                  "Please remove, or include valid options.");
-                }
 
-                // Loop through each provided storageEngine.
-                while (j.more()) {
-                    BSONElement storageEngineElement = j.next();
+                BSONForEach(storageEngineElement, e.Obj()) {
                     StringData storageEngineName = storageEngineElement.fieldNameStringData();
                     if (storageEngineElement.type() != mongo::Object) {
                         return Status(ErrorCodes::BadValue, str::stream() << "'storageEngine." <<

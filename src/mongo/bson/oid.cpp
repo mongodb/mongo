@@ -157,7 +157,7 @@ namespace {
                     kInstanceUniqueSize + kIncrementSize);
     }
 
-    time_t OID::asTimeT() {
+    time_t OID::asTimeT() const {
         return getTimestamp();
     }
 

@@ -52,12 +52,7 @@ namespace repl {
     public:
         typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
-        static const std::string kIdFieldName;
         static const std::string kVersionFieldName;
-        static const std::string kMembersFieldName;
-        static const std::string kSettingsFieldName;
-        static const std::string kMajorityWriteConcernModeName;
-        static const std::string kStepDownCheckWriteConcernModeName;
 
         static const size_t kMaxMembers = 50;
         static const size_t kMaxVotingMembers = 7;
@@ -214,6 +209,14 @@ namespace repl {
          */
         int getWriteMajority() const { return _writeMajority; }
 
+        /**
+         * Gets the protocol version for this configuration.
+         *
+         * The protocol version number currently determines what election protocol is used by the
+         * cluster; 0 is the default and indicates the old 3.0 election protocol.
+         */
+        long long getProtocolVersion() const { return _protocolVersion; }
+
     private:
         /**
          * Parses the "settings" subdocument of a replica set configuration.
@@ -242,6 +245,7 @@ namespace repl {
         int _totalVotingMembers;
         ReplicaSetTagConfig _tagConfig;
         StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
+        long long _protocolVersion;
     };
 
 

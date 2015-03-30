@@ -49,7 +49,7 @@ namespace mongo {
         virtual RecordStore* newNonCappedRecordStore() {
             OperationContextNoop txn;
             DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
-            md->setUserFlag( &txn, RecordStoreV1Base::Flag_NoPadding );
+            md->setUserFlag( &txn, CollectionOptions::Flag_NoPadding );
             SimpleRecordStoreV1* rs = new SimpleRecordStoreV1( &txn,
                                                                "a.b",
                                                                md,

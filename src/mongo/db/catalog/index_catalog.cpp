@@ -80,7 +80,9 @@ namespace mongo {
     // -------------
 
     IndexCatalog::IndexCatalog( Collection* collection )
-        : _magic(INDEX_CATALOG_UNINIT), _collection( collection ) {
+        : _magic(INDEX_CATALOG_UNINIT),
+          _collection( collection ),
+          _maxNumIndexesAllowed(_collection->getCatalogEntry()->getMaxAllowedIndexes()) {
     }
 
     IndexCatalog::~IndexCatalog() {
@@ -508,6 +510,9 @@ namespace {
         if (name.find('\0') != std::string::npos)
             return Status(ErrorCodes::CannotCreateIndex, "index names cannot contain NUL bytes");
 
+        if (name.empty())
+            return Status(ErrorCodes::CannotCreateIndex, "index names cannot be empty");
+
         const std::string indexNamespace = IndexDescriptor::makeIndexNamespace( nss.ns(), name );
         if ( indexNamespace.length() > NamespaceString::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
@@ -615,8 +620,7 @@ namespace {
             }
         }
 
-        if ( _collection->getCatalogEntry()->getTotalIndexCount( txn ) >=
-             _collection->getCatalogEntry()->getMaxAllowedIndexes() ) {
+        if ( numIndexesTotal(txn) >= _maxNumIndexesAllowed ) {
             string s = str::stream() << "add index fails, too many indexes for "
                                      << _collection->ns().ns() << " key:" << key.toString();
             log() << s;
@@ -872,11 +876,20 @@ namespace {
     }
 
     int IndexCatalog::numIndexesTotal( OperationContext* txn ) const {
-        return _collection->getCatalogEntry()->getTotalIndexCount( txn );
+        int count = _entries.size() + _unfinishedIndexes.size();
+        dassert(_collection->getCatalogEntry()->getTotalIndexCount(txn) == count);
+        return count;
     }
 
     int IndexCatalog::numIndexesReady( OperationContext* txn ) const {
-        return _collection->getCatalogEntry()->getCompletedIndexCount( txn );
+        int count = 0;
+        IndexIterator ii = getIndexIterator(txn, /*includeUnfinished*/false);
+        while (ii.more()) {
+            ii.next();
+            count++;
+        }
+        dassert(_collection->getCatalogEntry()->getCompletedIndexCount(txn) == count);
+        return count;
     }
 
     bool IndexCatalog::haveIdIndex( OperationContext* txn ) const {
@@ -1087,6 +1100,11 @@ namespace {
         InsertDeleteOptions options;
         options.logIfError = logIfError;
         options.dupsAllowed = isDupsAllowed( index->descriptor() );
+
+        // For unindex operations, dupsAllowed=false really means that it is safe to delete anything
+        // that matches the key, without checking the RecordID, since dups are impossible. We need
+        // to disable this behavior for in-progress indexes. See SERVER-17487 for more details.
+        options.dupsAllowed = options.dupsAllowed || !index->isReady(txn);
 
         int64_t removed;
         Status status = index->accessMethod()->remove(txn, obj, loc, options, &removed);

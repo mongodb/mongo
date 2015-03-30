@@ -34,10 +34,8 @@
 
 #include "mongo/dbtests/framework.h"
 
-#ifndef _WIN32
-#include <cxxabi.h>
-#include <sys/file.h>
-#endif
+#include <string>
+#include <vector>
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -48,6 +46,8 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/exit.h"
@@ -63,7 +63,7 @@ namespace mongo {
 
     namespace dbtests {
 
-        mutex globalCurrentTestNameMutex("globalCurrentTestNameMutex");
+        mutex globalCurrentTestNameMutex;
         std::string globalCurrentTestName;
 
         class TestWatchDog : public BackgroundJob {
@@ -75,7 +75,7 @@ namespace mongo {
                 std::string lastRunningTestName, currentTestName;
 
                 {
-                    scoped_lock lk( globalCurrentTestNameMutex );
+                    boost::lock_guard<boost::mutex> lk( globalCurrentTestNameMutex );
                     lastRunningTestName = globalCurrentTestName;
                 }
 
@@ -84,7 +84,7 @@ namespace mongo {
                     minutesRunning++;
 
                     {
-                        scoped_lock lk( globalCurrentTestNameMutex );
+                        boost::lock_guard<boost::mutex> lk( globalCurrentTestNameMutex );
                         currentTestName = globalCurrentTestName;
                     }
 
@@ -121,6 +121,12 @@ namespace mongo {
 
             getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
+            std::vector<std::string> configHosts;
+            configHosts.push_back("$dummy:10000");
+
+            configServer.init(configHosts);
+            invariant(grid.initCatalogManager(configHosts));
+
             TestWatchDog twd;
             twd.go();
 
@@ -135,9 +141,17 @@ namespace mongo {
         }
     }  // namespace dbtests
 
+#ifdef _WIN32
+namespace ntservice {
+    bool shouldStartService() {
+        return false;
+    }
+}
+#endif
+
 }  // namespace mongo
 
 void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {
-    scoped_lock lk( mongo::dbtests::globalCurrentTestNameMutex );
+    boost::lock_guard<boost::mutex> lk( mongo::dbtests::globalCurrentTestNameMutex );
     mongo::dbtests::globalCurrentTestName = testName;
 }

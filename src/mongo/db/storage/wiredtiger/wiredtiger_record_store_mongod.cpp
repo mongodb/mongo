@@ -35,10 +35,11 @@
 #include <set>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/client.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
@@ -59,7 +60,7 @@ namespace mongo {
         class WiredTigerRecordStoreThread : public BackgroundJob {
         public:
             WiredTigerRecordStoreThread(const NamespaceString& ns)
-                : _ns(ns) {
+                : BackgroundJob(true /* deleteSelf */), _ns(ns) {
                 _name = std::string("WiredTigerRecordStoreThread for ") + _ns.toString();
             }
 
@@ -96,11 +97,11 @@ namespace mongo {
                         return 0;
                     }
 
-                    Client::Context ctx(&txn, _ns, false);
+                    OldClientContext ctx(&txn, _ns, false);
                     WiredTigerRecordStore* rs =
                         checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
                     WriteUnitOfWork wuow(&txn);
-                    boost::timed_mutex::scoped_lock lock(rs->cappedDeleterMutex());
+                    boost::lock_guard<boost::timed_mutex> lock(rs->cappedDeleterMutex());
                     int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
                     wuow.commit();
                     return removed;
@@ -156,7 +157,7 @@ namespace mongo {
             return false;
         }
 
-        boost::mutex::scoped_lock lock(_backgroundThreadMutex);
+        boost::lock_guard<boost::mutex> lock(_backgroundThreadMutex);
         NamespaceString nss(ns);
         if (_backgroundThreadNamespaces.count(nss)) {
             log() << "WiredTigerRecordStoreThread " << ns << " already started";

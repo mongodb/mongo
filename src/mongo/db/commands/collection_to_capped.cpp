@@ -35,12 +35,14 @@
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/query/find.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
 
@@ -71,7 +73,7 @@ namespace {
 
         // create new collection
         {
-            Client::Context ctx(txn,  toNs );
+            OldClientContext ctx(txn,  toNs );
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", size );
@@ -123,8 +125,9 @@ namespace {
 
                 WriteUnitOfWork wunit(txn);
                 toCollection->insertDocument( txn, obj, true );
-                if ( logForReplication )
-                    repl::logOp(txn, "i", toNs.c_str(), obj);
+                if ( logForReplication ) {
+                    getGlobalEnvironment()->getOpObserver()->onInsert(txn, toNs, obj);
+                }
                 wunit.commit();
             }
         }
@@ -296,8 +299,12 @@ namespace {
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
-            if (!fromRepl)
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+            if (!fromRepl) {
+                getGlobalEnvironment()->getOpObserver()->onConvertToCapped(
+                        txn,
+                        NamespaceString(longSource),
+                        size);
+            }
 
             wunit.commit();
             return true;

@@ -47,6 +47,10 @@ errors = [
         interface, no further WiredTiger calls are required.'''),
     Error('WT_RESTART', -31805,
         'restart the operation (internal)', undoc=True),
+    Error('WT_RUN_RECOVERY', -31806,
+        'recovery must be run to continue', '''
+        This error is generated when wiredtiger_open is configured
+        to return an error if recovery is required to use the database.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.
@@ -88,28 +92,41 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 /*
  * Historically, there was only the wiredtiger_strerror call because the POSIX
  * port didn't need anything more complex; Windows requires memory allocation
- * of error strings, so we added the wiredtiger_strerror_r call. Because we
+ * of error strings, so we added the WT_SESSION.strerror method. Because we
  * want wiredtiger_strerror to continue to be as thread-safe as possible, errors
- * are split into three categories: WiredTiger constant strings, system constant
- * strings and Everything Else, and we check constant strings before Everything
- * Else.
+ * are split into two categories: WiredTiger's or the system's constant strings
+ * and Everything Else, and we check constant strings before Everything Else.
  */
 
 /*
- * __wiredtiger_error --
- *\tReturn a constant string for the WiredTiger errors.
+ * __wt_wiredtiger_error --
+ *\tReturn a constant string for WiredTiger POSIX-standard and errors.
  */
-static const char *
-__wiredtiger_error(int error)
+const char *
+__wt_wiredtiger_error(int error)
 {
+\tconst char *p;
+
+\t/*
+\t * Check for WiredTiger specific errors.
+\t */
 \tswitch (error) {
 ''')
 
 for err in errors:
     tfile.write('\tcase ' + err.name + ':\n')
     tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
-
 tfile.write('''\t}
+
+\t/*
+\t * POSIX errors are non-negative integers; check for 0 explicitly
+\t * in-case the underlying strerror doesn't handle 0, some don't.
+\t */
+\tif (error == 0)
+\t\treturn ("Successful return: 0");
+\tif (error > 0 && (p = strerror(error)) != NULL)
+\t\treturn (p);
+
 \treturn (NULL);
 }
 
@@ -121,39 +138,8 @@ const char *
 wiredtiger_strerror(int error)
 {
 \tstatic char buf[128];
-\tconst char *p;
 
-\t/* Check for a constant string. */
-\tif ((p = __wiredtiger_error(error)) != NULL ||
-\t    (p = __wt_strerror(error)) != NULL)
-\t\treturn (p);
-
-\t/* Else, fill in the non-thread-safe static buffer. */
-\tif (wiredtiger_strerror_r(error, buf, sizeof(buf)) != 0)
-\t\t(void)snprintf(buf, sizeof(buf), "error return: %d", error);
-
-\treturn (buf);
-}
-
-/*
- * wiredtiger_strerror_r --
- *\tReturn a string for any error value, thread-safe version.
- */
-int
-wiredtiger_strerror_r(int error, char *buf, size_t buflen)
-{
-\tconst char *p;
-
-\t/* Require at least 2 bytes, printable character and trailing nul. */
-\tif (buflen < 2)
-\t\treturn (ENOMEM);
-
-\t/* Check for a constant string. */
-\tif ((p = __wiredtiger_error(error)) != NULL ||
-\t    (p = __wt_strerror(error)) != NULL)
-\t\treturn (snprintf(buf, buflen, "%s", p) > 0 ? 0 : ENOMEM);
-
-\treturn (__wt_strerror_r(error, buf, buflen));
+\treturn (__wt_strerror(NULL, error, buf, sizeof(buf)));
 }
 ''')
 tfile.close()

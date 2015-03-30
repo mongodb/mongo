@@ -37,7 +37,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -622,6 +621,14 @@ namespace {
                                 "{text: {search: 'dave', prefix: {pre: 3}}},"
                                 "{ixscan: {filter: {$or: [{other: /bar/}]}, "
                                           "pattern: {other: 1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, TextCaseSensitive) {
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$text: {$search: 'blah', $caseSensitive: true}}"));
+
+        assertNumSolutions(1);
+        assertSolutionExists("{text: {search: 'blah', caseSensitive: true}}");
     }
 
 }  // namespace

@@ -30,6 +30,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
+#include "mongo/config.h"
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/action_set.h"
@@ -276,7 +278,7 @@ namespace mongo {
                 
         } network;
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         class Security : public ServerStatusSection {
         public:
             Security() : ServerStatusSection( "security" ) {}

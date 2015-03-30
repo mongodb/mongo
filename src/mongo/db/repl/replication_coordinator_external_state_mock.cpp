@@ -57,7 +57,6 @@ namespace repl {
     void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
     void ReplicationCoordinatorExternalStateMock::initiateOplog(OperationContext* txn) {}
     void ReplicationCoordinatorExternalStateMock::shutdown() {}
-    void ReplicationCoordinatorExternalStateMock::forwardSlaveHandshake() {}
     void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
     OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {

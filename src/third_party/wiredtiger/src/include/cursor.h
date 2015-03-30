@@ -289,6 +289,7 @@ struct __wt_cursor_metadata {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
+	int	notinitialized;		/* Cursor not initialized */
 	int	notpositioned;		/* Cursor not positioned */
 
 	WT_STATS *stats;		/* Stats owned by the cursor */
@@ -300,6 +301,8 @@ struct __wt_cursor_stat {
 		WT_DSRC_STATS dsrc_stats;
 		WT_CONNECTION_STATS conn_stats;
 	} u;
+
+	const char **cfg;		/* Original cursor configuration */
 
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */

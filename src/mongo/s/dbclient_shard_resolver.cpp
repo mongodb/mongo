@@ -44,8 +44,8 @@ namespace mongo {
         // Declare up here for parsing later
         string errMsg;
 
-        // Special-case for config and admin
-        if ( shardName == "config" || shardName == "admin" ) {
+        // Special-case for config
+        if (shardName == "config") {
             *shardHost = ConnectionString::parse( configServer.modelServer(), errMsg );
             dassert( errMsg == "" );
             return Status::OK();

@@ -525,12 +525,12 @@ namespace {
 
         // Stop the process
         // During clean shutdown, ie NT SCM signals us, _serviceCallback returns here
-        // as part of the listener loop terminating so we do not have to stop twice in this case
-        if ( ! inShutdown() ) {
-            // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
-            // the "terminate process" functionality in exitCleanly.
-            exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
-        }
+        // as part of the listener loop terminating.
+        // exitCleanly is supposed to return. If it blocks, some other thread must be exiting.
+        //
+        // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
+        // the "terminate process" functionality in exitCleanly.
+        exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
 
         reportStatus(SERVICE_STOPPED, 0, exitCode);
     }
@@ -543,12 +543,9 @@ namespace {
 
         reportStatus( SERVICE_STOP_PENDING );
 
-        if ( ! inShutdown() ) {
-            // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
-            // the "terminate process" functionality in exitCleanly.
-            // Note: This triggers _serviceCallback to stop by setting inShutdown() == true
-            exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
-        }
+        // Note: This triggers _serviceCallback, ie  ServiceMain,
+        // to stop by setting inShutdown() == true
+        signalShutdown();
 
         // Note: we will report exit status in initService
     }

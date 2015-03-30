@@ -33,21 +33,19 @@
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/export_macros.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
 
-    class Shard;
     class DBConnectionPool;
 
     /**
      * not thread safe
      * thread safety is handled by DBConnectionPool
      */
-    class MONGO_CLIENT_API PoolForHost {
+    class PoolForHost {
     public:
 
         // Sentinel value indicating pool has no cleanup limit
@@ -165,8 +163,7 @@ namespace mongo {
            c.conn()...
         }
     */
-    class MONGO_CLIENT_API DBConnectionPool : public PeriodicTask {
-
+    class DBConnectionPool : public PeriodicTask {
     public:
 
         DBConnectionPool();
@@ -268,9 +265,9 @@ namespace mongo {
 
     };
 
-    extern MONGO_CLIENT_API DBConnectionPool pool;
+    extern DBConnectionPool pool;
 
-    class MONGO_CLIENT_API AScopedConnection : boost::noncopyable {
+    class AScopedConnection : boost::noncopyable {
     public:
         AScopedConnection() { _numConnections.fetchAndAdd(1); }
         virtual ~AScopedConnection() { _numConnections.fetchAndAdd(-1); }
@@ -297,7 +294,7 @@ namespace mongo {
        clean up nicely (i.e. the socket gets closed automatically when the
        scopeddbconnection goes out of scope).
     */
-    class MONGO_CLIENT_API ScopedDbConnection : public AScopedConnection {
+    class ScopedDbConnection : public AScopedConnection {
     public:
         /** the main constructor you want to use
             throws UserException if can't connect
