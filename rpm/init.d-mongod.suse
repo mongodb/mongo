@@ -62,7 +62,7 @@ start()
   ulimit -v unlimited
   ulimit -n 64000
   ulimit -m unlimited
-  ulimit -u 32000
+  ulimit -u 64000
 
   echo -n "Starting mongod: "
   $NUMACTL /sbin/start_daemon -u "$MONGO_USER" -p "$PIDFILEPATH" $mongod $OPTIONS >/dev/null 2>&1

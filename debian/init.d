@@ -133,9 +133,9 @@ start_server() {
             # In bash, it's -u
             if readlink /proc/$$/exe | grep -q dash
             then
-                    ulimit -p 32000
+                    ulimit -p 64000
             else
-                    ulimit -u 32000
+                    ulimit -u 64000
             fi
 
             # Start the process using the wrapper
