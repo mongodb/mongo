@@ -255,37 +255,59 @@ namespace mongo {
             exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
         }
 
-        BSONObj objToIndex;
+        Snapshotted<BSONObj> objToIndex;
         RecordId loc;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc))) {
-            {
+        int retries = 0; // non-zero when retrying our last document.
+        while (retries
+                || (PlanExecutor::ADVANCED == (state = exec->getNextSnapshotted(&objToIndex,
+                                                                                &loc)))) {
+            try {
                 if (_allowInterruption)
                     _txn->checkForInterrupt();
 
-                bool shouldCommitWUnit = true;
-                WriteUnitOfWork wunit(_txn);
-                Status ret = insert(objToIndex, loc);
-                if (!ret.isOK()) {
-                    if (dupsOut && ret.code() == ErrorCodes::DuplicateKey) {
-                        // If dupsOut is non-null, we should only fail the specific insert that
-                        // led to a DuplicateKey rather than the whole index build.
-                        dupsOut->insert(loc);
-                        shouldCommitWUnit = false;
-                    }
-                    else {
-                        return ret;
-                    }
+                // Make sure we are working with the latest version of the document.
+                if (objToIndex.snapshotId() != _txn->recoveryUnit()->getSnapshotId()
+                        && !_collection->findDoc(_txn, loc, &objToIndex)) {
+                    // doc was deleted so don't index it.
+                    retries = 0;
+                    continue;
                 }
 
-                if (shouldCommitWUnit)
+                // Done before insert so we can retry document if it WCEs.
+                progress->setTotalWhileRunning( _collection->numRecords(_txn) );
+
+                WriteUnitOfWork wunit(_txn);
+                Status ret = insert(objToIndex.value(), loc);
+                if (ret.isOK()) {
                     wunit.commit();
+                }
+                else if (dupsOut && ret.code() == ErrorCodes::DuplicateKey) {
+                    // If dupsOut is non-null, we should only fail the specific insert that
+                    // led to a DuplicateKey rather than the whole index build.
+                    dupsOut->insert(loc);
+                }
+                else {
+                    // Fail the index build hard.
+                    return ret;
+                }
+
+                // Go to the next document
+                progress->hit();
+                n++;
+                retries = 0;
             }
+            catch (const WriteConflictException& wce) {
+                _txn->getCurOp()->debug().writeConflicts++;
+                retries++; // logAndBackoff expects this to be 1 on first call.
+                wce.logAndBackoff(retries, "index creation", _collection->ns().ns());
 
-            n++;
-            progress->hit();
-
-            progress->setTotalWhileRunning( _collection->numRecords(_txn) );
+                // Can't use WRITE_CONFLICT_RETRY_LOOP macros since we need to save/restore exec
+                // around call to commitAndRestart.
+                exec->saveState();
+                _txn->recoveryUnit()->commitAndRestart();
+                exec->restoreState(_txn); // Handles any WCEs internally.
+            }
         }
 
         if (state != PlanExecutor::IS_EOF) {
