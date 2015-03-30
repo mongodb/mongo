@@ -85,6 +85,11 @@ namespace mongo {
     class SimpleMutex : boost::noncopyable {
     public:
         SimpleMutex( StringData ) { InitializeCriticalSection( &_cs ); }
+        ~SimpleMutex() {
+            if ( ! StaticObserver::_destroyingStatics ) {
+                DeleteCriticalSection(&_cs);
+            }
+        }
         void dassertLocked() const { }
         void lock() { EnterCriticalSection( &_cs ); }
         void unlock() { LeaveCriticalSection( &_cs ); }
