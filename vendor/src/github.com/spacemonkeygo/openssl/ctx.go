@@ -533,7 +533,7 @@ func (c *Ctx) LoadVerifyLocations(ca_file string, ca_path string) error {
 	return nil
 }
 
-type Options int
+type Options uint
 
 const (
 	// NoCompression is only valid if you are using OpenSSL 1.0.1 or newer
