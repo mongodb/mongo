@@ -61,6 +61,9 @@ var insertAndRemove = function(host) {
             //print(id);
             coll.remove({_id: id});
             coll.insert({_id: id});
+
+            // Try to throttle this thread to prevent overloading slow machines.
+            sleep(1);
     }
 
     jsTestLog("finished bg writes on " + host);
