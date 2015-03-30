@@ -54,6 +54,7 @@ Checksum
 Checksums
 CityHash
 CloseHandle
+Comparator
 Config
 CreateFileMapping
 Crummey
@@ -67,6 +68,7 @@ DOI
 DUPLICATEV
 DbCursor
 DbEnv
+Decrement
 EAGAIN
 EBUSY
 EINTR
@@ -103,6 +105,7 @@ Fuerst
 GCC
 GIDs
 Gcc
+Geoff
 GetEnvironmentVariableA
 GetFileAttributesEx
 GetFileSizeEx
@@ -116,6 +119,7 @@ HHHHLL
 HHHLL
 IEC
 IEEE
+IKEY
 IMPL
 INCR
 INIT
@@ -157,6 +161,7 @@ LockFile
 Lookup
 MALLOC
 MEM
+MERCHANTABILITY
 MSVC
 MUTEX
 Manos
@@ -172,6 +177,7 @@ Multithreaded
 Mutex
 NEEDKEY
 NEEDVALUE
+NOLL
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
@@ -179,6 +185,7 @@ NOVALUE
 NUL
 NetBSD
 NoAddr
+Noll
 Nul
 OPTYPE
 OUTBUFF
@@ -286,6 +293,8 @@ af
 agc
 alfred
 alloc
+allocator
+allocators
 allocfile
 allocsize
 amd
@@ -339,6 +348,7 @@ bzip
 calloc
 catfmt
 cd
+centric
 cfg
 cfkos
 change's
@@ -362,6 +372,7 @@ colcheck
 colgroup
 colgroups
 collatorp
+comparator
 comparep
 compat
 concat
@@ -388,12 +399,14 @@ curfile
 curindex
 curlog
 curmetadata
+cursoring
 cursorp
 curstat
 curtable
 cust
 cv
 cxa
+data's
 database's
 datalen
 datasets
@@ -401,8 +414,11 @@ datasource
 datastore
 dbc
 decile
+deciles
 decl
 decr
+decrement
+decrementing
 deflateCopy
 deflateEnd
 deflateInit
@@ -524,9 +540,11 @@ idx
 ifdef's
 ikey
 incr
+incrementing
 indices
 indirects
 indx
+infeasible
 inflateInit
 init
 initn
@@ -536,6 +554,7 @@ inline
 inmem
 insertK
 insertV
+instantiation
 intl
 intnum
 intpack
@@ -543,6 +562,7 @@ inuse
 io
 ip
 ispo
+iteratively
 jnr
 jrx
 json
@@ -560,9 +580,11 @@ len
 lenp
 level's
 lex
+lexicographically
 lf
 lfence
 libdatasource
+libs
 libwiredtiger
 llll
 llu
@@ -694,6 +716,7 @@ py
 qdown
 qrrSS
 qsort
+quartile
 qup
 rS
 rb
@@ -707,10 +730,13 @@ realloc
 recno
 recnos
 reconfig
+reconfiguring
 recsize
 recurse
 refp
+reinitialization
 resize
+resizing
 ret
 retp
 rf
@@ -790,6 +816,7 @@ tokname
 tokstart
 toktype
 totalsec
+transactional
 transactionally
 trecno
 trk
@@ -821,8 +848,11 @@ unmarshalled
 unmerged
 unmodify
 unpackv
+unreferenced
 unregister
 unsized
+unterminated
+untyped
 upd
 update's
 upg
@@ -839,6 +869,7 @@ uu
 va
 valuep
 valuev
+vanishingly
 variable's
 versa
 vfprintf
