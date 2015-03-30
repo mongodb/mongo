@@ -3,7 +3,6 @@
 import os
 
 Import("env")
-Import("windows")
 Import("s3push")
 Import("has_option")
 

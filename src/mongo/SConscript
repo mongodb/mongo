@@ -13,7 +13,6 @@ Import("get_option")
 Import("serverJs")
 Import("usev8")
 Import("v8suffix")
-Import("darwin windows solaris linux nix")
 Import("wiredtiger")
 
 # Boost we need everywhere. 's2' is spammed in all over the place by
@@ -349,7 +348,7 @@ env.Library('lasterror', [
             ])
 
 def getSysInfo():
-    if windows:
+    if env.TargetOSIs("windows"):
         return "windows " + str( sys.getwindowsversion() )
     else:
         return " ".join( os.uname() )
@@ -428,7 +427,7 @@ extraCommonLibdeps = []
 
 if env['MONGO_BUILD_SASL_CLIENT']:
     saslLibs = ['sasl2']
-    if env['PYSYSPLATFORM'] == "win32":
+    if env.TargetOSIs('windows'):
         saslLibs.extend(["secur32"])
 
     env.Library('cyrus_sasl_client_session',
@@ -443,18 +442,8 @@ if env['MONGO_BUILD_SASL_CLIENT']:
     extraCommonLibdeps.append('cyrus_sasl_client_session')
 
 # handle processinfo*
-processInfoFiles = [ "util/processinfo.cpp" ]
-
-processInfoPlatformFile = env.File( "util/processinfo_${PYSYSPLATFORM}.cpp" )
-# NOTE( schwerin ): This is a very un-scons-y way to make this decision, and prevents one from using
-# code generation to produce util/processinfo_$PYSYSPLATFORM.cpp.
-if not os.path.exists( str( processInfoPlatformFile ) ):
-    processInfoPlatformFile = env.File( "util/processinfo_none.cpp" )
-
-processInfoFiles.append( processInfoPlatformFile )
-
 env.Library("processinfo",
-            processInfoFiles,
+            [ "util/processinfo.cpp", "util/processinfo_${TARGET_OS}.cpp" ],
             LIBDEPS=["foundation", "bson"])
 
 env.CppUnitTest("processinfo_test",
@@ -605,7 +594,7 @@ coredbEnv.Library("coredb", [
 env.Library('ntservice', ['util/ntservice.cpp'],
             LIBDEPS=['foundation',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser'])
-if windows:
+if env.TargetOSIs('windows'):
     env.CppUnitTest('ntservice_test', 'util/ntservice_test.cpp',
                     LIBDEPS=['ntservice'],
                     LIBS=['shell32', env['LIBS']],
@@ -691,7 +680,7 @@ env.Library('global_environment_experiment',
               'db/global_environment_noop.cpp' ])
 
 # Memory-mapped files support.  Used by mongod and some tools.
-env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${OS_FAMILY}.cpp'], LIBDEPS=['foundation'])
+env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${TARGET_OS_FAMILY}.cpp'], LIBDEPS=['foundation'])
 
 env.Library('elapsed_tracker',
             ['util/elapsed_tracker.cpp'],
@@ -850,7 +839,7 @@ env.CppUnitTest('server_options_test', 'db/server_options_test.cpp',
 env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.cpp', LIBDEPS=[])
 
 env.Library('stacktrace',
-            'util/stacktrace_${OS_FAMILY}.cpp',
+            'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
             LIBDEPS=['bson',
                      'stringutils',
                      'version',
@@ -1263,12 +1252,12 @@ env.Alias('file_allocator_bench', "$BUILD_ROOT/" + add_exe("file_allocator_bench
 
 # --- sniffer ---
 mongosniff_built = False
-if darwin or env["_HAVEPCAP"]:
+if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
     mongosniff_built = True
     sniffEnv = env.Clone()
     sniffEnv.Append( CPPDEFINES="MONGO_EXPOSE_MACROS" )
 
-    if not windows:
+    if not env.TargetOSIs('windows'):
         sniffEnv.Append( LIBS=[ "pcap" ] )
     else:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
@@ -1345,8 +1334,8 @@ if not has_option('noshell') and usev8:
                 LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser_init'])
 
     shellEnv = env.Clone()
-    if windows:
-        shellEnv.Append(LIBS=["winmm.lib"])
+    if env.TargetOSIs('windows'):
+       shellEnv.Append(LIBS=["winmm.lib"])
 
     mongo_shell = shellEnv.Program(
         "mongo",
@@ -1366,20 +1355,20 @@ else:
 
 distBinaries = []
 
-if windows:
+if env.TargetOSIs('windows'):
     distBinaries.extend(['mongod.pdb', 'mongos.pdb'])
 
 def installBinary( e, name ):
     name = add_exe( name )
 
-    if (solaris or linux) and (not has_option("nostrip")):
+    if env.TargetOSIs('solaris', 'linux') and (not has_option("nostrip")):
         name = e.Command('stripped/%s' % name, name, Copy('$TARGET', '$SOURCE'))[0]
         e.AddPostAction(name, 'strip $TARGET')
 
     distBinaries.append(name)
     inst = e.Install( "$INSTALL_DIR/bin", name )
 
-    if nix:
+    if env.TargetOSIs('posix'):
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
 def installExternalBinary( e, name_str ):
@@ -1391,7 +1380,7 @@ def installExternalBinary( e, name_str ):
     distBinaries.append(name)
     inst = e.Install( "$INSTALL_DIR/bin", name )
 
-    if nix:
+    if env.TargetOSIs('posix'):
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
 

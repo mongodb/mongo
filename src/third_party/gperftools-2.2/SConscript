@@ -3,7 +3,6 @@
 Import("env")
 Import("has_option")
 Import("debugBuild")
-Import("darwin")
 
 files = [
     'src/base/dynamic_annotations.c',

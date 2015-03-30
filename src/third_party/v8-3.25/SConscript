@@ -32,7 +32,7 @@ root_dir = dirname(File('SConscript').rfile().abspath)
 sys.path.insert(0, join(root_dir, 'tools'))
 import js2c
 
-Import("env windows linux darwin solaris freebsd debugBuild openbsd")
+Import("env debugBuild")
 
 # pared-down copies of the equivalent structures in v8's SConstruct/SConscript:
 LIBRARY_FLAGS = {
@@ -361,17 +361,17 @@ def get_options():
     else:
         assert False, "Unsupported architecture: " + processor
 
-    if linux:
+    if env.TargetOSIs('linux'):
         os_string = 'os:linux'
-    elif darwin:
+    elif env.TargetOSIs('osx'):
         os_string = 'os:macos'
-    elif windows:
+    elif env.TargetOSIs('windows'):
         os_string = 'os:win32'
-    elif freebsd:
+    elif env.TargetOSIs('freebsd'):
         os_string = 'os:freebsd'
-    elif solaris:
+    elif env.TargetOSIs('solaris'):
         os_string = 'os:solaris'
-    elif openbsd:
+    elif env.TargetOSIs('openbsd'):
         os_string = 'os:openbsd'
     else:
         os_string = 'os:nullos'
@@ -399,14 +399,8 @@ def get_sources(options):
 
     return sources
 
-def get_toolchain():
-    if windows:
-        return 'msvc'
-    else:
-        return 'gcc'
-
 # convert our SConstruct variables to their v8 equivalents:
-toolchain = get_toolchain()
+toolchain = 'msvc' if env.ToolchainIs('MSVC') else 'gcc'
 options = get_options()
 sources = get_sources(options)
 

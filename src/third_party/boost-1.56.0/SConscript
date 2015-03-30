@@ -7,9 +7,9 @@ env.Library('boost_system', ['libs/system/src/error_code.cpp'])
 boost_thread_source = dict(
     posix=['libs/thread/src/pthread/once.cpp',
            'libs/thread/src/pthread/thread.cpp'],
-    win=['libs/thread/src/win32/thread.cpp',
-         'libs/thread/src/win32/tss_pe.cpp']
-    ).get(env['OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['OS_FAMILY'])
+    windows=['libs/thread/src/win32/thread.cpp',
+             'libs/thread/src/win32/tss_pe.cpp']
+    ).get(env['TARGET_OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['TARGET_OS_FAMILY'])
 
 threadlib_env = env.Clone()
 threadlib_env.Append(CPPDEFINES=['BOOST_THREAD_BUILD_LIB'])

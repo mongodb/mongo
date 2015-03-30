@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env windows linux darwin solaris")
+Import("env")
 
 env = env.Clone()
 

@@ -43,38 +43,58 @@ def findSettingsSetup():
 def versiontuple(v):
     return tuple(map(int, (v.split("."))))
 
-# --- platform identification ---
+# --- OS identification ---
 #
 # This needs to precede the options section so that we can only offer some options on certain
-# platforms.
+# operating systems.
 
-platform = os.sys.platform
-nix = False
-linux = False
-darwin = False
-windows = False
-freebsd = False
-openbsd = False
-solaris = False
+# This function gets the running OS as identified by Python
+# It should only be used to set up defaults for options/variables, because
+# its value could potentially be overridden by setting TARGET_OS on the
+# command-line. Treat this output as the value of HOST_OS
+def get_running_os_name():
+    running_os = os.sys.platform
+    if running_os.startswith('linux'):
+        running_os = 'linux'
+    elif running_os.startswith('freebsd'):
+        running_os = 'freebsd'
+    elif running_os.startswith('openbsd'):
+        running_os = 'openbsd'
+    elif running_os == 'sunos5':
+        running_os = 'solaris'
+    elif running_os == 'win32':
+        running_os = 'windows'
+    elif running_os == 'darwin':
+        running_os = 'osx'
+    else:
+        running_os = 'unknown'
+    return running_os
 
-if "darwin" == platform:
-    darwin = True
-    platform = "osx" # prettier than darwin
-elif platform.startswith("linux"):
-    linux = True
-    platform = "linux"
-elif "sunos5" == platform:
-    solaris = True
-elif platform.startswith( "freebsd" ):
-    freebsd = True
-elif platform.startswith( "openbsd" ):
-    openbsd = True
-elif "win32" == platform:
-    windows = True
-else:
-    print( "No special config for [" + platform + "] which probably means it won't work" )
+def env_get_os_name_wrapper(self):
+    return env['TARGET_OS']
 
-nix = not windows
+def is_os_raw(target_os, os_list_to_check):
+    okay = False
+    posix_os_list = [ 'linux', 'openbsd', 'freebsd', 'osx', 'solaris' ]
+
+    for p in os_list_to_check:
+        if p == 'posix' and target_os in posix_os_list:
+            okay = True
+            break
+        elif p == target_os:
+            okay = True
+            break
+    return okay
+
+# This function tests the running OS as identified by Python
+# It should only be used to set up defaults for options/variables, because
+# its value could potentially be overridden by setting TARGET_OS on the
+# command-line. Treat this output as the value of HOST_OS
+def is_running_os(*os_list):
+    return is_os_raw(get_running_os_name(), os_list)
+
+def env_os_is_wrapper(self, *os_list):
+    return is_os_raw(self['TARGET_OS'], os_list)
 
 # --- options ----
 options = {}
@@ -168,7 +188,7 @@ def get_variant_dir():
         s = "cached"
         s += "/".join(extras) + "/"
     else:
-        s = "${PYSYSPLATFORM}/${TARGET_ARCH}/"
+        s = "${TARGET_ARCH}/"
         a += extras
 
         if len(a) > 0:
@@ -195,7 +215,7 @@ add_option( "variant-dir", "override variant subdirectory", 1, False )
 
 # linking options
 add_option( "release" , "release build" , 0 , True )
-add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
+
 add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
 add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
 
@@ -245,7 +265,7 @@ add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
 add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
 
 # debugging/profiling help
-if os.sys.platform.startswith("linux"):
+if is_running_os('linux'):
     defaultAllocator = 'tcmalloc'
 else:
     defaultAllocator = 'system'
@@ -307,22 +327,20 @@ add_option('propagate-shell-environment',
 add_option('variables-help',
            "Print the help text for SCons variables", 0, False)
 
-if darwin:
-    add_option("osx-version-min", "minimum OS X version to support", 1, True)
+add_option("osx-version-min", "minimum OS X version to support", 1, True)
 
-elif windows:
-    win_version_min_choices = {
-        'xpsp3'   : ('0501', '0300'),
-        'ws03sp2' : ('0502', '0200'),
-        'vista'   : ('0600', '0000'),
-        'ws08r2'  : ('0601', '0000'),
-        'win7'    : ('0601', '0000'),
-        'win8'    : ('0602', '0000'),
-    }
+win_version_min_choices = {
+    'xpsp3'   : ('0501', '0300'),
+    'ws03sp2' : ('0502', '0200'),
+    'vista'   : ('0600', '0000'),
+    'ws08r2'  : ('0601', '0000'),
+    'win7'    : ('0601', '0000'),
+    'win8'    : ('0602', '0000'),
+}
 
-    add_option("win-version-min", "minimum Windows version to support", 1, True,
-               type = 'choice', default = None,
-               choices = win_version_min_choices.keys())
+add_option("win-version-min", "minimum Windows version to support", 1, True,
+           type = 'choice', default = None,
+           choices = win_version_min_choices.keys())
 
 add_option('cache',
            "Use an object cache rather than a per-build variant directory (experimental)",
@@ -343,7 +361,7 @@ add_option('variable-parse-mode',
 def variable_shlex_converter(val):
     parse_mode = get_option('variable-parse-mode')
     if parse_mode == 'auto':
-        parse_mode = 'other' if windows else 'posix'
+        parse_mode = 'other' if is_running_os('windows') else 'posix'
     return shlex.split(val, posix=(parse_mode == 'posix'))
 
 def variable_arch_converter(val):
@@ -373,14 +391,12 @@ def variable_arch_converter(val):
 # If we aren't on a platform where we know the minimal set of tools, we fall back to loading
 # the 'default' tool.
 def decide_platform_tools():
-    if windows:
+    if is_running_os('windows'):
         # we only support MS toolchain on windows
         return ['msvc', 'mslink', 'mslib']
-    elif linux:
+    elif is_running_os('linux', 'solaris'):
         return ['gcc', 'g++', 'gnulink', 'ar']
-    elif solaris:
-        return ['gcc', 'g++', 'gnulink', 'ar']
-    elif darwin:
+    elif is_running_os('osx'):
         return ['gcc', 'g++', 'applelink', 'ar']
     else:
         return ["default"]
@@ -463,6 +479,11 @@ env_vars.Add('TARGET_ARCH',
     help='Sets the architecture to build for',
     converter=variable_arch_converter,
     default=None)
+
+env_vars.Add('TARGET_OS',
+    help='Sets the target OS to build for',
+    default=get_running_os_name()
+)
 
 env_vars.Add('TOOLS',
     help='Sets the list of SCons tools to add to the environment',
@@ -574,7 +595,6 @@ envDict = dict(BUILD_ROOT=buildDir,
                # TODO: Move unittests.txt to $BUILD_DIR, but that requires
                # changes to MCI.
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
-               PYSYSPLATFORM=os.sys.platform,
                PCRE_VERSION='8.36',
                CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
                CONFIGURELOG=sconsDataDir.File('config.log'),
@@ -586,6 +606,9 @@ envDict = dict(BUILD_ROOT=buildDir,
 
 env = Environment(variables=env_vars, **envDict)
 del envDict
+
+env.AddMethod(env_os_is_wrapper, 'TargetOSIs')
+env.AddMethod(env_get_os_name_wrapper, 'GetTargetOSName')
 
 if has_option('variables-help'):
     print env_vars.GenerateHelpText(env)
@@ -624,6 +647,7 @@ if has_option( "cc" ):
     env["CC"] = get_option( "cc" )
 
 detectEnv = env.Clone()
+
 # Identify the toolchain in use. We currently support the following:
 # These macros came from
 # http://nadeausoftware.com/articles/2012/10/c_c_tip_how_detect_compiler_name_and_version_using_compiler_predefined_macros
@@ -692,9 +716,33 @@ def CheckForProcessor(context, which_arch):
     context.Result('Could not detect processor model/architecture')
     return False
 
+# Taken from http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system
+os_macros = {
+    "windows": "_WIN32",
+    "solaris": "__sun",
+    "freebsd": "__FreeBSD__",
+    "openbsd": "__OpenBSD__",
+    "osx": "__APPLE__",
+    "linux": "__linux__",
+}
+
+def CheckForOS(context, which_os):
+    test_body = """
+    #if defined({0})
+    /* detected {1} */
+    #else
+    #error
+    #endif
+    """.format(os_macros[which_os], which_os)
+    context.Message('Checking if target OS {0} is supported by the toolchain '.format(which_os))
+    ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+    context.Result(ret)
+    return ret
+
 detectConf = Configure(detectEnv, help=False, custom_tests = {
     'CheckForToolchain' : CheckForToolchain,
     'CheckForProcessor': CheckForProcessor,
+    'CheckForOS': CheckForOS,
 })
 
 if not detectConf.CheckCXX():
@@ -705,8 +753,7 @@ if not detectConf.CheckCC():
     Exit(1)
 
 toolchain_search_sequence = [ "GCC", "clang" ]
-detected_toolchain = None
-if detectEnv['PYSYSPLATFORM'] == 'win32':
+if is_running_os('windows'):
     toolchain_search_sequence = [ 'MSVC', 'clang', 'GCC' ]
 for candidate_toolchain in toolchain_search_sequence:
     if detectConf.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
@@ -746,10 +793,21 @@ else:
         Exit(1)
     env['TARGET_ARCH'] = detected_processor
 
+if env['TARGET_OS'] not in os_macros:
+    print "No special config for [{0}] which probably means it won't work".format(env['TARGET_OS'])
+elif not detectConf.CheckForOS(env['TARGET_OS']):
+    print "TARGET_OS is not supported by compiler"
+    Exit(1)
+
 detectConf.Finish()
 
 if not env['HOST_ARCH']:
     env['HOST_ARCH'] = env['TARGET_ARCH']
+
+# In some places we have POSIX vs Windows cpp files, and so there's an additional
+# env variable to interpolate their names in child sconscripts
+
+env['TARGET_OS_FAMILY'] = 'posix' if env.TargetOSIs('posix') else env.GetTargetOSName()
 
 if has_option("cache"):
     if has_option("release"):
@@ -811,23 +869,13 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
 
 libdeps.setup_environment( env )
 
-if env['PYSYSPLATFORM'] == 'linux3':
-    env['PYSYSPLATFORM'] = 'linux2'
-if 'freebsd' in env['PYSYSPLATFORM']:
-    env['PYSYSPLATFORM'] = 'freebsd'
-
-if os.sys.platform == 'win32':
-    env['OS_FAMILY'] = 'win'
-else:
-    env['OS_FAMILY'] = 'posix'
-
-if env['PYSYSPLATFORM'] in ('linux2', 'freebsd'):
+if env.TargetOSIs('linux', 'freebsd'):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
-elif env['PYSYSPLATFORM'] == 'darwin':
+elif env.TargetOSIs('osx'):
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
-elif env['PYSYSPLATFORM'].startswith('sunos'):
+elif env.TargetOSIs('solaris'):
     env['LINK_LIBGROUP_START'] = '-z rescan'
     env['LINK_LIBGROUP_END'] = ''
 
@@ -847,22 +895,20 @@ def filterExists(paths):
 if debugBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
 
-if darwin:
-    pass
-elif linux:
+if env.TargetOSIs('linux'):
     env.Append( LIBS=['m'] )
 
-elif solaris:
+elif env.TargetOSIs('solaris'):
      env.Append( LIBS=["socket","resolv","lgrp"] )
 
-elif freebsd:
+elif env.TargetOSIs('freebsd'):
     env.Append( LIBS=[ "kvm" ] )
     env.Append( CCFLAGS=[ "-fno-omit-frame-pointer" ] )
 
-elif openbsd:
+elif env.TargetOSIs('openbsd'):
     env.Append( LIBS=[ "kvm" ] )
 
-elif windows:
+elif env.TargetOSIs('windows'):
     dynamicCRT = has_option("dynamic-windows")
 
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
@@ -1002,10 +1048,7 @@ elif windows:
         env.Append(LIBS=['winmm.lib'])
 
 env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
-if nix:
-
-    if has_option( "static-libstdc++" ):
-        env.Append( LINKFLAGS=["-static-libstdc++", "-static-libgcc"] )
+if env.TargetOSIs('posix'):
 
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fPIC",
@@ -1017,8 +1060,7 @@ if nix:
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
-    if linux or darwin:
-        env.Append( CCFLAGS=["-pipe"] )
+    if env.TargetOSIs('linux', 'osx'):
         if not has_option("disable-warnings-as-errors"):
             env.Append( CCFLAGS=["-Werror"] )
 
@@ -1030,14 +1072,12 @@ if nix:
     #
     # TODO: Is it necessary to add to both linkflags and shlinkflags, or are LINKFLAGS
     # propagated to SHLINKFLAGS?
-    if darwin:
+    if env.TargetOSIs('osx'):
         env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
         env.Append( SHLINKFLAGS=["-Wl,-bind_at_load"] )
     else:
         env.Append( LINKFLAGS=["-Wl,-z,now"] )
         env.Append( SHLINKFLAGS=["-Wl,-z,now"] )
-
-    if not darwin:
         env.Append( LINKFLAGS=["-rdynamic"] )
 
     env.Append( LIBS=[] )
@@ -1049,12 +1089,12 @@ if nix:
         except KeyError:
             pass
 
-    if linux and has_option( "gcov" ):
+    if env.TargetOSIs('linux') and has_option( "gcov" ):
         env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
         env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
 
     if optBuild:
-        env.Append( CCFLAGS=["-O3"] )
+        env.Append( CCFLAGS=["-O2"] )
     else:
         env.Append( CCFLAGS=["-O0"] )
 
@@ -1063,12 +1103,11 @@ if nix:
             env.Append( CCFLAGS=["-fstack-protector"] )
             env.Append( LINKFLAGS=["-fstack-protector"] )
             env.Append( SHLINKFLAGS=["-fstack-protector"] )
-        env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
 
 if has_option( "ssl" ):
     env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
     env.Append( MONGO_CRYPTO=["openssl"] )
-    if windows:
+    if env.TargetOSIs('windows'):
         env.Append( LIBS=["libeay32"] )
         env.Append( LIBS=["ssleay32"] )
     else:
@@ -1110,7 +1149,7 @@ try:
 except OSError:
     pass
 
-if not windows:
+if not env.TargetOSIs('windows'):
     for keysuffix in [ "1" , "2" ]:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
@@ -1241,7 +1280,7 @@ def doConfigure(myenv):
     # Vista respectively. Finally, if they haven't done either of these, try invoking the
     # compiler to figure out whether we are doing a 32 or 64 bit build and select as
     # appropriate.
-    if windows:
+    if env.TargetOSIs('windows'):
         win_version_min = None
         if has_option('win-version-min'):
             win_version_min = get_option('win-version-min')
@@ -1375,7 +1414,7 @@ def doConfigure(myenv):
         conf.Finish()
 
     # This needs to happen before we check for libc++, since it affects whether libc++ is available.
-    if darwin and has_option('osx-version-min'):
+    if env.TargetOSIs('osx') and has_option('osx-version-min'):
         min_version = get_option('osx-version-min')
         min_version_flag = '-mmacosx-version-min=%s' % (min_version)
         if not AddToCCFLAGSIfSupported(myenv, min_version_flag):
@@ -1388,7 +1427,7 @@ def doConfigure(myenv):
         if not myenv.ToolchainIs('clang'):
             print( 'libc++ is currently only supported for clang')
             Exit(1)
-        if darwin and has_option('osx-version-min') and versiontuple(min_version) < versiontuple('10.7'):
+        if env.TargetOSIs('osx') and has_option('osx-version-min') and versiontuple(min_version) < versiontuple('10.7'):
             print("Warning: You passed option 'libc++'. You probably want to also pass 'osx-version-min=10.7' or higher for libc++ support.")
         if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
             myenv.Append(LINKFLAGS=['-stdlib=libc++'])
@@ -1704,8 +1743,8 @@ def doConfigure(myenv):
             printf("Don't know how to enable --lto on current toolchain")
             Exit(1)
 
-    # glibc's memcmp is faster than gcc's
-    if linux:
+    # We set this to work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
+    if not myenv.ToolchainIs('msvc'):
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
 
     # When using msvc, check for support for __declspec(thread), unless we have been asked
@@ -1899,7 +1938,7 @@ def doConfigure(myenv):
 
     conf.env["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
-    if solaris:
+    if env.TargetOSIs('solaris'):
         conf.CheckLib( "nsl" )
 
     if usev8 and use_system_version_of_library("v8"):
@@ -1919,7 +1958,7 @@ def doConfigure(myenv):
         Exit(1)
 
     # requires ports devel/libexecinfo to be installed
-    if freebsd or openbsd:
+    if env.TargetOSIs('freebsd', 'openbsd'):
         if not conf.CheckLib("execinfo"):
             print("Cannot find libexecinfo, please install devel/libexecinfo.")
             Exit(1)
@@ -1992,10 +2031,10 @@ env.AlwaysBuild( "lint" )
 def getSystemInstallName():
     dist_arch = GetOption("distarch")
     arch_name = env['TARGET_ARCH'] if not dist_arch else dist_arch
-    n = platform + "-" + arch_name
+    n = env.GetTargetOSName() + "-" + arch_name
     if has_option("nostrip"):
         n += "-debugsymbols"
-    if nix and os.uname()[2].startswith("8."):
+    if env.TargetOSIs('posix') and os.uname()[2].startswith("8."):
         n += "-tiger"
 
     if len(mongo_modules):
@@ -2129,7 +2168,6 @@ Export("serverJs")
 Export("usev8")
 Export("v8version v8suffix")
 Export("boostSuffix")
-Export("darwin windows solaris linux freebsd nix openbsd")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("s3push")

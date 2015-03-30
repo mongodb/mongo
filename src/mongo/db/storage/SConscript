@@ -82,7 +82,7 @@ env.Library(
 env.Library(
     target='storage_engine_lock_file',
     source=[
-        'storage_engine_lock_file_${OS_FAMILY}.cpp',
+        'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
         ]

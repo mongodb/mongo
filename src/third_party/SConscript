@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris boostSuffix")
+Import("env use_system_version_of_library usev8 v8suffix boostSuffix")
 Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
@@ -97,7 +97,7 @@ boostEnv = env
 if use_system_version_of_library("boost"):
     # On windows, we don't need the syslibdeps because autolib will select the right libraries
     # for us automatically.
-    if not windows:
+    if not env.TargetOSIs('windows'):
         boostEnv = env.Clone(
             SYSLIBDEPS=[
                 env['LIBDEPS_BOOST_PROGRAM_OPTIONS_SYSLIBDEP'],
@@ -258,7 +258,7 @@ yamlEnv.Library(
 
 
 tzEnv = env.Clone()
-if solaris:
+if env.TargetOSIs('solaris'):
     tzEnv.InjectThirdPartyIncludePaths(libraries=['tz'])
     tzEnv.SConscript('tz/SConscript', exports={ 'env' : tzEnv })
     tzEnv = tzEnv.Clone(
