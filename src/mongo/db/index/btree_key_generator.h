@@ -40,10 +40,13 @@ namespace mongo {
      */
     class BtreeKeyGenerator {
     public:
-        BtreeKeyGenerator(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed, bool isSparse);
+        BtreeKeyGenerator(std::vector<const char*> fieldNames,
+                          std::vector<BSONElement> fixed,
+                          bool isSparse);
+
         virtual ~BtreeKeyGenerator() { }
 
-        void getKeys(const BSONObj &obj, BSONObjSet *keys) const;
+        void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         static const int ParallelArraysCode;
 
@@ -53,25 +56,31 @@ namespace mongo {
         bool _isIdIndex;
         bool _isSparse;
         BSONObj _nullKey; // a full key with all fields null
-        BSONObj _nullObj;     // only used for _nullElt
-        BSONElement _nullElt; // jstNull
         BSONSizeTracker _sizeTracker;
+
     private:
         // We have V0 and V1.  Sigh.
-        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                                 const BSONObj &obj, BSONObjSet *keys) const = 0;
+        virtual void getKeysImpl(std::vector<const char*> fieldNames,
+                                 std::vector<BSONElement> fixed,
+                                 const BSONObj& obj,
+                                 BSONObjSet* keys) const = 0;
+
         std::vector<BSONElement> _fixed;
     };
 
     class BtreeKeyGeneratorV0 : public BtreeKeyGenerator {
     public:
-        BtreeKeyGeneratorV0(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
+        BtreeKeyGeneratorV0(std::vector<const char*> fieldNames,
+                            std::vector<BSONElement> fixed,
                             bool isSparse);
+
         virtual ~BtreeKeyGeneratorV0() { }
 
     private:
-        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
-                                 const BSONObj &obj, BSONObjSet *keys) const;
+        virtual void getKeysImpl(std::vector<const char*> fieldNames,
+                                 std::vector<BSONElement> fixed,
+                                 const BSONObj& obj,
+                                 BSONObjSet* keys) const;
     };
 
     class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
@@ -85,15 +94,12 @@ namespace mongo {
     private:
         /**
          * Stores info regarding traversal of a positional path. A path through a document is
-         * considered positional if
-         *   1) at least one of the elements of the path has a name consisting of [0-9]+, and
-         *   2) this path element names an array element.
+         * considered positional if this path element names an array element. Generally this means
+         * that the field name consists of [0-9]+, but the implementation just calls .Obj() on
+         * the array and looks for the named field. This logic happens even if the field does
+         * not match [0-9]+.
          *
-         * Example 1:
-         *   The path 'a.b.c' will never be positional because none of the elements 'a', 'b', or
-         *   'c' can be interpreted as an integer.
-         *
-         * Example 2:
+         * Example:
          *   The path 'a.1.b' can sometimes be positional due to path element '1'. In the document
          *   {a: [{b: 98}, {b: 99}]} it would be considered positional, and would refer to
          *   element 99. In the document {a: [{'1': {b: 97}}]}, the path is *not* considered
@@ -152,7 +158,9 @@ namespace mongo {
                                  const BSONObj& obj,
                                  BSONObjSet* keys) const;
 
-        // These guys are called by getKeysImpl.
+        /**
+         * This recursive method does the heavy-lifting for getKeysImpl().
+         */
         void getKeysImplWithArray(std::vector<const char*> fieldNames,
                                   std::vector<BSONElement> fixed,
                                   const BSONObj& obj,
@@ -160,16 +168,49 @@ namespace mongo {
                                   unsigned numNotFound,
                                   const std::vector<PositionalPathInfo>& positionalInfo) const;
         /**
-         * @param arrayNestedArray - set if the returned element is an array nested directly
-         *                           within arr.
+         * A call to getKeysImplWithArray() begins by calling this for each field in the key
+         * pattern. It uses getFieldDottedOrArray() to traverse the path '*field' in 'obj'.
+         *
+         * The 'positionalInfo' arg is used for handling a field path where 'obj' has an
+         * array indexed by position. See the comments for PositionalPathInfo for more detail.
+         *
+         * Returns the element extracted as a result of traversing the path, or an indexed array
+         * if we encounter one during the path traversal.
+         *
+         * Out-parameters:
+         *   --Sets *field to the remaining path that must be traversed.
+         *   --Sets *arrayNestedArray to true if the returned BSONElement is a nested array that is
+         *     indexed by position in its parent array. Otherwise sets *arrayNestedArray to false.
+         *
+         * Example:
+         *   Suppose we have key pattern {"a.b.c": 1} and we're extracting keys from document
+         *   {a: [{b: {c: 98}}, {b: {c: 99}}]}. On the first call to extractNextElement(), 'obj'
+         *   will be the full document, {a: [{b: {c: 98}}, {b: {c: 99}}]}. The 'positionalInfo'
+         *   argument is not relevant, because the array is not being positionally indexed.
+         *   '*field' will point to "a.b.c".
+         *
+         *   The return value will be the array element [{b: {c: 98}}, {b: {c: 99}}], because path
+         *   traversal stops when an indexed array is encountered. Furthermore, '*field' will be set
+         *   to "b.c".
+         *
+         *   extractNextElement() will then be called from a recursive call to
+         *   getKeysImplWithArray() for each array element. For instance, it will get called with
+         *   'obj' {b: {c: 98}} and '*field' pointing to "b.c". It will return element 98 and
+         *   set '*field' to "". Similarly, it will return elemtn 99 and set '*field' to "" for
+         *   the second array element.
          */
-        BSONElement extractNextElement(const BSONObj &obj,
+        BSONElement extractNextElement(const BSONObj& obj,
                                        const PositionalPathInfo& positionalInfo,
-                                       const char*& field,
-                                       bool& arrayNestedArray) const;
+                                       const char** field,
+                                       bool* arrayNestedArray) const;
 
-        void _getKeysArrEltFixed(std::vector<const char*>& fieldNames,
-                                 std::vector<BSONElement>& fixed,
+        /**
+         * Sets extracted elements in 'fixed' for field paths that we have traversed to the end.
+         *
+         * Then calls getKeysImplWithArray() recursively.
+         */
+        void _getKeysArrEltFixed(std::vector<const char*>* fieldNames,
+                                 std::vector<BSONElement>* fixed,
                                  const BSONElement& arrEntry,
                                  BSONObjSet* keys,
                                  unsigned numNotFound,
@@ -178,8 +219,6 @@ namespace mongo {
                                  bool mayExpandArrayUnembedded,
                                  const std::vector<PositionalPathInfo>& positionalInfo) const;
 
-        BSONObj _undefinedObj;
-        BSONElement _undefinedElt;
         const std::vector<PositionalPathInfo> _emptyPositionalInfo;
     };
 
