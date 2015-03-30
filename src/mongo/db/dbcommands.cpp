@@ -1072,6 +1072,9 @@ namespace mongo {
                 if ( str::equals( "collMod", e.fieldName() ) ) {
                     // no-op
                 }
+                else if ( str::startsWith( e.fieldName(), "$" ) ) {
+                    // no-op: ignore top-level fields prefixed with $. They are for the command processor.
+                }
                 else if ( LiteParsedQuery::cmdOptionMaxTimeMS == e.fieldNameStringData() ) {
                     // no-op
                 }
