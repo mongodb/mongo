@@ -182,14 +182,7 @@ namespace mongo {
                                     ResourcePattern::forClusterResource(),
                                     ActionType::unlock);
 
-            if (isAuthorized) {
-                audit::logFsyncUnlockAuthzCheck(client, ErrorCodes::OK);
-                return Status::OK();
-            }
-            else {
-                audit::logFsyncUnlockAuthzCheck(client, ErrorCodes::Unauthorized);
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
+            return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
         bool run(OperationContext* txn,
