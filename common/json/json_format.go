@@ -1,6 +1,7 @@
 package json
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 )
@@ -70,14 +71,16 @@ func (d DBRef) MarshalJSON() ([]byte, error) {
 }
 
 func (d DBPointer) MarshalJSON() ([]byte, error) {
+	buffer := bytes.Buffer{}
 	// Convert the $id field to JSON
 	idChunk, err := Marshal(d.Id)
 	if err != nil {
 		return nil, err
 	}
-
-	data := append([]byte(fmt.Sprintf(`{ "$ref": "%v", "$id": `, d.Namespace)), idChunk...)
-	return append(data, '}'), nil
+	buffer.Write([]byte(fmt.Sprintf(`{ "$ref": "%v", "$id": { "$oid" : `, d.Namespace)))
+	buffer.Write(idChunk)
+	buffer.Write([]byte("}}"))
+	return buffer.Bytes(), nil
 }
 
 func (_ MinKey) MarshalJSON() ([]byte, error) {
