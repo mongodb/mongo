@@ -15,6 +15,16 @@ type aspell > /dev/null 2>&1 || {
 	exit 0
 }
 
+# replace:
+#	Create a replacement list of spelling words.
+replace() {
+	aspell --mode=ccpp --lang=en list < ../$1 |
+	sort -u |
+	comm -12 /dev/stdin s_string.ok
+}
+
+# check:
+#	Check the spelling of an individual file.
 check() {
 	aspell --mode=ccpp --lang=en list < ../$1 |
 	sort -u |
@@ -27,8 +37,27 @@ check() {
 
 # List of files to spellchk.
 l=`(cd .. &&
-    find examples ext src test -name '*.[chisy]' &&
+    find bench examples ext src test -name '*.[chisy]' &&
     find src -name '*.in')`
+
+usage()
+{
+	echo 'usage: s_string [-r]' >&2
+	exit 1
+}
+while :
+	do case "$1" in
+	-r)			# -r builds replacement list of OK words
+		for f in $l; do
+			replace $f
+		done | sort -u > $t
+		cp $t s_string.ok
+		shift;;
+	*)
+		test "$#" -eq 0 || usage
+		break;;
+	esac
+done
 
 for f in $l; do
 	check $f
