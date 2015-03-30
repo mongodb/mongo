@@ -474,6 +474,7 @@ coredbEnv.Library("coredb", [
         "db/commands/isself.cpp",
         "db/repl/isself.cpp",
         "db/commands/mr_common.cpp",
+        "db/commands/list_collections_common.cpp",
         "db/commands/rename_collection_common.cpp",
         "db/commands/server_status.cpp",
         "db/commands/parameters.cpp",

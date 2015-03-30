@@ -1471,6 +1471,16 @@ var authCommandsLib = {
                             actions: ["listCollections"]
                         }
                     ]
+                },
+                // test legacy (pre 3.0) way of authorizing listCollections
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: "system.namespaces"},
+                            actions: ["find"]
+                        }
+                    ]
                 }
             ]
         },

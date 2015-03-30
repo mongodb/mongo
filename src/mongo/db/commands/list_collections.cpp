@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_collections.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -62,12 +63,10 @@ namespace mongo {
 
         virtual void help( stringstream& help ) const { help << "list collections for this db"; }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::listCollections);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            return checkAuthForListCollectionsCommand(client, dbname, cmdObj);
         }
 
         CmdListCollections() : Command( "listCollections", true ) {}
