@@ -354,6 +354,8 @@ namespace mongo {
         if (!c.isGod())
             c.getAuthorizationSession()->startRequest();
 
+        c.setIsWriteCmd(false);
+
         if ( op == dbQuery ) {
             const char *ns = dbmsg.getns();
 

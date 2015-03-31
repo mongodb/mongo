@@ -69,7 +69,8 @@ namespace mongo {
         _shutdown(false),
         _desc(desc),
         _god(0),
-        _lastOp(0) {
+        _lastOp(0),
+        _isWriteCmd(false) {
     }
     Client::~Client() {}
     bool Client::shutdown() { return true; }

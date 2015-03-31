@@ -167,7 +167,8 @@ namespace mongo {
         _shutdown(false),
         _desc(desc),
         _god(0),
-        _lastOp(0)
+        _lastOp(0),
+        _isWriteCmd(false)
     {
         _hasWrittenThisOperation = false;
         _hasWrittenSinceCheckpoint = false;
@@ -312,22 +313,20 @@ namespace mongo {
     }
 
 
-    void Client::Context::checkNotStale() const { 
+    void Client::Context::checkNotStale() const {
+        // Write commands do not rely on the writeback mechanism (handled after the request
+        // has been processed) to reroute writes, so the version check needs to be done here.
+        if (_client->isWriteCmd()) {
+            ensureShardVersionOKOrThrow(_ns);
+        }
+
         switch ( _client->_curOp->getOp() ) {
         case dbGetMore: // getMore's are special and should be handled else where
         case dbUpdate: // update & delete check shard version in instance.cpp, so don't check here as well
         case dbDelete:
             break;
-        default: {
-            string errmsg;
-            ChunkVersion received;
-            ChunkVersion wanted;
-            if ( ! shardVersionOk( _ns , errmsg, received, wanted ) ) {
-                ostringstream os;
-                os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
-                throw SendStaleConfigException( _ns, os.str(), received, wanted );
-            }
-        }
+        default:
+            ensureShardVersionOKOrThrow(_ns);
         }
     }
 
@@ -538,6 +537,14 @@ namespace mongo {
             return false;
 
         return true;
+    }
+
+    void Client::setIsWriteCmd(bool newSetting) {
+        _isWriteCmd = newSetting;
+    }
+
+    bool Client::isWriteCmd() const {
+        return _isWriteCmd;
     }
 
     void OpDebug::reset() {

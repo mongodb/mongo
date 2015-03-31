@@ -54,6 +54,7 @@
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -813,6 +814,17 @@ namespace mongo {
 
         ElapsedTracker elapsedTracker(128, 10); // 128 hits or 10 ms, matching RunnerYieldPolicy's
 
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            if (request.isMetadataSet() && request.getMetadata()->isShardVersionSet()) {
+                info->setVersion(request.getTargetingNS(),
+                                 request.getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(request.getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
+
         for (state.currIndex = 0;
              state.currIndex < state.request->sizeWriteOps();
              ++state.currIndex) {
@@ -851,6 +863,20 @@ namespace mongo {
         scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, updateItem ) );
         incOpStats( updateItem );
 
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            const BatchedCommandRequest* rootRequest = updateItem.getRequest();
+            if (!updateItem.getUpdate()->getMulti() &&
+                    rootRequest->isMetadataSet() &&
+                    rootRequest->getMetadata()->isShardVersionSet()) {
+                info->setVersion(rootRequest->getTargetingNS(),
+                                 rootRequest->getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
+
         WriteOpResult result;
         multiUpdate( updateItem, &result );
 
@@ -876,6 +902,20 @@ namespace mongo {
         // BEGIN CURRENT OP
         scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, removeItem ) );
         incOpStats( removeItem );
+
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            const BatchedCommandRequest* rootRequest = removeItem.getRequest();
+            if (removeItem.getDelete()->getLimit() == 1 &&
+                    rootRequest->isMetadataSet() &&
+                    rootRequest->getMetadata()->isShardVersionSet()) {
+                info->setVersion(rootRequest->getTargetingNS(),
+                                 rootRequest->getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
 
         WriteOpResult result;
 
@@ -934,8 +974,7 @@ namespace mongo {
             return false;
         }
         _context.reset(new Client::Context(request->getNS(),
-                                           storageGlobalParams.dbpath,
-                                           false /* don't check version */));
+                                           storageGlobalParams.dbpath));
         Database* database = _context->db();
         dassert(database);
         _collection = database->getCollection(request->getTargetingNS());
@@ -997,6 +1036,14 @@ namespace mongo {
                     else {
                         singleCreateIndex(insertDoc, state->getCollection(), result);
                     }
+                    break;
+                }
+                catch (const StaleConfigException& staleExcep) {
+                    result->setError(new WriteErrorDetail);
+                    result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+                    buildStaleError(staleExcep.getVersionReceived(),
+                                    staleExcep.getVersionWanted(),
+                                    result->getError());
                     break;
                 }
                 catch (const DBException& ex) {
@@ -1131,9 +1178,8 @@ namespace mongo {
         if ( !checkShardVersion( &shardingState, *updateItem.getRequest(), result ) )
             return;
 
-        Client::Context ctx( nsString.ns(),
-                             storageGlobalParams.dbpath,
-                             false /* don't check version */ );
+        Client::Context ctx(nsString.ns(),
+                            storageGlobalParams.dbpath);
 
         try {
             UpdateResult res = executor.execute();
@@ -1148,6 +1194,13 @@ namespace mongo {
             result->getStats().nModified = didInsert ? 0 : numDocsModified;
             result->getStats().n = didInsert ? 1 : numMatched;
             result->getStats().upsertedID = resUpsertedID;
+        }
+        catch (const StaleConfigException& staleExcep) {
+            result->setError(new WriteErrorDetail);
+            result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+            buildStaleError(staleExcep.getVersionReceived(),
+                            staleExcep.getVersionWanted(),
+                            result->getError());
         }
         catch (const DBException& ex) {
             status = ex.toStatus();
@@ -1193,12 +1246,19 @@ namespace mongo {
 
         // Context once we're locked, to set more details in currentOp()
         // TODO: better constructor?
-        Client::Context writeContext( nss.ns(),
-                                      storageGlobalParams.dbpath,
-                                      false /* don't check version */);
+        Client::Context writeContext(nss.ns(),
+                                     storageGlobalParams.dbpath);
 
         try {
             result->getStats().n = executor.execute();
+        }
+        catch (const StaleConfigException& staleExcep) {
+            result->setError(new WriteErrorDetail);
+            result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+            buildStaleError(staleExcep.getVersionReceived(),
+                            staleExcep.getVersionWanted(),
+                            result->getError());
+            return;
         }
         catch ( const DBException& ex ) {
             status = ex.toStatus();

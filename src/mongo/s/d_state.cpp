@@ -56,6 +56,7 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/s/metadata_loader.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -1281,6 +1282,11 @@ namespace mongo {
         // TODO : all collections at some point, be sharded or not, will have a version
         //  (and a CollectionMetadata)
         received = info->getVersion( ns );
+
+        if (ChunkVersion::isIgnoredVersion(received)) {
+            return true;
+        }
+
         wanted = shardingState.getVersion( ns );
 
         if( received.isWriteCompatibleWith( wanted ) ) return true;
@@ -1331,6 +1337,17 @@ namespace mongo {
     }
 
     void usingAShardConnection( const string& addr ) {
+    }
+
+    void ensureShardVersionOKOrThrow(const std::string& ns) {
+        string errmsg;
+        ChunkVersion received;
+        ChunkVersion wanted;
+        if (!shardVersionOk(ns, errmsg, received, wanted)) {
+            StringBuilder sb;
+            sb << "[" << ns << "] shard version not ok: " << errmsg;
+            throw SendStaleConfigException(ns, sb.str(), received, wanted);
+        }
     }
 
 }

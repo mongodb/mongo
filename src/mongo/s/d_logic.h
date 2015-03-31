@@ -377,4 +377,6 @@ namespace mongo {
                            const BSONObj* fullObj,
                            bool forMigrateCleanup );
 
+    void ensureShardVersionOKOrThrow(const std::string& ns);
+
 }

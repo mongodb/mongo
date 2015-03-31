@@ -136,6 +136,8 @@ namespace mongo {
         // TODO: fix this for sane behavior where we query repl set object
         if ( getLastErrorDefault ) defaultWriteConcern = *getLastErrorDefault;
 
+        cc().setIsWriteCmd(true);
+
         WriteBatchExecutor writeBatchExecutor(defaultWriteConcern,
                                               &cc(),
                                               &globalOpCounters,

@@ -136,6 +136,9 @@ namespace mongo {
 
         LockState& lockState() { return _ls; }
 
+        void setIsWriteCmd(bool newSetting);
+        bool isWriteCmd() const;
+
     private:
         Client(const std::string& desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
@@ -158,6 +161,9 @@ namespace mongo {
         
         friend class PageFaultRetryableSection; // TEMP
         friend class NoPageFaultsAllowed; // TEMP
+
+        bool _isWriteCmd;
+
     public:
 
         /** "read lock, and set my context, all in one operation" 
