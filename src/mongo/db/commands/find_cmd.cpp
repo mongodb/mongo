@@ -48,6 +48,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/d_state.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -224,12 +225,15 @@ namespace mongo {
             const int dbProfilingLevel = ctx.getDb() ? ctx.getDb()->getProfilingLevel() :
                                                        serverGlobalParams.defaultProfile;
 
+            // It is possible that the sharding version will change during yield while we are
+            // retrieving a plan executor. If this happens we will throw an error and mongos will
+            // retry.
+            const ChunkVersion shardingVersionAtStart = shardingState.getVersion(nss.ns());
+
             // 3) Get the execution plan for the query.
             std::unique_ptr<PlanExecutor> execHolder;
             {
                 PlanExecutor* rawExec;
-                // TODO (SERVER-17284): This can yield before creating a ClientCursor, which means
-                // that we have to throw an error if the shard version changes during yield.
                 Status execStatus = getExecutorFind(txn,
                                                     collection,
                                                     nss,
@@ -240,6 +244,18 @@ namespace mongo {
                     return appendCommandStatus(result, execStatus);
                 }
                 execHolder.reset(rawExec);
+            }
+
+            // TODO: Currently, chunk ranges are kept around until all ClientCursors created while
+            // the chunk belonged on this node are gone. Separating chunk lifetime management from
+            // ClientCursor should allow this check to go away.
+            if (!shardingState.getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
+                // Version changed while retrieving a PlanExecutor. Terminate the operation,
+                // signaling that mongos should retry.
+                throw SendStaleConfigException(nss.ns(),
+                                               "version changed during find command",
+                                               shardingVersionAtStart,
+                                               shardingState.getVersion(nss.ns()));
             }
 
             if (!collection) {

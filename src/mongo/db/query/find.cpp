@@ -362,8 +362,6 @@ namespace mongo {
             // Reset timeout timer on the cursor since the cursor is still in use.
             cc->setIdleTime(0);
 
-            // TODO: fail point?
-
             // If the operation that spawned this cursor had a time limit set, apply leftover
             // time to this getmore.
             curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
@@ -666,7 +664,9 @@ namespace mongo {
             uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }
 
-        // TODO(greg): This will go away soon.
+        // TODO: Currently, chunk ranges are kept around until all ClientCursors created while the
+        // chunk belonged on this node are gone. Separating chunk lifetime management from
+        // ClientCursor should allow this check to go away.
         if (!shardingState.getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
             // if the version changed during the query we might be missing some data and its safe to
             // send this as mongos can resend at this point
