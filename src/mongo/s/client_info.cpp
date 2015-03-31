@@ -34,6 +34,8 @@
 
 #include "mongo/s/client_info.h"
 
+#include <utility>
+
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
@@ -51,13 +53,9 @@ namespace mongo {
         _cur = &_a;
         _prev = &_b;
         _autoSplitOk = true;
-        if (messagingPort) {
-            _remote = messagingPort->remote();
-        }
     }
 
-    ClientInfo::~ClientInfo() {
-    }
+    ClientInfo::~ClientInfo() = default;
 
     void ClientInfo::addShardHost( const string& shardHost ) {
         _cur->shardHostsWritten.insert( shardHost );
@@ -74,22 +72,8 @@ namespace mongo {
         }
     }
 
-    void ClientInfo::newPeerRequest( const HostAndPort& peer ) {
-        if ( ! _remote.hasPort() )
-            _remote = peer;
-        else if ( _remote != peer ) {
-            stringstream ss;
-            ss << "remotes don't match old [" << _remote.toString() << "] new [" << peer.toString() << "]";
-            throw UserException( 13134 , ss.str() );
-        }
-
-        newRequest();
-    }
-
     void ClientInfo::newRequest() {
-        RequestInfo* temp = _cur;
-        _cur = _prev;
-        _prev = temp;
+        std::swap(_cur, _prev);
         _cur->clear();
     }
 

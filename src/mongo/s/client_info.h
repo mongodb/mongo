@@ -54,18 +54,8 @@ namespace mongo {
         ClientInfo(AbstractMessagingPort* messagingPort);
         ~ClientInfo();
 
-        /** new request on behalf of a client, adjusts internal state */
-        void newPeerRequest( const HostAndPort& peer );
-
         /** new request not associated (yet or ever) with a client */
         void newRequest();
-
-        bool hasRemote() const { return true; }
-
-        /**
-         * @return remote socket address of the client
-         */
-        HostAndPort getRemote() const { return _remote; }
 
         /**
          * notes that this client use this shard
@@ -113,10 +103,6 @@ namespace mongo {
         static ClientInfo* create(AbstractMessagingPort* messagingPort);
 
     private:
-
-        int _id; // unique client id
-        HostAndPort _remote; // server:port of remote socket end
-
         struct RequestInfo {
 
             void clear() {

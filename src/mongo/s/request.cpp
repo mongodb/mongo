@@ -57,12 +57,7 @@ namespace mongo {
           _id(_m.header().getId()),
           _didInit(false) {
 
-        if (p) {
-            _clientInfo->newPeerRequest(p->remote());
-        }
-        else {
-            _clientInfo->newRequest();
-        }
+        _clientInfo->newRequest();
     }
 
     void Request::init() {
