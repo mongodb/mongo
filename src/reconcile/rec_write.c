@@ -3600,7 +3600,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_INSERT *ins;
 	WT_ITEM *last;
 	WT_UPDATE *upd;
-	uint64_t n, nrepeat, repeat_count, rle, src_recno;
+	uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
 	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, update_no_copy;
 	const void *data;
@@ -3915,11 +3915,26 @@ compare:		/*
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left
-			 * gaps in the name space.
+			 * gaps in the name space, and these gaps can be huge.
+			 * If we're in a set of deleted records, skip the boring
+			 * part.
 			 */
-			if (src_recno < n)
+			if (src_recno < n) {
 				deleted = 1;
-			else {
+				if (last_deleted) {
+					/*
+					 * The record adjustment is decremented
+					 * by one so we can naturally fall into
+					 * the RLE accounting below, where we
+					 * increment rle by one, then continue
+					 * in the outer loop, where we increment
+					 * src_recno by one.
+					 */
+					skip = (n - src_recno) - 1;
+					rle += skip;
+					src_recno += skip;
+				}
+			} else {
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);

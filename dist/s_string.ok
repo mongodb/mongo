@@ -209,6 +209,7 @@ REFs
 RET
 RHEL
 RLE
+RLEs
 RNG
 RPC
 RUNDIR
@@ -604,6 +605,8 @@ lru
 lseek
 lsm
 lsn
+lsnappy
+lt
 lu
 lz
 lzo
