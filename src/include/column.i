@@ -30,7 +30,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 */
 	ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;)
-		if (*insp != NULL && recno > WT_INSERT_RECNO(*insp)) {
+		if (*insp != NULL && recno >= WT_INSERT_RECNO(*insp)) {
 			ins = *insp;	/* GTE: keep going at this level */
 			insp = &(*insp)->next[i];
 		} else {
@@ -79,11 +79,11 @@ __col_insert_search_lt(WT_INSERT_HEAD *inshead, uint64_t recno)
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;)
-		if (*insp != NULL && recno < WT_INSERT_RECNO(*insp)) {
-			ins = *insp;	/* LT: keep going at this level */
+		if (*insp != NULL && recno > WT_INSERT_RECNO(*insp)) {
+			ins = *insp;	/* GT: keep going at this level */
 			insp = &(*insp)->next[i];
 		} else  {
-			--i;		/* GTE: drop down a level */
+			--i;		/* LTE: drop down a level */
 			--insp;
 		}
 
