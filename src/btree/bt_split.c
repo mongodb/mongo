@@ -754,9 +754,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	addr = NULL;
 	incr = 0;
 
-	/* In some cases, the underlying WT_REF has not yet been allocated. */
-	if (*refp == NULL)
-		WT_RET(__wt_calloc_one(session, refp));
+	/* Allocate an underlying WT_REF. */
+	WT_RET(__wt_calloc_one(session, refp));
 	ref = *refp;
 	incr += sizeof(WT_REF);
 

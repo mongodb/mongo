@@ -499,11 +499,11 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, 1, &next));
+		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, 0, &next));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, 1, &next));
+		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, 0, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
