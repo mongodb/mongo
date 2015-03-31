@@ -443,6 +443,27 @@ public:
         {
             if (mongoDumpGlobalParams.query.size()) {
                 dumpQuery = fromjson(mongoDumpGlobalParams.query);
+            } else if (mongoDumpGlobalParams.queryFile.size()) {
+                bool queryOk = false;
+                long long fileSize = boost::filesystem::file_size(mongoDumpGlobalParams.queryFile.c_str());
+                ifstream qFile(mongoDumpGlobalParams.queryFile.c_str(), ios_base::in);
+                if (qFile.is_open()) {
+                    boost::scoped_array<char> buf(new char[fileSize]);
+                    qFile.read(buf.get(), fileSize);
+                    try {
+                        int objSize;
+                        dumpQuery = fromjson(buf.get(), &objSize);
+                        queryOk = true;
+                    }
+                    catch (std::exception& e) {
+                        toolError() << "failed to parse query file: " << e.what() << std::endl;
+                    }
+                    qFile.close();
+                } else {
+                    toolError() << "Could not open query file." << std::endl;
+                }
+                if (!queryOk)
+                    return -1;
             }
         }
 
