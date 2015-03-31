@@ -20,7 +20,16 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     rst.add();
 
     clearRawMongoProgramOutput();
-    rst.reInitiate();
+    try {
+        rst.reInitiate();
+    }
+    catch (e) {
+        // reInitiate can throw because it tries to run an ismaster command on
+        // all secondaries, including the new one that may have already aborted
+        if (tojson(e).indexOf('error doing query: failed') === -1) {
+            throw e;
+        }
+    }
 
     var msg;
     if (schema.hasOwnProperty('currentVersion')) {
@@ -57,7 +66,16 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     rst.add();
 
     clearRawMongoProgramOutput();
-    rst.reInitiate();
+    try {
+        rst.reInitiate();
+    }
+    catch (e) {
+        // reInitiate can throw because it tries to run an ismaster command on
+        // all secondaries, including the new one that may have already aborted
+        if (tojson(e).indexOf('error doing query: failed') === -1) {
+            throw e;
+        }
+    }
 
     var msg = /During initial sync, found documents in admin\.system\.users/;
     var assertFn = function() {
