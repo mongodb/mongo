@@ -35,22 +35,24 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
     nentries = 13
 
     # Cursor forward
-    def forward(self, cursor):
+    def forward(self, cursor, expected):
         cursor.reset()
         i = 0
         while True:
             if cursor.next() != 0:
                 break
+            self.assertEqual(cursor.get_key(), expected[i])
             i += 1
         self.assertEqual(i, self.nentries)
 
     # Cursor backward
-    def backward(self, cursor):
+    def backward(self, cursor, expected):
         cursor.reset()
         i = 0
         while True:
             if cursor.prev() != 0:
                 break
+            self.assertEqual(cursor.get_key(), expected[i])
             i += 1
         self.assertEqual(i, self.nentries)
 
@@ -58,8 +60,9 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
     # namespace. If this runs in less-than-glacial time, it's working.
     def test_column_store_gap(self):
         uri = 'table:gap'
-        simple_populate(self, uri, 'key_format=r,value_format=S', 10)
+        simple_populate(self, uri, 'key_format=r,value_format=S', 0)
         cursor = self.session.open_cursor(uri, None, None)
+        self.nentries = 0
 
         # Create a column-store table with large gaps in the name-space.
         v = [ 1000, 2000000000000, 30000000000000 ]
@@ -67,30 +70,33 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
             cursor.set_key(key_populate(cursor, i))
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
+            self.nentries += 1
 
-        self.nentries = 13
         # In-memory cursor forward, backward.
-        self.forward(cursor)
-        self.backward(cursor)
+        self.forward(cursor, v)
+        self.backward(cursor, list(reversed(v)))
 
         self.reopen_conn()
         cursor = self.session.open_cursor(uri, None, None)
 
         # Disk page cursor forward, backward.
-        self.forward(cursor)
-        self.backward(cursor)
+        self.forward(cursor, v)
+        self.backward(cursor, list(reversed(v)))
 
     def test_column_store_gap_traverse(self):
         uri = 'table:gap'
         simple_populate(self, uri, 'key_format=r,value_format=S', 0)
         cursor = self.session.open_cursor(uri, None, None)
+        self.nentries = 0
 
-        # Create a column store with key gaps
+        # Create a column store with key gaps. The particular values aren't
+        # important, we just want some gaps.
         v = [ 1000, 1001, 2000, 2001]
         for i in v:
             cursor.set_key(key_populate(cursor, i))
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
+            self.nentries += 1
 
         # In-memory cursor forward, backward.
         self.forward(cursor, v)
@@ -103,15 +109,18 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         self.forward(cursor, v)
         self.backward(cursor, list(reversed(v)))
 
+        # Insert some new records, so there are in-memory updates and an
+        # on disk image. Put them in the middle of the existing values
+        # so the traversal walks to them.
         v2 = [ 1500, 1501 ]
         for i in v2:
             cursor.set_key(key_populate(cursor, i))
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
+            self.nentries += 1
 
-        # Disk page plus in memory updates.
+        # Tell the validation what to expect.
         v = [ 1000, 1001, 1500, 1501, 2000, 2001 ]
-        self.nentries = 8
         self.forward(cursor, v)
         self.backward(cursor, list(reversed(v)))
 
