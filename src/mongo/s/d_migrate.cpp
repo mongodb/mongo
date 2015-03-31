@@ -332,6 +332,8 @@ namespace mongo {
                    const BSONObj& obj,
                    BSONObj* patt,
                    bool notInActiveChunk) {
+            ensureShardVersionOKOrThrow(ns);
+
             const char op = opstr[0];
 
             if (notInActiveChunk) {
@@ -376,7 +378,7 @@ namespace mongo {
 
             if (op == 'u') {
                 BSONObj fullDoc;
-                OldClientContext ctx(txn, _ns);
+                OldClientContext ctx(txn, _ns, false);
                 if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), idObj, fullDoc)) {
                     warning() << "logOpForSharding couldn't find: " << idObj
                               << " even though should have" << migrateLog;

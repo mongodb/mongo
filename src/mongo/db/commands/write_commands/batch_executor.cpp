@@ -69,6 +69,7 @@
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -826,6 +827,17 @@ namespace mongo {
         ExecInsertsState state(_txn, &request);
         normalizeInserts(request, &state.normalizedInserts);
 
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            if (request.isMetadataSet() && request.getMetadata()->isShardVersionSet()) {
+                info->setVersion(request.getTargetingNS(),
+                                 request.getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(request.getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
+
         // Yield frequency is based on the same constants used by PlanYieldPolicy.
         ElapsedTracker elapsedTracker(internalQueryExecYieldIterations,
                                       internalQueryExecYieldPeriodMS);
@@ -874,6 +886,20 @@ namespace mongo {
         beginCurrentOp( &currentOp, _txn->getClient(), updateItem );
         incOpStats( updateItem );
 
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            auto rootRequest = updateItem.getRequest();
+            if (!updateItem.getUpdate()->getMulti() &&
+                    rootRequest->isMetadataSet() &&
+                    rootRequest->getMetadata()->isShardVersionSet()) {
+                info->setVersion(rootRequest->getTargetingNS(),
+                                 rootRequest->getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
+
         WriteOpResult result;
 
         multiUpdate( _txn, updateItem, &result );
@@ -903,6 +929,20 @@ namespace mongo {
         CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
         beginCurrentOp( &currentOp, _txn->getClient(), removeItem );
         incOpStats( removeItem );
+
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            auto rootRequest = removeItem.getRequest();
+            if (removeItem.getDelete()->getLimit() == 1 &&
+                    rootRequest->isMetadataSet() &&
+                    rootRequest->getMetadata()->isShardVersionSet()) {
+                info->setVersion(rootRequest->getTargetingNS(),
+                                 rootRequest->getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
 
         WriteOpResult result;
 
@@ -1058,6 +1098,14 @@ namespace mongo {
                                                        state->getCollection() ?
                                                        state->getCollection()->ns().ns() :
                                                        "index" );
+            }
+            catch (const StaleConfigException& staleExcep) {
+                result->setError(new WriteErrorDetail);
+                result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+                buildStaleError(staleExcep.getVersionReceived(),
+                                staleExcep.getVersionWanted(),
+                                result->getError());
+                break;
             }
             catch (const DBException& ex) {
                 Status status(ex.toStatus());
@@ -1316,6 +1364,13 @@ namespace mongo {
 
                 WriteConflictException::logAndBackoff( attempt++, "update", nsString.ns() );
             }
+            catch (const StaleConfigException& staleExcep) {
+                result->setError(new WriteErrorDetail);
+                result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+                buildStaleError(staleExcep.getVersionReceived(),
+                                staleExcep.getVersionWanted(),
+                                result->getError());
+            }
             catch (const DBException& ex) {
                 Status status = ex.toStatus();
                 if (ErrorCodes::isInterruption(status.code())) {
@@ -1398,6 +1453,14 @@ namespace mongo {
             catch ( const WriteConflictException& dle ) {
                 txn->getCurOp()->debug().writeConflicts++;
                 WriteConflictException::logAndBackoff( attempt++, "delete", nss.ns() );
+            }
+            catch (const StaleConfigException& staleExcep) {
+                result->setError(new WriteErrorDetail);
+                result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+                buildStaleError(staleExcep.getVersionReceived(),
+                                staleExcep.getVersionWanted(),
+                                result->getError());
+                return;
             }
             catch ( const DBException& ex ) {
                 Status status = ex.toStatus();
