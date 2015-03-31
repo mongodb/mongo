@@ -30,7 +30,14 @@ var $config = extendWorkload($config, function($config, $super) {
                                           endKeyInclusive: true, direction: 1 } } };
 
         var andix1ix2 = { andHash: { args: { nodes: [ixscan1, ixscan2] } } };
-        var res = db.runCommand({ stageDebug: { plan: andix1ix2, collection: collName } });
+
+        // On non-MMAP storage engines, index intersection plans will always re-filter
+        // the docs to make sure we don't get any spurious matches.
+        var fetch = { fetch: { filter: { c: { $lte: nMatches },
+                                         d: { $gte: (this.nDocs - nMatches) } },
+                               args: { node: andix1ix2 } } };
+
+        var res = db.runCommand({ stageDebug: { plan: fetch, collection: collName } });
         assertAlways.commandWorked(res);
         for (var i = 0; i < res.results.length; i++) {
             var result = res.results[i];
