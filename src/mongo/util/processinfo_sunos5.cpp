@@ -117,6 +117,10 @@ namespace mongo {
         return static_cast<int>(p.psinfo.pr_rssize / 1024);
     }
 
+    double ProcessInfo::getSystemMemoryPressurePercentage() {
+        return 0.0;
+    }
+
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
         ProcUsage p;
         info.appendNumber("page_faults", static_cast<long long>(p.prusage.pr_majf));

@@ -109,6 +109,10 @@ namespace mongo {
         return (int)( ti.resident_size / (1024 * 1024 ) );
     }
 
+    double ProcessInfo::getSystemMemoryPressurePercentage() {
+        return 0.0;
+    }
+
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
         struct task_events_info taskInfo;
         mach_msg_type_number_t taskInfoCount = TASK_EVENTS_INFO_COUNT;
