@@ -2479,160 +2479,135 @@ func (s *S) TestQueryErrorNext(c *C) {
 	c.Assert(result.Err, Matches, ".*Unsupported projection option:.*")
 }
 
+var indexTests = []struct {
+	index    mgo.Index
+	expected M
+}{{
+	mgo.Index{
+		Key:        []string{"a"},
+		Background: true,
+	},
+	M{
+		"name":       "a_1",
+		"key":        M{"a": 1},
+		"ns":         "mydb.mycoll",
+		"background": true,
+	},
+}, {
+	mgo.Index{
+		Key:      []string{"a", "-b"},
+		Unique:   true,
+		DropDups: true,
+	},
+	M{
+		"name":     "a_1_b_-1",
+		"key":      M{"a": 1, "b": -1},
+		"ns":       "mydb.mycoll",
+		"unique":   true,
+		"dropDups": true,
+	},
+}, {
+	mgo.Index{
+		Key:  []string{"@loc_old"}, // Obsolete
+		Min:  -500,
+		Max:  500,
+		Bits: 32,
+	},
+	M{
+		"name": "loc_old_2d",
+		"key":  M{"loc_old": "2d"},
+		"ns":   "mydb.mycoll",
+		"min":  -500,
+		"max":  500,
+		"bits": 32,
+	},
+}, {
+	mgo.Index{
+		Key:  []string{"$2d:loc"},
+		Min:  -500,
+		Max:  500,
+		Bits: 32,
+	},
+	M{
+		"name": "loc_2d",
+		"key":  M{"loc": "2d"},
+		"ns":   "mydb.mycoll",
+		"min":  -500,
+		"max":  500,
+		"bits": 32,
+	},
+}, {
+	mgo.Index{
+		Key:     []string{"$text:a", "$text:b"},
+		Weights: map[string]int{"b": 42},
+	},
+	M{
+		"name":              "a_text_b_text",
+		"key":               M{"_fts": "text", "_ftsx": 1},
+		"ns":                "mydb.mycoll",
+		"weights":           M{"a": 1, "b": 42},
+		"default_language":  "english",
+		"language_override": "language",
+		"textIndexVersion":  2,
+	},
+}, {
+	mgo.Index{
+		Key:              []string{"$text:a"},
+		DefaultLanguage:  "portuguese",
+		LanguageOverride: "idioma",
+	},
+	M{
+		"name":              "a_text",
+		"key":               M{"_fts": "text", "_ftsx": 1},
+		"ns":                "mydb.mycoll",
+		"weights":           M{"a": 1},
+		"default_language":  "portuguese",
+		"language_override": "idioma",
+		"textIndexVersion":  2,
+	},
+}, {
+	mgo.Index{
+		Key: []string{"$text:$**"},
+	},
+	M{
+		"name":              "$**_text",
+		"key":               M{"_fts": "text", "_ftsx": 1},
+		"ns":                "mydb.mycoll",
+		"weights":           M{"$**": 1},
+		"default_language":  "english",
+		"language_override": "language",
+		"textIndexVersion":  2,
+	},
+}}
+
 func (s *S) TestEnsureIndex(c *C) {
 	session, err := mgo.Dial("localhost:40001")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
-	index1 := mgo.Index{
-		Key:        []string{"a"},
-		Background: true,
-	}
+	coll := session.DB("mydb").C("mycoll")
+	idxs := session.DB("mydb").C("system.indexes")
 
-	index2 := mgo.Index{
-		Key:      []string{"a", "-b"},
-		Unique:   true,
-		DropDups: true,
-	}
+	for _, test := range indexTests {
+		err = coll.EnsureIndex(test.index)
+		c.Assert(err, IsNil)
 
-	// Obsolete:
-	index3 := mgo.Index{
-		Key:  []string{"@loc_old"},
-		Min:  -500,
-		Max:  500,
-		Bits: 32,
-	}
+		obtained := M{}
+		err = idxs.Find(M{"name": test.expected["name"]}).One(obtained)
+		c.Assert(err, IsNil)
 
-	index4 := mgo.Index{
-		Key:  []string{"$2d:loc"},
-		Min:  -500,
-		Max:  500,
-		Bits: 32,
-	}
+		delete(obtained, "v")
 
-	index5 := mgo.Index{
-		Key: []string{"$text:a", "$text:b"},
-	}
+		if s.versionAtLeast(2, 7) {
+			// Was deprecated in 2.6, and not being reported by 2.7+.
+			delete(test.expected, "dropDups")
+		}
 
-	index6 := mgo.Index{
-		Key:              []string{"$text:a"},
-		DefaultLanguage:  "portuguese",
-		LanguageOverride: "idioma",
-	}
+		c.Assert(obtained, DeepEquals, test.expected)
 
-	coll1 := session.DB("mydb").C("mycoll1")
-	coll2 := session.DB("mydb").C("mycoll2")
-
-	for _, index := range []mgo.Index{index1, index2, index3, index4, index5} {
-		err = coll1.EnsureIndex(index)
+		err = coll.DropIndex(test.index.Key...)
 		c.Assert(err, IsNil)
 	}
-
-	// Cannot have multiple text indexes on the same collection.
-	err = coll2.EnsureIndex(index6)
-	c.Assert(err, IsNil)
-
-	sysidx := session.DB("mydb").C("system.indexes")
-
-	result1 := M{}
-	err = sysidx.Find(M{"name": "a_1"}).One(result1)
-	c.Assert(err, IsNil)
-
-	result2 := M{}
-	err = sysidx.Find(M{"name": "a_1_b_-1"}).One(result2)
-	c.Assert(err, IsNil)
-
-	result3 := M{}
-	err = sysidx.Find(M{"name": "loc_old_2d"}).One(result3)
-	c.Assert(err, IsNil)
-
-	result4 := M{}
-	err = sysidx.Find(M{"name": "loc_2d"}).One(result4)
-	c.Assert(err, IsNil)
-
-	result5 := M{}
-	err = sysidx.Find(M{"name": "a_text_b_text"}).One(result5)
-	c.Assert(err, IsNil)
-
-	result6 := M{}
-	err = sysidx.Find(M{"name": "a_text"}).One(result6)
-	c.Assert(err, IsNil)
-
-	delete(result1, "v")
-	expected1 := M{
-		"name":       "a_1",
-		"key":        M{"a": 1},
-		"ns":         "mydb.mycoll1",
-		"background": true,
-	}
-	c.Assert(result1, DeepEquals, expected1)
-
-	delete(result2, "v")
-	expected2 := M{
-		"name":     "a_1_b_-1",
-		"key":      M{"a": 1, "b": -1},
-		"ns":       "mydb.mycoll1",
-		"unique":   true,
-		"dropDups": true,
-	}
-	if s.versionAtLeast(2, 7) {
-		// Was deprecated in 2.6, and not being reported by 2.7+.
-		delete(expected2, "dropDups")
-	}
-	c.Assert(result2, DeepEquals, expected2)
-
-	delete(result3, "v")
-	expected3 := M{
-		"name": "loc_old_2d",
-		"key":  M{"loc_old": "2d"},
-		"ns":   "mydb.mycoll1",
-		"min":  -500,
-		"max":  500,
-		"bits": 32,
-	}
-	c.Assert(result3, DeepEquals, expected3)
-
-	delete(result4, "v")
-	expected4 := M{
-		"name": "loc_2d",
-		"key":  M{"loc": "2d"},
-		"ns":   "mydb.mycoll1",
-		"min":  -500,
-		"max":  500,
-		"bits": 32,
-	}
-	c.Assert(result4, DeepEquals, expected4)
-
-	delete(result5, "v")
-	expected5 := M{
-		"name":              "a_text_b_text",
-		"key":               M{"_fts": "text", "_ftsx": 1},
-		"ns":                "mydb.mycoll1",
-		"weights":           M{"a": 1, "b": 1},
-		"default_language":  "english",
-		"language_override": "language",
-		"textIndexVersion":  2,
-	}
-	c.Assert(result5, DeepEquals, expected5)
-
-	delete(result6, "v")
-	expected6 := M{
-		"name":              "a_text",
-		"key":               M{"_fts": "text", "_ftsx": 1},
-		"ns":                "mydb.mycoll2",
-		"weights":           M{"a": 1},
-		"default_language":  "portuguese",
-		"language_override": "idioma",
-		"textIndexVersion":  2,
-	}
-	c.Assert(result6, DeepEquals, expected6)
-
-	// Ensure the index actually works for real.
-	err = coll1.Insert(M{"a": 1, "b": 1})
-	c.Assert(err, IsNil)
-	err = coll1.Insert(M{"a": 1, "b": 1})
-	c.Assert(err, ErrorMatches, ".*duplicate key error.*")
-	c.Assert(mgo.IsDup(err), Equals, true)
 }
 
 func (s *S) TestEnsureIndexWithBadInfo(c *C) {
@@ -3508,6 +3483,48 @@ func (s *S) TestSetCursorTimeout(c *C) {
 	c.Assert(iter.Next(&result), Equals, true)
 	c.Assert(result.N, Equals, 42)
 	c.Assert(iter.Next(&result), Equals, false)
+}
+
+func (s *S) TestNewIterNoServer(c *C) {
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	data, err := bson.Marshal(bson.M{"a": 1})
+
+	coll := session.DB("mydb").C("mycoll")
+	iter := coll.NewIter(nil, []bson.Raw{{3, data}}, 42, nil)
+
+	var result struct{ A int }
+	ok := iter.Next(&result)
+	c.Assert(ok, Equals, true)
+	c.Assert(result.A, Equals, 1)
+
+	ok = iter.Next(&result)
+	c.Assert(ok, Equals, false)
+
+	c.Assert(iter.Err(), ErrorMatches, "server not available")
+}
+
+func (s *S) TestNewIterNoServerPresetErr(c *C) {
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	data, err := bson.Marshal(bson.M{"a": 1})
+
+	coll := session.DB("mydb").C("mycoll")
+	iter := coll.NewIter(nil, []bson.Raw{{3, data}}, 42, fmt.Errorf("my error"))
+
+	var result struct{ A int }
+	ok := iter.Next(&result)
+	c.Assert(ok, Equals, true)
+	c.Assert(result.A, Equals, 1)
+
+	ok = iter.Next(&result)
+	c.Assert(ok, Equals, false)
+
+	c.Assert(iter.Err(), ErrorMatches, "my error")
 }
 
 // --------------------------------------------------------------------------

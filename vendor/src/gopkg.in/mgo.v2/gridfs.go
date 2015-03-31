@@ -131,7 +131,7 @@ func finalizeFile(file *GridFile) {
 //     }
 //     file, err := db.GridFS("fs").Create("myfile.txt")
 //     check(err)
-//     n, err := file.Write([]byte("Hello world!")
+//     n, err := file.Write([]byte("Hello world!"))
 //     check(err)
 //     err = file.Close()
 //     check(err)
@@ -521,17 +521,18 @@ func (file *GridFile) completeWrite() {
 		debugf("GridFile %p: waiting for %d pending chunks to complete file write", file, file.wpending)
 		file.c.Wait()
 	}
+	if file.err == nil {
+		hexsum := hex.EncodeToString(file.wsum.Sum(nil))
+		if file.doc.UploadDate.IsZero() {
+			file.doc.UploadDate = bson.Now()
+		}
+		file.doc.MD5 = hexsum
+		file.err = file.gfs.Files.Insert(file.doc)
+		file.gfs.Chunks.EnsureIndexKey("files_id", "n")
+	}
 	if file.err != nil {
 		file.gfs.Chunks.RemoveAll(bson.D{{"files_id", file.doc.Id}})
-		return
 	}
-	hexsum := hex.EncodeToString(file.wsum.Sum(nil))
-	if file.doc.UploadDate.IsZero() {
-		file.doc.UploadDate = bson.Now()
-	}
-	file.doc.MD5 = hexsum
-	file.err = file.gfs.Files.Insert(file.doc)
-	file.gfs.Chunks.EnsureIndexKey("files_id", "n")
 }
 
 // Abort cancels an in-progress write, preventing the file from being

@@ -361,8 +361,8 @@ func saslNewScram(cred Credential) *saslScram {
 }
 
 type saslScram struct {
-	cred           Credential
-	client         *scram.Client
+	cred   Credential
+	client *scram.Client
 }
 
 func (s *saslScram) Close() {}

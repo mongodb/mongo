@@ -965,7 +965,8 @@ type Index struct {
 	// documents with indexed time.Time older than the provided delta.
 	ExpireAfter time.Duration
 
-	// Index name computed by EnsureIndex during creation.
+	// Name holds the stored index name. On creation this field is ignored and the index name
+	// is automatically computed by EnsureIndex based on the index key
 	Name string
 
 	// Properties for spatial indexes.
@@ -974,6 +975,12 @@ type Index struct {
 	// Properties for text indexes.
 	DefaultLanguage  string
 	LanguageOverride string
+
+	// Weights defines the significance of provided fields relative to other
+	// fields in a text index. The score for a given word in a document is derived
+	// from the weighted sum of the frequency for each of the indexed fields in
+	// that document. The default field weight is 1.
+	Weights map[string]int
 }
 
 type indexKeyInfo struct {
@@ -998,10 +1005,12 @@ func parseIndexKey(key []string) (*indexKeyInfo, error) {
 					kind = field[1:c]
 					field = field[c+1:]
 					keyInfo.name += field + "_" + kind
+				} else {
+					field = "\x00"
 				}
 			}
 			switch field[0] {
-			case '$':
+			case 0:
 				// Logic above failed. Reset and error.
 				field = ""
 			case '@':
@@ -1063,7 +1072,8 @@ func (c *Collection) EnsureIndexKey(key ...string) error {
 }
 
 // EnsureIndex ensures an index with the given key exists, creating it with
-// the provided parameters if necessary.
+// the provided parameters if necessary. EnsureIndex does not modify a previously
+// existent index with a matching key. The old index must be dropped first instead.
 //
 // Once EnsureIndex returns successfully, following requests for the same index
 // will not contact the server unless Collection.DropIndex is used to drop the
@@ -1082,9 +1092,13 @@ func (c *Collection) EnsureIndexKey(key ...string) error {
 //
 // The Key value determines which fields compose the index. The index ordering
 // will be ascending by default.  To obtain an index with a descending order,
-// the field name should be prefixed by a dash (e.g. []string{"-time"}).
+// the field name should be prefixed by a dash (e.g. []string{"-time"}). It can
+// also be optionally prefixed by an index kind, as in "$text:summary" or
+// "$2d:-point". The key string format is:
 //
-// If Unique is true, the index must necessarily contain only a single
+//     [$<kind>:][-]<field name>
+//
+// If the Unique field is true, the index must necessarily contain only a single
 // document per Key.  With DropDups set to true, documents with the same key
 // as a previously indexed one will be dropped rather than an error returned.
 //
@@ -1158,6 +1172,17 @@ func (c *Collection) EnsureIndex(index Index) error {
 		LanguageOverride: index.LanguageOverride,
 	}
 
+NextField:
+	for name, weight := range index.Weights {
+		for i, elem := range spec.Weights {
+			if elem.Name == name {
+				spec.Weights[i].Value = weight
+				continue NextField
+			}
+		}
+		panic("weight provided for field that is not part of index key: " + name)
+	}
+
 	session = session.Clone()
 	defer session.Close()
 	session.SetMode(Strong, false)
@@ -1229,10 +1254,15 @@ func (c *Collection) DropIndex(key ...string) error {
 //
 // See the EnsureIndex method for more details on indexes.
 func (c *Collection) Indexes() (indexes []Index, err error) {
+	// Clone session and set it to Monotonic mode so that the server
+	// used for the query may be safely obtained afterwards, if
+	// necessary for iteration when a cursor is received.
 	session := c.Database.Session
-	session.m.RLock()
-	batchSize := int(session.queryConfig.op.limit)
-	session.m.RUnlock()
+	cloned := session.Clone()
+	cloned.SetMode(Monotonic, false)
+	defer cloned.Close()
+
+	batchSize := int(cloned.queryConfig.op.limit)
 
 	// Try with a command.
 	var result struct {
@@ -1245,7 +1275,7 @@ func (c *Collection) Indexes() (indexes []Index, err error) {
 		}
 	}
 	var iter *Iter
-	err = c.Database.Run(bson.D{{"listIndexes", c.Name}, {"cursor", bson.D{{"batchSize", batchSize}}}}, &result)
+	err = c.Database.With(cloned).Run(bson.D{{"listIndexes", c.Name}, {"cursor", bson.D{{"batchSize", batchSize}}}}, &result)
 	if err == nil {
 		firstBatch := result.Indexes
 		if firstBatch == nil {
@@ -1253,9 +1283,10 @@ func (c *Collection) Indexes() (indexes []Index, err error) {
 		}
 		ns := strings.SplitN(result.Cursor.NS, ".", 2)
 		if len(ns) < 2 {
-			panic("server returned invalid cursor.ns result on listIndexes")
+			iter = c.With(cloned).NewIter(nil, firstBatch, result.Cursor.Id, nil)
+		} else {
+			iter = cloned.DB(ns[0]).C(ns[1]).NewIter(nil, firstBatch, result.Cursor.Id, nil)
 		}
-		iter = session.DB(ns[0]).C(ns[1]).NewIter(nil, firstBatch, result.Cursor.Id, nil)
 	} else if isNoCmd(err) {
 		// Command not yet supported. Query the database instead.
 		iter = c.Database.C("system.indexes").Find(bson.M{"ns": c.FullName}).Iter()
@@ -1859,16 +1890,15 @@ type repairCmdCursor struct {
 //
 // Repair is supported in MongoDB 2.7.8 and later.
 func (c *Collection) Repair() *Iter {
-	// Clone session and set it to strong mode so that the server
+	// Clone session and set it to Monotonic mode so that the server
 	// used for the query may be safely obtained afterwards, if
 	// necessary for iteration when a cursor is received.
 	session := c.Database.Session
-	session.m.RLock()
-	batchSize := int(session.queryConfig.op.limit)
-	session.m.RUnlock()
 	cloned := session.Clone()
-	cloned.SetMode(Strong, false)
+	cloned.SetMode(Monotonic, false)
 	defer cloned.Close()
+
+	batchSize := int(cloned.queryConfig.op.limit)
 
 	var result struct {
 		Cursor struct {
@@ -1946,11 +1976,11 @@ func (c *Collection) Pipe(pipeline interface{}) *Pipe {
 // Iter executes the pipeline and returns an iterator capable of going
 // over all the generated results.
 func (p *Pipe) Iter() *Iter {
-	// Clone session and set it to strong mode so that the server
+	// Clone session and set it to Monotonic mode so that the server
 	// used for the query may be safely obtained afterwards, if
 	// necessary for iteration when a cursor is received.
 	cloned := p.session.Clone()
-	cloned.SetMode(Strong, false)
+	cloned.SetMode(Monotonic, false)
 	defer cloned.Close()
 	c := p.collection.With(cloned)
 
@@ -2001,8 +2031,8 @@ func (p *Pipe) Iter() *Iter {
 //
 // NewIter must be called right after the cursor id is obtained, and must not
 // be called on a collection in Eventual mode, because the cursor id is
-// associated with the specific server that returned it. The session parameter
-// may be in any mode or state, though.
+// associated with the specific server that returned it. The provided session
+// parameter may be in any mode or state, though.
 //
 func (c *Collection) NewIter(session *Session, firstBatch []bson.Raw, cursorId int64, err error) *Iter {
 	var server *mongoServer
@@ -2021,7 +2051,9 @@ func (c *Collection) NewIter(session *Session, firstBatch []bson.Raw, cursorId i
 		if csession.Mode() == Eventual {
 			panic("Collection.NewIter called in Eventual mode")
 		}
-		panic("Collection.NewIter called on a fresh session with no associated server")
+		if err == nil {
+			err = errors.New("server not available")
+		}
 	}
 
 	if session == nil {
@@ -2762,16 +2794,15 @@ func (s *Session) FindRef(ref *DBRef) *Query {
 
 // CollectionNames returns the collection names present in the db database.
 func (db *Database) CollectionNames() (names []string, err error) {
-	// Clone session and set it to strong mode so that the server
+	// Clone session and set it to Monotonic mode so that the server
 	// used for the query may be safely obtained afterwards, if
 	// necessary for iteration when a cursor is received.
 	session := db.Session
-	session.m.RLock()
-	batchSize := int(session.queryConfig.op.limit)
-	session.m.RUnlock()
 	cloned := session.Clone()
-	cloned.SetMode(Strong, false)
+	cloned.SetMode(Monotonic, false)
 	defer cloned.Close()
+
+	batchSize := int(cloned.queryConfig.op.limit)
 
 	// Try with a command.
 	var result struct {
@@ -2783,17 +2814,19 @@ func (db *Database) CollectionNames() (names []string, err error) {
 			Id         int64
 		}
 	}
-	err = db.Run(bson.D{{"listCollections", 1}, {"cursor", bson.D{{"batchSize", batchSize}}}}, &result)
+	err = db.With(cloned).Run(bson.D{{"listCollections", 1}, {"cursor", bson.D{{"batchSize", batchSize}}}}, &result)
 	if err == nil {
 		firstBatch := result.Collections
 		if firstBatch == nil {
 			firstBatch = result.Cursor.FirstBatch
 		}
+		var iter *Iter
 		ns := strings.SplitN(result.Cursor.NS, ".", 2)
 		if len(ns) < 2 {
-			panic("server returned invalid cursor.ns result on listCollections")
+			iter = db.With(cloned).C("").NewIter(nil, firstBatch, result.Cursor.Id, nil)
+		} else {
+			iter = cloned.DB(ns[0]).C(ns[1]).NewIter(nil, firstBatch, result.Cursor.Id, nil)
 		}
-		iter := session.DB(ns[0]).C(ns[1]).NewIter(nil, firstBatch, result.Cursor.Id, nil)
 		var coll struct{ Name string }
 		for iter.Next(&coll) {
 			names = append(names, coll.Name)

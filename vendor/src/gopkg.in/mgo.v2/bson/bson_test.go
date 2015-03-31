@@ -1296,6 +1296,11 @@ var oneWayCrossItems = []crossTypeItem{
 
 	// Would get decoded into a int32 too in the opposite direction.
 	{&shortIface{int64(1) << 30}, map[string]interface{}{"v": 1 << 30}},
+
+	// Ensure omitempty on struct with private fields works properly.
+	{&struct {
+		V struct{ v time.Time } ",omitempty"
+	}{}, map[string]interface{}{}},
 }
 
 func testCrossPair(c *C, dump interface{}, load interface{}) {
@@ -1446,31 +1451,65 @@ func (s *S) TestNewObjectIdWithTime(c *C) {
 // ObjectId JSON marshalling.
 
 type jsonType struct {
-	Id *bson.ObjectId
+	Id bson.ObjectId
 }
+
+var jsonIdTests = []struct {
+	value     jsonType
+	json      string
+	marshal   bool
+	unmarshal bool
+	error     string
+}{{
+	value:     jsonType{Id: bson.ObjectIdHex("4d88e15b60f486e428412dc9")},
+	json:      `{"Id":"4d88e15b60f486e428412dc9"}`,
+	marshal:   true,
+	unmarshal: true,
+}, {
+	value:     jsonType{},
+	json:      `{"Id":""}`,
+	marshal:   true,
+	unmarshal: true,
+}, {
+	value:     jsonType{},
+	json:      `{"Id":null}`,
+	marshal:   false,
+	unmarshal: true,
+}, {
+	json:      `{"Id":"4d88e15b60f486e428412dc9A"}`,
+	error:     `Invalid ObjectId in JSON: "4d88e15b60f486e428412dc9A"`,
+	marshal:   false,
+	unmarshal: true,
+}, {
+	json:      `{"Id":"4d88e15b60f486e428412dcZ"}`,
+	error:     `Invalid ObjectId in JSON: "4d88e15b60f486e428412dcZ" .*`,
+	marshal:   false,
+	unmarshal: true,
+}}
 
 func (s *S) TestObjectIdJSONMarshaling(c *C) {
-	id := bson.ObjectIdHex("4d88e15b60f486e428412dc9")
-	v := jsonType{Id: &id}
-	data, err := json.Marshal(&v)
-	c.Assert(err, IsNil)
-	c.Assert(string(data), Equals, `{"Id":"4d88e15b60f486e428412dc9"}`)
-}
+	for _, test := range jsonIdTests {
+		if test.marshal {
+			data, err := json.Marshal(&test.value)
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				c.Assert(string(data), Equals, test.json)
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
 
-func (s *S) TestObjectIdJSONUnmarshaling(c *C) {
-	data := []byte(`{"Id":"4d88e15b60f486e428412dc9"}`)
-	v := jsonType{}
-	err := json.Unmarshal(data, &v)
-	c.Assert(err, IsNil)
-	c.Assert(*v.Id, Equals, bson.ObjectIdHex("4d88e15b60f486e428412dc9"))
-}
-
-func (s *S) TestObjectIdJSONUnmarshalingError(c *C) {
-	v := jsonType{}
-	err := json.Unmarshal([]byte(`{"Id":"4d88e15b60f486e428412dc9A"}`), &v)
-	c.Assert(err, ErrorMatches, `Invalid ObjectId in JSON: "4d88e15b60f486e428412dc9A"`)
-	err = json.Unmarshal([]byte(`{"Id":"4d88e15b60f486e428412dcZ"}`), &v)
-	c.Assert(err, ErrorMatches, `Invalid ObjectId in JSON: "4d88e15b60f486e428412dcZ" .*`)
+		if test.unmarshal {
+			var value jsonType
+			err := json.Unmarshal([]byte(test.json), &value)
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				c.Assert(value, DeepEquals, test.value)
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
+	}
 }
 
 // --------------------------------------------------------------------------

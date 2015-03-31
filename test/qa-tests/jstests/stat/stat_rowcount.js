@@ -38,13 +38,13 @@ assert.neq(exitCodeSuccess, x, "can't connect causes an error exit code");
 
 pid = startMongoProgramNoConnect.apply(null, ["mongostat", "--rowcount", "-1"].concat(commonToolArgs))
 
-sleep(200);
+sleep(1100);
 
 assert.eq(exitCodeBadOptions, stopMongoProgramByPid(pid), "mongostat --rowcount specified with bad input: negative value")
 
 pid = startMongoProgramNoConnect.apply(null, ["mongostat", "--rowcount", "foobar"].concat(commonToolArgs));
 
-sleep(100);
+sleep(1100);
 
 assert.eq(exitCodeBadOptions, stopMongoProgramByPid(pid), "mongostat --rowcount specified with bad input: non-numeric value");
 

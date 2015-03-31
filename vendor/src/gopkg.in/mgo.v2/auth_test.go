@@ -1022,7 +1022,6 @@ var (
 	winKerberosPasswordEnv = "MGO_KERBEROS_PASSWORD"
 )
 
-
 // Kerberos has its own suite because it talks to a remote server
 // that is prepared to authenticate against a kerberos deployment.
 type KerberosSuite struct{}
