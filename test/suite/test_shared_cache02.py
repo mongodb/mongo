@@ -46,9 +46,7 @@ class test_shared_cache02(wttest.WiredTigerTestCase):
     def add_records(self, session, start, stop):
         cursor = session.open_cursor(self.uri, None, "overwrite")
         for i in range(start, stop+1):
-            cursor.set_key("%010d KEY------" % i)
-            cursor.set_value("%010d VALUE "% i + self.data_str)
-            self.assertEqual(cursor.insert(), 0)
+            cursor["%010d KEY------" % i] = ("%010d VALUE " % i) + self.data_str
         cursor.close()
 
     # Disable default setup/shutdown steps - connections are managed manually.

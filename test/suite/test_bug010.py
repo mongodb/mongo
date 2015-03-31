@@ -59,9 +59,7 @@ class test_bug010(wttest.WiredTigerTestCase):
             self.session.create(self.uri + str(i),
             'key_format=S,value_format=i')
             c = self.session.open_cursor(self.uri + str(i), None)
-            c.set_key('a')
-            c.set_value(0)
-            c.insert()
+            c['a'] = 0
             c.close()
 
         self.session.checkpoint()
@@ -79,9 +77,7 @@ class test_bug010(wttest.WiredTigerTestCase):
                 expected_val += 1
                 for i in range(0, self.num_tables):
                     c = self.session.open_cursor(self.uri + str(i), None)
-                    c.set_key('a')
-                    c.set_value(expected_val)
-                    c.insert()
+                    c['a'] = expected_val
                     c.close()
             finally:
                 done.set()

@@ -58,9 +58,7 @@ class test_config04(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(
             'table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
-            cursor.set_key(str(1000000 + i))
-            cursor.set_value('value' + str(i))
-            cursor.insert()
+            cursor[str(1000000 + i)] = 'value' + str(i)
         i = 0
         cursor.reset()
         for key, value in cursor:

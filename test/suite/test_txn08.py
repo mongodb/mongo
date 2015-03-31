@@ -72,9 +72,7 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.begin_transaction()
         for k in range(5):
-            c.set_key(k)
-            c.set_value(value)
-            c.insert()
+            c[k] = value
 
         self.session.commit_transaction()
 

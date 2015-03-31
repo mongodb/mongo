@@ -86,10 +86,8 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             # print "Creating %s with config '%s'" % (uri, self.create_params)
             self.session.create(uri, self.create_params)
             c = self.session.open_cursor(uri, None)
-            c.set_value(1)
             for k in range(self.numkv):
-                c.set_key(k+1)
-                c.insert()
+                c[k+1] = 1
             c.close()
             if f % 20 == 0:
                 time.sleep(1)
@@ -123,9 +121,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         sleep = 0
         while sleep < 12:
             k = k+1
-            c.set_key(k)
-            c.set_value(1)
-            c.insert()
+            c[k] = 1
             sleep += 2
             time.sleep(2)
         c.close()

@@ -145,9 +145,7 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
             for i in range(0, self.nentries):
                 key = self.get_key(i)
                 value = self.get_value(i)
-                cursor.set_key(key)
-                cursor.set_value(value)
-                cursor.insert()
+                cursor[key] = value
                 expectout.write(self.dumpstr(key, hexoutput))
                 expectout.write(self.dumpstr(value, hexoutput))
         cursor.close()

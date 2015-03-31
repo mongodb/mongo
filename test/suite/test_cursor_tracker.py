@@ -156,12 +156,8 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             for i in range(npairs):
                 wtkey = self.encode_key(i << 32)
                 wtval = self.encode_value(i << 32)
-                self.traceapi('cursor.set_key(' + str(wtkey) + ')')
-                cursor.set_key(wtkey)
-                self.traceapi('cursor.set_value(' + str(wtval) + ')')
-                cursor.set_value(wtval)
-                self.traceapi('cursor.insert()')
-                cursor.insert()
+                self.traceapi('cursor[' + str(wtkey) + '] = ' + str(wtval))
+                cursor[wtkey] = wtval
             cursor.close()
             self.pr('reopening the connection')
             self.conn.close()
@@ -316,12 +312,8 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         self.setpos(pos, True)
         wtkey = self.encode_key(bits)
         wtval = self.encode_value(bits)
-        self.traceapi('cursor.set_key(' + str(wtkey) + ')')
-        cursor.set_key(wtkey)
-        self.traceapi('cursor.set_value(' + str(wtval) + ')')
-        cursor.set_value(wtval)
-        self.traceapi('cursor.insert()')
-        cursor.insert()
+        self.traceapi('cursor[' + str(wtkey) + '] = ' + str(wtval))
+        cursor[wtkey] = wtval
 
     def cur_remove_here(self, cursor):
         # TODO: handle the exception case
