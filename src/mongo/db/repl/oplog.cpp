@@ -367,6 +367,8 @@ namespace {
             _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
+        ensureShardVersionOKOrThrow(ns);
+
         try {
             // TODO SERVER-15192 remove this once all listeners are rollback-safe.
             class RollbackPreventer : public RecoveryUnit::Change {

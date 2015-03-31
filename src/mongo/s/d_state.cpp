@@ -1328,6 +1328,11 @@ namespace mongo {
         // TODO : all collections at some point, be sharded or not, will have a version
         //  (and a CollectionMetadata)
         received = info->getVersion( ns );
+
+        if (ChunkVersion::isIgnoredVersion(received)) {
+            return true;
+        }
+
         wanted = shardingState.getVersion( ns );
 
         if( received.isWriteCompatibleWith( wanted ) ) return true;
