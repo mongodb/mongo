@@ -85,16 +85,67 @@ namespace mongo {
     int ProcessInfo::getVirtualMemorySize() {
         MEMORYSTATUSEX mse;
         mse.dwLength = sizeof(mse);
-        verify( GlobalMemoryStatusEx( &mse ) );
-        DWORDLONG x = (mse.ullTotalVirtual - mse.ullAvailVirtual) / (1024 * 1024) ;
-        verify( x <= 0x7fffffff );
+        BOOL status = GlobalMemoryStatusEx(&mse);
+        if (!status) {
+            DWORD gle = GetLastError();
+            error() << "GlobalMemoryStatusEx failed with " << errnoWithDescription(gle);
+            fassert(28621, status);
+        }
+
+        DWORDLONG x = (mse.ullTotalVirtual - mse.ullAvailVirtual) / (1024 * 1024);
+        invariant( x <= 0x7fffffff );
         return (int) x;
     }
 
     int ProcessInfo::getResidentSize() {
         PROCESS_MEMORY_COUNTERS pmc;
-        verify( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) );
+        BOOL status = GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+        if (!status) {
+            DWORD gle = GetLastError();
+            error() << "GetProcessMemoryInfo failed with " << errnoWithDescription(gle);
+            fassert(28622, status);
+        }
+
         return _wconvertmtos( pmc.WorkingSetSize );
+    }
+
+    double ProcessInfo::getSystemMemoryPressurePercentage() {
+        MEMORYSTATUSEX mse;
+        mse.dwLength = sizeof(mse);
+        BOOL status = GlobalMemoryStatusEx( &mse );
+        if (!status) {
+            DWORD gle = GetLastError();
+            error() << "GlobalMemoryStatusEx failed with " << errnoWithDescription(gle);
+            fassert(28623, status);
+        }
+
+        DWORDLONG totalPageFile = mse.ullTotalPageFile;
+        if (totalPageFile == 0) {
+            return false;
+        }
+
+        // If the page file is >= 50%, say we are low on system memory
+        // If the page file is >= 75%, we are running very low on system memory
+        //
+        DWORDLONG highWatermark = totalPageFile / 2;
+        DWORDLONG veryHighWatermark = 3 * (totalPageFile / 4);
+
+        DWORDLONG usedPageFile = mse.ullTotalPageFile - mse.ullAvailPageFile;
+
+        // Below the watermark, we are fine
+        // Also check we will not do a divide by zero below
+        if (usedPageFile < highWatermark ||
+            veryHighWatermark <= highWatermark) {
+            return 0.0;
+        }
+
+        // Above the high watermark, we tell MMapV1 how much to remap
+        // < 1.0, we have some pressure, but not much so do not be very aggressive
+        // 1.0 = we are at very high watermark, remap everything
+        // > 1.0, the user may run out of memory, remap everything
+        // i.e., Example (N - 50) / (75 - 50)
+        return static_cast<double>(usedPageFile - highWatermark) /
+                                  (veryHighWatermark - highWatermark);
     }
 
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {

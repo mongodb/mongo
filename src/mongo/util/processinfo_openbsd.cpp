@@ -131,6 +131,10 @@ namespace mongo {
         return (task->p_vm_rssize * sysconf( _SC_PAGESIZE )) / 1048576; // convert from pages to MB
     }
 
+    double ProcessInfo::getSystemMemoryPressurePercentage() {
+        return 0.0;
+    }
+
     void ProcessInfo::SystemInfo::collectSystemInfo() {
         osType = "BSD";
         osName = "OpenBSD";

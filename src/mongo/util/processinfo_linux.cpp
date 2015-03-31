@@ -400,6 +400,10 @@ namespace mongo {
         return (int)( p.getResidentSize() / ( 1024.0 * 1024 ) );
     }
 
+    double ProcessInfo::getSystemMemoryPressurePercentage() {
+        return 0.0;
+    }
+
     void ProcessInfo::getExtraInfo( BSONObjBuilder& info ) {
         // [dm] i don't think mallinfo works. (64 bit.)  ??
         struct mallinfo malloc_info = mallinfo(); // structure has same name as function that returns it. (see malloc.h)
