@@ -68,6 +68,7 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
 
+        self.nentries = 13
         # In-memory cursor forward, backward.
         self.forward(cursor)
         self.backward(cursor)
@@ -79,6 +80,44 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         self.forward(cursor)
         self.backward(cursor)
 
+    def test_column_store_gap_traverse(self):
+        uri = 'table:gap'
+        simple_populate(self, uri, 'key_format=r,value_format=S', 0)
+        cursor = self.session.open_cursor(uri, None, None)
+
+        # Create a column store with key gaps
+        v = [ 1000, 1001, 2000, 2001]
+        for i in v:
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+
+        # In-memory cursor forward, backward.
+        self.forward(cursor, v)
+        self.backward(cursor, list(reversed(v)))
+
+        self.reopen_conn()
+        cursor = self.session.open_cursor(uri, None, None)
+
+        # Disk page cursor forward, backward.
+        self.forward(cursor, v)
+        self.backward(cursor, list(reversed(v)))
+
+        v2 = [ 1500, 1501 ]
+        for i in v2:
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
+
+        # Disk page plus in memory updates.
+        v = [ 1000, 1001, 1500, 1501, 2000, 2001 ]
+        self.nentries = 8
+        self.forward(cursor, v)
+        self.backward(cursor, list(reversed(v)))
+
+
+if __name__ == '__main__':
+    wttest.run()
 
 if __name__ == '__main__':
     wttest.run()
