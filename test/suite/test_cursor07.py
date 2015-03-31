@@ -77,9 +77,7 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.begin_transaction()
         for k in range(self.nkeys):
-            c.set_key(k)
-            c.set_value(value)
-            c.insert()
+            c[k] = value
         self.session.commit_transaction()
         c.close()
 

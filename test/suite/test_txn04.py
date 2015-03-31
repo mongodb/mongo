@@ -139,10 +139,8 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         # We then truncate starting or ending in various places.
         # We use the overwrite config so insert can update as needed.
         current = {1:1, 2:1, 3:1, 4:1, 5:1}
-        c.set_value(1)
         for k in current:
-            c.set_key(k)
-            c.insert()
+            c[k] = 1
         committed = current.copy()
 
         ops = (self.op1, )
@@ -163,9 +161,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
             
             # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
             if op == 'insert' or op == 'update':
-                c.set_value(i + 2)
-                c.set_key(k)
-                c.insert()
+                c[k] = i + 2
                 current[k] = i + 2
             elif op == 'remove':
                 c.set_key(k)

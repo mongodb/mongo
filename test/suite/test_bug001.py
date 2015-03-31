@@ -43,13 +43,9 @@ class test_bug001(wttest.WiredTigerTestCase):
         r = initial
         for i in range(0, middle):
             r += 1
-            cursor.set_key(r)
-            cursor.set_value(0xab)
-            cursor.insert()
+            cursor[r] = 0xab
         r += trailing
-        cursor.set_key(r + 1)
-        cursor.set_value(0xbb)
-        cursor.insert()
+        cursor[r + 1] = 0xbb
         return (cursor)
 
     # Test a bug where cursor movement inside implicit records failed.

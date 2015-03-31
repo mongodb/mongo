@@ -346,9 +346,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                 for i in range(start + 1, stop + 1):
                     k = key_populate(cursor, i)
                     v = value_populate(cursor, i)
-                    cursor.set_key(k)
-                    cursor.set_value(v)
-                    cursor.insert()
+                    cursor[k] = v
                     expected[k] = [v]
                 cursor.close()
 
@@ -370,9 +368,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                     start += 1
                     k = key_populate(cursor, start)
                     v = value_populate(cursor, start)
-                    cursor.set_key(k)
-                    cursor.set_value(v)
-                    cursor.insert()
+                    cursor[k] = v
                     expected[k] = [v]
 
                 # Optionally insert trailing skipped records.
@@ -386,9 +382,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                     stop += 1
                     k = key_populate(cursor, stop)
                     v = value_populate(cursor, stop)
-                    cursor.set_key(k)
-                    cursor.set_value(v)
-                    cursor.insert()
+                    cursor[k] = v
                     expected[k] = [v]
                 cursor.close()
 

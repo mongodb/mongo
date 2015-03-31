@@ -73,9 +73,7 @@ class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.uri, self.create_params)
         for i in range(100):
             c = self.session.open_cursor(self.uri)
-            c.set_key(i)
-            c.set_value(i)
-            c.insert()
+            c[i] = i
             c.close()
             if i % 5 == 0:
                 self.session.checkpoint()

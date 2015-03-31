@@ -64,10 +64,9 @@ class test_empty(wttest.WiredTigerTestCase):
         # Add a few records to the object and remove them.
         cursor = self.session.open_cursor(uri, None, None)
         for i in range(1,5):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value("XXX")
-            cursor.insert()
-            cursor.remove()
+            key = key_populate(cursor, i)
+            cursor[key] = "XXX"
+            del cursor[key]
 
         # Perform a checkpoint (we shouldn't write any underlying pages because
         # of a checkpoint, either).
