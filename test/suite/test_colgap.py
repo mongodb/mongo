@@ -67,9 +67,7 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         # Create a column-store table with large gaps in the name-space.
         v = [ 1000, 2000000000000, 30000000000000 ]
         for i in v:
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
             self.nentries += 1
 
         # In-memory cursor forward, backward.
@@ -93,9 +91,7 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         # important, we just want some gaps.
         v = [ 1000, 1001, 2000, 2001]
         for i in v:
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
             self.nentries += 1
 
         # In-memory cursor forward, backward.
@@ -114,9 +110,7 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         # so the traversal walks to them.
         v2 = [ 1500, 1501 ]
         for i in v2:
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
             self.nentries += 1
 
         # Tell the validation what to expect.
@@ -124,9 +118,6 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         self.forward(cursor, v)
         self.backward(cursor, list(reversed(v)))
 
-
-if __name__ == '__main__':
-    wttest.run()
 
 if __name__ == '__main__':
     wttest.run()
