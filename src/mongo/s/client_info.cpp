@@ -61,7 +61,6 @@ namespace mongo {
 
     void ClientInfo::addShardHost( const string& shardHost ) {
         _cur->shardHostsWritten.insert( shardHost );
-        _sinceLastGetError.insert( shardHost );
     }
 
     void ClientInfo::addHostOpTime(ConnectionString connStr, HostOpTime stat) {
@@ -88,8 +87,6 @@ namespace mongo {
     }
 
     void ClientInfo::newRequest() {
-        _lastAccess = (int) time(0);
-
         RequestInfo* temp = _cur;
         _cur = _prev;
         _prev = temp;
@@ -128,12 +125,6 @@ namespace mongo {
 
     ClientBasic* ClientBasic::getCurrent() {
         return ClientInfo::get();
-    }
-
-
-    void ClientInfo::disconnect() {
-        // should be handled by TL cleanup
-        _lastAccess = 0;
     }
 
     void ClientInfo::disableForCommand() {

@@ -60,10 +60,6 @@ namespace mongo {
         /** new request not associated (yet or ever) with a client */
         void newRequest();
 
-
-        /** client disconnected */
-        void disconnect();
-
         bool hasRemote() const { return true; }
 
         /**
@@ -94,17 +90,6 @@ namespace mongo {
         const HostOpTimeMap& getPrevHostOpTimes() const {
             return _prev->hostOpTimes;
         }
-
-        /**
-         * gets all shards we've accessed since the last time we called clearSinceLastGetError
-         */
-        const std::set<std::string>& sinceLastGetError() const { return _sinceLastGetError; }
-
-        /**
-         * clears list of shards we've talked to
-         */
-        void clearSinceLastGetError() { _sinceLastGetError.clear(); }
-
 
         /**
          * resets the information stored for the current request
@@ -153,9 +138,6 @@ namespace mongo {
         RequestInfo* _prev; //  ""
 
 
-        std::set<std::string> _sinceLastGetError; // all shards accessed since last getLastError
-
-        int _lastAccess;
         bool _autoSplitOk;
 
         static boost::thread_specific_ptr<ClientInfo> _tlInfo;
