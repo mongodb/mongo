@@ -170,10 +170,8 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
         # We then truncate starting or ending in various places.
         c = self.session.open_cursor(self.uri, None)
         current = {1:1, 2:1, 3:1, 4:1, 5:1}
-        c.set_value(1)
         for k in current:
-            c.set_key(k)
-            c.insert()
+            c[k] = 1
         committed = current.copy()
 
         ops = (self.op1, )

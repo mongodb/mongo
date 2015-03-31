@@ -42,18 +42,14 @@ class test_jsondump02(wttest.WiredTigerTestCase):
     def set_kv(self, uri, key, val):
         cursor = self.session.open_cursor(uri, None, None)
         try:
-            cursor.set_key(key)
-            cursor.set_value(val)
-            cursor.insert()
+            cursor[key] = val
         finally:
             cursor.close()
 
     def set_kv2(self, uri, key, val1, val2):
         cursor = self.session.open_cursor(uri, None, None)
         try:
-            cursor.set_key(key)
-            cursor.set_value(val1, val2)
-            cursor.insert()
+            cursor[key] = (val1, val2)
         finally:
             cursor.close()
 
@@ -61,11 +57,10 @@ class test_jsondump02(wttest.WiredTigerTestCase):
     def populate_squarecube(self, uri):
         cursor = self.session.open_cursor(uri, None, None)
         for i in range(1, 5):
-            cursor.set_key(i, 'key' + str(i))
             square = i * i
             cube = square * i
-            cursor.set_value('val' + str(square), square, 'val' + str(cube), cube)
-            cursor.insert()
+            cursor[(i, 'key' + str(i))] = \
+                ('val' + str(square), square, 'val' + str(cube), cube)
         cursor.close()
 
     # Check the result of using a JSON cursor on the URI.
@@ -86,9 +81,7 @@ class test_jsondump02(wttest.WiredTigerTestCase):
         try:
             for insert in inserts:
                 #tty_pr('Insert: ' + str(insert))
-                cursor.set_key(insert[0])
-                cursor.set_value(insert[1])
-                cursor.insert()
+                cursor[insert[0]] = insert[1]
         finally:
             cursor.close()
         

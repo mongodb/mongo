@@ -167,11 +167,10 @@ class test_schema02(wttest.WiredTigerTestCase):
     def populate(self):
         cursor = self.session.open_cursor('table:main', None, None)
         for i in range(0, self.nentries):
-            cursor.set_key(i, 'key' + str(i))
             square = i * i
             cube = square * i
-            cursor.set_value('val' + str(square), square, 'val' + str(cube), cube)
-            cursor.insert()
+            cursor[(i, 'key' + str(i))] = \
+                ('val' + str(square), square, 'val' + str(cube), cube)
         cursor.close()
         
     def check_entries(self):

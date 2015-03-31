@@ -59,9 +59,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None, "overwrite")
         start, stop = self.checkpoints[name][0]
         for i in range(start, stop+1):
-            cursor.set_key("%010d KEY------" % i)
-            cursor.set_value("%010d VALUE "% i + name)
-            self.assertEqual(cursor.insert(), 0)
+            cursor["%010d KEY------" % i] = ("%010d VALUE " % i) + name
         cursor.close()
         self.checkpoints[name] = (self.checkpoints[name][0], 1)
 
@@ -214,9 +212,7 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 
     def update(self, uri, value):
         cursor = self.session.open_cursor(uri, None, "overwrite")
-        cursor.set_key(key_populate(cursor, 10))
-        cursor.set_value(value)
-        cursor.insert()
+        cursor[key_populate(cursor, 10)] = value
         cursor.close()
 
     def check(self, uri, value):
@@ -293,9 +289,7 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
         for value in ('FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH'):
             # Update the object.
             cursor = self.session.open_cursor(uri, None, "overwrite")
-            cursor.set_key(key_populate(cursor, 10))
-            cursor.set_value(value)
-            cursor.insert()
+            cursor[key_populate(cursor, 10)] = value
             cursor.close()
 
             # Checkpoint the object.
@@ -397,9 +391,7 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key")
-        cursor.set_value("value")
-        cursor.insert()
+        cursor["key"] = "value"
         self.session.checkpoint()
 
         cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
@@ -414,9 +406,7 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key")
-        cursor.set_value("value")
-        cursor.insert()
+        cursor["key"] = "value"
         self.session.checkpoint('name=ckpt')
 
         cursor = self.session.open_cursor(

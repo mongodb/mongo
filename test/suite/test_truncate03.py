@@ -113,9 +113,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         for i in range(3000, 7000, 137):
             k = key_populate(cursor, i)
             v = 'changed value: ' + str(i)
-            cursor.set_key(k)
-            cursor.set_value(v)
-            self.assertEqual(cursor.insert(), 0)
+            cursor[k] = v
         for i in range(3000, 7000, 137):
             k = key_populate(cursor, i)
             v = 'changed value: ' + str(i)

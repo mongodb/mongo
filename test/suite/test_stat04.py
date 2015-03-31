@@ -95,9 +95,7 @@ class test_stat04(wttest.WiredTigerTestCase, suite_subprocess):
         for i in range(0, self.nentries):
             if count % 50 == 0:
                 self.checkcount(uri, count)
-            cursor.set_key(self.genkey(i))
-            cursor.set_value(self.genvalue(i))
-            cursor.insert()
+            cursor[self.genkey(i)] = self.genvalue(i)
             count += 1
         # Remove a number of entries, at each step checking that stats match.
         for i in range(0, self.nentries / 37):

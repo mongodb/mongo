@@ -55,9 +55,7 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
         c_src = self.session.open_cursor(self.source_uri)
         c = self.session.open_cursor(self.uri)
         for k, v in c_src:
-            c.set_key(k)
-            c.set_value(v)
-            c.insert()
+            c[k] = v
 
 if __name__ == '__main__':
     wttest.run()

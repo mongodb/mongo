@@ -51,12 +51,7 @@ class test_perf001(wttest.WiredTigerTestCase):
         self.pr(`conn`)
         return conn
 
-    def insert_one(self, c, k1, v1, v2):
-        c.set_key(k1)
-        c.set_value(v1, v2)
-        self.assertEqual(c.insert(), 0)
-
-    def test_performance_of_indeces(self):
+    def test_performance_of_indices(self):
         uri = 'table:' + self.table_name
         create_args = 'key_format=i,value_format=ii,columns=(a,c,d),type=' + self.tabletype
         self.session.create(uri, create_args)
@@ -72,7 +67,7 @@ class test_perf001(wttest.WiredTigerTestCase):
                 end_time = clock()
                 self.assertTrue(end_time - start_time < 5)
                 start_time = end_time
-            self.insert_one(c, i, int(time()), random.randint(1,5))
+            c[i] = (int(time()), random.randint(1,5))
         c.close()
 
 if __name__ == '__main__':

@@ -64,10 +64,8 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         uri = self.type + 'random'
         self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key('AAA')
-        cursor.set_value('BBB')
-        cursor.insert()
-        cursor.close
+        cursor['AAA'] = 'BBB'
+        cursor.close()
         cursor = self.session.open_cursor(uri, None, "next_random=true")
         for i in range(1,5):
             cursor.next()
@@ -149,9 +147,7 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         # Start a transaction.
         self.session.begin_transaction()
         for i in range(1, 100):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
 
         # Open another session, the updates won't yet be visible, we shouldn't
         # find anything at all.
@@ -165,16 +161,12 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None)
 
         # Insert a single leading record.
-        cursor.set_key(key_populate(cursor, 1))
-        cursor.set_value(value_populate(cursor, 1))
-        cursor.insert()
+        cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
 
         # Start a transaction.
         self.session.begin_transaction()
         for i in range(2, 100):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
 
         # Open another session, the updates won't yet be visible, we should
         # return the only possible record.
@@ -189,16 +181,12 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None)
 
         # Insert a single leading record.
-        cursor.set_key(key_populate(cursor, 99))
-        cursor.set_value(value_populate(cursor, 99))
-        cursor.insert()
+        cursor[key_populate(cursor, 99)] = value_populate(cursor, 99)
 
         # Start a transaction.
         self.session.begin_transaction()
         for i in range(2, 100):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
 
         # Open another session, the updates won't yet be visible, we should
         # return the only possible record.

@@ -125,9 +125,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
 
         # 0. Populate the key space
         for i in range(0, self.nentries):
-            cursor.set_key(self.genkey(i))
-            cursor.set_value(self.genvalue(i))
-            cursor.insert()
+            cursor[self.genkey(i)] = self.genvalue(i)
 
         # 1. Calling search for a value that exists
         self.assertEqual(cursor[self.genkey(5)], self.genvalue(5))

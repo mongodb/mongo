@@ -50,9 +50,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
                 val = self.unique + '0'
             else:
                 val = key + key
-            cursor.set_key(key)
-            cursor.set_value(val)
-            cursor.insert()
+            cursor[key] = val
         cursor.close()
 
     def check_populate(self, tablename):

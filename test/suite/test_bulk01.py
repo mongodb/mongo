@@ -61,9 +61,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
         for i in range(1, 100):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
         cursor.close()
 
 
@@ -81,9 +79,8 @@ class test_bulk_load_row_order(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None, "bulk")
-        cursor.set_key(key_populate(cursor, 10))
-        cursor.set_value(value_populate(cursor, 10))
-        cursor.insert()
+        cursor[key_populate(cursor, 10)] = value_populate(cursor, 10)
+
         cursor.set_key(key_populate(cursor, 1))
         cursor.set_value(value_populate(cursor, 1))
         msg = '/compares smaller than previously inserted key/'
@@ -94,12 +91,8 @@ class test_bulk_load_row_order(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None, "bulk,skip_sort_check")
-        cursor.set_key(key_populate(cursor, 10))
-        cursor.set_value(value_populate(cursor, 10))
-        cursor.insert()
-        cursor.set_key(key_populate(cursor, 1))
-        cursor.set_value(value_populate(cursor, 1))
-        cursor.insert()
+        cursor[key_populate(cursor, 10)] = value_populate(cursor, 10)
+        cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
 
         if not wiredtiger.diagnostic_build():
             self.skipTest('requires a diagnostic build')
@@ -123,9 +116,7 @@ class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 1))
-        cursor.set_value(value_populate(cursor, 1))
-        cursor.insert()
+        cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
         # Close the insert cursor, else we'll get EBUSY.
         cursor.close()
         msg = '/bulk-load is only supported on newly created objects/'
@@ -136,9 +127,7 @@ class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 1))
-        cursor.set_value(value_populate(cursor, 1))
-        cursor.insert()
+        cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
         # Don't close the insert cursor, we want EBUSY.
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(uri, None, "bulk"))
