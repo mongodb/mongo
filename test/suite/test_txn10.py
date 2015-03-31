@@ -80,9 +80,7 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.t2, self.create_params)
         c = self.session.open_cursor(self.t2, None, None)
         for i in range(10000):
-            c.set_key(i)
-            c.set_value(i+1)
-            c.insert()
+            c[i] = i + 1
         c.close()
         self.simulate_crash_restart(".", "RESTART")
         c = self.session.open_cursor(self.t2, None, None)

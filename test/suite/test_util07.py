@@ -45,9 +45,7 @@ class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
         for i in range(0, self.nentries):
             key = 'KEY' + str(i)
             val = 'VAL' + str(i)
-            cursor.set_key(key)
-            cursor.set_value(val)
-            cursor.insert()
+            cursor[key] = val
         cursor.close()
 
     def close_conn(self):

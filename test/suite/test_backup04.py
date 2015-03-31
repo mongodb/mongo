@@ -71,20 +71,14 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('populate: ' + uri + ' with ' + str(rows) + ' rows')
         cursor = self.session.open_cursor(uri, None)
         for i in range(1, rows + 1):
-            cursor.set_key(key_populate(cursor, i))
-            my_data = str(i) + ':' + 'a' * dsize
-            cursor.set_value(my_data)
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = str(i) + ':' + 'a' * dsize
         cursor.close()
 
     def update(self, uri, dsize, upd, rows):
         self.pr('update: ' + uri + ' with ' + str(rows) + ' rows')
         cursor = self.session.open_cursor(uri, None)
         for i in range(1, rows + 1):
-            cursor.set_key(key_populate(cursor, i))
-            my_data = str(i) + ':' + upd * dsize
-            cursor.set_value(my_data)
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = str(i) + ':' + upd * dsize
         cursor.close()
 
     # Compare the original and backed-up files using the wt dump command.

@@ -160,10 +160,8 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
             # Choose large compressible values for the string cases.
             value = 'abc' * 1000000
         current = {1:value, 2:value, 3:value, 4:value, 5:value}
-        c.set_value(value)
         for k in current:
-            c.set_key(k)
-            c.insert()
+            c[k] = value
         committed = current.copy()
 
         ops = (self.op1, )

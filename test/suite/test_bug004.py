@@ -50,9 +50,8 @@ class test_bug004(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.config)
         c1 = self.session.open_cursor(self.uri, None)
         for i in range(1, self.nentries):
-            c1.set_key(key_populate(c1, i) + 'abcdef' * 100)
-            c1.set_value(value_populate(c1, i) + 'abcdef' * 100)
-            c1.insert()
+            c1[key_populate(c1, i) + 'abcdef' * 100] = \
+                value_populate(c1, i) + 'abcdef' * 100
         c1.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.

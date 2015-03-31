@@ -43,9 +43,7 @@ class test_bug005(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'value_format=S,key_format=S')
         cursor = self.session.open_cursor(self.uri, None)
         for i in range(1, 1000):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
         cursor.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.

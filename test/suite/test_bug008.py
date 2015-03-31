@@ -55,9 +55,7 @@ class test_bug008(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor = self.session.open_cursor(uri, None)
         for i in range(100, 140):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
 
         # Open a separate session and cursor.
         s = self.conn.open_session()
@@ -113,18 +111,14 @@ class test_bug008(wttest.WiredTigerTestCase):
         # Add some additional visible records.
         cursor = self.session.open_cursor(uri, None)
         for i in range(100, 120):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
         cursor.close()
 
         # Begin a transaction, and add some additional records.
         self.session.begin_transaction()
         cursor = self.session.open_cursor(uri, None)
         for i in range(120, 140):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
 
         # Open a separate session and cursor.
         s = self.conn.open_session()

@@ -63,9 +63,7 @@ class test_base04(wttest.WiredTigerTestCase):
     def insert(self, key, value):
         self.pr('insert')
         cursor = self.cursor()
-        cursor.set_key(key)
-        cursor.set_value(value)
-        cursor.insert()
+        cursor[key] = value
         cursor.close()
         if self.reconcile:
             self.reopen_conn()

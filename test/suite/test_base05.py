@@ -168,9 +168,7 @@ class test_base05(wttest.WiredTigerTestCase):
             numbers[i] = i
             key = self.mixed_string(i)
             value = self.mixed_string(i+1)
-            cursor.set_key(key)
-            cursor.set_value(value)
-            cursor.insert()
+            cursor[key] = value
 
         # quick spot check to make sure searches work
         for divisor in [3, 5, 7]:
@@ -212,9 +210,7 @@ class test_base05(wttest.WiredTigerTestCase):
                 key = val = unicode(strlist[i])
             else:
                 key = val = strlist[i]
-            cursor.set_key(key)
-            cursor.set_value(val)
-            cursor.insert()
+            cursor[key] = val
 
         for i in range(0, len(strlist)):
             if convert:
