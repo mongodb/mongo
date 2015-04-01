@@ -206,7 +206,14 @@ static const WT_CONFIG_CHECK confchk_session_begin_transaction[] = {
 	    NULL },
 	{ "name", "string", NULL, NULL, NULL },
 	{ "priority", "int", NULL, "min=-100,max=100", NULL },
+	{ "snapshot", "string", NULL, NULL, NULL },
 	{ "sync", "boolean", NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL }
+};
+
+static const WT_CONFIG_CHECK confchk_snapshot_subconfigs[] = {
+	{ "drop_to", "string", NULL, NULL, NULL },
+	{ "name", "string", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -214,6 +221,9 @@ static const WT_CONFIG_CHECK confchk_session_checkpoint[] = {
 	{ "drop", "list", NULL, NULL, NULL },
 	{ "force", "boolean", NULL, NULL, NULL },
 	{ "name", "string", NULL, NULL, NULL },
+	{ "snapshot", "category",
+	    NULL, NULL,
+	    confchk_snapshot_subconfigs },
 	{ "target", "list", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
@@ -698,11 +708,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
-	  "isolation=,name=,priority=0,sync=",
+	  "isolation=,name=,priority=0,snapshot=,sync=",
 	  confchk_session_begin_transaction
 	},
 	{ "session.checkpoint",
-	  "drop=,force=0,name=,target=",
+	  "drop=,force=0,name=,snapshot=(drop_to=,name=),target=",
 	  confchk_session_checkpoint
 	},
 	{ "session.close",

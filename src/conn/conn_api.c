@@ -820,6 +820,9 @@ err:	/*
 			    wt_session, NULL));
 		}
 
+	/* Release all named snapshots. */
+	WT_TRET(__wt_txn_nsnap_destroy(session));
+
 	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
 		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL)) {

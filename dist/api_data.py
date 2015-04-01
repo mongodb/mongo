@@ -778,6 +778,9 @@ methods = {
         priority of the transaction for resolving conflicts.
         Transactions with higher values are less likely to abort''',
         min='-100', max='100'),
+    Config('snapshot', '', r'''
+        use a named, in-memory snapshot, see
+        @ref transaction_named_snapshots'''),
     Config('sync', '', r'''
         whether to sync log records when the transaction commits,
         inherited from ::wiredtiger_open \c transaction_sync''',
@@ -805,6 +808,16 @@ methods = {
     Config('name', '', r'''
         if set, specify a name for the checkpoint (note that checkpoints
         including LSM trees may not be named)'''),
+    Config('snapshot', '', r'''
+        take a named, in-memory snapshot, see
+        @ref transaction_named_snapshots''',
+        type='category', subconfig=[
+        Config('drop_to', '', r'''
+            if non-empty, specifies that all snapshots up to and including the
+            specified name should be dropped.'''),
+        Config('name', '', r'''
+            if non-empty, specifies a named, in-memory snapshot'''),
+        ]),
     Config('target', '', r'''
         if non-empty, checkpoint the list of objects''', type='list'),
 ]),

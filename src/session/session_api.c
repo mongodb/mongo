@@ -862,6 +862,7 @@ err:	API_END_RET(session, ret);
 static int
 __session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
+	WT_CONFIG_ITEM nsnap_drop, nsnap_name;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
@@ -899,6 +900,19 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_ERR(__wt_session_reset_cursors(session));
 
 	/*
+	 * Check if this is a named snapshot operation.
+	 */
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "snapshot.name", 0, &nsnap_name));
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "snapshot.drop_to", 0, &nsnap_drop));
+	if (nsnap_name.len > 0 || nsnap_drop.len > 0) {
+		ret = __wt_txn_named_snapshot(
+		    session, &nsnap_name, &nsnap_drop, cfg);
+		goto done;
+	}
+
+	/*
 	 * Don't highjack the session checkpoint thread for eviction.
 	 *
 	 * Application threads are not generally available for potentially slow
@@ -924,7 +938,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
 
-	API_END_RET_NOTFOUND_MAP(session, ret);
+done:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*

@@ -25,6 +25,16 @@
 
 #define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
 
+struct __wt_named_snapshot {
+	const char *name;
+
+	STAILQ_ENTRY(__wt_named_snapshot) q;
+
+	uint64_t snap_min, snap_max;
+	uint64_t *snapshot;
+	uint32_t snapshot_count;
+};
+
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_txn_state {
 	volatile uint64_t id;
 	volatile uint64_t snap_min;
@@ -58,6 +68,11 @@ struct __wt_txn_global {
 	volatile uint64_t checkpoint_gen;
 	volatile uint64_t checkpoint_id;
 	volatile uint64_t checkpoint_snap_min;
+
+	/* Named snapshot state. */
+	WT_RWLOCK *nsnap_rwlock;
+	volatile uint64_t nsnap_oldest_id;
+	STAILQ_HEAD(__wt_nsnap_qh, __wt_named_snapshot) nsnaph;
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };

@@ -193,6 +193,11 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 	if (txn->id != WT_TXN_NONE && TXNID_LT(txn->id, oldest_id))
 		oldest_id = txn->id;
 
+	/* The oldest ID can't move past any named snapshots. */
+	if ((id = txn_global->nsnap_oldest_id) != WT_TXN_NONE &&
+	    TXNID_LT(id, oldest_id))
+		oldest_id = id;
+
 	/*
 	 * If we got a new snapshot, update the published snap_min for this
 	 * session.
@@ -298,7 +303,10 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		txn->txn_logsync = 0;
 
 	F_SET(txn, TXN_RUNNING);
-	if (txn->isolation == TXN_ISO_SNAPSHOT) {
+	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
+	if (cval.len > 0)
+		WT_RET(__wt_txn_nsnap_get(session, &cval));
+	else if (txn->isolation == TXN_ISO_SNAPSHOT) {
 		if (session->ncursors > 0)
 			WT_RET(__wt_session_copy_values(session));
 		__wt_txn_refresh(session, 1);
@@ -560,8 +568,14 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global->current = txn_global->last_running =
 	    txn_global->oldest_id = WT_TXN_FIRST;
 
+	WT_RET(__wt_rwlock_alloc(session,
+	    &txn_global->nsnap_rwlock, "named snapshot lock"));
+	txn_global->nsnap_oldest_id = WT_TXN_NONE;
+	STAILQ_INIT(&txn_global->nsnaph);
+
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
+
 	for (i = 0, s = txn_global->states; i < conn->session_size; i++, s++)
 		s->id = s->snap_min = WT_TXN_NONE;
 
@@ -572,15 +586,21 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
  * __wt_txn_global_destroy --
  *	Destroy the global transaction state.
  */
-void
+int
 __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
-	if (txn_global != NULL)
-		__wt_free(session, txn_global->states);
+	if (txn_global == NULL)
+		return (0);
+
+	WT_TRET(__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock));
+	__wt_free(session, txn_global->states);
+
+	return (ret);
 }
