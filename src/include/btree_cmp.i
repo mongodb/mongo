@@ -13,8 +13,8 @@
 #include <x86intrin.h>
 #define	HAVE_VECTOR_INSTR
 #endif
-						/* 16B alignment */
 #ifdef	HAVE_VECTOR_INSTR
+						/* 16B alignment */
 #define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
 #define	WT_VECTOR_SIZE		16		/* chunk size */
 #endif
