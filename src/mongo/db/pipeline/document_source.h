@@ -1103,7 +1103,6 @@ namespace mongo {
         bool spherical;
         double distanceMultiplier;
         boost::scoped_ptr<FieldPath> includeLocs;
-        bool uniqueDocs;
 
         // these fields are used while processing the results
         BSONObj cmdOutput;
