@@ -28,13 +28,18 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
+#include <vector>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bson_field.h"
 
 namespace mongo {
+
+    struct BSONArray;
+    class BSONObj;
+    class Status;
+    template<typename T> class StatusWith;
 
     /**
      * This class represents the layout and contents of documents contained in the
@@ -49,21 +54,16 @@ namespace mongo {
      *     exampleDoc = conn->findOne(ShardType::ConfigNS, query);
      *
      *     // Process the response.
-     *     ShardType exampleType;
-     *     std::string errMsg;
-     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
-     *         // Can't use 'exampleType'. Take action.
+     *     StatusWith<ShardType> exampleResult = ShardType::fromBSON(exampleDoc);
+     *     if (!exampleResult.isOK()) {
+     *         // handle error -- exampleResult.getStatus()
      *     }
+     *     ShardType exampleType = exampleResult.getValue();
      *     // use 'exampleType'
      *
      */
     class ShardType {
-        MONGO_DISALLOW_COPYING(ShardType);
     public:
-
-        //
-        // schema declarations
-        //
 
         // Name of the shards collection in the config server.
         static const std::string ConfigNS;
@@ -75,29 +75,25 @@ namespace mongo {
         static const BSONField<long long> maxSize;
         static const BSONField<BSONArray> tags;
 
-        //
-        // shards type methods
-        //
-
         ShardType();
         ~ShardType();
 
         /**
-         * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
+         * Constructs a new ShardType object from BSON.
+         * Also does validation of the contents.
          */
-        bool isValid(std::string* errMsg) const;
+        static StatusWith<ShardType> fromBSON(const BSONObj& source);
+
+        /**
+         * Returns OK if all fields have been set. Otherwise returns NoSuchKey
+         * and information about the first field that is missing.
+         */
+        Status validate() const;
 
         /**
          * Returns the BSON representation of the entry.
          */
         BSONObj toBSON() const;
-
-        /**
-         * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise sets errMsg and returns false.
-         */
-        bool parseBSON(const BSONObj& source, std::string* errMsg);
 
         /**
          * Clears the internal state.
@@ -114,118 +110,39 @@ namespace mongo {
          */
         std::string toString() const;
 
-        //
-        // individual field accessors
-        //
+        bool isNameSet() const { return _name.is_initialized(); }
+        const std::string& getName() const { return _name.get(); }
+        void setName(const std::string& name);
 
-        // Mandatory Fields
-        void setName(StringData name) {
-            _name = name.toString();
-            _isNameSet = true;
-        }
+        bool isHostSet() const { return _host.is_initialized(); }
+        const std::string& getHost() const { return _host.get(); }
+        void setHost(const std::string& host);
 
-        void unsetName() { _isNameSet = false; }
+        bool isDrainingSet() const { return _draining.is_initialized(); }
+        const bool getDraining() const { return _draining.get(); }
+        void setDraining(const bool draining);
 
-        bool isNameSet() const { return _isNameSet; }
+        bool isMaxSizeSet() const { return _maxSize.is_initialized(); }
+        const long long getMaxSize() const { return _maxSize.get(); }
+        void setMaxSize(const long long maxSize);
 
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string getName() const {
-            dassert(_isNameSet);
-            return _name;
-        }
-
-        void setHost(StringData host) {
-            _host = host.toString();
-            _isHostSet = true;
-        }
-
-        void unsetHost() { _isHostSet = false; }
-
-        bool isHostSet() const { return _isHostSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string getHost() const {
-            dassert(_isHostSet);
-            return _host;
-        }
-
-        // Optional Fields
-        void setDraining(bool draining) {
-            _draining = draining;
-            _isDrainingSet = true;
-        }
-
-        void unsetDraining() { _isDrainingSet = false; }
-
-        bool isDrainingSet() const {
-            return _isDrainingSet || draining.hasDefault();
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getDraining() const {
-            if (_isDrainingSet) {
-                return _draining;
-            } else {
-                dassert(draining.hasDefault());
-                return draining.getDefault();
-            }
-        }
-        void setMaxSize(long long maxSize) {
-            _maxSize = maxSize;
-            _isMaxSizeSet = true;
-        }
-
-        void unsetMaxSize() { _isMaxSizeSet = false; }
-
-        bool isMaxSizeSet() const {
-            return _isMaxSizeSet || maxSize.hasDefault();
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        long long getMaxSize() const {
-            if (_isMaxSizeSet) {
-                return _maxSize;
-            } else {
-                dassert(maxSize.hasDefault());
-                return maxSize.getDefault();
-            }
-        }
-        void setTags(BSONArray tags) {
-            _tags = tags;
-            _isTagsSet = true;
-        }
-
-        void unsetTags() { _isTagsSet = false; }
-
-        bool isTagsSet() const {
-            return _isTagsSet || tags.hasDefault();
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        BSONArray getTags() const {
-            if (_isTagsSet) {
-                return _tags;
-            } else {
-                dassert(tags.hasDefault());
-                return tags.getDefault();
-            }
-        }
+        bool isTagsSet() const { return _tags.is_initialized(); }
+        const std::vector<std::string>& getTags() const { return _tags.get(); }
+        void setTags(const std::vector<std::string>& tags);
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _name;     // (M)  shard's id
-        bool _isNameSet;
-        std::string _host;     // (M)  connection std::string for the host(s)
-        bool _isHostSet;
-        bool _draining;     // (O)  is it draining chunks?
-        bool _isDrainingSet;
-        long long _maxSize;     // (O)  maximum allowed disk space in MB
-        bool _isMaxSizeSet;
-        BSONArray _tags;     // (O)  shard tags
-        bool _isTagsSet;
+
+        // (M)  shard's id
+        boost::optional<std::string> _name;
+        // (M)  connection string for the host(s)
+        boost::optional<std::string> _host;
+        // (O) is it draining drunks?
+        boost::optional<bool> _draining;
+        // (O) maximum allowed disk space in MB
+        boost::optional<long long> _maxSize;
+        // (O) shard tags
+        boost::optional<std::vector<std::string>> _tags;
     };
 
 } // namespace mongo

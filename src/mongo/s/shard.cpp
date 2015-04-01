@@ -127,21 +127,16 @@ namespace mongo {
             _rsLookup.clear();
             
             for (list<BSONObj>::const_iterator iter = all.begin(); iter != all.end(); ++iter) {
-                ShardType shardData;
+                StatusWith<ShardType> shardRes = ShardType::fromBSON(*iter);
+                uassertStatusOK(shardRes.getStatus());
 
-                string errmsg;
-                if (!shardData.parseBSON(*iter, &errmsg) || !shardData.isValid(&errmsg)) {
-                    uasserted(28530, errmsg);
-                }
+                ShardType shardData = shardRes.getValue();
+                uassertStatusOK(shardData.validate());
 
-                const long long maxSize = shardData.isMaxSizeSet() ? shardData.getMaxSize() : 0;
-                const bool isDraining = shardData.isDrainingSet() ?
-                        shardData.getDraining() : false;
-                const BSONArray tags = shardData.isTagsSet() ? shardData.getTags() : BSONArray();
                 ShardPtr shard = boost::make_shared<Shard>(shardData.getName(),
                                                            shardData.getHost(),
-                                                           maxSize,
-                                                           isDraining);
+                                                           shardData.getMaxSize(),
+                                                           shardData.getDraining());
 
                 _lookup[shardData.getName()] = shard;
                 _installHost(shardData.getHost(), shard);

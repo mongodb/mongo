@@ -25,23 +25,26 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/type_shard.h"
 
-#include "mongo/db/field_parser.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-    using std::string;
-
-    using mongoutils::str::stream;
 
     const std::string ShardType::ConfigNS = "config.shards";
 
     const BSONField<std::string> ShardType::name("_id");
     const BSONField<std::string> ShardType::host("host");
-    const BSONField<bool> ShardType::draining("draining", false);
-    const BSONField<long long> ShardType::maxSize("maxSize", 0);
+    const BSONField<bool> ShardType::draining("draining");
+    const BSONField<long long> ShardType::maxSize("maxSize");
     const BSONField<BSONArray> ShardType::tags("tags");
 
     ShardType::ShardType() {
@@ -51,108 +54,132 @@ namespace mongo {
     ShardType::~ShardType() {
     }
 
-    bool ShardType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
+    StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
+        ShardType shard;
+
+        {
+            std::string shardName;
+            Status status = bsonExtractStringField(source, name.name(), &shardName);
+            if (!status.isOK()) return status;
+            shard._name = shardName;
         }
 
-        // All the mandatory fields must be present.
-        if (!_isNameSet) {
-            *errMsg = stream() << "missing " << name.name() << " field";
-            return false;
-        }
-        if (!_isHostSet) {
-            *errMsg = stream() << "missing " << host.name() << " field";
-            return false;
+        {
+            std::string shardHost;
+            Status status = bsonExtractStringField(source, host.name(), &shardHost);
+            if (!status.isOK()) return status;
+            shard._host = shardHost;
         }
 
-        return true;
+        {
+            bool isShardDraining;
+            Status status = bsonExtractBooleanFieldWithDefault(source,
+                                                               draining.name(),
+                                                               false,
+                                                               &isShardDraining);
+            if (!status.isOK()) return status;
+            shard._draining = isShardDraining;
+        }
+
+        {
+            long long shardMaxSize;
+            // maxSize == 0 means there's no limitation to space usage.
+            Status status = bsonExtractIntegerFieldWithDefault(source,
+                                                               maxSize.name(),
+                                                               0,
+                                                               &shardMaxSize);
+            if (!status.isOK()) return status;
+            shard._maxSize = shardMaxSize;
+        }
+
+        shard._tags = std::vector<std::string>();
+        if (source.hasField(tags.name())) {
+            BSONElement tagsElement;
+            Status status = bsonExtractTypedField(source, tags.name(), Array, &tagsElement);
+            if (!status.isOK()) return status;
+
+            BSONObjIterator it(tagsElement.Obj());
+            while (it.more()) {
+                BSONElement tagElement = it.next();
+                if (tagElement.type() != String) {
+                    return Status(ErrorCodes::TypeMismatch,
+                                  str::stream() << "Elements in \"" << tags.name()
+                                                << "\" array must be strings but found "
+                                                <<  typeName(tagElement.type()));
+                }
+                shard._tags->push_back(tagElement.String());
+            }
+        }
+
+        return shard;
+    }
+
+    Status ShardType::validate() const {
+
+        if (!_name.is_initialized() || _name->empty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << name.name() << " field");
+        }
+
+        if (!_host.is_initialized() || _host->empty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << host.name() << " field");
+        }
+
+        if (_maxSize.is_initialized() && getMaxSize() < 0) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "maxSize can't be negative");
+        }
+
+        return Status::OK();
     }
 
     BSONObj ShardType::toBSON() const {
         BSONObjBuilder builder;
 
-        if (_isNameSet) builder.append(name(), _name);
-        if (_isHostSet) builder.append(host(), _host);
-        if (_isDrainingSet) builder.append(draining(), _draining);
-        if (_isMaxSizeSet) builder.append(maxSize(), _maxSize);
-        if (_isTagsSet) builder.append(tags(), _tags);
+        if (_name) builder.append(name(), getName());
+        if (_host) builder.append(host(), getHost());
+        if (_draining) builder.append(draining(), getDraining());
+        if (_maxSize) builder.append(maxSize(), getMaxSize());
+        if (_tags) builder.append(tags(), getTags());
 
         return builder.obj();
     }
 
-    bool ShardType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
-
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
-
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, name, &_name, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, host, &_host, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isHostSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, draining, &_draining, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDrainingSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extractNumber(source, maxSize, &_maxSize, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMaxSizeSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, tags, &_tags, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isTagsSet = fieldState == FieldParser::FIELD_SET;
-
-        return true;
-    }
-
     void ShardType::clear() {
-
-        _name.clear();
-        _isNameSet = false;
-
-        _host.clear();
-        _isHostSet = false;
-
-        _draining = false;
-        _isDrainingSet = false;
-
-        _maxSize = 0;
-        _isMaxSizeSet = false;
-
-        _tags = BSONArray();
-        _isTagsSet = false;
-
-    }
-
-    void ShardType::cloneTo(ShardType* other) const {
-        other->clear();
-
-        other->_name = _name;
-        other->_isNameSet = _isNameSet;
-
-        other->_host = _host;
-        other->_isHostSet = _isHostSet;
-
-        other->_draining = _draining;
-        other->_isDrainingSet = _isDrainingSet;
-
-        other->_maxSize = _maxSize;
-        other->_isMaxSizeSet = _isMaxSizeSet;
-
-        other->_tags = _tags;
-        other->_isTagsSet = _isTagsSet;
-
+        _name.reset();
+        _host.reset();
+        _draining.reset();
+        _maxSize.reset();
+        _tags.reset();
     }
 
     std::string ShardType::toString() const {
         return toBSON().toString();
+    }
+
+    void ShardType::setName(const std::string& name) {
+        invariant(!name.empty());
+        _name = name;
+    }
+
+    void ShardType::setHost(const std::string& host) {
+        invariant(!host.empty());
+        _host = host;
+    }
+
+    void ShardType::setDraining(const bool isDraining) {
+        _draining = isDraining;
+    }
+
+    void ShardType::setMaxSize(const long long maxSize) {
+        invariant(maxSize >= 0);
+        _maxSize = maxSize;
+    }
+
+    void ShardType::setTags(const std::vector<std::string>& tags) {
+        invariant(tags.size() > 0);
+        _tags = tags;
     }
 
 } // namespace mongo

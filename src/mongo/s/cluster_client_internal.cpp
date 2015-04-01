@@ -138,15 +138,24 @@ namespace mongo {
 
                 BSONObj shardDoc = cursor->next();
 
-                ShardType shard;
-                string errMsg;
-                if (!shard.parseBSON(shardDoc, &errMsg) || !shard.isValid(&errMsg)) {
+                StatusWith<ShardType> shardRes = ShardType::fromBSON(shardDoc);
+                if (!shardRes.isOK()) {
                     connPtr->done();
                     return Status(ErrorCodes::UnsupportedFormat,
                                   stream() << "invalid shard " << shardDoc
-                                           << " read from the config server" << causedBy(errMsg));
+                                           << " read from the config server"
+                                           << causedBy(shardRes.getStatus()));
+                }
+                ShardType shard = shardRes.getValue();
+                Status status = shard.validate();
+                if (!status.isOK()) {
+                    connPtr->done();
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  stream() << "shard " << shardDoc
+                                           << " failed validation: " << causedBy(status));
                 }
 
+                string errMsg;
                 ConnectionString shardLoc = ConnectionString::parse(shard.getHost(), errMsg);
                 if (shardLoc.type() == ConnectionString::INVALID) {
                     connPtr->done();

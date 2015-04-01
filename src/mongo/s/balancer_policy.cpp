@@ -249,14 +249,12 @@ namespace mongo {
             uassert(28597, "Failed to load shard config", cursor.get() != NULL);
 
             while (cursor->more()) {
-                ShardType shard;
-                std::string errMsg;
-                bool parseOk = shard.parseBSON(cursor->next(), &errMsg);
+                StatusWith<ShardType> shardRes = ShardType::fromBSON(cursor->next());
 
-                if (!parseOk) {
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  errMsg);
+                if (!shardRes.isOK()) {
+                    return shardRes.getStatus();
                 }
+                ShardType shard = shardRes.getValue();
 
                 std::set<std::string> dummy;
                 ShardInfo newShardEntry(shard.getMaxSize(),
@@ -266,18 +264,11 @@ namespace mongo {
                                         dummy,
                                         Shard::getShardMongoVersion(shard.getHost()));
 
-                if (shard.isTagsSet()) {
-                    BSONArrayIteratorSorted tagIter(shard.getTags());
-                    while (tagIter.more()) {
-                        BSONElement tagElement = tagIter.next();
-                        if (tagElement.type() != String) {
-                            return Status(ErrorCodes::UnsupportedFormat,
-                                          str::stream() << "shard tags only supports strings, "
-                                              << "found " << typeName(tagElement.type()));
-                        }
-
-                        newShardEntry.addTag(tagElement.String());
-                    }
+                vector<string> shardTags = shard.getTags();
+                for (vector<string>::const_iterator it = shardTags.begin();
+                     it != shardTags.end();
+                     it++) {
+                    newShardEntry.addTag(*it);
                 }
 
                 shardInfo->insert(make_pair(shard.getName(), newShardEntry));
