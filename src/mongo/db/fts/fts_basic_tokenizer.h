@@ -58,7 +58,7 @@ namespace fts {
     public:
         BasicFTSTokenizer(const FTSLanguage* language);
 
-        void reset(const char* document, bool generateCaseSensitiveTokens) override;
+        void reset(const char* document, Options options) override;
 
         bool moveNext() override;
 
@@ -70,7 +70,7 @@ namespace fts {
         const StopWords* const _stopWords;
 
         std::unique_ptr<Tokenizer> _tokenizer;
-        bool _generateCaseSensitiveTokens;
+        Options _options;
 
         std::string _stem;
     };

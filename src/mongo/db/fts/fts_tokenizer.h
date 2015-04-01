@@ -42,17 +42,37 @@ namespace fts {
      * FTSTokenizer
      * A iterator of "documents" where a document contains space delimited words.
      * For each word returns a stem or lemma version of a word optimized for full text indexing.
-     * Optionally supports returning case sensitive search terms.
+     * Supports various options to control how tokens are generated.
      */
     class FTSTokenizer {
     public:
         virtual ~FTSTokenizer() = default;
 
         /**
+         * Options for generating tokens
+         */
+        enum Options {
+            /**
+             * Default means lower cased, and stop words are not filtered.
+             */
+            None = 0,
+
+            /**
+             * Do not lower case terms.
+             */
+            GenerateCaseSensitiveTokens = 1 << 0,
+
+            /**
+             * Filter out stop words from return tokens.
+             */
+            FilterStopWords = 1 << 1,
+        };
+
+        /**
          * Process a new document, and discards any previous results.
          * May be called multiple times on an instance of an iterator.
          */
-        virtual void reset(const char* document, bool generateCaseSensitiveTokens) = 0;
+        virtual void reset(const char* document, Options options) = 0;
 
         /**
          * Moves to the next token in the iterator.

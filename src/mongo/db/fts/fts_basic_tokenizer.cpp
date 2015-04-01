@@ -48,8 +48,8 @@ namespace fts {
         : _language(language), _stemmer(language), _stopWords(StopWords::getStopWords(language)) {
     }
 
-    void BasicFTSTokenizer::reset(const char* document, bool generateCaseSensitiveTokens) {
-        _generateCaseSensitiveTokens = generateCaseSensitiveTokens;
+    void BasicFTSTokenizer::reset(const char* document, Options options) {
+        _options = options;
         _tokenizer = stdx::make_unique<Tokenizer>(_language, document);
     }
 
@@ -69,11 +69,12 @@ namespace fts {
 
             // Stop words are case-sensitive so we need them to be lower cased to check
             // against the stop word list
-            if (_stopWords->isStopWord(word)) {
+            if ((_options & FTSTokenizer::FilterStopWords) &&
+                _stopWords->isStopWord(word)) {
                 continue;
             }
 
-            if (_generateCaseSensitiveTokens) {
+            if (_options & FTSTokenizer::GenerateCaseSensitiveTokens) {
                 word = token.data.toString();
             }
 

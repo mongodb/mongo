@@ -125,7 +125,7 @@ namespace mongo {
         void FTSQuery::_addTerm( FTSTokenizer* tokenizer,
                                  const string& token,
                                  bool negated ) {
-            tokenizer->reset(token.c_str(), false);
+            tokenizer->reset(token.c_str(), FTSTokenizer::FilterStopWords);
 
             auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
 
@@ -152,7 +152,9 @@ namespace mongo {
                 return;
             }
 
-            tokenizer->reset(token.c_str(), true);
+            tokenizer->reset(token.c_str(), static_cast<FTSTokenizer::Options>(
+                FTSTokenizer::FilterStopWords
+                | FTSTokenizer::GenerateCaseSensitiveTokens));
 
             // If we want case-sensitivity, get the case-sensitive token
             while (tokenizer->moveNext()) {

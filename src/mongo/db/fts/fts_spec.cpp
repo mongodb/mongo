@@ -182,7 +182,7 @@ namespace mongo {
 
             unsigned numTokens = 0;
 
-            tokenizer->reset(raw.rawData(), false );
+            tokenizer->reset(raw.rawData(), FTSTokenizer::FilterStopWords );
 
             while (tokenizer->moveNext()) {
                 string term = tokenizer->get().toString();

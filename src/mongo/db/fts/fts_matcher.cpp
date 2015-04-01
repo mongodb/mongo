@@ -99,7 +99,8 @@ namespace mongo {
                                                   const string& raw ) const {
             std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
 
-            tokenizer->reset(raw.c_str(), _query.getCaseSensitive());
+            tokenizer->reset(raw.c_str(), _query.getCaseSensitive() ?
+                FTSTokenizer::GenerateCaseSensitiveTokens : FTSTokenizer::None);
 
             while (tokenizer->moveNext()) {
                 string word = tokenizer->get().toString();
@@ -131,7 +132,8 @@ namespace mongo {
                                                   const string& raw ) const {
             std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
 
-            tokenizer->reset(raw.c_str(), _query.getCaseSensitive());
+            tokenizer->reset(raw.c_str(), _query.getCaseSensitive() ?
+                FTSTokenizer::GenerateCaseSensitiveTokens : FTSTokenizer::None);
 
             while (tokenizer->moveNext()) {
                 string word = tokenizer->get().toString();

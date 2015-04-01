@@ -94,6 +94,26 @@ namespace mongo {
             ASSERT( m.hasNegativeTerm( BSON( "x" << "gladly" ) ) );
         }
 
+        // Test the matcher does not filter out stop words from positive terms
+        TEST( FTSMatcher, MatcherDoesNotFilterStopWordsNeg ) {
+            FTSQuery q;
+            ASSERT_OK( q.parse( "-the", "none", false, TEXT_INDEX_VERSION_2 ) );
+            FTSMatcher m( q,
+                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+
+            ASSERT( m.hasNegativeTerm( BSON( "x" << "the" ) ) );
+        }
+
+        // Test the matcher does not filter out stop words from negative terms
+        TEST( FTSMatcher, MatcherDoesNotFilterStopWordsPos ) {
+            FTSQuery q;
+            ASSERT_OK( q.parse( "the", "none", false, TEXT_INDEX_VERSION_2 ) );
+            FTSMatcher m( q,
+                          FTSSpec( FTSSpec::fixSpec( BSON( "key" << BSON( "x" << "text" ) ) ) ) );
+
+            ASSERT( m.hasPositiveTerm( BSON( "x" << "the" ) ) );
+        }
+
         // Returns whether a document indexed with text data 'doc' contains any positive terms from
         // case-sensitive text query 'search'.
         static bool docHasPositiveTermWithCase( const std::string& doc,
