@@ -11,8 +11,11 @@
 #define	HAVE_VECTOR_INSTR
 #elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #include <x86intrin.h>
+#if defined(__SSE2__)
 #define	HAVE_VECTOR_INSTR
 #endif
+#endif
+
 #ifdef	HAVE_VECTOR_INSTR
 						/* 16B alignment */
 #define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
