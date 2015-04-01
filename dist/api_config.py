@@ -253,8 +253,8 @@ for name in sorted(api_data.methods.keys()):
     # Build a list of #defines that reference specific slots in the list (the
     # #defines are used to avoid a list search where we know the correct slot).
     config_defines +=\
-        '#define\tWT_CONFIG_ENTRY_' + name.replace('.', '_') + \
-            '\t' * max(1, 7 - (len('WT_CONFIG_ENTRY_' + name) / 8)) + \
+        '#define\tWT_CONFIG_ENTRY_' + name.replace('.', '_') + '\t' * \
+            max(1, 6 - (len('WT_CONFIG_ENTRY_' + name) / 8)) + \
             "%2s" % str(slot) + '\n'
 
     # Write the method name and base.
