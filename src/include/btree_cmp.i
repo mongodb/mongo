@@ -28,7 +28,7 @@
 static inline int
 __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
-	size_t len, remainder, usz, tsz;
+	size_t len, remain, usz, tsz;
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
@@ -43,8 +43,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	if (len >= WT_VECTOR_SIZE * 2) {
 		__m128i res_eq, u, t;
 
-		remainder = len % WT_VECTOR_SIZE;
-		len -= remainder;
+		remain = len % WT_VECTOR_SIZE;
+		len -= remain;
 		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
@@ -65,7 +65,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
 			}
-		len += remainder;
+		len += remain;
 	}
 #endif
 	/*
@@ -113,7 +113,7 @@ static inline int
 __wt_lex_compare_skip(
     const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
 {
-	size_t len, remainder, usz, tsz;
+	size_t len, remain, usz, tsz;
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
@@ -128,8 +128,8 @@ __wt_lex_compare_skip(
 	if (len >= WT_VECTOR_SIZE * 2) {
 		__m128i res_eq, u, t;
 
-		remainder = len % WT_VECTOR_SIZE;
-		len -= remainder;
+		remain = len % WT_VECTOR_SIZE;
+		len -= remain;
 		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
 			for (; len > 0;
 			    len -= WT_VECTOR_SIZE,
@@ -152,7 +152,7 @@ __wt_lex_compare_skip(
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
 			}
-		len += remainder;
+		len += remain;
 	}
 #endif
 	/*
