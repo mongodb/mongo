@@ -40,7 +40,7 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
     tablename = 'test_cursor08'
     uri = 'table:' + tablename
-    nkeys = 5
+    nkeys = 500
 
     reopens = check_scenarios([
         ('regular', dict(reopen=False)),
@@ -51,13 +51,13 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
         ('nop', dict(compress='nop')),
         ('snappy', dict(compress='snappy')),
         ('zlib', dict(compress='zlib')),
-        ('none', dict(compress='')),
+        ('none', dict(compress='none')),
     ])
     scenarios = number_scenarios(multiply_scenarios('.', reopens, compress))
 
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, name):
-        if name == None:
+        if name == None or name == 'none':
             return ''
 
         testdir = os.path.dirname(__file__)
