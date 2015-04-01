@@ -440,7 +440,8 @@ __wt_txn_truncate_end(WT_SESSION_IMPL *session)
  */
 static int
 __txn_printlog(WT_SESSION_IMPL *session,
-    WT_ITEM *rawrec, WT_LSN *lsnp, void *cookie, int firstrecord)
+    WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *next_lsnp,
+    void *cookie, int firstrecord)
 {
 	FILE *out;
 	WT_LOG_RECORD *logrec;
@@ -452,6 +453,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	const uint8_t *end, *p;
 	const char *msg;
 
+	WT_UNUSED(next_lsnp);
 	out = cookie;
 
 	p = LOG_SKIP_HEADER(rawrec->data);
