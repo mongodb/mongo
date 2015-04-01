@@ -58,13 +58,6 @@ func TestStatLine(t *testing.T) {
 				Writers: 2,
 			},
 		},
-		IndexCounter: &IndexCounterStats{
-			Accesses:  11429830532,
-			Hits:      11429794611,
-			Misses:    0,
-			Resets:    0,
-			MissRatio: 0,
-		},
 		Locks: map[string]LockStats{
 			".": {
 				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, // locked
@@ -153,13 +146,6 @@ func TestStatLine(t *testing.T) {
 				Readers: 4,
 				Writers: 6,
 			},
-		},
-		IndexCounter: &IndexCounterStats{
-			Accesses:  11429830532,
-			Hits:      11429794611,
-			Misses:    0,
-			Resets:    0,
-			MissRatio: 0,
 		},
 		Locks: map[string]LockStats{
 			".": {

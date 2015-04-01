@@ -59,7 +59,6 @@ type ServerStatus struct {
 	Connections        *ConnectionStats       `bson:"connections"`
 	Dur                *DurStats              `bson:"dur"`
 	GlobalLock         *GlobalLockStats       `bson:"globalLock"`
-	IndexCounter       *IndexCounterStats     `bson:"indexCounters"`
 	Locks              map[string]LockStats   `bson:"locks,omitempty"`
 	Network            *NetworkStats          `bson:"network"`
 	Opcounters         *OpcountStats          `bson:"opcounters"`
@@ -193,15 +192,6 @@ type GlobalLockStats struct {
 	ActiveClients *ClientStats `bson:"activeClients"`
 }
 
-// IndexCounterStats stores index statistics.
-type IndexCounterStats struct {
-	Accesses  int64 `bson:"accesses"`
-	Hits      int64 `bson:"hits"`
-	Misses    int64 `bson:"misses"`
-	Resets    int64 `bson:"resets"`
-	MissRatio int64 `bson:"missRatio"`
-}
-
 // NetworkStats stores information related to network traffic.
 type NetworkStats struct {
 	BytesIn     int64 `bson:"bytesIn"`
@@ -272,7 +262,6 @@ var StatHeaders = []StatHeader{
 	{"non-mapped", MMAPOnly | AllOnly},
 	{"faults", MMAPOnly},
 	{"    locked db", Locks},
-	{"idx miss %", MMAPOnly},
 	{"qr|qw", Always},
 	{"ar|aw", Always},
 	{"netIn", Always},
@@ -350,7 +339,6 @@ type StatLine struct {
 	Mapped, Virtual, Resident, NonMapped                  int64
 	Faults                                                int64
 	HighestLocked                                         *LockStatus
-	IndexMissPercent                                      float64
 	QueuedReaders, QueuedWriters                          int64
 	ActiveReaders, ActiveWriters                          int64
 	NetIn, NetOut                                         int64
@@ -456,7 +444,6 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		// add mmapv1-specific fields
 		if lineFlags&MMAPOnly > 0 {
 			lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
-			lineJson["idx miss %"] = fmt.Sprintf("%v", line.IndexMissPercent)
 			lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders,
 				line.QueuedWriters)
 			lineJson["ar|aw"] = fmt.Sprintf("%v|%v", line.ActiveReaders,
@@ -652,13 +639,6 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			} else {
 				//don't write any lock status for mongos nodes
 				glf.Writer.WriteCell("")
-			}
-		}
-		if lineFlags&MMAPOnly > 0 {
-			if mmap {
-				glf.Writer.WriteCell(fmt.Sprintf("%v", line.IndexMissPercent))
-			} else {
-				glf.Writer.WriteCell("n/a")
 			}
 		}
 		glf.Writer.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
