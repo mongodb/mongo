@@ -571,6 +571,7 @@ instantiation
 intl
 intnum
 intpack
+intrin
 inuse
 io
 ip
@@ -888,6 +889,7 @@ valuep
 valuev
 vanishingly
 variable's
+vectorized
 versa
 vfprintf
 vpack

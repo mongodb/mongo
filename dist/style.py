@@ -9,7 +9,7 @@ def missing_comment():
     for f in source_files():
         skip_re = re.compile(r'DO NOT EDIT: automatically built')
         func_re = re.compile(
-            r'(/\*(?:[^\*]|\*[^/])*\*/)?\n\w[\w ]+\n(\w+)', re.DOTALL)
+            r'(/\*(?:[^\*]|\*[^/])*\*/)?\n\w[\w \*]+\n(\w+)', re.DOTALL)
         s = open(f, 'r').read()
         if skip_re.search(s):
             continue

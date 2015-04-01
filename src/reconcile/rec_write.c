@@ -5470,15 +5470,6 @@ err:	__wt_scr_free(session, &tmp);
 }
 
 /*
- * The dictionary --
- *	The rest of this file is support for dictionaries.
- *
- * It's difficult to write generic skiplist functions without turning a single
- * memory allocation into two, or requiring a function call instead of a simple
- * comparison.  Fortunately, skiplists are relatively simple things and we can
- * include them in-place.  If you need generic skip-list functions to modify,
- * this set wouldn't be a bad place to start.
- *
  * __rec_dictionary_skip_search --
  *	Search a dictionary skiplist.
  */

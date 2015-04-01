@@ -395,7 +395,7 @@ __debug_dsk_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 }
 
 /*
- * __debug_shape_info --
+ * __debug_tree_shape_info --
  *	Pretty-print information about a page.
  */
 static char *
