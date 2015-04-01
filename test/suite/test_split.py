@@ -52,9 +52,7 @@ class test_split(wttest.WiredTigerTestCase):
         # Create a 4KB page (more than 3KB): 40 records w / 10 byte keys
         # and 81 byte values.
         for i in range(40):
-            cursor.set_key('%09d' % i)
-            cursor.set_value(8 * ('%010d' % i))
-            cursor.insert()
+            cursor['%09d' % i] = 8 * ('%010d' % i)
 
         # Stabilize
         self.reopen_conn()
@@ -66,9 +64,7 @@ class test_split(wttest.WiredTigerTestCase):
         # Now append a few records so we're definitely (a little) over 4KB
         cursor = self.session.open_cursor(self.uri, None)
         for i in range(50,55):
-            cursor.set_key('%09d' % i)
-            cursor.set_value(8 * ('%010d' % i))
-            cursor.insert()
+            cursor['%09d' % i] = 8 * ('%010d' % i)
 
         # Stabilize
         self.reopen_conn()
@@ -80,9 +76,7 @@ class test_split(wttest.WiredTigerTestCase):
         # Now insert some more records in between
         cursor = self.session.open_cursor(self.uri, None)
         for i in range(40,45):
-            cursor.set_key('%09d' % i)
-            cursor.set_value(8 * ('%010d' % i))
-            cursor.insert()
+            cursor['%09d' % i] = 8 * ('%010d' % i)
 
         # Stabilize
         self.reopen_conn()

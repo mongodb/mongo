@@ -49,8 +49,7 @@ restart:	page = current->page;
 
 		WT_ASSERT(session, current->key.recno == page->pg_intl_recno);
 
-		WT_ASSERT(session, session->split_gen != 0);
-		pindex = WT_INTL_INDEX_COPY(page);
+		WT_INTL_INDEX_GET(session, page, pindex);
 		base = pindex->entries;
 		descent = pindex->index[base - 1];
 
@@ -134,7 +133,7 @@ leaf_only:
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);
 	} else
-		if ((cip = __col_var_search(page, recno)) == NULL) {
+		if ((cip = __col_var_search(page, recno, NULL)) == NULL) {
 			cbt->recno = __col_var_last_recno(page);
 			goto past_end;
 		} else {

@@ -1924,7 +1924,7 @@ err:	/* Discard the configuration strings. */
 	__wt_buf_free(session, &i2);
 	__wt_buf_free(session, &i3);
 
-	if (ret != 0 && conn != NULL)
+	if (ret != 0)
 		WT_TRET(__wt_connection_close(conn));
 
 	return (ret);

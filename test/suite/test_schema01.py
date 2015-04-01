@@ -84,9 +84,7 @@ class test_schema01(wttest.WiredTigerTestCase):
             c = self.cursor('overwrite')
             try:
                 for record in pop_data:
-                    c.set_key(record[0])
-                    c.set_value(*record[1:])
-                    c.insert()
+                    c[record[0]] = record[1:]
             finally:
                 c.close()
 

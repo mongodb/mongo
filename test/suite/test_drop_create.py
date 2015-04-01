@@ -63,9 +63,7 @@ class test_drop_create(wttest.WiredTigerTestCase):
         # Create a table with the same name, but a different schema
         self.assertEqual(s.create("table:test", 'key_format=S,value_format=l,columns=(k,v)'), 0)
         c2 = s2.open_cursor("table:test", None, None)
-        c2.set_key("Hi")
-        c2.set_value(1)
-        c2.insert()
+        c2["Hi"] = 1
         self.assertEqual(s.close(), 0)
         self.assertEqual(s2.close(), 0)
 

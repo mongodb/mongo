@@ -117,9 +117,7 @@ class test_stat01(wttest.WiredTigerTestCase):
         value = ""
         for i in range(1, self.nentries):
             value = value + 1000 * "a"
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value)
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value
         cursor.close()
 
         # Force the object to disk, otherwise we can't check the overflow count.

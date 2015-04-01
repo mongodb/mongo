@@ -9,9 +9,12 @@
 #
 # Optional configuration flags:
 #       no_clear        Value not cleared when statistics cleared
+#       no_scale        Don't scale value per second in the logging tool script
+#
+# Data-source statistics are normally aggregated across the set of underlying
+# objects. Additional optionaly configuration flags are available:
 #       no_aggregate    Ignore the value when aggregating statistics
 #       max_aggregate   Take the maximum value when aggregating statistics
-#       no_scale        Don't scale value per second in the logging tool script
 
 from operator import attrgetter
 import sys
@@ -121,7 +124,7 @@ connection_stats = [
     AsyncStat('async_full', 'number of times operation allocation failed'),
     AsyncStat('async_cur_queue', 'current work queue length'),
     AsyncStat('async_max_queue',
-        'maximum work queue length', 'max_aggregate,no_scale'),
+        'maximum work queue length', 'no_clear,no_scale'),
     AsyncStat('async_nowork', 'number of times worker found no work'),
     AsyncStat('async_op_alloc', 'total allocations'),
     AsyncStat('async_op_compact', 'total compact calls'),
@@ -178,7 +181,7 @@ connection_stats = [
     CacheStat('cache_eviction_hazard', 'hazard pointer blocked page eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
     CacheStat('cache_eviction_maximum_page_size',
-        'maximum page size at eviction', 'max_aggregate,no_scale'),
+        'maximum page size at eviction', 'no_clear,no_scale'),
     CacheStat('cache_eviction_queue_empty',
         'eviction server candidate queue empty when topping up'),
     CacheStat('cache_eviction_queue_not_empty',
@@ -269,26 +272,20 @@ connection_stats = [
     TxnStat('txn_checkpoint_generation',
         'transaction checkpoint generation', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_max',
-        'transaction checkpoint max time (msecs)',
-        'no_aggregate,no_clear,no_scale'),
+        'transaction checkpoint max time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_min',
-        'transaction checkpoint min time (msecs)',
-        'max_aggregate,no_clear,no_scale'),
+        'transaction checkpoint min time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_recent',
-        'transaction checkpoint most recent time (msecs)',
-        'no_aggregate,no_clear,no_scale'),
+        'transaction checkpoint most recent time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_total',
-        'transaction checkpoint total time (msecs)',
-        'no_aggregate,no_clear,no_scale'),
+        'transaction checkpoint total time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_running',
-        'transaction checkpoint currently running',
-        'no_aggregate,no_clear,no_scale'),
+        'transaction checkpoint currently running', 'no_clear,no_scale'),
     TxnStat('txn_pinned_checkpoint_range',
         'transaction range of IDs currently pinned by a checkpoint',
-        'no_aggregate,no_clear,no_scale'),
+        'no_clear,no_scale'),
     TxnStat('txn_pinned_range',
-        'transaction range of IDs currently pinned',
-        'no_aggregate,no_clear,no_scale'),
+        'transaction range of IDs currently pinned', 'no_clear,no_scale'),
     TxnStat('txn_commit', 'transactions committed'),
     TxnStat('txn_fail_cache', 'transaction failures due to cache overflow'),
     TxnStat('txn_rollback', 'transactions rolled back'),
@@ -391,15 +388,15 @@ dsrc_stats = [
     BtreeStat('btree_maximum_depth',
         'maximum tree depth', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxintlkey',
-        'maximum internal page key size', 'no_aggregate,no_scale'),
+        'maximum internal page key size', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxintlpage',
-        'maximum internal page size', 'no_aggregate,no_scale'),
+        'maximum internal page size', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxleafkey',
-        'maximum leaf page key size', 'no_aggregate,no_scale'),
+        'maximum leaf page key size', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxleafpage',
-        'maximum leaf page size', 'no_aggregate,no_scale'),
+        'maximum leaf page size', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxleafvalue',
-        'maximum leaf page value size', 'no_aggregate,no_scale'),
+        'maximum leaf page value size', 'max_aggregate,no_scale'),
     BtreeStat('btree_overflow', 'overflow pages', 'no_scale'),
     BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale'),
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale'),
@@ -415,8 +412,7 @@ dsrc_stats = [
     LSMStat('bloom_page_read', 'bloom filter pages read into cache'),
     LSMStat('bloom_size', 'total size of bloom filters', 'no_scale'),
     LSMStat('lsm_checkpoint_throttle', 'sleep for LSM checkpoint throttle'),
-    LSMStat('lsm_chunk_count',
-        'chunks in the LSM tree', 'no_aggregate,no_scale'),
+    LSMStat('lsm_chunk_count', 'chunks in the LSM tree', 'no_scale'),
     LSMStat('lsm_generation_max',
         'highest merge generation in the LSM tree', 'max_aggregate,no_scale'),
     LSMStat('lsm_lookup_no_bloom',
