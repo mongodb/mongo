@@ -44,10 +44,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         key = ''
         for i in range(0, self.nentries):
             key += str(i)
-            val = key + key
-            cursor.set_key(key)
-            cursor.set_value(val)
-            cursor.insert()
+            cursor[key] = key + key
         cursor.close()
 
     def check_populate(self, tablename):

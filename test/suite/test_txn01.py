@@ -154,14 +154,10 @@ class test_read_committed_default(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(self.uri, None)
         self.session.begin_transaction()
-        cursor.set_key('key: aaa')
-        cursor.set_value('value: aaa')
-        cursor.insert()
+        cursor['key: aaa'] = 'value: aaa'
         self.session.commit_transaction()
         self.session.begin_transaction()
-        cursor.set_key('key: bbb')
-        cursor.set_value('value: bbb')
-        cursor.insert()
+        cursor['key: bbb'] = 'value: bbb'
 
         s = self.conn.open_session()
         cursor = s.open_cursor(self.uri, None)

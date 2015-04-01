@@ -58,9 +58,7 @@ class test_config05(wttest.WiredTigerTestCase):
         session.create("table:" + self.table_name1, create_args)
         cursor = session.open_cursor('table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
-            cursor.set_key(str(1000000 + i))
-            cursor.set_value('value' + str(i))
-            cursor.insert()
+            cursor[str(1000000 + i)] = 'value' + str(i)
         cursor.close()
 
     def verify_entries(self, session):

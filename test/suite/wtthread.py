@@ -126,9 +126,7 @@ class op_thread(threading.Thread):
                 if op == 'gi': # Group insert a number of tables.
                     sess.begin_transaction()
                     for next_cur in cursors:
-                        next_cur.set_key(key)
-                        next_cur.set_value(value)
-                        next_cur.insert()
+                        next_cur[key] = value
                     sess.commit_transaction()
                 if op == 'gu': # Group update a number of tables.
                     sess.begin_transaction()
@@ -139,9 +137,7 @@ class op_thread(threading.Thread):
                         next_cur.reset()
                     sess.commit_transaction()
                 if op == 'i': # Insert an item
-                    c.set_key(key)
-                    c.set_value(value)
-                    c.insert()
+                    c[key] = value
                 elif op == 'b': # Bounce the session handle.
                     c.close()
                     sess.close()
@@ -159,9 +155,7 @@ class op_thread(threading.Thread):
                         "key_format=" + self.key_fmt + ",value_format=S")
                     try:
                         c2 = sess.open_cursor(self.uris[0] + str(key), None, None)
-                        c2.set_key(key)
-                        c2.set_value(value)
-                        c2.insert()
+                        c2[key] = value
                         c2.close()
                     except wiredtiger.WiredTigerError as e:
                         # These operations can fail, if the drop in another

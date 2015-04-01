@@ -41,9 +41,7 @@ class test_cursor05(wttest.WiredTigerTestCase):
         """ Populate the given number of entries. """
         cursor = self.session.open_cursor('table:main', None, None)
         for i in range(0, count):
-            cursor.set_key(i, 'key' + str(i))
-            cursor.set_value('val' + str(i), i, 'val' + str(i), i)
-            cursor.insert()
+            cursor[(i, 'key' + str(i))] = ('val' + str(i), i, 'val' + str(i), i)
         cursor.close()
 
     def check_iterate_forward(self, cursor, expectcount):

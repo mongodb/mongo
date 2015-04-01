@@ -101,9 +101,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         self.assertCursorHasNoKeyValue(cursor)
 
         for i in range(0, self.nentries):
-            cursor.set_key(self.genkey(i))
-            cursor.set_value(self.genvalue(i))
-            cursor.insert()
+            cursor[self.genkey(i)] = self.genvalue(i)
 
         return cursor
 

@@ -47,9 +47,7 @@ class test_bug006(wttest.WiredTigerTestCase):
         self.session.create(uri, 'value_format=S,key_format=S')
         cursor = self.session.open_cursor(uri, None)
         for i in range(1, 1000):
-            cursor.set_key(key_populate(cursor, i))
-            cursor.set_value(value_populate(cursor, i))
-            cursor.insert()
+            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
 
         # Table operations should fail, the cursor is open.
         self.assertRaises(

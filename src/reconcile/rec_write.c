@@ -499,17 +499,16 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, 1, &next));
+		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, 0, &next));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, 1, &next));
+		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, 0, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_ASSERT(session, session->split_gen != 0);
-	pindex = WT_INTL_INDEX_COPY(next);
+	WT_INTL_INDEX_GET(session, next, pindex);
 	for (i = 0; i < mod->mod_multi_entries; ++i) {
 		WT_ERR(__wt_multi_to_ref(session,
 		    next, &mod->mod_multi[i], &pindex->index[i], NULL));
@@ -2931,8 +2930,11 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 		WT_RET_MSG(session, EINVAL,
 		    "bulk-load is only possible for newly created trees");
 
-	/* Get a reference to the empty leaf page. */
-	pindex = WT_INTL_INDEX_COPY(btree->root.page);
+	/*
+	 * Get a reference to the empty leaf page; we have exclusive access so
+	 * we can take a copy of the page, confident the parent won't split.
+	 */
+	pindex = WT_INTL_INDEX_GET_SAFE(btree->root.page);
 	cbulk->ref = pindex->index[0];
 	cbulk->leaf = cbulk->ref->page;
 
@@ -3598,7 +3600,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_INSERT *ins;
 	WT_ITEM *last;
 	WT_UPDATE *upd;
-	uint64_t n, nrepeat, repeat_count, rle, src_recno;
+	uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
 	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, update_no_copy;
 	const void *data;
@@ -3913,11 +3915,26 @@ compare:		/*
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left
-			 * gaps in the name space.
+			 * gaps in the name space, and these gaps can be huge.
+			 * If we're in a set of deleted records, skip the boring
+			 * part.
 			 */
-			if (src_recno < n)
+			if (src_recno < n) {
 				deleted = 1;
-			else {
+				if (last_deleted) {
+					/*
+					 * The record adjustment is decremented
+					 * by one so we can naturally fall into
+					 * the RLE accounting below, where we
+					 * increment rle by one, then continue
+					 * in the outer loop, where we increment
+					 * src_recno by one.
+					 */
+					skip = (n - src_recno) - 1;
+					rle += skip;
+					src_recno += skip;
+				}
+			} else {
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);

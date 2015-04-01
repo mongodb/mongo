@@ -66,9 +66,7 @@ class test_base03(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
-            cursor.set_key('key' + str(i))
-            cursor.set_value('value' + str(i))
-            cursor.insert()
+            cursor['key' + str(i)] = 'value' + str(i)
 
         i = 0
         cursor.reset()
@@ -89,9 +87,7 @@ class test_base03(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name2, None, None)
         for i in range(0, self.nentries):
-            cursor.set_key('key' + str(i))
-            cursor.set_value(i)
-            cursor.insert()
+            cursor['key' + str(i)] = i
 
         i = 0
         cursor.reset()
@@ -115,9 +111,7 @@ class test_base03(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name3, None, None)
         for i in range(0, self.nentries):
-            cursor.set_key(i)
-            cursor.set_value('value' + str(i))
-            cursor.insert()
+            cursor[i] = 'value' + str(i)
 
         i = 0
         cursor.reset()
@@ -141,9 +135,7 @@ class test_base03(wttest.WiredTigerTestCase):
         self.pr('stepping')
         for i in range(0, self.nentries):
             self.pr('put %d -> %d' % (i, i))
-            cursor.set_key(i)
-            cursor.set_value(i)
-            cursor.insert()
+            cursor[i] = i
 
         i = 0
         cursor.reset()
