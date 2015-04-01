@@ -10,10 +10,11 @@
 #include <intrin.h>
 #define	HAVE_VECTOR_INSTR
 #elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <x86intrin.h>
-#if defined(__SSE2__)
+/*
+ * Don't include <x86intrin.h>, older versions of gcc don't have it.
+ */
+#include <emmintrin.h>
 #define	HAVE_VECTOR_INSTR
-#endif
 #endif
 
 #ifdef	HAVE_VECTOR_INSTR

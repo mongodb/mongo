@@ -563,6 +563,7 @@ instantiation
 intl
 intnum
 intpack
+intrin
 inuse
 io
 ip
