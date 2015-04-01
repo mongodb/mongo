@@ -108,8 +108,6 @@ namespace mongo {
         if (includeLocs)
             result.setField("includeLocs", Value(includeLocs->getPath(false)));
 
-        result.setField("uniqueDocs", Value(uniqueDocs));
-
         return Value(DOC(getSourceName() << result.freeze()));
     }
 
@@ -139,8 +137,6 @@ namespace mongo {
 
         if (includeLocs)
             geoNear.append("includeLocs", true); // String in toBson
-
-        geoNear.append("uniqueDocs", uniqueDocs);
 
         return geoNear.obj();
     }
@@ -208,7 +204,8 @@ namespace mongo {
             includeLocs.reset(new FieldPath(options["includeLocs"].str()));
         }
 
-        uniqueDocs = options["uniqueDocs"].trueValue();
+        if (options.hasField("uniqueDocs"))
+            warning() << "ignoring deprecated uniqueDocs option in $geoNear aggregation stage";
     }
 
     DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext> &pExpCtx)
@@ -218,6 +215,5 @@ namespace mongo {
         , maxDistance(-1.0)
         , spherical(false)
         , distanceMultiplier(1.0)
-        , uniqueDocs(true)
     {}
 }
