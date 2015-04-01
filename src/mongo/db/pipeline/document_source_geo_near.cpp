@@ -26,10 +26,13 @@
  * it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
