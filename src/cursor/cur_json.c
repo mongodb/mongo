@@ -577,9 +577,9 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 }
 
 /*
- * __wt_json_tokname
+ * __wt_json_tokname --
  *	Return a descriptive name from the token type returned by
- *	__wt_json_token
+ *	__wt_json_token.
  */
 const char *
 __wt_json_tokname(int toktype)
