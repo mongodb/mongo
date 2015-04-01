@@ -33,6 +33,7 @@
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_element_iterator.h"
+#include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
@@ -167,13 +168,12 @@ namespace mongo {
 
             while ( it.more() ) {
                 FTSIteratorValue val = it.next();
-                Stemmer stemmer( *val._language );
-                Tools tools( *val._language, &stemmer, StopWords::getStopWords( *val._language ) );
-                _scoreStringV2( tools, val._text, term_freqs, val._weight );
+                std::unique_ptr<FTSTokenizer> tokenizer(val._language->createTokenizer());
+                _scoreStringV2( tokenizer.get(), val._text, term_freqs, val._weight );
             }
         }
 
-        void FTSSpec::_scoreStringV2( const Tools& tools,
+        void FTSSpec::_scoreStringV2( FTSTokenizer* tokenizer,
                                       StringData raw,
                                       TermFrequencyMap* docScores,
                                       double weight ) const {
@@ -182,18 +182,10 @@ namespace mongo {
 
             unsigned numTokens = 0;
 
-            Tokenizer i( tools.language, raw );
-            while ( i.more() ) {
-                Token t = i.next();
-                if ( t.type != Token::TEXT ) {
-                    continue;
-                }
+            tokenizer->reset(raw.rawData(), false );
 
-                string term = tolowerString( t.data );
-                if ( tools.stopwords->isStopWord( term ) ) {
-                    continue;
-                }
-                term = tools.stemmer->stem( term );
+            while (tokenizer->moveNext()) {
+                string term = tokenizer->get().toString();
 
                 ScoreHelperStruct& data = terms[term];
 

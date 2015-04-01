@@ -40,10 +40,10 @@ namespace mongo {
 
         using std::string;
 
-        Stemmer::Stemmer( const FTSLanguage& language ) {
+        Stemmer::Stemmer( const FTSLanguage* language ) {
             _stemmer = NULL;
-            if ( language.str() != "none" )
-                _stemmer = sb_stemmer_new(language.str().c_str(), "UTF_8");
+            if ( language->str() != "none" )
+                _stemmer = sb_stemmer_new(language->str().c_str(), "UTF_8");
         }
 
         Stemmer::~Stemmer() {

@@ -33,6 +33,8 @@
 #include <string>
  
 #include "mongo/base/init.h"
+#include "mongo/db/fts/fts_basic_tokenizer.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
@@ -77,6 +79,10 @@ namespace mongo {
             // Case-sensitive by lookup key.
             typedef std::map<StringData, const FTSLanguage*> LanguageMapV1;
             LanguageMapV1 languageMapV1;
+        }
+
+        std::unique_ptr<FTSTokenizer> BasicFTSLanguage::createTokenizer() const {
+            return stdx::make_unique<BasicFTSTokenizer>(this);
         }
 
         MONGO_INITIALIZER_GROUP( FTSAllLanguagesRegistered, MONGO_NO_PREREQUISITES,

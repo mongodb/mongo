@@ -119,7 +119,7 @@ namespace mongo {
              * Calculate the term scores for 'raw' and update 'term_freqs' with the result.  Parses
              * 'raw' using 'tools', and weights term scores based on 'weight'.
              */
-            void _scoreStringV2( const Tools& tools,
+            void _scoreStringV2( FTSTokenizer* tokenizer,
                                  StringData raw,
                                  TermFrequencyMap* term_freqs,
                                  double weight ) const;
