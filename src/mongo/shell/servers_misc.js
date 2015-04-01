@@ -156,7 +156,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     a.push( "--dbpath" );
     a.push( this.getPath( master ) );
     
-    if( jsTestOptions().noJournal ) a.push( "--nojournal" )
+    if( jsTestOptions().noJournal && !('journal' in extra)) a.push( "--nojournal" )
     if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
     if( jsTestOptions().keyFile ) {
         a.push( "--keyFile" )

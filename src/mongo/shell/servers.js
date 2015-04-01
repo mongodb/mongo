@@ -485,8 +485,8 @@ MongoRunner.mongodOptions = function( opts ){
     
     if( jsTestOptions().noJournalPrealloc || opts.noJournalPrealloc )
         opts.nopreallocj = ""
-            
-    if( jsTestOptions().noJournal || opts.noJournal )
+
+    if( (jsTestOptions().noJournal || opts.noJournal) && !('journal' in opts))
         opts.nojournal = ""
 
     if( jsTestOptions().keyFile && !opts.keyFile) {

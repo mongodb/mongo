@@ -261,9 +261,6 @@ add_option( "opt", "Enable compile-time optimization", "?", True, "opt",
 add_option( "sanitize", "enable selected sanitizers", 1, True, metavar="san1,san2,...sanN" )
 add_option( "llvm-symbolizer", "name of (or path to) the LLVM symbolizer", 1, False, default="llvm-symbolizer" )
 
-add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
-add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
-
 # debugging/profiling help
 if is_running_os('linux'):
     defaultAllocator = 'tcmalloc'
@@ -878,12 +875,6 @@ elif env.TargetOSIs('osx'):
 elif env.TargetOSIs('solaris'):
     env['LINK_LIBGROUP_START'] = '-z rescan'
     env['LINK_LIBGROUP_END'] = ''
-
-if has_option( "durableDefaultOn" ):
-    env.Append( CPPDEFINES=[ "_DURABLEDEFAULTON" ] )
-
-if has_option( "durableDefaultOff" ):
-    env.Append( CPPDEFINES=[ "_DURABLEDEFAULTOFF" ] )
 
 # ---- other build setup -----
 dontReplacePackage = False

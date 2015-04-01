@@ -120,7 +120,7 @@ namespace mongo {
         log() << "warning assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;
         logContext();
         assertionCount.condrollover( ++assertionCount.warning );
-#if defined(MONGO_CONFIG_DEBUG_BUILD) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
         quickExit(EXIT_ABRUPT);
@@ -135,7 +135,7 @@ namespace mongo {
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
         breakpoint();
-#if defined(MONGO_CONFIG_DEBUG_BUILD) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
         quickExit(EXIT_ABRUPT);

@@ -1900,9 +1900,9 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-duroff
     push_arch: x86_64
-    compile_flags: --durableDefaultOff -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/durableDefaultOff"
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/durableDefaultOff"
     has_debugsymbols: true
-    test_flags: --continue-on-failure
+    test_flags: --continue-on-failure --nojournal
   tasks:
   - name: compile
     distros:
