@@ -1510,8 +1510,9 @@ advance:
 		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
 		if (rd_lsn.offset != 0) {
 			if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
-				__wt_errx(session, "\tLOG_DECRYPT: [%d][%lu]",
-				rd_lsn.file, rd_lsn.offset);
+				__wt_errx(session,
+				    "\tLOG_DECRYPT: [%d][%" PRIu64 "]",
+				    rd_lsn.file, rd_lsn.offset);
 				WT_ERR(__log_decrypt(session,
 				    &buf, &decryptitem));
 				swap = buf;
@@ -1805,7 +1806,8 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		ret = __log_direct_write(session, record, &lsn, flags);
 		if (ret == 0 && lsnp != NULL)
 			*lsnp = lsn;
-		__wt_errx(session, "\tLOG_WRITE: wrote at LSN [%d][%lu]",
+		__wt_errx(session,
+		    "\tLOG_WRITE: wrote at LSN [%d][%" PRIu64 "]",
 		    lsn.file, lsn.offset);
 		if (ret == 0)
 			return (0);
@@ -1876,7 +1878,7 @@ err:
 		__wt_spin_unlock(session, &log->log_slot_lock);
 	if (ret == 0 && lsnp != NULL)
 		*lsnp = lsn;
-	__wt_errx(session, "\tLOG_WRITE: wrote at LSN [%d][%lu]",
+	__wt_errx(session, "\tLOG_WRITE: wrote at LSN [%d][%" PRIu64 "]",
 	    lsn.file, lsn.offset);
 	/*
 	 * If we're synchronous and some thread had an error, we don't know
