@@ -25,6 +25,30 @@
 
 command_type: system
 
+## Some variables for convenience:
+variables:
+
+- &packaging_variants
+  - enterprise-rhel-57-64-bit
+  - enterprise-rhel-62-64-bit
+  - enterprise-rhel-70-64-bit
+  - enterprise-suse11-64
+  - enterprise-ubuntu1204-64
+  - enterprise-ubuntu1404-64
+  - enterprise-debian71-64
+  - rhel55
+  - rhel62
+  - rhel70
+  - suse11
+  - ubuntu1204
+  - ubuntu1404
+  - amazon
+  - debian71
+
+#######################################
+#            Functions                #
+#######################################
+
 functions:
   "fetch source" :
     command: git.get_project
@@ -254,6 +278,18 @@ tasks:
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
           mv debugsymbols-*.${ext|tgz} mongo-debugsymbols.tgz || true
 
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          if [ "${has_packages|}" = "true" ] ; then
+            cd buildscripts
+            ${python|python} ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-binaries.tgz -s ${version} -m HEAD
+            cd ..
+          fi
     - command: archive.targz_pack
       params:
         target: "artifacts.tgz"
@@ -274,6 +310,7 @@ tasks:
           - "./**.pdb"
           - "./**.msi"
           - "./etc/*san.suppressions"
+          - "repo/**"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
@@ -1845,7 +1882,23 @@ tasks:
           mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
           /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
 
-          notary-client.py --key-name "${signing_key_name}" --auth-token-file ./signing_auth_token --comment "MCI Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
+          notary-client.py --key-name "${signing_key_name}" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tgz}
+
+          if [ "${has_packages|}" = "true" ] ; then
+            for rpm in $(find repo/ -name \*.rpm) ; do
+              pushd $(dirname $rpm)
+              # Use --package-file-suffix "" to overwrite existing RPM's instead of saving new "-signed.rpm" RPM files
+              #
+              notary-client.py --key-name "${signing_key_name}" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --archive-file-ext gpg --outputs sig --package-file-suffix "" $(basename $rpm)
+              popd
+            done
+            for release_file in $(find repo/ -name Release) ; do
+              pushd $(dirname $release_file)
+              notary-client.py --key-name "${signing_key_name}" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --outputs sig Release
+              popd
+            done
+          fi
+          tar zcvf repo-${push_arch}.tgz repo || true
           rm signing_auth_token
 
     # Put the binaries tarball/zipfile
@@ -2070,11 +2123,29 @@ tasks:
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5
 
+    # Put the tarred up Package repo
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        build_variants: *packaging_variants
+        local_file: src/repo-${push_arch}.tgz
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        remote_file: ${push_path}-STAGE/${push_name}/repo-${push_arch}-${task_id}.tgz
+
     - command: s3Copy.copy
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         s3_copy_files:
+            #Package repo tarballs
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/repo-${push_arch}-${task_id}.tgz', 'bucket': 'build-push-testing'},
+               'destination': {'path': 'packages/repo-${push_arch}-${suffix}.tgz', 'bucket': '${push_bucket}'},
+                build_variants: *packaging_variants
+                 }
+
             #Binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
@@ -2265,11 +2336,6 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32'], }
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          ssh distro-deb2.build.10gen.cc sudo -H -u ubuntu /home/ubuntu/git/kernel-tools/releases/publish_packages/publish_packages.sh v3.0 ${version} ${revision} || true
 
 #######################################
 #               Modules               #
@@ -2540,6 +2606,9 @@ buildvariants:
     compile_flags: --ssl --distmod=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: ubuntu1204
   tasks:
   - name: compile
     distros:
@@ -2616,6 +2685,9 @@ buildvariants:
     compile_flags: --ssl --distmod=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: ubuntu1404
   tasks:
   - name: compile
     distros:
@@ -2693,6 +2765,9 @@ buildvariants:
     compile_flags: --ssl --distmod=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: amazon
   tasks:
   - name: compile
     distros:
@@ -3405,6 +3480,9 @@ buildvariants:
     compile_flags: --ssl --distmod=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: rhel57
   tasks:
   - name: compile
     distros:
@@ -3441,6 +3519,9 @@ buildvariants:
     compile_flags: --ssl --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: rhel62
   tasks:
   - name: compile
     distros:
@@ -3476,6 +3557,9 @@ buildvariants:
     compile_flags: --ssl --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: rhel70
   tasks:
   - name: compile
   - name: audit
@@ -3509,6 +3593,9 @@ buildvariants:
     compile_flags: --ssl --distmod=rhel55 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: rhel55
   tasks:
   - name: compile
     distros:
@@ -3586,6 +3673,9 @@ buildvariants:
     compile_flags: --ssl --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: rhel62
   tasks:
   - name: compile
     distros:
@@ -3663,6 +3753,9 @@ buildvariants:
     compile_flags: --ssl --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: rhel70
   tasks:
   - name: compile
     distros:
@@ -3745,6 +3838,9 @@ buildvariants:
     compile_flags: --ssl --distmod=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: ubuntu1204
   tasks:
   - name: compile
     distros:
@@ -3780,6 +3876,9 @@ buildvariants:
     compile_flags: --ssl --distmod=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: ubuntu1404
   tasks:
   - name: compile
     distros:
@@ -3819,6 +3918,9 @@ buildvariants:
     compile_flags: --ssl --distmod=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: suse11
   tasks:
   - name: compile
     distros:
@@ -3853,6 +3955,9 @@ buildvariants:
     compile_flags: --ssl --distmod=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: suse11
   tasks:
   - name: compile
     distros:
@@ -3982,6 +4087,9 @@ buildvariants:
     compile_flags: --ssl --distmod=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: debian71
   tasks:
   - name: compile
     distros:
@@ -4016,6 +4124,9 @@ buildvariants:
     compile_flags: --ssl --distmod=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
     test_flags: --continue-on-failure
     has_debugsymbols: true
+    has_packages: true
+    packager_script: packager.py
+    packager_distro: debian71
   tasks:
   - name: compile
     distros:
