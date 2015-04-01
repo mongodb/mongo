@@ -88,9 +88,6 @@
 /* Define to 1 if you have the `posix_memalign' function. */
 /* #undef HAVE_POSIX_MEMALIGN */
 
-/* Define to 1 if you have the <pthread_np.h> header file. */
-/* #undef HAVE_PTHREAD_NP_H */
-
 /* Build the LevelDB API with RocksDB support. */
 /* #undef HAVE_ROCKSDB */
 
