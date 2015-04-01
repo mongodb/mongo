@@ -43,6 +43,7 @@ namespace mongo {
     class ConnectionString;
     class DatabaseType;
     class OperationContext;
+    class ShardType;
     class Status;
     template<typename T> class StatusWith;
 
@@ -131,6 +132,12 @@ namespace mongo {
          */
         virtual Status getChunksForShard(const std::string& shardName,
                                          std::vector<ChunkType>* chunks) = 0;
+
+        /**
+         * Retrieves all shards in this sharded cluster.
+         * Returns a !OK status if an error occurs.
+         */
+        virtual Status getAllShards(std::vector<ShardType>* shards) = 0;
 
         /**
          * Logs a diagnostic event locally and on the config server.

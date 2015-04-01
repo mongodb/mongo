@@ -50,7 +50,6 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
-#include "mongo/s/type_shard.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -733,6 +732,26 @@ namespace {
             }
             ChunkType chunk = chunkRes.getValue();
             chunks->push_back(chunk);
+        }
+        conn.done();
+
+        return Status::OK();
+    }
+
+    Status CatalogManagerLegacy::getAllShards(vector<ShardType>* shards) {
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+        boost::scoped_ptr<DBClientCursor> cursor(conn->query(ShardType::ConfigNS, BSONObj()));
+        while (cursor->more()) {
+            BSONObj shardObj = cursor->nextSafe();
+
+            StatusWith<ShardType> shardRes = ShardType::fromBSON(shardObj);
+            if (!shardRes.isOK()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "Failed to parse chunk BSONObj: "
+                                            << shardRes.getStatus().reason());
+            }
+            ShardType shard = shardRes.getValue();
+            shards->push_back(shard);
         }
         conn.done();
 

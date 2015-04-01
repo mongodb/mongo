@@ -32,7 +32,8 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/config.h"
+#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/type_shard.h"
 
 namespace mongo {
@@ -75,18 +76,18 @@ namespace {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            std::vector<BSONObj> all;
-
-            ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-            std::auto_ptr<DBClientCursor> cursor = conn->query(ShardType::ConfigNS, BSONObj());
-            while (cursor->more()) {
-                BSONObj o = cursor->next();
-                all.push_back(o);
+            std::vector<ShardType> shards;
+            Status status = grid.catalogManager()->getAllShards(&shards);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
             }
-
-            result.append("shards", all);
-
-            conn.done();
+            std::vector<BSONObj> shardsObj;
+            for (std::vector<ShardType>::const_iterator it = shards.begin();
+                 it != shards.end();
+                 it++) {
+                shardsObj.push_back(it->toBSON());
+            }
+            result.append("shards", shardsObj);
 
             return true;
         }

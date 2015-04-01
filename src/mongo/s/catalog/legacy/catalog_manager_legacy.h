@@ -69,6 +69,8 @@ namespace mongo {
         virtual Status getChunksForShard(const std::string& shardName,
                                          std::vector<ChunkType>* chunks);
 
+        virtual Status getAllShards(std::vector<ShardType>* shards);
+
         virtual void logChange(OperationContext* txn,
                                const std::string& what,
                                const std::string& ns,
