@@ -1451,8 +1451,8 @@ advance:
 				    &next_lsn, cookie, firstrecord));
 				__wt_scr_free(session, &uncitem);
 			} else
-				WT_ERR((*func)(session, &buf, &rd_lsn, &next_lsn,
-				    cookie, firstrecord));
+				WT_ERR((*func)(session, &buf,
+				    &rd_lsn, &next_lsn, cookie, firstrecord));
 
 			firstrecord = 0;
 
