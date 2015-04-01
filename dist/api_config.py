@@ -209,7 +209,7 @@ def add_subconfig(c):
     tfile.write('''
 static const WT_CONFIG_CHECK confchk_%(name)s_subconfigs[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 ''' % {
     'name' : c.name,
@@ -221,9 +221,9 @@ def getsubconfigstr(c):
     ctype = gettype(c)
     if ctype == 'category':
         add_subconfig(c)
-        return 'confchk_' + c.name + '_subconfigs'
+        return 'confchk_' + c.name + '_subconfigs, ' + str(len(c.subconfig))
     else:
-        return 'NULL'
+        return 'NULL, 0'
 
 # Write structures of arrays of allowable configuration options, including a
 # NULL as a terminator for iteration.
@@ -233,7 +233,7 @@ for name in sorted(api_data.methods.keys()):
         tfile.write('''
 static const WT_CONFIG_CHECK confchk_%(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 ''' % {
     'name' : name.replace('.', '_'),
@@ -270,14 +270,15 @@ for name in sorted(api_data.methods.keys()):
     # Write the checks reference, or NULL if no related checks structure.
     tfile.write('\n\t  ')
     if ctype:
-        tfile.write('confchk_' + name.replace('.', '_'))
+        tfile.write(
+            'confchk_' + name.replace('.', '_') + ', ' + str(len(ctype)))
     else:
-        tfile.write('NULL')
+        tfile.write('NULL, 0')
 
     tfile.write('\n\t},')
 
 # Write a NULL as a terminator for iteration.
-tfile.write('\n\t{ NULL, NULL, NULL }')
+tfile.write('\n\t{ NULL, NULL, NULL, 0 }')
 tfile.write('\n};\n')
 
 # Write the routine that connects the WT_CONNECTION_IMPL structure to the list
