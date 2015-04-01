@@ -275,7 +275,7 @@ namespace repl {
         /**
          * Blocks until the executor finishes running the callback referenced by "cbHandle".
          *
-         * Becaue callbacks all run during shutdown if they weren't run beforehand, there is no need
+         * Because callbacks all run during shutdown if they weren't run beforehand, there is no need
          * to indicate the reason for returning from wait(CallbackHandle).  It is always that the
          * callback ran.
          *
