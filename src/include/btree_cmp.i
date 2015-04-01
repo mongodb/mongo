@@ -29,9 +29,6 @@ static inline int
 __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	size_t len, usz, tsz;
-#ifdef HAVE_X86INTRIN_H
-	size_t remain;
-#endif
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
@@ -44,6 +41,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 #ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
 	if (len >= WT_VECTOR_SIZE * 2) {
+		size_t remain;
 		__m128i res_eq, u, t;
 
 		remain = len % WT_VECTOR_SIZE;
@@ -117,9 +115,6 @@ __wt_lex_compare_skip(
     const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
 {
 	size_t len, usz, tsz;
-#ifdef HAVE_X86INTRIN_H
-	size_t remain;
-#endif
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
@@ -132,6 +127,7 @@ __wt_lex_compare_skip(
 #ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
 	if (len >= WT_VECTOR_SIZE * 2) {
+		size_t remain;
 		__m128i res_eq, u, t;
 
 		remain = len % WT_VECTOR_SIZE;
