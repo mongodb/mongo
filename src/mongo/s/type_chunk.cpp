@@ -57,10 +57,6 @@ namespace mongo {
         clear();
     }
 
-    ChunkType::ChunkType(const ChunkType& chunk) {
-        chunk.cloneTo(this);
-    }
-
     ChunkType::~ChunkType() {
     }
 

@@ -79,7 +79,6 @@ namespace mongo {
         static const BSONField<OID> DEPRECATED_epoch;
 
         ChunkType();
-        ChunkType(const ChunkType& chunk);
         ~ChunkType();
 
         /**
@@ -114,31 +113,31 @@ namespace mongo {
          */
         std::string toString() const;
 
-        const bool isNameSet() const { return _name.is_initialized(); }
+        bool isNameSet() const { return _name.is_initialized(); }
         const std::string& getName() const { return _name.get(); }
         void setName(const std::string& name);
 
-        const bool isNSSet() const { return _ns.is_initialized(); }
+        bool isNSSet() const { return _ns.is_initialized(); }
         const std::string& getNS() const { return _ns.get(); }
         void setNS(const std::string& name);
 
-        const bool isMinSet() const { return _min.is_initialized(); }
+        bool isMinSet() const { return _min.is_initialized(); }
         const BSONObj& getMin() const { return _min.get(); }
         void setMin(const BSONObj& min);
 
-        const bool isMaxSet() const { return _max.is_initialized(); }
+        bool isMaxSet() const { return _max.is_initialized(); }
         const BSONObj& getMax() const { return _max.get(); }
         void setMax(const BSONObj& max);
 
-        const bool isVersionSet() const { return _version.is_initialized(); }
+        bool isVersionSet() const { return _version.is_initialized(); }
         const ChunkVersion& getVersion() const { return _version.get(); }
         void setVersion(const ChunkVersion& version);
 
-        const bool isShardSet() const { return _shard.is_initialized(); }
+        bool isShardSet() const { return _shard.is_initialized(); }
         const std::string& getShard() const { return _shard.get(); }
         void setShard(const std::string& shard);
 
-        const bool isJumboSet() const { return _jumbo.is_initialized(); }
+        bool isJumboSet() const { return _jumbo.is_initialized(); }
         const bool getJumbo() const { return _jumbo.get(); }
         void setJumbo(const bool);
 

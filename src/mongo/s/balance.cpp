@@ -420,7 +420,8 @@ namespace mongo {
                             << ": " << chunkRes.getStatus().reason();
                     return;
                 }
-                auto_ptr<ChunkType> chunk(new ChunkType(chunkRes.getValue()));
+                auto_ptr<ChunkType> chunk(new ChunkType());
+                chunkRes.getValue().cloneTo(chunk.get());
 
                 allChunkMinimums.insert(chunk->getMin().getOwned());
                 OwnedPointerVector<ChunkType>*& chunkList =
