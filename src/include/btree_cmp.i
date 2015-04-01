@@ -28,7 +28,10 @@
 static inline int
 __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
-	size_t len, remain, usz, tsz;
+	size_t len, usz, tsz;
+#ifdef HAVE_X86INTRIN_H
+	size_t remain;
+#endif
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
@@ -113,7 +116,10 @@ static inline int
 __wt_lex_compare_skip(
     const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
 {
-	size_t len, remain, usz, tsz;
+	size_t len, usz, tsz;
+#ifdef HAVE_X86INTRIN_H
+	size_t remain;
+#endif
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
