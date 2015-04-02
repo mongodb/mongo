@@ -42,15 +42,14 @@
 
 #include <wiredtiger.h>
 
-#define MIN(a, b)		(((a) < (b)) ? (a) : (b))
-
 static const char *home = NULL;
 
 /*! [encryption example callback implementation] */
 typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
 	uint32_t num_calls;	/* Count of calls */
-	char password[64];
+	char *password;		/* Saved password */
+	char *uri;		/* Saved uri */
 } EX_ENCRYPTOR;
 
 #define	CHKSUM_LEN	4
@@ -226,7 +225,6 @@ rot13_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
 {
 	EX_ENCRYPTOR *ex_encryptor;
-	size_t len;
 
 	(void)session;				/* Unused parameters */
 	(void)uri;				/* Unused parameters */
@@ -237,9 +235,12 @@ rot13_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	ex_encryptor->encryptor = *encryptor;
 
 	/* Stash the password from the configuration string. */
-	len = MIN(sizeof(ex_encryptor->password) - 1, passcfg->len);
-	strncpy(ex_encryptor->password, passcfg->str, len);
-	ex_encryptor->password[len] = '\0';
+	if ((ex_encryptor->password = malloc(passcfg->len + 1)) == NULL ||
+	    (ex_encryptor->uri = malloc(strlen(uri) + 1)) == NULL)
+		return (errno);
+	strncpy(ex_encryptor->password, passcfg->str, passcfg->len + 1);
+	ex_encryptor->password[passcfg->len] = '\0';
+	strncpy(ex_encryptor->uri, uri, strlen(uri) + 1);
 
 	++ex_encryptor->num_calls;		/* Call count */
 
@@ -261,7 +262,9 @@ rot13_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 	++ex_encryptor->num_calls;		/* Call count */
 
 	/* Free the allocated memory. */
-	free(encryptor);
+	free(ex_encryptor->password);
+	free(ex_encryptor->uri);
+	free(ex_encryptor);
 
 	return (0);
 }
@@ -393,7 +396,6 @@ not_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
 {
 	EX_ENCRYPTOR *ex_encryptor;
-	size_t len;
 
 	(void)session;				/* Unused parameters */
 	(void)uri;				/* Unused parameters */
@@ -404,9 +406,11 @@ not_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	ex_encryptor->encryptor = *encryptor;
 
 	/* Stash the password from the configuration string. */
-	len = MIN(sizeof(ex_encryptor->password) - 1, passcfg->len);
-	strncpy(ex_encryptor->password, passcfg->str, len);
-	ex_encryptor->password[len] = '\0';
+	if ((ex_encryptor->password = malloc(passcfg->len + 1)) == NULL ||
+	    (ex_encryptor->uri = malloc(strlen(uri) + 1)) == NULL)
+		return (errno);
+	strncpy(ex_encryptor->password, passcfg->str, passcfg->len + 1);
+	strncpy(ex_encryptor->uri, uri, strlen(uri) + 1);
 
 	++ex_encryptor->num_calls;		/* Call count */
 
@@ -443,10 +447,10 @@ add_my_encryptors(WT_CONNECTION *connection)
 	WT_ENCRYPTOR *not_encryptor, *rot13_encryptor;
 	int ret;
 
-	if ((not_encryptor = calloc(1, sizeof(WT_ENCRYPTOR))) == NULL)
+	if ((not_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
 		return (errno);
 
-	if ((rot13_encryptor = calloc(1, sizeof(WT_ENCRYPTOR))) == NULL)
+	if ((rot13_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
 		return (errno);
 
 	/*
