@@ -556,8 +556,6 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	uint64_t v;
 	const uint8_t *p;
 
-	copy.len = 0;
-
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
 	 * the end-of-page.  In that case, make sure we don't go past the end
@@ -596,20 +594,25 @@ restart:
 		unpack->data = cell->__chunk + 2;
 		unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
 		unpack->__len = 2 + unpack->size;
-		goto done;
+		WT_CELL_LEN_CHK(cell, unpack->__len);
+		return (0);
 	case WT_CELL_KEY_SHORT:
 	case WT_CELL_VALUE_SHORT:
 		unpack->prefix = 0;
 		unpack->data = cell->__chunk + 1;
 		unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
 		unpack->__len = 1 + unpack->size;
-		goto done;
+		WT_CELL_LEN_CHK(cell, unpack->__len);
+		return (0);
 	}
 
 	unpack->prefix = 0;
 	unpack->data = NULL;
 	unpack->size = 0;
 	unpack->__len = 0;
+
+	copy.len = 0;
+	copy.v = 0;
 
 	p = (uint8_t *)cell + 1;			/* skip cell */
 
@@ -698,13 +701,12 @@ restart:
 	 * diagnostic as well, we may be copying the cell from the page and
 	 * we need the right length).
 	 */
-done:	WT_CELL_LEN_CHK(cell, unpack->__len);
+	WT_CELL_LEN_CHK(cell, unpack->__len);
 	if (copy.len != 0) {
 		unpack->raw = WT_CELL_VALUE_COPY;
 		unpack->__len = copy.len;
 		unpack->v = copy.v;
 	}
-
 	return (0);
 }
 
