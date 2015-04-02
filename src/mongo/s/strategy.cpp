@@ -343,77 +343,36 @@ namespace mongo {
             return false;
         ns += 10;
 
-        BSONObjBuilder b;
-        vector<Shard> shards;
+        BSONObjBuilder reply;
 
-        ClientBasic* client = ClientBasic::getCurrent();
-        AuthorizationSession* authSession = client->getAuthorizationSession();
-        if ( strcmp( ns , "inprog" ) == 0 ) {
-            const bool isAuthorized = authSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::inprog);
-            audit::logInProgAuthzCheck(
-                    client, q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
-            uassert(ErrorCodes::Unauthorized, "not authorized to run inprog", isAuthorized);
-
-            Shard::getAllShards( shards );
-
-            BSONArrayBuilder arr( b.subarrayStart( "inprog" ) );
-
-            for ( unsigned i=0; i<shards.size(); i++ ) {
-                Shard shard = shards[i];
-                ScopedDbConnection conn(shard.getConnString());
-                BSONObj temp = conn->findOne( r.getns() , q.query );
-                if ( temp["inprog"].isABSONObj() ) {
-                    BSONObjIterator i( temp["inprog"].Obj() );
-                    while ( i.more() ) {
-                        BSONObjBuilder x;
-
-                        BSONObjIterator j( i.next().Obj() );
-                        while( j.more() ) {
-                            BSONElement e = j.next();
-                            if ( str::equals( e.fieldName() , "opid" ) ) {
-                                stringstream ss;
-                                ss << shard.getName() << ':' << e.numberInt();
-                                x.append( "opid" , ss.str() );
-                            }
-                            else if ( str::equals( e.fieldName() , "client" ) ) {
-                                x.appendAs( e , "client_s" );
-                            }
-                            else {
-                                x.append( e );
-                            }
-                        }
-                        arr.append( x.obj() );
-                    }
-                }
-                conn.done();
-            }
-
-            arr.done();
-        }
-        else if ( strcmp( ns , "killop" ) == 0 ) {
+        const auto upgradeToRealCommand = [&r, &q, &reply](StringData commandName) {
             BSONObjBuilder cmdBob;
-            cmdBob.append("killOp", 1);
-            cmdBob.appendElements(q.query); // fields are validated by ClusterKillOpCommand
+            cmdBob.append(commandName, 1);
+            cmdBob.appendElements(q.query); // fields are validated by Commands
             auto interposedCmd = cmdBob.done();
-
             NamespaceString nss(r.getns());
             NamespaceString interposedNss(nss.db(), "$cmd");
-
             Command::runAgainstRegistered(interposedNss.ns().c_str(),
                                           interposedCmd,
-                                          b,
+                                          reply,
                                           q.queryOptions);
+        };
+
+        if ( strcmp( ns , "inprog" ) == 0 ) {
+            upgradeToRealCommand("currentOp");
+        }
+        else if ( strcmp( ns , "killop" ) == 0 ) {
+            upgradeToRealCommand("killOp");
         }
         else if ( strcmp( ns , "unlock" ) == 0 ) {
-            b.append( "err" , "can't do unlock through mongos" );
+            reply.append( "err" , "can't do unlock through mongos" );
         }
         else {
             warning() << "unknown sys command [" << ns << "]" << endl;
             return false;
         }
 
-        BSONObj x = b.done();
+        BSONObj x = reply.done();
         replyToQuery(0, r.p(), r.m(), x);
         return true;
     }

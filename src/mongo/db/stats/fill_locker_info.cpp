@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,30 +26,37 @@
  *    it in the license file.
  */
 
-#pragma once
-
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/stats/fill_locker_info.h"
 
 namespace mongo {
 
-    class BSONObjBuilder;
-    struct DbResponse;
-    class Message;
-    class NamespaceString;
-    class OperationContext;
+    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder) {
+        // "locks" section
+        BSONObjBuilder locks(infoBuilder.subobjStart("locks"));
+        for (size_t i = 0; i < lockerInfo.locks.size(); i++) {
+            const Locker::OneLock& lock = lockerInfo.locks[i];
 
-    /**
-     * Executes the db.currentOp() command. Currently not an actual "command" object, but should
-     * be converted to one at some point.
-     */
-    void inProgCmd(OperationContext* txn,
-                   const NamespaceString& nss,
-                   Message &m,
-                   DbResponse &dbresponse);
+            if (resourceIdLocalDB == lock.resourceId) {
+                locks.append("local", legacyModeName(lock.mode));
+            }
+            else {
+                locks.append(resourceTypeName(lock.resourceId.getType()),
+                             legacyModeName(lock.mode));
+            }
+        }
+        locks.done();
 
-    /**
-     * Constructs a human-readable BSON from the specified LockerInfo structure.
-     */
-    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder);
+        // "waitingForLock" section
+        infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
 
-} // namespace mongo
+        // "lockStats" section
+        {
+            BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
+            lockerInfo.stats.report(&lockStats);
+            lockStats.done();
+        }
+    }
+
+}  // namespace mongo

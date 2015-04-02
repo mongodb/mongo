@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,49 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/util/net/get_status_from_command_result.h"
-
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/concurrency/locker.h"
 
 namespace mongo {
 
-    Status getStatusFromCommandResult(const BSONObj& result) {
-        BSONElement okElement = result["ok"];
-        BSONElement codeElement = result["code"];
-        BSONElement errmsgElement = result["errmsg"];
-        if (okElement.eoo()) {
-            return Status(ErrorCodes::CommandResultSchemaViolation,
-                          mongoutils::str::stream() << "No \"ok\" field in command result " <<
-                          result);
-        }
-        if (okElement.trueValue()) {
-            return Status::OK();
-        }
-        int code = codeElement.numberInt();
-        if (0 == code) {
-            code = ErrorCodes::UnknownError;
-        }
-        std::string errmsg;
-        if (errmsgElement.type() == String) {
-            errmsg = errmsgElement.String();
-        }
-        else if (!errmsgElement.eoo()) {
-            errmsg = errmsgElement.toString();
-        }
-
-        // we can't use startsWith(errmsg, "no such")
-        // as we have errors such as "no such collection"
-        if (code == ErrorCodes::UnknownError &&
-            (str::startsWith(errmsg, "no such cmd") ||
-             str::startsWith(errmsg, "no such command"))) {
-            code = ErrorCodes::CommandNotFound;
-        }
-
-        return Status(ErrorCodes::Error(code), errmsg);
-    }
+    /**
+     * Constructs a human-readable BSON from the specified LockerInfo structure.
+     */
+    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder);
 
 }  // namespace mongo

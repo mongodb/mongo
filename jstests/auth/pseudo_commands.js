@@ -74,7 +74,7 @@ function runTest(conn) {
              var passed = true;
              try {
                  var res = db.currentOp();
-                 passed = !res.err && !res['$err'];
+                 passed = res.ok && !res.hasOwnProperty("errmsg");
              } catch (e) {
                  passed = false;
              }

@@ -503,9 +503,7 @@ namespace mongo {
                                                  << realCommandName
                                                  << " response from server: "
                                                  << info);
-            } else if (status == ErrorCodes::CommandNotFound ||
-                       str::startsWith(status.reason(), "no such")) {
-
+            } else if (status == ErrorCodes::CommandNotFound) {
                 NamespaceString pseudoCommandNss(db, pseudoCommandCol);
                 // if this throws we just let it escape as that's how runCommand works.
                 info = findOne(pseudoCommandNss.ns(), cmdArgs, nullptr, options);

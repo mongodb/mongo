@@ -316,9 +316,12 @@ namespace mongo {
                 }
                 
                 const set<string>& uris = i->second;
-                
-                BSONObj inprog = conn->findOne( "admin.$cmd.sys.inprog", Query() )[ "inprog" ]
-                        .embeddedObject().getOwned();
+
+                BSONObj currentOpRes;
+                conn->runPseudoCommand("admin",
+                                       "currentOp",
+                                       "$cmd.sys.inprog", {}, currentOpRes);
+                auto inprog = currentOpRes["inprog"].embeddedObject();
                 BSONForEach( op, inprog ) {
                     if ( uris.count( op[ "client" ].String() ) ) {
                         if ( !withPrompt || prompter.confirm() ) {

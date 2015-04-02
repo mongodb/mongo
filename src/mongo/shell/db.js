@@ -683,7 +683,14 @@ DB.prototype.toString = function(){
 
 DB.prototype.isMaster = function () { return this.runCommand("isMaster"); }
 
-DB.prototype.currentOp = function( arg ){
+var commandUnsupported = function(res) {
+    return (!res.ok &&
+            (res.errmsg.startsWith("no such cmd") ||
+             res.errmsg.startsWith("no such command") ||
+             res.code === 59 /* CommandNotFound */))
+};
+
+DB.prototype.currentOp = function(arg) {
     var q = {}
     if ( arg ) {
         if ( typeof( arg ) == "object" )
@@ -692,17 +699,20 @@ DB.prototype.currentOp = function( arg ){
             q["$all"] = true;
     }
 
-    // always send currentOp with default (null) read preference (SERVER-17951)
-    var _readPref = this.getMongo().getReadPrefMode();
-
-    try { 
-        this.getMongo().setReadPref(null);
-        var results = this.$cmd.sys.inprog.findOne( q );
-    } finally { 
-        this.getMongo().setReadPref(_readPref);
+    var commandObj = {"currentOp": 1};
+    Object.extend(commandObj, q);
+    var res = this.adminCommand(commandObj);
+    if (commandUnsupported(res)) {
+        // always send legacy currentOp with default (null) read preference (SERVER-17951)
+        var _readPref = this.getMongo().getReadPrefMode();
+        try {
+            this.getMongo().setReadPref(null);
+            res = this.getSiblingDB("admin").$cmd.sys.inprog.findOne( q );
+        } finally {
+            this.getMongo().setReadPref(_readPref);
+        }
     }
-
-    return results 
+    return res;
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
@@ -710,17 +720,12 @@ DB.prototype.killOp = function(op) {
     if( !op ) 
         throw Error("no opNum to kill specified");
     var res = this.adminCommand({'killOp': 1, 'op': op});
-    if (!res.ok &&
-        (res.errmsg.startsWith("no such cmd") ||
-         res.errmsg.startsWith("no such command")) ||
-         res.code === 59) {
-
+    if (commandUnsupported(res)) {
         // fall back for old servers
         var _readPref = this.getMongo().getReadPrefMode();
-
         try {
             this.getMongo().setReadPref(null);
-            res = this.$cmd.sys.killop.findOne({'op': op});
+            res = this.getSiblingDB("admin").$cmd.sys.killop.findOne({'op': op});
         } finally {
             this.getMongo().setReadPref(_readPref);
         }
@@ -1006,13 +1011,7 @@ DB.prototype.fsyncLock = function() {
 
 DB.prototype.fsyncUnlock = function() {
     var res = this.adminCommand({fsyncUnlock: 1});
-    if (!res.ok &&
-        // handle both error messages for nonexistent command...
-        (res.errmsg.startsWith("no such cmd") ||
-         res.errmsg.startsWith("no such command") ||
-         res.code === 59)) {
-        // fallback for old servers
-
+    if (commandUnsupported(res)) {
         var _readPref = this.getMongo().getReadPrefMode();
         try {
             this.getMongo().setReadPref(null);

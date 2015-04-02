@@ -50,7 +50,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/currentop_command.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -391,11 +390,19 @@ namespace {
                 isCommand = true;
                 opwrite(m);
             }
+            // TODO: remove this entire code path after 3.2. Refs SERVER-7775
             else if (nsString.isSpecialCommand()) {
                 opwrite(m);
 
                 if (nsString.coll() == "$cmd.sys.inprog") {
-                    inProgCmd(txn, nsString, m, dbresponse);
+                    // HACK:
+                    // legacy inprog could run on any database. The currentOp command
+                    // can only run on 'admin'. To avoid breaking old shells and a multitude
+                    // of third-party tools, we rewrite the namespace. As auth is checked
+                    // later in Command::_checkAuthorizationImpl, we will still properly
+                    // reject the request if the client is not authorized.
+                    NamespaceString adminKludge("admin", nsString.coll());
+                    receivedPseudoCommand(txn, adminKludge, c, dbresponse, m, "currentOp");
                     return;
                 }
                 if (nsString.coll() == "$cmd.sys.killop") {

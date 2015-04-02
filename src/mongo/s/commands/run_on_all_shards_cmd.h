@@ -27,8 +27,10 @@
 */
 
 #include <string>
+#include <tuple>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {
@@ -59,7 +61,11 @@ namespace mongo {
         bool adminOnly() const override { return false; }
         bool isWriteCommandForConfigServer() const override { return false; }
 
-        virtual void aggregateResults(const std::vector<BSONObj>& results,
+        // The StringData contains the shard ident.
+        // This can be used to create an instance of Shard
+        using ShardAndReply = std::tuple<StringData, BSONObj>;
+
+        virtual void aggregateResults(const std::vector<ShardAndReply>& results,
                                       BSONObjBuilder& output);
 
         // The default implementation is the identity function.

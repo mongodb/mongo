@@ -294,9 +294,7 @@ function runTest(s) {
     assert.commandWorked(readOnlyDB.runCommand({count : "foo"}));
 
     print("make sure currentOp/killOp fail");
-    assert.throws(function() {
-        printjson(readOnlyDB.currentOp());
-    });
+    assert.commandFailed(readOnlyDB.currentOp());
     assert.commandFailed(readOnlyDB.killOp(123));
     // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
     /*
@@ -313,9 +311,7 @@ function runTest(s) {
     assert.commandWorked(readOnlyDB.runCommand({logout : 1}));
 
     print("make sure currentOp/killOp fail again");
-    assert.throws(function() {
-        printjson(readOnlyDB.currentOp());
-    });
+    assert.commandFailed(readOnlyDB.currentOp());
     assert.commandFailed(readOnlyDB.killOp(123));
     // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
 }

@@ -32,6 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <tuple>
+
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -422,9 +424,12 @@ namespace {
                 actions.addAction(ActionType::validate);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
-            virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
-                for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it!=end; it++){
-                    const BSONObj& result = *it;
+            virtual void aggregateResults(const vector<ShardAndReply>& results,
+                                          BSONObjBuilder& output) {
+
+                for (vector<ShardAndReply>::const_iterator it(results.begin()), end(results.end());
+                     it!=end; it++) {
+                    const BSONObj& result = std::get<1>(*it);
                     const BSONElement valid = result["valid"];
                     if (!valid.eoo()){
                         if (!valid.trueValue()) {
@@ -469,7 +474,8 @@ namespace {
                 out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
             }
 
-            virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
+            virtual void aggregateResults(const vector<ShardAndReply>& results,
+                                          BSONObjBuilder& output) {
                 long long objects = 0;
                 long long unscaledDataSize = 0;
                 long long dataSize = 0;
@@ -482,8 +488,9 @@ namespace {
                 long long freeListNum = 0;
                 long long freeListSize = 0;
 
-                for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it != end; ++it) {
-                    const BSONObj& b = *it;
+                for (vector<ShardAndReply>::const_iterator it(results.begin()), end(results.end());
+                     it != end; ++it) {
+                    const BSONObj& b = std::get<1>(*it);
                     objects     += b["objects"].numberLong();
                     unscaledDataSize    += b["avgObjSize"].numberLong() * b["objects"].numberLong();
                     dataSize    += b["dataSize"].numberLong();

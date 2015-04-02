@@ -158,9 +158,10 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('currentOp'), function() {
+        var errorCodeUnauthorized = 13;
         var res = db.currentOp();
 
-        if (res.err == 'unauthorized') {
+        if (res.code == errorCodeUnauthorized) {
             throw Error("unauthorized currentOp");
         }
     });

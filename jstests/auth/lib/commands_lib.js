@@ -752,6 +752,21 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "currentOp",
+            command: {currentOp: 1, $all: true},
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_monitoring,
+                    privileges: [
+                       { resource: {cluster: true}, actions: ["inprog"] }
+                    ]
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+           ]
+        },
+        {
             testname: "currentOpCtx",
             command: {currentOpCtx: 1},
             skipSharded: true,
