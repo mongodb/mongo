@@ -32,7 +32,7 @@ __wt_spin_lock_register_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
 	for (i = 0; i < WT_SPINLOCK_MAX; i++)
 		if (conn->spinlock_list[i] == NULL &&
-		    WT_ATOMIC_CAS(conn->spinlock_list[i], NULL, t))
+		    WT_ATOMIC_CAS8(conn->spinlock_list[i], NULL, t))
 			return (0);
 
 	WT_RET_MSG(session, ENOMEM,
@@ -76,7 +76,8 @@ __wt_spin_lock_unregister_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static int
 __spin_lock_next_id(WT_SESSION_IMPL *session, int *idp)
 {
-	static int lock_id = 0, next_id = 0;
+	static uint64_t lock_id = 0;
+	static int next_id = 0;
 	WT_DECL_RET;
 
 	/* If we've ever registered this location, we already have an ID. */
@@ -89,7 +90,7 @@ __spin_lock_next_id(WT_SESSION_IMPL *session, int *idp)
 	 * This work only gets done once per library instantiation, there
 	 * isn't a performance concern.
 	 */
-	while (!WT_ATOMIC_CAS(lock_id, 0, 1))
+	while (!WT_ATOMIC_CAS8(lock_id, 0, 1))
 		__wt_yield();
 
 	/* Allocate a blocking ID for this location. */
@@ -194,7 +195,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			continue;
 		}
 
-		WT_RET(__wt_fprintf(session, conn->stat_fp,
+		WT_RET(__wt_fprintf(conn->stat_fp,
 		    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
 		    conn->stat_stamp,
 		    spin->counter <= ignore ? 0 : spin->counter,
@@ -202,12 +203,12 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
 			spin->counter = 0;
 	}
-	WT_RET(__wt_fprintf(session, conn->stat_fp,
+	WT_RET(__wt_fprintf(conn->stat_fp,
 	    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
 	    conn->stat_stamp,
 	    block_manager <= ignore ? 0 : block_manager,
 	    tag, "block manager"));
-	WT_RET(__wt_fprintf(session, conn->stat_fp,
+	WT_RET(__wt_fprintf(conn->stat_fp,
 	    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
 	    conn->stat_stamp,
 	    btree_page <= ignore ? 0 : btree_page,
@@ -222,7 +223,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 		if (p->name == NULL)
 			continue;
 
-		WT_RET(__wt_fprintf(session, conn->stat_fp,
+		WT_RET(__wt_fprintf(conn->stat_fp,
 		    "%s %d %s spinlock %s acquired by %s(%d)\n",
 		    conn->stat_stamp,
 		    p->total <= ignore ? 0 : p->total,
@@ -236,7 +237,7 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 			if (t->name == NULL)
 				continue;
 
-			WT_RET(__wt_fprintf(session, conn->stat_fp,
+			WT_RET(__wt_fprintf(conn->stat_fp,
 			    "%s %d %s spinlock %s: %s(%d) blocked by %s(%d)\n",
 			    conn->stat_stamp,
 			    p->blocked[j] <= ignore ? 0 : p->blocked[j],

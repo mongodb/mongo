@@ -248,7 +248,7 @@ __backup_start(
 		 * Close any hot backup file.
 		 * We're about to open the incremental backup file.
 		 */
-		WT_TRET(__wt_fclose(session, &cb->bfp, WT_FHANDLE_WRITE));
+		WT_TRET(__wt_fclose(&cb->bfp, WT_FHANDLE_WRITE));
 		WT_ERR(__backup_file_create(session, cb, log_only));
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_INCREMENTAL_BACKUP));
@@ -266,7 +266,7 @@ __backup_start(
 	}
 
 err:	/* Close the hot backup file. */
-	WT_TRET(__wt_fclose(session, &cb->bfp, WT_FHANDLE_WRITE));
+	WT_TRET(__wt_fclose(&cb->bfp, WT_FHANDLE_WRITE));
 	if (ret != 0) {
 		WT_TRET(__backup_cleanup_handles(session, cb));
 		WT_TRET(__backup_stop(session));
@@ -347,7 +347,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_ERR(cursor->get_key(cursor, &key));
 		WT_ERR(cursor->get_value(cursor, &value));
-		WT_ERR(__wt_fprintf(session, cb->bfp, "%s\n%s\n", key, value));
+		WT_ERR(__wt_fprintf(cb->bfp, "%s\n%s\n", key, value));
 
 		/*
 		 * While reading the metadata file, check there are no "sources"
@@ -495,7 +495,7 @@ __wt_backup_list_uri_append(
 
 	/* Add the metadata entry to the backup file. */
 	WT_RET(__wt_metadata_search(session, name, &value));
-	WT_RET(__wt_fprintf(session, cb->bfp, "%s\n%s\n", name, value));
+	WT_RET(__wt_fprintf(cb->bfp, "%s\n%s\n", name, value));
 	__wt_free(session, value);
 
 	/* Add file type objects to the list of files to be copied. */

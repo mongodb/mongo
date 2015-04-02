@@ -59,13 +59,9 @@ __wt_fopen(WT_SESSION_IMPL *session,
  *	Vfprintf for a FILE handle.
  */
 int
-__wt_vfprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, va_list ap)
+__wt_vfprintf(FILE *fp, const char *fmt, va_list ap)
 {
-	WT_DECL_RET;
-
-	WT_UNUSED(session);
-
-	return (vfprintf(fp, fmt, ap) < 0 ? __wt_errno() : ret);
+	return (vfprintf(fp, fmt, ap) < 0 ? __wt_errno() : 0);
 }
 
 /*
@@ -73,14 +69,14 @@ __wt_vfprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, va_list ap)
  *	Fprintf for a FILE handle.
  */
 int
-__wt_fprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+__wt_fprintf(FILE *fp, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
 	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	ret = __wt_vfprintf(session, fp, fmt, ap);
+	ret = __wt_vfprintf(fp, fmt, ap);
 	va_end(ap);
 
 	return (ret);
@@ -91,10 +87,8 @@ __wt_fprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, ...)
  *	Flush a FILE handle.
  */
 int
-__wt_fflush(WT_SESSION_IMPL *session, FILE *fp)
+__wt_fflush(FILE *fp)
 {
-	WT_UNUSED(session);
-
 	/* Flush the handle. */
 	return (fflush(fp) == 0 ? 0 : __wt_errno());
 }
@@ -104,7 +98,7 @@ __wt_fflush(WT_SESSION_IMPL *session, FILE *fp)
  *	Close a FILE handle.
  */
 int
-__wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, WT_FHANDLE_MODE mode_flag)
+__wt_fclose(FILE **fpp, WT_FHANDLE_MODE mode_flag)
 {
 	FILE *fp;
 	WT_DECL_RET;
@@ -120,7 +114,7 @@ __wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, WT_FHANDLE_MODE mode_flag)
 	 * OS buffers, then flush the OS buffers to the backing disk.
 	 */
 	if (mode_flag == WT_FHANDLE_APPEND || mode_flag == WT_FHANDLE_WRITE) {
-		ret = __wt_fflush(session, fp);
+		ret = __wt_fflush(fp);
 		if (fsync(fileno(fp)) != 0)
 			WT_TRET(__wt_errno());
 	}
