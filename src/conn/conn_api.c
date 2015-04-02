@@ -564,8 +564,8 @@ __wt_conn_remove_data_source(WT_SESSION_IMPL *session)
  *	Validate the encryptor.
  */
 static int
-__encryptor_confchk(
-    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_ENCRYPTOR **encryptorp)
+__encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
+    WT_ENCRYPTOR **encryptorp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_ENCRYPTOR *nenc;
@@ -602,10 +602,33 @@ __wt_encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
  *	Given a configuration, configure the encryptor.
  */
 int
-__wt_encryptor_config(
-    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_ENCRYPTOR **encryptorp)
+__wt_encryptor_config(WT_SESSION_IMPL *session, const char *uri,
+    WT_CONFIG_ITEM *cval, WT_CONFIG_ITEM *passval, WT_ENCRYPTOR **encryptorp,
+    int *ownp)
 {
-	return (__encryptor_confchk(session, cval, encryptorp));
+	WT_ENCRYPTOR *encryptor;
+
+	*ownp = 0;
+
+	WT_RET(__encryptor_confchk(session, cval, &encryptor));
+	if (encryptor == NULL) {
+		if (passval->len != 0)
+			WT_RET_MSG(session, EINVAL, "log.encryption_password "
+			    "requires log.encryption_algorithm to be set");
+		return (0);
+	}
+
+	if (encryptor->customize != NULL) {
+		WT_RET(encryptor->customize(encryptor, &session->iface,
+		    uri, passval, encryptorp));
+	}
+
+	if (*encryptorp == NULL)
+		*encryptorp = encryptor;
+	else
+		*ownp = 1;
+
+	return (0);
 }
 
 /*

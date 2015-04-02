@@ -171,6 +171,14 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	}
 	btree->collator = NULL;
 
+	if (btree->encryptor_owned) {
+		if (btree->encryptor->terminate != NULL)
+			WT_TRET(btree->encryptor->terminate(
+			    btree->encryptor, &session->iface));
+		btree->encryptor_owned = 0;
+	}
+	btree->encryptor = NULL;
+
 	btree->bulk_load_ok = 0;
 
 	return (ret);
@@ -309,9 +317,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	WT_RET(__wt_config_gets_none(session,
 	    cfg, "encryption_algorithm", &cval));
-	WT_RET(__wt_encryptor_config(session, &cval, &btree->encryptor));
-
-	 /* XXX retrieve and do something with encryption_password */
+	WT_RET(__wt_config_gets_none(session,
+	    cfg, "encryption_password", &metadata));
+	WT_RET(__wt_encryptor_config(session, btree->dhandle->name, &cval,
+	    &metadata, &btree->encryptor, &btree->encryptor_owned));
 
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(

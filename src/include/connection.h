@@ -338,6 +338,7 @@ struct __wt_connection_impl {
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
 	WT_ENCRYPTOR	*log_encryptor; /* Logging encryptor */
+	int		 log_encryptor_owned; /* Encryptor must be freed */
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 	uint32_t	 log_prealloc;	/* Log file pre-allocation */
