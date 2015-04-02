@@ -324,6 +324,26 @@ namespace mongo {
 
     std::string demangleName( const std::type_info& typeinfo );
 
+    /**
+     * A utility function that converts an exception to a Status.
+     * Only call this function when there is an active exception
+     * (e.g. in a catch block).
+     *
+     * Note: this technique was created by Lisa Lippincott.
+     *
+     * Example usage:
+     *
+     *   Status myFunc() {
+     *       try {
+     *           funcThatThrows();
+     *           return Status::OK();
+     *       } catch (...) {
+     *           return exceptionToStatus();
+     *       }
+     *   }
+     */
+    Status exceptionToStatus();
+
 } // namespace mongo
 
 #define MONGO_ASSERT_ON_EXCEPTION( expression ) \
