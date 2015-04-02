@@ -40,6 +40,33 @@
 namespace mongo {
 namespace repl {
 
+namespace {
+
+    /**
+     * Updates command output document with status.
+     */
+    BSONObj getCommandResultFromStatus(const Status& status) {
+        BSONObjBuilder result;
+        Command::appendCommandStatus(result, status);
+        return result.obj();
+    }
+
+    /**
+     * Peeks at error in cursor. If an error has occurred, converts the {$err: "...", code: N}
+     * cursor error to a Status.
+     */
+    Status getStatusFromCursorResult(DBClientCursor& cursor) {
+        BSONObj error;
+        if (!cursor.peekError(&error)) {
+            return Status::OK();
+        }
+        BSONElement e = error.getField("code");
+        return Status(e.isNumber() ? ErrorCodes::fromInt(e.numberInt()) : ErrorCodes::UnknownError,
+                      getErrField(error).valuestrsafe());
+    }
+
+} // namespace
+
     Status runDownconvertedFindCommand(DBClientConnection* conn,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -54,6 +81,7 @@ namespace repl {
             // with the find command implementation on the remote server.
             Status status = LiteParsedQuery::make(ns, cmdObj, false, &lpqRaw);
             if (!status.isOK()) {
+                *output = getCommandResultFromStatus(status);
                 return status;
             }
             lpq.reset(lpqRaw);
@@ -76,6 +104,12 @@ namespace repl {
             conn->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
         cursor->decouple();
 
+        Status status = getStatusFromCursorResult(*cursor);
+        if (!status.isOK()) {
+            *output = getCommandResultFromStatus(status);
+            return status;
+        }
+
         BSONArrayBuilder batch;
         while (cursor->moreInCurrentBatch()) {
             batch.append(cursor->next());
@@ -93,13 +127,21 @@ namespace repl {
                                           BSONObj* output) {
         StatusWith<GetMoreRequest> parseResult = GetMoreRequest::parseFromBSON(dbname, cmdObj);
         if (!parseResult.isOK()) {
-            return parseResult.getStatus();
+            const Status& status = parseResult.getStatus();
+            *output = getCommandResultFromStatus(status);
+            return status;
         }
         const GetMoreRequest& req = parseResult.getValue();
         const std::string& ns = req.nss.ns();
 
         std::unique_ptr<DBClientCursor> cursor = conn->getMore(ns, req.cursorid, req.batchSize);
         cursor->decouple();
+
+        Status status = getStatusFromCursorResult(*cursor);
+        if (!status.isOK()) {
+            *output = getCommandResultFromStatus(status);
+            return status;
+        }
 
         BSONArrayBuilder batch;
         while (cursor->moreInCurrentBatch()) {
