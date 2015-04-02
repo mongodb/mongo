@@ -1083,6 +1083,27 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "find",
+            command: {find: "foo"},
+            skipSharded: true, // TODO: remove when find command is implemented in mongos
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_read,
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] }
+                    ]
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: roles_readAny,
+                    privileges: [
+                        { resource: {db: secondDbName, collection: "foo"}, actions: ["find"] }
+                    ]
+                }
+            ]
+        },
+        {
             testname: "findAndModify",
             command: {findAndModify: "x", query: {_id: "abc"}, update: {$inc: {n: 1}}},
             setup: function (db) {
@@ -1249,6 +1270,29 @@ var authCommandsLib = {
                 },
                 { runOnDb: firstDbName, roles: {} },
                 { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "getMore",
+            command: {getMore: NumberLong("1"), collection: "foo"},
+            skipSharded: true, // TODO: remove when getMore command is implemented in mongos
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_read,
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] }
+                    ],
+                    expectFail: true
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: roles_readAny,
+                    privileges: [
+                        { resource: {db: secondDbName, collection: "foo"}, actions: ["find"] }
+                    ],
+                    expectFail: true
+                }
             ]
         },
         {
