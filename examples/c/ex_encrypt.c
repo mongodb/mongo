@@ -42,14 +42,6 @@
 
 #include <wiredtiger.h>
 
-#if defined(_lint)
-#define	ATOMIC_ADD(v, val)      ((v) += (val), (v))
-#elif defined(_WIN32)
-#define	ATOMIC_ADD(v, val)      (_InterlockedExchangeAdd(&(v), val) + val)
-#else
-#define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
-#endif
-
 #define MIN(a, b)		(((a) < (b)) ? (a) : (b))
 
 static const char *home = NULL;
@@ -579,7 +571,7 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true"",encryption_algorithm=not,"
+	    "log=(enabled=true,encryption_algorithm=rot13,"
 	    "encryption_password=test_password1"")", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
@@ -605,8 +597,12 @@ main(void)
 
 		ret = c1->insert(c1);
 		ret = c2->insert(c2);
+		if (i % 5 == 0)
+			ret = session->log_printf(session,
+			    "Wrote %d records", i);
 	}
-	ret = session->log_printf(session, "Wrote %d records", i);
+	ret = session->log_printf(session,
+	    "Done. Wrote %d total records", i);
 	simple_walk_log(session);
 
 	while (c1->next(c1) == 0) {

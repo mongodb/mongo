@@ -3231,21 +3231,21 @@ struct __wt_encryptor {
 	 * Callback to size a destination buffer for encryption.
 	 *
 	 * WT_ENCRYPTOR::sizing is an callback that returns the number
-         * of additional bytes that is needed when encrypting a
-         * text buffer.  This is always necessary, since encryptors
-         * typically generate encrypted text that is larger than the
-         * plain text input. Without such a call, WiredTiger would
-         * have no way to know the worst case for the encrypted buffer size.
+	 * of additional bytes that is needed when encrypting a
+	 * text buffer.  This is always necessary, since encryptors
+	 * typically generate encrypted text that is larger than the
+	 * plain text input. Without such a call, WiredTiger would
+	 * have no way to know the worst case for the encrypted buffer size.
 	 *
 	 * This callback cannot be NULL.
 	 *
 	 * The callback should set \c expansion_constantp to the additional
-         * number of bytes needed.
+	 * number of bytes needed.
 	 *
-  	 * @param[in] src the data to encrypt
+	 * @param[in] src the data to encrypt
 	 * @param[in] src_len the length of the data to encrypt
 	 * @param[out] expansion_constantp the additional number of bytes needed
-         *             when encrypting.
+	 *             when encrypting.
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
 	 * @snippet nop_encrypt.c WT_ENCRYPTOR sizing
