@@ -428,9 +428,8 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * here after corruption happens.  If we're salvaging the file,
 	 * it's OK, otherwise it's really, really bad.
 	 */
-	if (ret != 0 || result_len != decrypted_size) {
+	if (ret != 0 || result_len != decrypted_size)
 		WT_ERR(WT_ERROR);
-	}
 err:	return (ret);
 }
 
@@ -1329,7 +1328,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_DECL_ITEM(uncitem);
 	WT_DECL_RET;
 	WT_FH *log_fh;
-	WT_ITEM buf, swap;
+	WT_ITEM buf, cbbuf;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, next_lsn, rd_lsn, start_lsn;
@@ -1535,22 +1534,28 @@ advance:
 		next_lsn = rd_lsn;
 		next_lsn.offset += (wt_off_t)rdup_len;
 		if (rd_lsn.offset != 0) {
+			/*
+			 * We need to manage the different buffers here.
+			 * Buf is the one the function uses to read from
+			 * the disk.  The callback buffer may change based
+			 * on whether encryption and compression are used.
+			 *
+			 * We want to free any buffers from compression and
+			 * encryption but keep the one we use for reading.
+			 */
+			cbbuf = buf;
 			if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
 				WT_ERR(__log_decrypt(session,
-				    &buf, &decryptitem));
-				swap = buf;
-				buf = *decryptitem;
-				*decryptitem = swap;
+				    &cbbuf, &decryptitem));
+				cbbuf = *decryptitem;
 			}
 			if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
-				WT_ERR(__log_decompress(session, &buf,
+				WT_ERR(__log_decompress(session, &cbbuf,
 				    &uncitem));
-				swap = buf;
-				buf = *uncitem;
-				*uncitem = swap;
+				cbbuf = *uncitem;
 			}
 			WT_ERR((*func)(session,
-			    &buf, &rd_lsn, &next_lsn, cookie, firstrecord));
+			    &cbbuf, &rd_lsn, &next_lsn, cookie, firstrecord));
 			__wt_scr_free(session, &decryptitem);
 			__wt_scr_free(session, &uncitem);
 
