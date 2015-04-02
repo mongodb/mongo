@@ -715,10 +715,10 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_free(session, conn->log_path);
 	__wt_free(session, conn->log);
 	if (conn->log_encryptor_owned) {
-               if (conn->log_encryptor->terminate != NULL)
-                       WT_TRET(conn->log_encryptor->terminate(
-                           conn->log_encryptor, &session->iface));
-               conn->log_encryptor_owned = 0;
+	       if (conn->log_encryptor->terminate != NULL)
+		       WT_TRET(conn->log_encryptor->terminate(
+			   conn->log_encryptor, &session->iface));
+	       conn->log_encryptor_owned = 0;
 	}
 
 	return (ret);

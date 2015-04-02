@@ -378,11 +378,11 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_LOG_RECORD *logrec;
-	size_t decrypted_size, result_len, skip, extra_size;
+	size_t decrypted_size, extra_size, header_skip, result_len;
 
 	conn = S2C(session);
 	logrec = (WT_LOG_RECORD *)in->mem;
-	skip = WT_LOG_ENCRYPT_SKIP;
+	header_skip = WT_LOG_ENCRYPT_SKIP;
 	encryptor = conn->log_encryptor;
 	if (encryptor == NULL || encryptor->decrypt == NULL)
 		WT_ERR_MSG(session, WT_ERROR,
@@ -391,13 +391,35 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	extra_size = 0;
 	WT_ERR(encryptor->sizing(encryptor, &session->iface, &extra_size));
 
-	decrypted_size = logrec->mem_len - skip - extra_size;
+	/*
+	 * There are a lot of sizes and offsets to keep track of here.
+	 * in->size: the size of the log record including padding to
+	 *	the log record allocation size.
+	 * header_skip: the size of the log record header that is not encrypted.
+	 * logrec->mem_len: the size of the log record in memory.  This is
+	 *	essentially in->size minus any padding.  This length does
+	 *	include the log record header space.
+	 * extra_size: the constant space added to the record by then
+	 *	encrypt function.
+	 * decrypted_size: the final size of the original data written
+	 *	less the log header.
+	 *
+	 * For the decrypted output, we need to allocate a buffer large
+	 * enough for a record header and the decrypted data.
+	 * We copy the log record into the new decrypted buffer and then
+	 * we decrypt.  The args to decrypt are:
+	 * src: input buffer after the log header.
+	 * src_len: unpadded log record size minus the log header.
+	 * dst: output buffer after log header.
+	 * dst_len: final decrypted size.
+	 */
+	decrypted_size = logrec->mem_len - header_skip - extra_size;
 	WT_ERR(__wt_scr_alloc(session, 0, out));
-	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size + skip));
-	memcpy((*out)->mem, in->mem, skip);
+	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size + header_skip));
+	memcpy((*out)->mem, in->mem, header_skip);
 	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
-	    (uint8_t *)in->mem + skip, logrec->mem_len - skip,
-	    (uint8_t *)(*out)->mem + skip,
+	    (uint8_t *)in->mem + header_skip, logrec->mem_len - header_skip,
+	    (uint8_t *)(*out)->mem + header_skip,
 	    decrypted_size, &result_len));
 
 	/*
