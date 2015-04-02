@@ -46,6 +46,7 @@ namespace repl {
 #endif
 
     const std::string ReplicaSetConfig::kVersionFieldName = "version";
+    const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
     const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 
 namespace {
@@ -53,7 +54,6 @@ namespace {
     const std::string kIdFieldName = "_id";
     const std::string kMembersFieldName = "members";
     const std::string kSettingsFieldName = "settings";
-    const std::string kMajorityWriteConcernModeName = "$majority";
     const std::string kStepDownCheckWriteConcernModeName = "$stepDownCheck";
     const std::string kProtocolVersionFieldName = "protocolVersion";
 

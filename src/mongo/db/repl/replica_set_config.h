@@ -53,6 +53,7 @@ namespace repl {
         typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
         static const std::string kVersionFieldName;
+        static const std::string kMajorityWriteConcernModeName;
 
         static const size_t kMaxMembers = 50;
         static const size_t kMaxVotingMembers = 7;
