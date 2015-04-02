@@ -675,24 +675,18 @@ namespace {
                 // document.
                 StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
                 if (commandName == "find") {
-                    Status findStatus = runDownconvertedFindCommand(
+                    runDownconvertedFindCommand(
                         conn,
                         request.dbname,
                         request.cmdObj,
                         &output);
-                    if (!findStatus.isOK()) {
-                        return ResponseStatus(findStatus);
-                    }
                 }
                 else if (commandName == "getMore") {
-                    Status getMoreStatus = runDownconvertedGetMoreCommand(
+                    runDownconvertedGetMoreCommand(
                         conn,
                         request.dbname,
                         request.cmdObj,
                         &output);
-                    if (!getMoreStatus.isOK()) {
-                        return ResponseStatus(getMoreStatus);
-                    }
                 }
             }
             const Date_t requestFinishDate = now();
