@@ -50,12 +50,15 @@
 #define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
 #endif
 
+#define MIN(a, b)		(((a) < (b)) ? (a) : (b))
+
 static const char *home = NULL;
 
 /*! [encryption example callback implementation] */
 typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
 	uint32_t num_calls;	/* Count of calls */
+	char password[64];
 } EX_ENCRYPTOR;
 
 #define	CHKSUM_LEN	4
@@ -223,6 +226,36 @@ rot13_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 }
 
 /*
+ * rot13_customize --
+ *	The customize function creates a customized encryptor
+ */
+static int
+rot13_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
+{
+	EX_ENCRYPTOR *ex_encryptor;
+	size_t len;
+
+	(void)session;				/* Unused parameters */
+	(void)uri;				/* Unused parameters */
+
+	/* Allocate our customized encryptor and set up callback functions. */
+	if ((ex_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
+		return (errno);
+	ex_encryptor->encryptor = *encryptor;
+
+	/* Stash the password from the configuration string. */
+	len = MIN(sizeof(ex_encryptor->password) - 1, passcfg->len);
+	strncpy(ex_encryptor->password, passcfg->str, len);
+	ex_encryptor->password[len] = '\0';
+
+	++ex_encryptor->num_calls;		/* Call count */
+
+	*customp = &ex_encryptor->encryptor;
+	return (0);
+}
+
+/*
  * rot13_terminate --
  *	WiredTiger rot13 encryption termination.
  */
@@ -360,6 +393,36 @@ not_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 }
 
 /*
+ * not_customize --
+ *	The customize function creates a customized encryptor
+ */
+static int
+not_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
+{
+	EX_ENCRYPTOR *ex_encryptor;
+	size_t len;
+
+	(void)session;				/* Unused parameters */
+	(void)uri;				/* Unused parameters */
+
+	/* Allocate our customized encryptor and set up callback functions. */
+	if ((ex_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
+		return (errno);
+	ex_encryptor->encryptor = *encryptor;
+
+	/* Stash the password from the configuration string. */
+	len = MIN(sizeof(ex_encryptor->password) - 1, passcfg->len);
+	strncpy(ex_encryptor->password, passcfg->str, len);
+	ex_encryptor->password[len] = '\0';
+
+	++ex_encryptor->num_calls;		/* Call count */
+
+	*customp = &ex_encryptor->encryptor;
+	return (0);
+}
+
+/*
  * not_terminate --
  *	WiredTiger not encryption termination.
  */
@@ -385,13 +448,13 @@ not_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 int
 add_my_encryptors(WT_CONNECTION *connection)
 {
-	EX_ENCRYPTOR *not_encryptor, *rot13_encryptor;
+	WT_ENCRYPTOR *not_encryptor, *rot13_encryptor;
 	int ret;
 
-	if ((not_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
+	if ((not_encryptor = calloc(1, sizeof(WT_ENCRYPTOR))) == NULL)
 		return (errno);
 
-	if ((rot13_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
+	if ((rot13_encryptor = calloc(1, sizeof(WT_ENCRYPTOR))) == NULL)
 		return (errno);
 
 	/*
@@ -406,19 +469,21 @@ add_my_encryptors(WT_CONNECTION *connection)
 	 * the encryptor is terminated.  However, this approach is more general
 	 * purpose and supports multiple databases per application.
 	 */
-	not_encryptor->encryptor.encrypt = not_encrypt;
-	not_encryptor->encryptor.decrypt = not_decrypt;
-	not_encryptor->encryptor.sizing = not_sizing;
-	not_encryptor->encryptor.terminate = not_terminate;
+	not_encryptor->encrypt = not_encrypt;
+	not_encryptor->decrypt = not_decrypt;
+	not_encryptor->sizing = not_sizing;
+	not_encryptor->customize = not_customize;
+	not_encryptor->terminate = not_terminate;
 
 	if ((ret = connection->add_encryptor(
 	    connection, "not", (WT_ENCRYPTOR *)not_encryptor, NULL)) != 0)
 		return (ret);
 
-	rot13_encryptor->encryptor.encrypt = rot13_encrypt;
-	rot13_encryptor->encryptor.decrypt = rot13_decrypt;
-	rot13_encryptor->encryptor.sizing = rot13_sizing;
-	rot13_encryptor->encryptor.terminate = rot13_terminate;
+	rot13_encryptor->encrypt = rot13_encrypt;
+	rot13_encryptor->decrypt = rot13_decrypt;
+	rot13_encryptor->sizing = rot13_sizing;
+	rot13_encryptor->customize = rot13_customize;
+	rot13_encryptor->terminate = rot13_terminate;
 
 	return (connection->add_encryptor(
 	    connection, "rot13", (WT_ENCRYPTOR *)rot13_encryptor, NULL));
@@ -519,7 +584,7 @@ main(void)
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(session, "table:crypto",
-	    /*"encryption_algorithm=rot13,encryption_password=test_password2,"*/
+	    "encryption_algorithm=rot13,encryption_password=test_password2,"
 	    "key_format=S,value_format=S");
 	ret = session->create(
 	    session, "table:nocrypto",
