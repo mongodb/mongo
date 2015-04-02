@@ -616,13 +616,13 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,encryption_algorithm=not,"
+	    "log=(enabled=true,encryption_algorithm=rot13,"
 	    "encryption_password=test_password1)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->open_cursor(session, "table:crypto", NULL, NULL, &c1);
 
-	printf("REOPEN\n", key, val);
+	printf("REOPEN\n");
 	while (c1->next(c1) == 0) {
 		ret = c1->get_key(c1, &key);
 		ret = c1->get_value(c1, &val);
