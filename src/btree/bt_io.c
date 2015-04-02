@@ -277,7 +277,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)etmp->mem + WT_BLOCK_ENCRYPT_SKIP;
-		dst_len = len;
+		dst_len = src_len + len;
 
 		if ((ret = btree->encryptor->encrypt(btree->encryptor,
 		    &session->iface,
