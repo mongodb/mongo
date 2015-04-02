@@ -16,11 +16,18 @@ env.Library('rslog',
             ])
 
 env.Library(
-    'network_interface_impl',
-    'network_interface_impl.cpp',
+    target='network_interface_impl',
+    source=[
+        'network_interface_impl.cpp',
+        'network_interface_impl_downconvert_find_getmore.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/clientdriver'
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/clientdriver',
+        '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/db/query/getmore_request',
+        '$BUILD_DIR/mongo/db/query/lite_parsed_query',
         ])
 
 env.Library('replication_executor',
