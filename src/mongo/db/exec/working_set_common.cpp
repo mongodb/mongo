@@ -31,9 +31,9 @@
 #include "mongo/db/exec/working_set_common.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/canonical_query.h"
 

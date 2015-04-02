@@ -34,7 +34,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"

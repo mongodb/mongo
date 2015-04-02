@@ -35,7 +35,7 @@
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <memory>
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/concurrency/synchronization.h"
@@ -445,7 +445,7 @@ namespace {
         while (!inShutdown() && !stopRequested()) {
             string errMsg;
 
-            boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
+            boost::scoped_ptr<OperationContext> txn(getGlobalServiceContext()->newOpCtx());
 
             RangeDeleteEntry* nextTask = NULL;
 

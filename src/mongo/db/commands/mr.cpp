@@ -45,7 +45,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/matcher/matcher.h"
@@ -441,7 +441,7 @@ namespace mongo {
                 b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
                 b.appendElements( options.toBSON() );
                 string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                getGlobalServiceContext()->getOpObserver()->onCreateCollection(
                         _txn,
                         NamespaceString(_config.tempNamespace),
                         options);
@@ -458,7 +458,7 @@ namespace mongo {
                     }
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
-                    getGlobalEnvironment()->getOpObserver()->onInsert(_txn, logNs, *it);
+                    getGlobalServiceContext()->getOpObserver()->onInsert(_txn, logNs, *it);
                 }
                 wuow.commit();
             }
@@ -695,7 +695,7 @@ namespace mongo {
             BSONObj bo = b.obj();
 
             uassertStatusOK( coll->insertDocument( _txn, bo, true ).getStatus() );
-            getGlobalEnvironment()->getOpObserver()->onInsert(_txn, ns, bo);
+            getGlobalServiceContext()->getOpObserver()->onInsert(_txn, ns, bo);
             wuow.commit();
         }
 

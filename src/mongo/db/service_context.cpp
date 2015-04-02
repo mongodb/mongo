@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
@@ -39,25 +39,23 @@ namespace mongo {
 
     namespace {
 
-        GlobalEnvironmentExperiment* globalEnvironmentExperiment = NULL;
+        ServiceContext* globalServiceContext = NULL;
 
     } // namespace
 
-    bool hasGlobalEnvironment() { return globalEnvironmentExperiment; }
+    bool hasGlobalServiceContext() { return globalServiceContext; }
 
-    GlobalEnvironmentExperiment* getGlobalEnvironment() {
-        fassert(17508, globalEnvironmentExperiment);
-        return globalEnvironmentExperiment;
+    ServiceContext* getGlobalServiceContext() {
+        fassert(17508, globalServiceContext);
+        return globalServiceContext;
     }
 
-    void setGlobalEnvironment(GlobalEnvironmentExperiment* newGlobalEnvironment) {
-        fassert(17509, newGlobalEnvironment);
+    void setGlobalServiceContext(std::unique_ptr<ServiceContext>&& serviceContext) {
+        fassert(17509, serviceContext.get());
 
-        if (NULL != globalEnvironmentExperiment) {
-            delete globalEnvironmentExperiment;
-        }
+        delete globalServiceContext;
 
-        globalEnvironmentExperiment = newGlobalEnvironment;
+        globalServiceContext = serviceContext.release();
     }
 
     bool _supportsDocLocking = false;
@@ -67,8 +65,7 @@ namespace mongo {
     }
 
     bool isMMAPV1() {
-        invariant(hasGlobalEnvironment());
-        StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* globalStorageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
         invariant(globalStorageEngine);
         return globalStorageEngine->isMmapV1();
@@ -87,7 +84,7 @@ namespace mongo {
                     << "' has to be an embedded document.");
             }
 
-            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalEnvironment()->
+            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
                                                             makeStorageFactoriesIterator());
             invariant(sfi);
             bool found = false;

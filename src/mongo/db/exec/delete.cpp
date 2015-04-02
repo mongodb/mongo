@@ -36,7 +36,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -164,7 +164,7 @@ namespace mongo {
                             << ", not logging.";
                         }
                         else {
-                            getGlobalEnvironment()->getOpObserver()->onDelete(
+                            getGlobalServiceContext()->getOpObserver()->onDelete(
                                     _txn,
                                     _collection->ns().ns(),
                                     deletedDoc,

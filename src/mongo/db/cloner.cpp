@@ -51,7 +51,7 @@
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -152,7 +152,7 @@ namespace mongo {
                 verify(collection);
 
                 if (logForRepl) {
-                    getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                    getGlobalServiceContext()->getOpObserver()->onCreateCollection(
                             txn,
                             to_collection,
                             CollectionOptions());
@@ -234,7 +234,7 @@ namespace mongo {
                 }
                 uassertStatusOK( loc.getStatus() );
                 if (logForRepl)
-                    getGlobalEnvironment()->getOpObserver()->onInsert(txn, to_collection.ns(), js);
+                    getGlobalServiceContext()->getOpObserver()->onInsert(txn, to_collection.ns(), js);
 
                 wunit.commit();
 
@@ -341,7 +341,7 @@ namespace mongo {
             collection = db->createCollection( txn, to_collection.ns() );
             invariant(collection);
             if (logForRepl) {
-                getGlobalEnvironment()->getOpObserver()->onCreateCollection(txn,
+                getGlobalServiceContext()->getOpObserver()->onCreateCollection(txn,
                                                                             to_collection,
                                                                             CollectionOptions());
             }
@@ -372,7 +372,7 @@ namespace mongo {
             const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
             for (vector<BSONObj>::const_iterator it = indexesToBuild.begin();
                     it != indexesToBuild.end(); ++it) {
-                getGlobalEnvironment()->getOpObserver()->onInsert(txn, createIndexNs, *it);
+                getGlobalServiceContext()->getOpObserver()->onInsert(txn, createIndexNs, *it);
             }
         }
         wunit.commit();
@@ -651,7 +651,7 @@ namespace mongo {
 
                         c->deleteDocument(txn, *it, true, true, opts.logForRepl ? &id : NULL);
                         if (opts.logForRepl)
-                            getGlobalEnvironment()->getOpObserver()->onDelete(txn,
+                            getGlobalServiceContext()->getOpObserver()->onDelete(txn,
                                                                               c->ns().ns(),
                                                                               id);
                         wunit.commit();
@@ -664,7 +664,7 @@ namespace mongo {
                     WriteUnitOfWork wunit(txn);
                     indexer.commit();
                     if (opts.logForRepl) {
-                        getGlobalEnvironment()->getOpObserver()->onCreateIndex(
+                        getGlobalServiceContext()->getOpObserver()->onCreateIndex(
                                 txn,
                                 c->ns().getSystemIndexesCollection().c_str(),
                                 c->getIndexCatalog()->getDefaultIdIndexSpec());

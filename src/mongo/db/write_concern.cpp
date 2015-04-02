@@ -33,7 +33,7 @@
 #include "mongo/base/counter.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
@@ -104,7 +104,7 @@ namespace mongo {
     }
 
     Status validateWriteConcern( const WriteConcernOptions& writeConcern ) {
-        const bool isJournalEnabled = getGlobalEnvironment()->getGlobalStorageEngine()->isDurable();
+        const bool isJournalEnabled = getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
 
         if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled ) {
             return Status( ErrorCodes::BadValue,
@@ -207,7 +207,7 @@ namespace mongo {
         case WriteConcernOptions::NONE:
             break;
         case WriteConcernOptions::FSYNC: {
-            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             if ( !storageEngine->isDurable() ) {
                 result->fsyncFiles = storageEngine->flushAllFiles( true );
             }

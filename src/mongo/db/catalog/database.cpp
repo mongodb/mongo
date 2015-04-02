@@ -48,8 +48,8 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/global_environment_d.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -221,7 +221,7 @@ namespace mongo {
         }
 
         vector<string> others;
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->listDatabases(&others);
 
         set<string> allShortNames;
@@ -272,7 +272,7 @@ namespace mongo {
                     continue;
                 }
 
-                getGlobalEnvironment()->getOpObserver()->onDropCollection(
+                getGlobalServiceContext()->getOpObserver()->onDropCollection(
                         txn, NamespaceString(ns));
                 wunit.commit();
             }
@@ -549,7 +549,7 @@ namespace mongo {
         Lock::GlobalWrite lk(txn->lockState());
 
         vector<string> n;
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->listDatabases(&n);
 
         if( n.size() == 0 ) return;
@@ -581,7 +581,7 @@ namespace mongo {
         dbHolder().close( txn, name );
         db = NULL; // d is now deleted
 
-        getGlobalEnvironment()->getGlobalStorageEngine()->dropDatabase( txn, name );
+        getGlobalServiceContext()->getGlobalStorageEngine()->dropDatabase( txn, name );
     }
 
     /** { ..., capped: true, size: ..., max: ... }
@@ -622,7 +622,7 @@ namespace mongo {
         invariant( db->createCollection( txn, ns, collectionOptions, true, createDefaultIndexes ) );
 
         if ( logForReplication ) {
-            getGlobalEnvironment()->getOpObserver()->onCreateCollection(txn,
+            getGlobalServiceContext()->getOpObserver()->onCreateCollection(txn,
                                                                         NamespaceString(ns),
                                                                         collectionOptions);
         }

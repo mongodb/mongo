@@ -36,7 +36,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
@@ -590,7 +590,7 @@ namespace mongo {
             // Call logOp if requested, and we're not an explain.
             if (request->shouldCallLogOp() && !logObj.isEmpty() && !request->isExplain()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                getGlobalEnvironment()->getOpObserver()->onUpdate(
+                getGlobalServiceContext()->getOpObserver()->onUpdate(
                         _txn,
                         request->getNamespaceString().ns().c_str(),
                         logObj,
@@ -742,7 +742,7 @@ namespace mongo {
                                                                  !request->isGod()/*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
         if (request->shouldCallLogOp()) {
-            getGlobalEnvironment()->getOpObserver()->onInsert(_txn,
+            getGlobalServiceContext()->getOpObserver()->onInsert(_txn,
                                                               request->getNamespaceString().ns(),
                                                               newObj,
                                                               request->isFromMigration());

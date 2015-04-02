@@ -71,7 +71,7 @@ namespace mongo {
      *   RangeDeleter* deleter = new RangeDeleter(new ...);
      *   deleter->startWorkers();
      *   ...
-     *   getGlobalEnvironment()->killAllOperations(); // stop all deletes
+     *   getGlobalServiceContext()->killAllOperations(); // stop all deletes
      *   deleter->stopWorkers();
      *   delete deleter;
      */

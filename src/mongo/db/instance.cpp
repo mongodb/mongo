@@ -58,7 +58,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -174,7 +174,7 @@ namespace mongo {
             else {
                 log() << "going to kill op: " << e << endl;
                 obj = fromjson("{\"info\":\"attempting to kill op\"}");
-                getGlobalEnvironment()->killOperation( (unsigned) e.number() );
+                getGlobalServiceContext()->killOperation( (unsigned) e.number() );
             }
         }
         replyToQuery(0, m, dbresponse, obj);
@@ -978,7 +978,7 @@ namespace {
                 if ( !collection ) {
                     collection = ctx.db()->createCollection( txn, ns );
                     verify( collection );
-                    getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                    getGlobalServiceContext()->getOpObserver()->onCreateCollection(
                             txn,
                             NamespaceString(ns),
                             CollectionOptions());
@@ -986,7 +986,7 @@ namespace {
 
                 StatusWith<RecordId> status = collection->insertDocument( txn, js, true );
                 uassertStatusOK( status.getStatus() );
-                getGlobalEnvironment()->getOpObserver()->onInsert(txn, std::string(ns), js);
+                getGlobalServiceContext()->getOpObserver()->onInsert(txn, std::string(ns), js);
                 wunit.commit();
                 break;
             }
@@ -1201,7 +1201,7 @@ namespace {
         log(LogComponent::kNetwork) << "shutdown: going to close sockets..." << endl;
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
-        getGlobalEnvironment()->shutdownGlobalStorageEngineCleanly();
+        getGlobalServiceContext()->shutdownGlobalStorageEngineCleanly();
     }
 
     // shutdownLock
@@ -1225,13 +1225,13 @@ namespace {
         boost::lock_guard<boost::mutex> lockguard(shutdownLock);
 
         // Global storage engine may not be started in all cases before we exit
-        if (getGlobalEnvironment()->getGlobalStorageEngine() == NULL) {
+        if (getGlobalServiceContext()->getGlobalStorageEngine() == NULL) {
             dbexit(code); // returns only under a windows service
             invariant(code == EXIT_WINDOWS_SERVICE_STOP);
             return;
         }
 
-        getGlobalEnvironment()->setKillAllOperations();
+        getGlobalServiceContext()->setKillAllOperations();
 
         repl::getGlobalReplicationCoordinator()->shutdown();
 

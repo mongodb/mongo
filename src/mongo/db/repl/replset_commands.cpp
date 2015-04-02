@@ -39,7 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/oplog.h"
@@ -401,7 +401,7 @@ namespace {
 
             WriteUnitOfWork wuow(txn);
             if (status.isOK() && !parsedArgs.force) {
-                getGlobalEnvironment()->getOpObserver()->onOpMessage(
+                getGlobalServiceContext()->getOpObserver()->onOpMessage(
                         txn,
                         BSON("msg" << "Reconfig set" <<
                              "version" << parsedArgs.newConfigObj["version"]));
@@ -634,7 +634,7 @@ namespace {
      */
     bool replHasDatabases(OperationContext* txn) {
         std::vector<string> names;
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->listDatabases(&names);
 
         if( names.size() >= 2 ) return true;

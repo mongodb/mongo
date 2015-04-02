@@ -40,7 +40,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -444,7 +444,7 @@ namespace mongo {
 
                         // This is the last thing we do before the WriteUnitOfWork commits (except
                         // for some BSON manipulation).
-                        getGlobalEnvironment()->getOpObserver()->onInsert(txn,
+                        getGlobalServiceContext()->getOpObserver()->onInsert(txn,
                                                                           collection->ns().ns(),
                                                                           newDoc); 
 

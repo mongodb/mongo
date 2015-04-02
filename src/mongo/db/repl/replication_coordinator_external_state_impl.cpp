@@ -43,7 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
@@ -117,7 +117,7 @@ namespace {
         Lock::GlobalWrite globalWrite(txn->lockState());
 
         WriteUnitOfWork wuow(txn);
-        getGlobalEnvironment()->getOpObserver()->onOpMessage(txn, BSON("msg" << "initiating set"));
+        getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, BSON("msg" << "initiating set"));
         wuow.commit();
     }
 
@@ -237,7 +237,7 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* txn) {
-        GlobalEnvironmentExperiment* environment = getGlobalEnvironment();
+        ServiceContext* environment = getGlobalServiceContext();
         environment->killAllUserOperations(txn);
     }
 
@@ -257,7 +257,7 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {
         std::vector<std::string> dbNames;
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->listDatabases(&dbNames);
 
         for (std::vector<std::string>::iterator it = dbNames.begin(); it != dbNames.end(); ++it) {

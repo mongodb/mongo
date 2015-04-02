@@ -35,7 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -53,7 +53,7 @@ namespace mongo {
 
         invariant(_locker);
 
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         _recovery.reset(storageEngine->newRecoveryUnit());
 
         _client->setOperationContext(this);
@@ -161,7 +161,7 @@ namespace mongo {
     }
 
     Status OperationContextImpl::checkForInterruptNoAssert() const {
-        if (getGlobalEnvironment()->getKillAllOperations()) {
+        if (getGlobalServiceContext()->getKillAllOperations()) {
             return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
         }
 

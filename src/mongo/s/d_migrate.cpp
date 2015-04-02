@@ -61,7 +61,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/op_observer.h"
@@ -2060,7 +2060,7 @@ namespace mongo {
 
                     for (size_t i = 0; i < indexSpecs.size(); i++) {
                         // make sure to create index on secondaries as well
-                        getGlobalEnvironment()->getOpObserver()->onCreateIndex(
+                        getGlobalServiceContext()->getOpObserver()->onCreateIndex(
                                 txn,
                                 db->getSystemIndexesName(),
                                 indexSpecs[i],

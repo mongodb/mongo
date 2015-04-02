@@ -41,7 +41,7 @@
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/storage/record_fetcher.h"
 

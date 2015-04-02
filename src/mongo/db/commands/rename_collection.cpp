@@ -39,7 +39,7 @@
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/namespace_string.h"
@@ -247,7 +247,7 @@ namespace mongo {
                     }
 
                     if (!fromRepl) {
-                        getGlobalEnvironment()->getOpObserver()->onRenameCollection(
+                        getGlobalServiceContext()->getOpObserver()->onRenameCollection(
                                 txn,
                                 NamespaceString(source),
                                 NamespaceString(target),
@@ -351,7 +351,7 @@ namespace mongo {
                 indexer.commit();
 
                 if (!fromRepl) {
-                    getGlobalEnvironment()->getOpObserver()->onRenameCollection(
+                    getGlobalServiceContext()->getOpObserver()->onRenameCollection(
                             txn,
                             NamespaceString(source),
                             NamespaceString(target),

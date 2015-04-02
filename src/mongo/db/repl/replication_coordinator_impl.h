@@ -36,7 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"

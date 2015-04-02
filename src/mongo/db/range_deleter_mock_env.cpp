@@ -28,8 +28,9 @@
 
 #include "mongo/db/range_deleter_mock_env.h"
 
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/global_environment_noop.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -56,7 +57,7 @@ namespace mongo {
         _pausedCount(0),
         _getCursorsCallCount(0) {
 
-        setGlobalEnvironment(new GlobalEnvironmentNoop());
+        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
     }
 
     void RangeDeleterMockEnv::addCursorId(StringData ns, CursorId id) {

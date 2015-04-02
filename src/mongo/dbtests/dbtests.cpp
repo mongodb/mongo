@@ -40,11 +40,12 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/framework.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/startup_test.h"
@@ -104,7 +105,7 @@ namespace dbtests {
 int dbtestsMain( int argc, char** argv, char** envp ) {
     static StaticObserver StaticObserver;
     ::mongo::setupSynchronousSignalHandlers();
-    setGlobalEnvironment(new GlobalEnvironmentMongoD());
+    setGlobalServiceContext(stdx::make_unique<ServiceContextMongoD>());
     repl::ReplSettings replSettings;
     replSettings.oplogSize = 10 * 1024 * 1024;
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));

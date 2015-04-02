@@ -45,7 +45,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
@@ -1072,7 +1072,7 @@ namespace mongo {
                                             request->getTargetingNS())));
                 return false;
             }
-            getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+            getGlobalServiceContext()->getOpObserver()->onCreateCollection(
                     txn,
                     NamespaceString(request->getTargetingNS()),
                     CollectionOptions());
@@ -1199,7 +1199,7 @@ namespace mongo {
             result->setError(toWriteError(status.getStatus()));
         }
         else {
-            getGlobalEnvironment()->getOpObserver()->onInsert(txn, insertNS, docToInsert);
+            getGlobalServiceContext()->getOpObserver()->onInsert(txn, insertNS, docToInsert);
             result->getStats().n = 1;
             wunit.commit();
         }

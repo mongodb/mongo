@@ -43,7 +43,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
@@ -449,7 +449,7 @@ namespace mongo {
                 BSONObj deletedId;
                 collection->deleteDocument( txn, rloc, false, false, &deletedId );
                 // The above throws on failure, and so is not logged
-                getGlobalEnvironment()->getOpObserver()->onDelete(txn, ns, deletedId, fromMigrate);
+                getGlobalServiceContext()->getOpObserver()->onDelete(txn, ns, deletedId, fromMigrate);
                 wuow.commit();
                 numDeleted++;
             }

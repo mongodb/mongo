@@ -28,7 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/db/global_environment_d.h"
+#include "mongo/db/service_context_d.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
@@ -41,6 +41,7 @@
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -48,19 +49,19 @@
 namespace mongo {
 
     MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-        setGlobalEnvironment(new GlobalEnvironmentMongoD());
+        setGlobalServiceContext(stdx::make_unique<ServiceContextMongoD>());
         return Status::OK();
     }
 
-    GlobalEnvironmentMongoD::GlobalEnvironmentMongoD()
+    ServiceContextMongoD::ServiceContextMongoD()
         : _globalKill(false),
           _storageEngine(NULL) { }
 
-    GlobalEnvironmentMongoD::~GlobalEnvironmentMongoD() {
+    ServiceContextMongoD::~ServiceContextMongoD() {
 
     }
 
-    StorageEngine* GlobalEnvironmentMongoD::getGlobalStorageEngine() {
+    StorageEngine* ServiceContextMongoD::getGlobalStorageEngine() {
         // We don't check that globalStorageEngine is not-NULL here intentionally.  We can encounter
         // an error before it's initialized and proceed to exitCleanly which is equipped to deal
         // with a NULL storage engine.
@@ -69,7 +70,7 @@ namespace mongo {
 
     extern bool _supportsDocLocking;
 
-    void GlobalEnvironmentMongoD::setGlobalStorageEngine(const std::string& name) {
+    void ServiceContextMongoD::setGlobalStorageEngine(const std::string& name) {
         // This should be set once.
         invariant(!_storageEngine);
 
@@ -123,15 +124,15 @@ namespace mongo {
         _supportsDocLocking = _storageEngine->supportsDocLocking();
     }
 
-    void GlobalEnvironmentMongoD::shutdownGlobalStorageEngineCleanly() {
+    void ServiceContextMongoD::shutdownGlobalStorageEngineCleanly() {
         invariant(_storageEngine);
         invariant(_lockFile.get());
         _storageEngine->cleanShutdown();
         _lockFile->clearPidAndUnlock();
     }
 
-    void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,
-                                                        const StorageEngine::Factory* factory) {
+    void ServiceContextMongoD::registerStorageEngine(const std::string& name,
+                                                     const StorageEngine::Factory* factory) {
         // No double-registering.
         invariant(0 == _storageFactories.count(name));
 
@@ -144,18 +145,18 @@ namespace mongo {
         _storageFactories[name] = factory;
     }
 
-    bool GlobalEnvironmentMongoD::isRegisteredStorageEngine(const std::string& name) {
+    bool ServiceContextMongoD::isRegisteredStorageEngine(const std::string& name) {
         return _storageFactories.count(name);
     }
 
-    StorageFactoriesIterator* GlobalEnvironmentMongoD::makeStorageFactoriesIterator() {
+    StorageFactoriesIterator* ServiceContextMongoD::makeStorageFactoriesIterator() {
         return new StorageFactoriesIteratorMongoD(_storageFactories.begin(),
                                                   _storageFactories.end());
     }
 
     StorageFactoriesIteratorMongoD::StorageFactoriesIteratorMongoD(
-        const GlobalEnvironmentMongoD::FactoryMap::const_iterator& begin,
-        const GlobalEnvironmentMongoD::FactoryMap::const_iterator& end) :
+        const ServiceContextMongoD::FactoryMap::const_iterator& begin,
+        const ServiceContextMongoD::FactoryMap::const_iterator& end) :
         _curr(begin), _end(end) {
     }
 
@@ -167,7 +168,7 @@ namespace mongo {
         return _curr++->second;
     }
 
-    void GlobalEnvironmentMongoD::setKillAllOperations() {
+    void ServiceContextMongoD::setKillAllOperations() {
         boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
         _globalKill = true;
         for (size_t i = 0; i < _killOpListeners.size(); i++) {
@@ -180,11 +181,11 @@ namespace mongo {
         }
     }
 
-    bool GlobalEnvironmentMongoD::getKillAllOperations() {
+    bool ServiceContextMongoD::getKillAllOperations() {
         return _globalKill;
     }
 
-    bool GlobalEnvironmentMongoD::_killOperationsAssociatedWithClientAndOpId_inlock(
+    bool ServiceContextMongoD::_killOperationsAssociatedWithClientAndOpId_inlock(
             Client* client, unsigned int opId) {
         for( CurOp *k = client->curop(); k; k = k->parent() ) {
             if ( k->opNum() != opId )
@@ -208,7 +209,7 @@ namespace mongo {
         return false;
     }
 
-    bool GlobalEnvironmentMongoD::killOperation(unsigned int opId) {
+    bool ServiceContextMongoD::killOperation(unsigned int opId) {
         boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
 
         for(ClientSet::const_iterator j = Client::clients.begin();
@@ -225,7 +226,7 @@ namespace mongo {
         return false;
     }
 
-    void GlobalEnvironmentMongoD::killAllUserOperations(const OperationContext* txn) {
+    void ServiceContextMongoD::killAllUserOperations(const OperationContext* txn) {
         boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
         for (ClientSet::const_iterator i = Client::clients.begin();
                 i != Client::clients.end(); i++) {
@@ -250,24 +251,24 @@ namespace mongo {
         }
     }
 
-    void GlobalEnvironmentMongoD::unsetKillAllOperations() {
+    void ServiceContextMongoD::unsetKillAllOperations() {
         _globalKill = false;
     }
 
-    void GlobalEnvironmentMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
+    void ServiceContextMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
         boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
         _killOpListeners.push_back(listener);
     }
 
-    OperationContext* GlobalEnvironmentMongoD::newOpCtx() {
+    OperationContext* ServiceContextMongoD::newOpCtx() {
         return new OperationContextImpl();
     }
 
-    void GlobalEnvironmentMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+    void ServiceContextMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
         _opObserver.reset(opObserver.get());
     }
 
-    OpObserver* GlobalEnvironmentMongoD::getOpObserver() {
+    OpObserver* ServiceContextMongoD::getOpObserver() {
         return _opObserver.get();
     }
 

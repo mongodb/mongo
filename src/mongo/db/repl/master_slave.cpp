@@ -56,7 +56,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update.h"
@@ -1284,7 +1284,7 @@ namespace repl {
 
                 try {
                     WriteUnitOfWork wuow(&txn);
-                    getGlobalEnvironment()->getOpObserver()->onOpMessage(&txn, BSONObj());
+                    getGlobalServiceContext()->getOpObserver()->onOpMessage(&txn, BSONObj());
                     wuow.commit();
                 }
                 catch (...) {

@@ -26,12 +26,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_environment_experiment.h"
+#pragma once
+
+#include <boost/scoped_ptr.hpp>
+#include <vector>
+
+#include "mongo/db/service_context.h"
+#include "mongo/platform/unordered_set.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
-    class GlobalEnvironmentNoop : public GlobalEnvironmentExperiment {
+    class Client;
+    class StorageEngineLockFile;
+
+    class ServiceContextMongoD : public ServiceContext {
     public:
+        typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
+
+        ServiceContextMongoD();
+
+        ~ServiceContextMongoD();
+
         StorageEngine* getGlobalStorageEngine();
 
         void setGlobalStorageEngine(const std::string& name);
@@ -45,15 +61,15 @@ namespace mongo {
 
         StorageFactoriesIterator* makeStorageFactoriesIterator();
 
-        bool killOperation(unsigned int opId);
-
-        void killAllUserOperations(const OperationContext* txn);
-
         void setKillAllOperations();
 
         void unsetKillAllOperations();
 
         bool getKillAllOperations();
+
+        bool killOperation(unsigned int opId);
+
+        void killAllUserOperations(const OperationContext* txn);
 
         void registerKillOpListener(KillOpListenerInterface* listener);
 
@@ -62,6 +78,41 @@ namespace mongo {
         void setOpObserver(std::unique_ptr<OpObserver> opObserver);
 
         OpObserver* getOpObserver();
+
+    private:
+
+        bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
+
+        bool _globalKill;
+
+        // protected by Client::clientsMutex
+        std::vector<KillOpListenerInterface*> _killOpListeners;
+
+        boost::scoped_ptr<StorageEngineLockFile> _lockFile;
+
+        // logically owned here, but never deleted by anyone.
+        StorageEngine* _storageEngine;
+
+        // logically owned here.
+        std::unique_ptr<OpObserver> _opObserver;
+
+        // All possible storage engines are registered here through MONGO_INIT.
+        FactoryMap _storageFactories;
+    };
+
+    class StorageFactoriesIteratorMongoD : public StorageFactoriesIterator {
+    public:
+
+        typedef ServiceContextMongoD::FactoryMap::const_iterator FactoryMapIterator;
+        StorageFactoriesIteratorMongoD(const FactoryMapIterator& begin,
+                                       const FactoryMapIterator& end);
+
+        virtual bool more() const;
+        virtual const StorageEngine::Factory* next();
+
+    private:
+        FactoryMapIterator _curr;
+        FactoryMapIterator _end;
     };
 
 }  // namespace mongo

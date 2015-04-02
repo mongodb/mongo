@@ -39,13 +39,12 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/version.h"
-
 
 namespace mongo {
 
@@ -66,11 +65,11 @@ namespace mongo {
     }
 
     BSONArray storageEngineList() {
-        if (!hasGlobalEnvironment())
+        if (!hasGlobalServiceContext())
             return BSONArray();
 
         boost::scoped_ptr<StorageFactoriesIterator> sfi(
-            getGlobalEnvironment()->makeStorageFactoriesIterator());
+            getGlobalServiceContext()->makeStorageFactoriesIterator());
 
         if (!sfi)
             return BSONArray();

@@ -42,7 +42,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
@@ -352,7 +352,7 @@ namespace mongo {
                 if (!cc->hasRecoveryUnit()) {
                     // Start using a new RecoveryUnit
                     cc->setOwnedRecoveryUnit(
-                        getGlobalEnvironment()->getGlobalStorageEngine()->newRecoveryUnit());
+                        getGlobalServiceContext()->getGlobalStorageEngine()->newRecoveryUnit());
 
                 }
                 // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.
@@ -705,7 +705,7 @@ namespace mongo {
                 // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
                 txn->recoveryUnit()->commitAndRestart();
                 cc->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
                 txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
             }
 

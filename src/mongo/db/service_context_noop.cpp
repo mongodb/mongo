@@ -28,34 +28,34 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/global_environment_noop.h"
+#include "mongo/db/service_context_noop.h"
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/op_observer.h"
 
 namespace mongo {
 
-    StorageEngine* GlobalEnvironmentNoop::getGlobalStorageEngine() {
+    StorageEngine* ServiceContextNoop::getGlobalStorageEngine() {
         return NULL;
     }
 
-    void GlobalEnvironmentNoop::setGlobalStorageEngine(const std::string& name) {
+    void ServiceContextNoop::setGlobalStorageEngine(const std::string& name) {
     }
 
-    void GlobalEnvironmentNoop::shutdownGlobalStorageEngineCleanly() {
+    void ServiceContextNoop::shutdownGlobalStorageEngineCleanly() {
     }
 
-    void GlobalEnvironmentNoop::registerStorageEngine(const std::string& name,
-                                                      const StorageEngine::Factory* factory) {
+    void ServiceContextNoop::registerStorageEngine(const std::string& name,
+                                                   const StorageEngine::Factory* factory) {
         // Takes ownership of 'factory' and deletes it because we don't need it.
         delete factory;
     }
 
-    bool GlobalEnvironmentNoop::isRegisteredStorageEngine(const std::string& name) {
+    bool ServiceContextNoop::isRegisteredStorageEngine(const std::string& name) {
         return false;
     }
 
-    StorageFactoriesIterator* GlobalEnvironmentNoop::makeStorageFactoriesIterator() {
+    StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
         class EmptySFI : public StorageFactoriesIterator {
         public:
             virtual bool more() const { return false; }
@@ -64,31 +64,31 @@ namespace mongo {
         return new EmptySFI();
     }
 
-    void GlobalEnvironmentNoop::setKillAllOperations() { }
+    void ServiceContextNoop::setKillAllOperations() { }
 
-    void GlobalEnvironmentNoop::unsetKillAllOperations() { }
+    void ServiceContextNoop::unsetKillAllOperations() { }
 
-    bool GlobalEnvironmentNoop::getKillAllOperations() {
+    bool ServiceContextNoop::getKillAllOperations() {
         return false;
     }
 
-    bool GlobalEnvironmentNoop::killOperation(unsigned int opId) {
+    bool ServiceContextNoop::killOperation(unsigned int opId) {
         return false;
     }
 
-    void GlobalEnvironmentNoop::killAllUserOperations(const OperationContext* txn) {}
+    void ServiceContextNoop::killAllUserOperations(const OperationContext* txn) {}
 
-    void GlobalEnvironmentNoop::registerKillOpListener(KillOpListenerInterface* listener) {
+    void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {
     }
 
-    OperationContext* GlobalEnvironmentNoop::newOpCtx() {
+    OperationContext* ServiceContextNoop::newOpCtx() {
         return new OperationContextNoop();
     }
 
-    void GlobalEnvironmentNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
+    void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
     }
 
-    OpObserver* GlobalEnvironmentNoop::getOpObserver() {
+    OpObserver* ServiceContextNoop::getOpObserver() {
         return nullptr;
     }
 }  // namespace mongo

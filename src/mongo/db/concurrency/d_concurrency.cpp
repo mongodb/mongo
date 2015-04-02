@@ -32,7 +32,7 @@
 
 #include <string>
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"

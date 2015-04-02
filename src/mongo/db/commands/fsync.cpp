@@ -46,7 +46,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/client.h"
@@ -152,7 +152,7 @@ namespace mongo {
 
                 // Take a global IS lock to ensure the storage engine is not shutdown
                 Lock::GlobalLock global(txn->lockState(), MODE_IS, UINT_MAX);
-                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
                 result.append( "numFiles" , storageEngine->flushAllFiles( sync ) );
             }
             return 1;
@@ -233,7 +233,7 @@ namespace mongo {
         txn.lockState()->downgradeGlobalXtoSForMMAPV1();
 
         try {
-            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             storageEngine->flushAllFiles(true);
         }
         catch( std::exception& e ) {

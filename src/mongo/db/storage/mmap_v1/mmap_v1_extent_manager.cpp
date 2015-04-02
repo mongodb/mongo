@@ -37,7 +37,7 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/record.h"
@@ -114,7 +114,7 @@ namespace mongo {
           _path(path.toString()),
           _directoryPerDB(directoryPerDB),
           _rid(RESOURCE_METADATA, dbname) {
-        StorageEngine* engine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
         invariant(engine->isMmapV1());
         MMAPV1Engine* mmapEngine = static_cast<MMAPV1Engine*>(engine);
         _recordAccessTracker = &mmapEngine->getRecordAccessTracker();

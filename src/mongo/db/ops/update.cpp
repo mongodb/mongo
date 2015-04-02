@@ -41,7 +41,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_driver.h"
@@ -92,7 +92,7 @@ namespace mongo {
             invariant(collection);
 
             if (!request.isFromReplication()) {
-                getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                getGlobalServiceContext()->getOpObserver()->onCreateCollection(
                         txn,
                         NamespaceString(nsString),
                         CollectionOptions());

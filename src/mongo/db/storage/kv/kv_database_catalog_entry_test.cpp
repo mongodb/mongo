@@ -32,11 +32,12 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/global_environment_noop.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -44,7 +45,7 @@ namespace {
     using namespace mongo;
 
     MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-        setGlobalEnvironment(new GlobalEnvironmentNoop());
+        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
         return Status::OK();
     }
 

@@ -36,7 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
@@ -126,7 +126,7 @@ namespace {
                 WriteUnitOfWork wunit(txn);
                 toCollection->insertDocument( txn, obj, true );
                 if ( logForReplication ) {
-                    getGlobalEnvironment()->getOpObserver()->onInsert(txn, toNs, obj);
+                    getGlobalServiceContext()->getOpObserver()->onInsert(txn, toNs, obj);
                 }
                 wunit.commit();
             }
@@ -300,7 +300,7 @@ namespace {
                 return appendCommandStatus( result, status );
 
             if (!fromRepl) {
-                getGlobalEnvironment()->getOpObserver()->onConvertToCapped(
+                getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
                         txn,
                         NamespaceString(longSource),
                         size);

@@ -41,7 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
@@ -336,7 +336,7 @@ namespace mongo {
                     // subsequent getMore requests. The calling OpCtx gets a fresh RecoveryUnit.
                     txn->recoveryUnit()->commitAndRestart();
                     cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-                    StorageEngine* engine = getGlobalEnvironment()->getGlobalStorageEngine();
+                    StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
                     txn->setRecoveryUnit(engine->newRecoveryUnit());
                 }
             }

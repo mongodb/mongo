@@ -38,7 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
@@ -235,7 +235,7 @@ namespace mongo {
             IndexBuilder::restoreIndexes(txn, indexes);
 
             if (!fromRepl) {
-                getGlobalEnvironment()->getOpObserver()->onEmptyCapped(txn, collection->ns());
+                getGlobalServiceContext()->getOpObserver()->onEmptyCapped(txn, collection->ns());
             }
 
             wuow.commit();

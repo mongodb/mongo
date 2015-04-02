@@ -48,7 +48,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/op_observer.h"
@@ -132,7 +132,7 @@ namespace mongo {
                     return false;
                 }
                 if (!fromRepl) {
-                    getGlobalEnvironment()->getOpObserver()->onDropIndex(txn,
+                    getGlobalServiceContext()->getOpObserver()->onDropIndex(txn,
                                                                          dbname + ".$cmd",
                                                                          jsobj);
                 }

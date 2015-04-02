@@ -32,7 +32,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -84,7 +84,7 @@ namespace mongo {
             Lock::GlobalWrite globalWrite(txn->lockState());
 
             WriteUnitOfWork wuow(txn);
-            getGlobalEnvironment()->getOpObserver()->onOpMessage(txn, dataElement.Obj());
+            getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, dataElement.Obj());
             wuow.commit();
             return true;
         }

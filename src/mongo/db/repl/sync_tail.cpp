@@ -46,7 +46,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
@@ -267,7 +267,7 @@ namespace repl {
     // Doles out all the work to the writer pool threads and waits for them to complete
     OpTime SyncTail::multiApply(OperationContext* txn, std::deque<BSONObj>& ops) {
 
-        if (getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1()) {
+        if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
             // Use a ThreadPool to prefetch all the operations in a batch.
             prefetchOps(ops);
         }
@@ -338,7 +338,7 @@ namespace repl {
                 *mustAwaitCommit = true;
             }
 
-            if (getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking() &&
+            if (getGlobalServiceContext()->getGlobalStorageEngine()->supportsDocLocking() &&
                 isCrudOpType(opType)) {
                 BSONElement id;
                 switch (opType[0]) {

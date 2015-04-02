@@ -51,7 +51,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/namespace_string.h"
@@ -415,11 +415,11 @@ namespace {
         WriteUnitOfWork uow( txn );
         invariant(ctx.db()->createCollection(txn, _oplogCollectionName, options));
         if( !rs )
-            getGlobalEnvironment()->getOpObserver()->onOpMessage(txn, BSONObj());
+            getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, BSONObj());
         uow.commit();
 
         /* sync here so we don't get any surprising lag later when we try to sync */
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->flushAllFiles(true);
         log() << "******" << endl;
     }

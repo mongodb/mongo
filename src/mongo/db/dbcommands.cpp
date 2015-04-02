@@ -59,8 +59,8 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -219,7 +219,7 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
 
                 if (!fromRepl) {
-                    getGlobalEnvironment()->getOpObserver()->onDropDatabase(txn, dbname + ".$cmd");
+                    getGlobalServiceContext()->getOpObserver()->onDropDatabase(txn, dbname + ".$cmd");
                 }
 
                 wunit.commit();
@@ -299,7 +299,7 @@ namespace mongo {
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
 
-            StorageEngine* engine = getGlobalEnvironment()->getGlobalStorageEngine();
+            StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
             Status status = repairDatabase(txn, engine, dbname, preserveClonedFilesOnFailure,
                                            backupOriginalFiles );
 
@@ -529,7 +529,7 @@ namespace mongo {
                 }
 
                 if ( !fromRepl ) {
-                    getGlobalEnvironment()->getOpObserver()->onDropCollection(
+                    getGlobalServiceContext()->getOpObserver()->onDropCollection(
                             txn,
                             NamespaceString(nsToDrop));
                 }
@@ -1173,7 +1173,7 @@ namespace mongo {
             }
 
             if (!fromRepl) {
-                getGlobalEnvironment()->getOpObserver()->onCollMod(txn,
+                getGlobalServiceContext()->getOpObserver()->onCollMod(txn,
                                                                    (dbname + ".$cmd").c_str(),
                                                                    jsobj);
             }

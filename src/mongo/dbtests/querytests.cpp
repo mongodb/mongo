@@ -38,8 +38,8 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
@@ -298,7 +298,7 @@ namespace QueryTests {
     class GetMoreKillOp : public ClientBase {
     public:
         ~GetMoreKillOp() {
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             _client.dropCollection( "unittests.querytests.GetMoreKillOp" );
         }
         void run() {
@@ -321,13 +321,13 @@ namespace QueryTests {
             
             // Set the killop kill all flag, forcing the next get more to fail with a kill op
             // exception.
-            getGlobalEnvironment()->setKillAllOperations();
+            getGlobalServiceContext()->setKillAllOperations();
             while( cursor->more() ) {
                 cursor->next();
             }
             
             // Revert the killop kill all flag.
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
 
             // Check that the cursor has been removed.
             {
@@ -350,7 +350,7 @@ namespace QueryTests {
     class GetMoreInvalidRequest : public ClientBase {
     public:
         ~GetMoreInvalidRequest() {
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             _client.dropCollection( "unittests.querytests.GetMoreInvalidRequest" );
         }
         void run() {

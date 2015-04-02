@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 

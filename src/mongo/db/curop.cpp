@@ -36,7 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/json.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"

@@ -47,7 +47,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
@@ -497,7 +497,7 @@ namespace {
             double v = vElt.Number();
 
             // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
-            if (v == 0 && !getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1()) {
+            if (v == 0 && !getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
                 return Status( ErrorCodes::CannotCreateIndex,
                                str::stream() << "use of v0 indexes is only allowed with the "
                                              << "mmapv1 storage engine");
@@ -1300,7 +1300,7 @@ namespace {
             // immediately after it recovers from yield, such that no further work is done
             // on the index build. Thus this thread does not have to synchronize with the
             // bg index operation; we can just assume that it is safe to proceed.
-            getGlobalEnvironment()->killOperation(opNum);
+            getGlobalServiceContext()->killOperation(opNum);
         }
 
         if (indexes.size() > 0) {

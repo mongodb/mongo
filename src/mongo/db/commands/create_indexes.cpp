@@ -42,7 +42,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
@@ -162,7 +162,7 @@ namespace mongo {
                     collection = db->createCollection( txn, ns.ns() );
                     invariant( collection );
                     if (!fromRepl) {
-                        getGlobalEnvironment()->getOpObserver()->onCreateCollection(
+                        getGlobalServiceContext()->getOpObserver()->onCreateCollection(
                                 txn,
                                 ns,
                                 CollectionOptions());
@@ -274,7 +274,7 @@ namespace mongo {
                 if ( !fromRepl ) {
                     for ( size_t i = 0; i < specs.size(); i++ ) {
                         std::string systemIndexes = ns.getSystemIndexesCollection();
-                        getGlobalEnvironment()->getOpObserver()->onCreateIndex(txn,
+                        getGlobalServiceContext()->getOpObserver()->onCreateIndex(txn,
                                                                                systemIndexes,
                                                                                specs[i]);
                     }

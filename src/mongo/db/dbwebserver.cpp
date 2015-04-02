@@ -48,7 +48,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/snapshots.h"
@@ -297,7 +297,7 @@ namespace {
                                 vector<string>& headers,
                                 const SockAddr &from) {
 
-        boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
+        boost::scoped_ptr<OperationContext> txn(getGlobalServiceContext()->newOpCtx());
 
         if (url.size() > 1) {
 

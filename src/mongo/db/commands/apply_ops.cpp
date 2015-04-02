@@ -45,7 +45,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context_impl.h"
@@ -224,7 +224,7 @@ namespace mongo {
                 while (true) {
                     try {
                         WriteUnitOfWork wunit(txn);
-                        getGlobalEnvironment()->getOpObserver()->onApplyOps(txn,
+                        getGlobalServiceContext()->getOpObserver()->onApplyOps(txn,
                                                                             tempNS,
                                                                             cmdRewritten);
                         wunit.commit();

@@ -39,7 +39,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/file_allocator.h"
@@ -122,7 +122,7 @@ namespace {
             uasserted(DatabaseDifferCaseCode, ss.str());
         }
 
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         invariant(storageEngine);
 
         DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
@@ -166,7 +166,7 @@ namespace {
         delete it->second;
         _dbs.erase(it);
 
-        getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase(txn, dbName.toString());
+        getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(txn, dbName.toString());
     }
 
     bool DatabaseHolder::closeAll(OperationContext* txn, BSONObjBuilder& result, bool force) {
@@ -200,7 +200,7 @@ namespace {
 
             _dbs.erase( name );
 
-            getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase( txn, name );
+            getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase( txn, name );
 
             bb.append( name );
         }

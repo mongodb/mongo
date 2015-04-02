@@ -40,7 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -72,7 +72,7 @@ namespace mongo {
              * @return Number of documents deleted.
              */
             int64_t _deleteExcessDocuments() {
-                if (!getGlobalEnvironment()->getGlobalStorageEngine()) {
+                if (!getGlobalServiceContext()->getGlobalStorageEngine()) {
                     LOG(1) << "no global storage engine yet";
                     return 0;
                 }

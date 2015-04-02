@@ -41,7 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/stats/counters.h"
@@ -184,7 +184,7 @@ namespace mongo {
             if (!cursor->hasRecoveryUnit()) {
                 // Start using a new RecoveryUnit.
                 cursor->setOwnedRecoveryUnit(
-                    getGlobalEnvironment()->getGlobalStorageEngine()->newRecoveryUnit());
+                    getGlobalServiceContext()->getGlobalStorageEngine()->newRecoveryUnit());
             }
 
             // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.

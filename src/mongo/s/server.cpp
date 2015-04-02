@@ -51,8 +51,8 @@
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/dbwebserver.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/global_environment_noop.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
@@ -71,6 +71,7 @@
 #include "mongo/s/request.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/task.h"
@@ -412,7 +413,7 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
 }
 
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalEnvironment(new GlobalEnvironmentNoop());
+    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
     return Status::OK();
 }
 

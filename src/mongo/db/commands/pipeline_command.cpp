@@ -41,7 +41,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/pipeline_proxy.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -138,7 +138,7 @@ namespace mongo {
                 // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
                 txn->recoveryUnit()->commitAndRestart();
                 cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
                 txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
             }
 

@@ -33,8 +33,8 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
@@ -121,7 +121,7 @@ namespace mongo {
                                          ("SetGlobalEnvironment"))
         (InitializerContext* context ) {
 
-        getGlobalEnvironment()->registerStorageEngine(kWiredTigerEngineName,
+        getGlobalServiceContext()->registerStorageEngine(kWiredTigerEngineName,
                                                       new WiredTigerFactory());
 
         return Status::OK();

@@ -67,10 +67,10 @@ namespace mongo {
         StorageFactoriesIterator() { }
     };
 
-    class GlobalEnvironmentExperiment {
-        MONGO_DISALLOW_COPYING(GlobalEnvironmentExperiment);
+    class ServiceContext {
+        MONGO_DISALLOW_COPYING(ServiceContext);
     public:
-        virtual ~GlobalEnvironmentExperiment() { }
+        virtual ~ServiceContext() { }
 
         //
         // Storage
@@ -149,7 +149,7 @@ namespace mongo {
          * Registers a listener to be notified each time an op is killed.
          *
          * listener does not become owned by the environment. As there is currently no way to
-         * unregister, the listener object must outlive this GlobalEnvironmentExperiment object.
+         * unregister, the listener object must outlive this ServiceContext object.
          */
         virtual void registerKillOpListener(KillOpListenerInterface* listener) = 0;
 
@@ -173,30 +173,30 @@ namespace mongo {
         virtual OpObserver* getOpObserver() = 0;
 
     protected:
-        GlobalEnvironmentExperiment() { }
+        ServiceContext() { }
     };
 
     /**
-     * Returns true if there is a globalEnvironment.
+     * Returns true if there is a global ServiceContext.
      */
-    bool hasGlobalEnvironment();
+    bool hasGlobalServiceContext();
 
     /**
-     * Returns the singleton GlobalEnvironmentExperiment for this server process.
+     * Returns the singleton ServiceContext for this server process.
      *
-     * Fatal if there is currently no globalEnvironment.
+     * Fatal if there is currently no global ServiceContext.
      *
      * Caller does not own pointer.
      */
-    GlobalEnvironmentExperiment* getGlobalEnvironment();
+    ServiceContext* getGlobalServiceContext();
 
     /**
-     * Sets the GlobalEnvironmentExperiment.  If 'globalEnvironment' is NULL, un-sets and deletes
-     * the current GlobalEnvironmentExperiment.
+     * Sets the global ServiceContext.  If 'serviceContext' is NULL, un-sets and deletes
+     * the current global ServiceContext.
      *
-     * Takes ownership of 'globalEnvironment'.
+     * Takes ownership of 'serviceContext'.
      */
-    void setGlobalEnvironment(GlobalEnvironmentExperiment* globalEnvironment);
+    void setGlobalServiceContext(std::unique_ptr<ServiceContext>&& serviceContext);
 
     /**
      * Shortcut for querying the storage engine about whether it supports document-level locking.

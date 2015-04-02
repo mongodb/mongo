@@ -480,7 +480,7 @@ env.Library('mongocommon', commonFiles,
                      'clientdriver',
                      'fail_point',
                      'foundation',
-                     'global_environment_experiment',
+                     'service_context',
                      'lasterror',
                      'md5',
                      'mongohasher',
@@ -696,10 +696,14 @@ else:
 
 env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIBDEPS=[ 'db/common' ])
 
-# Global Configuration.  Used by both mongos and mongod.
-env.Library('global_environment_experiment',
-            [ 'db/global_environment_experiment.cpp',
-              'db/global_environment_noop.cpp' ])
+env.Library(
+    target='service_context',
+    source=[
+        'db/service_context.cpp',
+        'db/service_context_noop.cpp',
+    ],
+    LIBDEPS=[
+         ])
 
 # Memory-mapped files support.  Used by mongod and some tools.
 env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${TARGET_OS_FAMILY}.cpp'], LIBDEPS=['foundation'])
@@ -773,7 +777,7 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/dbhelpers.cpp",
                     "db/driverHelpers.cpp",
                     "db/geo/haystack.cpp",
-                    "db/global_environment_d.cpp",
+                    "db/service_context_d.cpp",
                     "db/index/2d_access_method.cpp",
                     "db/index/btree_access_method.cpp",
                     "db/index/fts_access_method.cpp",
@@ -1029,7 +1033,7 @@ env.Library('range_deleter',
                 '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
                 'base/base',
                 'bson',
-                'global_environment_experiment',
+                'service_context',
                 'range_arithmetic',
                 'synchronization'
             ])

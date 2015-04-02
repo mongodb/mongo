@@ -33,7 +33,7 @@
 #include "mongo/db/storage/mmap_v1/data_file_sync.h"
 
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
@@ -84,7 +84,7 @@ namespace mongo {
             }
 
             Date_t start = jsTime();
-            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             int numFiles = storageEngine->flushAllFiles( true );
             time_flushing = (int) (jsTime() - start);
 
