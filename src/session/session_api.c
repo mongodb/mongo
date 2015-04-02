@@ -9,6 +9,7 @@
 #include "wt_internal.h"
 
 static int __session_checkpoint(WT_SESSION *, const char *);
+static int __session_snapshot(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
@@ -862,7 +863,6 @@ err:	API_END_RET(session, ret);
 static int
 __session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
-	WT_CONFIG_ITEM nsnap_drop, nsnap_name;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
@@ -900,19 +900,6 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_ERR(__wt_session_reset_cursors(session));
 
 	/*
-	 * Check if this is a named snapshot operation.
-	 */
-	WT_ERR(__wt_config_gets_def(
-	    session, cfg, "snapshot.name", 0, &nsnap_name));
-	WT_ERR(__wt_config_gets_def(
-	    session, cfg, "snapshot.drop_to", 0, &nsnap_drop));
-	if (nsnap_name.len > 0 || nsnap_drop.len > 0) {
-		ret = __wt_txn_named_snapshot(
-		    session, &nsnap_name, &nsnap_drop, cfg);
-		goto done;
-	}
-
-	/*
 	 * Don't highjack the session checkpoint thread for eviction.
 	 *
 	 * Application threads are not generally available for potentially slow
@@ -938,7 +925,65 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
 
-done:	API_END_RET_NOTFOUND_MAP(session, ret);
+	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_snapshot --
+ *	WT_SESSION->snapshot method.
+ */
+static int
+__session_snapshot(WT_SESSION *wt_session, const char *config)
+{
+	WT_CONFIG_ITEM nsnap_drop, nsnap_name;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	txn = &session->txn;
+
+	SESSION_API_CALL(session, snapshot, config, cfg);
+
+	/*
+	 * Checkpoints require a snapshot to write a transactionally consistent
+	 * snapshot of the data.
+	 *
+	 * We can't use an application's transaction: if it has uncommitted
+	 * changes, they will be written in the checkpoint and may appear after
+	 * a crash.
+	 *
+	 * Use a real snapshot transaction: we don't want any chance of the
+	 * snapshot being updated during the checkpoint.  Eviction is prevented
+	 * from evicting anything newer than this because we track the oldest
+	 * transaction ID in the system that is not visible to all readers.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_ERR_MSG(session, EINVAL,
+		    "Snapshot not permitted in a transaction");
+
+	/*
+	 * Reset open cursors.  Do this explicitly, even though it will happen
+	 * implicitly in the call to begin_transaction for the checkpoint, the
+	 * checkpoint code will acquire the schema lock before we do that, and
+	 * some implementation of WT_CURSOR::reset might need the schema lock.
+	 */
+	WT_ERR(__wt_session_reset_cursors(session));
+
+	/*
+	 * Check if this is a named snapshot operation.
+	 */
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "name", 0, &nsnap_name));
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "drop.to", 0, &nsnap_drop));
+	if (nsnap_name.len > 0 || nsnap_drop.len > 0) {
+		ret = __wt_txn_named_snapshot(
+		    session, &nsnap_name, &nsnap_drop, cfg);
+	}
+
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -1032,6 +1077,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
+		__session_snapshot,
 		__session_transaction_pinned_range
 	};
 	WT_DECL_RET;

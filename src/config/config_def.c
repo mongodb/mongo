@@ -211,19 +211,10 @@ static const WT_CONFIG_CHECK confchk_session_begin_transaction[] = {
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
-static const WT_CONFIG_CHECK confchk_snapshot_subconfigs[] = {
-	{ "drop_to", "string", NULL, NULL, NULL },
-	{ "name", "string", NULL, NULL, NULL },
-	{ NULL, NULL, NULL, NULL, NULL }
-};
-
 static const WT_CONFIG_CHECK confchk_session_checkpoint[] = {
 	{ "drop", "list", NULL, NULL, NULL },
 	{ "force", "boolean", NULL, NULL, NULL },
 	{ "name", "string", NULL, NULL, NULL },
-	{ "snapshot", "category",
-	    NULL, NULL,
-	    confchk_snapshot_subconfigs },
 	{ "target", "list", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
@@ -335,6 +326,17 @@ static const WT_CONFIG_CHECK confchk_session_reconfigure[] = {
 
 static const WT_CONFIG_CHECK confchk_session_salvage[] = {
 	{ "force", "boolean", NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL }
+};
+
+static const WT_CONFIG_CHECK confchk_drop_subconfigs[] = {
+	{ "to", "string", NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL }
+};
+
+static const WT_CONFIG_CHECK confchk_session_snapshot[] = {
+	{ "drop", "category", NULL, NULL, confchk_drop_subconfigs },
+	{ "name", "string", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -712,7 +714,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_session_begin_transaction
 	},
 	{ "session.checkpoint",
-	  "drop=,force=0,name=,snapshot=(drop_to=,name=),target=",
+	  "drop=,force=0,name=,target=",
 	  confchk_session_checkpoint
 	},
 	{ "session.close",
@@ -772,6 +774,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "session.salvage",
 	  "force=0",
 	  confchk_session_salvage
+	},
+	{ "session.snapshot",
+	  "drop=(to=),name=",
+	  confchk_session_snapshot
 	},
 	{ "session.strerror",
 	  "",

@@ -1436,21 +1436,33 @@ struct __wt_session {
 	 * @config{name, if set\, specify a name for the checkpoint (note that
 	 * checkpoints including LSM trees may not be named)., a string; default
 	 * empty.}
-	 * @config{snapshot = (, take a named\, in-memory snapshot\, see @ref
-	 * transaction_named_snapshots., a set of related configuration options
-	 * defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;drop_to, if
-	 * non-empty\, specifies that all snapshots up to and including the
-	 * specified name should be dropped., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, if non-empty\, specifies a
-	 * named\, in-memory snapshot., a string; default empty.}
-	 * @config{ ),,}
 	 * @config{target, if non-empty\, checkpoint the list of objects., a
 	 * list of strings; default empty.}
 	 * @configend
 	 * @errors
 	 */
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
+
+	/*!
+	 * Manage named snapshot transactions. Use this API to create and drop
+	 * named snapshots. Named snapshot transactions can be accessed via
+	 * WT_CURSOR::open. See @ref transaction_named_snapshots.
+	 *
+	 * @snippet ex_all.c Snapshot example
+	 *
+	 * @param session the session handle
+	 * @configstart{session.snapshot, see dist/api_data.py}
+	 * @config{drop = (, if non-empty\, specifies which snapshots to drop.,
+	 * a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, all snapshots up to and including
+	 * the specified name should be dropped., a string; default \c true.}
+	 * @config{ ),,}
+	 * @config{name, specify a name for the snapshot., a string; default
+	 * empty.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(snapshot)(WT_SESSION *session, const char *config);
 
 	/*!
 	 * Return the transaction ID range pinned by the session handle.

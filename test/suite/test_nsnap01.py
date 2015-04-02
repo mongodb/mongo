@@ -67,12 +67,12 @@ class test_nsnap01(wttest.WiredTigerTestCase, suite_subprocess):
         for n in xrange(self.nrows / self.nrows_per_snap):
             if len(snapshots) > self.nsnapshots:
                 middle = len(snapshots) / 2
-                dropcfg = ",drop_to=%d" % snapshots[middle][0]
+                dropcfg = ",drop=(to=%d)" % snapshots[middle][0]
                 snapshots = snapshots[middle + 1:]
             else:
                 dropcfg = ""
 
-            self.session.checkpoint("snapshot=(name=%d%s)" % (n, dropcfg))
+            self.session.snapshot("name=%d%s" % (n, dropcfg))
             snapshots.append((n, end - start))
             for i in xrange(2 * self.nrows_per_snap):
                 c[end + i] = "some value"

@@ -808,18 +808,19 @@ methods = {
     Config('name', '', r'''
         if set, specify a name for the checkpoint (note that checkpoints
         including LSM trees may not be named)'''),
-    Config('snapshot', '', r'''
-        take a named, in-memory snapshot, see
-        @ref transaction_named_snapshots''',
-        type='category', subconfig=[
-        Config('drop_to', '', r'''
-            if non-empty, specifies that all snapshots up to and including the
-            specified name should be dropped.'''),
-        Config('name', '', r'''
-            if non-empty, specifies a named, in-memory snapshot'''),
-        ]),
     Config('target', '', r'''
         if non-empty, checkpoint the list of objects''', type='list'),
+]),
+
+'session.snapshot' : Method([
+    Config('drop', '', r'''
+            if non-empty, specifies which snapshots to drop''',
+        type='category', subconfig=[
+        Config('to', 'true', r'''
+            all snapshots up to and including the specified name should
+            be dropped'''),
+    ]),
+    Config('name', '', r'''specify a name for the snapshot'''),
 ]),
 
 'connection.add_collator' : Method([]),
