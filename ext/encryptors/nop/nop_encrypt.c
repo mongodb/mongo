@@ -119,7 +119,7 @@ nop_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	*expansion_constantp = 0;
 	return (0);
 }
-/*! [WT_ENCRYPTOR presize] */
+/*! [WT_ENCRYPTOR sizing] */
 
 /*! [WT_ENCRYPTOR terminate] */
 /*
