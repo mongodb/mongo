@@ -929,7 +929,7 @@ namespace mongo {
 
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
         if (info) {
-            auto rootRequest = updateItem.getRequest();
+            const BatchedCommandRequest* rootRequest = updateItem.getRequest();
             if (!updateItem.getUpdate()->getMulti() &&
                     rootRequest->isMetadataSet() &&
                     rootRequest->getMetadata()->isShardVersionSet()) {
@@ -973,7 +973,7 @@ namespace mongo {
 
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
         if (info) {
-            auto rootRequest = removeItem.getRequest();
+            const BatchedCommandRequest* rootRequest = removeItem.getRequest();
             if (removeItem.getDelete()->getLimit() == 1 &&
                     rootRequest->isMetadataSet() &&
                     rootRequest->getMetadata()->isShardVersionSet()) {
