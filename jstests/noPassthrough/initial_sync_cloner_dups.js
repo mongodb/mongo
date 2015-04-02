@@ -22,7 +22,7 @@ var contains = function(logLines, func) {
     return false;
 }
 
-var replTest = new ReplSetTest({name: 'cloner', nodes: 3});
+var replTest = new ReplSetTest({name: 'cloner', nodes: 3, oplogSize: 150 /*~1.5x data size*/});
 replTest.startSet();
 var conf = replTest.getReplSetConfig();
 conf.settings = {};
