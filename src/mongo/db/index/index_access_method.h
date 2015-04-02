@@ -42,6 +42,7 @@
 namespace mongo {
 
     class BSONObjBuilder;
+    class MatchExpression;
     class UpdateTicket;
     struct InsertDeleteOptions;
 
@@ -105,7 +106,8 @@ namespace mongo {
                               const BSONObj& to,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
-                              UpdateTicket* ticket);
+                              UpdateTicket* ticket,
+                              const MatchExpression* indexFilter);
 
         /**
          * Perform a validated update.  The keys for the 'from' object will be removed, and the keys

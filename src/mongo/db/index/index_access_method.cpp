@@ -275,10 +275,13 @@ namespace mongo {
                                              const BSONObj &to,
                                              const RecordId &record,
                                              const InsertDeleteOptions &options,
-                                             UpdateTicket* ticket) {
+                                             UpdateTicket* ticket,
+                                             const MatchExpression* indexFilter) {
 
-        getKeys(from, &ticket->oldKeys);
-        getKeys(to, &ticket->newKeys);
+        if (indexFilter == NULL || indexFilter->matchesBSON(from))
+            getKeys(from, &ticket->oldKeys);
+        if (indexFilter == NULL || indexFilter->matchesBSON(to))
+            getKeys(to, &ticket->newKeys);
         ticket->loc = record;
         ticket->dupsAllowed = options.dupsAllowed;
 

@@ -72,7 +72,7 @@ namespace mongo {
     }
 
     // static
-    void QueryPlannerIXSelect::getFields(MatchExpression* node,
+    void QueryPlannerIXSelect::getFields(const MatchExpression* node,
                                          string prefix,
                                          unordered_set<string>* out) {
         // Do not traverse tree beyond a NOR negation node

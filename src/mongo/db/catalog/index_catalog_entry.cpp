@@ -40,6 +40,8 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
@@ -99,6 +101,19 @@ namespace mongo {
         _isReady = _catalogIsReady( txn );
         _head = _catalogHead( txn );
         _isMultikey = _catalogIsMultikey( txn );
+
+        BSONElement filterElement = _descriptor->getInfoElement("filter");
+        if ( filterElement.type() ) {
+            invariant( filterElement.isABSONObj() );
+            BSONObj filter = filterElement.Obj();
+            StatusWithMatchExpression res = MatchExpressionParser::parse( filter );
+            // this should be checked in create, so can blow up here
+            invariantOK( res.getStatus() );
+            _filterExpression.reset( res.getValue() );
+            LOG(2) << "have filter expression for "
+                   << _ns << " " << _descriptor->indexName()
+                   << " " << filter;
+        }
     }
 
     const RecordId& IndexCatalogEntry::head( OperationContext* txn ) const {

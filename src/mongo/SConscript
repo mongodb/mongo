@@ -194,6 +194,14 @@ env.Library('expressions',
                      '$BUILD_DIR/third_party/shim_pcrecpp'
                      ] )
 
+env.Library('expression_algo',
+            ['db/matcher/expression_algo.cpp'],
+            LIBDEPS=['expressions'])
+
+env.CppUnitTest('expression_algo_test',
+            ['db/matcher/expression_algo_test.cpp'],
+            LIBDEPS=['expression_algo'])
+
 env.Library('expressions_geo',
             ['db/matcher/expression_geo.cpp',
              'db/matcher/expression_parser_geo.cpp'],

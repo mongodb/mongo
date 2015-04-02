@@ -47,6 +47,7 @@ env.Library(
     LIBDEPS=[
         "query_planner",
         "query_planner_test_lib",
+        "$BUILD_DIR/mongo/expression_algo",
         "$BUILD_DIR/mongo/db/exec/exec"
     ],
 )

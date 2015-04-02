@@ -143,7 +143,11 @@ namespace mongo {
             IndexDescriptor* next();
 
             // returns the access method for the last return IndexDescriptor
-            IndexAccessMethod* accessMethod( IndexDescriptor* desc );
+            IndexAccessMethod* accessMethod( const IndexDescriptor* desc );
+
+            // returns the IndexCatalogEntry for the last return IndexDescriptor
+            IndexCatalogEntry* catalogEntry( const IndexDescriptor* desc );
+
         private:
             IndexIterator( OperationContext* txn,
                            const IndexCatalog* cat,

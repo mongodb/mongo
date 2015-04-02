@@ -51,6 +51,7 @@
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain.h"
@@ -111,6 +112,20 @@ namespace mongo {
     namespace {
         // The body is below in the "count hack" section but getExecutor calls it.
         bool turnIxscanIntoCount(QuerySolution* soln);
+
+        bool filteredIndexBad(const MatchExpression* filter, CanonicalQuery* query) {
+            if (!filter)
+                return false;
+
+            MatchExpression* queryPredicates = query->root();
+            if (!queryPredicates) {
+                // Index is filtered, but query has none.
+                // Impossible to use index.
+                return true;
+            }
+
+            return !expression::isClauseRedundant(queryPredicates, filter);
+        }
     }  // namespace
 
 
@@ -123,6 +138,12 @@ namespace mongo {
                                                                                          false);
         while (ii.more()) {
             const IndexDescriptor* desc = ii.next();
+
+            IndexCatalogEntry* ice = ii.catalogEntry(desc);
+            if (filteredIndexBad(ice->getFilterExpression(), canonicalQuery)) {
+                continue;
+            }
+
             plannerParams->indices.push_back(IndexEntry(desc->keyPattern(),
                                                         desc->getAccessMethodName(),
                                                         desc->isMultikey(txn),

@@ -203,6 +203,8 @@ namespace mongo {
             if (index.bulk)
                 log() << "\t building index using bulk method";
 
+            index.filterExpression = index.block->getEntry()->getFilterExpression();
+
             // TODO SERVER-14888 Suppress this in cases we don't want to audit.
             audit::logCreateIndex(_txn->getClient(), &info, descriptor->indexName(), ns);
 
@@ -335,6 +337,12 @@ namespace mongo {
 
     Status MultiIndexBlock::insert(const BSONObj& doc, const RecordId& loc) {
         for ( size_t i = 0; i < _indexes.size(); i++ ) {
+
+            if ( _indexes[i].filterExpression &&
+                 !_indexes[i].filterExpression->matchesBSON(doc) ) {
+                continue;
+            }
+
             int64_t unused;
             Status idxStatus(ErrorCodes::InternalError, "");
             if (_indexes[i].bulk) {

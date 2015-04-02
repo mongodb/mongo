@@ -54,6 +54,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -449,6 +450,39 @@ namespace {
         entry->setIsReady( true );
     }
 
+    namespace {
+        // While technically recursive, only current possible with 2 levels.
+        Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) {
+            if (!expression)
+                return Status::OK();
+
+            switch(expression->matchType()) {
+            case MatchExpression::AND:
+                if (level > 0)
+                    return Status(ErrorCodes::BadValue,
+                                  "$and only supported in filter at top level");
+                for (size_t i = 0; i < expression->numChildren(); i++) {
+                    Status status = _checkValidFilterExpressions(expression->getChild(i),
+                                                                 level + 1 );
+                    if (!status.isOK())
+                        return status;
+                }
+                return Status::OK();
+            case MatchExpression::EQ:
+            case MatchExpression::LT:
+            case MatchExpression::LTE:
+            case MatchExpression::GT:
+            case MatchExpression::GTE:
+            case MatchExpression::EXISTS:
+            case MatchExpression::TYPE_OPERATOR:
+                return Status::OK();
+            default:
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "unsupported expression in filtered index: "
+                              << expression->toString());
+            }
+        }
+    }
 
     Status IndexCatalog::_isSpecOk( const BSONObj& spec ) const {
 
@@ -541,6 +575,26 @@ namespace {
                 return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
             }
         }
+
+        // Ensure if there is a filter, its valid.
+        BSONElement filterElement = spec.getField("filter");
+        if ( filterElement.type() ) {
+            if ( filterElement.type() != Object ) {
+                return Status(ErrorCodes::BadValue,
+                              "'filter' for an index has to be a document");
+            }
+            StatusWithMatchExpression res = MatchExpressionParser::parse( filterElement.Obj() );
+            if ( !res.isOK() ) {
+                return res.getStatus();
+            }
+
+            Status status = _checkValidFilterExpressions(res.getValue());
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        // --- only storage engine checks allowed below this ----
 
         BSONElement storageEngineElement = spec.getField("storageEngine");
         if (storageEngineElement.eoo()) {
@@ -924,9 +978,14 @@ namespace {
         return _prev->descriptor();
     }
 
-    IndexAccessMethod* IndexCatalog::IndexIterator::accessMethod( IndexDescriptor* desc ) {
+    IndexAccessMethod* IndexCatalog::IndexIterator::accessMethod( const IndexDescriptor* desc ) {
         invariant( desc == _prev->descriptor() );
         return _prev->accessMethod();
+    }
+
+    IndexCatalogEntry* IndexCatalog::IndexIterator::catalogEntry( const IndexDescriptor* desc ) {
+        invariant( desc == _prev->descriptor() );
+        return _prev;
     }
 
     void IndexCatalog::IndexIterator::_advance() {
@@ -1084,6 +1143,11 @@ namespace {
                                       IndexCatalogEntry* index,
                                       const BSONObj& obj,
                                       const RecordId &loc ) {
+        const MatchExpression* filter = index->getFilterExpression();
+        if ( filter && !filter->matchesBSON( obj ) ) {
+            return Status::OK();
+        }
+
         InsertDeleteOptions options;
         options.logIfError = false;
         options.dupsAllowed = isDupsAllowed( index->descriptor() );
