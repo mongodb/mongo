@@ -392,13 +392,11 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ERR(encryptor->sizing(encryptor, &session->iface, &extra_size));
 
 	decrypted_size = logrec->mem_len - skip - extra_size;
-	__wt_errx(session, "\tLOG_DECRYPT: Record %lu, mem %lu, decrypted %lu",
-	    in->size, logrec->mem_len - skip, decrypted_size);
 	WT_ERR(__wt_scr_alloc(session, 0, out));
-	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size));
+	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size + skip));
 	memcpy((*out)->mem, in->mem, skip);
 	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
-	    (uint8_t *)in->mem + skip, in->size - skip,
+	    (uint8_t *)in->mem + skip, logrec->mem_len - skip,
 	    (uint8_t *)(*out)->mem + skip,
 	    decrypted_size, &result_len));
 
@@ -409,8 +407,6 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * it's OK, otherwise it's really, really bad.
 	 */
 	if (ret != 0 || result_len != decrypted_size) {
-		__wt_errx(session, "ret %d, result_len %lu dec %lu - %lu",
-		    ret, result_len, decrypted_size, WT_LOG_ENCRYPT_SKIP);
 		WT_ERR(WT_ERROR);
 	}
 err:	return (ret);
@@ -1518,9 +1514,6 @@ advance:
 		next_lsn.offset += (wt_off_t)rdup_len;
 		if (rd_lsn.offset != 0) {
 			if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
-				__wt_errx(session,
-				    "\tLOG_DECRYPT: [%d][%" PRIu64 "]",
-				    rd_lsn.file, rd_lsn.offset);
 				WT_ERR(__log_decrypt(session,
 				    &buf, &decryptitem));
 				swap = buf;
@@ -1731,9 +1724,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
-		__wt_errx(session,
-		    "LOG_ENCRYPT: Record %lu, encrypted %lu result %lu whole %lu",
-		    src_len, len, result_len, result_len + WT_LOG_ENCRYPT_SKIP);
 		result_len += WT_LOG_ENCRYPT_SKIP;
 
 		/* TODO: stats */
@@ -1814,9 +1804,6 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		ret = __log_direct_write(session, record, &lsn, flags);
 		if (ret == 0 && lsnp != NULL)
 			*lsnp = lsn;
-		__wt_errx(session,
-		    "\tLOG_WRITE: wrote at LSN [%d][%" PRIu64 "]",
-		    lsn.file, lsn.offset);
 		if (ret == 0)
 			return (0);
 		if (ret != EAGAIN)
@@ -1886,8 +1873,6 @@ err:
 		__wt_spin_unlock(session, &log->log_slot_lock);
 	if (ret == 0 && lsnp != NULL)
 		*lsnp = lsn;
-	__wt_errx(session, "\tLOG_WRITE: wrote at LSN [%d][%" PRIu64 "]",
-	    lsn.file, lsn.offset);
 	/*
 	 * If we're synchronous and some thread had an error, we don't know
 	 * if our write made it out to the file or not.  The error could be
