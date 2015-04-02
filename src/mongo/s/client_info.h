@@ -51,7 +51,6 @@ namespace mongo {
      */
     class ClientInfo : public ClientBasic {
     public:
-        ClientInfo(AbstractMessagingPort* messagingPort);
         ~ClientInfo();
 
         /** new request not associated (yet or ever) with a client */
@@ -98,9 +97,10 @@ namespace mongo {
         static bool exists();
         // Gets the ClientInfo object for this thread from _tlInfo. If no ClientInfo object exists
         // yet for this thread, it creates one.
-        static ClientInfo * get(AbstractMessagingPort* messagingPort = NULL);
+        static ClientInfo * get();
         // Creates a ClientInfo and stores it in _tlInfo
-        static ClientInfo* create(AbstractMessagingPort* messagingPort);
+        static ClientInfo* create(ServiceContext* serviceContext,
+                                  AbstractMessagingPort* messagingPort);
 
     private:
         struct RequestInfo {
@@ -113,6 +113,8 @@ namespace mongo {
             std::set<std::string> shardHostsWritten;
             HostOpTimeMap hostOpTimes;
         };
+
+        ClientInfo(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort);
 
         // we use _a and _b to store info from the current request and the previous request
         // we use 2 so we can flip for getLastError type operations

@@ -124,7 +124,9 @@ namespace mongo {
     private:
         friend class CurOp;
 
-        Client(const std::string& desc, AbstractMessagingPort *p = 0);
+        Client(const std::string& desc,
+               ServiceContext* serviceContext,
+               AbstractMessagingPort *p = 0);
 
 
         // Description for the client (e.g. conn8)

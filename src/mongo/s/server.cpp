@@ -51,12 +51,12 @@
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/dbwebserver.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
@@ -139,7 +139,7 @@ namespace mongo {
         virtual ~ShardedMessageHandler() {}
 
         virtual void connected( AbstractMessagingPort* p ) {
-            ClientInfo::create(p);
+            ClientInfo::create(getGlobalServiceContext(), p);
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {

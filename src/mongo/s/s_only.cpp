@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/client_info.h"
 #include "mongo/util/log.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -59,8 +60,8 @@ namespace mongo {
 
     TSP_DEFINE(Client,currentClient)
 
-    Client::Client(const string& desc, AbstractMessagingPort *p) :
-        ClientBasic(p),
+    Client::Client(const string& desc, ServiceContext* serviceContext, AbstractMessagingPort *p) :
+        ClientBasic(serviceContext, p),
         _desc(desc),
         _connectionId(),
         _inDirectClient(false),
@@ -81,7 +82,7 @@ namespace mongo {
 
         setThreadName( fullDesc.c_str() );
 
-        Client *c = new Client( fullDesc, mp );
+        Client *c = new Client( fullDesc, getGlobalServiceContext(), mp );
         currentClient.reset(c);
         mongo::lastError.initThread();
         c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos(

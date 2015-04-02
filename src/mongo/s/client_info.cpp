@@ -49,7 +49,8 @@ namespace mongo {
     using std::string;
     using std::stringstream;
 
-    ClientInfo::ClientInfo(AbstractMessagingPort* messagingPort) : ClientBasic(messagingPort) {
+    ClientInfo::ClientInfo(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort) :
+        ClientBasic(serviceContext, messagingPort) {
         _cur = &_a;
         _prev = &_b;
         _autoSplitOk = true;
@@ -77,10 +78,11 @@ namespace mongo {
         _cur->clear();
     }
 
-    ClientInfo* ClientInfo::create(AbstractMessagingPort* messagingPort) {
+    ClientInfo* ClientInfo::create(ServiceContext* serviceContext,
+                                   AbstractMessagingPort* messagingPort) {
         ClientInfo * info = _tlInfo.get();
         massert(16472, "A ClientInfo already exists for this thread", !info);
-        info = new ClientInfo(messagingPort);
+        info = new ClientInfo(serviceContext, messagingPort);
         info->setAuthorizationSession(new AuthorizationSession(
                 new AuthzSessionExternalStateMongos(getGlobalAuthorizationManager())));
         _tlInfo.reset( info );
@@ -88,18 +90,9 @@ namespace mongo {
         return info;
     }
 
-    ClientInfo * ClientInfo::get(AbstractMessagingPort* messagingPort) {
-        ClientInfo * info = _tlInfo.get();
-        if (!info) {
-            info = create(messagingPort);
-        }
-        massert(16483,
-                mongoutils::str::stream() << "AbstractMessagingPort was provided to ClientInfo::get"
-                        << " but differs from the one stored in the current ClientInfo object. "
-                        << "Current ClientInfo messaging port "
-                        << (info->port() ? "is not" : "is")
-                        << " NULL",
-                messagingPort == NULL || messagingPort == info->port());
+    ClientInfo* ClientInfo::get() {
+        ClientInfo* info = _tlInfo.get();
+        fassert(16483, info);
         return info;
     }
 
@@ -140,7 +133,7 @@ namespace mongo {
         BSONElement subobj = result[kGLEStatsFieldName];
         OpTime lastOpTime = subobj[kGLEStatsLastOpTimeFieldName]._opTime();
         OID electionId = subobj[kGLEStatsElectionIdFieldName].OID();
-        ClientInfo* clientInfo = ClientInfo::get( NULL );
+        ClientInfo* clientInfo = ClientInfo::get();
         LOG(4) << "saveGLEStats lastOpTime:" << lastOpTime 
                << " electionId:" << electionId;
 

@@ -39,8 +39,8 @@ namespace mongo {
 
     using boost::scoped_ptr;
 
-    ClientBasic::ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {
-    }
+    ClientBasic::ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort) :
+        _serviceContext(serviceContext), _messagingPort(messagingPort) {}
     ClientBasic::~ClientBasic() {}
 
     AuthenticationSession* ClientBasic::getAuthenticationSession() {

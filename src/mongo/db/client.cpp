@@ -54,6 +54,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
@@ -94,7 +95,7 @@ namespace mongo {
         mongo::lastError.initThread();
 
         // Create the client obj, attach to thread
-        Client* client = new Client(fullDesc, mp);
+        Client* client = new Client(fullDesc, getGlobalServiceContext(), mp);
         client->setAuthorizationSession(
             new AuthorizationSession(
                 new AuthzSessionExternalStateMongod(getGlobalAuthorizationManager())));
@@ -106,8 +107,8 @@ namespace mongo {
         clients.insert(client);
     }
 
-    Client::Client(const string& desc, AbstractMessagingPort *p)
-        : ClientBasic(p),
+    Client::Client(const string& desc, ServiceContext* serviceContext, AbstractMessagingPort *p)
+        : ClientBasic(serviceContext, p),
           _desc(desc),
           _threadId(boost::this_thread::get_id()),
           _connectionId(p ? p->connectionId() : 0),

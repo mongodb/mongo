@@ -212,7 +212,7 @@ namespace {
 
             // Save the last opTimes written on each shard for this client, to allow GLE to work
             if (ClientInfo::exists() && writer.getStats().hasShardStats()) {
-                ClientInfo* clientInfo = ClientInfo::get(NULL);
+                ClientInfo* clientInfo = ClientInfo::get();
                 clientInfo->addHostOpTimes(writer.getStats().getShardStats().getWriteOpTimes());
             }
 
