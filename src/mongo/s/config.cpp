@@ -294,7 +294,10 @@ namespace mongo {
             }
             try {
                 ShardConnection conn( getPrimary(), ns );
-                conn.setVersion();
+                if (!conn.setVersion()) {
+                    warning() << "could not update initial version of "
+                              << ns << " on shard primary " << getPrimary();
+                }
                 conn.done();
                 break;
             }

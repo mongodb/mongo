@@ -555,7 +555,13 @@ namespace mongo {
         try {
             ShardConnection conn(primaryShard, "");
             // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
-            conn->runCommand(db, command, shardResult, options);
+            if (!conn->runCommand(db, command, shardResult, options)) {
+                conn.done();
+                return Status(ErrorCodes::OperationFailed,
+                              str::stream() << "Passthrough command failed: " << command
+                                            << " on ns " << versionedNS
+                                            << "; result: " << shardResult);
+            }
             conn.done();
         }
         catch (const DBException& ex) {

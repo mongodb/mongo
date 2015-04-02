@@ -481,8 +481,9 @@ namespace mongo {
         splitStringDelim(server, &configdbs, ',');
 
         configServer.init(configdbs);
-        grid.initCatalogManager(configdbs);
-
+        uassert(28627,
+                "failed to initialize catalog manager",
+                grid.initCatalogManager(configdbs));
         _enabled = true;
     }
 

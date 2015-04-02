@@ -118,7 +118,10 @@ namespace {
 
             // Make sure to update any stale metadata
             DBConfigPtr db = grid.getDBConfig(dbname);
-            db->load();
+            if (!db->load()) {
+                status = Status(ErrorCodes::OperationFailed,
+                                str::stream() << "error loading database info for db: " << dbname);
+            }
 
             return appendCommandStatus(result, status);
         }
