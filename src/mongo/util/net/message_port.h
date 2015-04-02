@@ -29,12 +29,11 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 #include <vector>
 
+#include "mongo/config.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/sock.h"
 

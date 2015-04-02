@@ -29,8 +29,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/message_port.h"
@@ -39,6 +37,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include "mongo/config.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"

@@ -28,8 +28,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/authentication_commands.h"
@@ -43,6 +41,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/config.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"

@@ -29,8 +29,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/background.h"
@@ -40,6 +38,7 @@
 #include <boost/thread/once.hpp>
 #include <boost/thread/thread.hpp>
 
+#include "mongo/config.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/spin_lock.h"

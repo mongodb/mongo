@@ -30,8 +30,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/listen.h"
@@ -39,6 +37,7 @@
 #include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/exit.h"

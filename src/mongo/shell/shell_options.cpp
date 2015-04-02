@@ -26,8 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/config.h"
-
 #include "mongo/shell/shell_options.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -36,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/config.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/server_options.h"
 #include "mongo/shell/shell_utils.h"

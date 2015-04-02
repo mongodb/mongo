@@ -30,8 +30,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/server.h"
@@ -45,6 +43,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/config.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"

@@ -28,8 +28,6 @@
 *    it in the license file.
 */
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include <set>
@@ -37,6 +35,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/commands.h"

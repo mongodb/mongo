@@ -7,19 +7,18 @@ import utils
 
 class CheckForConfigH:
     def __init__(self):
-        self.first_include = None
+        self.found_configh = False
 
     def __call__(self, filename, clean_lines, line_num, error):
-        if self.first_include == None:
-            for line in clean_lines.elided:
-                if line.startswith("#include"):
-                    self.first_include = line.startswith('#include "mongo/config.h"')
-                    break
+        if self.found_configh:
+            return
 
         cur_line = clean_lines.elided[line_num]
-        if "MONGO_CONFIG_" in cur_line and self.first_include == False:
+        self.found_configh = cur_line.startswith('#include "mongo/config.h"')
+
+        if not self.found_configh and "MONGO_CONFIG_" in cur_line:
             error(filename, line_num, 'build/config_h_include', 5,
-                'config.h define used without config.h as first include.')
+                  'MONGO_CONFIG define used without prior inclusion of config.h.')
 
 def run_lint( paths, nudgeOn=False ):
     # errors are as of 10/14

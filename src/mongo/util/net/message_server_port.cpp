@@ -29,8 +29,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include <boost/scoped_ptr.hpp>
@@ -38,6 +36,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/config.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"

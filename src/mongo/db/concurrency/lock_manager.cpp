@@ -28,14 +28,13 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include <vector>
 
 #include "mongo/db/concurrency/lock_manager.h"
 
+#include "mongo/config.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"

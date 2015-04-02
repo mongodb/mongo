@@ -27,11 +27,10 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <cstring>
 #include <type_traits>
 
+#include "mongo/config.h"
 #include "mongo/platform/endian.h"
 
 namespace mongo {

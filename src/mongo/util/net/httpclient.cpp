@@ -27,13 +27,12 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/httpclient.h"
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/config.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"

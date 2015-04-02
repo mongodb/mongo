@@ -29,8 +29,6 @@
 */
 
 
-#include "mongo/config.h"
-
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -45,6 +43,7 @@
 
 using namespace std;
 
+#include "mongo/config.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 #include "rwlockimpl.h"

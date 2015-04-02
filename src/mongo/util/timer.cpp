@@ -27,11 +27,11 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/timer.h"
+
+#include "mongo/config.h"
 
 #include <ctime>
 #include <limits>

@@ -30,12 +30,12 @@
 
 #ifdef _WIN32
 
-#include "mongo/config.h"
+#include "mongo/platform/basic.h"
 
 #include <ostream>
-
-#include "mongo/platform/basic.h"
 #include <DbgHelp.h>
+
+#include "mongo/config.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/log.h"

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
@@ -39,6 +37,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/net/sock.h"

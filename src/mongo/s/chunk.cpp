@@ -30,8 +30,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/chunk.h"
@@ -39,6 +37,7 @@
 #include <iostream>
 
 #include "mongo/base/owned_pointer_map.h"
+#include "mongo/config.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/lasterror.h"

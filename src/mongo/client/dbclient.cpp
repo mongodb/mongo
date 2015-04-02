@@ -29,8 +29,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/util/bson_extract.h"
@@ -40,6 +38,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"

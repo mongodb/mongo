@@ -28,9 +28,9 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/config.h"
-
 #include <boost/thread/tss.hpp>
+
+#include "mongo/config.h"
 
 namespace mongo { 
 

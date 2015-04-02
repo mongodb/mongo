@@ -36,8 +36,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -49,6 +47,7 @@
 #include <fstream>
 #include <mutex>
 
+#include "mongo/config.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"

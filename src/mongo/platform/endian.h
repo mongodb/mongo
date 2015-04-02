@@ -27,13 +27,13 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <climits>
 #include <cstring>
 #include <boost/static_assert.hpp>
 #include <boost/mpl/if.hpp>
 #include <boost/type_traits/is_signed.hpp>
+
+#include "mongo/config.h"
 #include "mongo/platform/cstdint.h"
 
 #pragma push_macro("MONGO_UINT16_SWAB")

@@ -31,14 +31,13 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include <boost/thread.hpp>
 #include <boost/version.hpp>
 #include <iostream>
 
+#include "mongo/config.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context_impl.h"

@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/record_access_tracker.h"
@@ -35,6 +33,7 @@
 #include <cstring>
 
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/platform/bits.h"
 #include "mongo/util/debug_util.h"

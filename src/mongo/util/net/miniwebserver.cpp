@@ -29,8 +29,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/miniwebserver.h"
@@ -38,6 +36,7 @@
 #include <boost/shared_ptr.hpp>
 #include <pcrecpp.h>
 
+#include "mongo/config.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 

@@ -30,8 +30,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournal
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -41,6 +39,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"

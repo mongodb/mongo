@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <stdio.h>
 
 #ifndef _WIN32
@@ -52,6 +50,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/config.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"

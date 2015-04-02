@@ -27,9 +27,9 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <string>
+
+#include "mongo/config.h"
 
 #ifdef MONGO_CONFIG_SSL
 

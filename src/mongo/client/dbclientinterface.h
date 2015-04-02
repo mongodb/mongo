@@ -32,13 +32,12 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
+#include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"

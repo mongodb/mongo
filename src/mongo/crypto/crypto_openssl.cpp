@@ -26,9 +26,9 @@
  *    it in the license file.
  */
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
+
+#include "mongo/config.h"
 
 #ifndef MONGO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds

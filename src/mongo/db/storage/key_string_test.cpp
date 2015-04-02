@@ -30,11 +30,10 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/config.h"
-
 #include <cmath>
 
 #include "mongo/platform/basic.h"
+#include "mongo/config.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"

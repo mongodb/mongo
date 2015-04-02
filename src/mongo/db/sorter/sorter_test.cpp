@@ -26,8 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/sorter/sorter.h"
@@ -37,6 +35,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
+#include "mongo/config.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"

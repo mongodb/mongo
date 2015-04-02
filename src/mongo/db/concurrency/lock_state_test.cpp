@@ -28,13 +28,12 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/config.h"
-
 #include "mongo/platform/basic.h"
 
 #include <boost/shared_ptr.hpp>
 #include <vector>
 
+#include "mongo/config.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"

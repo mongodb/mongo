@@ -28,13 +28,12 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <boost/static_assert.hpp>
 #include <string>
 #include <limits>
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/hash_namespace.h"
 

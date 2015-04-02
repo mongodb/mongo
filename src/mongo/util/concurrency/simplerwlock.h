@@ -28,11 +28,10 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <boost/noncopyable.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {

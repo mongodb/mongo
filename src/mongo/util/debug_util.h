@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/config.h"
 
 namespace mongo {
 
