@@ -149,9 +149,6 @@ namespace mongo {
 
         // Changes, based on what operation is running. Some of this should be in OperationContext.
         CurOp* _curOp;
-
-        // Tracks if Client::shutdown() gets called (TODO: Is this necessary?)
-        bool _shutdown;
     };
 
     /** get the Client object for this thread. */

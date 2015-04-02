@@ -64,8 +64,7 @@ namespace mongo {
         ClientBasic(serviceContext, p),
         _desc(desc),
         _connectionId(),
-        _inDirectClient(false),
-        _shutdown(false) {
+        _inDirectClient(false) {
     }
     Client::~Client() {}
     bool Client::shutdown() { return true; }

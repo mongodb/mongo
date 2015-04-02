@@ -50,7 +50,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/dbwebserver.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
@@ -113,8 +112,7 @@ namespace mongo {
           _threadId(boost::this_thread::get_id()),
           _connectionId(p ? p->connectionId() : 0),
           _inDirectClient(false),
-          _txn(NULL),
-          _shutdown(false) {
+          _txn(NULL) {
 
         _curOp = new CurOp( this );
     }
@@ -124,8 +122,7 @@ namespace mongo {
             // we can't clean up safely once we're in shutdown
             {
                 boost::lock_guard<boost::mutex> clientLock(clientsMutex);
-                if ( ! _shutdown )
-                    clients.erase(this);
+                clients.erase(this);
             }
 
             CurOp* last;
@@ -138,14 +135,10 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
-        _shutdown = true;
-        if ( inShutdown() )
-            return false;
-        {
+        if (!inShutdown()) {
             boost::lock_guard<boost::mutex> clientLock(clientsMutex);
             clients.erase(this);
         }
-
         return false;
     }
 
