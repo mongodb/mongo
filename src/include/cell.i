@@ -553,8 +553,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		uint64_t len;
 		uint32_t v;
 	} copy;
-	uint64_t saved_v, v;
-	uint32_t saved_len;
+	uint64_t v;
 	const uint8_t *p;
 
 	copy.len = 0;
