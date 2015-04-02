@@ -1437,6 +1437,7 @@ advance:
 			WT_ERR(__log_openfile(
 			    session, 0, &log_fh, WT_LOG_FILENAME, rd_lsn.file));
 			WT_ERR(__log_filesize(session, log_fh, &log_size));
+			eol = 0;
 			continue;
 		}
 		/*
@@ -1499,6 +1500,12 @@ advance:
 			 */
 			if (log != NULL)
 				log->trunc_lsn = rd_lsn;
+			/*
+			 * If the user asked for a specific LSN and it is not
+			 * a valid LSN, return WT_NOTFOUND.
+			 */
+			if (LF_ISSET(WT_LOGSCAN_ONE))
+				ret = WT_NOTFOUND;
 			break;
 		}
 

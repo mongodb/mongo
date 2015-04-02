@@ -22,6 +22,7 @@ struct __wt_config_check {
 	int (*checkf)(WT_SESSION_IMPL *, WT_CONFIG_ITEM *);
 	const char *checks;
 	const WT_CONFIG_CHECK *subconfigs;
+	u_int subconfigs_entries;
 };
 
 #define	WT_CONFIG_REF(session, n)					\
@@ -33,6 +34,7 @@ struct __wt_config_entry {
 	const char *base;			/* configuration base */
 
 	const WT_CONFIG_CHECK *checks;		/* check array */
+	u_int checks_entries;
 };
 
 struct __wt_config_parser_impl {
