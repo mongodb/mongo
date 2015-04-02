@@ -205,42 +205,20 @@ rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 }
 
 /*
- * rot13_post_size --
- *	A simple post-size example that returns the source length.
+ * rot13_sizing --
+ *	A sizing example returns the header size needed.
  */
 static int
-rot13_post_size(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
+rot13_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+    size_t *expansion_constantp)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 
 	(void)session;				/* Unused parameters */
-	(void)src;
 
 	++ex_encryptor->num_calls;		/* Call count */
 
-	*result_lenp = src_len - CHKSUM_LEN - IV_LEN;
-	return (0);
-}
-
-/*
- * rot13_pre_size --
- *	A simple pre-size example that returns the source length.
- */
-static int
-rot13_pre_size(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
-{
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
-
-	(void)session;				/* Unused parameters */
-	(void)src;
-
-	++ex_encryptor->num_calls;		/* Call count */
-
-	*result_lenp = src_len + CHKSUM_LEN + IV_LEN;
+	*expansion_constantp = CHKSUM_LEN + IV_LEN;
 	return (0);
 }
 
@@ -364,42 +342,20 @@ not_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 }
 
 /*
- * not_post_size --
- *	A simple post-size example that returns the source length.
+ * not_sizing --
+ *	A sizing example returns the header size needed.
  */
 static int
-not_post_size(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
+not_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+    size_t *expansion_constantp)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 
 	(void)session;				/* Unused parameters */
-	(void)src;
 
 	++ex_encryptor->num_calls;		/* Call count */
 
-	*result_lenp = src_len - CHKSUM_LEN - IV_LEN;
-	return (0);
-}
-
-/*
- * not_pre_size --
- *	A simple pre-size example that returns the source length.
- */
-static int
-not_pre_size(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
-{
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
-
-	(void)session;				/* Unused parameters */
-	(void)src;
-
-	++ex_encryptor->num_calls;		/* Call count */
-
-	*result_lenp = src_len + CHKSUM_LEN + IV_LEN;
+	*expansion_constantp = CHKSUM_LEN + IV_LEN;
 	return (0);
 }
 
@@ -452,8 +408,7 @@ add_my_encryptors(WT_CONNECTION *connection)
 	 */
 	not_encryptor->encryptor.encrypt = not_encrypt;
 	not_encryptor->encryptor.decrypt = not_decrypt;
-	not_encryptor->encryptor.post_size = not_post_size;
-	not_encryptor->encryptor.pre_size = not_pre_size;
+	not_encryptor->encryptor.sizing = not_sizing;
 	not_encryptor->encryptor.terminate = not_terminate;
 
 	if ((ret = connection->add_encryptor(
@@ -462,8 +417,7 @@ add_my_encryptors(WT_CONNECTION *connection)
 
 	rot13_encryptor->encryptor.encrypt = rot13_encrypt;
 	rot13_encryptor->encryptor.decrypt = rot13_decrypt;
-	rot13_encryptor->encryptor.post_size = rot13_post_size;
-	rot13_encryptor->encryptor.pre_size = rot13_pre_size;
+	rot13_encryptor->encryptor.sizing = rot13_sizing;
 	rot13_encryptor->encryptor.terminate = rot13_terminate;
 
 	return (connection->add_encryptor(
@@ -560,12 +514,12 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,encryption_algorithm=not,"
-	    "encryption_password=test_password1)", &conn);
+	    "log=(enabled=true"",encryption_algorithm=not,"
+	    "encryption_password=test_password1"")", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(session, "table:crypto",
-	    "encryption_algorithm=rot13,encryption_password=test_password2,"
+	    /*"encryption_algorithm=rot13,encryption_password=test_password2,"*/
 	    "key_format=S,value_format=S");
 	ret = session->create(
 	    session, "table:nocrypto",
@@ -607,7 +561,7 @@ main(void)
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->open_cursor(session, "table:crypto", NULL, NULL, &c1);
 
-	printf("REOPEN: Read key %s; value %s\n", key, val);
+	printf("REOPEN\n", key, val);
 	while (c1->next(c1) == 0) {
 		ret = c1->get_key(c1, &key);
 		ret = c1->get_value(c1, &val);

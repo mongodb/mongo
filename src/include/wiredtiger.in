@@ -3228,71 +3228,38 @@ struct __wt_encryptor {
 	    size_t *result_lenp);
 
 	/*!
-	 * Callback to size a destination buffer for decryption
+	 * Callback to size a destination buffer for encryption.
 	 *
-	 * WT_ENCRYPTOR::post_size is an optional callback that, given the
-	 * source buffer and size, produces the size of the destination
-	 * buffer to be given to WT_ENCRYPTOR::decrypt.  This is most useful
-	 * for encryptors that generate encrypted text significantly larger
-	 * than the plain text.  When WT_ENCRYPTOR::post_size is set to NULL,
-	 * the destination buffer is sized the same as the source buffer.
+	 * WT_ENCRYPTOR::sizing is an callback that returns the number
+         * of additional bytes that is needed when encrypting a
+         * text buffer.  This is always necessary, since encryptors
+         * typically generate encrypted text that is larger than the
+         * plain text input. Without such a call, WiredTiger would
+         * have no way to know the worst case for the encrypted buffer size.
 	 *
-	 * If not NULL, this callback is called before each call to
-	 * WT_ENCRYPTOR::decrypt to determine the size of the destination
-	 * buffer to provide.  If the callback is NULL, the destination
-	 * buffer will be the same size as the source buffer.
+	 * This callback cannot be NULL.
 	 *
-	 * The callback should set \c result_lenp to a suitable buffer size
-	 * for decryption, typically the maximum length required by
-	 * WT_ENCRYPTOR::decrypt.
+	 * The callback should set \c expansion_constantp to the additional
+         * number of bytes needed.
 	 *
-	 * This callback function is for encryptors that require an output
-	 * buffer larger than the source buffer (for example, that do not
-	 * check for buffer overflow during decryption).
-	 *
-	 * @param[in] src the data to decrypt
-	 * @param[in] src_len the length of the data to decrypt
-	 * @param[out] result_lenp the required destination buffer size
+  	 * @param[in] src the data to encrypt
+	 * @param[in] src_len the length of the data to encrypt
+	 * @param[out] expansion_constantp the additional number of bytes needed
+         *             when encrypting.
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet nop_encrypt.c WT_ENCRYPTOR postsize
+	 * @snippet nop_encrypt.c WT_ENCRYPTOR sizing
 	 */
-	int (*post_size)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-	    uint8_t *src, size_t src_len, size_t *result_lenp);
+	int (*sizing)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+	    size_t *expansion_constantp);
 
 	/*!
-	 * Callback to size a destination buffer for encryption
-	 *
-	 * WT_ENCRYPTOR::pre_size is an callback that, given the
-	 * source buffer and size, produces the size of the destination buffer
-	 * to be given to WT_ENCRYPTOR::encrypt.  This is always
-	 * necessary, since encryptors typically generate encrypted
-	 * text that is larger than the plain text input. Without
-	 * such a call, WiredTiger would have no way to know the
-	 * worst case for the encrypted buffer size.
-	 *
-	 * If not NULL, this callback is called before each call to
-	 * WT_ENCRYPTOR::encrypt to determine the size of the destination
-	 * buffer to provide.  If the callback is NULL, the destination
-	 * buffer will be the same size as the source buffer.
-	 *
-	 * The callback should set \c result_lenp to a suitable buffer size
-	 * for encryption, typically the maximum length required by
-	 * WT_ENCRYPTOR::encrypt.
-	 *
-	 * This callback function is for encryptors that require an output
-	 * buffer larger than the source buffer (for example, that do not
-	 * check for buffer overflow during encryption).
-	 *
-	 * @param[in] src the data to encrypt
-	 * @param[in] src_len the length of the data to encrypt
-	 * @param[out] result_lenp the required destination buffer size
-	 * @returns zero for success, non-zero to indicate an error.
-	 *
-	 * @snippet nop_encrypt.c WT_ENCRYPTOR presize
+	 * If non-NULL, this callback is called to customize the encryptor for
+	 * each index.  If the callback returns a non-NULL encryptor, that
+	 * instance is used instead of this one for all comparisons.
 	 */
-	int (*pre_size)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-	    uint8_t *src, size_t src_len, size_t *result_lenp);
+	int (*customize)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_ENCRYPTOR **customp);
 
 	/*!
 	 * If non-NULL, a callback performed when the database is closed.

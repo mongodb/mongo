@@ -262,15 +262,16 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		src_len = ip->size - WT_BLOCK_ENCRYPT_SKIP;
 
 		/* TODO: ensure (when encryptor is added?)
-		 * that pre_size is set.
+		 * that sizing is set.
 		 */
 		/*
 		 * Compute the size needed for the destination buffer.
 		 */
-		WT_ERR(btree->encryptor->pre_size(btree->encryptor,
-		    &session->iface, src, src_len, &len));
+		len = 0;
+		WT_ERR(btree->encryptor->sizing(btree->encryptor,
+		    &session->iface, &len));
 
-		size = len + WT_BLOCK_ENCRYPT_SKIP;
+		size = ip->size + len;
 		WT_ERR(bm->write_size(bm, session, &size));
 		WT_ERR(__wt_scr_alloc(session, size, &etmp));
 

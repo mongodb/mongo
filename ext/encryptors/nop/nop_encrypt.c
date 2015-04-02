@@ -100,46 +100,23 @@ nop_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 }
 /*! [WT_ENCRYPTOR decrypt] */
 
-/*! [WT_ENCRYPTOR postsize] */
+/*! [WT_ENCRYPTOR sizing] */
 /*
- * nop_post_size --
- *	A simple post-size example that returns the source length.
+ * nop_sizing --
+ *	A simple sizing example that tells wiredtiger that the
+ *	encrypted buffer is always the same as the source buffer.
  */
 static int
-nop_post_size(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
+nop_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+    size_t *expansion_constantp)
 {
 	NOP_ENCRYPTOR *nop_encryptor = (NOP_ENCRYPTOR *)encryptor;
 
 	(void)session;				/* Unused parameters */
-	(void)src;
 
 	++nop_encryptor->nop_calls;		/* Call count */
 
-	*result_lenp = src_len;
-	return (0);
-}
-/*! [WT_ENCRYPTOR postsize] */
-
-/*! [WT_ENCRYPTOR presize] */
-/*
- * nop_pre_size --
- *	A simple pre-size example that returns the source length.
- */
-static int
-nop_pre_size(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
-{
-	NOP_ENCRYPTOR *nop_encryptor = (NOP_ENCRYPTOR *)encryptor;
-
-	(void)session;				/* Unused parameters */
-	(void)src;
-
-	++nop_encryptor->nop_calls;		/* Call count */
-
-	*result_lenp = src_len;
+	*expansion_constantp = 0;
 	return (0);
 }
 /*! [WT_ENCRYPTOR presize] */
@@ -194,8 +171,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	 */
 	nop_encryptor->encryptor.encrypt = nop_encrypt;
 	nop_encryptor->encryptor.decrypt = nop_decrypt;
-	nop_encryptor->encryptor.post_size = nop_post_size;
-	nop_encryptor->encryptor.pre_size = nop_pre_size;
+	nop_encryptor->encryptor.sizing = nop_sizing;
 	nop_encryptor->encryptor.terminate = nop_terminate;
 
 	nop_encryptor->wt_api = connection->get_extension_api(connection);
