@@ -6,15 +6,9 @@
  * See the file LICENSE for redistribution information.
  */
 
-#if defined(_MSC_VER)
-#include <intrin.h>
-#define	HAVE_VECTOR_INSTR
-#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+#ifdef HAVE_X86INTRIN_H
 #include <x86intrin.h>
-#define	HAVE_VECTOR_INSTR
-#endif
 						/* 16B alignment */
-#ifdef	HAVE_VECTOR_INSTR
 #define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
 #define	WT_VECTOR_SIZE		16		/* chunk size */
 #endif
@@ -34,7 +28,7 @@
 static inline int
 __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
-	size_t len, remain, usz, tsz;
+	size_t len, usz, tsz;
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
@@ -44,9 +38,10 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	userp = user_item->data;
 	treep = tree_item->data;
 
-#ifdef HAVE_VECTOR_INSTR
+#ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
 	if (len >= WT_VECTOR_SIZE * 2) {
+		size_t remain;
 		__m128i res_eq, u, t;
 
 		remain = len % WT_VECTOR_SIZE;
@@ -119,7 +114,7 @@ static inline int
 __wt_lex_compare_skip(
     const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
 {
-	size_t len, remain, usz, tsz;
+	size_t len, usz, tsz;
 	const uint8_t *userp, *treep;
 
 	usz = user_item->size;
@@ -129,9 +124,10 @@ __wt_lex_compare_skip(
 	userp = (uint8_t *)user_item->data + *matchp;
 	treep = (uint8_t *)tree_item->data + *matchp;
 
-#ifdef HAVE_VECTOR_INSTR
+#ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
 	if (len >= WT_VECTOR_SIZE * 2) {
+		size_t remain;
 		__m128i res_eq, u, t;
 
 		remain = len % WT_VECTOR_SIZE;

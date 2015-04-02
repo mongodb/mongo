@@ -88,9 +88,6 @@
 /* Define to 1 if you have the `posix_memalign' function. */
 /* #undef HAVE_POSIX_MEMALIGN */
 
-/* Define to 1 if you have the <pthread_np.h> header file. */
-/* #undef HAVE_PTHREAD_NP_H */
-
 /* Build the LevelDB API with RocksDB support. */
 /* #undef HAVE_ROCKSDB */
 
@@ -123,6 +120,9 @@
 
 /* Enable verbose message configuration. */
 /* #undef HAVE_VERBOSE */
+
+/* Define to 1 if you have the <x86intrin.h> header file. */
+#define HAVE_X86INTRIN_H 1
 
 /* Spinlock type from mutex.h. */
 #define SPINLOCK_TYPE SPINLOCK_MSVC
