@@ -25,6 +25,7 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/optime.h"
 
 #include <iostream>
@@ -41,4 +42,11 @@ namespace mongo {
         return OpTime(t, i);
     }
 
+    void OpTime::append(BufBuilder& builder, const StringData& fieldName) const {
+	// No endian conversions needed, since we store in-memory representation
+	// in little endian format, regardless of target endian.
+	builder.appendNum( static_cast<char>(Timestamp) );
+	builder.appendStr( fieldName );
+	builder.appendNum( asDate() );
+    }
 }

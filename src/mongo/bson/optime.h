@@ -30,6 +30,7 @@
 #include <boost/thread/condition.hpp>
 #include <sstream>
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/time_support.h"
@@ -125,6 +126,11 @@ namespace mongo {
         bool operator>=(const OpTime& r) const {
             return !(*this < r);
         }
+
+        // Append the BSON representation of this OpTime to the given BufBuilder with the given
+        // name. This lives here because OpTime manages its own serialization format.
+        void append(BufBuilder& builder, const StringData& fieldName) const;
+
     };
 #pragma pack()
 

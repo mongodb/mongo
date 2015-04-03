@@ -44,15 +44,18 @@
 
 namespace mongo {
 
-    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( StringData fieldName , unsigned long long time , unsigned int inc ) {
-        OpTime t( (unsigned) (time / 1000) , inc );
-        appendTimestamp( fieldName , t.asDate() );
+    inline BSONObjBuilder& BSONObjBuilder::append(StringData fieldName, OpTime optime) {
+        optime.append(_b, fieldName);
         return *this;
     }
 
-    inline BSONObjBuilder& BSONObjBuilder::append(StringData fieldName, OpTime optime) {
-        appendTimestamp(fieldName, optime.asDate());
-        return *this;
+    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( StringData fieldName ) {
+        return append(fieldName, OpTime());
+    }
+
+    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( StringData fieldName,
+                                                            unsigned long long val ) {
+        return append(fieldName, OpTime(val));
     }
 
     inline OpTime BSONElement::_opTime() const {

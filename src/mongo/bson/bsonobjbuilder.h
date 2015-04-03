@@ -459,32 +459,15 @@ namespace mongo {
         }
 
         // Append a Timestamp field -- will be updated to next OpTime on db insert.
-        BSONObjBuilder& appendTimestamp( StringData fieldName ) {
-            _b.appendNum( (char) Timestamp );
-            _b.appendStr( fieldName );
-            _b.appendNum( (unsigned long long) 0 );
-            return *this;
-        }
+        BSONObjBuilder& appendTimestamp( StringData fieldName );
+
+        BSONObjBuilder& appendTimestamp( StringData fieldName , unsigned long long val );
 
         /**
          * To store an OpTime in BSON, use this function.
          * This captures both the secs and inc fields.
          */
         BSONObjBuilder& append(StringData fieldName, OpTime optime);
-
-        BSONObjBuilder& appendTimestamp( StringData fieldName , unsigned long long val ) {
-            _b.appendNum( (char) Timestamp );
-            _b.appendStr( fieldName );
-            _b.appendNum( val );
-            return *this;
-        }
-
-        /**
-        Timestamps are a special BSON datatype that is used internally for replication.
-        Append a timestamp element to the object being ebuilt.
-        @param time - in millis (but stored in seconds)
-        */
-        BSONObjBuilder& appendTimestamp( StringData fieldName , unsigned long long time , unsigned int inc );
 
         /*
         Append an element of the deprecated DBRef type.
@@ -788,11 +771,6 @@ namespace mongo {
         // These two just use next position
         BufBuilder &subobjStart() { return _b.subobjStart( num() ); }
         BufBuilder &subarrayStart() { return _b.subarrayStart( num() ); }
-
-        BSONArrayBuilder& appendTimestamp(unsigned int sec, unsigned int inc) {
-            _b.appendTimestamp(num(), sec, inc);
-            return *this;
-        }
 
         BSONArrayBuilder& appendRegex(StringData regex, StringData options = "") {
             _b.appendRegex(num(), regex, options);

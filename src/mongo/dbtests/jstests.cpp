@@ -525,7 +525,7 @@ namespace JSTests {
             b.appendTimestamp( "a" , 123456789 );
             b.appendMinKey( "b" );
             b.appendMaxKey( "c" );
-            b.appendTimestamp( "d" , 1234000 , 9876 );
+            b.append( "d" , OpTime(1234, 9876) );
 
 
             {
@@ -1648,7 +1648,7 @@ namespace JSTests {
         class Timestamp : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendTimestamp( "a", 20000ULL, 5 );
+                b.append( "a", OpTime(20, 5) );
                 return b.obj();
             }
             virtual string json() const {
