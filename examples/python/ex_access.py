@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Public Domain 2014-2015 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
@@ -25,13 +24,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
 from wiredtiger import wiredtiger_open
 
 # Connect to the database and open a session
-if not os.path.exists('WT_TEST'):
-    os.makedirs('WT_TEST')
-
 conn = wiredtiger_open('WT_TEST', 'create')
 session = conn.open_session()
 
