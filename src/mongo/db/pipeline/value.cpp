@@ -200,7 +200,6 @@ namespace mongo {
             break;
 
         case Timestamp:
-            // asDate is a poorly named function that returns a ReplTime
             _storage.timestampValue = elem._opTime().asDate();
             break;
 

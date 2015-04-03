@@ -2221,7 +2221,7 @@ namespace mongo {
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
-            ReplTime lastOpApplied = txn->getClient()->getLastOp().asDate();
+            OpTime lastOpApplied = txn->getClient()->getLastOp();
 
             {
                 // 4. do bulk of mods
@@ -2392,8 +2392,8 @@ namespace mongo {
                    BSONObj max,
                    BSONObj shardKeyPattern,
                    const BSONObj& xfer,
-                   ReplTime* lastOpApplied) {
-            ReplTime dummy;
+                   OpTime* lastOpApplied) {
+            OpTime dummy;
             if ( lastOpApplied == NULL ) {
                 lastOpApplied = &dummy;
             }
@@ -2436,7 +2436,7 @@ namespace mongo {
                                   false /* god */,
                                   true /* fromMigrate */);
 
-                    *lastOpApplied = txn->getClient()->getLastOp().asDate();
+                    *lastOpApplied = txn->getClient()->getLastOp();
                     didAnything = true;
                 }
             }
@@ -2472,7 +2472,7 @@ namespace mongo {
                     // We are in write lock here, so sure we aren't killing
                     Helpers::upsert( txn, ns , updatedDoc , true );
 
-                    *lastOpApplied = txn->getClient()->getLastOp().asDate();
+                    *lastOpApplied = txn->getClient()->getLastOp();
                     didAnything = true;
                 }
             }
@@ -2508,7 +2508,7 @@ namespace mongo {
          * writeConcern (if not empty) have applied till the specified lastOp.
          */
         bool opReplicatedEnough(const OperationContext* txn,
-                                const ReplTime& lastOpApplied,
+                                const OpTime& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             WriteConcernOptions majorityWriteConcern;
             majorityWriteConcern.wTimeout = -1;
@@ -2535,7 +2535,7 @@ namespace mongo {
                                 const std::string& ns,
                                 BSONObj min,
                                 BSONObj max,
-                                const ReplTime& lastOpApplied,
+                                const OpTime& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             if (!opReplicatedEnough(txn, lastOpApplied, writeConcern)) {
                 OpTime op( lastOpApplied );

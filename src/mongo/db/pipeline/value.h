@@ -72,7 +72,7 @@ namespace mongo {
         explicit Value(int value)                 : _storage(NumberInt, value) {}
         explicit Value(long long value)           : _storage(NumberLong, value) {}
         explicit Value(double value)              : _storage(NumberDouble, value) {}
-        explicit Value(const OpTime& value)       : _storage(Timestamp, value.asDate()) {}
+        explicit Value(const OpTime& value)       : _storage(Timestamp, value) {}
         explicit Value(const OID& value)          : _storage(jstOID, value) {}
         explicit Value(StringData value)   : _storage(String, value) {}
         explicit Value(const std::string& value)       : _storage(String, StringData(value)) {}
@@ -328,7 +328,7 @@ namespace mongo {
 
     inline OpTime Value::getTimestamp() const {
         verify(getType() == Timestamp);
-        return _storage.timestampValue;
+        return Date_t(_storage.timestampValue);
     }
 
     inline const char* Value::getRegex() const {

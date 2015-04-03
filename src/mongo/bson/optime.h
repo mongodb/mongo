@@ -40,12 +40,6 @@ namespace mongo {
         ClockSkewException() : DBException( "clock skew exception" , 20001 ) {}
     };
 
-    /* replsets used to use RSOpTime.
-       M/S uses OpTime.
-       But this is useable from both.
-       */
-    typedef unsigned long long ReplTime;
-
     /* Operation sequence #.  A combination of current second plus an ordinal value.
      */
 #pragma pack(4)
@@ -64,10 +58,7 @@ namespace mongo {
             reinterpret_cast<unsigned long long&>(*this) = date.millis;
             dassert( (int)secs >= 0 );
         }
-        OpTime(ReplTime x) {
-            reinterpret_cast<unsigned long long&>(*this) = x;
-            dassert( (int)secs >= 0 );
-        }
+
         OpTime(unsigned a, unsigned b) {
             secs = a;
             i = b;
@@ -86,12 +77,6 @@ namespace mongo {
         // Maximum OpTime value.
         static OpTime max();
 
-        /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
-         64 bit "container" for these values.  While these are not really "Dates", that seems a
-         better choice for now than say, Number, which is floating point.  Note the BinData type
-         is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has 5
-         bytes of overhead.
-         */
         unsigned long long asDate() const {
             return reinterpret_cast<const unsigned long long*>(&i)[0];
         }
