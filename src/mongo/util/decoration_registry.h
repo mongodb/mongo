@@ -62,10 +62,11 @@ namespace mongo {
             static_assert(std::is_nothrow_destructible<T>::value,
                           "Decorations must be nothrow destructible");
 #endif
-            return { std::move(declareDecoration(sizeof(T),
-                                                 std::alignment_of<T>::value,
-                                                 &constructAt<T>,
-                                                 &destructAt<T>)) };
+            return DecorationContainer::DecorationDescriptorWithType<T>(
+                    std::move(declareDecoration(sizeof(T),
+                                                std::alignment_of<T>::value,
+                                                &constructAt<T>,
+                                                &destructAt<T>)));
         }
 
         size_t getDecorationBufferSizeBytes() const { return _totalSizeBytes; }
