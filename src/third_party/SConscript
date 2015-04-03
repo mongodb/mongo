@@ -5,6 +5,7 @@ Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
 zlibSuffix = '-1.2.8'
+pcreSuffix = "-8.36"
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -17,7 +18,7 @@ if not use_system_version_of_library('tcmalloc'):
 
 if not use_system_version_of_library('pcre'):
     thirdPartyIncludePathList.append(
-        ('pcre', '#/src/third_party/pcre-${PCRE_VERSION}'))
+        ('pcre', '#/src/third_party/pcre' + pcreSuffix))
 
 if not use_system_version_of_library('boost'):
     thirdPartyIncludePathList.append(
@@ -80,10 +81,10 @@ if use_system_version_of_library("pcre"):
 else:
     pcreEnv = env.Clone()
     pcreEnv.InjectThirdPartyIncludePaths(libraries=['pcre'])
-    pcreEnv.SConscript('pcre-${PCRE_VERSION}/SConscript', exports={ 'env' : pcreEnv })
+    pcreEnv.SConscript('pcre' + pcreSuffix + '/SConscript', exports={ 'env' : pcreEnv })
     pcreEnv = pcreEnv.Clone(
         LIBDEPS=[
-            'pcre-${PCRE_VERSION}/pcrecpp',
+            'pcre' + pcreSuffix + '/pcrecpp',
         ])
 
 pcreEnv.Library(
