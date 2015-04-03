@@ -46,6 +46,7 @@ using namespace std;
 #include "mongo/util/debugger.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 
@@ -271,6 +272,22 @@ namespace mongo {
         free(niceName);
         return s;
 #endif
+    }
+
+    Status exceptionToStatus() {
+        try {
+            throw;
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        } catch (const std::exception& ex) {
+            return Status(ErrorCodes::UnknownError,
+                          mongoutils::str::stream() << "Caught exception of type "
+                                                    << demangleName(typeid(ex))
+                                                    << ": "
+                                                    << ex.what());
+        } catch (...) {
+            return Status(ErrorCodes::UnknownError, "Caught unknown exception");
+        }
     }
 
     string ExceptionInfo::toString() const {
