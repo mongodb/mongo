@@ -9,7 +9,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
-	"io"
 )
 
 // Metadata holds information about a collection's options and indexes.
@@ -24,11 +23,17 @@ type IndexDocumentFromDB struct {
 	Key     bson.D `bson:"key"`
 }
 
-// dumpMetadataToWriter gets the metadata for a collection and writes it
+// dumpMetadata gets the metadata for a collection and writes it
 // in readable JSON format.
-func (dump *MongoDump) dumpMetadataToWriter(intent *intents.Intent, writer io.Writer) error {
+func (dump *MongoDump) dumpMetadata(intent *intents.Intent) error {
+	var err error
+	err = intent.MetadataFile.Open()
+	if err != nil {
+		return err
+	}
+	defer intent.MetadataFile.Close()
 	// make a buffered writer for nicer disk i/o
-	w := bufio.NewWriter(writer)
+	w := bufio.NewWriter(intent.MetadataFile)
 
 	nsID := fmt.Sprintf("%v.%v", intent.DB, intent.C)
 	meta := Metadata{
@@ -40,7 +45,6 @@ func (dump *MongoDump) dumpMetadataToWriter(intent *intents.Intent, writer io.Wr
 
 	// The collection options were already gathered while building the list of intents.
 	// We convert them to JSON so that they can be written to the metadata json file as text.
-	var err error
 	if intent.Options != nil {
 		if meta.Options, err = bsonutil.ConvertBSONValueToJSON(*intent.Options); err != nil {
 			return fmt.Errorf("error converting collection options to JSON: %v", err)

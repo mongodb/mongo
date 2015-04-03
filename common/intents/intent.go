@@ -4,8 +4,14 @@ package intents
 import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
+	"io"
 	"sync"
 )
+
+type file interface {
+	io.ReadWriteCloser
+	Open() error
+}
 
 // mongorestore first scans the directory to generate a list
 // of all files to restore and what they map to. TODO comments
@@ -16,7 +22,10 @@ type Intent struct {
 
 	// File locations as absolute paths
 	BSONPath     string
+	BSONFile     file
+	BSONSize     int64
 	MetadataPath string
+	MetadataFile file
 
 	// Collection options
 	Options *bson.D
@@ -71,10 +80,6 @@ func (it *Intent) IsSystemIndexes() bool {
 // Intent Manager
 
 type Manager struct {
-	// for handling more complex restore logic. Stores special
-	// collections like roles/users separate from most collection intents
-	useCategories bool
-
 	// map for merging metadata with BSON intents
 	intents map[string]*Intent
 
@@ -98,18 +103,12 @@ type Manager struct {
 	indexIntents  map[string]*Intent
 }
 
-func NewCategorizingIntentManager() *Manager {
-	manager := NewIntentManager()
-	manager.useCategories = true
-	manager.indexIntents = map[string]*Intent{}
-	return manager
-}
-
 func NewIntentManager() *Manager {
 	return &Manager{
 		intents:                 map[string]*Intent{},
 		intentsByDiscoveryOrder: []*Intent{},
 		priotitizerLock:         &sync.Mutex{},
+		indexIntents:            map[string]*Intent{},
 	}
 }
 
@@ -133,33 +132,31 @@ func (manager *Manager) Put(intent *Intent) {
 	}
 
 	// bucket special-case collections
-	if manager.useCategories {
-		if intent.IsOplog() {
-			manager.oplogIntent = intent
-			return
+	if intent.IsOplog() {
+		manager.oplogIntent = intent
+		return
+	}
+	if intent.IsSystemIndexes() {
+		manager.indexIntents[intent.DB] = intent
+		return
+	}
+	if intent.IsUsers() {
+		if intent.BSONPath != "" {
+			manager.usersIntent = intent
 		}
-		if intent.IsSystemIndexes() {
-			manager.indexIntents[intent.DB] = intent
-			return
+		return
+	}
+	if intent.IsRoles() {
+		if intent.BSONPath != "" {
+			manager.rolesIntent = intent
 		}
-		if intent.IsUsers() {
-			if intent.BSONPath != "" {
-				manager.usersIntent = intent
-			}
-			return
+		return
+	}
+	if intent.IsAuthVersion() {
+		if intent.BSONPath != "" {
+			manager.versionIntent = intent
 		}
-		if intent.IsRoles() {
-			if intent.BSONPath != "" {
-				manager.rolesIntent = intent
-			}
-			return
-		}
-		if intent.IsAuthVersion() {
-			if intent.BSONPath != "" {
-				manager.versionIntent = intent
-			}
-			return
-		}
+		return
 	}
 
 	// BSON and metadata files for the same collection are merged
@@ -171,11 +168,17 @@ func (manager *Manager) Put(intent *Intent) {
 		if existing.BSONPath == "" {
 			existing.BSONPath = intent.BSONPath
 		}
+		if existing.BSONFile == nil {
+			existing.BSONFile = intent.BSONFile
+		}
 		if existing.Size == 0 {
 			existing.Size = intent.Size
 		}
 		if existing.MetadataPath == "" {
 			existing.MetadataPath = intent.MetadataPath
+		}
+		if existing.MetadataFile == nil {
+			existing.MetadataFile = intent.MetadataFile
 		}
 		return
 	}
@@ -183,6 +186,31 @@ func (manager *Manager) Put(intent *Intent) {
 	// if key doesn't already exist, add it to the manager
 	manager.intents[intent.Namespace()] = intent
 	manager.intentsByDiscoveryOrder = append(manager.intentsByDiscoveryOrder, intent)
+}
+
+// Intents returns a slice containing all of the intents in the manager
+// Intents() is not thread safe
+func (manager *Manager) Intents() []*Intent {
+	allIntents := []*Intent{}
+	for _, intent := range manager.intents {
+		allIntents = append(allIntents, intent)
+	}
+	for _, intent := range manager.indexIntents {
+		allIntents = append(allIntents, intent)
+	}
+	if manager.oplogIntent != nil {
+		allIntents = append(allIntents, manager.oplogIntent)
+	}
+	if manager.usersIntent != nil {
+		allIntents = append(allIntents, manager.usersIntent)
+	}
+	if manager.rolesIntent != nil {
+		allIntents = append(allIntents, manager.rolesIntent)
+	}
+	if manager.versionIntent != nil {
+		allIntents = append(allIntents, manager.versionIntent)
+	}
+	return allIntents
 }
 
 // Pop returns the next available intent from the manager. If the manager is
@@ -227,6 +255,15 @@ func (manager *Manager) Oplog() *Intent {
 // SystemIndexes returns the system.indexes bson for a database
 func (manager *Manager) SystemIndexes(dbName string) *Intent {
 	return manager.indexIntents[dbName]
+}
+
+// SystemIndexes returns the databases for which there are system.indexes
+func (manager *Manager) SystemIndexDBs() []string {
+	databases := []string{}
+	for dbname := range manager.indexIntents {
+		databases = append(databases, dbname)
+	}
+	return databases
 }
 
 // Users returns the intent of the users collection to restore, a special case

@@ -43,7 +43,7 @@ func TestCreateAllIntents(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager:      intents.NewCategorizingIntentManager(),
+			manager:      intents.NewIntentManager(),
 			InputOptions: &InputOptions{},
 			ToolOptions:  &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
 		}
@@ -109,7 +109,7 @@ func TestCreateIntentsForDB(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager:     intents.NewCategorizingIntentManager(),
+			manager:     intents.NewIntentManager(),
 			ToolOptions: &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
 		}
 		log.SetWriter(&buff)
@@ -159,7 +159,7 @@ func TestHandlingBSON(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager:     intents.NewCategorizingIntentManager(),
+			manager:     intents.NewIntentManager(),
 			ToolOptions: &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
 		}
 
@@ -203,7 +203,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 	Convey("With a test MongoRestore", t, func() {
 		buff = bytes.Buffer{}
 		mr = &MongoRestore{
-			manager:     intents.NewCategorizingIntentManager(),
+			manager:     intents.NewIntentManager(),
 			ToolOptions: &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
 		}
 		log.SetWriter(&buff)

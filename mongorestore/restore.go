@@ -7,9 +7,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
 	"gopkg.in/mgo.v2/bson"
-	"io"
 	"io/ioutil"
-	"os"
 	"strings"
 	"time"
 )
@@ -109,23 +107,27 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 	var indexes []IndexDocument
 
 	// get indexes from system.indexes dump if we have it but don't have metadata files
-	if intent.MetadataPath == "" && restore.manager.SystemIndexes(intent.DB) != nil {
-		systemIndexesFile := restore.manager.SystemIndexes(intent.DB).BSONPath
-		log.Logf(log.Always, "no metadata file; reading indexes from %v", systemIndexesFile)
-		indexes, err = restore.IndexesFromBSON(intent, systemIndexesFile)
-		if err != nil {
-			return fmt.Errorf("error reading indexes from %v: %v", systemIndexesFile, err)
+	if intent.MetadataPath == "" {
+		if _, ok := restore.dbCollectionIndexes[intent.DB]; ok {
+			if indexes, ok = restore.dbCollectionIndexes[intent.DB][intent.C]; ok {
+				log.Logf(log.Always, "no metadata file; falling back to system.indexes")
+			}
 		}
 	}
 
 	// first create the collection with options from the metadata file
 	if intent.MetadataPath != "" {
+		err = intent.MetadataFile.Open()
+		if err != nil {
+			return err
+		}
+		defer intent.MetadataFile.Close()
 		log.Logf(log.Always, "reading metadata file from %v", intent.MetadataPath)
-		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
+		metadata, err := ioutil.ReadAll(intent.MetadataFile)
 		if err != nil {
 			return fmt.Errorf("error reading metadata file %v: %v", intent.MetadataPath, err)
 		}
-		options, indexes, err = restore.MetadataFromJSON(jsonBytes)
+		options, indexes, err = restore.MetadataFromJSON(metadata)
 		if err != nil {
 			return fmt.Errorf("error parsing metadata file %v: %v", intent.MetadataPath, err)
 		}
@@ -150,30 +152,16 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	// then do bson
 	if intent.BSONPath != "" {
+		err = intent.BSONFile.Open()
+		if err != nil {
+			return err
+		}
+		defer intent.BSONFile.Close()
+
 		log.Logf(log.Always, "restoring %v from file %v", intent.Namespace(), intent.BSONPath)
-		var rawBSONSource io.ReadCloser
 		var size int64
 
-		if restore.useStdin {
-			// closing stdin results in inconsistent behavior between
-			// environments, so we just avoid closing it
-			rawBSONSource = ioutil.NopCloser(os.Stdin)
-			log.Log(log.Always, "restoring from stdin")
-		} else {
-			fileInfo, err := os.Lstat(intent.BSONPath)
-			if err != nil {
-				return fmt.Errorf("error reading BSON file %v: %v", intent.BSONPath, err)
-			}
-			size = fileInfo.Size()
-			log.Logf(log.Info, "\tfile %v is %v bytes", intent.BSONPath, size)
-
-			rawBSONSource, err = os.Open(intent.BSONPath)
-			if err != nil {
-				return fmt.Errorf("error reading BSON file %v: %v", intent.BSONPath, err)
-			}
-		}
-
-		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawBSONSource))
+		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
 		defer bsonSource.Close()
 
 		err = restore.RestoreCollectionToDB(intent.DB, intent.C, bsonSource, size)

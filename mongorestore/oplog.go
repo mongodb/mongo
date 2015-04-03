@@ -8,7 +8,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -25,20 +24,11 @@ func (restore *MongoRestore) RestoreOplog() error {
 		log.Log(log.Always, "no oplog.bson file in root of the dump directory, skipping oplog application")
 		return nil
 	}
-
-	fileInfo, err := os.Lstat(intent.BSONPath)
-	if err != nil {
-		return fmt.Errorf("error reading bson file: %v", err)
+	if err := intent.BSONFile.Open(); err != nil {
+		return err
 	}
-	size := fileInfo.Size()
-	log.Logf(log.Info, "\toplog %v is %v bytes", intent.BSONPath, size)
-
-	oplogFile, err := os.Open(intent.BSONPath)
-	if err != nil {
-		return fmt.Errorf("error reading oplog file: %v", err)
-	}
-
-	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(oplogFile))
+	defer intent.BSONFile.Close()
+	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
 	entryArray := make([]interface{}, 0, 1024)
@@ -47,7 +37,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	var totalOps int64
 	var entrySize, bufferedBytes int
 
-	oplogProgressor := progress.NewCounter(size)
+	oplogProgressor := progress.NewCounter(intent.BSONSize)
 	bar := progress.Bar{
 		Name:      "oplog",
 		Watching:  oplogProgressor,

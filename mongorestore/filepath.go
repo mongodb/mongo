@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -20,6 +21,57 @@ const (
 	BSONFileType
 	MetadataFileType
 )
+
+type bsonFileFile struct {
+	*os.File
+	intent *intents.Intent
+}
+
+func (f *bsonFileFile) Open() (err error) {
+	if f.intent.BSONPath == "" {
+		return fmt.Errorf("No BSONPath for %v.%v", f.intent.DB, f.intent.C)
+	}
+	f.File, err = os.Open(f.intent.BSONPath)
+	if err != nil {
+		return fmt.Errorf("error reading BSON file %v: %v", f.intent.BSONPath, err)
+	}
+	return nil
+}
+
+type metadataFileFile struct {
+	*os.File
+	intent *intents.Intent
+}
+
+func (f *metadataFileFile) Open() (err error) {
+	if f.intent.MetadataPath == "" {
+		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
+	}
+	f.File, err = os.Open(f.intent.MetadataPath)
+	if err != nil {
+		return fmt.Errorf("error reading Metadata file %v: %v", f.intent.MetadataPath, err)
+	}
+	return nil
+}
+
+type stdinFile struct {
+	io.Reader
+	intent *intents.Intent
+}
+
+func (f *stdinFile) Open() error {
+	// I think that stdin should be duplicated in a cross platform fashion here.
+	f.Reader = os.Stdin
+	return nil
+}
+
+func (f *stdinFile) Close() error {
+	return nil
+}
+
+func (f *stdinFile) Write(p []byte) (n int, err error) {
+	return 0, fmt.Errorf("can't write to standard output")
+}
 
 // GetInfoFromFilename pulls the base collection name and FileType from a given file.
 func GetInfoFromFilename(filename string) (string, FileType) {
@@ -66,11 +118,13 @@ func (restore *MongoRestore) CreateAllIntents(dumpDir string) error {
 					log.Log(log.DebugLow, "found oplog.bson file to replay")
 				}
 				foundOplog = true
-				restore.manager.Put(&intents.Intent{
+				oplogIntent := &intents.Intent{
 					C:        "oplog",
 					BSONPath: filepath.Join(dumpDir, entry.Name()),
 					Size:     entry.Size(),
-				})
+				}
+				oplogIntent.BSONFile = &bsonFileFile{intent: oplogIntent}
+				restore.manager.Put(oplogIntent)
 			} else {
 				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
 					filepath.Join(dumpDir, entry.Name()))
@@ -132,6 +186,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, dir string) error {
 					Size:     entry.Size(),
 					BSONPath: filepath.Join(dir, entry.Name()),
 				}
+				intent.BSONFile = &bsonFileFile{intent: intent}
 				log.Logf(log.Info, "found collection %v bson to restore", intent.Namespace())
 				restore.manager.Put(intent)
 			case MetadataFileType:
@@ -141,6 +196,8 @@ func (restore *MongoRestore) CreateIntentsForDB(db, dir string) error {
 					C:            collection,
 					MetadataPath: filepath.Join(dir, entry.Name()),
 				}
+				intent.MetadataFile = &metadataFileFile{intent: intent}
+
 				log.Logf(log.Info, "found collection %v metadata to restore", intent.Namespace())
 				restore.manager.Put(intent)
 			default:
@@ -180,6 +237,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db, collection, fullpath 
 			C:        collection,
 			BSONPath: "-",
 		}
+		intent.BSONFile = &stdinFile{intent: intent}
 		restore.manager.Put(intent)
 		return nil
 	}
@@ -205,6 +263,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db, collection, fullpath 
 		BSONPath: fullpath,
 		Size:     file.Size(),
 	}
+	intent.BSONFile = &bsonFileFile{intent: intent}
 
 	// finally, check if it has a .metadata.json file in its folder
 	log.Logf(log.DebugLow, "scanning directory %v for metadata file", filepath.Dir(fullpath))
@@ -222,6 +281,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db, collection, fullpath 
 			metadataPath := filepath.Join(filepath.Dir(fullpath), metadataName)
 			log.Logf(log.Info, "found metadata for collection at %v", metadataPath)
 			intent.MetadataPath = metadataPath
+			intent.MetadataFile = &metadataFileFile{intent: intent}
 			break
 		}
 	}

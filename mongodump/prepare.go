@@ -17,6 +17,57 @@ type collectionInfo struct {
 	Options *bson.D `bson:"options"`
 }
 
+type bsonFileFile struct {
+	*os.File
+	intent *intents.Intent
+}
+
+func (f *bsonFileFile) Open() (err error) {
+	if f.intent.BSONPath == "" {
+		return fmt.Errorf("No BSONPath for %v.%v", f.intent.DB, f.intent.C)
+	}
+	f.File, err = os.Create(f.intent.BSONPath)
+	if err != nil {
+		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
+	}
+	return nil
+}
+
+type metadataFileFile struct {
+	*os.File
+	intent *intents.Intent
+}
+
+func (f *metadataFileFile) Open() (err error) {
+	if f.intent.MetadataPath == "" {
+		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
+	}
+	f.File, err = os.Create(f.intent.MetadataPath)
+	if err != nil {
+		return fmt.Errorf("error creating Metadata file %v: %v", f.intent.MetadataPath, err)
+	}
+	return nil
+}
+
+type stdoutFile struct {
+	*os.File
+	intent *intents.Intent
+}
+
+func (f *stdoutFile) Open() error {
+	f.File = os.Stdout
+	return nil
+}
+
+func (f *stdoutFile) Close() error {
+	f.File = nil
+	return nil
+}
+
+func (f *stdoutFile) Read(p []byte) (n int, err error) {
+	return 0, fmt.Errorf("can't read from standard output")
+}
+
 // shouldSkipCollection returns true when a collection name is excluded
 // by the mongodump options.
 func (dump *MongoDump) shouldSkipCollection(colName string) bool {
@@ -49,8 +100,10 @@ func (dump *MongoDump) NewIntent(dbName, collName string, stdout bool) (*intents
 
 	// add stdout flags if we're using stdout
 	if dump.useStdout {
-		intent.BSONPath = "-"
-		intent.MetadataPath = "-"
+		intent.BSONFile = &stdoutFile{intent: intent}
+		// We don't actually need a stdoutMetadataFile type because none of the methods on the stdoutFile
+		// Make any use of the BSON or Metadata parts of the intent
+		intent.MetadataFile = &stdoutFile{intent: intent}
 	}
 
 	// get a document count for scheduling purposes
@@ -67,6 +120,66 @@ func (dump *MongoDump) NewIntent(dbName, collName string, stdout bool) (*intents
 	intent.Size = int64(count)
 
 	return intent, nil
+}
+
+func (dump *MongoDump) CreateOplogIntents() error {
+
+	err := dump.determineOplogCollectionName()
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(dump.OutputOptions.Out, defaultPermissions)
+	if err != nil {
+		return err
+	}
+
+	oplogIntent := &intents.Intent{
+		DB:       "local",
+		C:        dump.oplogCollection,
+		BSONPath: filepath.Join(dump.OutputOptions.Out, "oplog.bson"),
+	}
+	oplogIntent.BSONFile = &bsonFileFile{intent: oplogIntent}
+	dump.manager.Put(oplogIntent)
+	return nil
+}
+
+// CreateUsersRolesVersionIntentsForDB create intents to be written in to the specific
+// collection folder, for the users, roles and version admin database collections
+// And then it adds the intents in to the manager
+func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
+
+	outDir := filepath.Join(dump.OutputOptions.Out, db)
+	err := os.MkdirAll(outDir, defaultPermissions)
+	if err != nil {
+		return err
+	}
+
+	usersIntent := &intents.Intent{
+		DB:       "admin",
+		C:        "system.users",
+		BSONPath: filepath.Join(outDir, "$admin.system.users.bson"),
+	}
+	usersIntent.BSONFile = &bsonFileFile{intent: usersIntent}
+	dump.manager.Put(usersIntent)
+
+	rolesIntent := &intents.Intent{
+		DB:       "admin",
+		C:        "system.roles",
+		BSONPath: filepath.Join(outDir, "$admin.system.roles.bson"),
+	}
+	rolesIntent.BSONFile = &bsonFileFile{intent: rolesIntent}
+	dump.manager.Put(rolesIntent)
+
+	versionIntent := &intents.Intent{
+		DB:       "admin",
+		C:        "system.version",
+		BSONPath: filepath.Join(outDir, "$admin.system.version.bson"),
+	}
+	versionIntent.BSONFile = &bsonFileFile{intent: versionIntent}
+	dump.manager.Put(versionIntent)
+
+	return nil
 }
 
 // CreateIntentsForCollection builds an intent for a given collection and

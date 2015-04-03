@@ -10,7 +10,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"os"
 	"strings"
 )
 
@@ -95,33 +94,36 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 	return meta.Options, meta.Indexes, nil
 }
 
-// IndexesFromBSON extracts index information from BSON files.
-func (restore *MongoRestore) IndexesFromBSON(intent *intents.Intent, bsonFile string) ([]IndexDocument, error) {
-	log.Logf(log.DebugLow, "scanning %v for indexes on %v collections", bsonFile, intent.C)
+// LoadIndexesFromBSON reads indexes from the index BSON files and
+// caches them in the MongoRestore object.
+func (restore *MongoRestore) LoadIndexesFromBSON() error {
 
-	rawFile, err := os.Open(bsonFile)
-	if err != nil {
-		return nil, fmt.Errorf("error reading index bson file %v: %v", bsonFile, err)
-	}
+	dbCollectionIndexes := make(map[string]collectionIndexes)
 
-	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
-	defer bsonSource.Close()
+	for _, dbname := range restore.manager.SystemIndexDBs() {
+		dbCollectionIndexes[dbname] = make(collectionIndexes)
+		intent := restore.manager.SystemIndexes(dbname)
+		err := intent.BSONFile.Open()
+		if err != nil {
+			return err
+		}
+		defer intent.BSONFile.Close()
+		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
+		defer bsonSource.Close()
 
-	// iterate over stored indexes, saving all that match the collection
-	indexDocument := &IndexDocument{}
-	collectionIndexes := []IndexDocument{}
-	for bsonSource.Next(indexDocument) {
-		namespace := indexDocument.Options["ns"].(string)
-		if stripDBFromNS(namespace) == intent.C {
-			log.Logf(log.DebugHigh, "\tfound index %v", indexDocument.Options["name"])
-			collectionIndexes = append(collectionIndexes, *indexDocument)
+		// iterate over stored indexes, saving all that match the collection
+		indexDocument := &IndexDocument{}
+		for bsonSource.Next(indexDocument) {
+			namespace := indexDocument.Options["ns"].(string)
+			dbCollectionIndexes[dbname][stripDBFromNS(namespace)] =
+				append(dbCollectionIndexes[dbname][stripDBFromNS(namespace)], *indexDocument)
+		}
+		if err := bsonSource.Err(); err != nil {
+			return fmt.Errorf("error scanning system.indexes: %v", err)
 		}
 	}
-	if bsonSource.Err() != nil {
-		return nil, fmt.Errorf("error scanning system.indexes for %v indexes: %v", intent.C, err)
-	}
-
-	return collectionIndexes, nil
+	restore.dbCollectionIndexes = dbCollectionIndexes
+	return nil
 }
 
 func stripDBFromNS(ns string) string {
@@ -297,11 +299,12 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		return fmt.Errorf("cannot use %v as a collection type in RestoreUsersOrRoles", collectionType)
 	}
 
-	rawFile, err := os.Open(intent.BSONPath)
+	err := intent.BSONFile.Open()
 	if err != nil {
-		return fmt.Errorf("error reading index bson file %v: %v", intent.BSONPath, err)
+		return err
 	}
-	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
+	defer intent.BSONFile.Close()
+	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
 	tempColExists, err := restore.CollectionExists(&intents.Intent{DB: "admin", C: tempCol})
@@ -407,18 +410,20 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 		log.Log(log.Always, "assuming users in the dump directory are from <= 2.4 (auth version 1)")
 		return 1, nil
 	}
-	rawFile, err := os.Open(intent.BSONPath)
+
+	err := intent.BSONFile.Open()
 	if err != nil {
-		return 0, fmt.Errorf("error reading version bson file %v: %v", intent.BSONPath, err)
+		return 0, err
 	}
-	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
+	defer intent.BSONFile.Close()
+	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
 	versionDoc := struct {
 		CurrentVersion int `bson:"currentVersion"`
 	}{}
 	bsonSource.Next(&versionDoc)
-	if err = bsonSource.Err(); err != nil {
+	if err := bsonSource.Err(); err != nil {
 		return 0, fmt.Errorf("error reading version bson file %v: %v", intent.BSONPath, err)
 	}
 	authVersion := versionDoc.CurrentVersion

@@ -3,11 +3,9 @@ package mongodump
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
-	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
-	"io"
 )
 
 // determineOplogCollectionName uses a command to infer
@@ -69,7 +67,7 @@ func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, 
 
 // DumpOplogAfterTimestamp takes a timestamp and writer and dumps all oplog entries after
 // the given timestamp to the writer. Returns any errors that occur.
-func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp, out io.Writer) error {
+func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp) error {
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {
 		return err
@@ -79,6 +77,5 @@ func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp, out io.Wr
 	session.SetPrefetch(1.0) // mimic exhaust cursor
 	queryObj := bson.M{"ts": bson.M{"$gt": ts}}
 	oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
-	return dump.dumpQueryToWriter(
-		oplogQuery, &intents.Intent{DB: "local", C: dump.oplogCollection}, out)
+	return dump.dumpQueryToWriter(oplogQuery, dump.manager.Oplog())
 }
