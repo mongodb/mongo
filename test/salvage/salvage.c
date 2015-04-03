@@ -38,6 +38,13 @@
 #define	PSIZE	(2 * 1024)
 #define	OSIZE	(PSIZE / 20)
 
+#define	CHECK(x) do {							\
+	if (!(x)) {							\
+		fprintf(stderr, "%s: failed\n", #x);			\
+		assert(0);						\
+	}								\
+} while (0)
+
 void build(int, int, int);
 void copy(u_int, u_int);
 void empty(int);
@@ -161,8 +168,8 @@ run(int r)
 
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-	assert(system("rm -f WiredTiger* __slvg.* __schema.*") == 0);
-	assert((res_fp = fopen(RSLT, "w")) != NULL);
+	CHECK(system("rm -f WiredTiger* __slvg.* __schema.*") == 0);
+	CHECK((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*
 	 * Each run builds the LOAD file, and then appends the first page of
@@ -434,7 +441,7 @@ run(int r)
 		exit(EXIT_FAILURE);
 	}
 
-	assert(fclose(res_fp) == 0);
+	CHECK(fclose(res_fp) == 0);
 
 	process();
 
@@ -476,10 +483,10 @@ build(int ikey, int ivalue, int cnt)
 	 * Disable logging: we're modifying files directly, we don't want to
 	 * run recovery.
 	 */
-	assert(wiredtiger_open(
+	CHECK(wiredtiger_open(
 	    NULL, NULL, "create,log=(enabled=false)", &conn) == 0);
-	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->drop(session, "file:" LOAD, "force") == 0);
+	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
+	CHECK(session->drop(session, "file:" LOAD, "force") == 0);
 
 	switch (page_type) {
 	case WT_PAGE_COL_FIX:
@@ -509,8 +516,8 @@ build(int ikey, int ivalue, int cnt)
 	default:
 		assert(0);
 	}
-	assert(session->create(session, "file:" LOAD, config) == 0);
-	assert(session->open_cursor(
+	CHECK(session->create(session, "file:" LOAD, config) == 0);
+	CHECK(session->open_cursor(
 	    session, "file:" LOAD, NULL, "bulk", &cursor) == 0);
 	for (; cnt > 0; --cnt, ++ikey, ++ivalue) {
 		switch (page_type) {			/* Build the key. */
@@ -537,7 +544,7 @@ build(int ikey, int ivalue, int cnt)
 			value.size = 20;
 			cursor->set_value(cursor, &value);
 		}
-		assert(cursor->insert(cursor) == 0);
+		CHECK(cursor->insert(cursor) == 0);
 	}
 
 	/*
@@ -547,10 +554,10 @@ build(int ikey, int ivalue, int cnt)
 	 */
 	new_slvg = !file_exists(SLVG);
 	if (new_slvg) {
-		assert(session->drop(session, "file:" SLVG, "force") == 0);
-		assert(session->create(session, "file:" SLVG, config) == 0);
+		CHECK(session->drop(session, "file:" SLVG, "force") == 0);
+		CHECK(session->create(session, "file:" SLVG, config) == 0);
 	}
-	assert(conn->close(conn, 0) == 0);
+	CHECK(conn->close(conn, 0) == 0);
 	if (new_slvg)
 		(void)remove(SLVG);
 }
@@ -567,7 +574,7 @@ copy(u_int gen, u_int recno)
 	WT_BLOCK_HEADER *blk;
 	char buf[PSIZE];
 
-	assert((ifp = fopen(LOAD, "r")) != NULL);
+	CHECK((ifp = fopen(LOAD, "r")) != NULL);
 
 	/*
 	 * If the salvage file doesn't exist, then we're creating it:
@@ -575,19 +582,19 @@ copy(u_int gen, u_int recno)
 	 * Otherwise, we are appending to an existing file.
 	 */
 	if (file_exists(SLVG))
-		assert((ofp = fopen(SLVG, "a")) != NULL);
+		CHECK((ofp = fopen(SLVG, "a")) != NULL);
 	else {
-		assert((ofp = fopen(SLVG, "w")) != NULL);
-		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
-		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+		CHECK((ofp = fopen(SLVG, "w")) != NULL);
+		CHECK(fread(buf, 1, PSIZE, ifp) == PSIZE);
+		CHECK(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 
 	/*
 	 * If there's data, copy/update the first formatted page.
 	 */
 	if (gen != 0) {
-		assert(fseek(ifp, (long)PSIZE, SEEK_SET) == 0);
-		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
+		CHECK(fseek(ifp, (long)PSIZE, SEEK_SET) == 0);
+		CHECK(fread(buf, 1, PSIZE, ifp) == PSIZE);
 		dsk = (void *)buf;
 		if (page_type != WT_PAGE_ROW_LEAF)
 			dsk->recno = recno;
@@ -595,11 +602,11 @@ copy(u_int gen, u_int recno)
 		blk = WT_BLOCK_HEADER_REF(buf);
 		blk->cksum = 0;
 		blk->cksum = __wt_cksum(dsk, PSIZE);
-		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+		CHECK(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 
-	assert(fclose(ifp) == 0);
-	assert(fclose(ofp) == 0);
+	CHECK(fclose(ifp) == 0);
+	CHECK(fclose(ofp) == 0);
 }
 
 /*
@@ -624,35 +631,35 @@ process(void)
 		    progname);
 	strcat(config, "log=(enabled=false),");
 
-	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
-	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->salvage(session, "file:" SLVG, 0) == 0);
-	assert(conn->close(conn, 0) == 0);
+	CHECK(wiredtiger_open(NULL, NULL, config, &conn) == 0);
+	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
+	CHECK(session->salvage(session, "file:" SLVG, 0) == 0);
+	CHECK(conn->close(conn, 0) == 0);
 
 	/* Verify. */
-	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
-	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->verify(session, "file:" SLVG, 0) == 0);
-	assert(conn->close(conn, 0) == 0);
+	CHECK(wiredtiger_open(NULL, NULL, config, &conn) == 0);
+	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
+	CHECK(session->verify(session, "file:" SLVG, 0) == 0);
+	CHECK(conn->close(conn, 0) == 0);
 
 	/* Dump. */
-	assert((fp = fopen(DUMP, "w")) != NULL);
-	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
-	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
-	assert(session->open_cursor(
+	CHECK((fp = fopen(DUMP, "w")) != NULL);
+	CHECK(wiredtiger_open(NULL, NULL, config, &conn) == 0);
+	CHECK(conn->open_session(conn, NULL, NULL, &session) == 0);
+	CHECK(session->open_cursor(
 	    session, "file:" SLVG, NULL, "dump=print", &cursor) == 0);
 	while (cursor->next(cursor) == 0) {
 		if (page_type == WT_PAGE_ROW_LEAF) {
-			assert(cursor->get_key(cursor, &key) == 0);
-			assert(fputs(key, fp) >= 0);
-			assert(fputc('\n', fp) >= 0);
+			CHECK(cursor->get_key(cursor, &key) == 0);
+			CHECK(fputs(key, fp) >= 0);
+			CHECK(fputc('\n', fp) >= 0);
 		}
-		assert(cursor->get_value(cursor, &value) == 0);
-		assert(fputs(value, fp) >= 0);
-		assert(fputc('\n', fp) >= 0);
+		CHECK(cursor->get_value(cursor, &value) == 0);
+		CHECK(fputs(value, fp) >= 0);
+		CHECK(fputc('\n', fp) >= 0);
 	}
-	assert(conn->close(conn, 0) == 0);
-	assert(fclose(fp) == 0);
+	CHECK(conn->close(conn, 0) == 0);
+	CHECK(fclose(fp) == 0);
 }
 
 /*

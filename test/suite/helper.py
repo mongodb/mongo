@@ -134,9 +134,7 @@ def simple_populate(self, uri, config, rows):
     self.session.create(uri, 'value_format=S,' + config)
     cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows + 1):
-        cursor.set_key(key_populate(cursor, i))
-        cursor.set_value(value_populate(cursor, i))
-        cursor.insert()
+        cursor[key_populate(cursor, i)] = value_populate(cursor, i)
     cursor.close()
 
 def simple_populate_check_cursor(self, cursor, rows):
@@ -206,10 +204,8 @@ def complex_populate_type(self, uri, config, rows, type):
         indxname + ':indx6', 'columns=(column3,column5,column4)' + ',' + type)
     cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows + 1):
-        cursor.set_key(key_populate(cursor, i))
         v = complex_value_populate(cursor, i)
-        cursor.set_value(v[0], v[1], v[2], v[3])
-        cursor.insert()
+        cursor[key_populate(cursor, i)] = (v[0], v[1], v[2], v[3])
     cursor.close()
 
 def complex_populate_colgroup_name(self, uri):

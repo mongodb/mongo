@@ -12,7 +12,7 @@
  * __wt_txnid_cmp --
  *	Compare transaction IDs for sorting / searching.
  */
-int
+int WT_CDECL
 __wt_txnid_cmp(const void *v1, const void *v2)
 {
 	uint64_t id1, id2;

@@ -229,7 +229,7 @@ track_operation(TRACK *trk, uint64_t usecs)
 		++trk->us[v];
 
 	/*
-	 * Second buckets: millseconds from 1ms to 1000ms, at 1ms each.
+	 * Second buckets: milliseconds from 1ms to 1000ms, at 1ms each.
 	 */
 	else if (v < ms_to_us(1000))
 		++trk->ms[us_to_ms(v)];
@@ -2026,7 +2026,7 @@ main(int argc, char *argv[])
 		cfg->async_threads = 2;
 	if (cfg->async_threads > 0) {
 		/*
-		 * The maximum number of async threasd is two digits, so just
+		 * The maximum number of async threads is two digits, so just
 		 * use that to compute the space we need.  Assume the default
 		 * of 1024 for the max ops.  Although we could bump that up
 		 * to 4096 if needed.

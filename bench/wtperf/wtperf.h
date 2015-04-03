@@ -102,7 +102,7 @@ typedef struct {
  * NOTE:  If you add any fields to this structure here, you must also add
  * an initialization in wtperf.c in the default_cfg.
  */
-struct __config {			/* Configuration struction */
+struct __config {			/* Configuration structure */
 	const char *home;		/* WiredTiger home */
 	const char *monitor_dir;	/* Monitor output dir */
 	char *base_uri;			/* Object URI */

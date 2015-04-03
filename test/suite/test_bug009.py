@@ -55,13 +55,8 @@ class test_bug009(wttest.WiredTigerTestCase):
         # Insert two items with keys that will be prefix compressed and data
         # items sized so that the compression size difference tips the
         # size over a page boundary.
-        cursor.set_key('fill_2__b_27')
-        cursor.set_value(2294 * '0')
-        cursor.insert()
-
-        cursor.set_key('fill_2__b_28')
-        cursor.set_value(3022 * '0')
-        cursor.insert()
+        cursor['fill_2__b_27'] = '0' * 2294
+        cursor['fill_2__b_28'] = '0' * 3022
 
 if __name__ == '__main__':
     wttest.run()

@@ -59,23 +59,17 @@ class test_txn03(wttest.WiredTigerTestCase):
         # Set up the table with entries for 1 and 10
         # We use the overwrite config so insert can update as needed.
         c = self.session.open_cursor(self.uri1, None, 'overwrite')
-        c.set_value(self.data_str1)
-        c.set_key(self.key_str)
-        c.insert()
+        c[self.key_str] = self.data_str1
         c.close()
         c = self.session.open_cursor(self.uri2, None, 'overwrite')
-        c.set_value(self.data_str1)
-        c.set_key(self.key_str)
-        c.insert()
+        c[self.key_str] = self.data_str1
         c.close()
 
         # Update the first table - this update should be visible in the
         # new session.
         self.session.begin_transaction()
         c = self.session.open_cursor(self.uri1, None, 'overwrite')
-        c.set_value(self.data_str2)
-        c.set_key(self.key_str)
-        c.insert()
+        c[self.key_str] = self.data_str2
         self.session.commit_transaction()
         c.close()
 
@@ -88,9 +82,7 @@ class test_txn03(wttest.WiredTigerTestCase):
         # Make an update in the first session.
         self.session.begin_transaction()
         c = self.session.open_cursor(self.uri2, None, 'overwrite')
-        c.set_value(self.data_str2)
-        c.set_key(self.key_str)
-        c.insert()
+        c[self.key_str] = self.data_str2
         self.session.commit_transaction()
         c.close()
 

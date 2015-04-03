@@ -42,10 +42,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablebase
     numfiles = 50
     numkv = 1000
-    ckpt_list = [
-        ('off', dict(ckpt=0)),
-        ('on', dict(ckpt=10)),
-    ]
+    ckpt = 5
 
     types = [
         ('row', dict(tabletype='row',
@@ -56,8 +53,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
-    scenarios = number_scenarios(
-        prune_scenarios(multiply_scenarios('.', types, ckpt_list), 1, 100))
+    scenarios = types
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
@@ -90,10 +86,8 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             # print "Creating %s with config '%s'" % (uri, self.create_params)
             self.session.create(uri, self.create_params)
             c = self.session.open_cursor(uri, None)
-            c.set_value(1)
             for k in range(self.numkv):
-                c.set_key(k+1)
-                c.insert()
+                c[k+1] = 1
             c.close()
             if f % 20 == 0:
                 time.sleep(1)
@@ -107,12 +101,16 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         ref1 = stat_cursor[stat.conn.dh_conn_ref][2]
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
-        # Inactive time on a handle must be a minute or more.
-        # We've configured the sweep server to run every 2 seconds and idle
-        # time to be 6 seconds. It should take at most 8 seconds for a handle
-        # to be closed. Sleep for 12 seconds to be safe.
+
+        #
+        # We've configured checkpoints to run every 5 seconds, sweep server to
+        # run every 2 seconds and idle time to be 6 seconds. It should take
+        # about 8 seconds for a handle to be closed. Sleep for 12 seconds to be
+        # safe.
+        #
         uri = '%s.test' % self.uri
         self.session.create(uri, self.create_params)
+
         #
         # Keep inserting data to keep at least one handle active and give
         # checkpoint something to do.  Make sure checkpoint doesn't adjust
@@ -120,12 +118,10 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         #
         c = self.session.open_cursor(uri, None)
         k = 0
-        sleep=0
+        sleep = 0
         while sleep < 12:
             k = k+1
-            c.set_key(k)
-            c.set_value(1)
-            c.insert()
+            c[k] = 1
             sleep += 2
             time.sleep(2)
         c.close()

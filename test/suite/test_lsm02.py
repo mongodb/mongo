@@ -36,9 +36,7 @@ class test_lsm02(wttest.WiredTigerTestCase):
 
     def add_key(self, uri, key, value):
         cursor = self.session.open_cursor(uri, None, None)
-        cursor.set_key(key)
-        cursor.set_value(value)
-        cursor.insert()
+        cursor[key] = value
         cursor.close()
 
     def verify_key_exists(self, uri, key, value):

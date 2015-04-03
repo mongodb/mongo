@@ -41,9 +41,6 @@ extern "C" {
 #else
 #include <pthread.h>
 #endif
-#ifdef HAVE_PTHREAD_NP_H
-#include <pthread_np.h>
-#endif
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -331,6 +328,7 @@ struct __wt_update;
 #include "txn.i"			/* required by btree.i */
 
 #include "btree.i"			/* required by cursor.i */
+#include "btree_cmp.i"
 #include "cursor.i"
 
 #include "bitstring.i"

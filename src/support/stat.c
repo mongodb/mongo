@@ -253,6 +253,16 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->btree_column_internal.v += c->btree_column_internal.v;
 	p->btree_column_deleted.v += c->btree_column_deleted.v;
 	p->btree_column_variable.v += c->btree_column_variable.v;
+	if (c->btree_maxintlkey.v > p->btree_maxintlkey.v)
+	    p->btree_maxintlkey.v = c->btree_maxintlkey.v;
+	if (c->btree_maxintlpage.v > p->btree_maxintlpage.v)
+	    p->btree_maxintlpage.v = c->btree_maxintlpage.v;
+	if (c->btree_maxleafkey.v > p->btree_maxleafkey.v)
+	    p->btree_maxleafkey.v = c->btree_maxleafkey.v;
+	if (c->btree_maxleafpage.v > p->btree_maxleafpage.v)
+	    p->btree_maxleafpage.v = c->btree_maxleafpage.v;
+	if (c->btree_maxleafvalue.v > p->btree_maxleafvalue.v)
+	    p->btree_maxleafvalue.v = c->btree_maxleafvalue.v;
 	if (c->btree_maximum_depth.v > p->btree_maximum_depth.v)
 	    p->btree_maximum_depth.v = c->btree_maximum_depth.v;
 	p->btree_entries.v += c->btree_entries.v;
@@ -301,6 +311,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->bloom_page_evict.v += c->bloom_page_evict.v;
 	p->bloom_page_read.v += c->bloom_page_read.v;
 	p->bloom_count.v += c->bloom_count.v;
+	p->lsm_chunk_count.v += c->lsm_chunk_count.v;
 	if (c->lsm_generation_max.v > p->lsm_generation_max.v)
 	    p->lsm_generation_max.v = c->lsm_generation_max.v;
 	p->lsm_lookup_no_bloom.v += c->lsm_lookup_no_bloom.v;
@@ -550,7 +561,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 
 	stats = (WT_CONNECTION_STATS *)stats_arg;
 	stats->async_cur_queue.v = 0;
-	stats->async_max_queue.v = 0;
 	stats->async_alloc_race.v = 0;
 	stats->async_flush.v = 0;
 	stats->async_alloc_view.v = 0;
@@ -582,7 +592,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_inmem_split.v = 0;
 	stats->cache_eviction_internal.v = 0;
-	stats->cache_eviction_maximum_page_size.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_deepen.v = 0;
 	stats->cache_eviction_force.v = 0;

@@ -1552,7 +1552,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG));
 
 	/* Close any file handle left open, remove any temporary file. */
-err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_WRITE));
+err:	WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 
 	return (ret);
@@ -1803,7 +1803,7 @@ err:	/* Discard the configuration strings. */
 	__wt_buf_free(session, &i2);
 	__wt_buf_free(session, &i3);
 
-	if (ret != 0 && conn != NULL)
+	if (ret != 0)
 		WT_TRET(__wt_connection_close(conn));
 
 	return (ret);

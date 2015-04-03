@@ -26,8 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn10.py
-#   Transactions: commits and rollbacks
+# test_durability01.py
+#   Durability: make sure the metadata is stable after exclusive operations
+#   cause files to be closed.
 #
 
 import fnmatch, os, shutil, time
@@ -36,19 +37,11 @@ from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
-class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
-    t1 = 'table:test_txn10_1'
-    t2 = 'table:test_txn10_2'
+class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
+    uri = 'table:test_durability01'
     create_params = 'key_format=i,value_format=i'
 
-    # Overrides WiredTigerTestCase, add extra config params
-    def setUpConnectionOpen(self, dir):
-        self.conn_config = \
-                'log=(archive=false,enabled,file_max=100K),' + \
-                'transaction_sync=(method=dsync,enabled)'
-        return wttest.WiredTigerTestCase.setUpConnectionOpen(self, dir)
-
-    def simulate_crash_restart(self, olddir, newdir):
+    def check_crash_restart(self, olddir, newdir):
         ''' Simulate a crash from olddir and restart in newdir. '''
         # with the connection still open, copy files to new directory
         shutil.rmtree(newdir, ignore_errors=True)
@@ -58,45 +51,35 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
             # Skip lock file on Windows since it is locked
             if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
                 shutil.copy(fullname, newdir)
-        # close the original connection and open to new directory
-        self.close_conn()
-        self.conn = self.setUpConnectionOpen(newdir)
-        self.session = self.setUpSessionOpen(self.conn)
+
+        # Open the new directory
+        conn = self.setUpConnectionOpen(newdir)
+        session = self.setUpSessionOpen(conn)
+        session.verify(self.uri)
+        conn.close()
         
-    def test_recovery(self):
-        ''' Check for bugs in file ID allocation. '''
+    def test_durability(self):
+        '''Check for missing metadata checkpoints'''
 
         # Here's the strategy:
-        #    - Create a table (t1). 
-        #    - Do a clean restart. 
-        #    - Create another table (t2). 
-        #    - Insert data into t2. 
-        #    - Make recovery run.
+        #    - update the table
+        #    - verify, which causes the table to be flushed
+        #    - copy the database directory (live, simulating a crash)
+        #    - verify in the copy
+        #    - repeat
         #
-        # If we aren't tracking file IDs properly, it's possible that
-        # we'd end up apply the log records for t2 to table t1.
-        self.session.create(self.t1, self.create_params)
-        self.reopen_conn()
-        self.session.create(self.t2, self.create_params)
-        c = self.session.open_cursor(self.t2, None, None)
-        for i in range(10000):
-            c[i] = i + 1
-        c.close()
-        self.simulate_crash_restart(".", "RESTART")
-        c = self.session.open_cursor(self.t2, None, None)
-        i = 0
-        for key, value in c:
-            self.assertEqual(i, key)
-            self.assertEqual(i+1, value)
-            i += 1
-        self.assertEqual(i, 10000)
-        c.close()
-        c = self.session.open_cursor(self.t1, None, None)
-        i = 0
-        for key, value in c:
-            i += 1
-        self.assertEqual(i, 0)
-        c.close()
+        # If the metadata isn't flushed, eventually the metadata we copy will
+        # be sufficiently out-of-sync with the data file that it won't verify.
+        self.session.create(self.uri, self.create_params)
+        for i in range(100):
+            c = self.session.open_cursor(self.uri)
+            c[i] = i
+            c.close()
+            if i % 5 == 0:
+                self.session.checkpoint()
+            else:
+                self.session.verify(self.uri)
+            self.check_crash_restart(".", "RESTART")
 
 if __name__ == '__main__':
     wttest.run()

@@ -1,3 +1,85 @@
+WiredTiger release 2.5.2, 2015-03-23
+------------------------------------
+
+The WiredTiger 2.5.2 release contains important bug fixes.
+
+API changes:
+
+* Allow memory_page_max to be at most a quater of the cache size not half.
+  This avoids operations getting stalled due to the cache being filled with
+  one or two pages.
+
+Bug fixes and other important changes:
+
+* When skipping a dirty page during a checkpoint, make sure the tree is marked
+  dirty.
+  refs SUPPORT-1248, SERVER-17319, SERVER-17506, #1404, #1643, #1721, #1735
+
+* Fix a bug in range truncate where we could remove the wrong records.
+  refs SERVER-17345
+
+* Fix a bug in LSM management where we could let the cache get full - leading
+  to a operations being blocked.
+  refs #1720
+
+* Fix several bugs in the checkpoint implementation that could lead to a tree
+  being marked clean when it had updates in memory. If shutdown occurred at
+  a specific time those updates would be discarded without being written.
+  refs SUPPORT-1248
+
+* Fix some bugs in logging - where system crashes could leave empty files that
+  would stop recovery working on re-start.
+  refs #1717, #1719, SERVER-17451
+
+* Fix a bug in recovery. Force recovery instead of returning an error if the
+  LSN given doesn't exist.
+  refs #1700, #1704
+
+* Move writing into log worker thread to avoid latency in application threads.
+  refs #1683
+
+* Fix a bug in the reconfigure API related to adhering to shared cache quotas.
+  refs #1712, #1713
+
+* Fix a bug in WiredTiger statistics where we weren't recording overflow
+  record statistics.
+  refs #1520, #1703, #1711
+
+* Several enhancements to eviction of large pages including:
+  - Don't do forced eviction of a page if it is the current walk point.
+  - Don't update the read generation on page in if it's set to oldest.
+  - Clear the walk positions before the eviction server sleeps.
+  - Reverse the direction of the LRU walk regularly.
+  - Add all pages that would block to the eviction queue.
+  - If evicting dirty pages use the worker threads not the server.
+ refs #1706
+
+* Use raw mode when dumping indices.
+  refs #1709
+
+* Fix a bug where we could race opening files while a WT_CONNECTION::close is
+  in progress.
+  refs SERVER-17319
+
+* Fix a bug in LSM where snapshot transaction updates could have the wrong
+  visibility check applied. Leading to invalid updates.
+  refs #1641, #1701, #1702
+
+* Fix a bug in checkpoint where it could get an EBUSY return unnecessarily.
+  refs #1404, #1589, #1705
+
+* Fix a bug when writing a page from memory to disk (reconciling). We could
+  overwrite the end of a temporary buffer in some cases.
+  refs #1697, #1699
+
+* Sometimes we would choose a sub-optimal layout for on disk pages when
+  writing them out from memory.
+  refs #1699
+
+* Improve the performance of in-memory lookups by making the content of the
+  page structure more cache friendly.
+
+
 WiredTiger release 2.5.1, 2015-03-07
 ------------------------------------
 

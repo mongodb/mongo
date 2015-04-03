@@ -59,6 +59,7 @@ usleep(useconds_t useconds)
 int
 pthread_rwlock_destroy(pthread_rwlock_t *lock)
 {
+	lock = lock;
 	return (0);
 }
 
@@ -66,6 +67,7 @@ int
 pthread_rwlock_init(pthread_rwlock_t *rwlock,
     const pthread_rwlockattr_t *ignored)
 {
+	ignored = ignored;
 	InitializeSRWLock(&rwlock->rwlock);
 	rwlock->exclusive_locked = 0;
 
@@ -99,13 +101,15 @@ pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
 	rwlock->exclusive_locked = GetCurrentThreadId();
 
 	return (0);
-
 }
 
+#pragma warning( once : 4024 )
+#pragma warning( once : 4047 )
 int
 pthread_create(pthread_t *tidret, const pthread_attr_t *ignored,
     void *(*func)(void *), void * arg)
 {
+	ignored = ignored;
 	*tidret = CreateThread(NULL, 0, func, arg, 0, NULL);
 
 	if (*tidret != NULL)
@@ -117,6 +121,7 @@ pthread_create(pthread_t *tidret, const pthread_attr_t *ignored,
 int
 pthread_join(pthread_t thread, void **ignored)
 {
+	ignored = ignored;
 	WaitForSingleObject(thread, INFINITE);
 	return (0);
 }

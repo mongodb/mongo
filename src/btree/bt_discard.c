@@ -209,7 +209,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_free_ref_index(session, page, WT_INTL_INDEX_COPY(page), 0);
+	__wt_free_ref_index(session, page, WT_INTL_INDEX_GET_SAFE(page), 0);
 }
 
 /*

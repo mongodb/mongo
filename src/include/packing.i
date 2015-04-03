@@ -376,6 +376,11 @@ __pack_write(
 			pad = pv->size - s;
 		if (pv->type == 'U') {
 			oldp = *pp;
+			/*
+			 * Check that there is at least one byte available: the
+			 * low-level routines treat zero length as unchecked.
+			 */
+			WT_SIZE_CHECK(1, maxlen);
 			WT_RET(__wt_vpack_uint(pp, maxlen, s + pad));
 			maxlen -= (size_t)(*pp - oldp);
 		}
@@ -404,6 +409,11 @@ __pack_write(
 	case 'i':
 	case 'l':
 	case 'q':
+		/*
+		 * Check that there is at least one byte available: the
+		 * low-level routines treat zero length as unchecked.
+		 */
+		WT_SIZE_CHECK(1, maxlen);
 		WT_RET(__wt_vpack_int(pp, maxlen, pv->u.i));
 		break;
 	case 'H':
@@ -411,6 +421,11 @@ __pack_write(
 	case 'L':
 	case 'Q':
 	case 'r':
+		/*
+		 * Check that there is at least one byte available: the
+		 * low-level routines treat zero length as unchecked.
+		 */
+		WT_SIZE_CHECK(1, maxlen);
 		WT_RET(__wt_vpack_uint(pp, maxlen, pv->u.u));
 		break;
 	case 'R':
@@ -453,6 +468,11 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*pp += s;
 		break;
 	case 'U':
+		/*
+		 * Check that there is at least one byte available: the
+		 * low-level routines treat zero length as unchecked.
+		 */
+		WT_SIZE_CHECK(1, maxlen);
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		/* FALLTHROUGH */
 	case 'u':
@@ -481,6 +501,11 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'i':
 	case 'l':
 	case 'q':
+		/*
+		 * Check that there is at least one byte available: the
+		 * low-level routines treat zero length as unchecked.
+		 */
+		WT_SIZE_CHECK(1, maxlen);
 		WT_RET(__wt_vunpack_int(pp, maxlen, &pv->u.i));
 		break;
 	case 'H':
@@ -488,6 +513,11 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'L':
 	case 'Q':
 	case 'r':
+		/*
+		 * Check that there is at least one byte available: the
+		 * low-level routines treat zero length as unchecked.
+		 */
+		WT_SIZE_CHECK(1, maxlen);
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		break;
 	case 'R':

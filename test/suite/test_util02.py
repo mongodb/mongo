@@ -128,11 +128,7 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, params)
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
         for i in range(0, self.nentries):
-            key = self.get_key(i)
-            value = self.get_value(i)
-            cursor.set_key(key)
-            cursor.set_value(value)
-            cursor.insert()
+            cursor[self.get_key(i)] = self.get_value(i)
         cursor.close()
 
         dumpargs = ["dump"]
