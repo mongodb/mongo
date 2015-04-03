@@ -224,6 +224,7 @@ function runTest() {
     t.drop()
 }
 
-if (db.serverStatus().process != "mongos") {
+// Don't run test against mongos.
+if (!db.runCommand("isdbgrid").isdbgrid) {
     runTest();
 }

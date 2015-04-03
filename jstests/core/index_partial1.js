@@ -59,6 +59,7 @@ function runTest() {
     assert.eq( 1, t.getIndexes().length );
 }
 
-if (db.serverStatus().process != "mongos") {
+// Don't run test against mongos.
+if (!db.runCommand("isdbgrid").isdbgrid) {
     runTest();
 }
