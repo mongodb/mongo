@@ -30,28 +30,6 @@
 
 #ifndef _WIN32
 # include <sys/poll.h>
-#else
-# if defined(NTDDI_VERSION) && ( !defined(NTDDI_VISTA) || ( NTDDI_VERSION < NTDDI_VISTA ) )
-    // These are only defined in winsock2.h on newer windows but we need them everywhere.
-#   define POLLRDNORM  0x0100
-#   define POLLRDBAND  0x0200
-#   define POLLIN      (POLLRDNORM | POLLRDBAND)
-#   define POLLPRI     0x0400
-
-#   define POLLWRNORM  0x0010
-#   define POLLOUT     (POLLWRNORM)
-#   define POLLWRBAND  0x0020
-
-#   define POLLERR     0x0001
-#   define POLLHUP     0x0002
-#   define POLLNVAL    0x0004
-
-    struct pollfd {
-        SOCKET fd;
-        SHORT events;
-        SHORT revents;
-    };
-# endif // old windows
 #endif // ndef _WIN32
 
 namespace mongo {

@@ -319,12 +319,11 @@ add_option('variables-help',
 add_option("osx-version-min", "minimum OS X version to support", 1, True)
 
 win_version_min_choices = {
-    'xpsp3'   : ('0501', '0300'),
-    'ws03sp2' : ('0502', '0200'),
     'vista'   : ('0600', '0000'),
-    'ws08r2'  : ('0601', '0000'),
     'win7'    : ('0601', '0000'),
+    'ws08r2'  : ('0601', '0000'),
     'win8'    : ('0602', '0000'),
+    'win81'   : ('0603', '0000'),
 }
 
 add_option("win-version-min", "minimum Windows version to support", 1, True,
@@ -960,6 +959,10 @@ elif env.TargetOSIs('windows'):
                          "/wd4290", "/wd4068", "/wd4351"] )
 
     # some warnings we should treat as errors:
+    # c4013
+    #  'function' undefined; assuming extern returning int
+    #    This warning occurs when files compiled for the C language use functions not defined
+    #    in a header file.
     # c4099
     #  identifier' : type name first seen using 'objecttype1' now seen using 'objecttype2'
     #    This warning occurs when classes and structs are declared with a mix of struct and class
@@ -970,7 +973,7 @@ elif env.TargetOSIs('windows'):
     #     was probably intended as a variable definition.  A common example is accidentally
     #     declaring a function called lock that takes a mutex when one meant to create a guard
     #     object called lock on the stack.
-    env.Append( CCFLAGS=["/we4099", "/we4930"] )
+    env.Append( CCFLAGS=["/we4013", "/we4099", "/we4930"] )
 
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS"] )
 
@@ -1005,13 +1008,6 @@ elif env.TargetOSIs('windows'):
     }
 
     env.Append(CCFLAGS=[winRuntimeLibMap[(dynamicCRT, debugBuild)]])
-
-    # With VS 2012 and later we need to specify 5.01 as the target console
-    # so that our 32-bit builds run on Windows XP
-    # See https://software.intel.com/en-us/articles/linking-applications-using-visual-studio-2012-to-run-on-windows-xp
-    #
-    if env["TARGET_ARCH"] == "i386":
-        env.Append( LINKFLAGS=["/SUBSYSTEM:CONSOLE,5.01"])
 
     if optBuild:
         # /O2:  optimize for speed (as opposed to size)
@@ -1273,19 +1269,13 @@ def doConfigure(myenv):
         print("WARNING: The build may fail, binaries may crash, or may run but corrupt data...")
 
     # Figure out what our minimum windows version is. If the user has specified, then use
-    # that. Otherwise, if they have explicitly selected between 32 bit or 64 bit, choose XP or
-    # Vista respectively. Finally, if they haven't done either of these, try invoking the
-    # compiler to figure out whether we are doing a 32 or 64 bit build and select as
-    # appropriate.
+    # that.
     if env.TargetOSIs('windows'):
-        win_version_min = None
         if has_option('win-version-min'):
             win_version_min = get_option('win-version-min')
-        # If no minimum version has beeen specified, use our defaults for 32-bit/64-bit windows.
-        elif env['TARGET_ARCH'] == 'x86_64':
-            win_version_min = 'ws03sp2'
-        elif env['TARGET_ARCH'] == 'i386':
-            win_version_min = 'xpsp3'
+        else:
+            # If no minimum version has beeen specified, use our default
+            win_version_min = 'vista'
 
         env['WIN_VERSION_MIN'] = win_version_min
         win_version_min = win_version_min_choices[win_version_min]
@@ -1539,6 +1529,33 @@ def doConfigure(myenv):
             print("--use-glibcxx-debug not compatible with system versions of C++ libraries.")
             Exit(1)
         myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"]);
+
+    # Check if we have a modern Windows SDK
+    if env.TargetOSIs('windows'):
+        def CheckWindowsSDKVersion(context):
+
+            test_body = """
+            #include <windows.h>
+            #if !defined(NTDDI_WINBLUE)
+            #error Need Windows SDK Version 8.1 or higher
+            #endif
+            """
+
+            context.Message('Checking Windows SDK is 8.1 or newer... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+            context.Result(ret)
+            return ret
+
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckWindowsSDKVersion' : CheckWindowsSDKVersion,
+        })
+
+        if not conf.CheckWindowsSDKVersion():
+            print( 'Windows SDK Version 8.1 or higher is required to build MongoDB' )
+            Exit(1)
+
+
+        conf.Finish()
 
     # Check if we are on a POSIX system by testing if _POSIX_VERSION is defined.
     def CheckPosixSystem(context):

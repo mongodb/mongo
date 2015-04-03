@@ -86,12 +86,10 @@ namespace mongo {
 #if defined(_WIN32)
     std::string targetMinOS() {
         stringstream ss;
-#if (NTDDI_VERSION >= 0x06010000)
+#if (NTDDI_VERSION >= NTDDI_WIN7)
         ss << "Windows 7/Windows Server 2008 R2";
-#elif (NTDDI_VERSION >= 0x05020200)
-        ss << "Windows Server 2003 SP2";
-#elif (NTDDI_VERSION >= 0x05010300)
-        ss << "Windows XP SP3";
+#elif (NTDDI_VERSION >= NTDDI_VISTA)
+        ss << "Windows Vista/Windows Server 2008";
 #else
 #error This targetted Windows version is not supported
 #endif // NTDDI_VERSION
