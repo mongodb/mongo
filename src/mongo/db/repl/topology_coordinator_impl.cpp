@@ -702,7 +702,7 @@ namespace {
         // Heartbeat status message
         response->setHbMsg(_getHbmsg(now));
         response->setTime(Seconds(Milliseconds(now.asInt64()).total_seconds()));
-        response->setOpTime(lastOpApplied.asDate());
+        response->setOpTime(lastOpApplied);
 
         if (!_syncSource.empty()) {
             response->setSyncingTo(_syncSource.toString());
@@ -997,7 +997,7 @@ namespace {
                         }
                         return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
                     }
-                    else if ((highestPriorityMemberOptime == _selfIndex) &&
+                    else if ((highestPriorityIndex == _selfIndex) &&
                              (_electionSleepUntil <= now)) {
                         // If this node is the highest priority node, and it is not in
                         // an inter-election sleep period, ask the current primary to step down.
