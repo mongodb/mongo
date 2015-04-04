@@ -1592,8 +1592,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(i1);
+	WT_DECL_ITEM(i2);
+	WT_DECL_ITEM(i3);
 	WT_DECL_RET;
-	WT_ITEM i1, i2, i3;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 
@@ -1604,14 +1606,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
-
-	/*
-	 * We could use scratch buffers, but I'd rather the default session
-	 * not tie down chunks of memory past the open call.
-	 */
-	WT_CLEAR(i1);
-	WT_CLEAR(i2);
-	WT_CLEAR(i3);
 
 	WT_RET(__wt_library_init());
 
@@ -1667,12 +1661,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
 	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &i1));
+	WT_ERR(__wt_scr_alloc(session, 0, &i2));
+	WT_ERR(__wt_scr_alloc(session, 0, &i3));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open_all);
 	cfg[1] = NULL;
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, &i1));
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
 	__conn_config_append(cfg, config);
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, &i2));
-	WT_ERR(__conn_config_env(session, cfg, &i3));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
+	WT_ERR(__conn_config_env(session, cfg, i3));
 
 	/*
 	 * Configuration ...
@@ -1799,9 +1796,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	*wt_connp = &conn->iface;
 
 err:	/* Discard the configuration strings. */
-	__wt_buf_free(session, &i1);
-	__wt_buf_free(session, &i2);
-	__wt_buf_free(session, &i3);
+
+	/*
+	 * Clear out any scratch buffers allocated during open, discard the
+	 * memory entirely so the default session doesn't hold it.
+	 */
+	__wt_scr_free(session, &i1);
+	__wt_scr_free(session, &i2);
+	__wt_scr_free(session, &i3);
+	if (ret == 0)
+		__wt_scr_discard(session);
 
 	if (ret != 0)
 		WT_TRET(__wt_connection_close(conn));
