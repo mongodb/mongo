@@ -1795,17 +1795,19 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-err:	/* Discard the configuration strings. */
-
-	/*
-	 * Clear out any scratch buffers allocated during open, discard the
-	 * memory entirely so the default session doesn't hold it.
-	 */
+err:	/* Discard the sratch buffers. */
 	__wt_scr_free(session, &i1);
 	__wt_scr_free(session, &i2);
 	__wt_scr_free(session, &i3);
-	if (ret == 0)
+
+	/*
+	 * We may have allocated scratch memory when using the dummy session or
+	 * the subsequently created real session, and we don't want to tie down
+	 * memory for the rest of the run in either of them.
+	 */
+	if (session != &conn->dummy_session)
 		__wt_scr_discard(session);
+	__wt_scr_discard(&conn->dummy_session);
 
 	if (ret != 0)
 		WT_TRET(__wt_connection_close(conn));
