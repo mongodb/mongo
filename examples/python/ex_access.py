@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#
 # Public Domain 2014-2015 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
@@ -24,6 +25,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+#
 
 import os
 from wiredtiger import wiredtiger_open
