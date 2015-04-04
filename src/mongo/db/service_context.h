@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/decorable.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -67,7 +68,7 @@ namespace mongo {
         StorageFactoriesIterator() { }
     };
 
-    class ServiceContext {
+    class ServiceContext : public Decorable<ServiceContext> {
         MONGO_DISALLOW_COPYING(ServiceContext);
     public:
         virtual ~ServiceContext() { }
