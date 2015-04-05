@@ -296,10 +296,12 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	int valid;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	upd = NULL;					/* -Wuninitialized */
 
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
@@ -312,22 +314,25 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	 * or the search of the pinned page doesn't find an exact match, search
 	 * from the root.
 	 */
+	valid = 0;
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		__wt_txn_cursor_op(session);
 
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, cbt->ref, 0) :
 		    __cursor_col_search(session, cbt, cbt->ref));
+		valid = cbt->compare == 0 && __cursor_valid(cbt, &upd);
 	}
-	if (!F_ISSET(cbt, WT_CBT_ACTIVE) || cbt->compare != 0) {
+	if (!valid) {
 		WT_ERR(__cursor_func_init(cbt, 1));
 
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, 0) :
 		    __cursor_col_search(session, cbt, NULL));
+		valid = cbt->compare == 0 && __cursor_valid(cbt, &upd);
 	}
 
-	if (cbt->compare == 0 && __cursor_valid(cbt, &upd))
+	if (valid)
 		ret = __wt_kv_return(session, cbt, upd);
 	else if (__cursor_fix_implicit(btree, cbt)) {
 		/*
@@ -358,11 +363,12 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	int exact;
+	int exact, valid;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	upd = NULL;					/* -Wuninitialized */
 	exact = 0;
 
 	WT_STAT_FAST_CONN_INCR(session, cursor_search_near);
@@ -371,19 +377,47 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 
-	WT_RET(__cursor_func_init(cbt, 1));
-
 	/*
+	 * If we have a row-store page pinned, search it; if we don't have a
+	 * page pinned, or the search of the pinned page doesn't find an exact
+	 * match, search from the root. Unlike WT_CURSOR.search, ignore pinned
+	 * pages in the case of column-store, search-near isn't an interesting
+	 * enough case for column-store to add the complexity needed to avoid
+	 * the tree search.
+	 *
 	 * Set the "insert" flag for the btree row-store search; we may intend
-	 * to position our cursor at the end of the tree, rather than match an
+	 * to position the cursor at the end of the tree, rather than match an
 	 * existing record.
 	 */
-	WT_ERR(btree->type == BTREE_ROW ?
-	    __cursor_row_search(session, cbt, NULL, 1) :
-	    __cursor_col_search(session, cbt, NULL));
+	valid = 0;
+	if (btree->type == BTREE_ROW && F_ISSET(cbt, WT_CBT_ACTIVE)) {
+		__wt_txn_cursor_op(session);
+
+		WT_ERR(__cursor_row_search(session, cbt, cbt->ref, 1));
+
+		/*
+		 * Search-near is trickier than search when searching an already
+		 * pinned page. If search returns the first or last page slots,
+		 * discard the results and search the full tree as the neighbor
+		 * pages might offer better matches. This test is simplistic as
+		 * we're ignoring append lists (there may be no page slots or we
+		 * might be legitimately positioned after the last page slot).
+		 * Ignore those cases, it makes things too complicated.
+		 */
+		if (cbt->slot != 0 &&
+		    cbt->slot != cbt->ref->page->pg_row_entries - 1)
+			valid = __cursor_valid(cbt, &upd);
+	}
+	if (!valid) {
+		WT_ERR(__cursor_func_init(cbt, 1));
+		WT_ERR(btree->type == BTREE_ROW ?
+		    __cursor_row_search(session, cbt, NULL, 1) :
+		    __cursor_col_search(session, cbt, NULL));
+		valid = __cursor_valid(cbt, &upd);
+	}
 
 	/*
-	 * If we find an valid key, return it.
+	 * If we find a valid key, return it.
 	 *
 	 * Else, creating a record past the end of the tree in a fixed-length
 	 * column-store implicitly fills the gap with empty records.  In this
@@ -399,7 +433,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	 *
 	 * If that fails, quit, there's no record to return.
 	 */
-	if (__cursor_valid(cbt, &upd)) {
+	if (valid) {
 		exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt, upd);
 	} else if (__cursor_fix_implicit(btree, cbt)) {
