@@ -141,7 +141,7 @@ leaf_only:
 			goto past_end;
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);
-	} else
+	} else {
 		if (recno < page->pg_var_recno) {
 			cbt->compare = 1;
 			return (0);
@@ -153,6 +153,7 @@ leaf_only:
 			cbt->slot = WT_COL_SLOT(page, cip);
 			ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
 		}
+	}
 
 	/*
 	 * We have a match on the page, check for an update.  Check the page's
