@@ -288,6 +288,11 @@ namespace mongo {
                                                   data->loc,
                                                   data->dupsAllowed);
             if ( !status.isOK() ) {
+                if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(txn)) {
+                    // Ignore.
+                    continue;
+                }
+
                 return status;
             }
         }
