@@ -2,14 +2,14 @@ WiredTiger 2.5.3: (March 26, 2015)
 
 This is version 2.5.3 of WiredTiger.
 
-WiredTiger release packages and documentation can be found at:
+Documentation is included in the "docs" directory, documentation can
+also be found at:
+
+	http://source.wiredtiger.com/2.5.3/index.html
+
+Other WiredTiger release packages and documentation can be found at:
 
 	http://source.wiredtiger.com/
-
-Information on configuring, building and installing WiredTiger can be
-found at:
-
-	http://source.wiredtiger.com/2.5.3/install.html
 
 WiredTiger licensing information can be found at:
 
