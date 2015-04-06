@@ -354,6 +354,10 @@ add_option('variable-parse-mode',
            type='choice', default=variable_parse_mode_choices[0],
            choices=variable_parse_mode_choices)
 
+add_option('modules',
+           "Comma-separated list of modules to build. Empty means none. Default is all.",
+           1, False)
+
 # Setup the command-line variables
 def variable_shlex_converter(val):
     parse_mode = get_option('variable-parse-mode')
@@ -1167,7 +1171,7 @@ if not use_system_version_of_library("boost"):
     boostSuffix = "-%s.0" % get_option( "internal-boost")
 
 # discover modules, and load the (python) module for each module's build.py
-mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules')
+mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
 env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 
 # --- check system ---
