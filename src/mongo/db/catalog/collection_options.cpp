@@ -65,6 +65,14 @@ namespace mongo {
         storageEngine = BSONObj();
     }
 
+    bool CollectionOptions::isValid() const {
+        return validate().isOK();
+    }
+
+    Status CollectionOptions::validate() const {
+        return CollectionOptions().parse(toBSON());
+    }
+
     Status CollectionOptions::parse(const BSONObj& options) {
         reset();
 

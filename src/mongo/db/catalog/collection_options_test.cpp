@@ -55,6 +55,22 @@ namespace mongo {
         checkRoundTrip( options );
     }
 
+    TEST(CollectionOptions, IsValid) {
+        CollectionOptions options;
+        ASSERT_TRUE(options.isValid());
+
+        options.storageEngine = fromjson("{storageEngine1: 1}");
+        ASSERT_FALSE(options.isValid());
+    }
+
+    TEST(CollectionOptions, Validate) {
+        CollectionOptions options;
+        ASSERT_OK(options.validate());
+
+        options.storageEngine = fromjson("{storageEngine1: 1}");
+        ASSERT_NOT_OK(options.validate());
+    }
+
     TEST( CollectionOptions, ErrorBadSize ) {
         ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: true, size: -1}" ) ) );
         ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: false, size: -1}" ) ) );
