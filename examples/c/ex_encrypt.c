@@ -533,22 +533,7 @@ simple_walk_log(WT_SESSION *session)
 
 #define	MAX_KEYS	20
 
-/*
- * Choose a name that dlsym can find.  To keep this example in
- * a single file, we use a locally defined symbol, which unfortunately
- * results in non-portable naming.
- */
-#ifndef __DARWIN_C_ANSI
-#define	DLSYM_LOCAL_USCORE
-#else
-/* #undef DLSYM_LOCAL_USCORE */
-#endif
-
-#ifdef DLSYM_LOCAL_USCORE
-#define	EXTENSION_NAME  "local=(entry=_add_my_encryptors)"
-#else
 #define	EXTENSION_NAME  "local=(entry=add_my_encryptors)"
-#endif
 
 int
 main(void)

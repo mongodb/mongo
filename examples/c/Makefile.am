@@ -23,6 +23,8 @@ noinst_PROGRAMS = \
 	ex_stat \
 	ex_thread
 
+ex_encrypt_LDFLAGS = -rdynamic
+
 # The examples can be run with no arguments as simple smoke tests
 TESTS = $(noinst_PROGRAMS)
 
