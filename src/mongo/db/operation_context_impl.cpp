@@ -126,7 +126,7 @@ namespace {
     }
 
     CurOp* OperationContextImpl::getCurOp() const {
-        return getClient()->curop();
+        return CurOp::get(getClient());
     }
 
     unsigned int OperationContextImpl::getOpID() const {
@@ -162,7 +162,7 @@ namespace {
             }
 
             // Only target nested operations if requested.
-            if (!failPointInfo["allowNested"].trueValue() && c.curop()->parent() != NULL) {
+            if (!failPointInfo["allowNested"].trueValue() && CurOp::get(c)->parent() != NULL) {
                 return false;
             }
 
@@ -192,20 +192,21 @@ namespace {
         }
 
         Client* c = getClient();
-        if (c->curop()->maxTimeHasExpired()) {
-            c->curop()->kill();
+        if (CurOp::get(c)->maxTimeHasExpired()) {
+            CurOp::get(c)->kill();
             return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
         }
 
         MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
             if (opShouldFail(*c, scopedFailPoint.getData())) {
-                log() << "set pending kill on " << (c->curop()->parent() ? "nested" : "top-level")
-                      << " op " << c->curop()->opNum() << ", for checkForInterruptFail";
-                c->curop()->kill();
+                log() << "set pending kill on "
+                      << (CurOp::get(c)->parent() ? "nested" : "top-level")
+                      << " op " << CurOp::get(c)->opNum() << ", for checkForInterruptFail";
+                CurOp::get(c)->kill();
             }
         }
 
-        if (c->curop()->killPending()) {
+        if (CurOp::get(c)->killPending()) {
             return Status(ErrorCodes::Interrupted, "operation was interrupted");
         }
 

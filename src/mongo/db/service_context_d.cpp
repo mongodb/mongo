@@ -187,12 +187,12 @@ namespace mongo {
 
     bool ServiceContextMongoD::_killOperationsAssociatedWithClientAndOpId_inlock(
             Client* client, unsigned int opId) {
-        for( CurOp *k = client->curop(); k; k = k->parent() ) {
+        for( CurOp *k = CurOp::get(client); k; k = k->parent() ) {
             if ( k->opNum() != opId )
                 continue;
 
             k->kill();
-            for( CurOp *l = client->curop(); l; l = l->parent() ) {
+            for( CurOp *l = CurOp::get(client); l; l = l->parent() ) {
                 l->kill();
             }
 
@@ -237,15 +237,15 @@ namespace mongo {
                 continue;
             }
 
-            if (client->curop()->opNum() == txn->getOpID()) {
+            if (CurOp::get(client)->opNum() == txn->getOpID()) {
                 // Don't kill ourself.
                 continue;
             }
 
             bool found = _killOperationsAssociatedWithClientAndOpId_inlock(
-                    client, client->curop()->opNum());
+                    client, CurOp::get(client)->opNum());
             if (!found) {
-                warning() << "Attempted to kill operation " << client->curop()->opNum()
+                warning() << "Attempted to kill operation " << CurOp::get(client)->opNum()
                           << " but the opId changed";
             }
         }

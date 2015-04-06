@@ -135,7 +135,7 @@ namespace mongo {
         // Replication-related stuff.  TODO: Document and clean.
         //
 
-        void updateSlaveLocation(OperationContext* txn, CurOp& curop);
+        void updateSlaveLocation(OperationContext* txn);
         void slaveReadTill( const OpTime& t ) { _slaveReadTill = t; }
         /** Just for testing. */
         OpTime getSlaveReadTill() const { return _slaveReadTill; }

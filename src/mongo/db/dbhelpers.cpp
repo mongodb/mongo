@@ -270,7 +270,7 @@ namespace mongo {
 
         update(txn, context.db(), request, &debug);
 
-        txn->getClient()->curop()->done();
+        CurOp::get(txn->getClient())->done();
     }
 
     BSONObj Helpers::toKeyFormat( const BSONObj& o ) {

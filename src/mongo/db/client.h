@@ -49,7 +49,6 @@
 
 namespace mongo {
 
-    class CurOp;
     class Collection;
     class AbstractMessagingPort;
 
@@ -98,7 +97,6 @@ namespace mongo {
         bool shutdown();
 
         std::string clientAddress(bool includePort = false) const;
-        CurOp* curop() const { return _curOp; }
         const std::string& desc() const { return _desc; }
 
         void reportState(BSONObjBuilder& builder);
@@ -122,8 +120,6 @@ namespace mongo {
         bool isFromUserConnection() const { return _connectionId > 0; }
 
     private:
-        friend class CurOp;
-
         Client(const std::string& desc,
                ServiceContext* serviceContext,
                AbstractMessagingPort *p = 0);
@@ -146,9 +142,6 @@ namespace mongo {
 
         // If != NULL, then contains the currently active OperationContext
         OperationContext* _txn;
-
-        // Changes, based on what operation is running. Some of this should be in OperationContext.
-        CurOp* _curOp;
     };
 
     /** get the Client object for this thread. */

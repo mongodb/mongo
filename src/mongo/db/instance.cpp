@@ -217,7 +217,7 @@ namespace {
         DbMessage dbMessage(message);
         QueryMessage queryMessage(dbMessage);
 
-        CurOp* op = client.curop();
+        CurOp* op = CurOp::get(client);
 
         std::unique_ptr<Message> response(new Message());
 
@@ -325,7 +325,7 @@ namespace {
         QueryMessage q(d);
         auto_ptr< Message > resp( new Message() );
 
-        CurOp& op = *(c.curop());
+        CurOp& op = *CurOp::get(c);
 
         try {
             Client* client = txn->getClient();
@@ -436,15 +436,13 @@ namespace {
             globalOpCounters.gotDelete();
             break;
         }
-        
+
         scoped_ptr<CurOp> nestedOp;
-        CurOp* currentOpP = c.curop();
-        if ( currentOpP->active() ) {
-            nestedOp.reset( new CurOp( &c , currentOpP ) );
-            currentOpP = nestedOp.get();
+        if (CurOp::get(c)->active()) {
+            nestedOp.reset(new CurOp(&c));
         }
 
-        CurOp& currentOp = *currentOpP;
+        CurOp& currentOp = *CurOp::get(c);
         currentOp.reset(remote,op);
 
         OpDebug& debug = currentOp.debug();

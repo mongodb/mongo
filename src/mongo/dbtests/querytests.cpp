@@ -1509,7 +1509,7 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            string exhaust = runQuery(&_txn, queryMessage, NamespaceString(ns()), *cc().curop(),
+            string exhaust = runQuery(&_txn, queryMessage, NamespaceString(ns()), *CurOp::get(cc()),
                                       result);
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );

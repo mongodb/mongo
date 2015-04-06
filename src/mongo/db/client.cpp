@@ -111,8 +111,6 @@ namespace mongo {
           _connectionId(p ? p->connectionId() : 0),
           _inDirectClient(false),
           _txn(NULL) {
-
-        _curOp = new CurOp( this );
     }
 
     Client::~Client() {
@@ -122,13 +120,6 @@ namespace mongo {
                 boost::lock_guard<boost::mutex> clientLock(clientsMutex);
                 clients.erase(this);
             }
-
-            CurOp* last;
-            do {
-                last = _curOp;
-                delete _curOp;
-                // _curOp may have been reset to _curOp->_wrapped
-            } while (_curOp != last);
         }
     }
 
@@ -167,9 +158,13 @@ namespace mongo {
     }
 
     string Client::clientAddress(bool includePort) const {
-        if( _curOp )
-            return _curOp->getRemoteString(includePort);
-        return "";
+        if (!hasRemote()) {
+            return "";
+        }
+        if (includePort) {
+            return getRemote().toString();
+        }
+        return getRemote().host();
     }
 
     ClientBasic* ClientBasic::getCurrent() {

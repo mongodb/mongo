@@ -44,7 +44,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -182,13 +181,13 @@ namespace mongo {
         _idleAgeMillis = millis;
     }
 
-    void ClientCursor::updateSlaveLocation(OperationContext* txn, CurOp& curop) {
+    void ClientCursor::updateSlaveLocation(OperationContext* txn) {
         if (_slaveReadTill.isNull())
             return;
 
         verify(str::startsWith(_ns.c_str(), "local.oplog."));
 
-        Client* c = curop.getClient();
+        Client* c = txn->getClient();
         verify(c);
         OID rid = repl::ReplClientInfo::forClient(c).getRemoteID();
         if (!rid.isSet())

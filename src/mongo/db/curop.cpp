@@ -33,18 +33,69 @@
 #include "mongo/db/curop.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/json.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
     using std::string;
+
+    /**
+     * This type decorates a Client object with a stack of active CurOp objects.
+     *
+     * It encapsulates the nesting logic for curops attached to a Client, along with
+     * the notion that there is always a root CurOp attached to a Client.
+     *
+     * The stack itself is represented in the _parent pointers of the CurOp class.
+     */
+    class CurOp::ClientCuropStack {
+        MONGO_DISALLOW_COPYING(ClientCuropStack);
+    public:
+        ClientCuropStack() : _base(this) {}
+
+        /**
+         * Returns the top of the CurOp stack.
+         */
+        CurOp* top() const { return _top; }
+
+        /**
+         * Adds "curOp" to the top of the CurOp stack for a client. Called by CurOp's constructor.
+         */
+        void push(CurOp* curOp) {
+            boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
+            invariant(!curOp->_parent);
+            curOp->_parent = _top;
+            _top = curOp;
+        }
+
+        /**
+         * Pops the top off the CurOp stack for a Client. Called by CurOp's destructor.
+         */
+        CurOp* pop() {
+            boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
+            invariant(_top);
+            CurOp* retval = _top;
+            _top = _top->_parent;
+            return retval;
+        }
+
+    private:
+        // Top of the stack of CurOps for a Client.
+        CurOp* _top = nullptr;
+
+        // The bottom-most CurOp for a client.
+        const CurOp _base;
+    };
+
+    const auto CurOp::_curopStack = Client::declareDecoration<CurOp::ClientCuropStack>();
 
     // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
     // valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
@@ -64,12 +115,13 @@ namespace mongo {
                                     fromjson("{\"$msg\":\"query not recording (too large)\"}");
 
 
-    CurOp::CurOp( Client * client , CurOp * wrapped ) :
-        _client(client),
-        _wrapped(wrapped)
-    {
-        if ( _wrapped )
-            _client->_curOp = this;
+    CurOp* CurOp::get(const Client* client) { return _curopStack(client).top(); }
+    CurOp* CurOp::get(const Client& client) { return _curopStack(client).top(); }
+
+    CurOp::CurOp(Client* client) : CurOp(&_curopStack(client)) {}
+
+    CurOp::CurOp(ClientCuropStack* stack) : _stack(stack) {
+        _stack->push(this);
         _start = 0;
         _active = false;
         _reset();
@@ -130,11 +182,10 @@ namespace mongo {
     }
 
     CurOp::~CurOp() {
-        if ( _wrapped ) {
-            boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
-            _client->_curOp = _wrapped;
+        if (!inShutdown()) {
+            // TODO(schwerin): See if there's a reason not to clean up during shutdown.
+            invariant(this == _stack->pop());
         }
-        _client = 0;
     }
 
     void CurOp::setNS( StringData ns ) {

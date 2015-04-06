@@ -189,7 +189,7 @@ namespace QueryStageUpdate {
             {
                 OldClientWriteContext ctx(&_txn, ns());
                 Client& c = cc();
-                CurOp& curOp = *c.curop();
+                CurOp& curOp = *CurOp::get(c);
                 OpDebug* opDebug = &curOp.debug();
                 UpdateDriver driver( (UpdateDriver::Options()) );
                 Collection* collection = ctx.getCollection();
@@ -258,7 +258,7 @@ namespace QueryStageUpdate {
                 ASSERT_EQUALS(10U, count(BSONObj()));
 
                 Client& c = cc();
-                CurOp& curOp = *c.curop();
+                CurOp& curOp = *CurOp::get(c);
                 OpDebug* opDebug = &curOp.debug();
                 UpdateDriver driver( (UpdateDriver::Options()) );
                 Database* db = ctx.db();

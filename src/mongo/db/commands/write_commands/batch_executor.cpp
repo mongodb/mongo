@@ -922,7 +922,7 @@ namespace mongo {
                                          WriteErrorDetail** error ) {
 
         // BEGIN CURRENT OP
-        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        CurOp currentOp(_txn->getClient());
         beginCurrentOp( &currentOp, _txn->getClient(), updateItem );
         incOpStats( updateItem );
 
@@ -966,7 +966,7 @@ namespace mongo {
         // Removes are similar to updates, but page faults are handled externally
 
         // BEGIN CURRENT OP
-        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        CurOp currentOp(_txn->getClient());
         beginCurrentOp( &currentOp, _txn->getClient(), removeItem );
         incOpStats( removeItem );
 
@@ -1165,7 +1165,7 @@ namespace mongo {
 
     void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
         BatchItemRef currInsertItem(state->request, state->currIndex);
-        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        CurOp currentOp(_txn->getClient());
         beginCurrentOp( &currentOp, _txn->getClient(), currInsertItem );
         incOpStats(currInsertItem);
 

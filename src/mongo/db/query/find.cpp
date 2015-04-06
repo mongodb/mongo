@@ -368,7 +368,7 @@ namespace mongo {
             txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
             if (0 == pass) { 
-                cc->updateSlaveLocation(txn, curop); 
+                cc->updateSlaveLocation(txn); 
             }
 
             if (cc->isAggCursor()) {
