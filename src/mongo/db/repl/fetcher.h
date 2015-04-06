@@ -68,9 +68,9 @@ namespace repl {
          * Represents next steps of fetcher.
          */
         enum class NextAction {
-            kNoAction=0,
-            kContinue=2,
-            kNumNextActions
+            kInvalid=0,
+            kNoAction=1,
+            kContinue=2
         };
 
         /**

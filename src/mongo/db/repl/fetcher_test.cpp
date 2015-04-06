@@ -214,7 +214,7 @@ namespace {
     FetcherBatchTest::FetcherBatchTest()
         : status(getDefaultStatus()),
           cursorId(-1),
-          nextAction(Fetcher::NextAction::kNumNextActions) { }
+          nextAction(Fetcher::NextAction::kInvalid) { }
 
     void FetcherBatchTest::setUp() {
         FetcherTest::setUp();
@@ -235,7 +235,7 @@ namespace {
         status = getDefaultStatus();
         cursorId = -1;
         documents.clear();
-        nextAction = Fetcher::NextAction::kNumNextActions;
+        nextAction = Fetcher::NextAction::kInvalid;
     }
 
     void FetcherBatchTest::processNetworkResponse(const BSONObj& obj) {
