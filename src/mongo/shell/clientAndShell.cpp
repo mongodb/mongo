@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/thread.hpp>
+
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"

@@ -1858,7 +1858,7 @@ namespace mutablebson {
         return setValue(newValue._repIdx);
     }
 
-    Status Element::setValueTimestamp(const OpTime value) {
+    Status Element::setValueTimestamp(const Timestamp value) {
         verify(ok());
         Document::Impl& impl = getDocument().getImpl();
         const ElementRep& thisRep = impl.getElementRep(_repIdx);
@@ -2477,13 +2477,13 @@ namespace mutablebson {
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 
-    Element Document::makeElementTimestamp(StringData fieldName, const OpTime value) {
+    Element Document::makeElementTimestamp(StringData fieldName, const Timestamp value) {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
         BSONObjBuilder& builder = impl.leafBuilder();
         const int leafRef = builder.len();
-        builder.appendTimestamp(fieldName, value.asDate());
+        builder.append(fieldName, value);
         return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
     }
 

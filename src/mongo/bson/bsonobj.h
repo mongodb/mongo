@@ -36,6 +36,9 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/disallow_copying.h"

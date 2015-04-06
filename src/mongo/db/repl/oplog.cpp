@@ -52,7 +52,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/global_optime.h"
+#include "mongo/db/global_timestamp.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -91,7 +91,7 @@ namespace {
     Database* _localDB = nullptr;
     Collection* _localOplogCollection = nullptr;
 
-    // Synchronizes the section where a new OpTime is generated and when it actually
+    // Synchronizes the section where a new Timestamp is generated and when it actually
     // appears in the oplog.
     mongo::mutex newOpMutex;
     boost::condition newOptimeNotifier;
@@ -115,13 +115,13 @@ namespace {
      * function registers the new optime with the storage system and the replication coordinator,
      * and provides no facility to revert those registrations on rollback.
      */
-    std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
+    std::pair<Timestamp, long long> getNextOpTime(OperationContext* txn,
                                                Collection* oplog,
                                                const char* ns,
                                                ReplicationCoordinator* replCoord,
                                                const char* opstr) {
         boost::lock_guard<boost::mutex> lk(newOpMutex);
-        OpTime ts = getNextGlobalOptime();
+        Timestamp ts = getNextGlobalTimestamp();
         newOptimeNotifier.notify_all();
 
         fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(txn, ts));
@@ -151,7 +151,7 @@ namespace {
         }
 
         replCoord->setMyLastOptime(ts);
-        return std::pair<OpTime,long long>(ts, hashNew);
+        return std::pair<Timestamp,long long>(ts, hashNew);
     }
 
     /**
@@ -259,7 +259,7 @@ namespace {
                     _localOplogCollection);
         }
 
-        std::pair<OpTime, long long> slot = getNextOpTime(txn,
+        std::pair<Timestamp, long long> slot = getNextOpTime(txn,
                                                           _localOplogCollection,
                                                           ns,
                                                           replCoord,
@@ -270,7 +270,7 @@ namespace {
         */
 
         BSONObjBuilder b(256);
-        b.appendTimestamp("ts", slot.first.asDate());
+        b.append("ts", slot.first);
         b.append("h", slot.second);
         b.append("v", OPLOG_VERSION);
         b.append("op", opstr);
@@ -296,9 +296,9 @@ namespace {
         ReplClientInfo::forClient(txn->getClient()).setLastOp( slot.first );
     }
 
-    OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
+    Timestamp writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        OpTime lastOptime = replCoord->getMyLastOptime();
+        Timestamp lastOptime = replCoord->getMyLastOptime();
         invariant(!ops.empty());
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
@@ -323,7 +323,7 @@ namespace {
                  it != ops.end();
                  ++it) {
                 const BSONObj& op = *it;
-                const OpTime ts = op["ts"]._opTime();
+                const Timestamp ts = op["ts"].timestamp();
 
                 checkOplogInsert(_localOplogCollection->insertDocument(txn, op, false));
 
@@ -669,19 +669,19 @@ namespace {
         return Status::OK();
     }
 
-    void waitUpToOneSecondForOptimeChange(const OpTime& referenceTime) {
+    void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime) {
         boost::unique_lock<boost::mutex> lk(newOpMutex);
 
-        while (referenceTime == getLastSetOptime()) {
+        while (referenceTime == getLastSetTimestamp()) {
             if (!newOptimeNotifier.timed_wait(lk,
                                               boost::posix_time::seconds(1)))
                 return;
         }
     }
 
-    void setNewOptime(const OpTime& newTime) {
+    void setNewOptime(const Timestamp& newTime) {
         boost::lock_guard<boost::mutex> lk(newOpMutex);
-        setGlobalOptime(newTime);
+        setGlobalTimestamp(newTime);
         newOptimeNotifier.notify_all();
     }
 

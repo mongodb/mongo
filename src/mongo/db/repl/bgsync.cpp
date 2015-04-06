@@ -228,7 +228,7 @@ namespace {
 
 
         // find a target to sync from the last optime fetched
-        OpTime lastOpTimeFetched;
+        Timestamp lastOpTimeFetched;
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             lastOpTimeFetched = _lastOpTimeFetched;
@@ -354,7 +354,7 @@ namespace {
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _lastFetchedHash = o["h"].numberLong();
-                _lastOpTimeFetched = o["ts"]._opTime();
+                _lastOpTimeFetched = o["ts"].timestamp();
                 LOG(3) << "lastOpTimeFetched: " << _lastOpTimeFetched.toStringPretty();
             }
         }
@@ -402,7 +402,7 @@ namespace {
                     sleepsecs(2);
                     return true;
                 }
-                OpTime theirTS = theirLastOp["ts"]._opTime();
+                Timestamp theirTS = theirLastOp["ts"].timestamp();
                 if (theirTS < _lastOpTimeFetched) {
                     log() << "we are ahead of the sync source, will try to roll back";
                     syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
@@ -420,7 +420,7 @@ namespace {
         }
 
         BSONObj o = r.nextSafe();
-        OpTime ts = o["ts"]._opTime();
+        Timestamp ts = o["ts"].timestamp();
         long long hash = o["h"].numberLong();
         if( ts != _lastOpTimeFetched || hash != _lastFetchedHash ) {
             log() << "our last op time fetched: " << _lastOpTimeFetched.toStringPretty();
@@ -447,7 +447,7 @@ namespace {
 
         _pause = true;
         _syncSourceHost = HostAndPort();
-        _lastOpTimeFetched = OpTime(0,0);
+        _lastOpTimeFetched = Timestamp(0,0);
         _lastFetchedHash = 0;
         _appliedBufferCondition.notify_all();
         _pausedCondition.notify_all();

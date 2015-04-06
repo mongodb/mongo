@@ -37,13 +37,14 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
-    class OpTime;
     class BSONObj;
     class BSONElement;
     class BSONObjBuilder;
+    class Timestamp;
 
     typedef BSONElement be;
     typedef BSONObj bo;
@@ -452,6 +453,12 @@ namespace mongo {
             }
         }
 
+        Timestamp timestamp() const {
+            if( type() == mongo::Date || type() == bsonTimestamp )
+                return Timestamp(ConstDataView(value()).readLE<unsigned long long>());
+            return Timestamp();
+        }
+
         Date_t timestampTime() const {
             unsigned long long t = ConstDataView(value() + 4).readLE<unsigned int>();
             return t * 1000;
@@ -524,7 +531,6 @@ namespace mongo {
         }
 
         std::string _asCode() const;
-        OpTime _opTime() const;
 
         template<typename T> bool coerce( T* out ) const;
 

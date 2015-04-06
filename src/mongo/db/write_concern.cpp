@@ -191,7 +191,7 @@ namespace mongo {
     }
 
     Status waitForWriteConcern( OperationContext* txn,
-                                const OpTime& replOpTime,
+                                const Timestamp& replOpTime,
                                 WriteConcernResult* result ) {
 
         const WriteConcernOptions& writeConcern = txn->getWriteConcern();

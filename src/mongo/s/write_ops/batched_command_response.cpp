@@ -45,7 +45,7 @@ namespace mongo {
     const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
-    const BSONField<OpTime> BatchedCommandResponse::lastOp("lastOp");
+    const BSONField<Timestamp> BatchedCommandResponse::lastOp("lastOp");
     const BSONField<OID> BatchedCommandResponse::electionId("electionId");
     const BSONField<std::vector<WriteErrorDetail*> >
         BatchedCommandResponse::writeErrors("writeErrors");
@@ -223,7 +223,7 @@ namespace mongo {
             _upsertDetails.reset();
         }
 
-        _lastOp = OpTime();
+        _lastOp = Timestamp();
         _isLastOpSet = false;
 
         _electionId = OID();
@@ -452,7 +452,7 @@ namespace mongo {
         return _upsertDetails->at(pos);
     }
 
-    void BatchedCommandResponse::setLastOp(OpTime lastOp) {
+    void BatchedCommandResponse::setLastOp(Timestamp lastOp) {
         _lastOp = lastOp;
         _isLastOpSet = true;
     }
@@ -465,7 +465,7 @@ namespace mongo {
          return _isLastOpSet;
     }
 
-    OpTime BatchedCommandResponse::getLastOp() const {
+    Timestamp BatchedCommandResponse::getLastOp() const {
         dassert(_isLastOpSet);
         return _lastOp;
     }

@@ -31,7 +31,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -114,13 +114,13 @@ namespace repl {
         /**
          * Sets the global opTime to be 'newTime'.
          */
-        virtual void setGlobalOpTime(const OpTime& newTime) = 0;
+        virtual void setGlobalTimestamp(const Timestamp& newTime) = 0;
 
         /**
          * Gets the last optime of an operation performed on this host, from stable
          * storage.
          */
-        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn) = 0;
+        virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn) = 0;
 
         /**
          * Returns the HostAndPort of the remote client connected to us that initiated the operation

@@ -186,7 +186,7 @@ namespace repl {
             uassert(17347,
                     "Problem reading earliest entry from oplog",
                     Helpers::getSingleton(txn, oplogNS.c_str(), o));
-            result.append("earliestOptime", o["ts"]._opTime());
+            result.append("earliestOptime", o["ts"].timestamp());
             return result.obj();
         }
     } oplogInfoServerStatus;

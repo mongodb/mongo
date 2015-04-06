@@ -30,9 +30,7 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/ordering.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {

@@ -46,7 +46,7 @@ namespace repl {
         /**
          * applies up to endOpTime, fetching missing documents as needed.
          */
-        void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
+        void oplogApplication(OperationContext* txn, const Timestamp& endOpTime);
     };
 
     // Used for ReplSetTest testing.

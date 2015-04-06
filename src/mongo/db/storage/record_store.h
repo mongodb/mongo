@@ -343,7 +343,7 @@ namespace mongo {
          * they are ordered.
          */
         virtual Status oplogDiskLocRegister( OperationContext* txn,
-                                             const OpTime& opTime ) {
+                                             const Timestamp& opTime ) {
             return Status::OK();
         }
 

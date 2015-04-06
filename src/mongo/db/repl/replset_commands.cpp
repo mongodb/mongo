@@ -729,7 +729,7 @@ namespace {
                     "numeric type, but found " << typeName(cfgverElement.type()),
                     cfgverElement.isNumber());
             parsedArgs.cfgver = cfgverElement.safeNumberLong();
-            parsedArgs.opTime = OpTime(cmdObj["opTime"].Date());
+            parsedArgs.opTime = Timestamp(cmdObj["opTime"].Date());
 
             status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs, &result);
             return appendCommandStatus(result, status);

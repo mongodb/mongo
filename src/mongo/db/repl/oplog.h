@@ -43,7 +43,7 @@ namespace mongo {
     class Database;
     class NamespaceString;
     class OperationContext;
-    class OpTime;
+    class Timestamp;
     class RecordId;
 
 namespace repl {
@@ -58,7 +58,7 @@ namespace repl {
     // used internally by replication secondaries after they have applied ops.  Updates the global
     // optime.
     // Returns the optime for the last op inserted.
-    OpTime writeOpsToOplog(OperationContext* txn,
+    Timestamp writeOpsToOplog(OperationContext* txn,
                            const std::deque<BSONObj>& ops);
 
     extern std::string rsOplogName;
@@ -104,9 +104,9 @@ namespace repl {
                                  bool convertUpdateToUpsert = false);
 
     /**
-     * Waits one second for the OpTime from the oplog to change.
+     * Waits one second for the Timestamp from the oplog to change.
      */
-    void waitUpToOneSecondForOptimeChange(const OpTime& referenceTime);
+    void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime);
 
     /**
      * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
@@ -116,7 +116,7 @@ namespace repl {
     /**
      * Sets the global OpTime to be 'newTime'.
      */
-    void setNewOptime(const OpTime& newTime);
+    void setNewOptime(const Timestamp& newTime);
 
     /**
      * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.

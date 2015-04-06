@@ -555,7 +555,7 @@ namespace mongo {
         if (!readToken(RBRACE)) {
             return parseError("Expecting '}'");
         }
-        builder.append(fieldName, OpTime(seconds, count));
+        builder.append(fieldName, Timestamp(seconds, count));
         return Status::OK();
     }
 
@@ -815,7 +815,7 @@ namespace mongo {
         if (!readToken(RPAREN)) {
             return parseError("Expecting ')'");
         }
-        builder.append(fieldName, OpTime(seconds, count));
+        builder.append(fieldName, Timestamp(seconds, count));
         return Status::OK();
     }
 

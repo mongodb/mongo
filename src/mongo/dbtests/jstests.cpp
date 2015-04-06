@@ -525,7 +525,7 @@ namespace JSTests {
             b.appendTimestamp( "a" , 123456789 );
             b.appendMinKey( "b" );
             b.appendMaxKey( "c" );
-            b.append( "d" , OpTime(1234, 9876) );
+            b.append( "d" , Timestamp(1234, 9876) );
 
 
             {
@@ -539,10 +539,10 @@ namespace JSTests {
             ASSERT( s->invoke( "y = { a : z.a , b : z.b , c : z.c , d: z.d }" , 0, 0 ) == 0 );
 
             BSONObj out = s->getObject( "y" );
-            ASSERT_EQUALS( Timestamp , out["a"].type() );
+            ASSERT_EQUALS( bsonTimestamp , out["a"].type() );
             ASSERT_EQUALS( MinKey , out["b"].type() );
             ASSERT_EQUALS( MaxKey , out["c"].type() );
-            ASSERT_EQUALS( Timestamp , out["d"].type() );
+            ASSERT_EQUALS( bsonTimestamp , out["d"].type() );
 
             ASSERT_EQUALS( 9876U , out["d"].timestampInc() );
             ASSERT_EQUALS( 1234000U , out["d"].timestampTime() );
@@ -794,7 +794,7 @@ namespace JSTests {
             BSONObj in;
             {
                 BSONObjBuilder b;
-                b.bb().appendNum( static_cast<char>(Timestamp) );
+                b.bb().appendNum( static_cast<char>(bsonTimestamp) );
                 b.bb().appendStr( "a" );
                 b.bb().appendNum( std::numeric_limits<unsigned long long>::max() );
 
@@ -1647,10 +1647,10 @@ namespace JSTests {
             }
         };
 
-        class Timestamp : public TestRoundTrip {
+        class JSTimestamp : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.append( "a", OpTime(20, 5) );
+                b.append( "a", Timestamp(20, 5) );
                 return b.obj();
             }
             virtual string json() const {
@@ -1661,12 +1661,12 @@ namespace JSTests {
         class TimestampMax : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendMaxForType( "a", mongo::Timestamp );
+                b.appendMaxForType( "a", mongo::bsonTimestamp );
                 BSONObj o = b.obj();
                 return o;
             }
             virtual string json() const {
-                OpTime opTime = OpTime::max();
+                Timestamp opTime = Timestamp::max();
                 stringstream ss;
                 ss << "{ \"a\" : Timestamp( " << opTime.getSecs() << ", " << opTime.getInc()
                    << " ) }";
@@ -2154,7 +2154,7 @@ namespace JSTests {
             add< RoundTripTests::Date >();
             add< RoundTripTests::DateNonzero >();
             add< RoundTripTests::DateNegative >();
-            add< RoundTripTests::Timestamp >();
+            add< RoundTripTests::JSTimestamp >();
             add< RoundTripTests::TimestampMax >();
             add< RoundTripTests::Regex >();
             add< RoundTripTests::RegexWithQuotes >();

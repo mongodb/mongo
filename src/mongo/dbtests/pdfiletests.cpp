@@ -106,9 +106,9 @@ namespace PdfileTests {
                 ASSERT( fixed.firstElement().number() == 1 );
 
                 BSONElement a = fixed["a"];
-                ASSERT( o["a"].type() == Timestamp );
+                ASSERT( o["a"].type() == bsonTimestamp );
                 ASSERT( o["a"].timestampValue() == 0 );
-                ASSERT( a.type() == Timestamp );
+                ASSERT( a.type() == bsonTimestamp );
                 ASSERT( a.timestampValue() > 0 );
             }
         };
@@ -131,15 +131,15 @@ namespace PdfileTests {
                 ASSERT( fixed.firstElement().number() == 1 );
 
                 BSONElement a = fixed["a"];
-                ASSERT( o["a"].type() == Timestamp );
+                ASSERT( o["a"].type() == bsonTimestamp );
                 ASSERT( o["a"].timestampValue() == 0 );
-                ASSERT( a.type() == Timestamp );
+                ASSERT( a.type() == bsonTimestamp );
                 ASSERT( a.timestampValue() > 0 );
 
                 BSONElement b = fixed["b"];
-                ASSERT( o["b"].type() == Timestamp );
+                ASSERT( o["b"].type() == bsonTimestamp );
                 ASSERT( o["b"].timestampValue() == 0 );
-                ASSERT( b.type() == Timestamp );
+                ASSERT( b.type() == bsonTimestamp );
                 ASSERT( b.timestampValue() > 0 );
             }
         };

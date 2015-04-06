@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bson_field.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

@@ -191,7 +191,7 @@ namespace {
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(
                                               BSON("ok" << 1 <<
                                                    "fresher" << false <<
-                                                   "opTime" << Date_t(OpTime(0, 0).asDate()) <<
+                                                   "opTime" << Date_t(Timestamp(0, 0).asULL()) <<
                                                    "veto" << false)));
             }
             else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetElect") {

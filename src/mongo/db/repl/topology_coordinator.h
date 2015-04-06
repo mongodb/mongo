@@ -41,7 +41,7 @@
 namespace mongo {
 
     class OperationContext;
-    class OpTime;
+    class Timestamp;
 
 namespace repl {
 
@@ -117,7 +117,7 @@ namespace repl {
         /**
          * Chooses and sets a new sync source, based on our current knowledge of the world.
          */
-        virtual HostAndPort chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) = 0;
+        virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastOpApplied) = 0;
 
         /**
          * Suppresses selecting "host" as sync source until "until".
@@ -185,21 +185,21 @@ namespace repl {
         // produces a reply to a replSetSyncFrom command
         virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
                                              const HostAndPort& target,
-                                             const OpTime& lastOpApplied,
+                                             const Timestamp& lastOpApplied,
                                              BSONObjBuilder* response,
                                              Status* result) = 0;
 
         // produce a reply to a replSetFresh command
         virtual void prepareFreshResponse(const ReplicationCoordinator::ReplSetFreshArgs& args,
                                           Date_t now,
-                                          OpTime lastOpApplied,
+                                          Timestamp lastOpApplied,
                                           BSONObjBuilder* response,
                                           Status* result) = 0;
 
         // produce a reply to a received electCmd
         virtual void prepareElectResponse(const ReplicationCoordinator::ReplSetElectArgs& args,
                                           Date_t now,
-                                          OpTime lastOpApplied,
+                                          Timestamp lastOpApplied,
                                           BSONObjBuilder* response,
                                           Status* result) = 0;
 
@@ -207,14 +207,14 @@ namespace repl {
         virtual Status prepareHeartbeatResponse(Date_t now,
                                                 const ReplSetHeartbeatArgs& args,
                                                 const std::string& ourSetName,
-                                                const OpTime& lastOpApplied,
+                                                const Timestamp& lastOpApplied,
                                                 ReplSetHeartbeatResponse* response) = 0;
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
                                            unsigned uptime,
-                                           const OpTime& lastOpApplied,
+                                           const Timestamp& lastOpApplied,
                                            BSONObjBuilder* response,
                                            Status* result) = 0;
 
@@ -246,7 +246,7 @@ namespace repl {
         virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
                                   Date_t now,
-                                  OpTime lastOpApplied) = 0;
+                                  Timestamp lastOpApplied) = 0;
 
         /**
          * Prepares a heartbeat request appropriate for sending to "target", assuming the
@@ -296,7 +296,7 @@ namespace repl {
                 Milliseconds networkRoundTripTime,
                 const HostAndPort& target,
                 const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
-                OpTime myLastOpApplied) = 0;
+                Timestamp myLastOpApplied) = 0;
 
         /**
          * If getRole() == Role::candidate and this node has not voted too recently, updates the
@@ -312,7 +312,7 @@ namespace repl {
          * Exactly one of either processWinElection or processLoseElection must be called if
          * processHeartbeatResponse returns StartElection, to exit candidate mode.
          */
-        virtual void processWinElection(OID electionId, OpTime electionOpTime) = 0;
+        virtual void processWinElection(OID electionId, Timestamp electionOpTime) = 0;
 
         /**
          * Performs state updates associated with losing an election.
@@ -332,7 +332,7 @@ namespace repl {
          *
          * Returns whether or not the step down succeeded.
          */
-        virtual bool stepDown(Date_t until, bool force, OpTime lastOpApplied) = 0;
+        virtual bool stepDown(Date_t until, bool force, Timestamp lastOpApplied) = 0;
 
         /**
          * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
@@ -348,7 +348,7 @@ namespace repl {
          * Considers whether or not this node should stand for election, and returns true
          * if the node has transitioned to candidate role as a result of the call.
          */
-        virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) = 0;
+        virtual bool checkShouldStandForElection(Date_t now, const Timestamp& lastOpApplied) = 0;
 
         /**
          * Set the outgoing heartbeat message from self

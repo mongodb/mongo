@@ -556,8 +556,8 @@ namespace {
 
         // See if the RecordStore supports the oplogStartHack
         const BSONElement tsElem = extractOplogTsOptime(tsExpr);
-        if (tsElem.type() == Timestamp) {
-            StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem._opTime());
+        if (tsElem.type() == bsonTimestamp) {
+            StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem.timestamp());
             if (goal.isOK()) {
                 startLoc = collection->getRecordStore()->oplogStartHack(txn, goal.getValue());
             }

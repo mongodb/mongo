@@ -264,7 +264,7 @@ namespace mongo {
                 return ChunkVersion( 0, 0, el.OID() );
             }
 
-            if( type == Timestamp || type == Date ){
+            if( type == bsonTimestamp || type == Date ){
                 return fromDeprecatedLong( el._numberLong(), OID() );
             }
 

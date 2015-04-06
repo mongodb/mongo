@@ -119,8 +119,9 @@ namespace repl {
         uassert( 10119 ,  "only source='main' allowed for now with replication", sourceName() == "main" );
         BSONElement e = o.getField("syncedTo");
         if ( !e.eoo() ) {
-            uassert( 10120 ,  "bad sources 'syncedTo' field value", e.type() == Date || e.type() == Timestamp );
-            OpTime tmp( e.date() );
+            uassert(10120, "bad sources 'syncedTo' field value",
+                    e.type() == Date || e.type() == bsonTimestamp);
+            Timestamp tmp( e.date() );
             syncedTo = tmp;
         }
 
@@ -156,7 +157,7 @@ namespace repl {
         if ( !only.empty() )
             b.append("only", only);
         if ( !syncedTo.isNull() )
-            b.appendTimestamp("syncedTo", syncedTo.asDate());
+            b.append("syncedTo", syncedTo);
 
         BSONObjBuilder dbsNextPassBuilder;
         int n = 0;
@@ -453,7 +454,7 @@ namespace repl {
                 }
             }
         }
-        syncedTo = OpTime();
+        syncedTo = Timestamp();
         addDbNextPass.clear();
         save(txn);
     }
@@ -512,13 +513,13 @@ namespace repl {
     
     static DatabaseIgnorer ___databaseIgnorer;
     
-    void DatabaseIgnorer::doIgnoreUntilAfter( const string &db, const OpTime &futureOplogTime ) {
+    void DatabaseIgnorer::doIgnoreUntilAfter( const string &db, const Timestamp &futureOplogTime ) {
         if ( futureOplogTime > _ignores[ db ] ) {
             _ignores[ db ] = futureOplogTime;   
         }
     }
 
-    bool DatabaseIgnorer::ignoreAt( const string &db, const OpTime &currentOplogTime ) {
+    bool DatabaseIgnorer::ignoreAt( const string &db, const Timestamp &currentOplogTime ) {
         if ( _ignores[ db ].isNull() ) {
             return false;
         }
@@ -541,7 +542,7 @@ namespace repl {
             return true;   
         }
         BSONElement ts = op.getField( "ts" );
-        if ( ( ts.type() == Date || ts.type() == Timestamp ) && ___databaseIgnorer.ignoreAt( db, ts.date() ) ) {
+        if ( ( ts.type() == Date || ts.type() == bsonTimestamp ) && ___databaseIgnorer.ignoreAt( db, ts.date() ) ) {
             // Database is ignored due to a previous indication that it is
             // missing from master after optime "ts".
             return false;   
@@ -551,7 +552,7 @@ namespace repl {
             return true;
         }
         
-        OpTime lastTime;
+        Timestamp lastTime;
         bool dbOk = false;
         {
             // This is always a GlobalWrite lock (so no ns/db used from the context)
@@ -564,9 +565,10 @@ namespace repl {
             
             BSONObj last = oplogReader.findOne( this->ns().c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
             if ( !last.isEmpty() ) {
-	            BSONElement ts = last.getField( "ts" );
-	            massert( 14032, "Invalid 'ts' in remote log", ts.type() == Date || ts.type() == Timestamp );
-	            lastTime = OpTime( ts.date() );
+                    BSONElement ts = last.getField( "ts" );
+                    massert(14032, "Invalid 'ts' in remote log",
+                            ts.type() == Date || ts.type() == bsonTimestamp);
+	            lastTime = Timestamp( ts.date() );
             }
 
             BSONObj info;
@@ -782,8 +784,9 @@ namespace repl {
         BSONObj last = oplogReader.findOne( _ns.c_str(), Query( b.done() ).sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
             BSONElement ts = last.getField( "ts" );
-            massert( 10386 ,  "non Date ts found: " + last.toString(), ts.type() == Date || ts.type() == Timestamp );
-            syncedTo = OpTime( ts.date() );
+            massert(10386, "non Date ts found: " + last.toString(),
+                    ts.type() == Date || ts.type() == bsonTimestamp);
+            syncedTo = Timestamp( ts.date() );
         }
     }
 
@@ -878,7 +881,7 @@ namespace repl {
             }
 
             BSONObjBuilder gte;
-            gte.appendTimestamp("$gte", syncedTo.asDate());
+            gte.append("$gte", syncedTo);
             BSONObjBuilder query;
             query.append("ts", gte.done());
             if ( !only.empty() ) {
@@ -931,11 +934,11 @@ namespace repl {
             return okResultCode;
         }
 
-        OpTime nextOpTime;
+        Timestamp nextOpTime;
         {
             BSONObj op = oplogReader.next();
             BSONElement ts = op.getField("ts");
-            if ( ts.type() != Date && ts.type() != Timestamp ) {
+            if ( ts.type() != Date && ts.type() != bsonTimestamp ) {
                 string err = op.getStringField("$err");
                 if ( !err.empty() ) {
                     // 13051 is "tailable cursor requested on non capped collection"
@@ -954,7 +957,7 @@ namespace repl {
                 }
             }
 
-            nextOpTime = OpTime( ts.date() );
+            nextOpTime = Timestamp( ts.date() );
             LOG(2) << "first op time received: " << nextOpTime.toString() << '\n';
             if ( initial ) {
                 LOG(1) << "initial run\n";
@@ -967,7 +970,7 @@ namespace repl {
                     verify(false);
                 }
                 oplogReader.putBack( op ); // op will be processed in the loop below
-                nextOpTime = OpTime(); // will reread the op below
+                nextOpTime = Timestamp(); // will reread the op below
             }
             else if ( nextOpTime != syncedTo ) { // didn't get what we queried for - error
                 log()
@@ -1033,15 +1036,15 @@ namespace repl {
                 while( 1 ) {
 
                     BSONElement ts = op.getField("ts");
-                    if( !( ts.type() == Date || ts.type() == Timestamp ) ) {
+                    if( !( ts.type() == Date || ts.type() == bsonTimestamp ) ) {
                         log() << "sync error: problem querying remote oplog record" << endl;
                         log() << "op: " << op.toString() << endl;
                         log() << "halting replication" << endl;
                         replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
                         throw SyncException();
                     }
-                    OpTime last = nextOpTime;
-                    nextOpTime = OpTime( ts.date() );
+                    Timestamp last = nextOpTime;
+                    nextOpTime = Timestamp( ts.date() );
                     if ( !( last < nextOpTime ) ) {
                         log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
                         log() << " last:       " << last.toStringLong() << endl;

@@ -129,7 +129,7 @@ namespace mutablebson {
         return pushBack(getDocument().makeElementInt(fieldName, value));
     }
 
-    Status Element::appendTimestamp(StringData fieldName, OpTime value) {
+    Status Element::appendTimestamp(StringData fieldName, Timestamp value) {
         return pushBack(getDocument().makeElementTimestamp(fieldName, value));
     }
 

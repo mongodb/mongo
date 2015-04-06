@@ -515,7 +515,7 @@ namespace {
 
     StatusWith<RecordId> insertBSON(scoped_ptr<OperationContext>& opCtx,
                                    scoped_ptr<RecordStore>& rs,
-                                   const OpTime& opTime) {
+                                   const Timestamp& opTime) {
         BSONObj obj = BSON( "ts" << opTime );
         WriteUnitOfWork wuow(opCtx.get());
         WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
@@ -540,33 +540,33 @@ namespace {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
 
             // always illegal
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,-1)).getStatus(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2,-1)).getStatus(),
                   ErrorCodes::BadValue);
 
             {
-                BSONObj obj = BSON("not_ts" << OpTime(2,1));
+                BSONObj obj = BSON("not_ts" << Timestamp(2,1));
                 ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
                                            false ).getStatus(),
                           ErrorCodes::BadValue);
 
-                obj = BSON( "ts" << "not an OpTime" );
+                obj = BSON( "ts" << "not a Timestamp" );
                 ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
                                            false ).getStatus(),
                           ErrorCodes::BadValue);
             }
 
             // currently dasserts
-            // ASSERT_EQ(insertBSON(opCtx, rs, BSON("ts" << OpTime(-2,1))).getStatus(),
+            // ASSERT_EQ(insertBSON(opCtx, rs, BSON("ts" << Timestamp(-2,1))).getStatus(),
             // ErrorCodes::BadValue);
 
             // success cases
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,1)).getValue(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1,1)).getValue(),
                       RecordId(1,1));
 
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,2)).getValue(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1,2)).getValue(),
                       RecordId(1,2));
 
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,2)).getValue(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2,2)).getValue(),
                       RecordId(2,2));
         }
 
@@ -628,7 +628,7 @@ namespace {
 
         scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
 
-        BSONObj obj = BSON( "ts" << OpTime(2,-1) );
+        BSONObj obj = BSON( "ts" << Timestamp(2,-1) );
         {
             WriteUnitOfWork wuow( opCtx.get() );
             ASSERT_OK(rs->insertRecord(opCtx.get(), obj.objdata(),
@@ -746,7 +746,7 @@ namespace {
     RecordId _oplogOrderInsertOplog( OperationContext* txn,
                                     scoped_ptr<RecordStore>& rs,
                                     int inc ) {
-        OpTime opTime = OpTime(5,inc);
+        Timestamp opTime = Timestamp(5,inc);
         WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         Status status = wrs->oplogDiskLocRegister( txn, opTime );
         ASSERT_OK( status );

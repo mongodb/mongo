@@ -32,7 +32,7 @@
 
 #include "mongo/db/repl/rs_initialsync.h"
 
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -207,7 +207,7 @@ namespace {
     bool _initialSyncApplyOplog( OperationContext* ctx,
                                  repl::SyncTail& syncer,
                                  OplogReader* r) {
-        const OpTime startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime();
+        const Timestamp startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime();
         BSONObj lastOp;
         try {
             // It may have been a long time since we last used this connection to
@@ -234,7 +234,7 @@ namespace {
             return false;
         }
 
-        OpTime stopOpTime = lastOp["ts"]._opTime();
+        Timestamp stopOpTime = lastOp["ts"].timestamp();
 
         // If we already have what we need then return.
         if (stopOpTime == startOpTime)
@@ -333,7 +333,7 @@ namespace {
         truncateAndResetOplog(&txn, replCoord, bgsync);
 
         OplogReader r;
-        OpTime now(Milliseconds(curTimeMillis64()).total_seconds(), 0);
+        Timestamp now(Milliseconds(curTimeMillis64()).total_seconds(), 0);
 
         while (r.getHost().empty()) {
             // We must prime the sync source selector so that it considers all candidates regardless
@@ -391,7 +391,7 @@ namespace {
         std::deque<BSONObj> ops;
         ops.push_back(lastOp);
 
-        OpTime lastOptime = writeOpsToOplog(&txn, ops);
+        Timestamp lastOptime = writeOpsToOplog(&txn, ops);
         ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
         replCoord->setMyLastOptime(lastOptime);
         setNewOptime(lastOptime);
@@ -443,7 +443,7 @@ namespace {
         {
             ScopedTransaction scopedXact(&txn, MODE_IX);
             AutoGetDb autodb(&txn, "local", MODE_X);
-            OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
+            Timestamp lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
             log() << "set minValid=" << lastOpTimeWritten;
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing

@@ -27,24 +27,16 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
-#include <sstream>
-
+#include "mongo/base/data_view.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    struct ClockSkewException : public DBException {
-        ClockSkewException() : DBException( "clock skew exception" , 20001 ) {}
-    };
-
-    /* Operation sequence #.  A combination of current second plus an ordinal value.
+    /* Timestamp: A combination of current second plus an ordinal value.
      */
 #pragma pack(4)
-    class OpTime {
+    class Timestamp {
         unsigned i; // ordinal comes first so we can do a single 64 bit compare on little endian
         unsigned secs;
     public:
@@ -55,30 +47,30 @@ namespace mongo {
             return i;
         }
 
-        OpTime(Date_t date) {
+        Timestamp(Date_t date) {
             reinterpret_cast<unsigned long long&>(*this) = date.millis;
             dassert( (int)secs >= 0 );
         }
 
-        OpTime(unsigned a, unsigned b) {
+        Timestamp(unsigned a, unsigned b) {
             secs = a;
             i = b;
             dassert( (int)secs >= 0 );
         }
-        OpTime( const OpTime& other ) { 
+        Timestamp( const Timestamp& other ) { 
             secs = other.secs;
             i = other.i;
             dassert( (int)secs >= 0 );
         }
-        OpTime() {
+        Timestamp() {
             secs = 0;
             i = 0;
         }
 
-        // Maximum OpTime value.
-        static OpTime max();
+        // Maximum Timestamp value.
+        static Timestamp max();
 
-        unsigned long long asDate() const {
+        unsigned long long asULL() const {
             return reinterpret_cast<const unsigned long long*>(&i)[0];
         }
         long long asLL() const {
@@ -87,48 +79,35 @@ namespace mongo {
 
         bool isNull() const { return secs == 0; }
 
-        std::string toStringLong() const {
-            std::stringstream ss;
-            ss << time_t_to_String_short(secs) << ' ';
-            ss << std::hex << secs << ':' << i;
-            return ss.str();
-        }
+        std::string toStringLong() const;
 
-        std::string toStringPretty() const {
-            std::stringstream ss;
-            ss << time_t_to_String_short(secs) << ':' << std::hex << i;
-            return ss.str();
-        }
+        std::string toStringPretty() const;
 
-        std::string toString() const {
-            std::stringstream ss;
-            ss << std::hex << secs << ':' << i;
-            return ss.str();
-        }
+        std::string toString() const;
 
-        bool operator==(const OpTime& r) const {
+        bool operator==(const Timestamp& r) const {
             return i == r.i && secs == r.secs;
         }
-        bool operator!=(const OpTime& r) const {
+        bool operator!=(const Timestamp& r) const {
             return !(*this == r);
         }
-        bool operator<(const OpTime& r) const {
+        bool operator<(const Timestamp& r) const {
             if ( secs != r.secs )
                 return secs < r.secs;
             return i < r.i;
         }
-        bool operator<=(const OpTime& r) const {
+        bool operator<=(const Timestamp& r) const {
             return *this < r || *this == r;
         }
-        bool operator>(const OpTime& r) const {
+        bool operator>(const Timestamp& r) const {
             return !(*this <= r);
         }
-        bool operator>=(const OpTime& r) const {
+        bool operator>=(const Timestamp& r) const {
             return !(*this < r);
         }
 
-        // Append the BSON representation of this OpTime to the given BufBuilder with the given
-        // name. This lives here because OpTime manages its own serialization format.
+        // Append the BSON representation of this Timestamp to the given BufBuilder with the given
+        // name. This lives here because Timestamp manages its own serialization format.
         void append(BufBuilder& builder, const StringData& fieldName) const;
 
     };

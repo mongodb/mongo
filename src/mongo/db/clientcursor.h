@@ -136,9 +136,9 @@ namespace mongo {
         //
 
         void updateSlaveLocation(OperationContext* txn);
-        void slaveReadTill( const OpTime& t ) { _slaveReadTill = t; }
+        void slaveReadTill( const Timestamp& t ) { _slaveReadTill = t; }
         /** Just for testing. */
-        OpTime getSlaveReadTill() const { return _slaveReadTill; }
+        Timestamp getSlaveReadTill() const { return _slaveReadTill; }
 
         //
         // Query-specific functionality that may be adapted for the PlanExecutor.
@@ -250,7 +250,7 @@ namespace mongo {
         bool _isNoTimeout;
 
         // TODO: document better.
-        OpTime _slaveReadTill;
+        Timestamp _slaveReadTill;
 
         // How long has the cursor been idle?
         int _idleAgeMillis;

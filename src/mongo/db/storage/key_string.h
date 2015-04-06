@@ -31,9 +31,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/bson/bson_db.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -248,7 +247,7 @@ namespace mongo {
 
         void _appendBool(bool val, bool invert);
         void _appendDate(Date_t val, bool invert);
-        void _appendTimestamp(OpTime val, bool invert);
+        void _appendTimestamp(Timestamp val, bool invert);
         void _appendOID(OID val, bool invert);
         void _appendString(StringData val, bool invert);
         void _appendSymbol(StringData val, bool invert);

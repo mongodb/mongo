@@ -30,7 +30,6 @@
 
 #include <string>
 
-#include "mongo/bson/bson_field.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/util/time_support.h"
@@ -107,13 +106,13 @@ namespace mongo {
                                    std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
-                                   const BSONField<OpTime>& field,
-                                   OpTime* out,
+                                   const BSONField<Timestamp>& field,
+                                   Timestamp* out,
                                    std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
-                                   const BSONField<OpTime>& field,
-                                   OpTime* out,
+                                   const BSONField<Timestamp>& field,
+                                   Timestamp* out,
                                    std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,

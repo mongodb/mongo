@@ -31,9 +31,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bson_field.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
 

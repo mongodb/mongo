@@ -291,7 +291,7 @@ namespace mongo {
                         // or delete any documents, which preserves old behavior but is conservative
                         _stats->noteWriteAt( shardHost,
                                              response.isLastOpSet() ? 
-                                             response.getLastOp() : OpTime(),
+                                             response.getLastOp() : Timestamp(),
                                              response.isElectionIdSet() ?
                                              response.getElectionId() : OID());
                     }
@@ -386,7 +386,7 @@ namespace mongo {
     }
 
     void BatchWriteExecStats::noteWriteAt(const ConnectionString& host,
-                                          OpTime opTime,
+                                          Timestamp opTime,
                                           const OID& electionId) {
         _writeOpTimes[host] = HostOpTime(opTime, electionId);
     }

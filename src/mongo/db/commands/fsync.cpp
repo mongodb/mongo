@@ -30,6 +30,7 @@
 
 #include "mongo/db/commands/fsync.h"
 
+#include <boost/thread/condition.hpp>
 #include <iostream>
 #include <sstream>
 #include <string>

@@ -28,18 +28,18 @@
 
 #pragma once
 
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 
 namespace mongo {
-    void setGlobalOptime(const OpTime& newTime);
+    void setGlobalTimestamp(const Timestamp& newTime);
 
     /**
-     * Returns the value of the global OpTime generated last time or set.
+     * Returns the value of the global Timestamp generated last time or set.
      */
-    OpTime getLastSetOptime();
+    Timestamp getLastSetTimestamp();
 
     /**
-     * Generates a new and unique OpTime.
+     * Generates a new and unique Timestamp.
      */
-    OpTime getNextGlobalOptime();
+    Timestamp getNextGlobalTimestamp();
 }

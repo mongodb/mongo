@@ -375,7 +375,7 @@ namespace DocumentTests {
                 append("codeWScope", BSONCodeWScope("asdf", BSONObj()));
                 append("codeWScopeWScope", BSONCodeWScope("asdf", BSON("one" << 1)));
                 append("int", 1);
-                append("timestamp", OpTime());
+                append("timestamp", Timestamp());
                 append("long", 1LL);
                 append("very long", 1LL << 40);
                 append("maxkey", MAXKEY);
@@ -533,12 +533,12 @@ namespace DocumentTests {
         };
         
         /** Timestamp type. */
-        class Timestamp {
+        class JSTimestamp {
         public:
             void run() {
-                Value value = Value( OpTime( 777 ) );
-                ASSERT( OpTime( 777 ) == value.getTimestamp() );
-                ASSERT_EQUALS( mongo::Timestamp, value.getType() );
+                Value value = Value( Timestamp( 777 ) );
+                ASSERT( Timestamp( 777 ) == value.getTimestamp() );
+                ASSERT_EQUALS( mongo::bsonTimestamp, value.getType() );
                 assertRoundTrips( value );
             }
         };
@@ -1024,7 +1024,7 @@ namespace DocumentTests {
              */
             class TimestampToDate : public ToDateBase {
                 Value value() {
-                    return Value( OpTime( 777, 666 ) );
+                    return Value( Timestamp( 777, 666 ) );
                 }
                 long long expected() { return 777 * 1000; }
             };
@@ -1076,9 +1076,9 @@ namespace DocumentTests {
             /** Coerce timestamp to string. */
             class TimestampToString : public ToStringBase {
                 Value value() {
-                    return Value( OpTime( 1, 2 ) );
+                    return Value( Timestamp( 1, 2 ) );
                 }
-                string expected() { return OpTime( 1, 2 ).toStringPretty(); }
+                string expected() { return Timestamp( 1, 2 ).toStringPretty(); }
             };
             
             /** Coerce date to string. */
@@ -1111,8 +1111,8 @@ namespace DocumentTests {
             class TimestampToTimestamp {
             public:
                 void run() {
-                    Value value = Value( OpTime( 1010 ) );
-                    ASSERT( OpTime( 1010 ) == value.coerceToTimestamp() );
+                    Value value = Value( Timestamp( 1010 ) );
+                    ASSERT( Timestamp( 1010 ) == value.coerceToTimestamp() );
                 }
             };
 
@@ -1272,8 +1272,8 @@ namespace DocumentTests {
                 assertComparison( -1, fromjson( "{'':/a/}" ), fromjson( "{'':/aa/}" ) );
 
                 // Timestamp.
-                assertComparison( 0, OpTime( 1234 ), OpTime( 1234 ) );
-                assertComparison( -1, OpTime( 4 ), OpTime( 1234 ) );
+                assertComparison( 0, Timestamp( 1234 ), Timestamp( 1234 ) );
+                assertComparison( -1, Timestamp( 4 ), Timestamp( 1234 ) );
 
                 // Cross-type comparisons. Listed in order of canonical types.
                 assertComparison(-1, Value(mongo::MINKEY), Value());
@@ -1291,8 +1291,8 @@ namespace DocumentTests {
                 assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));
                 assertComparison(-1, Value(mongo::OID()), Value(false));
                 assertComparison(-1, Value(false), Value(Date_t(0)));
-                assertComparison(-1, Value(Date_t(0)), Value(OpTime()));
-                assertComparison(-1, Value(OpTime()), Value(BSONRegEx("")));
+                assertComparison(-1, Value(Date_t(0)), Value(Timestamp()));
+                assertComparison(-1, Value(Timestamp()), Value(BSONRegEx("")));
                 assertComparison(-1, Value(BSONRegEx("")), Value(BSONDBRef("", mongo::OID())));
                 assertComparison(-1, Value(BSONDBRef("", mongo::OID())), Value(BSONCode("")));
                 assertComparison(-1, Value(BSONCode("")), Value(BSONCodeWScope("", BSONObj())));
@@ -1303,11 +1303,11 @@ namespace DocumentTests {
             void assertComparison( int expectedResult, const T& a, const U& b ) {
                 assertComparison( expectedResult, BSON( "" << a ), BSON( "" << b ) );
             }
-            void assertComparison( int expectedResult, const OpTime& a, const OpTime& b ) {
+            void assertComparison( int expectedResult, const Timestamp& a, const Timestamp& b ) {
                 BSONObjBuilder first;
-                first.appendTimestamp( "", a.asDate() );
+                first.append( "", a );
                 BSONObjBuilder second;
-                second.appendTimestamp( "", b.asDate() );
+                second.append( "", b );
                 assertComparison( expectedResult, first.obj(), second.obj() );
             }
             int sign(int cmp) {
@@ -1433,7 +1433,7 @@ namespace DocumentTests {
             add<Value::String>();
             add<Value::StringWithNull>();
             add<Value::Date>();
-            add<Value::Timestamp>();
+            add<Value::JSTimestamp>();
             add<Value::EmptyDocument>();
             add<Value::EmptyArray>();
             add<Value::Array>();

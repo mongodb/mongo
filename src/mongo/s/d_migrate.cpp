@@ -2224,7 +2224,7 @@ namespace mongo {
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
 
-            OpTime lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+            Timestamp lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
 
             {
                 // 4. do bulk of mods
@@ -2395,8 +2395,8 @@ namespace mongo {
                    BSONObj max,
                    BSONObj shardKeyPattern,
                    const BSONObj& xfer,
-                   OpTime* lastOpApplied) {
-            OpTime dummy;
+                   Timestamp* lastOpApplied) {
+            Timestamp dummy;
             if ( lastOpApplied == NULL ) {
                 lastOpApplied = &dummy;
             }
@@ -2511,7 +2511,7 @@ namespace mongo {
          * writeConcern (if not empty) have applied till the specified lastOp.
          */
         bool opReplicatedEnough(const OperationContext* txn,
-                                const OpTime& lastOpApplied,
+                                const Timestamp& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             WriteConcernOptions majorityWriteConcern;
             majorityWriteConcern.wTimeout = -1;
@@ -2538,10 +2538,10 @@ namespace mongo {
                                 const std::string& ns,
                                 BSONObj min,
                                 BSONObj max,
-                                const OpTime& lastOpApplied,
+                                const Timestamp& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             if (!opReplicatedEnough(txn, lastOpApplied, writeConcern)) {
-                OpTime op( lastOpApplied );
+                Timestamp op( lastOpApplied );
                 OCCASIONALLY warning() << "migrate commit waiting for a majority of slaves for '"
                                        << ns << "' " << min << " -> " << max
                                        << " waiting for: " << op

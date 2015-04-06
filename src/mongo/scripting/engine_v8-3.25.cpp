@@ -1541,7 +1541,7 @@ namespace mongo {
             argv[1] = v8StringData(ss.str());
             return BinDataFT()->GetFunction()->NewInstance(2, argv);
         }
-        case mongo::Timestamp: {
+        case mongo::bsonTimestamp: {
             v8::TryCatch tryCatch;
 
             argv[0] = v8::Number::New(_isolate, elem.timestampTime() / 1000);
@@ -1674,8 +1674,8 @@ namespace mongo {
         } else if (BinDataFT()->HasInstance(value)) {
             v8ToMongoBinData(b, elementName, obj);
         } else if (TimestampFT()->HasInstance(value)) {
-            OpTime ot (obj->Get(strLitToV8("t"))->Uint32Value(),
-                       obj->Get(strLitToV8("i"))->Uint32Value());
+            Timestamp ot (obj->Get(strLitToV8("t"))->Uint32Value(),
+                          obj->Get(strLitToV8("i"))->Uint32Value());
             b.append(elementName, ot);
         } else if (MinKeyFT()->HasInstance(value)) {
             b.appendMinKey(elementName);

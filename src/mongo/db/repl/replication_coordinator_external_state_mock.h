@@ -28,12 +28,14 @@
 
 #pragma once
 
+#include <boost/thread.hpp>
+#include <boost/thread/condition.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/util/net/hostandport.h"
@@ -58,8 +60,8 @@ namespace repl {
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-        virtual void setGlobalOpTime(const OpTime& newTime);
-        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
+        virtual void setGlobalTimestamp(const Timestamp& newTime);
+        virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn);
         virtual void closeConnections();
         virtual void killAllUserOperations(OperationContext* txn);
         virtual void clearShardingState();
@@ -86,7 +88,7 @@ namespace repl {
         /**
          * Sets the return value for subsequent calls to loadLastOpTimeApplied.
          */
-        void setLastOpTime(const StatusWith<OpTime>& lastApplied);
+        void setLastOpTime(const StatusWith<Timestamp>& lastApplied);
 
         /**
          * Sets the return value for subsequent calls to storeLocalConfigDocument().
@@ -102,7 +104,7 @@ namespace repl {
 
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
-        StatusWith<OpTime>  _lastOpTime;
+        StatusWith<Timestamp>  _lastOpTime;
         std::vector<HostAndPort> _selfHosts;
         bool _canAcquireGlobalSharedLock;
         Status _storeLocalConfigDocumentStatus;

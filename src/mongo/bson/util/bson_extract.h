@@ -39,7 +39,7 @@ namespace mongo {
     class BSONObj;
     class BSONElement;
     class OID;
-    class OpTime;
+    class Timestamp;
 
     /**
      * Finds an element named "fieldName" in "object".
@@ -103,16 +103,16 @@ namespace mongo {
                                   std::string* out);
 
     /**
-     * Finds an OpTime-typed element named "fieldName" in "object" and stores its value in "out".
+     * Finds an Timestamp-typed element named "fieldName" in "object" and stores its value in "out".
      *
-     * Returns Status::OK() and sets *out to the found element's OpTime value on success.  Returns
+     * Returns Status::OK() and sets *out to the found element's Timestamp value on success. Returns
      * ErrorCodes::NoSuchKey if there are no matches for "fieldName", and ErrorCodes::TypeMismatch
-     * if the type of the matching element is not OpTime.  For return values other than
+     * if the type of the matching element is not Timestamp.  For return values other than
      * Status::OK(), the resulting value of "*out" is undefined.
      */
-    Status bsonExtractOpTimeField(const BSONObj& object,
-                                  StringData fieldName,
-                                  OpTime* out);
+    Status bsonExtractTimestampField(const BSONObj& object,
+                                     StringData fieldName,
+                                     Timestamp* out);
 
     /**
      * Finds an OID-typed element named "fieldName" in "object" and stores its value in "out".

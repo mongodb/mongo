@@ -31,7 +31,7 @@
 namespace mongo {
     class BSONObj;
     class OperationContext;
-    class OpTime;
+    class Timestamp;
 
 namespace repl {
 
@@ -57,11 +57,11 @@ namespace repl {
     bool getInitialSyncFlag();
 
     /**
-     * The minValid optime value is the earliest (minimum) OpTime that must be applied in order to
+     * The minValid value is the earliest (minimum) Timestamp that must be applied in order to
      * consider the dataset consistent.  Do not allow client reads if our last applied operation is
      * before the minValid time.
      */
-    void setMinValid(OperationContext* ctx, OpTime ts);
-    OpTime getMinValid(OperationContext* txn);
+    void setMinValid(OperationContext* ctx, Timestamp ts);
+    Timestamp getMinValid(OperationContext* txn);
 }
 }

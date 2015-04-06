@@ -406,7 +406,7 @@ namespace {
     TEST_F(ReplCoordTest, AwaitReplicationNoReplEnabled) {
         init("");
         OperationContextNoop txn;
-        OpTime time(100, 1);
+        Timestamp time(100, 1);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -424,7 +424,7 @@ namespace {
         settings.master = true;
         init(settings);
         OperationContextNoop txn;
-        OpTime time(100, 1);
+        Timestamp time(100, 1);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -449,7 +449,7 @@ namespace {
                 HostAndPort("node1", 12345));
 
         OperationContextNoop txn;
-        OpTime time(100, 1);
+        Timestamp time(100, 1);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -462,7 +462,7 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
 
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
@@ -480,11 +480,11 @@ namespace {
                                              BSON("host" << "node4:12345" << "_id" << 3))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -555,11 +555,11 @@ namespace {
                                              "multiDCAndRack" << BSON("dc" << 2 << "rack" << 3)))),
                 HostAndPort("node0"));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         // Test invalid write concern
         WriteConcernOptions invalidWriteConcern;
@@ -643,7 +643,7 @@ namespace {
             _result(ReplicationCoordinator::StatusAndDuration(
                     Status::OK(), ReplicationCoordinator::Milliseconds(0))) {}
 
-        void setOpTime(const OpTime& ot) {
+        void setOpTime(const Timestamp& ot) {
             _optime = ot;
         }
 
@@ -681,7 +681,7 @@ namespace {
 
         ReplicationCoordinatorImpl* _replCoord;
         bool _finished;
-        OpTime _optime;
+        Timestamp _optime;
         WriteConcernOptions _writeConcern;
         ReplicationCoordinator::StatusAndDuration _result;
         boost::scoped_ptr<boost::thread> _thread;
@@ -697,13 +697,13 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -748,13 +748,13 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = 50;
@@ -781,13 +781,13 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -817,13 +817,13 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -893,13 +893,13 @@ namespace {
                                              BSON("_id" << 2 << "host" << "node3"))),
                 HostAndPort("node1"));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -947,7 +947,7 @@ namespace {
 
     TEST_F(StepDownTest, StepDownNotPrimary) {
         OperationContextReplMock txn;
-        OpTime optime1(100, 1);
+        Timestamp optime1(100, 1);
         // All nodes are caught up
         getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
@@ -960,7 +960,7 @@ namespace {
 
     TEST_F(StepDownTest, StepDownTimeoutAcquiringGlobalLock) {
         OperationContextReplMock txn;
-        OpTime optime1(100, 1);
+        Timestamp optime1(100, 1);
         // All nodes are caught up
         getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
@@ -978,7 +978,7 @@ namespace {
 
     TEST_F(StepDownTest, StepDownNoWaiting) {
         OperationContextReplMock txn;
-        OpTime optime1(100, 1);
+        Timestamp optime1(100, 1);
         // All nodes are caught up
         getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
@@ -1114,8 +1114,8 @@ namespace {
 
     TEST_F(StepDownTest, StepDownNotCaughtUp) {
         OperationContextReplMock txn;
-        OpTime optime1(100, 1);
-        OpTime optime2(100, 2);
+        Timestamp optime1(100, 1);
+        Timestamp optime2(100, 2);
         // No secondary is caught up
         getReplCoord()->setMyLastOptime(optime2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
@@ -1156,8 +1156,8 @@ namespace {
 
     TEST_F(StepDownTest, StepDownCatchUp) {
         OperationContextReplMock txn;
-        OpTime optime1(100, 1);
-        OpTime optime2(100, 2);
+        Timestamp optime1(100, 1);
+        Timestamp optime2(100, 2);
         // No secondary is caught up
         getReplCoord()->setMyLastOptime(optime2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
@@ -1204,8 +1204,8 @@ namespace {
 
     TEST_F(StepDownTest, InterruptStepDown) {
         OperationContextNoopWithInterrupt txn;
-        OpTime optime1(100, 1);
-        OpTime optime2(100, 2);
+        Timestamp optime1(100, 1);
+        Timestamp optime2(100, 2);
         // No secondary is caught up
         getReplCoord()->setMyLastOptime(optime2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
@@ -1278,9 +1278,9 @@ namespace {
                                              BSON("_id" << 1 << "host" << "test2:1234") <<
                                              BSON("_id" << 2 << "host" << "test3:1234"))),
                 HostAndPort("test1", 1234));
-        OpTime optime1(100, 1);
-        OpTime optime2(100, 2);
-        OpTime optime3(2, 1);
+        Timestamp optime1(100, 1);
+        Timestamp optime2(100, 2);
+        Timestamp optime3(2, 1);
         getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime2));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 2, optime3));
@@ -1299,12 +1299,12 @@ namespace {
             long long memberId = entry["memberId"].Number();
             memberIds.insert(memberId);
             if (memberId == 0) {
-                ASSERT_EQUALS(optime1, entry["optime"]._opTime());
+                ASSERT_EQUALS(optime1, entry["optime"].timestamp());
             } else if (memberId == 1) {
-                ASSERT_EQUALS(optime2, entry["optime"]._opTime());
+                ASSERT_EQUALS(optime2, entry["optime"].timestamp());
             } else {
                 ASSERT_EQUALS(2, memberId);
-                ASSERT_EQUALS(optime3, entry["optime"]._opTime());
+                ASSERT_EQUALS(optime3, entry["optime"].timestamp());
             }
         }
         ASSERT_EQUALS(3U, memberIds.size()); // Make sure we saw all 3 nodes
@@ -1321,7 +1321,7 @@ namespace {
                 HostAndPort("test2", 1234));
         OperationContextNoop txn;
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
 
         // Can't unset maintenance mode if it was never set to begin with.
         Status status = getReplCoord()->setMaintenanceMode(false);
@@ -1404,8 +1404,8 @@ namespace {
                 HostAndPort("node1", 12345));
         OperationContextNoop txn;
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         getReplCoord()->setMyLastOptime(time2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time1));
@@ -1434,8 +1434,8 @@ namespace {
         OperationContextNoop txn;
 
         OID client = OID::gen();
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
 
         getExternalState()->setClientHostAndPort(clientHost);
         HandshakeArgs handshake;
@@ -1579,12 +1579,12 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
         simulateSuccessfulElection();
 
-        OpTime time1(100, 1);
-        OpTime time2(100, 2);
-        OpTime staleTime(10, 0);
+        Timestamp time1(100, 1);
+        Timestamp time2(100, 2);
+        Timestamp staleTime(10, 0);
         getReplCoord()->setMyLastOptime(time1);
 
         WriteConcernOptions writeConcern;
@@ -1678,10 +1678,10 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 2));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 2));
         simulateSuccessfulElection();
 
-        OpTime time(100, 2);
+        Timestamp time(100, 2);
 
         // 3 nodes waiting for time
         WriteConcernOptions writeConcern;
@@ -1748,10 +1748,10 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 2));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 2));
         simulateSuccessfulElection();
 
-        OpTime time(100, 2);
+        Timestamp time(100, 2);
 
         // 3 nodes waiting for time
         WriteConcernOptions writeConcern;
@@ -1805,10 +1805,10 @@ namespace {
                                              BSON("host" << "node5:12345" << "_id" << 4))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100, 1));
+        getReplCoord()->setMyLastOptime(Timestamp(100, 1));
         simulateSuccessfulElection();
 
-        OpTime time(100, 2);
+        Timestamp time(100, 2);
 
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time));
@@ -1878,7 +1878,7 @@ namespace {
                                                   "arbiterOnly" << true))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        OpTime time(100, 0);
+        Timestamp time(100, 0);
         getReplCoord()->setMyLastOptime(time);
         simulateSuccessfulElection();
 
@@ -1919,8 +1919,8 @@ namespace {
                                                   "arbiterOnly" << true))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        OpTime zero(0, 0);
-        OpTime time(100, 0);
+        Timestamp zero(0, 0);
+        Timestamp time(100, 0);
         getReplCoord()->setMyLastOptime(time);
         simulateSuccessfulElection();
 
@@ -1935,7 +1935,7 @@ namespace {
 
 
         // Set a new, later OpTime.
-        OpTime newTime = OpTime(100, 1);
+        Timestamp newTime = Timestamp(100, 1);
         getReplCoord()->setMyLastOptime(newTime);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 3, newTime));
         ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());

@@ -99,7 +99,7 @@ namespace {
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(
                                               BSON("ok" << 1 <<
                                                    "fresher" << false <<
-                                                   "opTime" << Date_t(OpTime(0, 0).asDate()) <<
+                                                   "opTime" << Date_t(Timestamp(0, 0).asULL()) <<
                                                    "veto" << false)));
             }
             else {
@@ -149,7 +149,7 @@ namespace {
         ASSERT(getReplCoord()->getMemberState().secondary()) <<
                                                       getReplCoord()->getMemberState().toString();
 
-        getReplCoord()->setMyLastOptime(OpTime(10,0));
+        getReplCoord()->setMyLastOptime(Timestamp(10,0));
 
         NetworkInterfaceMock* net = getNet();
         net->enterNetwork();
@@ -210,7 +210,7 @@ namespace {
                                 ));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         OperationContextNoop txn;
-        getReplCoord()->setMyLastOptime(OpTime (100, 1));
+        getReplCoord()->setMyLastOptime(Timestamp (100, 1));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
         startCapturingLogMessages();
         simulateSuccessfulElection();
@@ -231,7 +231,7 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OpTime time1(100, 1);
+        Timestamp time1(100, 1);
         getReplCoord()->setMyLastOptime(time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -278,7 +278,7 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OpTime time1(100, 1);
+        Timestamp time1(100, 1);
         getReplCoord()->setMyLastOptime(time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -326,7 +326,7 @@ namespace {
                                          BSON("_id" << 5 << "host" << "node5:12345") )),
             HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100,0));
+        getReplCoord()->setMyLastOptime(Timestamp(100,0));
 
         // set hbreconfig to hang while in progress
         getExternalState()->setStoreLocalConfigDocumentToHang(true);

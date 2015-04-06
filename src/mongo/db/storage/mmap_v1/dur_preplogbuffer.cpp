@@ -39,6 +39,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"

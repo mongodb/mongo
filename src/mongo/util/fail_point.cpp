@@ -31,6 +31,7 @@
 #include "mongo/util/fail_point.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include "mongo/platform/random.h"
 #include "mongo/util/concurrency/threadlocal.h"

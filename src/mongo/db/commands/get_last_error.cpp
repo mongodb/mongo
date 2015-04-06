@@ -130,7 +130,7 @@ namespace mongo {
             Client& c = *txn->getClient();
             if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet) {
-                const OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
+                const Timestamp lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
                 if (!lastOp.isNull()) {
                     result.append("lastOp", lastOp);
                 }
@@ -139,8 +139,8 @@ namespace mongo {
             // for sharding; also useful in general for debugging
             result.appendNumber( "connectionId" , c.getConnectionId() );
 
-            OpTime lastOpTime;
-            BSONField<OpTime> wOpTimeField("wOpTime");
+            Timestamp lastOpTime;
+            BSONField<Timestamp> wOpTimeField("wOpTime");
             FieldParser::FieldState extracted = FieldParser::extract(cmdObj, wOpTimeField, 
                                                                      &lastOpTime, &errmsg);
             if (!extracted) {

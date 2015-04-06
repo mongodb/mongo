@@ -59,7 +59,7 @@ namespace {
 
     class FreshnessCheckerTest : public mongo::unittest::Test {
     protected:
-        void startTest(const OpTime& lastOpTimeApplied,
+        void startTest(const Timestamp& lastOpTimeApplied,
                        const ReplicaSetConfig& currentConfig,
                        int selfIndex,
                        const std::vector<HostAndPort>& hosts);
@@ -80,7 +80,7 @@ namespace {
 
     private:
         void freshnessCheckerRunner(const ReplicationExecutor::CallbackData& data,
-                                    const OpTime& lastOpTimeApplied,
+                                    const Timestamp& lastOpTimeApplied,
                                     const ReplicaSetConfig& currentConfig,
                                     int selfIndex,
                                     const std::vector<HostAndPort>& hosts);
@@ -120,12 +120,12 @@ namespace {
     }
 
     const BSONObj makeFreshRequest(const ReplicaSetConfig& rsConfig, 
-                                   OpTime lastOpTimeApplied, 
+                                   Timestamp lastOpTimeApplied, 
                                    int selfIndex) {
         const MemberConfig& myConfig = rsConfig.getMemberAt(selfIndex);
         return BSON("replSetFresh" << 1 <<
                     "set" << rsConfig.getReplSetName() <<
-                    "opTime" << Date_t(lastOpTimeApplied.asDate()) <<
+                    "opTime" << Date_t(lastOpTimeApplied.asULL()) <<
                     "who" << myConfig.getHostAndPort().toString() <<
                     "cfgver" << rsConfig.getConfigVersion() <<
                     "id" << myConfig.getId());
@@ -135,7 +135,7 @@ namespace {
     // for correct concurrency operation.
     void FreshnessCheckerTest::freshnessCheckerRunner(
             const ReplicationExecutor::CallbackData& data,
-            const OpTime& lastOpTimeApplied,
+            const Timestamp& lastOpTimeApplied,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
             const std::vector<HostAndPort>& hosts) {
@@ -149,7 +149,7 @@ namespace {
         _checkerDoneEvent = assertGet(evh);
     }
 
-    void FreshnessCheckerTest::startTest(const OpTime& lastOpTimeApplied,
+    void FreshnessCheckerTest::startTest(const Timestamp& lastOpTimeApplied,
                                          const ReplicaSetConfig& currentConfig,
                                          int selfIndex,
                                          const std::vector<HostAndPort>& hosts) {
@@ -176,9 +176,9 @@ namespace {
 
         std::vector<HostAndPort> hosts;
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(0,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(0,0), 0);
 
-        startTest(OpTime(0, 0), config, 0, hosts);
+        startTest(Timestamp(0, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         _net->enterNetwork();
         for (size_t i = 0; i < hosts.size(); ++i) {
@@ -195,7 +195,7 @@ namespace {
                                                 "set" << "rs0" <<
                                                 "who" << "h1" <<
                                                 "cfgver" << 1 <<
-                                                "opTime" << Date_t(OpTime(0,0).asDate())),
+                                                "opTime" << Date_t(Timestamp(0,0).asULL())),
                                            Milliseconds(8))));
         }
         _net->runUntil(startDate + 10);
@@ -218,7 +218,7 @@ namespace {
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         startTest(
-                OpTime(0, 0),
+                Timestamp(0, 0),
                 config,
                 0,
                 hosts);
@@ -244,9 +244,9 @@ namespace {
         std::vector<HostAndPort> hosts;
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         _net->enterNetwork();
         for (size_t i = 0; i < hosts.size(); ++i) {
@@ -264,7 +264,7 @@ namespace {
                                                 "who" << "h1" <<
                                                 "cfgver" << 1 <<
                                                 "fresher" << true <<
-                                                "opTime" << Date_t(OpTime(0,0).asDate())),
+                                                "opTime" << Date_t(Timestamp(0,0).asULL())),
                                            Milliseconds(8))));
         }
         _net->runUntil(startDate + 10);
@@ -290,9 +290,9 @@ namespace {
         std::vector<HostAndPort> hosts;
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(0,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(0,0), 0);
 
-        startTest(OpTime(0, 0), config, 0, hosts);
+        startTest(Timestamp(0, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         _net->enterNetwork();
         for (size_t i = 0; i < hosts.size(); ++i) {
@@ -309,7 +309,7 @@ namespace {
                                                 "set" << "rs0" <<
                                                 "who" << "h1" <<
                                                 "cfgver" << 1 <<
-                                                "opTime" << Date_t(OpTime(10,0).asDate())),
+                                                "opTime" << Date_t(Timestamp(10,0).asULL())),
                                            Milliseconds(8))));
         }
         _net->runUntil(startDate + 10);
@@ -334,9 +334,9 @@ namespace {
         std::vector<HostAndPort> hosts;
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         _net->enterNetwork();
         for (size_t i = 0; i < hosts.size(); ++i) {
@@ -381,9 +381,9 @@ namespace {
         std::vector<HostAndPort> hosts;
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         _net->enterNetwork();
         for (size_t i = 0; i < hosts.size(); ++i) {
@@ -402,7 +402,7 @@ namespace {
                                                 "cfgver" << 1 <<
                                                 "veto" << true <<
                                                 "errmsg" << "I'd rather you didn't" <<
-                                                "opTime" << Date_t(OpTime(0,0).asDate())),
+                                                "opTime" << Date_t(Timestamp(0,0).asULL())),
                                            Milliseconds(8))));
         }
         _net->runUntil(startDate + 10);
@@ -443,9 +443,9 @@ namespace {
             hosts.push_back(mem->getHostAndPort());
         }
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         unordered_set<HostAndPort> seen;
         _net->enterNetwork();
@@ -462,7 +462,7 @@ namespace {
                 "set" << "rs0" <<
                 "who" << target.toString() <<
                 "cfgver" << 1 <<
-                "opTime" << Date_t(OpTime(0,0).asDate());
+                "opTime" << Date_t(Timestamp(0,0).asULL());
             if (target.host() == "h1") {
                 responseBuilder << "fresher" << true;
             }
@@ -505,9 +505,9 @@ namespace {
             hosts.push_back(mem->getHostAndPort());
         }
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         unordered_set<HostAndPort> seen;
         _net->enterNetwork();
@@ -526,7 +526,7 @@ namespace {
                     "set" << "rs0" <<
                     "who" << target.toString() <<
                     "cfgver" << 1 <<
-                    "opTime" << Date_t(OpTime(20,0).asDate());
+                    "opTime" << Date_t(Timestamp(20,0).asULL());
                 _net->scheduleResponse(
                         noi,
                         startDate + 20,
@@ -541,7 +541,7 @@ namespace {
                     "set" << "rs0" <<
                     "who" << target.toString() <<
                     "cfgver" << 1 <<
-                    "opTime" << Date_t(OpTime(10,0).asDate());
+                    "opTime" << Date_t(Timestamp(10,0).asULL());
                 _net->scheduleResponse(
                         noi,
                         startDate + 10,
@@ -581,9 +581,9 @@ namespace {
             hosts.push_back(mem->getHostAndPort());
         }
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         unordered_set<HostAndPort> seen;
         _net->enterNetwork();
@@ -604,7 +604,7 @@ namespace {
                 responseBuilder << "opTime" << 3;
             }
             else {
-                responseBuilder << "opTime" << Date_t(OpTime(0,0).asDate());
+                responseBuilder << "opTime" << Date_t(Timestamp(0,0).asULL());
             }
             _net->scheduleResponse(
                     noi,
@@ -643,9 +643,9 @@ namespace {
             hosts.push_back(mem->getHostAndPort());
         }
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         unordered_set<HostAndPort> seen;
         _net->enterNetwork();
@@ -662,7 +662,7 @@ namespace {
                 "set" << "rs0" <<
                 "who" << target.toString() <<
                 "cfgver" << 1 <<
-                "opTime" << Date_t(OpTime(0,0).asDate());
+                "opTime" << Date_t(Timestamp(0,0).asULL());
             if (target.host() == "h1") {
                 responseBuilder << "veto" << true << "errmsg" << "I'd rather you didn't";
             }
@@ -706,9 +706,9 @@ namespace {
             hosts.push_back(mem->getHostAndPort());
         }
 
-        const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
+        const BSONObj freshRequest = makeFreshRequest(config, Timestamp(10,0), 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         unordered_set<HostAndPort> seen;
         _net->enterNetwork();
@@ -729,7 +729,7 @@ namespace {
                     "cfgver" << 1 <<
                     "veto" << true <<
                     "errmsg" << "I'd rather you didn't" <<
-                    "opTime" << Date_t(OpTime(10,0).asDate());
+                    "opTime" << Date_t(Timestamp(10,0).asULL());
                 _net->scheduleResponse(
                         noi,
                         startDate + 20,
@@ -744,7 +744,7 @@ namespace {
                     "set" << "rs0" <<
                     "who" << target.toString() <<
                     "cfgver" << 1 <<
-                    "opTime" << Date_t(OpTime(10,0).asDate());
+                    "opTime" << Date_t(Timestamp(10,0).asULL());
                 _net->scheduleResponse(
                         noi,
                         startDate + 10,
@@ -785,10 +785,10 @@ namespace {
             hosts.push_back(mem->getHostAndPort());
         }
 
-        const OpTime lastOpTimeApplied(10,0);
+        const Timestamp lastOpTimeApplied(10,0);
         const BSONObj freshRequest = makeFreshRequest(config, lastOpTimeApplied, 0);
 
-        startTest(OpTime(10, 0), config, 0, hosts);
+        startTest(Timestamp(10, 0), config, 0, hosts);
         const Date_t startDate = _net->now();
         unordered_set<HostAndPort> seen;
         _net->enterNetwork();
@@ -812,7 +812,7 @@ namespace {
                     "set" << "rs0" <<
                     "who" << target.toString() <<
                     "cfgver" << 1 <<
-                    "opTime" << Date_t(OpTime(0,0).asDate());
+                    "opTime" << Date_t(Timestamp(0,0).asULL());
                 _net->scheduleResponse(
                         noi,
                         startDate + 10,
@@ -832,7 +832,7 @@ namespace {
     public:
         virtual void setUp() {
             int selfConfigIndex = 0;
-            OpTime lastOpTimeApplied(100, 0);
+            Timestamp lastOpTimeApplied(100, 0);
 
             ReplicaSetConfig config;
             config.initialize(BSON("_id" << "rs0" <<
@@ -876,14 +876,14 @@ namespace {
         ResponseStatus lessFresh() {
             BSONObjBuilder bb;
             bb.append("ok", 1.0);
-            bb.appendDate("opTime", OpTime(10, 0).asDate());
+            bb.appendDate("opTime", Timestamp(10, 0).asULL());
             return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
         }
 
         ResponseStatus moreFreshViaOpTime() {
             BSONObjBuilder bb;
             bb.append("ok", 1.0);
-            bb.appendDate("opTime", OpTime(110, 0).asDate());
+            bb.appendDate("opTime", Timestamp(110, 0).asULL());
             return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
         }
 
@@ -905,7 +905,7 @@ namespace {
         ResponseStatus tiedForFreshness() {
             BSONObjBuilder bb;
             bb.append("ok", 1.0);
-            bb.appendDate("opTime", OpTime(100, 0).asDate());
+            bb.appendDate("opTime", Timestamp(100, 0).asULL());
             return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
         }
 

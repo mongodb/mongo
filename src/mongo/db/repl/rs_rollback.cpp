@@ -146,7 +146,7 @@ namespace {
 
         set<string> collectionsToResync;
 
-        OpTime commonPoint;
+        Timestamp commonPoint;
         RecordId commonPointOurDiskloc;
 
         int rbid; // remote server's current rollback sequence #
@@ -286,9 +286,9 @@ namespace {
         if (oplogCursor.get() == NULL || !oplogCursor->more())
             throw RSFatalException("remote oplog empty or unreadable");
 
-        OpTime ourTime = ourObj["ts"]._opTime();
+        Timestamp ourTime = ourObj["ts"].timestamp();
         BSONObj theirObj = oplogCursor->nextSafe();
-        OpTime theirTime = theirObj["ts"]._opTime();
+        Timestamp theirTime = theirObj["ts"].timestamp();
 
         long long diff = static_cast<long long>(ourTime.getSecs())
                                - static_cast<long long>(theirTime.getSecs());
@@ -328,7 +328,7 @@ namespace {
                     throw RSFatalException("RS100 reached beginning of remote oplog [2]");
                 }
                 theirObj = oplogCursor->nextSafe();
-                theirTime = theirObj["ts"]._opTime();
+                theirTime = theirObj["ts"].timestamp();
 
                 if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
                     severe() << "rollback error RS101 reached beginning of local oplog";
@@ -337,7 +337,7 @@ namespace {
                     log() << "  ourTime:   " << ourTime.toStringLong();
                     throw RSFatalException("RS101 reached beginning of local oplog [1]");
                 }
-                ourTime = ourObj["ts"]._opTime();
+                ourTime = ourObj["ts"].timestamp();
             }
             else if (theirTime > ourTime) {
                 if (!oplogCursor->more()) {
@@ -349,7 +349,7 @@ namespace {
                     throw RSFatalException("RS100 reached beginning of remote oplog [1]");
                 }
                 theirObj = oplogCursor->nextSafe();
-                theirTime = theirObj["ts"]._opTime();
+                theirTime = theirObj["ts"].timestamp();
             }
             else {
                 // theirTime < ourTime
@@ -361,7 +361,7 @@ namespace {
                     log() << "  ourTime:   " << ourTime.toStringLong();
                     throw RSFatalException("RS101 reached beginning of local oplog [2]");
                 }
-                ourTime = ourObj["ts"]._opTime();
+                ourTime = ourObj["ts"].timestamp();
             }
         }
     }
@@ -449,7 +449,7 @@ namespace {
 
         // we have items we are writing that aren't from a point-in-time.  thus best not to come
         // online until we get to that point in freshness.
-        OpTime minValid = newMinValid["ts"]._opTime();
+        Timestamp minValid = newMinValid["ts"].timestamp();
         log() << "minvalid=" << minValid.toStringLong();
         setMinValid(txn, minValid);
 
@@ -499,7 +499,7 @@ namespace {
                     err = "can't get minvalid from sync source";
                 }
                 else {
-                    OpTime minValid = newMinValid["ts"]._opTime();
+                    Timestamp minValid = newMinValid["ts"].timestamp();
                     log() << "minvalid=" << minValid.toStringLong();
                     setMinValid(txn, minValid);
                 }
@@ -807,13 +807,13 @@ namespace {
 } // namespace
 
     void syncRollback(OperationContext* txn,
-                      OpTime lastOpTimeApplied,
+                      Timestamp lastOpTimeApplied,
                       OplogReader* oplogreader, 
                       ReplicationCoordinator* replCoord) {
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
         // inconsistent state
         {
-            OpTime minvalid = getMinValid(txn);
+            Timestamp minvalid = getMinValid(txn);
             if( minvalid > lastOpTimeApplied ) {
                 severe() << "need to rollback, but in inconsistent state" << endl;
                 log() << "minvalid: " << minvalid.toString() << " our last optime: "

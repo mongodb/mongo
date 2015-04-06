@@ -863,7 +863,7 @@ namespace {
     }
 
     Status WiredTigerRecordStore::oplogDiskLocRegister( OperationContext* txn,
-                                                        const OpTime& opTime ) {
+                                                        const Timestamp& opTime ) {
         StatusWith<RecordId> loc = oploghack::keyForOptime( opTime );
         if ( !loc.isOK() )
             return loc.getStatus();

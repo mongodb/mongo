@@ -28,15 +28,17 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/db/global_optime.h"
+#include <boost/thread.hpp>
+
+#include "mongo/db/global_timestamp.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 
 namespace {
-    mongo::mutex globalOptimeMutex;
-    mongo::OpTime globalOpTime(0, 0);
+    mongo::mutex globalTimestampMutex;
+    mongo::Timestamp globalTimestamp(0, 0);
 
-    bool skewed(const mongo::OpTime& val) {
+    bool skewed(const mongo::Timestamp& val) {
         if (val.getInc() & 0x80000000) {
             mongo::warning() << "clock skew detected  prev: " << val.getSecs()
                              << " now: " << (unsigned) time(0) << std::endl;
@@ -48,33 +50,33 @@ namespace {
 }
 
 namespace mongo {
-    void setGlobalOptime(const OpTime& newTime) {
-        boost::lock_guard<boost::mutex> lk(globalOptimeMutex);
-        globalOpTime = newTime;
+    void setGlobalTimestamp(const Timestamp& newTime) {
+        boost::lock_guard<boost::mutex> lk(globalTimestampMutex);
+        globalTimestamp = newTime;
     }
 
-    OpTime getLastSetOptime() {
-        boost::lock_guard<boost::mutex> lk(globalOptimeMutex);
-        return globalOpTime;
+    Timestamp getLastSetTimestamp() {
+        boost::lock_guard<boost::mutex> lk(globalTimestampMutex);
+        return globalTimestamp;
     }
 
-    OpTime getNextGlobalOptime() {
-        boost::lock_guard<boost::mutex> lk(globalOptimeMutex);
+    Timestamp getNextGlobalTimestamp() {
+        boost::lock_guard<boost::mutex> lk(globalTimestampMutex);
 
         const unsigned now = (unsigned) time(0);
-        const unsigned globalSecs = globalOpTime.getSecs();
+        const unsigned globalSecs = globalTimestamp.getSecs();
         if ( globalSecs == now ) {
-            globalOpTime = OpTime(globalSecs, globalOpTime.getInc() + 1);
+            globalTimestamp = Timestamp(globalSecs, globalTimestamp.getInc() + 1);
         }
         else if ( now < globalSecs ) {
-            globalOpTime = OpTime(globalSecs, globalOpTime.getInc() + 1);
+            globalTimestamp = Timestamp(globalSecs, globalTimestamp.getInc() + 1);
             // separate function to keep out of the hot code path
-            fassert(17449, !skewed(globalOpTime));
+            fassert(17449, !skewed(globalTimestamp));
         }
         else {
-            globalOpTime = OpTime(now, 1);
+            globalTimestamp = Timestamp(now, 1);
         }
 
-        return globalOpTime;
+        return globalTimestamp;
     }
 }

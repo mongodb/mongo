@@ -65,7 +65,7 @@ namespace mongo {
             return 0;
         case Bool:
             return *l.value() - *r.value();
-        case Timestamp:
+        case bsonTimestamp:
         case Date:
             // unsigned dates for old version
             if ( l.date() < r.date() )

@@ -32,11 +32,11 @@
 
 #pragma once
 
+#include <boost/thread/lock_guard.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bson_field.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"
@@ -350,7 +350,7 @@ namespace mongo {
         std::string _string;
         std::string _setName;
 
-        static mutex _connectHookMutex;
+        static boost::mutex _connectHookMutex;
         static ConnectionHook* _connectHook;
     };
 

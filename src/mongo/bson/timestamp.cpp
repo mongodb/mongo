@@ -26,27 +26,49 @@
  */
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 
+#include <ctime>
 #include <iostream>
 #include <limits>
-#include <ctime>
+#include <sstream>
 
 #include "mongo/platform/cstdint.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    OpTime OpTime::max() {
+    Timestamp Timestamp::max() {
         unsigned int t = static_cast<unsigned int>(std::numeric_limits<int32_t>::max());
         unsigned int i = std::numeric_limits<uint32_t>::max();
-        return OpTime(t, i);
+        return Timestamp(t, i);
     }
 
-    void OpTime::append(BufBuilder& builder, const StringData& fieldName) const {
+    void Timestamp::append(BufBuilder& builder, const StringData& fieldName) const {
 	// No endian conversions needed, since we store in-memory representation
 	// in little endian format, regardless of target endian.
-	builder.appendNum( static_cast<char>(Timestamp) );
+	builder.appendNum( static_cast<char>(bsonTimestamp) );
 	builder.appendStr( fieldName );
-	builder.appendNum( asDate() );
+	builder.appendNum( asULL() );
     }
+
+    std::string Timestamp::toStringLong() const {
+        std::stringstream ss;
+        ss << time_t_to_String_short(secs) << ' ';
+        ss << std::hex << secs << ':' << i;
+        return ss.str();
+    }
+
+    std::string Timestamp::toStringPretty() const {
+        std::stringstream ss;
+        ss << time_t_to_String_short(secs) << ':' << std::hex << i;
+        return ss.str();
+    }
+
+    std::string Timestamp::toString() const {
+        std::stringstream ss;
+        ss << std::hex << secs << ':' << i;
+        return ss.str();
+    }
+
 }

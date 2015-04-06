@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
+#include <boost/thread/condition.hpp>
 #include <limits>
 
 #include "mongo/db/server_options.h"

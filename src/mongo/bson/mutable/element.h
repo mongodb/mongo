@@ -318,7 +318,7 @@ namespace mutablebson {
         inline int32_t getValueInt() const;
 
         /** Get the value from a timestamp valued Element. */
-        inline OpTime getValueTimestamp() const;
+        inline Timestamp getValueTimestamp() const;
 
         /** Get the value from a long valued Element. */
         inline int64_t getValueLong() const;
@@ -438,7 +438,7 @@ namespace mutablebson {
         Status setValueInt(int32_t value);
 
         /** Set the value of this Element to the given timestamp. */
-        Status setValueTimestamp(OpTime value);
+        Status setValueTimestamp(Timestamp value);
 
         /** Set the value of this Element to the given long integer */
         Status setValueLong(int64_t value);
@@ -562,7 +562,7 @@ namespace mutablebson {
         Status appendInt(StringData fieldName, int32_t value);
 
         /** Append the provided timestamp as a new field with the provided name. */
-        Status appendTimestamp(StringData fieldName, OpTime value);
+        Status appendTimestamp(StringData fieldName, Timestamp value);
 
         /** Append the provided long integer as a new field with the provided name. */
         Status appendLong(StringData fieldName, int64_t value);

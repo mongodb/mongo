@@ -30,7 +30,6 @@
 #include <vector>
 #include <map>
 
-#include "mongo/bson/bson_field.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"

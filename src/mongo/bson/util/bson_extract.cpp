@@ -106,14 +106,14 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status bsonExtractOpTimeField(const BSONObj& object,
+    Status bsonExtractTimestampField(const BSONObj& object,
                                   StringData fieldName,
-                                  OpTime* out) {
+                                  Timestamp* out) {
         BSONElement element;
-        Status status = bsonExtractTypedField(object, fieldName, Timestamp, &element);
+        Status status = bsonExtractTypedField(object, fieldName, bsonTimestamp, &element);
         if (!status.isOK())
             return status;
-        *out = element._opTime();
+        *out = element.timestamp();
         return Status::OK();
     }
 

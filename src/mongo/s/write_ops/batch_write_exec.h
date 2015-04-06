@@ -34,7 +34,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/shard_resolver.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -97,9 +97,9 @@ namespace mongo {
     };
 
     struct HostOpTime {
-        HostOpTime(OpTime ot, OID e) : opTime(ot), electionId(e) {};
+        HostOpTime(Timestamp ot, OID e) : opTime(ot), electionId(e) {};
         HostOpTime() {};
-        OpTime opTime;
+        Timestamp opTime;
         OID electionId;
     };
 
@@ -112,7 +112,7 @@ namespace mongo {
            numRounds( 0 ), numTargetErrors( 0 ), numResolveErrors( 0 ), numStaleBatches( 0 ) {
         }
 
-        void noteWriteAt(const ConnectionString& host, OpTime opTime, const OID& electionId);
+        void noteWriteAt(const ConnectionString& host, Timestamp opTime, const OID& electionId);
 
         const HostOpTimeMap& getWriteOpTimes() const;
 

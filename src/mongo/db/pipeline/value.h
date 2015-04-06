@@ -72,7 +72,7 @@ namespace mongo {
         explicit Value(int value)                 : _storage(NumberInt, value) {}
         explicit Value(long long value)           : _storage(NumberLong, value) {}
         explicit Value(double value)              : _storage(NumberDouble, value) {}
-        explicit Value(const OpTime& value)       : _storage(Timestamp, value) {}
+        explicit Value(const Timestamp& value)    : _storage(bsonTimestamp, value) {}
         explicit Value(const OID& value)          : _storage(jstOID, value) {}
         explicit Value(StringData value)   : _storage(String, value) {}
         explicit Value(const std::string& value)       : _storage(String, StringData(value)) {}
@@ -150,7 +150,7 @@ namespace mongo {
         OID getOid() const;
         bool getBool() const;
         long long getDate() const; // in milliseconds
-        OpTime getTimestamp() const;
+        Timestamp getTimestamp() const;
         const char* getRegex() const;
         const char* getRegexFlags() const;
         std::string getSymbol() const;
@@ -189,7 +189,7 @@ namespace mongo {
         int coerceToInt() const;
         long long coerceToLong() const;
         double coerceToDouble() const;
-        OpTime coerceToTimestamp() const;
+        Timestamp coerceToTimestamp() const;
         long long coerceToDate() const;
         time_t coerceToTimeT() const;
         tm coerceToTm() const; // broken-out time struct (see man gmtime)
@@ -326,8 +326,8 @@ namespace mongo {
         return _storage.dateValue;
     }
 
-    inline OpTime Value::getTimestamp() const {
-        verify(getType() == Timestamp);
+    inline Timestamp Value::getTimestamp() const {
+        verify(getType() == bsonTimestamp);
         return Date_t(_storage.timestampValue);
     }
 

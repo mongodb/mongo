@@ -44,7 +44,7 @@ namespace mongo {
     class IndexDescriptor;
     class NamespaceString;
     class OperationContext;
-    class OpTime;
+    class Timestamp;
     struct WriteConcernOptions;
 
 namespace repl {
@@ -172,7 +172,7 @@ namespace repl {
          * ErrorCodes::Interrupted if the operation was killed with killop()
          */
         virtual StatusAndDuration awaitReplication(const OperationContext* txn,
-                                                   const OpTime& ts,
+                                                   const Timestamp& ts,
                                                    const WriteConcernOptions& writeConcern) = 0;
 
         /**
@@ -246,7 +246,7 @@ namespace repl {
          * Updates our internal tracking of the last OpTime applied for the given slave
          * identified by "rid".  Only valid to call in master/slave mode
          */
-        virtual Status setLastOptimeForSlave(const OID& rid, const OpTime& ts) = 0;
+        virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts) = 0;
 
         /**
          * Updates our internal tracking of the last OpTime applied to this node.
@@ -256,7 +256,7 @@ namespace repl {
          * that after calls to resetLastOpTimeFromOplog(), the minimum acceptable value for "ts" is
          * reset based on the contents of the oplog, and may go backwards due to rollback.
          */
-        virtual void setMyLastOptime(const OpTime& ts) = 0;
+        virtual void setMyLastOptime(const Timestamp& ts) = 0;
 
         /**
          * Same as above, but used during places we need to zero our last optime.
@@ -271,7 +271,7 @@ namespace repl {
         /**
          * Returns the last optime recorded by setMyLastOptime.
          */
-        virtual OpTime getMyLastOptime() const = 0;
+        virtual Timestamp getMyLastOptime() const = 0;
 
         /**
          * Retrieves and returns the current election id, which is a unique id that is local to
@@ -443,7 +443,7 @@ namespace repl {
             HostAndPort who;  // host and port of the member that sent the replSetFresh command
             unsigned id;  // replSet id of the member that sent the replSetFresh command
             int cfgver;  // replSet config version that the member who sent the command thinks it has
-            OpTime opTime;  // last optime seen by the member who sent the replSetFresh command
+            Timestamp opTime;  // last optime seen by the member who sent the replSetFresh command
         };
 
         /*
@@ -503,7 +503,7 @@ namespace repl {
         /**
          * Returns a vector of members that have applied the operation with OpTime 'op'.
          */
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) = 0;
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op) = 0;
 
         /**
          * Returns a vector of the members other than ourself in the replica set, as specified in
@@ -554,7 +554,7 @@ namespace repl {
          * Committed means a majority of the voting nodes of the config are known to have the
          * operation in their oplogs.  This implies such ops will never be rolled back.
          */
-        virtual OpTime getLastCommittedOpTime() const = 0;
+        virtual Timestamp getLastCommittedOpTime() const = 0;
 
     protected:
 

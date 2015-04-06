@@ -82,7 +82,7 @@ namespace mutablebson {
         inline bool isValueNull() const;
         inline StringData getValueSymbol() const;
         inline int32_t getValueInt() const;
-        inline OpTime getValueTimestamp() const;
+        inline Timestamp getValueTimestamp() const;
         inline int64_t getValueLong() const;
         inline bool isValueMinKey() const;
         inline bool isValueMaxKey() const;

@@ -94,7 +94,7 @@ namespace mongo {
      * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
      */
     Status waitForWriteConcern( OperationContext* txn,
-                                const OpTime& replOpTime,
+                                const Timestamp& replOpTime,
                                 WriteConcernResult* result );
 
 

@@ -90,7 +90,7 @@ namespace mongo {
         ConnectionString shardConn = ConnectionString::parse(hostString, errmsg);
 
         BSONElement subobj = result[kGLEStatsFieldName];
-        OpTime lastOpTime = subobj[kGLEStatsLastOpTimeFieldName]._opTime();
+        Timestamp lastOpTime = subobj[kGLEStatsLastOpTimeFieldName].timestamp();
         OID electionId = subobj[kGLEStatsElectionIdFieldName].OID();
         ClientInfo* clientInfo = ClientInfo::get();
         LOG(4) << "saveGLEStats lastOpTime:" << lastOpTime 

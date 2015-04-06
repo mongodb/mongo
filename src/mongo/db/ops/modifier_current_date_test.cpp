@@ -43,7 +43,7 @@ namespace {
     using mongo::LogBuilder;
     using mongo::ModifierCurrentDate;
     using mongo::ModifierInterface;
-    using mongo::OpTime;
+    using mongo::Timestamp;
     using mongo::Status;
     using mongo::StringData;
     using mongo::fromjson;
@@ -220,7 +220,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
         ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
 
-        mongo::OpTime ts;
+        mongo::Timestamp ts;
         BSONObj olderDateObj = BSON("a" << ts);
         ASSERT_OK(mod.apply());
         ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -305,7 +305,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
         ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
 
-        mongo::OpTime ts;
+        mongo::Timestamp ts;
         BSONObj olderDateObj = BSON("a" << ts);
         ASSERT_OK(mod.apply());
         ASSERT_TRUE(doc.isInPlaceModeEnabled()); //Same Size as Date
@@ -327,7 +327,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
         ASSERT_EQUALS("a.b", execInfo.fieldRef[0]->dottedField());
 
-        mongo::OpTime ts;
+        mongo::Timestamp ts;
         BSONObj olderDateObj = BSON("a" << BSON( "b" << ts));
         ASSERT_OK(mod.apply());
         ASSERT_TRUE(doc.isInPlaceModeEnabled()); //Same Size as Date
@@ -349,7 +349,7 @@ namespace {
         ASSERT_FALSE(execInfo.noOp);
         ASSERT_EQUALS("a.b", execInfo.fieldRef[0]->dottedField());
 
-        mongo::OpTime ts;
+        mongo::Timestamp ts;
         BSONObj olderDateObj = BSON("a" << BSON( "b" << ts));
         ASSERT_OK(mod.apply());
         ASSERT_FALSE(doc.isInPlaceModeEnabled());

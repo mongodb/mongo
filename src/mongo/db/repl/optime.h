@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2008 10gen Inc.
+*    Copyright (C) 2015 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,36 +26,57 @@
 *    it in the license file.
 */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <tuple>
+#include <utility>
 
-#include "mongo/db/repl/initial_sync.h"
-
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/util/log.h"
-
+#include "mongo/bson/timestamp.h"
 
 namespace mongo {
 namespace repl {
 
-    unsigned replSetForceInitialSyncFailure = 0;
+    class OpTime {
+    public:
+        OpTime() = default;
+        OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
 
-    InitialSync::InitialSync(BackgroundSyncInterface *q) : 
-        SyncTail(q, multiInitialSyncApply) {}
-
-    InitialSync::~InitialSync() {}
-
-    /* initial oplog application, during initial sync, after cloning.
-    */
-    void InitialSync::oplogApplication(OperationContext* txn, const Timestamp& endOpTime) {
-        if (replSetForceInitialSyncFailure > 0) {
-            log() << "test code invoked, forced InitialSync failure: "
-                  << replSetForceInitialSyncFailure;
-            replSetForceInitialSyncFailure--;
-            throw DBException("forced error",0);
+        Timestamp getTimestamp() const {
+            return _timestamp;
         }
-        _applyOplogUntil(txn, endOpTime);
+
+        long long getTerm() const {
+            return _term;
+        }
+
+    private:
+        Timestamp _timestamp;
+        long long _term = -1;
+    };
+
+    inline bool operator==(const OpTime& lhs, const OpTime& rhs) {
+        return std::tie(lhs.opTime, lhs.term) == std::tie(rhs.opTime, rhs.term);
+    }
+
+    inline bool operator<(const OpTime& lhs, const OpTime& rhs) {
+        // Compare term first, then the opTimes.
+        return std::tie(lhs.term, lhs.opTime) < std::tie(rhs.term, rhs.opTime);
+    }
+
+    inline bool operator!=(const OpTime& lhs, const OpTime& rhs) {
+        return !(lhs == rhs);
+    }
+
+    inline bool operator<=(const OpTime& lhs, const OpTime& rhs) {
+        return lhs < rhs || lhs == rhs;
+    }
+
+    inline bool operator>(const OpTime& lhs, const OpTime& rhs) {
+        return !(lhs <= rhs);
+    }
+
+    inline bool operator>=(const OpTime& lhs, const OpTime& rhs) {
+        return !(lhs < rhs);
     }
 
 } // namespace repl

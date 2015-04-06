@@ -375,8 +375,8 @@ namespace mutablebson {
         /** Create a new integer Element with the given value and field name. */
         Element makeElementInt(StringData fieldName, int32_t value);
 
-        /** Create a new timetamp Element with the given value and field name. */
-        Element makeElementTimestamp(StringData fieldName, OpTime value);
+        /** Create a new timestamp Element with the given value and field name. */
+        Element makeElementTimestamp(StringData fieldName, Timestamp value);
 
         /** Create a new long integer Element with the given value and field name. */
         Element makeElementLong(StringData fieldName, int64_t value);

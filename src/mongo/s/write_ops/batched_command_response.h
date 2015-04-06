@@ -59,7 +59,7 @@ namespace mongo {
         static const BSONField<long long> n;
         static const BSONField<long long> nModified;
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
-        static const BSONField<OpTime> lastOp;
+        static const BSONField<Timestamp> lastOp;
         static const BSONField<OID> electionId;
         static const BSONField<std::vector<WriteErrorDetail*> > writeErrors;
         static const BSONField<WCErrorDetail*> writeConcernError;
@@ -121,10 +121,10 @@ namespace mongo {
         const std::vector<BatchedUpsertDetail*>& getUpsertDetails() const;
         const BatchedUpsertDetail* getUpsertDetailsAt(std::size_t pos) const;
 
-        void setLastOp(OpTime lastOp);
+        void setLastOp(Timestamp lastOp);
         void unsetLastOp();
         bool isLastOpSet() const;
-        OpTime getLastOp() const;
+        Timestamp getLastOp() const;
 
         void setElectionId(const OID& electionId);
         void unsetElectionId();
@@ -181,7 +181,7 @@ namespace mongo {
         //      Normally, getLastError can use Client::_lastOp, but this is not valid for
         //      mongos which loses track of the session due to RCAR.  Therefore, we must
         //      keep track of the lastOp manually ourselves.
-        OpTime _lastOp;
+        Timestamp _lastOp;
         bool _isLastOpSet;
 
         // (O)  In addition to keeping track of the above lastOp timestamp, we must also keep

@@ -59,7 +59,7 @@
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/global_optime.h"
+#include "mongo/db/global_timestamp.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
@@ -828,7 +828,7 @@ namespace {
         int pass = 0;
         bool exhaust = false;
         QueryResult::View msgdata = 0;
-        OpTime last;
+        Timestamp last;
         while( 1 ) {
             bool isCursorAuthorized = false;
             try {
@@ -846,10 +846,10 @@ namespace {
                     }
 
                     if (pass == 0) {
-                        last = getLastSetOptime();
+                        last = getLastSetTimestamp();
                     }
                     else {
-                        repl::waitUpToOneSecondForOptimeChange(last);
+                        repl::waitUpToOneSecondForTimestampChange(last);
                     }
                 }
 

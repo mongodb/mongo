@@ -1366,15 +1366,15 @@ namespace ReplTests {
     public:
         void run() {
             DatabaseIgnorer d;
-            ASSERT( !d.ignoreAt( "a", OpTime( 4, 0 ) ) );
-            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
-            ASSERT( d.ignoreAt( "a", OpTime( 4, 0 ) ) );
-            ASSERT( !d.ignoreAt( "b", OpTime( 4, 0 ) ) );
-            ASSERT( d.ignoreAt( "a", OpTime( 4, 10 ) ) );
-            ASSERT( d.ignoreAt( "a", OpTime( 5, 0 ) ) );
-            ASSERT( !d.ignoreAt( "a", OpTime( 5, 1 ) ) );
+            ASSERT( !d.ignoreAt( "a", Timestamp( 4, 0 ) ) );
+            d.doIgnoreUntilAfter( "a", Timestamp( 5, 0 ) );
+            ASSERT( d.ignoreAt( "a", Timestamp( 4, 0 ) ) );
+            ASSERT( !d.ignoreAt( "b", Timestamp( 4, 0 ) ) );
+            ASSERT( d.ignoreAt( "a", Timestamp( 4, 10 ) ) );
+            ASSERT( d.ignoreAt( "a", Timestamp( 5, 0 ) ) );
+            ASSERT( !d.ignoreAt( "a", Timestamp( 5, 1 ) ) );
             // Ignore state is expired.
-            ASSERT( !d.ignoreAt( "a", OpTime( 4, 0 ) ) );
+            ASSERT( !d.ignoreAt( "a", Timestamp( 4, 0 ) ) );
         }
     };
 
@@ -1382,19 +1382,19 @@ namespace ReplTests {
     public:
         void run() {
             DatabaseIgnorer d;
-            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
-            d.doIgnoreUntilAfter( "a", OpTime( 6, 0 ) );
-            ASSERT( d.ignoreAt( "a", OpTime( 5, 5 ) ) );
-            ASSERT( d.ignoreAt( "a", OpTime( 6, 0 ) ) );
-            ASSERT( !d.ignoreAt( "a", OpTime( 6, 1 ) ) );
+            d.doIgnoreUntilAfter( "a", Timestamp( 5, 0 ) );
+            d.doIgnoreUntilAfter( "a", Timestamp( 6, 0 ) );
+            ASSERT( d.ignoreAt( "a", Timestamp( 5, 5 ) ) );
+            ASSERT( d.ignoreAt( "a", Timestamp( 6, 0 ) ) );
+            ASSERT( !d.ignoreAt( "a", Timestamp( 6, 1 ) ) );
 
-            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
-            d.doIgnoreUntilAfter( "a", OpTime( 6, 0 ) );
-            d.doIgnoreUntilAfter( "a", OpTime( 6, 0 ) );
-            d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
-            ASSERT( d.ignoreAt( "a", OpTime( 5, 5 ) ) );
-            ASSERT( d.ignoreAt( "a", OpTime( 6, 0 ) ) );
-            ASSERT( !d.ignoreAt( "a", OpTime( 6, 1 ) ) );
+            d.doIgnoreUntilAfter( "a", Timestamp( 5, 0 ) );
+            d.doIgnoreUntilAfter( "a", Timestamp( 6, 0 ) );
+            d.doIgnoreUntilAfter( "a", Timestamp( 6, 0 ) );
+            d.doIgnoreUntilAfter( "a", Timestamp( 5, 0 ) );
+            ASSERT( d.ignoreAt( "a", Timestamp( 5, 5 ) ) );
+            ASSERT( d.ignoreAt( "a", Timestamp( 6, 0 ) ) );
+            ASSERT( !d.ignoreAt( "a", Timestamp( 6, 1 ) ) );
         }
     };
 

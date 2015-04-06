@@ -186,38 +186,38 @@ namespace {
         }
     }
 
-    void ReplicationCoordinatorExternalStateImpl::setGlobalOpTime(const OpTime& newTime) {
+    void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
         setNewOptime(newTime);
     }
 
-    StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
+    StatusWith<Timestamp> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
             OperationContext* txn) {
 
         try {
             BSONObj oplogEntry;
             if (!Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry)) {
-                return StatusWith<OpTime>(
+                return StatusWith<Timestamp>(
                         ErrorCodes::NoMatchingDocument,
                         str::stream() << "Did not find any entries in " << rsOplogName);
             }
             BSONElement tsElement = oplogEntry[tsFieldName];
             if (tsElement.eoo()) {
-                return StatusWith<OpTime>(
+                return StatusWith<Timestamp>(
                         ErrorCodes::NoSuchKey,
                         str::stream() << "Most recent entry in " << rsOplogName << " missing \"" <<
                         tsFieldName << "\" field");
             }
-            if (tsElement.type() != Timestamp) {
-                return StatusWith<OpTime>(
+            if (tsElement.type() != bsonTimestamp) {
+                return StatusWith<Timestamp>(
                         ErrorCodes::TypeMismatch,
                         str::stream() << "Expected type of \"" << tsFieldName <<
                         "\" in most recent " << rsOplogName <<
                         " entry to have type Timestamp, but found " << typeName(tsElement.type()));
             }
-            return StatusWith<OpTime>(tsElement._opTime());
+            return StatusWith<Timestamp>(tsElement.timestamp());
         }
         catch (const DBException& ex) {
-            return StatusWith<OpTime>(ex.toStatus());
+            return StatusWith<Timestamp>(ex.toStatus());
         }
     }
 

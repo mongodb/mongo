@@ -34,6 +34,8 @@
 
 #include "mongo/s/client_info.h"
 
+#include <boost/thread.hpp>
+
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/service_context.h"

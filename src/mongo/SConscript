@@ -117,7 +117,7 @@ env.Library('bson', [
         'util/safe_num.cpp',
         'bson/bson_validate.cpp',
         'bson/oid.cpp',
-        "bson/optime.cpp",
+        "bson/timestamp.cpp",
         'bson/bson_startuptest.cpp',
         'bson/bsonelement.cpp',
         'bson/bsonmisc.cpp',
@@ -283,7 +283,7 @@ env.CppUnitTest(
         'range_arithmetic'
     ])
 
-env.Library('global_optime', ['db/global_optime.cpp'])
+env.Library('global_timestamp', ['db/global_timestamp.cpp'])
 
 env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
 env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
@@ -1064,7 +1064,7 @@ serveronlyLibdeps = ["coreshard",
                      "db/concurrency/write_conflict_exception",
                      "db/ops/update_driver",
                      "defaultversion",
-                     "global_optime",
+                     "global_timestamp",
                      "index_key_validate",
                      'range_deleter',
                      'scripting_server',

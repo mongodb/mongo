@@ -220,7 +220,7 @@ namespace mongo {
 
             case NumberDouble:
             case NumberLong:
-            case Timestamp:
+            case bsonTimestamp:
             case Date:
                 if ( !buffer->skip( sizeof(int64_t) ) )
                     return makeError("invalid bson", idElem);

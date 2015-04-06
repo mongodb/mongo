@@ -40,7 +40,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/global_optime.h"
+#include "mongo/db/global_timestamp.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context_impl.h"
@@ -665,9 +665,9 @@ namespace QueryTests {
                                      "capped" << true << "size" << 8192 ),
                                 info );
 
-            Date_t one = getNextGlobalOptime().asDate();
-            Date_t two = getNextGlobalOptime().asDate();
-            Date_t three = getNextGlobalOptime().asDate();
+            Date_t one = getNextGlobalTimestamp().asULL();
+            Date_t two = getNextGlobalTimestamp().asULL();
+            Date_t three = getNextGlobalTimestamp().asULL();
             insert( ns, BSON( "ts" << one ) );
             insert( ns, BSON( "ts" << two ) );
             insert( ns, BSON( "ts" << three ) );
@@ -680,7 +680,7 @@ namespace QueryTests {
             
             ClientCursorPin clientCursor( ctx.db()->getCollection( ns )->getCursorManager(),
                                           cursorId );
-            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
+            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asULL() );
         }
     };
 

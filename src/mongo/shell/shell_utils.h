@@ -32,6 +32,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 

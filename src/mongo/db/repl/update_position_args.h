@@ -44,10 +44,10 @@ namespace repl {
     class UpdatePositionArgs {
     public:
         struct UpdateInfo {
-            UpdateInfo(const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId);
+            UpdateInfo(const OID& anRid, const Timestamp& aTs, long long aCfgver, long long aMemberId);
 
             OID rid;
-            OpTime ts;
+            Timestamp ts;
             long long cfgver;
             long long memberId;
         };

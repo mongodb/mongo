@@ -31,7 +31,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/condition.hpp>
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"

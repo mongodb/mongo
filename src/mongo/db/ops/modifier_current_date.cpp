@@ -30,7 +30,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/global_optime.h"
+#include "mongo/db/global_timestamp.h"
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
@@ -210,7 +210,7 @@ namespace mongo {
 
             elemToSet = _typeIsDate ?
                             doc.makeElementDate(lastPart, Date_t()) :
-                            doc.makeElementTimestamp(lastPart, OpTime());
+                            doc.makeElementTimestamp(lastPart, Timestamp());
 
             if (!elemToSet.ok()) {
                 return Status(ErrorCodes::InternalError, "can't create new element");
@@ -246,7 +246,7 @@ namespace mongo {
                 return s;
         }
         else {
-            Status s = elemToSet.setValueTimestamp(getNextGlobalOptime());
+            Status s = elemToSet.setValueTimestamp(getNextGlobalTimestamp());
             if (!s.isOK())
                 return s;
         }

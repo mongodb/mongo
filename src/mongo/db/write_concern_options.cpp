@@ -27,9 +27,9 @@
 
 #include "mongo/db/write_concern_options.h"
 
-#include "mongo/bson/bson_field.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

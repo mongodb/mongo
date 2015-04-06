@@ -143,7 +143,7 @@ namespace mongo {
             case jstOID: return CType::kOID;
             case Bool: return CType::kBool;
             case Date: return CType::kDate;
-            case Timestamp: return CType::kTimestamp;
+            case bsonTimestamp: return CType::kTimestamp;
             case RegEx: return CType::kRegEx;
             case DBRef: return CType::kDBRef;
 
@@ -363,7 +363,7 @@ namespace mongo {
         _append(endian::nativeToBig(encoded), invert);
     }
 
-    void KeyString::_appendTimestamp(OpTime val, bool invert) {
+    void KeyString::_appendTimestamp(Timestamp val, bool invert) {
         _append(CType::kTimestamp, invert);
         _append(endian::nativeToBig(val.asLL()), invert);
     }
@@ -558,7 +558,7 @@ namespace mongo {
             break;
         }
         case NumberInt: _appendNumberInt(elem._numberInt(), invert); break;
-        case Timestamp: _appendTimestamp(elem._opTime(), invert); break;
+        case bsonTimestamp: _appendTimestamp(elem.timestamp(), invert); break;
         case NumberLong: _appendNumberLong(elem._numberLong(), invert); break;
 
         default:
@@ -740,7 +740,7 @@ namespace mongo {
                 break;
 
             case CType::kTimestamp:
-                *stream << OpTime(endian::bigToNative(readType<uint64_t>(reader, inverted)));
+                *stream << Timestamp(endian::bigToNative(readType<uint64_t>(reader, inverted)));
                 break;
 
             case CType::kOID:

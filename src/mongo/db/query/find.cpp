@@ -377,7 +377,7 @@ namespace mongo {
             }
 
             // If we're replaying the oplog, we save the last time that we read.
-            OpTime slaveReadTill;
+            Timestamp slaveReadTill;
 
             // What number result are we starting at?  Used to fill out the reply.
             startingResult = cc->pos();
@@ -401,8 +401,8 @@ namespace mongo {
                 // Possibly note slave's position in the oplog.
                 if (queryOptions & QueryOption_OplogReplay) {
                     BSONElement e = obj["ts"];
-                    if (Date == e.type() || Timestamp == e.type()) {
-                        slaveReadTill = e._opTime();
+                    if (Date == e.type() || bsonTimestamp == e.type()) {
+                        slaveReadTill = e.timestamp();
                     }
                 }
 
@@ -615,7 +615,7 @@ namespace mongo {
         int numResults = 0;
 
         // If we're replaying the oplog, we save the last time that we read.
-        OpTime slaveReadTill;
+        Timestamp slaveReadTill;
 
         BSONObj obj;
         PlanExecutor::ExecState state;
@@ -634,8 +634,8 @@ namespace mongo {
             // Possibly note slave's position in the oplog.
             if (pq.isOplogReplay()) {
                 BSONElement e = obj["ts"];
-                if (Date == e.type() || Timestamp == e.type()) {
-                    slaveReadTill = e._opTime();
+                if (Date == e.type() || bsonTimestamp == e.type()) {
+                    slaveReadTill = e.timestamp();
                 }
             }
 

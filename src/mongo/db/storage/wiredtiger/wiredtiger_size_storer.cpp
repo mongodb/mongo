@@ -31,6 +31,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include <boost/thread.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/bson/bsonobj.h"

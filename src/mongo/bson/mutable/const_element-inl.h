@@ -141,7 +141,7 @@ namespace mutablebson {
         return _basis.getValueInt();
     }
 
-    inline OpTime ConstElement::getValueTimestamp() const {
+    inline Timestamp ConstElement::getValueTimestamp() const {
         return _basis.getValueTimestamp();
     }
 

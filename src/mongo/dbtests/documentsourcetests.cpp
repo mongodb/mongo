@@ -32,6 +32,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/thread/condition.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"

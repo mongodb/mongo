@@ -34,7 +34,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/log_builder.h"

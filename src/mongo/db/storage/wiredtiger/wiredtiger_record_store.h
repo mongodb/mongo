@@ -182,7 +182,7 @@ namespace mongo {
                                                          const RecordId& startingPosition) const;
 
         virtual Status oplogDiskLocRegister( OperationContext* txn,
-                                             const OpTime& opTime );
+                                             const Timestamp& opTime );
 
         virtual void updateStatsAfterRepair(OperationContext* txn,
                                             long long numRecords,

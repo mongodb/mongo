@@ -130,9 +130,9 @@ namespace repl {
         cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
     }
 
-    void OplogReader::tailingQueryGTE(const char *ns, OpTime optime, const BSONObj* fields ) {
+    void OplogReader::tailingQueryGTE(const char *ns, Timestamp optime, const BSONObj* fields ) {
         BSONObjBuilder gte;
-        gte.appendTimestamp("$gte", optime.asDate());
+        gte.append("$gte", optime);
         BSONObjBuilder query;
         query.append("ts", gte.done());
         tailingQuery(ns, query.done(), fields);
@@ -143,10 +143,10 @@ namespace repl {
     }
 
     void OplogReader::connectToSyncSource(OperationContext* txn,
-                                          OpTime lastOpTimeFetched,
+                                          Timestamp lastOpTimeFetched,
                                           ReplicationCoordinator* replCoord) {
-        const OpTime sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
-        OpTime oldestOpTimeSeen = sentinel;
+        const Timestamp sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
+        Timestamp oldestOpTimeSeen = sentinel;
 
         invariant(conn() == NULL);
 
@@ -190,7 +190,7 @@ namespace repl {
             // fetched op. Otherwise, we have fallen off the back of that source's oplog.
             BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));
             BSONElement tsElem(remoteOldestOp["ts"]);
-            if (tsElem.type() != Timestamp) {
+            if (tsElem.type() != bsonTimestamp) {
                 // This member's got a bad op in its oplog.
                 warning() << "oplog invalid format on node " << candidate.toString();
                 resetConnection();
@@ -198,7 +198,7 @@ namespace repl {
                                                Date_t(curTimeMillis64() + 600*1000));
                 continue;
             }
-            OpTime remoteOldOpTime = tsElem._opTime();
+            Timestamp remoteOldOpTime = tsElem.timestamp();
 
             if (lastOpTimeFetched < remoteOldOpTime) {
                 // We're too stale to use this sync source.

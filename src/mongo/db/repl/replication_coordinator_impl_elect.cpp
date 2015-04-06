@@ -120,9 +120,9 @@ namespace {
 
 
         invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
-        OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
+        Timestamp lastOpTimeApplied(_getMyLastOptime_inlock());
 
-        if (lastOpTimeApplied == OpTime()) {
+        if (lastOpTimeApplied == Timestamp()) {
             log() << "not trying to elect self, "
                 "do not yet have a complete set of data from any point in time";
             return;

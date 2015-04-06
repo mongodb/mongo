@@ -150,7 +150,7 @@ TEST(KeyStringTest, AllTypesSimple) {
     ROUNDTRIP(BSON("" << BSONCode("abc_code")));
     ROUNDTRIP(BSON("" << BSONCodeWScope("def_code", BSON("x_scope" << "a"))));
     ROUNDTRIP(BSON("" << 5));
-    ROUNDTRIP(BSON("" << OpTime(123123, 123)));
+    ROUNDTRIP(BSON("" << Timestamp(123123, 123)));
     ROUNDTRIP(BSON("" << 1235123123123LL));
 }
 
@@ -310,12 +310,12 @@ TEST(KeyStringTest, RecordIdOrder2Double) {
     ASSERT_LESS_THAN(a, c);
 }
 
-TEST(KeyStringTest, OpTime) {
+TEST(KeyStringTest, Timestamp) {
 
-    BSONObj a = BSON("" << OpTime(0, 0));
-    BSONObj b = BSON("" << OpTime(1234, 1));
-    BSONObj c = BSON("" << OpTime(1234, 2));
-    BSONObj d = BSON("" << OpTime(1235, 1));
+    BSONObj a = BSON("" << Timestamp(0, 0));
+    BSONObj b = BSON("" << Timestamp(1234, 1));
+    BSONObj c = BSON("" << Timestamp(1234, 2));
+    BSONObj d = BSON("" << Timestamp(1235, 1));
 
     {
         ROUNDTRIP(a);

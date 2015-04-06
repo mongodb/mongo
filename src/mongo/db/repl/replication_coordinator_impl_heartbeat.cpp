@@ -126,7 +126,7 @@ namespace {
         const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
                                     (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
-        const OpTime lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
+        const Timestamp lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
@@ -177,7 +177,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat_inlock(int targetIndex,
-                                                                       OpTime optime) {
+                                                                       Timestamp optime) {
         invariant(_selfIndex >= 0);
         invariant(targetIndex >= 0);
 
