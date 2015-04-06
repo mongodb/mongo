@@ -81,11 +81,13 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isShardNameSet = fieldState == FieldParser::FIELD_SET;
 
-        ChunkVersion* tempChunkVersion = NULL;
-        fieldState = FieldParser::extract(source, shardVersion,
-                                          &tempChunkVersion, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) _shardVersion.reset(tempChunkVersion);
+        {
+            boost::scoped_ptr<ChunkVersion> tempChunkVersion(new ChunkVersion);
+            fieldState = FieldParser::extract(source, shardVersion,
+                                              tempChunkVersion.get(), errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID) return false;
+            if (fieldState == FieldParser::FIELD_SET) _shardVersion.swap(tempChunkVersion);
+        }
 
         fieldState = FieldParser::extract(source, session, &_session, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
