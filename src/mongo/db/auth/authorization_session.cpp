@@ -57,10 +57,10 @@ namespace {
     const std::string ADMIN_DBNAME = "admin";
 }  // namespace
 
-    AuthorizationSession::AuthorizationSession(AuthzSessionExternalState* externalState) 
-        : _impersonationFlag(false) {
-        _externalState.reset(externalState);
-    }
+    AuthorizationSession::AuthorizationSession(
+            std::unique_ptr<AuthzSessionExternalState> externalState)
+        : _externalState(std::move(externalState)),
+          _impersonationFlag(false) {}
 
     AuthorizationSession::~AuthorizationSession() {
         for (UserSet::iterator it = _authenticatedUsers.begin();

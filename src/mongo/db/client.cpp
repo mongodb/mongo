@@ -45,7 +45,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_session_external_state_d.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
@@ -96,8 +95,7 @@ namespace mongo {
         // Create the client obj, attach to thread
         Client* client = new Client(fullDesc, getGlobalServiceContext(), mp);
         client->setAuthorizationSession(
-            new AuthorizationSession(
-                new AuthzSessionExternalStateMongod(getGlobalAuthorizationManager())));
+                getGlobalAuthorizationManager()->makeAuthorizationSession());
 
         currentClient.reset(client);
 

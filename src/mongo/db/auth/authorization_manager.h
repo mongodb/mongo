@@ -51,9 +51,10 @@
 
 namespace mongo {
 
+    class AuthorizationSession;
     class AuthzManagerExternalState;
-    class UserDocumentParser;
     class OperationContext;
+    class UserDocumentParser;
 
     /**
      * Internal secret key info.
@@ -154,6 +155,10 @@ namespace mongo {
                                      const RoleName& roleName,
                                      mutablebson::Element result);
 
+        /**
+         * Returns a new AuthorizationSession for use with this AuthorizationManager.
+         */
+        std::unique_ptr<AuthorizationSession> makeAuthorizationSession();
 
         /**
          * Sets whether or not access control enforcement is enabled for this manager.

@@ -75,6 +75,10 @@ namespace mongo {
         // This class should never be instantiated directly.
         AuthzSessionExternalState(AuthorizationManager* authzManager);
 
+        // Pointer to the authorization manager associated with the authorization session
+        // that owns this object.
+        //
+        // TODO(schwerin): Eliminate this back pointer.
         AuthorizationManager* _authzManager;
     };
 

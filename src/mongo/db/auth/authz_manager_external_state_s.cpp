@@ -39,6 +39,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -46,6 +47,7 @@
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -110,6 +112,13 @@ namespace {
 
     Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
         return Status::OK();
+    }
+
+    std::unique_ptr<AuthzSessionExternalState>
+    AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(
+            AuthorizationManager* authzManager) {
+
+        return stdx::make_unique<AuthzSessionExternalStateMongos>(authzManager);
     }
 
     Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(

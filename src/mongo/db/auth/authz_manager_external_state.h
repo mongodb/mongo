@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,8 @@
 
 namespace mongo {
 
+    class AuthorizationManager;
+    class AuthzSessionExternalState;
     class OperationContext;
 
     /**
@@ -61,6 +64,13 @@ namespace mongo {
          * than Status::OK().
          */
         virtual Status initialize(OperationContext* txn) = 0;
+
+        /**
+         * Creates an external state manipulator for an AuthorizationSession whose
+         * AuthorizationManager uses this object as its own external state manipulator.
+         */
+        virtual std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+                AuthorizationManager* authzManager) = 0;
 
         /**
          * Retrieves the schema version of the persistent data describing users and roles.

@@ -50,6 +50,9 @@ namespace mongo {
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
 
+        std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+                AuthorizationManager* authzManager) override;
+
         virtual Status findOne(OperationContext* txn,
                                const NamespaceString& collectionName,
                                const BSONObj& query,

@@ -58,6 +58,9 @@ namespace mongo {
         void setAuthorizationManager(AuthorizationManager* authzManager);
         void setAuthzVersion(int version);
 
+        std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+                AuthorizationManager* authzManager) override;
+
         virtual Status findOne(OperationContext* txn,
                                const NamespaceString& collectionName,
                                const BSONObj& query,

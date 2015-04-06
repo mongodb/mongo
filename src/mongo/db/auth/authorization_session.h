@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -64,7 +64,7 @@ namespace mongo {
     public:
 
         // Takes ownership of the externalState.
-        explicit AuthorizationSession(AuthzSessionExternalState* externalState);
+        explicit AuthorizationSession(std::unique_ptr<AuthzSessionExternalState> externalState);
         ~AuthorizationSession();
 
         AuthorizationManager& getAuthorizationManager();
@@ -232,7 +232,7 @@ namespace mongo {
         // lock on the admin database (to update out-of-date user privilege information).
         bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
-        boost::scoped_ptr<AuthzSessionExternalState> _externalState;
+        std::unique_ptr<AuthzSessionExternalState> _externalState;
 
         // All Users who have been authenticated on this connection.
         UserSet _authenticatedUsers;

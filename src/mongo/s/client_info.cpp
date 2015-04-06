@@ -38,7 +38,6 @@
 
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/service_context.h"
@@ -84,8 +83,7 @@ namespace mongo {
         ClientInfo * info = _tlInfo.get();
         massert(16472, "A ClientInfo already exists for this thread", !info);
         info = new ClientInfo(serviceContext, messagingPort);
-        info->setAuthorizationSession(new AuthorizationSession(
-                new AuthzSessionExternalStateMongos(getGlobalAuthorizationManager())));
+        info->setAuthorizationSession(getGlobalAuthorizationManager()->makeAuthorizationSession());
         _tlInfo.reset( info );
         info->newRequest();
         return info;

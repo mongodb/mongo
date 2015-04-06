@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/util/decorable.h"
@@ -60,7 +60,7 @@ namespace mongo {
 
         bool hasAuthorizationSession() const;
         AuthorizationSession* getAuthorizationSession() const;
-        void setAuthorizationSession(AuthorizationSession* authorizationSession);
+        void setAuthorizationSession(std::unique_ptr<AuthorizationSession> authorizationSession);
 
         bool getIsLocalHostConnection() {
             if (!hasRemote()) {
@@ -92,7 +92,7 @@ namespace mongo {
 
     private:
         boost::scoped_ptr<AuthenticationSession> _authenticationSession;
-        boost::scoped_ptr<AuthorizationSession> _authorizationSession;
+        std::unique_ptr<AuthorizationSession> _authorizationSession;
         ServiceContext* const _serviceContext;
         AbstractMessagingPort* const _messagingPort;
     };

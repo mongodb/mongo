@@ -45,6 +45,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
@@ -57,9 +58,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -266,6 +267,11 @@ namespace mongo {
             fassert(17265, it->second != internalSecurity.user);
             delete it->second ;
         }
+    }
+
+    std::unique_ptr<AuthorizationSession> AuthorizationManager::makeAuthorizationSession() {
+        return stdx::make_unique<AuthorizationSession>(
+                _externalState->makeAuthzSessionExternalState(this));
     }
 
     Status AuthorizationManager::getAuthorizationVersion(OperationContext* txn, int* version) {

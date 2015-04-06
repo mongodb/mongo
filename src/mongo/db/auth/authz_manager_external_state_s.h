@@ -54,6 +54,8 @@ namespace mongo {
         virtual ~AuthzManagerExternalStateMongos();
 
         virtual Status initialize(OperationContext* txn);
+        std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+                AuthorizationManager* authzManager) override;
         virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
         virtual Status getUserDescription(
                             OperationContext* txn, const UserName& userName, BSONObj* result);

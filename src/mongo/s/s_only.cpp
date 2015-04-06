@@ -34,7 +34,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
@@ -84,8 +83,7 @@ namespace mongo {
         Client *c = new Client( fullDesc, getGlobalServiceContext(), mp );
         currentClient.reset(c);
         mongo::lastError.initThread();
-        c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos(
-                getGlobalAuthorizationManager())));
+        c->setAuthorizationSession(getGlobalAuthorizationManager()->makeAuthorizationSession());
     }
 
     string Client::clientAddress(bool includePort) const {

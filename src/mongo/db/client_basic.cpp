@@ -70,11 +70,12 @@ namespace mongo {
             return _authorizationSession.get();
     }
 
-    void ClientBasic::setAuthorizationSession(AuthorizationSession* authorizationSession) {
+    void ClientBasic::setAuthorizationSession(
+            std::unique_ptr<AuthorizationSession> authorizationSession) {
         massert(16477,
                 "An AuthorizationManager has already been set up for this connection",
                 !hasAuthorizationSession());
-        _authorizationSession.reset(authorizationSession);
+        _authorizationSession = std::move(authorizationSession);
     }
 
 }  // namespace mongo
