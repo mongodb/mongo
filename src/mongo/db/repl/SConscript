@@ -257,6 +257,6 @@ env.CppUnitTest(
     source='fetcher_test.cpp',
     LIBDEPS=[
         'fetcher',
-        'replmocks',
+        'replication_executor_test_fixture',
     ],
 )

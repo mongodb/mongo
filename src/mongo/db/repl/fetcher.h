@@ -49,7 +49,7 @@ namespace repl {
     public:
 
         /**
-         * Container for BSON documents extracted from find and getMore command results.
+         * Container for BSON documents extracted from cursor results.
          */
         typedef std::vector<BSONObj> Documents;
 
@@ -81,14 +81,18 @@ namespace repl {
         /**
          * Creates Fetcher task but does not schedule it to be run by the executor.
          *
+         * First remote command to be run by the executor will be 'cmdObj'. The results
+         * of 'cmdObj' must contain a cursor response object.
+         * See Commands::appendCursorResponseObject.
+         *
          * Callback function 'work' will be called 1 or more times after a successful
-         * schedule() call depending on the results of the query.
+         * schedule() call depending on the results of the remote command.
          *
-         * Depending on the query in the initial find command object, the fetcher may run
+         * Depending on the cursor ID in the initial cursor response object, the fetcher may run
          * subsequent getMore commands on the remote server in order to obtain a complete
-         * set of results for the query.
+         * set of results.
          *
-         * Failed find or getMore commands will also cause 'work' to be invoked with the
+         * Failed remote commands will also cause 'work' to be invoked with the
          * error details provided by the remote server. On failure, the fetcher will stop
          * sending getMore requests to the remote server.
          *
@@ -104,9 +108,9 @@ namespace repl {
          * behavior is undefined and may result in a deadlock.
          */
         Fetcher(ReplicationExecutor* executor,
-                const HostAndPort& target,
+                const HostAndPort& source,
                 const std::string& dbname,
-                const BSONObj& findCmdObj,
+                const BSONObj& cmdObj,
                 const CallbackFn& work);
 
         virtual ~Fetcher();
@@ -117,24 +121,24 @@ namespace repl {
         std::string getDiagnosticString() const;
 
         /**
-         * Returns true if a find or getMore has been scheduled (but not completed)
+         * Returns true if a remote command has been scheduled (but not completed)
          * with the executor.
          */
         bool isActive() const;
 
         /**
-         * Schedules query to be run on the remote server.
+         * Schedules 'cmdObj' to be run on the remote server.
          */
         Status schedule();
 
         /**
-         * Cancels current find or getMore request.
+         * Cancels remote command request.
          * Returns immediately if fetcher is not active.
          */
         void cancel();
 
         /**
-         * Waits for active find or getMore request to complete.
+         * Waits for active remote command request to complete.
          * Returns immediately if fetcher is not active.
          */
         void wait();
@@ -142,12 +146,12 @@ namespace repl {
     private:
 
         /**
-         * Schedules find or getMore command to be run by the executor
+         * Schedules remote command to be run by the executor
          */
         Status _schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName);
 
         /**
-         * Callback for both find and getMore remote command.
+         * Callback for remote command.
          */
         void _callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd,
                        const char* batchFieldName);
@@ -155,9 +159,9 @@ namespace repl {
         // Not owned by us.
         ReplicationExecutor* _executor;
 
-        HostAndPort _target;
+        HostAndPort _source;
         std::string _dbname;
-        BSONObj _findCmdObj;
+        BSONObj _cmdObj;
         CallbackFn _work;
 
         // Protects member data of this Fetcher.

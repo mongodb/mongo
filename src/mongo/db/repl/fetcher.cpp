@@ -30,6 +30,8 @@
 
 #include "mongo/db/repl/fetcher.h"
 
+#include <boost/thread/lock_guard.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -50,13 +52,14 @@ namespace {
     const char* kNextBatchFieldName = "nextBatch";
 
     /**
-     * Parses find and getMore command result for cursor ID, namespace and documents.
-     * 'batchFieldName' will be 'firstBatch' for find and 'nextBatch' for getMore.
+     * Parses cursor response in command result for cursor ID, namespace and documents.
+     * 'batchFieldName' will be 'firstBatch' for the initial remote command invocation and
+     * 'nextBatch' for getMore.
      */
-    Status parseCommandResult(const BSONObj& obj,
-                              const std::string& batchFieldName,
-                              Fetcher::BatchData* batchData,
-                              NamespaceString* nss) {
+    Status parseCursorResponse(const BSONObj& obj,
+                               const std::string& batchFieldName,
+                               Fetcher::BatchData* batchData,
+                               NamespaceString* nss) {
         invariant(batchFieldName == kFirstBatchFieldName || batchFieldName == kNextBatchFieldName);
         invariant(batchData);
         invariant(nss);
@@ -64,7 +67,7 @@ namespace {
         BSONElement cursorElement = obj.getField(kCursorFieldName);
         if (cursorElement.eoo()) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<
-                          "find command result must contain '" << kCursorFieldName <<
+                          "cursor response must contain '" << kCursorFieldName <<
                           "' field: " << obj);
         }
         if (!cursorElement.isABSONObj()) {
@@ -76,7 +79,7 @@ namespace {
         BSONElement cursorIdElement = cursorObj.getField(kCursorIdFieldName);
         if (cursorIdElement.eoo()) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<
-                          "find command result must contain '" << kCursorFieldName << "." <<
+                          "cursor response must contain '" << kCursorFieldName << "." <<
                           kCursorIdFieldName << "' field: " << obj);
         }
         if (cursorIdElement.type() != mongo::NumberLong) {
@@ -89,7 +92,7 @@ namespace {
         BSONElement namespaceElement = cursorObj.getField(kNamespaceFieldName);
         if (namespaceElement.eoo()) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<
-                          "find command result must contain " <<
+                          "cursor response must contain " <<
                           "'" << kCursorFieldName << "." << kNamespaceFieldName << "' field: " <<
                           obj);
         }
@@ -109,7 +112,7 @@ namespace {
         BSONElement batchElement = cursorObj.getField(batchFieldName);
         if (batchElement.eoo()) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<
-                          "find command result must contain '" << kCursorFieldName << "." <<
+                          "cursor response must contain '" << kCursorFieldName << "." <<
                           batchFieldName << "' field: " << obj);
         }
         if (!batchElement.isABSONObj()) {
@@ -140,14 +143,14 @@ namespace {
           documents(theDocuments) { }
 
     Fetcher::Fetcher(ReplicationExecutor* executor,
-                     const HostAndPort& target,
+                     const HostAndPort& source,
                      const std::string& dbname,
                      const BSONObj& findCmdObj,
                      const CallbackFn& work)
         : _executor(executor),
-          _target(target),
+          _source(source),
           _dbname(dbname),
-          _findCmdObj(findCmdObj.getOwned()),
+          _cmdObj(findCmdObj.getOwned()),
           _work(work),
           _active(false),
           _remoteCommandCallbackHandle() {
@@ -155,12 +158,6 @@ namespace {
         uassert(ErrorCodes::BadValue, "null replication executor", executor);
         uassert(ErrorCodes::BadValue, "database name cannot be empty", !dbname.empty());
         uassert(ErrorCodes::BadValue, "command object cannot be empty", !findCmdObj.isEmpty());
-        uassert(ErrorCodes::BadValue, "first field must be named 'find'",
-                mongoutils::str::equals(findCmdObj.firstElementFieldName(), "find"));
-        uassert(ErrorCodes::BadValue, "first field must be a string",
-                findCmdObj.firstElementType() == mongo::String);
-        uassert(ErrorCodes::BadValue, "collection name cannot be empty",
-                !findCmdObj.firstElement().String().empty());
         uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
     }
 
@@ -171,7 +168,9 @@ namespace {
         str::stream output;
         output << "Fetcher";
         output << " executor: " << _executor->getDiagnosticString();
-        output << " query: " << _findCmdObj;
+        output << " source: " << _source.toString();
+        output << " database: " << _dbname;
+        output << " query: " << _cmdObj;
         output << " active: " << _active;
         return output;
     }
@@ -183,35 +182,49 @@ namespace {
 
     Status Fetcher::schedule() {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        return _schedule_inlock(_findCmdObj, kFirstBatchFieldName);
+        return _schedule_inlock(_cmdObj, kFirstBatchFieldName);
     }
 
     void Fetcher::cancel() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        ReplicationExecutor::CallbackHandle remoteCommandCallbackHandle;
+        {
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
-        if (!_active) {
-            return;
+            if (!_active) {
+                return;
+            }
+
+            remoteCommandCallbackHandle = _remoteCommandCallbackHandle;
         }
 
-        invariant(_remoteCommandCallbackHandle.isValid());
-        _executor->cancel(_remoteCommandCallbackHandle);
+        invariant(remoteCommandCallbackHandle.isValid());
+        _executor->cancel(remoteCommandCallbackHandle);
     }
 
     void Fetcher::wait() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        ReplicationExecutor::CallbackHandle remoteCommandCallbackHandle;
+        {
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
-        if (!_active) {
-            return;
+            if (!_active) {
+                return;
+            }
+
+            remoteCommandCallbackHandle = _remoteCommandCallbackHandle;
         }
 
-        invariant(_remoteCommandCallbackHandle.isValid());
-        _executor->wait(_remoteCommandCallbackHandle);
+        invariant(remoteCommandCallbackHandle.isValid());
+        _executor->wait(remoteCommandCallbackHandle);
     }
 
     Status Fetcher::_schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName) {
+        if (_active) {
+            return Status(ErrorCodes::IllegalOperation, "fetcher already scheduled");
+        }
+
         StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
             _executor->scheduleRemoteCommand(
-                ReplicationExecutor::RemoteCommandRequest(_target, _dbname, cmdObj),
+                ReplicationExecutor::RemoteCommandRequest(_source, _dbname, cmdObj),
                 stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, batchFieldName));
 
         if (!scheduleResult.isOK()) {
@@ -230,17 +243,13 @@ namespace {
 
         NextAction nextAction = NextAction::kNoAction;
 
-        if (rcbd.response.getStatus().code() == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-
         if (!rcbd.response.isOK()) {
             _work(StatusWith<Fetcher::BatchData>(rcbd.response.getStatus()), &nextAction);
             return;
         }
 
-        const BSONObj& commandResult = rcbd.response.getValue().data;
-        Status status = getStatusFromCommandResult(commandResult);
+        const BSONObj& cursorReponseObj = rcbd.response.getValue().data;
+        Status status = getStatusFromCommandResult(cursorReponseObj);
         if (!status.isOK()) {
             _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
             return;
@@ -249,7 +258,7 @@ namespace {
 
         BatchData batchData;
         NamespaceString nss;
-        status = parseCommandResult(commandResult, batchFieldName, &batchData, &nss);
+        status = parseCursorResponse(cursorReponseObj, batchFieldName, &batchData, &nss);
         if (!status.isOK()) {
             _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
             return;
