@@ -34,6 +34,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
 
@@ -99,7 +100,8 @@ namespace {
 
             // For compatibility with 2.4 sharded GLE, we always enforce the write concern
             // across all shards.
-            HostOpTimeMap hostOpTimes(ClientInfo::get()->getPrevHostOpTimes());
+            const HostOpTimeMap hostOpTimes(
+                    ClusterLastErrorInfo::get(ClientInfo::get()).getPrevHostOpTimes());
             HostOpTimeMap resolvedHostOpTimes;
 
             Status status(Status::OK());
@@ -131,7 +133,7 @@ namespace {
             }
 
             // Don't forget about our last hosts, reset the client info
-            ClientInfo::get()->disableForCommand();
+            ClusterLastErrorInfo::get(ClientInfo::get()).disableForCommand();
 
             // We're now done contacting all remote servers, just report results
 

@@ -31,6 +31,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_last_error_info.h"
 
 namespace mongo {
 namespace {
@@ -73,7 +74,7 @@ namespace {
 
             if (cmdObj["forShell"].trueValue()) {
                 lastError.disableForCommand();
-                ClientInfo::get()->disableForCommand();
+                ClusterLastErrorInfo::get(ClientInfo::get()).disableForCommand();
             }
 
             errmsg = "replSetGetStatus is not supported through mongos";

@@ -36,6 +36,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/cluster_explain.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -213,7 +214,8 @@ namespace {
             // Save the last opTimes written on each shard for this client, to allow GLE to work
             if (ClientInfo::exists() && writer.getStats().hasShardStats()) {
                 ClientInfo* clientInfo = ClientInfo::get();
-                clientInfo->addHostOpTimes(writer.getStats().getShardStats().getWriteOpTimes());
+                ClusterLastErrorInfo::get(clientInfo).addHostOpTimes(
+                        writer.getStats().getShardStats().getWriteOpTimes());
             }
 
             // TODO

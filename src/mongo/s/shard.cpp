@@ -39,18 +39,18 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client_info.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/scc_fast_query_handler.h"
 #include "mongo/s/type_shard.h"

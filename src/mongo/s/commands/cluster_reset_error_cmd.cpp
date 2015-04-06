@@ -35,6 +35,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_last_error_info.h"
 
 namespace mongo {
 namespace {
@@ -72,7 +73,8 @@ namespace {
             }
 
             ClientInfo* client = ClientInfo::get();
-            const std::set<std::string>* shards = client->getPrevShardHosts();
+            const std::set<std::string>* shards =
+                ClusterLastErrorInfo::get(client).getPrevShardHosts();
 
             for (std::set<std::string>::const_iterator i = shards->begin();
                  i != shards->end();

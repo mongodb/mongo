@@ -38,6 +38,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
@@ -57,7 +58,7 @@ namespace mongo {
           _id(_m.header().getId()),
           _didInit(false) {
 
-        _clientInfo->newRequest();
+        ClusterLastErrorInfo::get(_clientInfo).newRequest();
     }
 
     void Request::init() {
@@ -71,7 +72,7 @@ namespace mongo {
     // Deprecated, will move to the strategy itself
     void Request::reset() {
         _m.header().setId(_id);
-        _clientInfo->clearRequestInfo();
+        ClusterLastErrorInfo::get(_clientInfo).clearRequestInfo();
 
         if ( !_d.messageShouldHaveNs()) {
             return;

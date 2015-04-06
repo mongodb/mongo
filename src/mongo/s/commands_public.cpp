@@ -42,20 +42,21 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/find_and_modify.h"
 #include "mongo/db/commands/mr.h"
 #include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_explain.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
@@ -1013,8 +1014,8 @@ namespace mongo {
                 if (ok) {
                     // check whether split is necessary (using update object for size heuristic)
                     ClientInfo *client = ClientInfo::get();
-                        
-                    if (client != NULL && client->autoSplitOk()) {
+
+                    if (client != NULL && ClusterLastErrorInfo::get(client).autoSplitOk()) {
                       chunk->splitIfShould( cmdObj.getObjectField("update").objsize() ); 
                     }
                 }

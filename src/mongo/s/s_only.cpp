@@ -38,8 +38,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/client_info.h"
-#include "mongo/util/log.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/log.h"
 
 /*
   most a pile of hacks to make linking nicer
@@ -53,8 +54,8 @@ namespace mongo {
     /** When this callback is run, we record a shard that we've used for useful work
      *  in an operation to be read later by getLastError()
     */
-    void usingAShardConnection( const string& addr ) {
-        ClientInfo::get()->addShardHost( addr );
+    void usingAShardConnection(const std::string& addr) {
+        ClusterLastErrorInfo::get(ClientInfo::get()).addShardHost(addr);
     }
 
     TSP_DEFINE(Client,currentClient)
