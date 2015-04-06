@@ -47,6 +47,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"
@@ -476,6 +477,43 @@ namespace mongo {
         BSONObjBuilder b;
         b.append(command, 1);
         return runCommand(dbname, b.done(), *info);
+    }
+
+    bool DBClientWithCommands::runPseudoCommand(StringData db,
+                                                StringData realCommandName,
+                                                StringData pseudoCommandCol,
+                                                const BSONObj& cmdArgs,
+                                                BSONObj& info,
+                                                int options) {
+
+        BSONObjBuilder bob;
+        bob.append(realCommandName, 1);
+        bob.appendElements(cmdArgs);
+        auto cmdObj = bob.done();
+
+        bool success = false;
+
+        if (!(success = runCommand(db.toString(), cmdObj, info, options))) {
+
+            auto status = getStatusFromCommandResult(info);
+            verify(!status.isOK());
+
+            if (status == ErrorCodes::CommandResultSchemaViolation) {
+                msgasserted(28624, str::stream() << "Received bad "
+                                                 << realCommandName
+                                                 << " response from server: "
+                                                 << info);
+            } else if (status == ErrorCodes::CommandNotFound ||
+                       str::startsWith(status.reason(), "no such")) {
+
+                NamespaceString pseudoCommandNss(db, pseudoCommandCol);
+                // if this throws we just let it escape as that's how runCommand works.
+                info = findOne(pseudoCommandNss.ns(), cmdArgs, nullptr, options);
+                return true;
+            }
+        }
+
+        return success;
     }
 
     unsigned long long DBClientWithCommands::count(const string &myns, const BSONObj& query, int options, int limit, int skip ) {

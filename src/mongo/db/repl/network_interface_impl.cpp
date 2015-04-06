@@ -42,7 +42,6 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/get_status_from_command_result.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/network_interface_impl_downconvert_find_getmore.h"
 #include "mongo/platform/unordered_map.h"
@@ -50,6 +49,7 @@
 #include "mongo/stdx/list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

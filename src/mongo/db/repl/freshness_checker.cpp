@@ -34,12 +34,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
-#include "mongo/db/get_status_from_command_result.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 

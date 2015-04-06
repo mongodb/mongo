@@ -322,7 +322,12 @@ namespace mongo {
                 BSONForEach( op, inprog ) {
                     if ( uris.count( op[ "client" ].String() ) ) {
                         if ( !withPrompt || prompter.confirm() ) {
-                            conn->findOne( "admin.$cmd.sys.killop", QUERY( "op"<< op[ "opid" ] ) );                        
+                            BSONObjBuilder cmdBob;
+                            BSONObj info;
+                            cmdBob.append("op", op["opid"]);
+                            auto cmdArgs = cmdBob.done();
+                            conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop",
+                                                   cmdArgs, info);
                         }
                         else {
                             return;

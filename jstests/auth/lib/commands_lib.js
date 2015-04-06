@@ -1463,6 +1463,39 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "killOp", // standalone version
+            command: {killOp: 1, op: 123},
+            skipSharded: true,
+            testcases : [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["killop"] }
+                    ]
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "killOp", // sharded version
+            command: {killOp: 1, op: "shard1:123"},
+            skipStandalone: true,
+            testcases : [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_hostManager,
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["killop"] }
+                    ],
+                    expectFail: true // we won't be able to find the shardId
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
             testname: "listCommands",
             command: {listCommands: 1},
             testcases: [

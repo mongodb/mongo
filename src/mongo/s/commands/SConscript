@@ -20,6 +20,7 @@ env.Library(
         'cluster_index_filter_cmd.cpp',
         'cluster_is_db_grid_cmd.cpp',
         'cluster_is_master_cmd.cpp',
+        'cluster_kill_op.cpp',
         'cluster_list_databases_cmd.cpp',
         'cluster_list_shards_cmd.cpp',
         'cluster_merge_chunks_cmd.cpp',

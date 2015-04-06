@@ -14,7 +14,6 @@ env.Library(
         'field_ref.cpp',
         'field_ref_set.cpp',
         'field_parser.cpp',
-        'get_status_from_command_result.cpp',
         'keypattern.cpp',
         'write_concern_options.cpp'
     ],

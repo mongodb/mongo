@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/get_status_from_command_result.h"
+#include "mongo/util/net/get_status_from_command_result.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"

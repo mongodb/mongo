@@ -150,36 +150,6 @@ namespace mongo {
 
     MONGO_FP_DECLARE(rsStopGetMore);
 
-    void killOp( OperationContext* txn, Message &m, DbResponse &dbresponse ) {
-        DbMessage d(m);
-        QueryMessage q(d);
-        BSONObj obj;
-
-        const bool isAuthorized = txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::killop);
-        audit::logKillOpAuthzCheck(txn->getClient(),
-                                   q.query,
-                                   isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
-        if (!isAuthorized) {
-            obj = fromjson("{\"err\":\"unauthorized\"}");
-        }
-        /*else if( !dbMutexInfo.isLocked() )
-            obj = fromjson("{\"info\":\"no op in progress/not locked\"}");
-            */
-        else {
-            BSONElement e = q.query.getField("op");
-            if( !e.isNumber() ) {
-                obj = fromjson("{\"err\":\"no op number field specified?\"}");
-            }
-            else {
-                log() << "going to kill op: " << e << endl;
-                obj = fromjson("{\"info\":\"attempting to kill op\"}");
-                getGlobalServiceContext()->killOperation( (unsigned) e.number() );
-            }
-        }
-        replyToQuery(0, m, dbresponse, obj);
-    }
-
 namespace {
 
     void generateErrorResponse(const AssertionException* exception,
@@ -310,12 +280,18 @@ namespace {
                                DbResponse& dbResponse,
                                Message& message,
                                StringData realCommandName) {
-        Message interposed;
 
+        DbMessage originalDbm(message);
+        originalDbm.pullInt(); // ntoskip
+        originalDbm.pullInt(); // ntoreturn
+        auto cmdParams = originalDbm.nextJsObj();
+
+        Message interposed;
         NamespaceString interposedNss(nss.db(), "$cmd");
 
         BSONObjBuilder cmdBob;
         cmdBob.append(realCommandName, 1);
+        cmdBob.appendElements(cmdParams);
         auto cmd = cmdBob.done();
 
         // TODO: use OP_COMMAND here instead of constructing
@@ -416,7 +392,7 @@ namespace {
                     return;
                 }
                 if (nsString.coll() == "$cmd.sys.killop") {
-                    killOp(txn, m, dbresponse);
+                    receivedPseudoCommand(txn, nsString, c, dbresponse, m, "killOp");
                     return;
                 }
                 if (nsString.coll() == "$cmd.sys.unlock") {

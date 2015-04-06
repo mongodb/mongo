@@ -294,11 +294,8 @@ function runTest(s) {
     assert.throws(function() {
         printjson(readOnlyDB.currentOp());
     });
-    assert.throws(function() {
-        printjson(readOnlyDB.killOp(123));
-    });
+    assert.commandFailed(readOnlyDB.killOp(123));
     // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
-
     /*
     broken because of SERVER-4156
     print( "   testing write command (should fail)" );
@@ -316,9 +313,7 @@ function runTest(s) {
     assert.throws(function() {
         printjson(readOnlyDB.currentOp());
     });
-    assert.throws(function() {
-        printjson(readOnlyDB.killOp(123));
-    });
+    assert.commandFailed(readOnlyDB.killOp(123));
     // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
 }
 

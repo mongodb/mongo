@@ -149,9 +149,10 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('killOp'), function() {
+        var errorCodeUnauthorized = 13;
         var res = db.killOp(1);
 
-        if (res.err == 'unauthorized') {
+        if (res.code == errorCodeUnauthorized) {
             throw Error("unauthorized killOp");
         }
     });

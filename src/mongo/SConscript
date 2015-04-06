@@ -57,7 +57,11 @@ env.SConscript(['base/SConscript',
                 'util/concurrency/SConscript',
                 'util/options_parser/SConscript',
                 'util/cmdline_utils/SConscript',
-                'util/mongoutils/SConscript'])
+                'util/mongoutils/SConscript',
+                'util/net/SConscript',
+            ]
+)
+
 
 def add_exe( v ):
     return "${PROGPREFIX}%s${PROGSUFFIX}" % v
@@ -342,6 +346,7 @@ env.Library('clientdriver', [
             ],
             LIBDEPS=['$BUILD_DIR/mongo/db/auth/authcommon',
                      '$BUILD_DIR/mongo/crypto/scramauth',
+                     '$BUILD_DIR/mongo/util/net/command_status',
                      'network'
             ])
 
@@ -753,6 +758,7 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/commands/getmore_cmd.cpp",
                     "db/commands/group.cpp",
                     "db/commands/index_filter_commands.cpp",
+                    "db/commands/kill_op.cpp",
                     "db/commands/list_collections.cpp",
                     "db/commands/list_databases.cpp",
                     "db/commands/list_indexes.cpp",

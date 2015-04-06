@@ -698,7 +698,15 @@ DB.prototype.currentOP = DB.prototype.currentOp;
 DB.prototype.killOp = function(op) {
     if( !op ) 
         throw Error("no opNum to kill specified");
-    return this.$cmd.sys.killop.findOne({'op':op});
+    var res = this.adminCommand({'killOp': 1, 'op': op});
+    if (!res.ok &&
+        (res.errmsg.startsWith("no such cmd") ||
+         res.errmsg.startsWith("no such command")) ||
+         res.code === 59) {
+        // fall back for old servers
+        res = this.$cmd.sys.killop.findOne({'op': op});
+    }
+    return res;
 }
 DB.prototype.killOP = DB.prototype.killOp;
 

@@ -41,6 +41,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/cstdint.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
@@ -847,7 +848,6 @@ namespace mongo {
         bool setDbProfilingLevel(const std::string &dbname, ProfilingLevel level, BSONObj *info = 0);
         bool getDbProfilingLevel(const std::string &dbname, ProfilingLevel& level, BSONObj *info = 0);
 
-
         /** This implicitly converts from char*, string, and BSONObj to be an argument to mapreduce
             You shouldn't need to explicitly construct this
          */
@@ -1035,6 +1035,24 @@ namespace mongo {
             return _postRunCommandHook;
         }
 
+        /**
+         * Run a pseudo-command such as sys.inprog/currentOp, sys.killop/killOp
+         * or sys.unlock/fsyncUnlock
+         *
+         * The real command will be tried first, and if the remote server does not
+         * implement the command, it will fall back to the pseudoCommand.
+         *
+         * The cmdArgs parameter should NOT include {<commandName>: 1}.
+         *
+         * TODO: remove after MongoDB 3.2 is released and replace all callers with
+         * a call to plain runCommand
+         */
+        virtual bool runPseudoCommand(StringData db,
+                                      StringData realCommandName,
+                                      StringData pseudoCommandCol,
+                                      const BSONObj& cmdArgs,
+                                      BSONObj& info,
+                                      int options=0);
 
     protected:
         /** if the result of a command is ok*/
