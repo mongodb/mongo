@@ -260,3 +260,25 @@ env.CppUnitTest(
         'replication_executor_test_fixture',
     ],
 )
+
+env.Library(
+    target='collection_cloner',
+    source=[
+        'collection_cloner.cpp',
+    ],
+    LIBDEPS=[
+        'fetcher',
+        'replication_executor',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/logger/logger',
+    ],
+)
+
+env.CppUnitTest(
+    target='collection_cloner_test',
+    source='collection_cloner_test.cpp',
+    LIBDEPS=[
+        'collection_cloner',
+        'replication_executor_test_fixture',
+    ],
+)
