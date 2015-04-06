@@ -17,9 +17,33 @@
 
     t.drop();
     db.getSiblingDB('admin').runCommand( { setParameter: 1, failIndexKeyTooLong: false } );
-    assert.writeOK(t.insert({name:x}));
+
+    // inserts
+    assert.writeOK(t.insert({_id: 1, name:x}));
     assert.commandWorked(t.ensureIndex({name:1}));
-    assert.writeOK(t.insert({name:x}));
+    assert.writeOK(t.insert({_id: 2, name:x}));
+    assert.writeOK(t.insert({_id: 3, name:x}));
+    assert.eq(t.count(), 3);
+
+    // updates (smaller and larger)
+    assert.writeOK(t.update({_id: 1}, {$set:{name:'short'}}));
+    assert.writeOK(t.update({_id: 1}, {$set:{name: x}}));
+    assert.writeOK(t.update({_id: 1}, {$set:{name: x + 'even longer'}}));
+
+    // remove
+    assert.writeOK(t.remove({_id: 1}));
+    assert.eq(t.count(), 2);
+
+    db.getSiblingDB('admin').runCommand( { setParameter: 1, failIndexKeyTooLong: true } );
+
+    // can still delete even if key is oversized
+    assert.writeOK(t.remove({_id: 2}));
+    assert.eq(t.count(), 1);
+
+    // can still update to shorter, but not longer name.
+    assert.writeError(t.update({_id: 3}, {$set:{name: x + 'even longer'}}));
+    assert.writeOK(t.update({_id: 3}, {$set:{name:'short'}}));
+    assert.writeError(t.update({_id: 3}, {$set:{name: x}}));
 
     db.getSiblingDB('admin').runCommand( { setParameter: 1, failIndexKeyTooLong: was } );
 }());
