@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/util/log.h"
 
@@ -92,7 +93,10 @@ namespace mongo {
 
     ClientInfo* ClientInfo::get() {
         ClientInfo* info = _tlInfo.get();
-        fassert(16483, info);
+        //fassert(16483, info);
+        if (!info) {
+            return create(getGlobalServiceContext(), nullptr);
+        }
         return info;
     }
 
