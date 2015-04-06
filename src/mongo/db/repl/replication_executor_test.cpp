@@ -34,6 +34,7 @@
 
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -89,49 +90,6 @@ namespace {
     }
 
     const int64_t prngSeed = 1;
-
-    class ReplicationExecutorTest : public unittest::Test {
-    protected:
-        NetworkInterfaceMock* getNet() { return _net; }
-        ReplicationExecutor& getExecutor() { return *_executor; }
-
-        void launchExecutorThread();
-        void joinExecutorThread();
-
-        virtual void setUp();
-        virtual void tearDown();
-
-    private:
-        NetworkInterfaceMock* _net;
-        boost::scoped_ptr<ReplicationExecutor> _executor;
-        boost::scoped_ptr<boost::thread> _executorThread;
-    };
-
-    void ReplicationExecutorTest::launchExecutorThread() {
-        ASSERT(!_executorThread);
-        _executorThread.reset(
-                new boost::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
-        _net->enterNetwork();
-    }
-
-    void ReplicationExecutorTest::joinExecutorThread() {
-        ASSERT(_executorThread);
-        _net->exitNetwork();
-        _executorThread->join();
-        _executorThread.reset();
-    }
-
-    void ReplicationExecutorTest::setUp() {
-        _net = new NetworkInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, prngSeed));
-    }
-
-    void ReplicationExecutorTest::tearDown() {
-        if (_executorThread) {
-            _executor->shutdown();
-            joinExecutorThread();
-        }
-    }
 
     TEST_F(ReplicationExecutorTest, RunOne) {
         ReplicationExecutor& executor = getExecutor();

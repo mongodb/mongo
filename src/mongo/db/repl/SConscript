@@ -40,10 +40,26 @@ env.Library('replication_executor',
             LIBDEPS=['$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/hostandport'])
 
-env.CppUnitTest('replication_executor_test',
-                'replication_executor_test.cpp',
-                LIBDEPS=['replication_executor',
-                         'replmocks'])
+env.Library(
+    target='replication_executor_test_fixture',
+    source=[
+        'replication_executor_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'replication_executor',
+        'replmocks',
+    ],
+)
+
+env.CppUnitTest(
+    target='replication_executor_test',
+    source=[
+        'replication_executor_test.cpp',
+    ],
+    LIBDEPS=[
+        'replication_executor_test_fixture',
+    ],
+)
 
 env.Library('topology_coordinator',
             [
