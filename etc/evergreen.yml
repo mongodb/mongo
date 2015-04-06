@@ -158,7 +158,7 @@ functions:
             set -o igncr
         fi;
 
-        git checkout r3.1.0
+        git checkout r3.1.1
         . ./${set_tools_gopath|set_gopath.sh}
 
         for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
