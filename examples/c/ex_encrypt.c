@@ -492,6 +492,13 @@ print_record(WT_LSN *lsn, uint32_t opcount,
    uint32_t rectype, uint32_t optype, uint64_t txnid, uint32_t fileid,
    WT_ITEM *key, WT_ITEM *value)
 {
+	(void)lsn;		/* Unused */
+	(void)opcount;		/* Unused */
+	(void)optype;		/* Unused */
+	(void)txnid;		/* Unused */
+	(void)fileid;		/* Unused */
+	(void)key;		/* Unused */
+
 	if (rectype == WT_LOGREC_MESSAGE)
 		printf("Application Record: %s\n", (char *)value->data);
 }
