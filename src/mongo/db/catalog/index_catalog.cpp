@@ -459,7 +459,7 @@ namespace {
             switch(expression->matchType()) {
             case MatchExpression::AND:
                 if (level > 0)
-                    return Status(ErrorCodes::BadValue,
+                    return Status(ErrorCodes::CannotCreateIndex,
                                   "$and only supported in filter at top level");
                 for (size_t i = 0; i < expression->numChildren(); i++) {
                     Status status = _checkValidFilterExpressions(expression->getChild(i),
@@ -477,7 +477,7 @@ namespace {
             case MatchExpression::TYPE_OPERATOR:
                 return Status::OK();
             default:
-                return Status(ErrorCodes::BadValue,
+                return Status(ErrorCodes::CannotCreateIndex,
                               str::stream() << "unsupported expression in filtered index: "
                               << expression->toString());
             }
@@ -579,8 +579,13 @@ namespace {
         // Ensure if there is a filter, its valid.
         BSONElement filterElement = spec.getField("filter");
         if ( filterElement.type() ) {
+            if ( spec["sparse"].trueValue() ) {
+                return Status( ErrorCodes::CannotCreateIndex,
+                               "cannot mix \"filter\" and \"sparse\" options" );
+            }
+
             if ( filterElement.type() != Object ) {
-                return Status(ErrorCodes::BadValue,
+                return Status(ErrorCodes::CannotCreateIndex,
                               "'filter' for an index has to be a document");
             }
             StatusWithMatchExpression res = MatchExpressionParser::parse( filterElement.Obj() );
@@ -601,11 +606,11 @@ namespace {
             return Status::OK();
         }
         if (storageEngineElement.type() != mongo::Object) {
-            return Status(ErrorCodes::BadValue, "'storageEngine' has to be a document.");
+            return Status(ErrorCodes::CannotCreateIndex, "'storageEngine' has to be a document.");
         }
         BSONObj storageEngineOptions = storageEngineElement.Obj();
         if (storageEngineOptions.isEmpty()) {
-            return Status(ErrorCodes::BadValue,
+            return Status(ErrorCodes::CannotCreateIndex,
                           "Empty 'storageEngine' options are invalid. "
                           "Please remove, or include valid options.");
 

@@ -57,6 +57,13 @@ function runTest() {
     assert.commandFailed( t.ensureIndex( { x : 1 }, { filter : { x : { $asdasd : 3 } } } ) );
 
     assert.eq( 1, t.getIndexes().length );
+
+    // Partial indexes can't also be sparse indexes.
+    assert.commandFailed( t.ensureIndex( { x : 1 }, { filter : { a : 1 }, sparse: true } ) );
+    assert.commandFailed( t.ensureIndex( { x : 1 }, { filter : { a : 1 }, sparse: 1 } ) );
+    assert.commandWorked( t.ensureIndex( { x : 1 }, { filter : { a : 1 }, sparse: false } ) );
+
+    assert.eq( 2, t.getIndexes().length );
 }
 
 // Don't run test against mongos.
