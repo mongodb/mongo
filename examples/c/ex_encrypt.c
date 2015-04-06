@@ -272,185 +272,14 @@ rot13_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 }
 
 /*
- * XOR encryption functions.
- */
-/*
- * do_bitwisenot --
- *	Perform XOR on the buffer given.
- */
-static void
-do_bitwisenot(uint8_t *buf, size_t len)
-{
-	uint32_t i;
-	/*
-	 * Now bitwise not
-	 */
-	for (i = 0; i < len; i++)
-		buf[i] = ~buf[i];
-}
-
-/*
- * not_decrypt --
- *	A simple not decryption.
- */
-static int
-not_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    uint8_t *dst, size_t dst_len,
-    size_t *result_lenp)
-{
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
-	uint32_t i;
-
-	(void)session;		/* Unused */
-	++ex_encryptor->num_calls;
-
-	if (src == NULL)
-		return (0);
-	/*
-	 * Make sure it is big enough.
-	 */
-	if (dst_len < src_len - CHKSUM_LEN - IV_LEN)
-		return (ENOMEM);
-
-	/*
-	 * Most implementations would verify the checksum now.
-	 */
-	i = CHKSUM_LEN + IV_LEN;
-	memcpy(&dst[0], &src[i], dst_len);
-	/*
-	 * Call common not function on the text portion of the
-	 * source buffer.  Send in dst_len as the length of
-	 * the text.
-	 */
-	/*
-	 * Most implementations would send in the IV too.
-	 */
-	do_bitwisenot(&dst[0], dst_len);
-	*result_lenp = dst_len;
-	return (0);
-}
-
-/*
- * not_encrypt --
- *	A simple not encryption.
- */
-static int
-not_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    uint8_t *dst, size_t dst_len,
-    size_t *result_lenp)
-{
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
-	uint32_t i;
-
-	(void)session;		/* Unused */
-	++ex_encryptor->num_calls;
-
-	if (src == NULL)
-		return (0);
-	if (dst_len < src_len + CHKSUM_LEN + IV_LEN)
-		return (ENOMEM);
-
-	i = CHKSUM_LEN + IV_LEN;
-	memcpy(&dst[i], &src[0], src_len);
-	/*
-	 * Call common not function on the text portion of the
-	 * destination buffer.  Send in src_len as the length of
-	 * the text.
-	 */
-	do_bitwisenot(&dst[i], src_len);
-	/*
-	 * Checksum the encrypted buffer and add the IV.
-	 */
-	i = 0;
-	make_cksum(&dst[i]);
-	i += CHKSUM_LEN;
-	make_iv(&dst[i]);
-	*result_lenp = dst_len;
-	return (0);
-}
-
-/*
- * not_sizing --
- *	A sizing example returns the header size needed.
- */
-static int
-not_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    size_t *expansion_constantp)
-{
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
-
-	(void)session;				/* Unused parameters */
-
-	++ex_encryptor->num_calls;		/* Call count */
-
-	*expansion_constantp = CHKSUM_LEN + IV_LEN;
-	return (0);
-}
-
-/*
- * not_customize --
- *	The customize function creates a customized encryptor
- */
-static int
-not_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
-{
-	EX_ENCRYPTOR *ex_encryptor;
-
-	(void)session;				/* Unused parameters */
-	(void)uri;				/* Unused parameters */
-
-	/* Allocate our customized encryptor and set up callback functions. */
-	if ((ex_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
-		return (errno);
-	ex_encryptor->encryptor = *encryptor;
-
-	/* Stash the password from the configuration string. */
-	if ((ex_encryptor->password = malloc(passcfg->len + 1)) == NULL ||
-	    (ex_encryptor->uri = malloc(strlen(uri) + 1)) == NULL)
-		return (errno);
-	strncpy(ex_encryptor->password, passcfg->str, passcfg->len + 1);
-	strncpy(ex_encryptor->uri, uri, strlen(uri) + 1);
-
-	++ex_encryptor->num_calls;		/* Call count */
-
-	*customp = &ex_encryptor->encryptor;
-	return (0);
-}
-
-/*
- * not_terminate --
- *	WiredTiger not encryption termination.
- */
-static int
-not_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
-{
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
-
-	(void)session;				/* Unused parameters */
-
-	++ex_encryptor->num_calls;		/* Call count */
-
-	/* Free the allocated memory. */
-	free(encryptor);
-
-	return (0);
-}
-
-/*
  * add_my_encryptors --
  *	A simple example of adding encryption callbacks.
  */
 int
 add_my_encryptors(WT_CONNECTION *connection)
 {
-	WT_ENCRYPTOR *not_encryptor, *rot13_encryptor;
+	WT_ENCRYPTOR *rot13_encryptor;
 	int ret;
-
-	if ((not_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
-		return (errno);
 
 	if ((rot13_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
 		return (errno);
@@ -467,16 +296,6 @@ add_my_encryptors(WT_CONNECTION *connection)
 	 * the encryptor is terminated.  However, this approach is more general
 	 * purpose and supports multiple databases per application.
 	 */
-	not_encryptor->encrypt = not_encrypt;
-	not_encryptor->decrypt = not_decrypt;
-	not_encryptor->sizing = not_sizing;
-	not_encryptor->customize = not_customize;
-	not_encryptor->terminate = not_terminate;
-
-	if ((ret = connection->add_encryptor(
-	    connection, "not", (WT_ENCRYPTOR *)not_encryptor, NULL)) != 0)
-		return (ret);
-
 	rot13_encryptor->encrypt = rot13_encrypt;
 	rot13_encryptor->decrypt = rot13_decrypt;
 	rot13_encryptor->sizing = rot13_sizing;
