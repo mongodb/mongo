@@ -324,10 +324,10 @@ namespace {
                 // 5. If no useful index exists, and collection empty, create one on proposedKey.
                 //    Only need to call ensureIndex on primary shard, since indexes get copied to
                 //    receiving shard whenever a migrate occurs.
-                Status result = clusterCreateIndex(ns, proposedKey, careAboutUnique, NULL);
-                if (!result.isOK()) {
+                Status status = clusterCreateIndex(ns, proposedKey, careAboutUnique, NULL);
+                if (!status.isOK()) {
                     errmsg = str::stream() << "ensureIndex failed to create index on "
-                        << "primary shard: " << result.reason();
+                        << "primary shard: " << status.reason();
                     conn.done();
                     return false;
                 }

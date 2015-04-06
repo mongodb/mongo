@@ -1560,14 +1560,14 @@ namespace mongo {
 
                     // get another chunk on that shard
                     ChunkType bumpChunk;
-                    bool result = 
-                        bumpedCollMetadata->getNextChunk( bumpedCollMetadata->getMinKey(),
-                                                          &bumpChunk );
+                    bool chunkRes =
+                        bumpedCollMetadata->getNextChunk(bumpedCollMetadata->getMinKey(),
+                                                         &bumpChunk);
                     BSONObj bumpMin = bumpChunk.getMin();
                     BSONObj bumpMax = bumpChunk.getMax();
 
-                    (void)result; // for compile warning on non-debug
-                    dassert( result );
+                    (void)chunkRes; // for compile warning on non-debug
+                    dassert(chunkRes);
                     dassert( bumpMin.woCompare( min ) != 0 );
 
                     BSONObjBuilder op;
