@@ -62,14 +62,6 @@ namespace mongo {
             reset( ident );
         }
 
-        Shard(const Shard& other):
-            _name(other._name),
-            _addr(other._addr),
-            _cs(other._cs),
-            _maxSizeMB(other._maxSizeMB),
-            _isDraining(other._isDraining) {
-        }
-
         /**
          * Returns a Shard corresponding to 'ident', which can
          * either be a shard name or a connection string.
