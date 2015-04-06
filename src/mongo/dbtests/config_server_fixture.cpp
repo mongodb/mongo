@@ -36,9 +36,9 @@
 #include <list>
 
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/type_chunk.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/log.h"
 

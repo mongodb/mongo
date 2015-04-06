@@ -35,8 +35,8 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/range_arithmetic.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/type_chunk.h"
 
 namespace mongo {
 

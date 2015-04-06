@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/type_chunk.h"
+#include "mongo/s/catalog/type_chunk.h"
 
 #include <cstring>
 

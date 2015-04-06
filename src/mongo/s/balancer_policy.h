@@ -36,8 +36,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/type_chunk.h"
 
 namespace mongo {
 

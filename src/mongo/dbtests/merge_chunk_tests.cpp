@@ -28,13 +28,13 @@
 
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/dbtests/config_server_fixture.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h" // for genID
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/d_merge.h"
 #include "mongo/s/type_collection.h"
-#include "mongo/s/type_chunk.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
