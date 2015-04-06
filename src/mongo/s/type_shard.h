@@ -119,11 +119,11 @@ namespace mongo {
         void setHost(const std::string& host);
 
         bool isDrainingSet() const { return _draining.is_initialized(); }
-        const bool getDraining() const { return _draining.get(); }
+        bool getDraining() const { return _draining.get(); }
         void setDraining(const bool draining);
 
         bool isMaxSizeSet() const { return _maxSize.is_initialized(); }
-        const long long getMaxSize() const { return _maxSize.get(); }
+        long long getMaxSize() const { return _maxSize.get(); }
         void setMaxSize(const long long maxSize);
 
         bool isTagsSet() const { return _tags.is_initialized(); }

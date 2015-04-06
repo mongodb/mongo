@@ -138,7 +138,7 @@ namespace mongo {
         void setShard(const std::string& shard);
 
         bool isJumboSet() const { return _jumbo.is_initialized(); }
-        const bool getJumbo() const { return _jumbo.get(); }
+        bool getJumbo() const { return _jumbo.get(); }
         void setJumbo(const bool);
 
     private:
