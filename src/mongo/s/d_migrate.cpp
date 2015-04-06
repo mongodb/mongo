@@ -2197,7 +2197,7 @@ namespace mongo {
                             _clonedBytes += docToClone.objsize();
                         }
 
-                        if (writeConcern.shouldWaitForOtherNodes() && thisTime > 0) {
+                        if (writeConcern.shouldWaitForOtherNodes()) {
                             repl::ReplicationCoordinator::StatusAndDuration replStatus =
                                     repl::getGlobalReplicationCoordinator()->awaitReplication(
                                             txn,
