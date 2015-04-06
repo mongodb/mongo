@@ -134,8 +134,10 @@ rot13_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * Make sure it is big enough.
 	 */
-	if (dst_len < src_len - CHKSUM_LEN - IV_LEN)
+	if (dst_len < src_len - CHKSUM_LEN - IV_LEN) {
+		fprintf(stderr, "ROT13: ENOMEM ERROR\n");
 		return (ENOMEM);
+	}
 
 	/*
 	 * !!! Most implementations would verify the checksum here.
@@ -490,13 +492,6 @@ print_record(WT_LSN *lsn, uint32_t opcount,
    uint32_t rectype, uint32_t optype, uint64_t txnid, uint32_t fileid,
    WT_ITEM *key, WT_ITEM *value)
 {
-	printf(
-	    "LSN [%" PRIu32 "][%" PRIu64 "].%" PRIu32
-	    ": record type %" PRIu32 " optype %" PRIu32
-	    " txnid %" PRIu64 " fileid %" PRIu32,
-	    lsn->file, (uint64_t)lsn->offset, opcount,
-	    rectype, optype, txnid, fileid);
-	printf(" key size %zu value size %zu\n", key->size, value->size);
 	if (rectype == WT_LOGREC_MESSAGE)
 		printf("Application Record: %s\n", (char *)value->data);
 }
@@ -601,7 +596,6 @@ main(void)
 		printf("Read key %s; value %s\n", key, val);
 	}
 	ret = conn->close(conn, NULL);
-#if 0
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
@@ -619,6 +613,5 @@ main(void)
 		printf("Read key %s; value %s\n", key, val);
 	}
 	ret = conn->close(conn, NULL);
-#endif
 	return (ret);
 }

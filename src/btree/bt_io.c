@@ -21,17 +21,17 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	const WT_PAGE_HEADER *dsk;
-	size_t result_len;
+	size_t extra_size, result_len, skip;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 
 	/*
-	 * If anticipating a compressed block, read into a scratch buffer and
-	 * decompress into the caller's buffer.  Else, read directly into the
-	 * caller's buffer.
+	 * If anticipating a compressed or encrypted block, read into a scratch
+	 * buffer and decompress into the caller's buffer.  Else, read directly
+	 * into the caller's buffer.
 	 */
-	if (btree->compressor == NULL) {
+	if (btree->compressor == NULL && btree->encryptor == NULL) {
 		WT_RET(bm->read(bm, session, buf, addr, addr_size));
 		dsk = buf->data;
 	} else {
@@ -44,6 +44,41 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	 * If the block is compressed, copy the skipped bytes of the original
 	 * image into place, then decompress.
 	 */
+	if (F_ISSET(dsk, WT_PAGE_ENCRYPTED)) {
+		if (btree->encryptor == NULL ||
+		    btree->encryptor->decrypt == NULL)
+			WT_ERR_MSG(session, WT_ERROR,
+			    "read encrypted block where no decryption engine "
+			    "configured");
+
+		skip = WT_BLOCK_ENCRYPT_SKIP;
+		WT_ERR(btree->encryptor->sizing(btree->encryptor, &session->iface,
+		    &extra_size));
+		/*
+		 * We're allocating the exact number of bytes we're expecting
+		 * from decryption plus the unencrypted header.
+		 */
+		WT_ERR(__wt_buf_initsize(session, buf, dsk->mem_size + skip));
+
+		memcpy(buf->mem, tmp->data, skip);
+		ret = btree->encryptor->decrypt(
+		    btree->encryptor, &session->iface,
+		    (uint8_t *)tmp->data + skip, dsk->mem_size + extra_size,
+		    (uint8_t *)buf->mem + skip, dsk->mem_size, &result_len);
+
+		/*
+		 * If checksums were turned off because we're depending on the
+		 * decryption to fail on any corrupted data, we'll end up
+		 * here after corruption happens.  If we're salvaging the file,
+		 * it's OK, otherwise it's really, really bad.
+		 */
+		if (ret != 0 || result_len != dsk->mem_size)
+			WT_ERR(
+			    F_ISSET(btree, WT_BTREE_VERIFY) ||
+			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
+			    WT_ERROR :
+			    __wt_illegal_value(session, btree->dhandle->name));
+	}
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
 		if (btree->compressor == NULL ||
 		    btree->compressor->decompress == NULL)
