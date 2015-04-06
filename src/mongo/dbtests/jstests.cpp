@@ -791,11 +791,13 @@ namespace JSTests {
             auto_ptr<Scope> s( globalScriptEngine->newScope() );
 
             // Timestamp 't' component cannot exceed max for int32_t.
-            // Use appendTimestamp(field, Date) to bypass OpTime construction.
             BSONObj in;
             {
                 BSONObjBuilder b;
-                b.appendTimestamp( "a", std::numeric_limits<unsigned long long>::max() );
+                b.bb().appendNum( static_cast<char>(Timestamp) );
+                b.bb().appendStr( "a" );
+                b.bb().appendNum( std::numeric_limits<unsigned long long>::max() );
+
                 in = b.obj();
             }
             s->setObject( "a" , in );
