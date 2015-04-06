@@ -1275,6 +1275,13 @@ namespace mongo {
 
             bool run(OperationContext* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
+
+                if (txn->getClient()->isInDirectClient()) {
+                    return appendCommandStatus(result,
+                                               Status(ErrorCodes::IllegalOperation,
+                                                      "Cannot run mapReduce command from eval()"));
+                }
+
                 CurOp* op = txn->getCurOp();
 
                 Config config( dbname , cmd );

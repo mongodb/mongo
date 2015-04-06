@@ -185,8 +185,7 @@ namespace mongo {
             if (txn->getClient()->isInDirectClient()) {
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::IllegalOperation,
-                                                  "Cannot run find command from "
-                                                  "inside DBDirectClient"));
+                                                  "Cannot run find command from eval()"));
             }
 
             // 1a) Parse the command BSON to a LiteParsedQuery.

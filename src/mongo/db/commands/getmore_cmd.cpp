@@ -118,8 +118,7 @@ namespace mongo {
             if (txn->getClient()->isInDirectClient()) {
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::IllegalOperation,
-                                                  "Cannot run getMore command from "
-                                                  "inside DBDirectClient"));
+                                                  "Cannot run getMore command from eval()"));
             }
 
             StatusWith<GetMoreRequest> parseStatus = GetMoreRequest::parseFromBSON(dbname, cmdObj);
