@@ -417,10 +417,14 @@ namespace {
                     // If the ok field is anything other than 1, count it as error
                     if (!obj["ok"].trueValue()) {
                         error = true;
+                        log() << "Config server check for host " << host
+                              << " returned error: " << response;
                     }
                 }
                 else {
                     error = true;
+                    log() << "Config server check for host " << host
+                          << " failed with status: " << status;
                 }
             }
 
