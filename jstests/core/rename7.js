@@ -49,7 +49,7 @@ a.save( {a: 1} );
 a.save( {a: 2} );
 a.save( {a: 3} );
 
-previousStorageSize = a.stats().storageSize
+previousMaxSize = a.stats().maxSize
 
 assert.commandWorked( admin.runCommand( {renameCollection: "db_a.rename7_capped",
                                          to: "db_b.rename7_capped"} ) );
@@ -61,7 +61,7 @@ assert.eq( 3, b.find().count() );
 assert( db_b.getCollectionNames().indexOf( "rename7_capped" ) >= 0 );
 printjson( db_b.rename7_capped.stats() );
 assert( db_b.rename7_capped.stats().capped );
-assert.eq( previousStorageSize, b.stats().storageSize );
+assert.eq( previousMaxSize, b.stats().maxSize );
 
 a.drop();
 b.drop();
