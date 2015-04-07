@@ -74,9 +74,11 @@ namespace mongo {
                 sleepmillis(10);
             }
 
-            setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-            setGlobalAuthorizationManager(
-                    new AuthorizationManager(new AuthzManagerExternalStateMock()));
+            auto service = stdx::make_unique<ServiceContextNoop>();
+            AuthorizationManager::set(
+                    service.get(),
+                    stdx::make_unique<AuthorizationManager>(new AuthzManagerExternalStateMock()));
+            setGlobalServiceContext(std::move(service));
             Client::initThread("CurOpTestMain");
             return Status::OK();
         }

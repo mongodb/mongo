@@ -404,12 +404,16 @@ namespace mongo {
 #endif
 
 MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
-                          ("SetupInternalSecurityUser", "OIDGeneration"),
+                          ("SetupInternalSecurityUser",
+                           "OIDGeneration",
+                           "SetGlobalEnvironment",
+                           "EndStartupOptionStorage"),
                           MONGO_NO_DEPENDENTS)
         (InitializerContext* context) {
-    AuthorizationManager* authzManager =
-                new AuthorizationManager(new AuthzManagerExternalStateMongos());
-    setGlobalAuthorizationManager(authzManager);
+    auto authzManager = stdx::make_unique<AuthorizationManager>(
+            new AuthzManagerExternalStateMongos());
+    authzManager->setAuthEnabled(serverGlobalParams.isAuthEnabled);
+    AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
     return Status::OK();
 }
 

@@ -38,8 +38,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -955,11 +953,11 @@ namespace mongo {
         }
         if (params.count("security.authorization") &&
             params["security.authorization"].as<std::string>() == "disabled") {
-            getGlobalAuthorizationManager()->setAuthEnabled(false);
+            serverGlobalParams.isAuthEnabled = false;
         }
         if (params.count("security.authorization") &&
             params["security.authorization"].as<std::string>() == "enabled") {
-            getGlobalAuthorizationManager()->setAuthEnabled(true);
+            serverGlobalParams.isAuthEnabled = true;
         }
         if (params.count("storage.mmapv1.quota.enforced")) {
             mmapv1GlobalOptions.quota = params["storage.mmapv1.quota.enforced"].as<bool>();

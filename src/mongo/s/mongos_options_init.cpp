@@ -63,9 +63,7 @@ namespace mongo {
     }
 
     MONGO_INITIALIZER_GENERAL(MongosOptions_Store,
-                              ("BeginStartupOptionStorage",
-                               "CreateAuthorizationManager"), // Requried to call
-                                                              // getGlobalAuthorizationManager().
+                              ("BeginStartupOptionStorage"),
                               ("EndStartupOptionStorage"))
                              (InitializerContext* context) {
         Status ret = storeMongosOptions(moe::startupOptionsParsed, context->args());

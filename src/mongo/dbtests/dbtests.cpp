@@ -111,7 +111,9 @@ int dbtestsMain( int argc, char** argv, char** envp ) {
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
     Command::testCommandsEnabled = 1;
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongod()));
+    AuthorizationManager::set(
+            getGlobalServiceContext(),
+            stdx::make_unique<AuthorizationManager>(new AuthzManagerExternalStateMongod()));
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);
 }

@@ -60,9 +60,11 @@ namespace {
 
     MONGO_INITIALIZER(SCFTestGlobalServiceContext)(InitializerContext*) {
         invariant(!hasGlobalServiceContext());
-        mongo::setGlobalAuthorizationManager(new mongo::AuthorizationManager(
-                                                     new mongo::AuthzManagerExternalStateMock()));
         setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+        AuthorizationManager::set(
+                getGlobalServiceContext(),
+                stdx::make_unique<AuthorizationManager>(
+                        new mongo::AuthzManagerExternalStateMock()));
         return Status::OK();
     }
 

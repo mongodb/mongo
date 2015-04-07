@@ -118,6 +118,7 @@ namespace mongo {
 
         BSONArray argvArray;
         BSONObj parsedOpts;
+        bool isAuthEnabled = false;
         AtomicInt32 clusterAuthMode;    // --clusterAuthMode, the internal cluster auth mode
 
         enum ClusterAuthModes {

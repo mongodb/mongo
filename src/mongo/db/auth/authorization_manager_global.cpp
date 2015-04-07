@@ -33,12 +33,11 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
-    AuthorizationManager* globalAuthManager = NULL;
-
     class AuthzVersionParameter : public ServerParameter {
         MONGO_DISALLOW_COPYING(AuthzVersionParameter);
     public:
@@ -79,19 +78,10 @@ namespace {
 
     const std::string authSchemaVersionServerParameter = "authSchemaVersion";
 
-    void setGlobalAuthorizationManager(AuthorizationManager* authManager) {
-        fassert(16841, globalAuthManager == NULL);
-        globalAuthManager = authManager;
-    }
-
-    void clearGlobalAuthorizationManager() {
-        fassert(16843, globalAuthManager != NULL);
-        delete globalAuthManager;
-        globalAuthManager = NULL;
-    }
-
     AuthorizationManager* getGlobalAuthorizationManager() {
-        fassert(16842, globalAuthManager != NULL);
+        AuthorizationManager* globalAuthManager = AuthorizationManager::get(
+                getGlobalServiceContext());
+        fassert(16842, globalAuthManager != nullptr);
         return globalAuthManager;
     }
 

@@ -32,14 +32,20 @@
 #include <utility>
 
 #include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
     const auto getAuthenticationSession =
         ClientBasic::declareDecoration<std::unique_ptr<AuthenticationSession>>();
+
+    const auto getAuthorizationManager =
+        ServiceContext::declareDecoration<std::unique_ptr<AuthorizationManager>>();
 
     const auto getAuthorizationSession =
         ClientBasic::declareDecoration<std::unique_ptr<AuthorizationSession>>();
@@ -57,6 +63,22 @@ namespace {
             std::unique_ptr<AuthenticationSession>& other) {
         using std::swap;
         swap(getAuthenticationSession(client), other);
+    }
+
+    AuthorizationManager* AuthorizationManager::get(ServiceContext* service) {
+        return getAuthorizationManager(service).get();
+    }
+
+    AuthorizationManager* AuthorizationManager::get(ServiceContext& service) {
+        return getAuthorizationManager(service).get();
+    }
+
+    void AuthorizationManager::set(ServiceContext* service,
+                                   std::unique_ptr<AuthorizationManager> authzManager) {
+        auto& manager = getAuthorizationManager(service);
+        invariant(authzManager);
+        invariant(!manager);
+        manager = std::move(authzManager);
     }
 
     AuthorizationSession* AuthorizationSession::get(ClientBasic* client) {
@@ -78,7 +100,10 @@ namespace {
     void AuthorizationSession::set(
             ClientBasic* client,
             std::unique_ptr<AuthorizationSession> authorizationSession) {
-        getAuthorizationSession(client) = std::move(authorizationSession);
+        auto& authzSession = getAuthorizationSession(client);
+        invariant(authorizationSession);
+        invariant(!authzSession);
+        authzSession = std::move(authorizationSession);
     }
 
 }  // namespace mongo

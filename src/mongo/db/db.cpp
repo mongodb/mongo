@@ -757,12 +757,16 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 }
 
 MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
-                          ("SetupInternalSecurityUser", "OIDGeneration"),
+                          ("SetupInternalSecurityUser",
+                           "OIDGeneration",
+                           "SetGlobalEnvironment",
+                           "EndStartupOptionStorage"),
                           MONGO_NO_DEPENDENTS)
         (InitializerContext* context) {
-    AuthorizationManager* authzManager =
-            new AuthorizationManager(new AuthzManagerExternalStateMongod());
-    setGlobalAuthorizationManager(authzManager);
+    auto authzManager = stdx::make_unique<AuthorizationManager>(
+            new AuthzManagerExternalStateMongod());
+    authzManager->setAuthEnabled(serverGlobalParams.isAuthEnabled);
+    AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
     return Status::OK();
 }
 

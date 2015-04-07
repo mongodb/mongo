@@ -54,6 +54,7 @@ namespace mongo {
     class AuthorizationSession;
     class AuthzManagerExternalState;
     class OperationContext;
+    class ServiceContext;
     class UserDocumentParser;
 
     /**
@@ -70,6 +71,10 @@ namespace mongo {
     class AuthorizationManager {
         MONGO_DISALLOW_COPYING(AuthorizationManager);
     public:
+        static AuthorizationManager* get(ServiceContext* service);
+        static AuthorizationManager* get(ServiceContext& service);
+        static void set(ServiceContext* service,
+                        std::unique_ptr<AuthorizationManager> authzManager);
 
         // The newly constructed AuthorizationManager takes ownership of "externalState"
         explicit AuthorizationManager(AuthzManagerExternalState* externalState);
