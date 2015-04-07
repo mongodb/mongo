@@ -36,7 +36,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -111,7 +111,7 @@ int dbtestsMain( int argc, char** argv, char** envp ) {
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
     Command::testCommandsEnabled = 1;
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
+    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongod()));
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);
 }
