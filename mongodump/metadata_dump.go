@@ -2,10 +2,11 @@ package mongodump
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
+	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -25,11 +26,11 @@ type IndexDocumentFromDB struct {
 
 // dumpMetadataToWriter gets the metadata for a collection and writes it
 // in readable JSON format.
-func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) error {
+func (dump *MongoDump) dumpMetadataToWriter(intent *intents.Intent, writer io.Writer) error {
 	// make a buffered writer for nicer disk i/o
 	w := bufio.NewWriter(writer)
 
-	nsID := fmt.Sprintf("%v.%v", dbName, c)
+	nsID := fmt.Sprintf("%v.%v", intent.DB, intent.C)
 	meta := Metadata{
 		// We have to initialize Indexes to an empty slice, not nil, so that an empty
 		// array is marshalled into json instead of null. That is, {indexes:[]} is okay
@@ -37,42 +38,15 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		Indexes: []interface{}{},
 	}
 
-	// First, we get the options for the collection. These are pulled
-	// using either listCollections (2.7+) or by querying system.namespaces
-	// (2.6 and earlier), the internal collection containing collection names
-	// and properties. For mongodump, we copy just the "options"
-	// subdocument for the collection.
-	log.Logf(log.DebugHigh, "\treading options for `%v`", nsID)
-
-	session, err := dump.sessionProvider.GetSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-	session.SetSocketTimeout(0)
-	collection := session.DB(dbName).C(c)
-
-	collectionInfo, err := db.GetCollectionOptions(collection)
-	if err != nil {
-		return fmt.Errorf("failed to get collection options for `%v`: %v", err)
-	}
-	if collectionInfo == nil {
-		// The collection wasn't found, which means it was probably deleted
-		// between now and the time that collections were listed. Skip it.
-		log.Logf(log.DebugLow, "Warning: no metadata found for collection: `%v`: %v", nsID, err)
-		return nil
-	}
-	meta.Options = bsonutil.MarshalD{}
-	if opts, err := bsonutil.FindValueByKey("options", collectionInfo); err == nil {
-		if optsD, ok := opts.(bson.D); ok {
-			// make the options properly json-able
-			meta.Options, err = bsonutil.ConvertBSONValueToJSON(optsD)
-			if err != nil {
-				return fmt.Errorf("error converting collection options to JSON: %v", err)
-			}
-		} else {
-			return fmt.Errorf("collection options contains invalid data: %v", opts)
+	// The collection options were already gathered while building the list of intents.
+	// We convert them to JSON so that they can be written to the metadata json file as text.
+	var err error
+	if intent.Options != nil {
+		if meta.Options, err = bsonutil.ConvertBSONValueToJSON(*intent.Options); err != nil {
+			return fmt.Errorf("error converting collection options to JSON: %v", err)
 		}
+	} else {
+		meta.Options = nil
 	}
 
 	// Second, we read the collection's index information by either calling
@@ -82,8 +56,14 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	// that list as the "indexes" field of the metadata document.
 	log.Logf(log.DebugHigh, "\treading indexes for `%v`", nsID)
 
+	session, err := dump.sessionProvider.GetSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
 	// get the indexes
-	indexesIter, err := db.GetIndexes(collection)
+	indexesIter, err := db.GetIndexes(session.DB(intent.DB).C(intent.C))
 	if err != nil {
 		return err
 	}

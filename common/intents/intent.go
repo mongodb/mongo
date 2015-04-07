@@ -3,6 +3,7 @@ package intents
 
 import (
 	"github.com/mongodb/mongo-tools/common/log"
+	"gopkg.in/mgo.v2/bson"
 	"sync"
 )
 
@@ -16,6 +17,9 @@ type Intent struct {
 	// File locations as absolute paths
 	BSONPath     string
 	MetadataPath string
+
+	// Collection options
+	Options *bson.D
 
 	// File/collection size, for some prioritizer implementations.
 	// Units don't matter as long as they are consistent for a given use case.
