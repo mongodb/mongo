@@ -69,8 +69,7 @@ namespace mongo {
          * caused the error, and a unique position in the where the error occurred
          * (similar to an assert number)
          */
-        Status(ErrorCodes::Error code, const std::string& reason, int location = 0);
-        Status(ErrorCodes::Error code, const char* reason, int location = 0);
+        Status(ErrorCodes::Error code, std::string reason, int location = 0);
 
         inline Status(const Status& other);
         inline Status& operator=(const Status& other);
@@ -127,10 +126,9 @@ namespace mongo {
             const std::string reason;      // description of error cause
             const int location;            // unique location of the triggering line in the code
 
-            static ErrorInfo* create(ErrorCodes::Error code,
-                                     StringData reason, int location);
+            static ErrorInfo* create(ErrorCodes::Error code, std::string reason, int location);
 
-            ErrorInfo(ErrorCodes::Error code, StringData reason, int location);
+            ErrorInfo(ErrorCodes::Error code, std::string reason, int location);
         };
 
         ErrorInfo* _error;

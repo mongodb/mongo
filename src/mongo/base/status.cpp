@@ -32,24 +32,19 @@
 
 namespace mongo {
 
-    Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, StringData aReason, int aLocation)
-        : code(aCode), reason(aReason.toString()), location(aLocation) {
+    Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, std::string aReason, int aLocation)
+        : code(aCode), reason(std::move(aReason)), location(aLocation) {
     }
 
-    Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, StringData r, int l) {
+    Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, std::string r, int l) {
         const bool needRep = ((c != ErrorCodes::OK) ||
                               !r.empty() ||
                               (l != 0));
-        return needRep ? new ErrorInfo(c, r, l) : NULL;
+        return needRep ? new ErrorInfo(c, std::move(r), l) : NULL;
     }
 
-    Status::Status(ErrorCodes::Error code, const std::string& reason, int location)
-        : _error(ErrorInfo::create(code, reason, location)) {
-        ref(_error);
-    }
-
-    Status::Status(ErrorCodes::Error code, const char* reason, int location)
-        : _error(ErrorInfo::create(code, reason, location)) {
+    Status::Status(ErrorCodes::Error code, std::string reason, int location)
+        : _error(ErrorInfo::create(code, std::move(reason), location)) {
         ref(_error);
     }
 
