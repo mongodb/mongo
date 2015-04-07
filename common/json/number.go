@@ -64,12 +64,21 @@ func (d *decodeState) getNumberInt() interface{} {
 	if err := ctorNumArgsMismatch("NumberInt", 1, len(args)); err != nil {
 		d.error(err)
 	}
-	arg0, err := args[0].(Number).Int32()
-	if err != nil {
-		d.error(fmt.Errorf("expected int32 for first argument of NumberInt constructor"))
+	var number Number
+	switch v := args[0].(type) {
+	case Number:
+		number = v
+	case string:
+		number = Number(v)
+	default:
+		d.error(fmt.Errorf("expected int32 for first argument of NumberInt constructor, got %t", v))
 	}
 
 	d.useNumber = useNumber
+	arg0, err := number.Int32()
+	if err != nil {
+		d.error(fmt.Errorf("expected int32 for first argument of NumberInt constructor, got %t", number))
+	}
 	return NumberInt(arg0)
 }
 
@@ -107,11 +116,22 @@ func (d *decodeState) getNumberLong() interface{} {
 	if err := ctorNumArgsMismatch("NumberLong", 1, len(args)); err != nil {
 		d.error(err)
 	}
-	arg0, err := args[0].(Number).Int64()
-	if err != nil {
-		d.error(fmt.Errorf("expected int64 for first argument of NumberLong constructor"))
+	var number Number
+	switch v := args[0].(type) {
+	case Number:
+		number = v
+	case string:
+		number = Number(v)
+
+	default:
+		d.error(fmt.Errorf("expected int64 for first argument of NumberLong constructor, got %t", v))
+
 	}
 
 	d.useNumber = useNumber
+	arg0, err := number.Int64()
+	if err != nil {
+		d.error(fmt.Errorf("expected int64 for first argument of NumberLong constructor, got %t", number))
+	}
 	return NumberLong(arg0)
 }

@@ -2,10 +2,10 @@ package mongodump
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"

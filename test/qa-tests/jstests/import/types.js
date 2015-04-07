@@ -23,9 +23,8 @@
       m : MaxKey(),
       n : ISODate("2015-02-25T16:42:11Z"),
       o: DBRef('namespace', 'identifier', 'database'),
+      p: NumberInt(5),
     }
-
-
 
     //Make a dummy file to import by writing a test collection and exporting it
     assert.eq( 0 , db1.c.count() , "setup1" );
@@ -41,6 +40,7 @@
     for(var i=0;i<docKeys.length;i++){
       jsTest.log("checking field", docKeys[i])
       assert.eq(testDoc[docKeys[i]], postImportDoc[docKeys[i]], "imported field " + docKeys[i] + " does not match original")
+
     }
 
     // DBPointer should turn into a DBRef with a $ref field and hte $id field being an ObjectId. It will not convert back to a DBPointer. 
@@ -49,6 +49,8 @@
     var testDBPointer = {
       _id : ObjectId(),
       a : DBPointer('namespace', oid),
+      b : NumberInt("5"),
+      c : NumberLong("5000"),
     }
 
     db1.c.drop()
@@ -64,6 +66,12 @@
 
     var dbRef = DBRef("namespace", oid );
     assert.eq(postImportDoc["a"], dbRef);
+
+    var numInt = NumberInt(5);
+    assert.eq(postImportDoc["b"], numInt);
+
+    var numLong = NumberLong(5000);
+    assert.eq(postImportDoc["c"], numLong);
 
 
     toolTest.stop();

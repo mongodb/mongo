@@ -70,15 +70,15 @@ func TestNumberIntValue(t *testing.T) {
 			}
 		})
 
-		Convey("cannot use string as argument", func() {
-			var jsonMap map[string]interface{}
-
+		Convey("can use string as argument", func() {
 			key := "key"
 			value := `NumberInt("123")`
 			data := fmt.Sprintf(`{"%v":%v}`, key, value)
 
-			err := Unmarshal([]byte(data), &jsonMap)
-			So(err, ShouldNotBeNil)
+			jsonValue, err := UnmarshalBsonD([]byte(data))
+
+			So(jsonValue[0].Value, ShouldEqual, NumberInt(123))
+			So(err, ShouldBeNil)
 		})
 
 		Convey("can specify argument in hexadecimal", func() {
@@ -162,15 +162,15 @@ func TestNumberLongValue(t *testing.T) {
 			}
 		})
 
-		Convey("cannot use string as argument", func() {
-			var jsonMap map[string]interface{}
-
+		Convey("can use string as argument", func() {
 			key := "key"
 			value := `NumberLong("123")`
 			data := fmt.Sprintf(`{"%v":%v}`, key, value)
 
-			err := Unmarshal([]byte(data), &jsonMap)
-			So(err, ShouldNotBeNil)
+			jsonValue, err := UnmarshalBsonD([]byte(data))
+
+			So(jsonValue[0].Value, ShouldEqual, NumberLong(123))
+			So(err, ShouldBeNil)
 		})
 
 		Convey("can specify argument in hexadecimal", func() {
