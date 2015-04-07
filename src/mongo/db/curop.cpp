@@ -34,10 +34,10 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/json.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/exit.h"
@@ -326,58 +326,6 @@ namespace mongo {
         return _maxTimeTracker.getRemainingMicros();
     }
 
-    AtomicUInt32 CurOp::_nextOpNum;
-
-    static Counter64 returnedCounter;
-    static Counter64 insertedCounter;
-    static Counter64 updatedCounter;
-    static Counter64 deletedCounter;
-    static Counter64 scannedCounter;
-    static Counter64 scannedObjectCounter;
-
-    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
-    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
-    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
-    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
-    static ServerStatusMetricField<Counter64> displayScanned( "queryExecutor.scanned", &scannedCounter );
-    static ServerStatusMetricField<Counter64> displayScannedObjects( "queryExecutor.scannedObjects",
-                                                                     &scannedObjectCounter );
-
-    static Counter64 idhackCounter;
-    static Counter64 scanAndOrderCounter;
-    static Counter64 fastmodCounter;
-    static Counter64 writeConflictsCounter;
-
-    static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
-    static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
-    static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
-    static ServerStatusMetricField<Counter64> displayWriteConflicts( "operation.writeConflicts",
-                                                                     &writeConflictsCounter );
-
-    void OpDebug::recordStats() {
-        if ( nreturned > 0 )
-            returnedCounter.increment( nreturned );
-        if ( ninserted > 0 )
-            insertedCounter.increment( ninserted );
-        if ( nMatched > 0 )
-            updatedCounter.increment( nMatched );
-        if ( ndeleted > 0 )
-            deletedCounter.increment( ndeleted );
-        if ( nscanned > 0 )
-            scannedCounter.increment( nscanned );
-        if ( nscannedObjects > 0 )
-            scannedObjectCounter.increment( nscannedObjects );
-
-        if ( idhack )
-            idhackCounter.increment();
-        if ( scanAndOrder )
-            scanAndOrderCounter.increment();
-        if ( fastmod )
-            fastmodCounter.increment();
-        if ( writeConflicts )
-            writeConflictsCounter.increment( writeConflicts );
-    }
-
     CurOp::MaxTimeTracker::MaxTimeTracker() {
         reset();
     }
@@ -449,4 +397,283 @@ namespace mongo {
         return _targetEpochMicros - now;
     }
 
-}
+
+    AtomicUInt32 CurOp::_nextOpNum;
+
+    static Counter64 returnedCounter;
+    static Counter64 insertedCounter;
+    static Counter64 updatedCounter;
+    static Counter64 deletedCounter;
+    static Counter64 scannedCounter;
+    static Counter64 scannedObjectCounter;
+
+    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
+    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
+    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
+    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
+    static ServerStatusMetricField<Counter64> displayScanned( "queryExecutor.scanned", &scannedCounter );
+    static ServerStatusMetricField<Counter64> displayScannedObjects( "queryExecutor.scannedObjects",
+                                                                     &scannedObjectCounter );
+
+    static Counter64 idhackCounter;
+    static Counter64 scanAndOrderCounter;
+    static Counter64 fastmodCounter;
+    static Counter64 writeConflictsCounter;
+
+    static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
+    static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
+    static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
+    static ServerStatusMetricField<Counter64> displayWriteConflicts( "operation.writeConflicts",
+                                                                     &writeConflictsCounter );
+
+    void OpDebug::recordStats() {
+        if ( nreturned > 0 )
+            returnedCounter.increment( nreturned );
+        if ( ninserted > 0 )
+            insertedCounter.increment( ninserted );
+        if ( nMatched > 0 )
+            updatedCounter.increment( nMatched );
+        if ( ndeleted > 0 )
+            deletedCounter.increment( ndeleted );
+        if ( nscanned > 0 )
+            scannedCounter.increment( nscanned );
+        if ( nscannedObjects > 0 )
+            scannedObjectCounter.increment( nscannedObjects );
+
+        if ( idhack )
+            idhackCounter.increment();
+        if ( scanAndOrder )
+            scanAndOrderCounter.increment();
+        if ( fastmod )
+            fastmodCounter.increment();
+        if ( writeConflicts )
+            writeConflictsCounter.increment( writeConflicts );
+    }
+
+    void OpDebug::reset() {
+        extra.reset();
+
+        op = 0;
+        iscommand = false;
+        ns = "";
+        query = BSONObj();
+        updateobj = BSONObj();
+
+        cursorid = -1;
+        ntoreturn = -1;
+        ntoskip = -1;
+        exhaust = false;
+
+        nscanned = -1;
+        nscannedObjects = -1;
+        idhack = false;
+        scanAndOrder = false;
+        nMatched = -1;
+        nModified = -1;
+        ninserted = -1;
+        ndeleted = -1;
+        nmoved = -1;
+        fastmod = false;
+        fastmodinsert = false;
+        upsert = false;
+        cursorExhausted = false;
+        keyUpdates = 0;  // unsigned, so -1 not possible
+        writeConflicts = 0;
+        planSummary = "";
+        execStats.reset();
+
+        exceptionInfo.reset();
+
+        executionTime = 0;
+        nreturned = -1;
+        responseLength = -1;
+    }
+
+
+#define OPDEBUG_TOSTRING_HELP(x) if( x >= 0 ) s << " " #x ":" << (x)
+#define OPDEBUG_TOSTRING_HELP_BOOL(x) if( x ) s << " " #x ":" << (x)
+    string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const {
+        StringBuilder s;
+        if ( iscommand )
+            s << "command ";
+        else
+            s << opToString( op ) << ' ';
+        s << ns.toString();
+
+        if ( ! query.isEmpty() ) {
+            if ( iscommand ) {
+                s << " command: ";
+
+                Command* curCommand = curop.getCommand();
+                if (curCommand) {
+                    mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
+                    curCommand->redactForLogging(&cmdToLog);
+                    s << curCommand->name << " ";
+                    s << cmdToLog.toString();
+                }
+                else { // Should not happen but we need to handle curCommand == NULL gracefully
+                    s << query.toString();
+                }
+            }
+            else {
+                s << " query: ";
+                s << query.toString();
+            }
+        }
+
+        if (!planSummary.empty()) {
+            s << " planSummary: " << planSummary.toString();
+        }
+
+        if ( ! updateobj.isEmpty() ) {
+            s << " update: ";
+            updateobj.toString( s );
+        }
+
+        OPDEBUG_TOSTRING_HELP( cursorid );
+        OPDEBUG_TOSTRING_HELP( ntoreturn );
+        OPDEBUG_TOSTRING_HELP( ntoskip );
+        OPDEBUG_TOSTRING_HELP_BOOL( exhaust );
+
+        OPDEBUG_TOSTRING_HELP( nscanned );
+        OPDEBUG_TOSTRING_HELP( nscannedObjects );
+        OPDEBUG_TOSTRING_HELP_BOOL( idhack );
+        OPDEBUG_TOSTRING_HELP_BOOL( scanAndOrder );
+        OPDEBUG_TOSTRING_HELP( nmoved );
+        OPDEBUG_TOSTRING_HELP( nMatched );
+        OPDEBUG_TOSTRING_HELP( nModified );
+        OPDEBUG_TOSTRING_HELP( ninserted );
+        OPDEBUG_TOSTRING_HELP( ndeleted );
+        OPDEBUG_TOSTRING_HELP_BOOL( fastmod );
+        OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
+        OPDEBUG_TOSTRING_HELP_BOOL( upsert );
+        OPDEBUG_TOSTRING_HELP_BOOL( cursorExhausted );
+        OPDEBUG_TOSTRING_HELP( keyUpdates );
+        OPDEBUG_TOSTRING_HELP( writeConflicts );
+
+        if ( extra.len() )
+            s << " " << extra.str();
+
+        if ( ! exceptionInfo.empty() ) {
+            s << " exception: " << exceptionInfo.msg;
+            if ( exceptionInfo.code )
+                s << " code:" << exceptionInfo.code;
+        }
+
+        s << " numYields:" << curop.numYields();
+
+        OPDEBUG_TOSTRING_HELP( nreturned );
+        if (responseLength > 0) {
+            s << " reslen:" << responseLength;
+        }
+
+        {
+            BSONObjBuilder locks;
+            lockStats.report(&locks);
+            s << " locks:" << locks.obj().toString();
+        }
+
+        s << " " << executionTime << "ms";
+
+        return s.str();
+    }
+
+    namespace {
+        /**
+         * Appends {name: obj} to the provided builder.  If obj is greater than maxSize, appends a
+         * string summary of obj instead of the object itself.
+         */
+        void appendAsObjOrString(StringData name,
+                                 const BSONObj& obj,
+                                 size_t maxSize,
+                                 BSONObjBuilder* builder) {
+            if (static_cast<size_t>(obj.objsize()) <= maxSize) {
+                builder->append(name, obj);
+            }
+            else {
+                // Generate an abbreviated serialization for the object, by passing false as the
+                // "full" argument to obj.toString().
+                const bool isArray = false;
+                const bool full = false;
+                std::string objToString = obj.toString(isArray, full);
+                if (objToString.size() <= maxSize) {
+                    builder->append(name, objToString);
+                }
+                else {
+                    // objToString is still too long, so we append to the builder a truncated form
+                    // of objToString concatenated with "...".  Instead of creating a new string
+                    // temporary, mutate objToString to do this (we know that we can mutate
+                    // characters in objToString up to and including objToString[maxSize]).
+                    objToString[maxSize - 3] = '.';
+                    objToString[maxSize - 2] = '.';
+                    objToString[maxSize - 1] = '.';
+                    builder->append(name, StringData(objToString).substr(0, maxSize));
+                }
+            }
+        }
+    } // namespace
+
+#define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.appendNumber( #x , (x) )
+#define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
+    void OpDebug::append(const CurOp& curop,
+                         const SingleThreadedLockStats& lockStats,
+                         BSONObjBuilder& b) const {
+
+        const size_t maxElementSize = 50 * 1024;
+
+        b.append( "op" , iscommand ? "command" : opToString( op ) );
+        b.append( "ns" , ns.toString() );
+
+        if (!query.isEmpty()) {
+            appendAsObjOrString(iscommand ? "command" : "query", query, maxElementSize, &b);
+        }
+        else if (!iscommand && curop.haveQuery()) {
+            appendAsObjOrString("query", curop.query(), maxElementSize, &b);
+        }
+
+        if (!updateobj.isEmpty()) {
+            appendAsObjOrString("updateobj", updateobj, maxElementSize, &b);
+        }
+
+        const bool moved = (nmoved >= 1);
+
+        OPDEBUG_APPEND_NUMBER( cursorid );
+        OPDEBUG_APPEND_NUMBER( ntoreturn );
+        OPDEBUG_APPEND_NUMBER( ntoskip );
+        OPDEBUG_APPEND_BOOL( exhaust );
+
+        OPDEBUG_APPEND_NUMBER( nscanned );
+        OPDEBUG_APPEND_NUMBER( nscannedObjects );
+        OPDEBUG_APPEND_BOOL( idhack );
+        OPDEBUG_APPEND_BOOL( scanAndOrder );
+        OPDEBUG_APPEND_BOOL( moved );
+        OPDEBUG_APPEND_NUMBER( nmoved );
+        OPDEBUG_APPEND_NUMBER( nMatched );
+        OPDEBUG_APPEND_NUMBER( nModified );
+        OPDEBUG_APPEND_NUMBER( ninserted );
+        OPDEBUG_APPEND_NUMBER( ndeleted );
+        OPDEBUG_APPEND_BOOL( fastmod );
+        OPDEBUG_APPEND_BOOL( fastmodinsert );
+        OPDEBUG_APPEND_BOOL( upsert );
+        OPDEBUG_APPEND_BOOL( cursorExhausted );
+        OPDEBUG_APPEND_NUMBER( keyUpdates );
+        OPDEBUG_APPEND_NUMBER( writeConflicts );
+        b.appendNumber("numYield", curop.numYields());
+
+        {
+            BSONObjBuilder locks(b.subobjStart("locks"));
+            lockStats.report(&locks);
+        }
+
+        if (!exceptionInfo.empty()) {
+            exceptionInfo.append(b, "exception", "exceptionCode");
+        }
+
+        OPDEBUG_APPEND_NUMBER( nreturned );
+        OPDEBUG_APPEND_NUMBER( responseLength );
+        b.append( "millis" , executionTime );
+
+        execStats.append(b, "execStats");
+    }
+
+}  // namespace mongo

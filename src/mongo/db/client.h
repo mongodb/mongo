@@ -94,7 +94,7 @@ namespace mongo {
         /** this has to be called as the client goes away, but before thread termination
          *  @return true if anything was done
          */
-        bool shutdown();
+        void shutdown();
 
         std::string clientAddress(bool includePort = false) const;
         const std::string& desc() const { return _desc; }

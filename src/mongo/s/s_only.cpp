@@ -67,7 +67,7 @@ namespace mongo {
         _inDirectClient(false) {
     }
     Client::~Client() {}
-    bool Client::shutdown() { return true; }
+    void Client::shutdown() {}
 
     void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         // mp is non-null only for client connections, and mongos uses ClientInfo for those
