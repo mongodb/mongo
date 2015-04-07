@@ -58,7 +58,7 @@ namespace mongo {
          */
         template <typename T>
         DecorationContainer::DecorationDescriptorWithType<T> declareDecoration() {
-#if not defined(_MSC_VER) or (_MSC_VER > 1800)  // Try again with MSVC 2015.
+#if !defined(_MSC_VER) || (_MSC_VER > 1800) // Try again with MSVC 2015
             static_assert(std::is_nothrow_destructible<T>::value,
                           "Decorations must be nothrow destructible");
 #endif
