@@ -36,6 +36,7 @@ env.Library(
         'cluster_split_collection_cmd.cpp',
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',
+        'run_on_all_shards_cmd.cpp',
     ],
     LIBDEPS=[
 

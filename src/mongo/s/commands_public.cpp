@@ -58,6 +58,7 @@
 #include "mongo/s/cluster_explain.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_commands_common.h"
+#include "mongo/s/commands/run_on_all_shards_cmd.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/distlock.h"
@@ -169,132 +170,6 @@ namespace mongo {
                 conn.done();
                 return ok;
             }
-        };
-
-        class RunOnAllShardsCommand : public Command {
-        public:
-            RunOnAllShardsCommand(const char* n,
-                                  const char* oldname=NULL,
-                                  bool useShardConn = false):
-                                      Command(n, false, oldname),
-                                      _useShardConn(useShardConn) {
-            }
-
-            virtual bool slaveOk() const { return true; }
-            virtual bool adminOnly() const { return false; }
-
-            // all grid commands are designed not to lock
-            virtual bool isWriteCommandForConfigServer() const { return false; }
-
-            // default impl uses all shards for DB
-            virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
-                vector<Shard> shardList;
-                Shard::getAllShards(shardList);
-                shards.insert(shardList.begin(), shardList.end());
-            }
-
-            virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {}
-
-            virtual BSONObj specialErrorHandler( const string& server,
-                                                 const string& dbName,
-                                                 const BSONObj& cmdObj,
-                                                 const BSONObj& originalResult ) const {
-                return originalResult;
-            }
-
-            // don't override
-            virtual bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& output, bool) {
-                LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj << endl;
-                set<Shard> shards;
-                getShards(dbName, cmdObj, shards);
-
-                // TODO: Future is deprecated, replace with commandOp()
-
-                list< shared_ptr<Future::CommandResult> > futures;
-                for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString(),
-                                                             dbName,
-                                                             cmdObj,
-                                                             0,
-                                                             NULL,
-                                                             _useShardConn ));
-                }
-
-                vector<BSONObj> results;
-                BSONObjBuilder subobj (output.subobjStart("raw"));
-                BSONObjBuilder errors;
-                int commonErrCode = -1;
-
-                for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
-                    shared_ptr<Future::CommandResult> res = *i;
-
-                    if ( res->join() ) {
-                        // success :)
-                        BSONObj result = res->result();
-                        results.push_back( result );
-                        subobj.append( res->getServer(), result );
-                        continue;
-                    }
-
-                    BSONObj result = res->result();
-
-                    if ( result["errmsg"].type() ||
-                         result["code"].numberInt() != 0 ) {
-                        result = specialErrorHandler( res->getServer(), dbName, cmdObj, result );
-
-                        BSONElement errmsg = result["errmsg"];
-                        if ( errmsg.eoo() || errmsg.String().empty() ) {
-                            // it was fixed!
-                            results.push_back( result );
-                            subobj.append( res->getServer(), result );
-                            continue;
-                        }
-                    }
-
-                    // Handle "errmsg".
-                    if( ! result["errmsg"].eoo() ){
-                        errors.appendAs(result["errmsg"], res->getServer());
-                    }
-                    else {
-                        // Can happen if message is empty, for some reason
-                        errors.append( res->getServer(), str::stream() <<
-                                       "result without error message returned : " << result );
-                    }
-
-                    // Handle "code".
-                    int errCode = result["code"].numberInt();
-                    if ( commonErrCode == -1 ) {
-                        commonErrCode = errCode;
-                    }
-                    else if ( commonErrCode != errCode ) {
-                        commonErrCode = 0;
-                    }
-
-                    results.push_back( result );
-                    subobj.append( res->getServer(), result );
-                }
-
-                subobj.done();
-
-                BSONObj errobj = errors.done();
-                if (! errobj.isEmpty()) {
-                    errmsg = errobj.toString(false, true);
-
-                    // If every error has a code, and the code for all errors is the same, then add
-                    // a top-level field "code" with this value to the output object.
-                    if ( commonErrCode > 0 ) {
-                        output.append( "code", commonErrCode );
-                    }
-
-                    return false;
-                }
-
-                aggregateResults(results, output);
-                return true;
-            }
-
-        private:
-            bool _useShardConn; // use ShardConnection as opposed to ScopedDbConnection
         };
 
         class AllShardsCollectionCommand : public RunOnAllShardsCommand {
