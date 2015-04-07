@@ -40,7 +40,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/json.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -183,10 +182,7 @@ namespace mongo {
     }
 
     CurOp::~CurOp() {
-        if (!inShutdown()) {
-            // TODO(schwerin): See if there's a reason not to clean up during shutdown.
-            invariant(this == _stack->pop());
-        }
+        invariant(this == _stack->pop());
     }
 
     void CurOp::setNS( StringData ns ) {
