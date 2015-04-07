@@ -59,8 +59,8 @@ namespace mongo {
         bool adminOnly() const override { return false; }
         bool isWriteCommandForConfigServer() const override { return false; }
 
-        void aggregateResults(const std::vector<BSONObj>& results,
-                              BSONObjBuilder& output);
+        virtual void aggregateResults(const std::vector<BSONObj>& results,
+                                      BSONObjBuilder& output);
 
         // The default implementation is the identity function.
         virtual BSONObj specialErrorHandler(const std::string& server,
