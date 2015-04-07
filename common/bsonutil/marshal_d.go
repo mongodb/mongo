@@ -2,8 +2,8 @@ package bsonutil
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/json"
 	"gopkg.in/mgo.v2/bson"
 )
 

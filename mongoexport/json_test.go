@@ -2,7 +2,7 @@ package mongoexport
 
 import (
 	"bytes"
-	"encoding/json"
+	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
@@ -57,7 +57,6 @@ func TestJSONArray(t *testing.T) {
 
 			err = jsonExporter.WriteFooter()
 			So(err, ShouldBeNil)
-
 			// Unmarshal the whole thing, it should be valid json
 			fromJSON := []map[string]interface{}{}
 			err = json.Unmarshal(out.Bytes(), &fromJSON)
