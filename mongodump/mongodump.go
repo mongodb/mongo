@@ -147,7 +147,7 @@ func (dump *MongoDump) Dump() error {
 	case dump.ToolOptions.DB != "" && dump.ToolOptions.Collection == "":
 		err = dump.CreateIntentsForDatabase(dump.ToolOptions.DB)
 	case dump.ToolOptions.DB != "" && dump.ToolOptions.Collection != "":
-		err = dump.CreateIntentForCollection(dump.ToolOptions.DB, dump.ToolOptions.Collection)
+		err = dump.CreateCollectionIntent(dump.ToolOptions.DB, dump.ToolOptions.Collection)
 	}
 	if err != nil {
 		return err
@@ -374,7 +374,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	defer metaOut.Close()
 
 	log.Logf(log.Always, "writing %v metadata to %v", intent.Namespace(), metadataFilepath)
-	if err = dump.dumpMetadataToWriter(intent.DB, intent.C, metaOut); err != nil {
+	if err = dump.dumpMetadataToWriter(intent, metaOut); err != nil {
 		return err
 	}
 
