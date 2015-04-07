@@ -52,8 +52,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		skip = WT_BLOCK_ENCRYPT_SKIP;
-		WT_ERR(btree->encryptor->sizing(btree->encryptor, &session->iface,
-		    &extra_size));
+		WT_ERR(btree->encryptor->sizing(btree->encryptor,
+		    &session->iface, &extra_size));
 		/*
 		 * We're allocating the exact number of bytes we're expecting
 		 * from decryption plus the unencrypted header.

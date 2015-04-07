@@ -279,7 +279,6 @@ int
 add_my_encryptors(WT_CONNECTION *connection)
 {
 	WT_ENCRYPTOR *rot13_encryptor;
-	int ret;
 
 	if ((rot13_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
 		return (errno);
