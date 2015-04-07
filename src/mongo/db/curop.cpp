@@ -95,7 +95,8 @@ namespace mongo {
         const CurOp _base;
     };
 
-    const auto CurOp::_curopStack = Client::declareDecoration<CurOp::ClientCuropStack>();
+    const Client::Decoration<ClientCuropStack> CurOp::_curopStack =
+        Client::declareDecoration<CurOp::ClientCuropStack>();
 
     // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
     // valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
