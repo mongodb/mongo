@@ -129,7 +129,7 @@ namespace {
         invariant(entry);
         const bool exists = entry->exists();
         if (!exists) {
-            audit::logCreateDatabase(currentClient.get(), dbname);
+            audit::logCreateDatabase(&cc(), dbname);
         }
 
         if (justCreated) {

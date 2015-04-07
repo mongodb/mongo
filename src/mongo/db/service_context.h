@@ -28,13 +28,19 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/util/decorable.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
+    class AbstractMessagingPort;
+    class Client;
     class OperationContext;
     class OpObserver;
 
@@ -68,10 +74,103 @@ namespace mongo {
         StorageFactoriesIterator() { }
     };
 
+    /**
+     * Class representing the context of a service, such as a MongoD database service or
+     * a MongoS routing service.
+     *
+     * A ServiceContext is the root of a hierarchy of contexts.  A ServiceContext owns
+     * zero or more Clients, which in turn each own OperationContexts.
+     */
     class ServiceContext : public Decorable<ServiceContext> {
         MONGO_DISALLOW_COPYING(ServiceContext);
     public:
-        virtual ~ServiceContext() { }
+        /**
+         * Special deleter used for cleaning up Client objects owned by a ServiceContext.
+         * See UniqueClient, below.
+         */
+        class ClientDeleter {
+        public:
+            void operator()(Client* client) const;
+        };
+
+        /**
+         * Observer interface implemented to hook client creation and destruction.
+         */
+        class ClientObserver {
+        public:
+            virtual ~ClientObserver() = default;
+
+            /**
+             * Hook called after a new client "client" is created on "service" by
+             * service->makeClient().
+             *
+             * For a given client and registered instance of ClientObserver, if onCreateClient
+             * returns without throwing an exception, onDestroyClient will be called when "client"
+             * is deleted.
+             */
+            virtual void onCreateClient(ServiceContext* service, Client* client) = 0;
+
+            /**
+             * Hook called on a "client" created by "service" before deleting "client".
+             *
+             * Like a destructor, must not throw exceptions.
+             */
+            virtual void onDestroyClient(ServiceContext* service, Client* client) = 0;
+        };
+
+        using ClientSet = unordered_set<Client*>;
+
+        /**
+         * Cursor for enumerating the live Client objects belonging to a ServiceContext.
+         *
+         * Lifetimes of this type are synchronized with client creation and destruction.
+         */
+        class LockedClientsCursor {
+        public:
+            /**
+             * Constructs a cursor for enumerating the clients of "service", blocking "service" from
+             * creating or destroying Client objects until this instance is destroyed.
+             */
+            explicit LockedClientsCursor(ServiceContext* service);
+
+            /**
+             * Returns the next client in the enumeration, or nullptr if there are no more clients.
+             */
+            Client* next();
+
+        private:
+            boost::unique_lock<boost::mutex> _lock;
+            ClientSet::const_iterator _curr;
+            ClientSet::const_iterator _end;
+        };
+
+        /**
+         * This is the unique handle type for Clients created by a ServiceContext.
+         */
+        using UniqueClient = std::unique_ptr<Client, ClientDeleter>;
+
+        virtual ~ServiceContext();
+
+        /**
+         * Registers an observer of lifecycle events on Clients created by this ServiceContext.
+         *
+         * See the ClientObserver type, above, for details.
+         *
+         * All calls to registerClientObserver must complete before ServiceContext
+         * is used in multi-threaded operation, or is used to create clients via calls
+         * to makeClient.
+         */
+        void registerClientObserver(std::unique_ptr<ClientObserver> observer);
+
+        /**
+         * Creates a new Client object representing a client session associated with this
+         * ServiceContext.
+         *
+         * The "desc" string is used to set a descriptive name for the client, used in logging.
+         *
+         * If supplied, "p" is the communication channel used for communicating with the client.
+         */
+        UniqueClient makeClient(std::string desc, AbstractMessagingPort* p = nullptr);
 
         //
         // Storage
@@ -174,7 +273,20 @@ namespace mongo {
         virtual OpObserver* getOpObserver() = 0;
 
     protected:
-        ServiceContext() { }
+        ServiceContext() = default;
+
+        /**
+         * Mutex used to synchronize access to mutable state of this ServiceContext instance,
+         * including possibly by its subclasses.
+         */
+        boost::mutex _mutex;
+
+    private:
+        /**
+         * Vector of registered observers.
+         */
+        std::vector<std::unique_ptr<ClientObserver>> _clientObservers;
+        ClientSet _clients;
     };
 
     /**

@@ -864,7 +864,7 @@ namespace {
 
         // --------- START REAL WORK ----------
 
-        audit::logDropIndex( currentClient.get(), indexName, _collection->ns().ns() );
+        audit::logDropIndex( &cc(), indexName, _collection->ns().ns() );
 
         invariant(_entries.release(entry->descriptor()) == entry);
         txn->recoveryUnit()->registerChange(new IndexRemoveChange(txn, _collection,

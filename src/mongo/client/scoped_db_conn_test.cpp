@@ -108,9 +108,6 @@ namespace mongo {
                 LastError * le) {
             boost::this_thread::interruption_point();
         }
-
-        virtual void disconnected(AbstractMessagingPort* p) {
-        }
     };
 }
 

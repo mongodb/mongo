@@ -58,7 +58,7 @@ namespace mongo {
     class CurOp::ClientCuropStack {
         MONGO_DISALLOW_COPYING(ClientCuropStack);
     public:
-        ClientCuropStack() : _base(this) {}
+        ClientCuropStack() : _base(nullptr, this) {}
 
         /**
          * Returns the top of the CurOp stack.
@@ -68,8 +68,19 @@ namespace mongo {
         /**
          * Adds "curOp" to the top of the CurOp stack for a client. Called by CurOp's constructor.
          */
-        void push(CurOp* curOp) {
-            boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
+        void push(Client* client, CurOp* curOp) {
+            invariant(client);
+            if (_client) {
+                invariant(_client == client);
+            }
+            else {
+                _client = client;
+            }
+            boost::lock_guard<Client> lk(*_client);
+            push_nolock(curOp);
+        }
+
+        void push_nolock(CurOp* curOp) {
             invariant(!curOp->_parent);
             curOp->_parent = _top;
             _top = curOp;
@@ -79,14 +90,31 @@ namespace mongo {
          * Pops the top off the CurOp stack for a Client. Called by CurOp's destructor.
          */
         CurOp* pop() {
-            boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
+            // It is not necessary to lock when popping the final item off of the curop stack. This
+            // is because the item at the base of the stack is owned by the stack itself, and is not
+            // popped until the stack is being destroyed.  By the time the stack is being destroyed,
+            // no other threads can be observing the Client that owns the stack, because it has been
+            // removed from its ServiceContext's set of owned clients.  Further, because the last
+            // item is popped in the destructor of the stack, and that destructor runs during
+            // destruction of the owning client, it is not safe to access other member variables of
+            // the client during the final pop.
+            const bool shouldLock = _top->_parent;
+            if (shouldLock) {
+                invariant(_client);
+                _client->lock();
+            }
             invariant(_top);
             CurOp* retval = _top;
             _top = _top->_parent;
+            if (shouldLock) {
+                _client->unlock();
+            }
             return retval;
         }
 
     private:
+        Client* _client = nullptr;
+
         // Top of the stack of CurOps for a Client.
         CurOp* _top = nullptr;
 
@@ -118,10 +146,15 @@ namespace mongo {
     CurOp* CurOp::get(const Client* client) { return _curopStack(client).top(); }
     CurOp* CurOp::get(const Client& client) { return _curopStack(client).top(); }
 
-    CurOp::CurOp(Client* client) : CurOp(&_curopStack(client)) {}
+    CurOp::CurOp(Client* client) : CurOp(client, &_curopStack(client)) {}
 
-    CurOp::CurOp(ClientCuropStack* stack) : _stack(stack) {
-        _stack->push(this);
+    CurOp::CurOp(Client* client, ClientCuropStack* stack) : _stack(stack) {
+        if (client) {
+            _stack->push(client, this);
+        }
+        else {
+            _stack->push_nolock(this);
+        }
         _start = 0;
         _active = false;
         _reset();

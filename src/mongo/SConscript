@@ -681,10 +681,13 @@ env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIBDEPS=[ 'db/c
 env.Library(
     target='service_context',
     source=[
+        'db/client.cpp',
+        'db/client_basic.cpp',
         'db/service_context.cpp',
         'db/service_context_noop.cpp',
     ],
     LIBDEPS=[
+        'lasterror',  # TODO(schwerin): REMOVE!
         'util/decorable',
          ])
 
@@ -717,7 +720,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/catalog/index_catalog.cpp",
                     "db/catalog/index_catalog_entry.cpp",
                     "db/catalog/index_create.cpp",
-                    "db/client.cpp",
                     "db/db_raii.cpp",
                     "db/clientcursor.cpp",
                     "db/cloner.cpp",
@@ -1118,7 +1120,6 @@ mongodOnlyFiles = [ "db/db.cpp", "db/mongod_options_init.cpp" ]
 env.Library(
     target='coreserver',
     source=[
-        'db/client_basic.cpp',
         'db/conn_pool_options.cpp',
         'db/log_process_details.cpp',
         'db/stats/counters.cpp',

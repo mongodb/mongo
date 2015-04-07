@@ -101,8 +101,6 @@ namespace {
             error() << "IndexBuilder could not build index: " << status.toString();
             fassert(28555, ErrorCodes::isInterruption(status.code()));
         }
-
-        txn.getClient()->shutdown();
     }
 
     Status IndexBuilder::buildInForeground(OperationContext* txn, Database* db) const {

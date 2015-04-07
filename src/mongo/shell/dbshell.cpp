@@ -179,7 +179,6 @@ void killOps() {
 
 // Stubs for signal_handlers.cpp
 namespace mongo {
-    void Client::initThread(const char *desc, mongo::AbstractMessagingPort *mp) {}
     void logProcessDetailsForLogRotate() {}
 
     void exitCleanly(ExitCode code) {

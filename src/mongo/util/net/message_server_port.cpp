@@ -260,7 +260,6 @@ namespace {
             if (manager)
                 manager->cleanupThreadLocals();
 #endif
-            handler->disconnected(portWithHandler.get());
 
             return NULL;
         }

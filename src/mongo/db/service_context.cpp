@@ -31,7 +31,9 @@
 #include "mongo/db/service_context.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -105,6 +107,73 @@ namespace mongo {
             }
         }
         return Status::OK();
+    }
+
+    ServiceContext::~ServiceContext() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_clients.empty());
+    }
+
+    ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
+                                                            AbstractMessagingPort* p) {
+        std::unique_ptr<Client> client(new Client(std::move(desc), this, p));
+        auto observer = _clientObservers.cbegin();
+        try {
+            for (; observer != _clientObservers.cend(); ++observer) {
+                observer->get()->onCreateClient(this, client.get());
+            }
+        }
+        catch (...) {
+            try {
+                while (observer != _clientObservers.cbegin()) {
+                    --observer;
+                    observer->get()->onDestroyClient(this, client.get());
+                }
+            }
+            catch (...) {
+                std::terminate();
+            }
+            throw;
+        }
+        {
+            boost::lock_guard<boost::mutex> lk(_mutex);
+            invariant(_clients.insert(client.get()).second);
+        }
+        return UniqueClient(client.release());
+    }
+
+    void ServiceContext::ClientDeleter::operator()(Client* client) const {
+        ServiceContext* const service = client->getServiceContext();
+        {
+            boost::lock_guard<boost::mutex> lk(service->_mutex);
+            invariant(service->_clients.erase(client));
+        }
+        try {
+            for (const auto& observer : service->_clientObservers) {
+                observer->onDestroyClient(service, client);
+            }
+        }
+        catch (...) {
+            std::terminate();
+        }
+        delete client;
+    }
+
+    void ServiceContext::registerClientObserver(std::unique_ptr<ClientObserver> observer) {
+        _clientObservers.push_back(std::move(observer));
+    }
+
+    ServiceContext::LockedClientsCursor::LockedClientsCursor(ServiceContext* service)
+        : _lock(service->_mutex),
+          _curr(service->_clients.cbegin()),
+          _end(service->_clients.cend()) {}
+
+    Client* ServiceContext::LockedClientsCursor::next() {
+        if (_curr == _end)
+            return nullptr;
+        Client* result = *_curr;
+        ++_curr;
+        return result;
     }
 
 }  // namespace mongo

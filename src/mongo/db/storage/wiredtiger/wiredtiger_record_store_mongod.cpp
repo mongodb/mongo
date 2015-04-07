@@ -133,8 +133,6 @@ namespace mongo {
                     }
                 }
 
-                cc().shutdown();
-
                 log() << "shutting down";
             }
 

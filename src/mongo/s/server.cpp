@@ -184,10 +184,6 @@ namespace mongo {
             // Release connections back to pool, if any still cached
             ShardConnection::releaseMyConnections();
         }
-
-        virtual void disconnected( AbstractMessagingPort* p ) {
-            // all things are thread local
-        }
     };
 
     void start( const MessageServer::Options& opts ) {

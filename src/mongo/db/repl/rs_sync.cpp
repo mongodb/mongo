@@ -142,7 +142,6 @@ namespace repl {
                 sleepsecs(10);
             }
         }
-        cc().shutdown();
     }
 
 } // namespace repl

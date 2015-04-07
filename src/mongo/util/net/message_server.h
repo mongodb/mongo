@@ -54,11 +54,6 @@ namespace mongo {
          * handler is responsible for responding to client
          */
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * err ) = 0;
-
-        /**
-         * called once when a socket is disconnected
-         */
-        virtual void disconnected( AbstractMessagingPort* p ) = 0;
     };
 
     class MessageServer {

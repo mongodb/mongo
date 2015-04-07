@@ -58,53 +58,6 @@ namespace mongo {
         ClusterLastErrorInfo::get(cc()).addShardHost(addr);
     }
 
-    TSP_DEFINE(Client,currentClient)
-
-    Client::Client(const string& desc, ServiceContext* serviceContext, AbstractMessagingPort *p) :
-        ClientBasic(serviceContext, p),
-        _desc(desc),
-        _connectionId(),
-        _inDirectClient(false) {
-    }
-    Client::~Client() {}
-    void Client::shutdown() {}
-
-    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-        initThread(desc, getGlobalServiceContext(), mp);
-    }
-
-    void Client::initThread(const char* desc,
-                            ServiceContext* serviceContext,
-                            AbstractMessagingPort *mp) {
-
-        verify(currentClient.get() == 0);
-
-        string fullDesc = desc;
-        if ( str::equals( "conn" , desc ) && mp != NULL )
-            fullDesc = str::stream() << desc << mp->connectionId();
-
-        setThreadName( fullDesc.c_str() );
-
-        Client *c = new Client(fullDesc, serviceContext, mp);
-        currentClient.reset(c);
-        mongo::lastError.initThread();
-        AuthorizationSession::set(c, getGlobalAuthorizationManager()->makeAuthorizationSession());
-    }
-
-    ClientBasic* ClientBasic::getCurrent() {
-        return currentClient.get();
-    }
-
-    string Client::clientAddress(bool includePort) const {
-        if (!hasRemote()) {
-            return "";
-        }
-        if (includePort) {
-            return getRemote().toString();
-        }
-        return getRemote().host();
-    }
-
     // Need a version that takes a Client to match the mongod interface so the web server can call
     // execCommand and not need to worry if it's in a mongod or mongos.
     void Command::execCommand(OperationContext* txn,

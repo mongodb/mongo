@@ -2654,7 +2654,6 @@ namespace mongo {
         txn.getCurOp()->reset();
 
         migrateStatus.go(&txn, ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
-        cc().shutdown();
     }
 
     /**

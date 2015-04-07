@@ -50,8 +50,7 @@ namespace mongo {
     using std::string;
 
     void RangeDeleterDBEnv::initThread() {
-        if ( currentClient.get() == NULL )
-            Client::initThread( "RangeDeleter" );
+        Client::initThreadIfNotAlready("RangeDeleter");
     }
 
     /**
@@ -76,11 +75,7 @@ namespace mongo {
         const bool fromMigrate = taskDetails.options.fromMigrate;
         const bool onlyRemoveOrphans = taskDetails.options.onlyRemoveOrphanedDocs;
 
-        const bool initiallyHaveClient = haveClient();
-
-        if (!initiallyHaveClient) {
-            Client::initThread("RangeDeleter");
-        }
+        Client::initThreadIfNotAlready("RangeDeleter");
 
         *deletedDocs = 0;
         ShardForceVersionOkModeBlock forceVersion;
@@ -119,10 +114,6 @@ namespace mongo {
                     *errMsg = "collection or index dropped before data could be cleaned";
                     warning() << *errMsg << endl;
 
-                    if (!initiallyHaveClient) {
-                        txn->getClient()->shutdown();
-                    }
-
                     return false;
                 }
 
@@ -139,16 +130,8 @@ namespace mongo {
                                         << " -> " << exclusiveUpper
                                         << ", cause by:" << causedBy(ex);
 
-                if (!initiallyHaveClient) {
-                    txn->getClient()->shutdown();
-                }
-
                 return false;
             }
-        }
-
-        if (!initiallyHaveClient) {
-            txn->getClient()->shutdown();
         }
 
         return true;

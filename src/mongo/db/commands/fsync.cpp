@@ -75,7 +75,6 @@ namespace mongo {
             catch ( std::exception& e ) {
                 error() << "FSyncLockThread exception: " << e.what() << endl;
             }
-            cc().shutdown();
         }
     };
 

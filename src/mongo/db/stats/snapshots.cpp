@@ -109,8 +109,6 @@ namespace mongo {
 
     void SnapshotThread::run() {
         Client::initThread("snapshot");
-        Client& client = cc();
-
         while ( ! inShutdown() ) {
             try {
                 statsSnapshots.takeSnapshot();
@@ -121,8 +119,6 @@ namespace mongo {
 
             sleepsecs(4);
         }
-
-        client.shutdown();
     }
 
     Snapshots statsSnapshots;

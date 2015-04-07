@@ -40,8 +40,6 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -52,17 +50,29 @@ namespace mongo {
 
     using logger::LogComponent;
 
-    boost::mutex Client::clientsMutex;
-    ClientSet Client::clients;
+    TSP_DECLARE(ServiceContext::UniqueClient, currentClient)
+    TSP_DEFINE(ServiceContext::UniqueClient, currentClient)
 
-    TSP_DEFINE(Client, currentClient)
+    void Client::initThreadIfNotAlready(const char* desc) {
+        if (currentClient.getMake()->get())
+            return;
+        initThread(desc);
+    }
+
+    void Client::initThreadIfNotAlready() {
+        initThreadIfNotAlready(getThreadName().c_str());
+    }
+
+    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+        initThread(desc, getGlobalServiceContext(), mp);
+    }
 
     /**
      * This must be called whenever a new thread is started, so that active threads can be tracked
      * so each thread has a Client object in TLS.
      */
-    void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-        invariant(currentClient.get() == 0);
+    void Client::initThread(const char *desc, ServiceContext* service, AbstractMessagingPort *mp) {
+        invariant(currentClient.getMake()->get() == nullptr);
 
         std::string fullDesc;
         if (mp != NULL) {
@@ -76,43 +86,16 @@ namespace mongo {
         mongo::lastError.initThread();
 
         // Create the client obj, attach to thread
-        Client* client = new Client(fullDesc, getGlobalServiceContext(), mp);
-        AuthorizationSession::set(client,
-                                  getGlobalAuthorizationManager()->makeAuthorizationSession());
-
-        currentClient.reset(client);
-
-        // This makes the client visible to maintenance threads
-        boost::lock_guard<boost::mutex> clientLock(clientsMutex);
-        clients.insert(client);
+        *currentClient.get() = service->makeClient(fullDesc, mp);
     }
 
-    Client::Client(const std::string& desc,
+    Client::Client(std::string desc,
                    ServiceContext* serviceContext,
                    AbstractMessagingPort *p)
         : ClientBasic(serviceContext, p),
-          _desc(desc),
+          _desc(std::move(desc)),
           _threadId(boost::this_thread::get_id()),
-          _connectionId(p ? p->connectionId() : 0),
-          _inDirectClient(false),
-          _txn(NULL) {
-    }
-
-    Client::~Client() {
-        if ( ! inShutdown() ) {
-            // we can't clean up safely once we're in shutdown
-            {
-                boost::lock_guard<boost::mutex> clientLock(clientsMutex);
-                clients.erase(this);
-            }
-        }
-    }
-
-    void Client::shutdown() {
-        if (!inShutdown()) {
-            boost::lock_guard<boost::mutex> clientLock(clientsMutex);
-            clients.erase(this);
-        }
+          _connectionId(p ? p->connectionId() : 0) {
     }
 
     void Client::reportState(BSONObjBuilder& builder) {
@@ -152,12 +135,15 @@ namespace mongo {
     }
 
     ClientBasic* ClientBasic::getCurrent() {
-        return currentClient.get();
+        return currentClient.getMake()->get();
     }
 
-    void saveGLEStats(const BSONObj& result, const std::string& conn) {
-        // This can be called in mongod, which is unfortunate.  To fix this,
-        // we can redesign how connection pooling works on mongod for sharded operations.
+    Client& cc() {
+        Client* c = currentClient.getMake()->get();
+        verify(c);
+        return *c;
     }
+
+    bool haveClient() { return currentClient.getMake()->get(); }
 
 } // namespace mongo

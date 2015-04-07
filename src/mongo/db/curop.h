@@ -327,7 +327,7 @@ namespace mongo {
 
         static const Client::Decoration<ClientCuropStack> _curopStack;
 
-        explicit CurOp(ClientCuropStack*);
+        CurOp(Client*, ClientCuropStack*);
 
         void _reset();
 

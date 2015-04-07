@@ -889,8 +889,6 @@ namespace {
         journalWriter.shutdown();
 
         log() << "Durability thread stopped";
-
-        cc().shutdown();
     }
 
 

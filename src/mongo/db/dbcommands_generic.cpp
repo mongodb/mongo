@@ -288,12 +288,8 @@ namespace mongo {
             }
             ::abort();
         }
-        Client * c = currentClient.get();
-        if ( c ) {
-            c->shutdown();
-        }
 
-        log() << "terminating, shutdown command received" << endl;
+        log() << "terminating, shutdown command received";
 
 #if defined(_WIN32)
         // Signal the ServiceMain thread to shutdown.

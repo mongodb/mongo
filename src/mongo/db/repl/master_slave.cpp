@@ -1362,11 +1362,7 @@ namespace repl {
     int _dummy_z;
 
     void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
-        Client *c = currentClient.get();
-        if( c == 0 ) {
-            Client::initThread("pretouchN");
-            c = &cc();
-        }
+        Client::initThreadIfNotAlready("pretouchN");
 
         OperationContextImpl txn; // XXX
         ScopedTransaction transaction(&txn, MODE_S);

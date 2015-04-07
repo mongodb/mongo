@@ -208,7 +208,6 @@ namespace repl {
                 _positionChanged = true;
             }
         }
-        cc().shutdown();
     }
 } // namespace repl
 } // namespace mongo

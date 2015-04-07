@@ -399,7 +399,6 @@ namespace PerfTests {
                 if( stop ) 
                     break;
             }
-            cc().shutdown();
         }
 
         unsigned long long launchThreads(int remaining) {

@@ -76,21 +76,19 @@ namespace {
 
                << "</tr>\n";
             
-            _processAllClients(ss);
+            _processAllClients(txn->getClient()->getServiceContext(), ss);
             
             ss << "</table>\n";
         }
 
     private:
 
-        static void _processAllClients(std::stringstream& ss) {
+        static void _processAllClients(ServiceContext* service, std::stringstream& ss) {
             using namespace html;
 
-            boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
+            for (ServiceContext::LockedClientsCursor cursor(service);
+                 Client* client = cursor.next();) {
 
-            ClientSet::const_iterator it = Client::clients.begin();
-            for (; it != Client::clients.end(); it++) {
-                Client* client = *it;
                 invariant(client);
 
                 // Make the client stable
@@ -186,7 +184,9 @@ namespace {
                 filter.reset( res.getValue() );
             }
 
-            result.appendArray("operations", _processAllClients(filter.get()));
+            result.appendArray(
+                    "operations",
+                    _processAllClients(txn->getClient()->getServiceContext(), filter.get()));
 
             return true;
         }
@@ -194,14 +194,12 @@ namespace {
 
     private:
 
-        static BSONArray _processAllClients(MatchExpression* matcher) {
+        static BSONArray _processAllClients(ServiceContext* service, MatchExpression* matcher) {
             BSONArrayBuilder array;
 
-            boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
+            for (ServiceContext::LockedClientsCursor cursor(service);
+                 Client* client = cursor.next();) {
 
-            ClientSet::const_iterator it = Client::clients.begin();
-            for (; it != Client::clients.end(); it++) {
-                Client* client = *it;
                 invariant(client);
 
                 BSONObjBuilder b;

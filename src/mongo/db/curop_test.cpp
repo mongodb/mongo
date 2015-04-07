@@ -31,9 +31,6 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/base/init.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
@@ -73,19 +70,14 @@ namespace mongo {
             while (Listener::getElapsedTimeMillis() == 0) {
                 sleepmillis(10);
             }
-
-            auto service = stdx::make_unique<ServiceContextNoop>();
-            AuthorizationManager::set(
-                    service.get(),
-                    stdx::make_unique<AuthorizationManager>(new AuthzManagerExternalStateMock()));
-            setGlobalServiceContext(std::move(service));
-            Client::initThread("CurOpTestMain");
             return Status::OK();
         }
 
         // Long operation + short timeout => time should expire.
         TEST(TimeHasExpired, PosSimple) {
-            CurOp curOp(&cc());
+            auto service = stdx::make_unique<ServiceContextNoop>();
+            auto client = service->makeClient("CurOpTest");
+            CurOp curOp(client.get());
             curOp.setMaxTimeMicros(intervalShort);
             curOp.ensureStarted();
             sleepmicros(intervalLong);
@@ -94,7 +86,9 @@ namespace mongo {
 
         // Short operation + long timeout => time should not expire.
         TEST(TimeHasExpired, NegSimple) {
-            CurOp curOp(&cc());
+            auto service = stdx::make_unique<ServiceContextNoop>();
+            auto client = service->makeClient("CurOpTest");
+            CurOp curOp(client.get());
             curOp.setMaxTimeMicros(intervalLong);
             curOp.ensureStarted();
             sleepmicros(intervalShort);

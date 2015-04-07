@@ -279,8 +279,6 @@ namespace {
         }
 
         log() << "Journal writer thread stopped";
-
-        cc().shutdown();
     }
 
 

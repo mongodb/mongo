@@ -591,8 +591,6 @@ namespace {
         Client::initThread("websvr");
 
         dbWebServer->initAndListen();
-
-        cc().shutdown();
     }
 
 } // namespace mongo

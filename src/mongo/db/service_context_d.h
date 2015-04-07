@@ -33,7 +33,6 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -85,7 +84,7 @@ namespace mongo {
 
         bool _globalKill;
 
-        // protected by Client::clientsMutex
+        // protected by parent class's _mutex
         std::vector<KillOpListenerInterface*> _killOpListeners;
 
         boost::scoped_ptr<StorageEngineLockFile> _lockFile;

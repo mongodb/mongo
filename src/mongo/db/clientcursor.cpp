@@ -290,7 +290,6 @@ namespace mongo {
 
         void run() {
             Client::initThread("clientcursormon");
-            Client& client = cc();
             Timer t;
             const int Secs = 4;
             while (!inShutdown()) {
@@ -299,7 +298,6 @@ namespace mongo {
                     CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
                 sleepsecs(Secs);
             }
-            client.shutdown();
         }
     };
 

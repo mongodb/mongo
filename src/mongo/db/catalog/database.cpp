@@ -380,7 +380,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForNs( fullns );
 
-        audit::logDropCollection( currentClient.get(), fullns );
+        audit::logDropCollection( &cc(), fullns );
 
         Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
         if ( !s.isOK() ) {
@@ -450,7 +450,7 @@ namespace mongo {
                                        StringData toNS,
                                        bool stayTemp ) {
 
-        audit::logRenameCollection( currentClient.get(), fromNS, toNS );
+        audit::logRenameCollection( &cc(), fromNS, toNS );
         invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         { // remove anything cached
@@ -508,7 +508,7 @@ namespace mongo {
         NamespaceString nss( ns );
         uassert( 17316, "cannot create a blank collection", nss.coll() > 0 );
 
-        audit::logCreateCollection( currentClient.get(), ns );
+        audit::logCreateCollection( &cc(), ns );
 
         txn->recoveryUnit()->registerChange( new AddCollectionChange(this, ns) );
 
@@ -577,7 +577,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(name.c_str());
 
-        audit::logDropDatabase( currentClient.get(), name );
+        audit::logDropDatabase( &cc(), name );
 
         dbHolder().close( txn, name );
         db = NULL; // d is now deleted

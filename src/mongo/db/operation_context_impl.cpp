@@ -74,7 +74,7 @@ namespace {
     using std::string;
 
     OperationContextImpl::OperationContextImpl()
-        : _client(currentClient.get()),
+        : _client(&cc()),
           _locker(clientOperationInfoDecoration(_client).getLocker()),
           _writesAreReplicated(true) {
 

@@ -162,8 +162,6 @@ namespace {
                 fassertFailed(28546);
             }
         }
-
-        cc().shutdown();
     }
 
     void BackgroundSync::_producerThread() {

@@ -50,8 +50,6 @@ namespace mongo {
     class ClientBasic : public Decorable<ClientBasic> {
         MONGO_DISALLOW_COPYING(ClientBasic);
     public:
-        virtual ~ClientBasic();
-
         bool getIsLocalHostConnection() {
             if (!hasRemote()) {
                 return false;
@@ -59,8 +57,8 @@ namespace mongo {
             return getRemote().isLocalHost();
         }
 
-        virtual bool hasRemote() const { return _messagingPort; }
-        virtual HostAndPort getRemote() const {
+        bool hasRemote() const { return _messagingPort; }
+        HostAndPort getRemote() const {
             verify( _messagingPort );
             return _messagingPort->remote();
         }
@@ -79,6 +77,7 @@ namespace mongo {
 
     protected:
         ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort);
+        ~ClientBasic();
 
     private:
         ServiceContext* const _serviceContext;

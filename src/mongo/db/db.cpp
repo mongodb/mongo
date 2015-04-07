@@ -199,12 +199,6 @@ namespace mongo {
                 break;
             }
         }
-
-        virtual void disconnected( AbstractMessagingPort* p ) {
-            Client * c = currentClient.get();
-            if( c ) c->shutdown();
-        }
-
     };
 
     static void logStartup() {
@@ -516,7 +510,6 @@ namespace mongo {
 
         if (storageGlobalParams.upgrade) {
             log() << "finished checking dbs" << endl;
-            cc().shutdown();
             exitCleanly(EXIT_CLEAN);
         }
 

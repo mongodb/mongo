@@ -912,7 +912,16 @@ namespace {
 
         const string changeID = changeIdBuilder.str();
 
-        Client* const client = (opCtx ? opCtx->getClient() : currentClient.get());
+        Client* client;
+        if (opCtx) {
+            client = opCtx->getClient();
+        }
+        else if (haveClient()) {
+            client = &cc();
+        }
+        else {
+            client = nullptr;
+        }
 
         // Send a copy of the message to the local log in case it doesn't manage to reach
         // config.changelog

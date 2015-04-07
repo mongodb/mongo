@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/service_context_d.h"
 
 #include "mongo/base/init.h"
@@ -169,7 +171,7 @@ namespace mongo {
     }
 
     void ServiceContextMongoD::setKillAllOperations() {
-        boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> clientLock(_mutex);
         _globalKill = true;
         for (size_t i = 0; i < _killOpListeners.size(); i++) {
             try {
@@ -210,13 +212,7 @@ namespace mongo {
     }
 
     bool ServiceContextMongoD::killOperation(unsigned int opId) {
-        boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
-
-        for(ClientSet::const_iterator j = Client::clients.begin();
-                j != Client::clients.end(); ++j) {
-
-            Client* client = *j;
-
+        for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
             bool found = _killOperationsAssociatedWithClientAndOpId_inlock(client, opId);
             if (found) {
                 return true;
@@ -227,11 +223,7 @@ namespace mongo {
     }
 
     void ServiceContextMongoD::killAllUserOperations(const OperationContext* txn) {
-        boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
-        for (ClientSet::const_iterator i = Client::clients.begin();
-                i != Client::clients.end(); i++) {
-
-            Client* client = *i;
+        for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
             if (!client->isFromUserConnection()) {
                 // Don't kill system operations.
                 continue;
@@ -256,7 +248,7 @@ namespace mongo {
     }
 
     void ServiceContextMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
-        boost::lock_guard<boost::mutex> clientLock(Client::clientsMutex);
+        boost::lock_guard<boost::mutex> clientLock(_mutex);
         _killOpListeners.push_back(listener);
     }
 

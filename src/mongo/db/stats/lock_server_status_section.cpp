@@ -55,35 +55,28 @@ namespace {
             int numWaitingWrite = 0;
 
             // This returns the blocked lock states
-            {
-                boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
+            for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
+                 Client* client = cursor.next();) {
 
-                // Count all clients
-                numTotal = Client::clients.size();
+                invariant(client);
+                ++numTotal;
+                boost::unique_lock<Client> uniqueLock(*client);
 
-                ClientSet::const_iterator it = Client::clients.begin();
-                for (; it != Client::clients.end(); it++) {
-                    Client* client = *it;
-                    invariant(client);
+                const OperationContext* opCtx = client->getOperationContext();
+                if (opCtx == NULL) continue;
 
-                    boost::unique_lock<Client> uniqueLock(*client);
+                if (opCtx->lockState()->isWriteLocked()) {
+                    numWriteLocked++;
 
-                    const OperationContext* opCtx = client->getOperationContext();
-                    if (opCtx == NULL) continue;
-
-                    if (opCtx->lockState()->isWriteLocked()) {
-                        numWriteLocked++;
-
-                        if (opCtx->lockState()->getWaitingResource().isValid()) {
-                            numWaitingWrite++;
-                        }
+                    if (opCtx->lockState()->getWaitingResource().isValid()) {
+                        numWaitingWrite++;
                     }
-                    else if (opCtx->lockState()->isReadLocked()) {
-                        numReadLocked++;
+                }
+                else if (opCtx->lockState()->isReadLocked()) {
+                    numReadLocked++;
 
-                        if (opCtx->lockState()->getWaitingResource().isValid()) {
-                            numWaitingRead++;
-                        }
+                    if (opCtx->lockState()->getWaitingResource().isValid()) {
+                        numWaitingRead++;
                     }
                 }
             }

@@ -101,11 +101,9 @@ namespace mongo {
 
             BSONArrayBuilder inprogBuilder(result.subarrayStart("inprog"));
 
-            boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
+            for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
+                 Client* client = cursor.next();) {
 
-            ClientSet::const_iterator it = Client::clients.begin();
-            for ( ; it != Client::clients.end(); it++) {
-                Client* client = *it;
                 invariant(client);
 
                 boost::unique_lock<Client> uniqueLock(*client);

@@ -1433,4 +1433,12 @@ namespace mongo {
 
     void usingAShardConnection( const string& addr ) {
     }
+
+    void saveGLEStats(const BSONObj& result, const std::string& conn) {
+        // Declared in cluster_last_error_info.h.
+        //
+        // This can be called in mongod, which is unfortunate.  To fix this,
+        // we can redesign how connection pooling works on mongod for sharded operations.
+    }
+
 }

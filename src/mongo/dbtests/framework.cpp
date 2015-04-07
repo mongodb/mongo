@@ -132,7 +132,6 @@ namespace mongo {
                                                     frameworkGlobalParams.runsPerTest);
 
 
-            cc().shutdown();
             exitCleanly( (ExitCode)ret ); // so everything shuts down cleanly
             return ret;
         }

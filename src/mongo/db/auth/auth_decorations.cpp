@@ -34,8 +34,9 @@
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -49,6 +50,17 @@ namespace {
 
     const auto getAuthorizationSession =
         ClientBasic::declareDecoration<std::unique_ptr<AuthorizationSession>>();
+
+    class AuthzClientObserver final : public ServiceContext::ClientObserver {
+    public:
+        void onCreateClient(ServiceContext* service, Client* client) override {
+            AuthorizationSession::set(
+                    client,
+                    AuthorizationManager::get(service)->makeAuthorizationSession());
+        }
+
+        void onDestroyClient(ServiceContext* service, Client* client) override {}
+    };
 
 }  // namespace
 
@@ -79,6 +91,7 @@ namespace {
         invariant(authzManager);
         invariant(!manager);
         manager = std::move(authzManager);
+        service->registerClientObserver(stdx::make_unique<AuthzClientObserver>());
     }
 
     AuthorizationSession* AuthorizationSession::get(ClientBasic* client) {

@@ -1263,7 +1263,7 @@ namespace {
     }
 
     NOINLINE_DECL void dbexit( ExitCode rc, const char *why ) {
-        audit::logShutdown(currentClient.get());
+        audit::logShutdown(&cc());
 
         log(LogComponent::kControl) << "dbexit: " << why << " rc: " << rc;
 

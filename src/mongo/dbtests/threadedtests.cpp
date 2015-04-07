@@ -246,7 +246,6 @@ namespace ThreadedTests {
                 }
                 pm.hit();
             }
-            cc().shutdown();
         }
 
         virtual void validate() {
@@ -568,8 +567,6 @@ namespace ThreadedTests {
             default:
                 ASSERT(false);
             }
-
-            cc().shutdown();
         }
     };
 
@@ -736,7 +733,6 @@ namespace ThreadedTests {
                 LOG(Z) << t.millis() << endl;
                 ASSERT( t.millis() > 50 );
             }
-            cc().shutdown();
         }
     };
 
@@ -800,9 +796,6 @@ namespace ThreadedTests {
                     mongo::unittest::log() << "checked in " << i << " times..." << endl;
 
             }
-
-            cc().shutdown();
-
         }
 
         virtual void validate() {
