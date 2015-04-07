@@ -421,35 +421,35 @@ var primaryChanged = function(conns, replTest, primaryIndex) {
 };
 
 /*
- * If we have determined a collection doesn't match on two hosts, use this to print out the
+ * If we have determined a collection doesn't match on two hosts, use this to get a string of the
  * differences.
  */
-function printCollectionDiff(db1, db2, collName) {
+function getCollectionDiff(db1, db2, collName) {
     var coll1 = db1[collName];
     var coll2 = db2[collName];
     var cur1 = coll1.find().sort({$natural: 1});
     var cur2 = coll2.find().sort({$natural: 1});
+    var diffText = "";
     while (cur1.hasNext() && cur2.hasNext()) {
         var doc1 = cur1.next();
         var doc2 = cur2.next();
         if (doc1 != doc2) {
-            print("Mismatching doc:");
-            printjson(doc1);
-            printjson(doc2);
+            diffText += "mismatching doc:" + tojson(doc1) + tojson(doc2);
         }
     }
     if (cur1.hasNext()) {
-        print(db1.getMongo().host + " has extra documents:");
+        diffText += db1.getMongo().host + " has extra documents:";
         while (cur1.hasNext()) {
-            printjson(cur1.next());
+            diffText += "\n" + tojson(cur1.next());
         }
     }
     if (cur2.hasNext()) {
-        print(db2.getMongo().host + " has extra documents:");
+        diffText += db2.getMongo().host + " has extra documents:";
         while (cur2.hasNext()) {
-            printjson(cur2.next());
+            diffText += "\n" + tojson(cur2.next());
         }
     }
+    return diffText;
 }
 
 /*
@@ -463,31 +463,40 @@ function assertDBsEq(db1, db2) {
     var host1 = db1.getMongo().host;
     var host2 = db2.getMongo().host;
     var success = true;
+    var collNames1 = db1.getCollectionNames();
+    var collNames2 = db2.getCollectionNames();
+    var diffText = "";
     if (db1.getName() === 'local') {
-        // We don't expect the entire local collection to be the same, just the oplog.
-        if (hash1.collections["oplog.rs"] !== hash2.collections["oplog.rs"]) {
-            success = false;
-            print("oplog differs on " + host1 + " and " + host2);
-            printCollectionDiff(db1.oplog.rs, db2.oplog.rs);
-        }
+        // We don't expect the entire local collection to be the same, not even the oplog, since
+        // it's a capped collection.
+        return;
     }
     else if (hash1.md5 != hash2.md5) {
-        print("Database " + db1.getName() + " differs on " + host1 + " and " + host2);
-        var collNames1 = db1.getCollectionNames();
-        var collNames2 = db2.getCollectionNames();
-        print("Collections: ");
-        print(collNames1);
-        print(collNames2);
         for (var i = 0; i < Math.min(collNames1.length, collNames2.length); i++) {
             var collName = collNames1[i];
             if (hash1.collections[collName] !== hash2.collections[collName]) {
-                success = false;
-                print(collName + " differs:");
-                printCollectionDiff(db1, db2, collName);
+                if (db1[collName].stats().capped) {
+                    if (!db2[collName].stats().capped) {
+                        success = false;
+                        diffText += "\n" + collName + " is capped on " + host1 + " but not on " +
+                                     host2;
+                    }
+                    else {
+                        // Skip capped collections. They are not expected to be the same from host
+                        // to host.
+                        continue;
+                    }
+                }
+                else {
+                    success = false;
+                    diffText += "\n" + collName + " differs: " +
+                                getCollectionDiff(db1, db2, collName);
+                }
             }
         }
     }
-    assert.eq(success, true, "Database(s) not equal. See output above.");
+    assert.eq(success, true, "Database " + db1.getName() + " differs on " + host1 + " and " +
+              host2 + "\nCollections: " + collNames1 + " vs. " + collNames2 + "\n" + diffText);
 }
 
 /*
@@ -594,7 +603,6 @@ function doMultiThreadedWork(primary, numThreads) {
     // Ensure all are synced.
     replTest.awaitSecondaryNodes(120000);
     var primary = replTest.getPrimary();
-
 
     // Keep track of the indices of different types of primaries.
     // We'll rotate to get a primary of each type.
