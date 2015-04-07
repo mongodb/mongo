@@ -95,7 +95,7 @@ namespace mongo {
         const CurOp _base;
     };
 
-    const Client::Decoration<ClientCuropStack> CurOp::_curopStack =
+    const Client::Decoration<CurOp::ClientCuropStack> CurOp::_curopStack =
         Client::declareDecoration<CurOp::ClientCuropStack>();
 
     // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
