@@ -10,6 +10,12 @@ db = conn.getDB("test");
 conn.forceWriteMode("commands");
 
 function doTest() {
+    "use strict"
+
+    // Some tests use "conn" and can override the "conn" defined above, so save a copy of it here
+    // in local scope.
+    var myConn = conn.port;
+
     var files = listFiles("jstests/core");
     files = files.sort(compareOn('name'));
 
@@ -37,7 +43,7 @@ function doTest() {
         }
     );
 
-    MongoRunner.stopMongod(conn);
+    MongoRunner.stopMongod(myConn);
 
     var runnerEnd = new Date()
 
