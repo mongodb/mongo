@@ -27,9 +27,13 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/disallow_copying.h"
 
 namespace mongo {
+
+    class ClientBasic;
 
     /**
      * Abstract type representing an ongoing authentication session.
@@ -44,7 +48,17 @@ namespace mongo {
             SESSION_TYPE_SASL  // SASL authentication mechanism.
         };
 
-        virtual ~AuthenticationSession() {}
+        /**
+         * Sets the authentication session for the given "client" to "newSession".
+         */
+        static void set(ClientBasic* client, std::unique_ptr<AuthenticationSession> newSession);
+
+        /**
+         * Swaps "client"'s current authentication session with "other".
+         */
+        static void swap(ClientBasic* client, std::unique_ptr<AuthenticationSession>& other);
+
+        virtual ~AuthenticationSession() = default;
 
         /**
          * Return an identifer of the type of session, so that a caller can safely cast it and

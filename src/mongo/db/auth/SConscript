@@ -44,6 +44,7 @@ env.Library('authcommon',
 env.Library('authservercommon',
             ['authorization_manager_global.cpp',
              'authz_session_external_state_server_common.cpp',
+             'client_auth_session.cpp',
              'sasl_commands.cpp',
              'security_key.cpp'],
             LIBDEPS=['authcommon', 'authcore', 'authmocks', 'saslauth'])

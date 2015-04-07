@@ -32,7 +32,6 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
 
 namespace mongo {
@@ -42,22 +41,6 @@ namespace mongo {
     ClientBasic::ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort) :
         _serviceContext(serviceContext), _messagingPort(messagingPort) {}
     ClientBasic::~ClientBasic() {}
-
-    AuthenticationSession* ClientBasic::getAuthenticationSession() {
-        return _authenticationSession.get();
-    }
-
-    void ClientBasic::resetAuthenticationSession(
-            AuthenticationSession* newSession) {
-
-        _authenticationSession.reset(newSession);
-    }
-
-    void ClientBasic::swapAuthenticationSession(
-            scoped_ptr<AuthenticationSession>& other) {
-
-        _authenticationSession.swap(other);
-    }
 
     bool ClientBasic::hasAuthorizationSession() const {
         return _authorizationSession.get();

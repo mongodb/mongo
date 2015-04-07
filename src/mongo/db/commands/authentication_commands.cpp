@@ -56,6 +56,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
@@ -117,8 +118,9 @@ namespace mongo {
             stringstream ss;
             ss << hex << n;
             result.append("nonce", ss.str() );
-            ClientBasic::getCurrent()->resetAuthenticationSession(
-                    new MongoAuthenticationSession(n));
+            AuthenticationSession::set(
+                    ClientBasic::getCurrent(),
+                    stdx::make_unique<MongoAuthenticationSession>(n));
             return true;
         }
 
@@ -246,8 +248,8 @@ namespace mongo {
 
         {
             ClientBasic *client = ClientBasic::getCurrent();
-            boost::scoped_ptr<AuthenticationSession> session;
-            client->swapAuthenticationSession(session);
+            std::unique_ptr<AuthenticationSession> session;
+            AuthenticationSession::swap(client, session);
             if (!session || session->getType() != AuthenticationSession::SESSION_TYPE_MONGO) {
                 sleepmillis(30);
                 return Status(ErrorCodes::ProtocolError, "No pending nonce");
