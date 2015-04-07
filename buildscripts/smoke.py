@@ -258,6 +258,8 @@ class mongod(NullMongod):
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
                      '--sslCAFile', 'jstests/libs/ca.pem',
                      '--sslAllowConnectionsWithoutCertificates']
+        if self.kwargs.get('rlp_path'):
+            argv += ['--basisTechRootDirectory', self.kwargs.get('rlp_path')]
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
@@ -691,6 +693,7 @@ def run_tests(tests):
                             auth=auth,
                             authMechanism=authMechanism,
                             keyFile=keyFile,
+                            rlp_path=rlp_path,
                             use_ssl=use_ssl)
             master.start()
 
@@ -718,6 +721,7 @@ def run_tests(tests):
                            auth=auth,
                            authMechanism=authMechanism,
                            keyFile=keyFile,
+                           rlp_path=rlp_path,
                            use_ssl=use_ssl)
             slave.start()
             primary = MongoClient(port=master.port);
@@ -800,6 +804,7 @@ def run_tests(tests):
                                         auth=auth,
                                         authMechanism=authMechanism,
                                         keyFile=keyFile,
+                                        rlp_path=rlp_path,
                                         use_ssl=use_ssl)
                         master.start()
 
@@ -1082,6 +1087,7 @@ def set_globals(options, tests):
     global small_oplog, small_oplog_rs
     global no_journal, set_parameters, set_parameters_mongos, no_preallocj, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
     global auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
+    global rlp_path
     global use_ssl
     global file_of_commands_mode
     global report_file, shell_write_mode, use_write_commands
@@ -1121,6 +1127,7 @@ def set_globals(options, tests):
     auth = options.auth
     authMechanism = options.authMechanism
     keyFile = options.keyFile
+    rlp_path = options.rlp_path
 
     clean_every_n_tests = options.clean_every_n_tests
     clean_whole_dbroot = options.with_cleanbb
@@ -1230,7 +1237,7 @@ def add_to_failfile(tests, options):
 def main():
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog
     global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
-    global keyFile, smoke_db_prefix, test_path, use_write_commands
+    global keyFile, smoke_db_prefix, test_path, use_write_commands, rlp_path
 
     try:
         signal.signal(signal.SIGUSR1, dump_stacks)
@@ -1331,6 +1338,8 @@ def main():
                       help='Deprecated(use --shell-write-mode): Sets the shell to use write commands by default')
     parser.add_option('--shell-write-mode', dest='shell_write_mode', default="commands",
                       help='Sets the shell to use a specific write mode: commands/compatibility/legacy (default:legacy)')
+    parser.add_option('--basisTechRootDirectory', dest='rlp_path', default=None,
+                      help='Basis Tech Rosette Linguistics Platform root directory')
 
     parser.add_option('--include-tags', dest='include_tags', default="", action='store',
                       help='Filters jstests run by tag regex(es) - a tag in the test must match the regexes.  ' +

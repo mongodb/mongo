@@ -232,7 +232,7 @@ tasks:
           ${scons|scons} ${compile_flags|} --use-new-tools all dist ${msi_target|}
           ${python|python} -c "ver = open('version.txt','r').read().strip(); print 'suffix: latest' if ver[-1] == '-' else 'suffix: ' + ver; print 'version: ' + ver"  > compile_expansions.yml
           if [ "${has_debugsymbols|}" = "true" ]; then ${scons|scons} ${compile_flags|} --nostrip --use-new-tools dist; original_filename=$(ls | grep debugsymbols); mv $original_filename $(echo $original_filename | sed 's/debugsymbols-//' | sed 's/mongodb/debugsymbols-mongodb/'); fi
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mode files --from-file build/unittests.txt --dont-start-mongod  --report-file report.json core
+          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/smoke.py --with-cleanbb --mode files --from-file build/unittests.txt --dont-start-mongod  --report-file report.json core
           mv mongodb*.${ext|tgz} mongodb-binaries.tgz
           mv debugsymbols-*.${ext|tgz} mongo-debugsymbols.tgz || true
     - command: archive.targz_pack
@@ -1466,6 +1466,22 @@ tasks:
 
           cp mongodb*/bin/* .
           ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth repl
+
+- name: rlp
+  depends_on:
+  - name: compile
+  commands:
+    - func: "fetch artifacts"
+    - func: "fetch binaries"
+    - func: "extract binaries"
+    - func: "setup credentials"
+    - func: "get buildnumber"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          cp mongodb*/bin/* .
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --basisTechRootDirectory /opt/basis --set-parameters rlpEnableExperimentalLanguagesForTesting=true rlp
 
 - name: sasl
   depends_on:
@@ -3187,7 +3203,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel62
-    compile_flags: --ssl --ssl-fips-capability --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    compile_flags: --ssl --ssl-fips-capability --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release" CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     test_flags: --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -3201,6 +3218,7 @@ buildvariants:
   - name: mmap
   - name: jsCore_auth
   - name: replicasets_auth
+  - name: rlp
   - name: sasl
   - name: sharding_auth
   - name: snmp
