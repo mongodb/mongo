@@ -1181,14 +1181,14 @@ def doConfigure(myenv):
     # bare compilers, and we should re-check at the very end that TryCompile and TryLink still
     # work with the flags we have selected.
     if myenv.ToolchainIs('msvc'):
-        compiler_minimum_string = "Microsoft Visual Studio 2013 Update 2"
+        compiler_minimum_string = "Microsoft Visual Studio 2013 Update 4"
         compiler_test_body = textwrap.dedent(
         """
         #if !defined(_MSC_VER)
         #error
         #endif
 
-        #if _MSC_VER < 1800 || (_MSC_VER == 1800 && _MSC_FULL_VER < 180030501)
+        #if _MSC_VER < 1800 || (_MSC_VER == 1800 && _MSC_FULL_VER < 180031101)
         #error %s or newer is required to build MongoDB
         #endif
 
@@ -1459,7 +1459,7 @@ def doConfigure(myenv):
     # We appear to have C++11, or at least a flag to enable it. Check that the declared C++
     # language level is not less than C++11, and that we can at least compile an 'auto'
     # expression. We don't check the __cplusplus macro when using MSVC because as of our
-    # current required MS compiler version (MSVS 2013 Update 2), they don't set it. If
+    # current required MS compiler version (MSVS 2013 Update 4), they don't set it. If
     # MSFT ever decides (in MSVS 2015?) to define __cplusplus >= 201103L, remove the exception
     # here for _MSC_VER
     def CheckCxx11(context):
