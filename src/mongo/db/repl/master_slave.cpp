@@ -325,7 +325,7 @@ namespace repl {
                 DBDirectClient c(txn);
                 BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
                 if ( !op.isEmpty() ) {
-                    tmp.syncedTo = op[ "ts" ].date();
+                    tmp.syncedTo = op[ "ts" ].timestamp();
                 }
             }
             addSourceToList(txn, v, tmp, old);
@@ -542,7 +542,8 @@ namespace repl {
             return true;   
         }
         BSONElement ts = op.getField( "ts" );
-        if ( ( ts.type() == Date || ts.type() == bsonTimestamp ) && ___databaseIgnorer.ignoreAt( db, ts.date() ) ) {
+        if ( ( ts.type() == Date || ts.type() == bsonTimestamp )
+             && ___databaseIgnorer.ignoreAt( db, ts.timestamp() ) ) {
             // Database is ignored due to a previous indication that it is
             // missing from master after optime "ts".
             return false;   

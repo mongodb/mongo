@@ -454,9 +454,10 @@ namespace mongo {
         }
 
         Timestamp timestamp() const {
+            Timestamp result;
             if( type() == mongo::Date || type() == bsonTimestamp )
-                return Timestamp(ConstDataView(value()).readLE<unsigned long long>());
-            return Timestamp();
+                result.readFrom(value());
+            return result;
         }
 
         Date_t timestampTime() const {

@@ -694,7 +694,7 @@ namespace {
 
         if (!lastOp.isEmpty()) {
             LOG(1) << "replSet setting last OpTime";
-            setNewOptime(lastOp[ "ts" ].date());
+            setNewOptime(lastOp[ "ts" ].timestamp());
         }
     }
 

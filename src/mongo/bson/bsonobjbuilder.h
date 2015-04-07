@@ -458,16 +458,23 @@ namespace mongo {
             return *this;
         }
 
-        // Append a Timestamp field -- will be updated to next server Timestamp
-        BSONObjBuilder& appendTimestamp( StringData fieldName );
-
-        BSONObjBuilder& appendTimestamp( StringData fieldName , unsigned long long val );
-
         /**
          * To store a Timestamp in BSON, use this function.
          * This captures both the secs and inc fields.
          */
-        BSONObjBuilder& append(StringData fieldName, Timestamp timestamp);
+        inline BSONObjBuilder& append(StringData fieldName, Timestamp ts) {
+            ts.append(_b, fieldName);
+            return *this;
+        }
+
+        // Append a Timestamp field -- will be updated to next server Timestamp
+        inline BSONObjBuilder& appendTimestamp(StringData fieldName) {
+            return append(fieldName, Timestamp());
+        }
+
+        inline BSONObjBuilder& appendTimestamp(StringData fieldName, unsigned long long val) {
+            return append(fieldName, Timestamp(val));
+        }
 
         /*
         Append an element of the deprecated DBRef type.
@@ -947,20 +954,6 @@ namespace mongo {
     BSONObjBuilder& Labeler::operator<<( T value ) {
         s_->subobj()->append( l_.l_, value );
         return *s_->_builder;
-    }
-
-    inline BSONObjBuilder& BSONObjBuilder::append(StringData fieldName, Timestamp optime) {
-        optime.append(_b, fieldName);
-        return *this;
-    }
-
-    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( StringData fieldName ) {
-        return append(fieldName, Timestamp());
-    }
-
-    inline BSONObjBuilder& BSONObjBuilder::appendTimestamp( StringData fieldName,
-                                                            unsigned long long val ) {
-        return append(fieldName, Timestamp(val));
     }
 
 }

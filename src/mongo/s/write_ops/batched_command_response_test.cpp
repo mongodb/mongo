@@ -42,7 +42,6 @@ namespace {
     using mongo::BatchedCommandResponse;
     using mongo::WriteErrorDetail;
     using mongo::WCErrorDetail;
-    using mongo::Date_t;
     using std::string;
 
     TEST(RoundTrip, Normal) {
@@ -71,7 +70,7 @@ namespace {
                  BatchedCommandResponse::errCode(-1) <<
                  BatchedCommandResponse::errMessage("this batch didn't work") <<
                  BatchedCommandResponse::n(0) <<
-                 BatchedCommandResponse::lastOp(Date_t(1)) <<
+                 BatchedCommandResponse::lastOp(mongo::Timestamp(0, 1)) <<
                  BatchedCommandResponse::writeErrors() << writeErrorsArray <<
                  BatchedCommandResponse::writeConcernError() << writeConcernError);
 

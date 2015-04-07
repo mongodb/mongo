@@ -124,7 +124,7 @@ namespace {
         ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
         // set electionTime
-        hbResponse.setElectionTime(Timestamp(10,0));
+        hbResponse.setElectionTime(Timestamp(10, 0));
         ++fieldsSet;
         ASSERT_EQUALS(false, hbResponse.hasState());
         ASSERT_EQUALS(true, hbResponse.hasElectionTime());
@@ -139,21 +139,21 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
 
         hbResponseObj = hbResponse.toBSON();
         ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
 
         initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj);
         ASSERT_EQUALS(Status::OK(), initializeResult);
         ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
         // set opTime
-        hbResponse.setOpTime(Date_t(10));
+        hbResponse.setOpTime(Timestamp(0, 10));
         ++fieldsSet;
         ASSERT_EQUALS(false, hbResponse.hasState());
         ASSERT_EQUALS(true, hbResponse.hasElectionTime());
@@ -168,16 +168,16 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
 
         hbResponseObj = hbResponse.toBSON();
         ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
 
         initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj);
         ASSERT_EQUALS(Status::OK(), initializeResult);
@@ -199,8 +199,8 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
 
         hbResponseObj = hbResponse.toBSON();
@@ -208,8 +208,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
 
         initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj);
@@ -232,8 +232,8 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
 
@@ -242,8 +242,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
         ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
 
@@ -268,8 +268,8 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -279,8 +279,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
         ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -307,8 +307,8 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -318,8 +318,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
         ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -347,8 +347,8 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -358,8 +358,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
         ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -389,8 +389,8 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -400,8 +400,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
         ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -432,8 +432,8 @@ namespace {
         ASSERT_EQUALS("", hbResponse.getHbMsg());
         ASSERT_EQUALS("syncTarget", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -443,8 +443,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
         ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -475,8 +475,8 @@ namespace {
         ASSERT_EQUALS("lub dub", hbResponse.getHbMsg());
         ASSERT_EQUALS("syncTarget", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
@@ -486,8 +486,8 @@ namespace {
         ASSERT_EQUALS("rs0", hbResponseObj["set"].String());
         ASSERT_EQUALS("lub dub", hbResponseObj["hbmsg"].String());
         ASSERT_EQUALS(1, hbResponseObj["v"].Number());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponseObj["electionTime"].timestamp());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponseObj["opTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponseObj["electionTime"].timestamp());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponseObj["opTime"].timestamp());
         ASSERT_EQUALS(10, hbResponseObj["time"].numberLong());
         ASSERT_EQUALS(true, hbResponseObj["e"].trueValue());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponseObj["config"].Obj().toString());
@@ -518,8 +518,8 @@ namespace {
         ASSERT_EQUALS("lub dub", hbResponse.getHbMsg());
         ASSERT_EQUALS("syncTarget", hbResponse.getSyncingTo());
         ASSERT_EQUALS(1, hbResponse.getVersion());
-        ASSERT_EQUALS(Timestamp(10,0), hbResponse.getElectionTime());
-        ASSERT_EQUALS(Timestamp(0,10), hbResponse.getOpTime());
+        ASSERT_EQUALS(Timestamp(10, 0), hbResponse.getElectionTime());
+        ASSERT_EQUALS(Timestamp(0, 10), hbResponse.getOpTime());
         ASSERT_EQUALS(10, hbResponse.getTime().total_seconds());
         ASSERT_EQUALS(true, hbResponse.isElectable());
         ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());

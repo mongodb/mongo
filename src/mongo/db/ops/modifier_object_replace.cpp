@@ -28,6 +28,7 @@
 
 #include "mongo/db/ops/modifier_object_replace.h"
 
+#include "mongo/base/data_cursor.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/global_timestamp.h"
@@ -47,16 +48,14 @@ namespace mongo {
                 BSONElement e = i.next();
 
                 // Skip _id field -- we do not replace it
-                if (e.type() == bsonTimestamp && e.fieldNameStringData() != idFieldName) {
-                    // TODO(emilkie): This is not endian-safe.
-                    unsigned long long &timestamp =
-                        *(reinterpret_cast<unsigned long long*>(
-                              const_cast<char *>(e.value())));
-                    if (timestamp == 0) {
-                        // performance note, this locks a mutex:
-                        Timestamp ts(getNextGlobalTimestamp());
-                        timestamp = ts.asULL();
-                    }
+                if (e.type() == bsonTimestamp &&
+                    e.fieldNameStringData() != idFieldName &&
+                    e.timestamp().getSecs() == 0 &&
+                    e.timestamp().getInc() == 0) {
+                    Timestamp ts(getNextGlobalTimestamp());
+                    DataCursor(const_cast<char*>(e.value()))
+                        .writeLEAndAdvance<uint32_t>(ts.getInc())
+                        .writeLE<uint32_t>(ts.getSecs());
                 }
             }
 
