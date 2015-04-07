@@ -6,7 +6,8 @@ env.Library(
     target='catalog_types',
     source=[
         'type_changelog.cpp',
-        'type_chunk.cpp'
+        'type_chunk.cpp',
+        'type_shard.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
@@ -33,7 +34,8 @@ env.CppUnitTest(
     target='catalog_types_test',
     source=[
         'type_changelog_test.cpp',
-        'type_chunk_test.cpp'
+        'type_chunk_test.cpp',
+        'type_shard_test.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/catalog_types'

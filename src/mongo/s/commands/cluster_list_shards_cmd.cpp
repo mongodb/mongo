@@ -33,8 +33,8 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/type_shard.h"
 
 namespace mongo {
 namespace {

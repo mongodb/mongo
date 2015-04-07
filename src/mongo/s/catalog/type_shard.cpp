@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/type_shard.h"
+#include "mongo/s/catalog/type_shard.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
