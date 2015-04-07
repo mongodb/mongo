@@ -11,7 +11,7 @@ function assertHasRole(rolesArray, roleName, roleDB) {
 }
 
 
-(function(db) {
+function runTest(db) {
      var db = db.getSiblingDB("user_management_helpers");
      db.dropDatabase();
      db.dropAllUsers();
@@ -91,4 +91,12 @@ function assertHasRole(rolesArray, roleName, roleDB) {
      assert(db.auth('user1', 'y'));
      assert(db.auth('user2', 'y'));
 
-}(db));
+};
+
+try {
+    runTest(db);
+} catch (x) {
+    // BF-836 Print current users on failure to aid debugging
+    db.getSiblingDB('admin').system.users.find().forEach(printjson);
+    throw x;
+}
