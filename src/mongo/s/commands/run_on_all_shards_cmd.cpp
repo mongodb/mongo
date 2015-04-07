@@ -48,6 +48,7 @@ namespace mongo {
                                                  const char* oldName,
                                                  bool useShardConn)
         : Command(name, false, oldName)
+        , _useShardConn(useShardConn)
     {}
 
     void RunOnAllShardsCommand::aggregateResults(const std::vector<BSONObj>& results,
