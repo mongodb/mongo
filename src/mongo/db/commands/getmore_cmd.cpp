@@ -94,7 +94,7 @@ namespace mongo {
             }
             const GetMoreRequest& request = parseStatus.getValue();
 
-            return client->getAuthorizationSession()->checkAuthForGetMore(request.nss,
+            return AuthorizationSession::get(client)->checkAuthForGetMore(request.nss,
                                                                           request.cursorid);
         }
 

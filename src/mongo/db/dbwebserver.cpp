@@ -420,7 +420,7 @@ namespace {
                                vector<string>& headers,
                                const SockAddr &from) {
 
-        AuthorizationSession* authSess = cc().getAuthorizationSession();
+        AuthorizationSession* authSess = AuthorizationSession::get(cc());
         if (!authSess->getAuthorizationManager().isAuthEnabled()) {
             return true;
         }
@@ -448,7 +448,7 @@ namespace {
             UserName userName(parms["username"], "admin");
             User* user;
             AuthorizationManager& authzManager =
-                cc().getAuthorizationSession()->getAuthorizationManager();
+                AuthorizationSession::get(cc())->getAuthorizationManager();
             Status status = authzManager.acquireUser(txn, userName, &user);
             if (!status.isOK()) {
                 if (status.code() != ErrorCodes::UserNotFound) {

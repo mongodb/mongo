@@ -54,21 +54,21 @@ namespace rename_collection {
             // either can read both of source and dest collections or *can't* read either of source
             // or dest collection, then you get can do the rename, even without insert on the
             // destination collection.
-            bool canRename = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            bool canRename = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(sourceNS.db()),
                     ActionType::renameCollectionSameDB);
 
             bool canDropTargetIfNeeded = true;
             if (dropTarget) {
                 canDropTargetIfNeeded =
-                        client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                             ResourcePattern::forExactNamespace(targetNS),
                             ActionType::dropCollection);
             }
 
-            bool canReadSrc = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            bool canReadSrc = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forExactNamespace(sourceNS), ActionType::find);
-            bool canReadDest = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            bool canReadDest = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forExactNamespace(targetNS), ActionType::find);
 
             if (canRename && canDropTargetIfNeeded && (canReadSrc || !canReadDest)) {
@@ -80,7 +80,7 @@ namespace rename_collection {
         ActionSet actions;
         actions.addAction(ActionType::find);
         actions.addAction(ActionType::dropCollection);
-        if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(sourceNS), actions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -92,7 +92,7 @@ namespace rename_collection {
         if (dropTarget) {
             actions.addAction(ActionType::dropCollection);
         }
-        if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(targetNS), actions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }

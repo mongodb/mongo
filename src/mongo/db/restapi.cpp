@@ -273,7 +273,7 @@ namespace mongo {
     } restHandler;
 
     bool RestAdminAccess::haveAdminUsers(OperationContext* txn) const {
-        AuthorizationSession* authzSession = txn->getClient()->getAuthorizationSession();
+        AuthorizationSession* authzSession = AuthorizationSession::get(txn->getClient());
         return authzSession->getAuthorizationManager().hasAnyPrivilegeDocuments(txn);
     }
 

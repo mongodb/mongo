@@ -81,7 +81,7 @@ namespace mongo {
                     nss.isValid());
         }
 
-        _clientInfo->getAuthorizationSession()->startRequest(NULL);
+        AuthorizationSession::get(_clientInfo)->startRequest(NULL);
         _didInit = true;
     }
 

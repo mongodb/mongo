@@ -534,7 +534,7 @@ namespace {
             virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
-                AuthorizationSession* authzSession = client->getAuthorizationSession();
+                AuthorizationSession* authzSession = AuthorizationSession::get(client);
                 if (cmdObj["capped"].trueValue()) {
                     if (!authzSession->isAuthorizedForActionsOnResource(
                             parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
@@ -1191,7 +1191,7 @@ namespace {
             virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
-                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
                         ActionType::splitVector)) {
@@ -2449,7 +2449,7 @@ namespace {
             virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
-                AuthorizationSession* authzSession = client->getAuthorizationSession();
+                AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
                 // Check for the listCollections ActionType on the database
                 // or find on system.namespaces for pre 3.0 systems.

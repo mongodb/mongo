@@ -1281,7 +1281,7 @@ namespace repl {
             // printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date even
             // when things are idle.
             OperationContextImpl txn;
-            txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
+            AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 
             Lock::GlobalWrite globalWrite(txn.lockState(), 1);
             if (globalWrite.isLocked()) {
@@ -1308,7 +1308,7 @@ namespace repl {
         Client::initThread("replslave");
 
         OperationContextImpl txn;
-        txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
+        AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 
         while ( 1 ) {
             try {
@@ -1338,7 +1338,7 @@ namespace repl {
         if( !replSettings.slave && !replSettings.master )
             return;
 
-        txn->getClient()->getAuthorizationSession()->grantInternalAuthorization();
+        AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
 
         {
             ReplSource temp(txn); // Ensures local.me is populated

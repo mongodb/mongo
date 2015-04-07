@@ -998,7 +998,7 @@ namespace mongo {
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                     ActionType::moveChunk)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -2653,7 +2653,7 @@ namespace mongo {
         OperationContextImpl txn;
         if (getGlobalAuthorizationManager()->isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
-            txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
+            AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
         }
 
         // Make curop active so this will show up in currOp.

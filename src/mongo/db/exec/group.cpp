@@ -91,7 +91,7 @@ namespace mongo {
     void GroupStage::initGroupScripting() {
         // Initialize _scope.
         const std::string userToken =
-            ClientBasic::getCurrent()->getAuthorizationSession()
+            AuthorizationSession::get(ClientBasic::getCurrent())
                                      ->getAuthenticatedUserNamesToken();
 
         const NamespaceString nss(_request.ns);

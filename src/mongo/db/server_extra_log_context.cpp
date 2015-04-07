@@ -52,11 +52,11 @@ namespace {
         ClientBasic* clientBasic = ClientBasic::getCurrent();
         if (!clientBasic)
             return;
-        if (!clientBasic->hasAuthorizationSession())
+        if (!AuthorizationSession::exists(clientBasic))
             return;
 
         UserNameIterator users =
-            clientBasic->getAuthorizationSession()->getAuthenticatedUserNames();
+            AuthorizationSession::get(clientBasic)->getAuthenticatedUserNames();
 
         if (!users.more())
             return;

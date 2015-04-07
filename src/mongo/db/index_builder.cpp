@@ -85,7 +85,7 @@ namespace {
         OperationContextImpl txn;
         txn.lockState()->setIsBatchWriter(true);
 
-        txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
+        AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 
         txn.getCurOp()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());

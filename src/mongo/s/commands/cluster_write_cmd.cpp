@@ -77,7 +77,7 @@ namespace {
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
 
-            Status status = auth::checkAuthForWriteCommand(client->getAuthorizationSession(),
+            Status status = auth::checkAuthForWriteCommand(AuthorizationSession::get(client),
                                                            _writeType,
                                                            NamespaceString(parseNs(dbname,
                                                                                    cmdObj)),

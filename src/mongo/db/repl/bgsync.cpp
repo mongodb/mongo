@@ -146,7 +146,7 @@ namespace {
 
     void BackgroundSync::producerThread() {
         Client::initThread("rsBackgroundSync");
-        cc().getAuthorizationSession()->grantInternalAuthorization();
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
 
         while (!inShutdown()) {
             try {

@@ -88,8 +88,7 @@ namespace mongo {
             long long start = Listener::getElapsedTimeMillis();
             BSONObjBuilder timeBuilder(256);
 
-            const ClientBasic* myClientBasic = ClientBasic::getCurrent();
-            AuthorizationSession* authSession = myClientBasic->getAuthorizationSession();
+            const auto authSession = AuthorizationSession::get(ClientBasic::getCurrent());
             
             // --- basic fields that are global
 

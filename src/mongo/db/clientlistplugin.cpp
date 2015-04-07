@@ -159,7 +159,7 @@ namespace {
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
-            if ( client->getAuthorizationSession()
+            if ( AuthorizationSession::get(client)
                  ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                     ActionType::inprog) ) {
                 return Status::OK();

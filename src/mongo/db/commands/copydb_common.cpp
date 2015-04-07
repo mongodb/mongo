@@ -64,7 +64,7 @@ namespace copydb {
         ActionSet actions;
         actions.addAction(ActionType::insert);
         actions.addAction(ActionType::createIndex);
-        if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(todb), actions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -72,7 +72,7 @@ namespace copydb {
         actions.removeAllActions();
         actions.addAction(ActionType::insert);
         for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnNamespace(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(
                     NamespaceString(todb, legalClientSystemCollections[i]), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -82,12 +82,12 @@ namespace copydb {
             // If copying from self, also require privileges on source db
             actions.removeAllActions();
             actions.addAction(ActionType::find);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(fromdb), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
             for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
-                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnNamespace(
+                if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(
                         NamespaceString(fromdb, legalClientSystemCollections[i]), actions)) {
                     return Status(ErrorCodes::Unauthorized, "Unauthorized");
                 }

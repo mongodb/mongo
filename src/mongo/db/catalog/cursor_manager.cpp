@@ -210,7 +210,7 @@ namespace mongo {
 
         // Check if we are authorized to erase this cursor.
         if (checkAuth) {
-            AuthorizationSession* as = txn->getClient()->getAuthorizationSession();
+            AuthorizationSession* as = AuthorizationSession::get(txn->getClient());
             Status authorizationStatus = as->checkAuthForKillCursors(nss, id);
             if (!authorizationStatus.isOK()) {
                 audit::logKillCursorsAuthzCheck(txn->getClient(),

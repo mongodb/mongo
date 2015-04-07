@@ -63,7 +63,7 @@ namespace repl {
 
     void runSyncThread() {
         Client::initThread("rsSync");
-        cc().getAuthorizationSession()->grantInternalAuthorization();
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
         // Set initial indexPrefetch setting

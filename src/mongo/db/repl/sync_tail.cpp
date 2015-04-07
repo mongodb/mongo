@@ -90,7 +90,7 @@ namespace repl {
     void initializePrefetchThread() {
         if (!ClientBasic::getCurrent()) {
             Client::initThreadIfNotAlready();
-            cc().getAuthorizationSession()->grantInternalAuthorization();
+            AuthorizationSession::get(cc())->grantInternalAuthorization();
         }
     }
     namespace {
@@ -651,7 +651,7 @@ namespace {
         // Only do this once per thread
         if (!ClientBasic::getCurrent()) {
             Client::initThreadIfNotAlready();
-            cc().getAuthorizationSession()->grantInternalAuthorization();
+            AuthorizationSession::get(cc())->grantInternalAuthorization();
         }
     }
 

@@ -83,7 +83,7 @@ namespace mongo {
 
         virtual void run() {
             Client::initThread( name().c_str() );
-            cc().getAuthorizationSession()->grantInternalAuthorization();
+            AuthorizationSession::get(cc())->grantInternalAuthorization();
 
             while ( ! inShutdown() ) {
                 sleepsecs( ttlMonitorSleepSecs );

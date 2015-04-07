@@ -73,7 +73,7 @@ namespace repl {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::internal);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -146,7 +146,7 @@ namespace repl {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetGetStatus);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -178,7 +178,7 @@ namespace repl {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetGetConfig);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -286,7 +286,7 @@ namespace {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetConfigure);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -371,7 +371,7 @@ namespace {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetConfigure);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -427,7 +427,7 @@ namespace {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -459,7 +459,7 @@ namespace {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -534,7 +534,7 @@ namespace {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
@@ -564,7 +564,7 @@ namespace {
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::replSetStateChange);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }

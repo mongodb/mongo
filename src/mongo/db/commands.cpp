@@ -338,7 +338,7 @@ namespace mongo {
                                         const BSONObj& cmdObj) {
         std::vector<Privilege> privileges;
         this->addRequiredPrivileges(dbname, cmdObj, &privileges);
-        if (client->getAuthorizationSession()->isAuthorizedForPrivileges(privileges))
+        if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
             return Status::OK();
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
@@ -371,7 +371,7 @@ namespace mongo {
             return Status(ErrorCodes::Unauthorized, str::stream() << c->name <<
                           " may only be run against the admin database.");
         }
-        if (client->getAuthorizationSession()->getAuthorizationManager().isAuthEnabled()) {
+        if (AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
             Status status = c->checkAuthForCommand(client, dbname, cmdObj);
             if (status == ErrorCodes::Unauthorized) {
                 mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);

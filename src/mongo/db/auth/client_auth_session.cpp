@@ -32,6 +32,7 @@
 #include <utility>
 
 #include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
 
 namespace mongo {
@@ -39,6 +40,9 @@ namespace {
 
     const auto getAuthenticationSession =
         ClientBasic::declareDecoration<std::unique_ptr<AuthenticationSession>>();
+
+    const auto getAuthorizationSession =
+        ClientBasic::declareDecoration<std::unique_ptr<AuthorizationSession>>();
 
 }  // namespace
 
@@ -53,6 +57,28 @@ namespace {
             std::unique_ptr<AuthenticationSession>& other) {
         using std::swap;
         swap(getAuthenticationSession(client), other);
+    }
+
+    AuthorizationSession* AuthorizationSession::get(ClientBasic* client) {
+        return get(*client);
+    }
+
+    AuthorizationSession* AuthorizationSession::get(ClientBasic& client) {
+        AuthorizationSession* retval = getAuthorizationSession(client).get();
+        massert(16481,
+                "No AuthorizationManager has been set up for this connection",
+                retval);
+        return retval;
+    }
+
+    bool AuthorizationSession::exists(ClientBasic* client) {
+        return getAuthorizationSession(client).get();
+    }
+
+    void AuthorizationSession::set(
+            ClientBasic* client,
+            std::unique_ptr<AuthorizationSession> authorizationSession) {
+        getAuthorizationSession(client) = std::move(authorizationSession);
     }
 
 }  // namespace mongo

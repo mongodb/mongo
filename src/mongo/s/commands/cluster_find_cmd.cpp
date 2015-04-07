@@ -72,7 +72,7 @@ namespace mongo {
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
 
-            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            AuthorizationSession* authzSession = AuthorizationSession::get(client);
             ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
             if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {

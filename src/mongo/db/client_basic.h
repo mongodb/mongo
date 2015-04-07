@@ -38,7 +38,6 @@
 
 namespace mongo {
 
-    class AuthorizationSession;
     class ServiceContext;
 
     /**
@@ -52,10 +51,6 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(ClientBasic);
     public:
         virtual ~ClientBasic();
-
-        bool hasAuthorizationSession() const;
-        AuthorizationSession* getAuthorizationSession() const;
-        void setAuthorizationSession(std::unique_ptr<AuthorizationSession> authorizationSession);
 
         bool getIsLocalHostConnection() {
             if (!hasRemote()) {
@@ -86,7 +81,6 @@ namespace mongo {
         ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort);
 
     private:
-        std::unique_ptr<AuthorizationSession> _authorizationSession;
         ServiceContext* const _serviceContext;
         AbstractMessagingPort* const _messagingPort;
     };

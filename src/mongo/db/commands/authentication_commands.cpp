@@ -298,7 +298,7 @@ namespace mongo {
         }
 
         AuthorizationSession* authorizationSession =
-            ClientBasic::getCurrent()->getAuthorizationSession();
+            AuthorizationSession::get(ClientBasic::getCurrent());
         status = authorizationSession->addAndAuthorizeUser(txn, user);
         if (!status.isOK()) {
             return status;
@@ -355,7 +355,7 @@ namespace mongo {
         }
 
         ClientBasic *client = ClientBasic::getCurrent();
-        AuthorizationSession* authorizationSession = client->getAuthorizationSession();
+        AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
         std::string subjectName = client->port()->getX509SubjectName();
 
         if (!getSSLManager()->getSSLConfiguration().hasCA) {
@@ -416,7 +416,7 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl) {
             AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
+                    AuthorizationSession::get(ClientBasic::getCurrent());
             authSession->logoutDatabase(dbname);
             if (Command::testCommandsEnabled && dbname == "admin") {
                 // Allows logging out as the internal user against the admin database, however

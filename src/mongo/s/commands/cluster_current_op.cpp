@@ -67,7 +67,7 @@ namespace {
                                    const BSONObj& cmdObj) final {
 
 
-            bool isAuthorized = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                                     ResourcePattern::forClusterResource(),
                                     ActionType::inprog);
 

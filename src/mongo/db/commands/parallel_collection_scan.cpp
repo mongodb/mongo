@@ -66,7 +66,7 @@ namespace mongo {
             ActionSet actions;
             actions.addAction(ActionType::find);
             Privilege p(parseResourcePattern(dbname, cmdObj), actions);
-            if ( client->getAuthorizationSession()->isAuthorizedForPrivilege(p) )
+            if ( AuthorizationSession::get(client)->isAuthorizedForPrivilege(p) )
                 return Status::OK();
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }

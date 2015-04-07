@@ -52,7 +52,8 @@ namespace {
         ClientInfo * info = tlInfo.get();
         massert(16472, "A ClientInfo already exists for this thread", !info);
         info = new ClientInfo(serviceContext, messagingPort);
-        info->setAuthorizationSession(getGlobalAuthorizationManager()->makeAuthorizationSession());
+        AuthorizationSession::set(info,
+                                  getGlobalAuthorizationManager()->makeAuthorizationSession());
         tlInfo.reset( info );
         return info;
     }

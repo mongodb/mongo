@@ -383,7 +383,7 @@ namespace mongo {
         ConstDataCursor cursors(dbmessage.getArray(n));
 
         ClientBasic* client = ClientBasic::getCurrent();
-        AuthorizationSession* authSession = client->getAuthorizationSession();
+        AuthorizationSession* authSession = AuthorizationSession::get(client);
         for ( int i=0; i<n; i++ ) {
             long long id = cursors.readAndAdvance<LittleEndian<int64_t>>();
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;

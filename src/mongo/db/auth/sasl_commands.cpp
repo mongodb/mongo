@@ -285,7 +285,7 @@ namespace {
         }
 
         SaslAuthenticationSession* session =
-            SaslAuthenticationSession::create(client->getAuthorizationSession(), mechanism);
+            SaslAuthenticationSession::create(AuthorizationSession::get(client), mechanism);
 
         std::unique_ptr<AuthenticationSession> sessionGuard(session);
 

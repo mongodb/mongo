@@ -77,8 +77,8 @@ namespace mongo {
 
         // Create the client obj, attach to thread
         Client* client = new Client(fullDesc, getGlobalServiceContext(), mp);
-        client->setAuthorizationSession(
-                getGlobalAuthorizationManager()->makeAuthorizationSession());
+        AuthorizationSession::set(client,
+                                  getGlobalAuthorizationManager()->makeAuthorizationSession());
 
         currentClient.reset(client);
 

@@ -306,7 +306,7 @@ namespace mongo {
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
-            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
             if (cmdObj.firstElement().numberInt() == -1 && !cmdObj.hasField("slowms")) {
                 // If you just want to get the current profiling level you can do so with just
@@ -488,7 +488,7 @@ namespace mongo {
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
-            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            AuthorizationSession* authzSession = AuthorizationSession::get(client);
             if (cmdObj["capped"].trueValue()) {
                 if (!authzSession->isAuthorizedForActionsOnResource(
                         parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
@@ -1250,7 +1250,7 @@ namespace mongo {
         // in that code path that must not see the impersonated user and roles array elements.
         std::vector<UserName> parsedUserNames;
         std::vector<RoleName> parsedRoleNames;
-        AuthorizationSession* authSession = txn->getClient()->getAuthorizationSession();
+        AuthorizationSession* authSession = AuthorizationSession::get(txn->getClient());
         bool rolesFieldIsPresent = false;
         bool usersFieldIsPresent = false;
         audit::parseAndRemoveImpersonatedRolesField(cmdObj,

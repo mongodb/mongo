@@ -343,7 +343,7 @@ namespace {
 
         try {
             Client* client = txn->getClient();
-            Status status = client->getAuthorizationSession()->checkAuthForQuery(nss, q.query);
+            Status status = AuthorizationSession::get(client)->checkAuthForQuery(nss, q.query);
             audit::logQueryAuthzCheck(client, nss, q.query, status.code());
             uassertStatusOK(status);
 
@@ -383,8 +383,8 @@ namespace {
         DbMessage dbmsg(m);
 
         Client& c = *txn->getClient();
-        if (!txn->getClient()->isInDirectClient()) {
-            c.getAuthorizationSession()->startRequest(txn);
+        if (!c.isInDirectClient()) {
+            AuthorizationSession::get(c)->startRequest(txn);
 
             // We should not be holding any locks at this point
             invariant(!txn->lockState()->isLocked());
@@ -641,7 +641,7 @@ namespace {
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
 
-        Status status = txn->getClient()->getAuthorizationSession()->checkAuthForUpdate(nsString,
+        Status status = AuthorizationSession::get(txn->getClient())->checkAuthForUpdate(nsString,
                                                                            query,
                                                                            toupdate,
                                                                            upsert);
@@ -765,7 +765,7 @@ namespace {
         verify( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
 
-        Status status = txn->getClient()->getAuthorizationSession()->checkAuthForDelete(nsString,
+        Status status = AuthorizationSession::get(txn->getClient())->checkAuthForDelete(nsString,
                                                                                         pattern);
         audit::logDeleteAuthzCheck(txn->getClient(), nsString, pattern, status.code());
         uassertStatusOK(status);
@@ -848,7 +848,7 @@ namespace {
                 const NamespaceString nsString( ns );
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                Status status = txn->getClient()->getAuthorizationSession()->checkAuthForGetMore(
+                Status status = AuthorizationSession::get(txn->getClient())->checkAuthForGetMore(
                     nsString, cursorid);
                 audit::logGetMoreAuthzCheck(txn->getClient(), nsString, cursorid, status.code());
                 uassertStatusOK(status);
@@ -1107,7 +1107,7 @@ namespace {
 
             // Check auth for insert (also handles checking if this is an index build and checks
             // for the proper privileges in that case).
-            Status status = txn->getClient()->getAuthorizationSession()->checkAuthForInsert(nsString, obj);
+            Status status = AuthorizationSession::get(txn->getClient())->checkAuthForInsert(nsString, obj);
             audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
             uassertStatusOK(status);
         }

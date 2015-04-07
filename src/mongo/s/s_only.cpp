@@ -84,7 +84,7 @@ namespace mongo {
         Client *c = new Client( fullDesc, getGlobalServiceContext(), mp );
         currentClient.reset(c);
         mongo::lastError.initThread();
-        c->setAuthorizationSession(getGlobalAuthorizationManager()->makeAuthorizationSession());
+        AuthorizationSession::set(c, getGlobalAuthorizationManager()->makeAuthorizationSession());
     }
 
     string Client::clientAddress(bool includePort) const {

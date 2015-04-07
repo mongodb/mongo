@@ -80,7 +80,7 @@ namespace mongo {
             ActionSet actions;
             actions.addAction(ActionType::insert);
             actions.addAction(ActionType::createIndex);
-            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(dbname), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }

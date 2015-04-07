@@ -179,7 +179,7 @@ namespace mongo {
                                    const std::string& dbname,
                                    const BSONObj& cmdObj) override {
 
-            bool isAuthorized = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                                     ResourcePattern::forClusterResource(),
                                     ActionType::unlock);
 

@@ -150,7 +150,7 @@ namespace {
 } // namespace
 
     void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
-        txn->getClient()->getAuthorizationSession()->grantInternalAuthorization();
+        AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
 
         std::vector<std::string> dbNames;
 

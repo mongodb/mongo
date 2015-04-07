@@ -151,7 +151,7 @@ namespace mongo {
 
         NamespaceString ns(q.ns);
         ClientBasic* client = ClientBasic::getCurrent();
-        AuthorizationSession* authSession = client->getAuthorizationSession();
+        AuthorizationSession* authSession = AuthorizationSession::get(client);
         Status status = authSession->checkAuthForQuery(ns, q.query);
         audit::logQueryAuthzCheck(client, ns, q.query, status.code());
         uassertStatusOK(status);
@@ -579,7 +579,7 @@ namespace mongo {
 
         ClientBasic* client = ClientBasic::getCurrent();
         NamespaceString nsString(ns);
-        AuthorizationSession* authSession = client->getAuthorizationSession();
+        AuthorizationSession* authSession = AuthorizationSession::get(client);
         Status status = authSession->checkAuthForGetMore( nsString, id );
         audit::logGetMoreAuthzCheck( client, nsString, id, status.code() );
         uassertStatusOK(status);

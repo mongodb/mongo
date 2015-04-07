@@ -54,7 +54,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool fromRepl) {
             AuthorizationSession* authSession =
-                    ClientBasic::getCurrent()->getAuthorizationSession();
+                    AuthorizationSession::get(ClientBasic::getCurrent());
 
             bool showPrivileges;
             Status status = bsonExtractBooleanFieldWithDefault(cmdObj,

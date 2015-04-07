@@ -157,7 +157,7 @@ namespace mongo {
     Status IndexFilterCommand::checkAuthForCommand(ClientBasic* client,
                                                    const std::string& dbname,
                                                    const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = client->getAuthorizationSession();
+        AuthorizationSession* authzSession = AuthorizationSession::get(client);
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
         if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheIndexFilter)) {

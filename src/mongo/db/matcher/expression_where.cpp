@@ -114,7 +114,7 @@ namespace mongo {
         _code = theCode.toString();
         _userScope = scope.getOwned();
 
-        const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
+        const string userToken = AuthorizationSession::get(ClientBasic::getCurrent())
                                                           ->getAuthenticatedUserNamesToken();
 
         _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);

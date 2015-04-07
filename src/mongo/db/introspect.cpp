@@ -97,7 +97,7 @@ namespace {
         b.appendDate("ts", jsTime());
         b.append("client", txn->getClient()->clientAddress());
 
-        AuthorizationSession * authSession = txn->getClient()->getAuthorizationSession();
+        AuthorizationSession * authSession = AuthorizationSession::get(txn->getClient());
         _appendUserInfo(*txn->getCurOp(), b, authSession);
 
         const BSONObj p = b.done();

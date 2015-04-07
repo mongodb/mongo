@@ -62,7 +62,7 @@ namespace {
                                    const std::string& dbname,
                                    const BSONObj& cmdObj) final {
 
-            bool isAuthorized = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+            bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                                     ResourcePattern::forClusterResource(),
                                     ActionType::killop);
             return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
