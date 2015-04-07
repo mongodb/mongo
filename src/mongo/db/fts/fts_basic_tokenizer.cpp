@@ -48,9 +48,10 @@ namespace fts {
         : _language(language), _stemmer(language), _stopWords(StopWords::getStopWords(language)) {
     }
 
-    void BasicFTSTokenizer::reset(const char* document, Options options) {
+    void BasicFTSTokenizer::reset(StringData document, Options options) {
         _options = options;
-        _tokenizer = stdx::make_unique<Tokenizer>(_language, document);
+        _document = document.toString();
+        _tokenizer = stdx::make_unique<Tokenizer>(_language, _document);
     }
 
     bool BasicFTSTokenizer::moveNext() {

@@ -72,7 +72,7 @@ namespace fts {
          * Process a new document, and discards any previous results.
          * May be called multiple times on an instance of an iterator.
          */
-        virtual void reset(const char* document, Options options) = 0;
+        virtual void reset(StringData document, Options options) = 0;
 
         /**
          * Moves to the next token in the iterator.

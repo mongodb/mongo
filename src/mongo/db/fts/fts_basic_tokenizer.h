@@ -58,17 +58,18 @@ namespace fts {
     public:
         BasicFTSTokenizer(const FTSLanguage* language);
 
-        void reset(const char* document, Options options) override;
+        void reset(StringData document, Options options) final;
 
-        bool moveNext() override;
+        bool moveNext() final;
 
-        StringData get() const override;
+        StringData get() const final;
 
     private:
         const FTSLanguage* const _language;
         const Stemmer _stemmer;
         const StopWords* const _stopWords;
 
+        std::string _document;
         std::unique_ptr<Tokenizer> _tokenizer;
         Options _options;
 
