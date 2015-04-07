@@ -62,15 +62,15 @@ namespace mongo {
         /**
          * for the error case
          */
-        StatusWith( ErrorCodes::Error code, const std::string& reason, int location = 0 )
-            : _status( Status( code, reason, location ) ) {
+        StatusWith( ErrorCodes::Error code, std::string reason, int location = 0 )
+            : _status( code, std::move( reason ), location ) {
         }
 
         /**
          * for the error case
          */
-        StatusWith( const Status& status )
-            : _status( status ) {
+        StatusWith( Status status )
+            : _status( std::move( status ) ) {
         }
 
         /**
