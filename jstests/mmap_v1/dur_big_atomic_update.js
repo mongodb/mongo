@@ -2,7 +2,7 @@
 //
 // this tests writing 1GB in an atomic update to make sure we commit periodically
 
-var conn = MongoRunner.runMongod({dur: "", durOptions: 8});
+var conn = MongoRunner.runMongod({journal: "", journalOptions: 8});
 d = conn.getDB("test");
 d.foo.drop();
 
