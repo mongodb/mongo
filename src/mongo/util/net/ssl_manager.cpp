@@ -43,6 +43,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/debug_util.h"
@@ -831,39 +832,31 @@ namespace mongo {
     }
 
     SSLConnection* SSLManager::connect(Socket* socket) {
-        SSLConnection* sslConn = new SSLConnection(_clientContext, socket, NULL, 0);
-        ScopeGuard sslGuard = MakeGuard(::SSL_free, sslConn->ssl);
-        ScopeGuard bioGuard = MakeGuard(::BIO_free, sslConn->networkBIO);
+        std::unique_ptr<SSLConnection> sslConn = stdx::make_unique<SSLConnection>(_clientContext, socket, (const char*)NULL, 0);
  
         int ret;
         do {
             ret = ::SSL_connect(sslConn->ssl);
-        } while(!_doneWithSSLOp(sslConn, ret));
+        } while(!_doneWithSSLOp(sslConn.get(), ret));
  
         if (ret != 1)
-            _handleSSLError(SSL_get_error(sslConn, ret), ret);
+            _handleSSLError(SSL_get_error(sslConn.get(), ret), ret);
  
-        sslGuard.Dismiss();
-        bioGuard.Dismiss();
-        return sslConn;
+        return sslConn.release();
     }
 
     SSLConnection* SSLManager::accept(Socket* socket, const char* initialBytes, int len) {
-        SSLConnection* sslConn = new SSLConnection(_serverContext, socket, initialBytes, len);
-        ScopeGuard sslGuard = MakeGuard(::SSL_free, sslConn->ssl);
-        ScopeGuard bioGuard = MakeGuard(::BIO_free, sslConn->networkBIO);
+        std::unique_ptr<SSLConnection> sslConn = stdx::make_unique<SSLConnection>(_serverContext, socket, initialBytes, len);
  
         int ret;
         do {
             ret = ::SSL_accept(sslConn->ssl);
-        } while(!_doneWithSSLOp(sslConn, ret));
+        } while(!_doneWithSSLOp(sslConn.get(), ret));
  
         if (ret != 1)
-            _handleSSLError(SSL_get_error(sslConn, ret), ret);
+            _handleSSLError(SSL_get_error(sslConn.get(), ret), ret);
  
-        sslGuard.Dismiss();
-        bioGuard.Dismiss();
-        return sslConn;
+        return sslConn.release();
     }
 
     // TODO SERVER-11601 Use NFC Unicode canonicalization
