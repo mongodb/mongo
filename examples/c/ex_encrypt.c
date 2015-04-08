@@ -237,12 +237,15 @@ rot13_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	ex_encryptor->encryptor = *encryptor;
 
 	/* Stash the password from the configuration string. */
-	if ((ex_encryptor->password = malloc(passcfg->len + 1)) == NULL ||
-	    (ex_encryptor->uri = malloc(strlen(uri) + 1)) == NULL)
+	if ((ex_encryptor->password = malloc(passcfg->len + 1)) == NULL)
 		return (errno);
 	strncpy(ex_encryptor->password, passcfg->str, passcfg->len + 1);
 	ex_encryptor->password[passcfg->len] = '\0';
-	strncpy(ex_encryptor->uri, uri, strlen(uri) + 1);
+	if (uri != NULL) {
+		if ((ex_encryptor->uri = malloc(strlen(uri) + 1)) == NULL)
+			return (errno);
+		strncpy(ex_encryptor->uri, uri, strlen(uri) + 1);
+	}
 
 	++ex_encryptor->num_calls;		/* Call count */
 
@@ -380,12 +383,12 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,encryption_algorithm=rot13,"
-	    "encryption_password=test_password1"")", &conn);
+	    "log=(enabled=true),encryption=(name=rot13,"
+	    "keyid=test_password1)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(session, "table:crypto",
-	    "encryption_algorithm=rot13,encryption_password=test_password2,"
+	    "encryption=(name=rot13,keyid=test_password2),"
 	    "key_format=S,value_format=S");
 	ret = session->create(
 	    session, "table:nocrypto",
@@ -424,8 +427,8 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,encryption_algorithm=rot13,"
-	    "encryption_password=test_password1)", &conn);
+	    "log=(enabled=true),encryption=(name=rot13,"
+	    "keyid=test_password1)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->open_cursor(session, "table:crypto", NULL, NULL, &c1);

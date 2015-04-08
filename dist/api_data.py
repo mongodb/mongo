@@ -159,14 +159,17 @@ file_config = format_meta + [
         row-store leaf page value dictionary; see
         @ref file_formats_compression for more information''',
         min='0'),
-    Config('encryption_algorithm', 'none', r'''
-        Permitted values are \c "none"
-        or custom encryption engine name created with
-        WT_CONNECTION::add_encryptor.  
-        See @ref encryption for more information''',
-        func='__wt_encryptor_confchk'),
-    Config('encryption_password', '', r'''
-        password key sent to callback'''),
+    Config('encryption', '', r'''
+        configure an encryptor for file blocks''',
+        type='category', subconfig=[
+        Config('name', 'none', r'''
+            Permitted values are \c "none"
+            or custom encryption engine name created with
+            WT_CONNECTION::add_encryptor.
+            See @ref encryption for more information'''),
+        Config('keyid', '', r'''
+            An identifier that is passed to the WT_ENCRYPTOR::initialize function'''),
+        ]),
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
@@ -533,6 +536,17 @@ common_wiredtiger_open = [
         WiredTiger data files opened at a checkpoint (i.e: read only) to
         use \c O_DIRECT''',
         type='list', choices=['checkpoint', 'data', 'log']),
+    Config('encryption', '', r'''
+        configure an encryptor for system wide metadata and logs''',
+        type='category', subconfig=[
+        Config('name', 'none', r'''
+            Permitted values are \c "none"
+            or custom encryption engine name created with
+            WT_CONNECTION::add_encryptor.
+            See @ref encryption for more information'''),
+        Config('keyid', '', r'''
+            An identifier that is passed to the WT_ENCRYPTOR::initialize function'''),
+        ]),
     Config('extensions', '', r'''
         list of shared library extensions to load (using dlopen).
         Any values specified to an library extension are passed to
@@ -566,14 +580,6 @@ common_wiredtiger_open = [
         Config('enabled', 'false', r'''
             enable logging subsystem''',
             type='boolean'),
-        Config('encryption_algorithm', 'none', r'''
-            Permitted values are \c "none"
-            or custom encryption engine name created with
-            WT_CONNECTION::add_encryptor.  
-            See @ref encryption for more information'''),
-        Config('encryption_password', '', r'''
-            logging password key sent to encryption callback when operating
-            on log records'''),
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
             min='100KB', max='2GB'),

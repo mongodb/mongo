@@ -383,7 +383,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	conn = S2C(session);
 	logrec = (WT_LOG_RECORD *)in->mem;
 	header_skip = WT_LOG_ENCRYPT_SKIP;
-	encryptor = conn->log_encryptor;
+	encryptor = conn->encryptor;
 	if (encryptor == NULL || encryptor->decrypt == NULL)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "log_read: Encrypted record with "
@@ -1734,7 +1734,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			complrp->mem_len = WT_STORE_SIZE(record->size);
 		}
 	}
-	if ((encryptor = conn->log_encryptor) != NULL) {
+	if ((encryptor = conn->encryptor) != NULL) {
 		/* Skip the log header */
 		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
 		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;

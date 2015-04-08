@@ -1027,12 +1027,15 @@ struct __wt_session {
 	 * the Btree row-store leaf page value dictionary; see @ref
 	 * file_formats_compression for more information., an integer greater
 	 * than or equal to 0; default \c 0.}
-	 * @config{encryption_algorithm, Permitted values are \c "none" or
-	 * custom encryption engine name created with
+	 * @config{encryption = (, configure an encryptor for file blocks., a
+	 * set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that is passed
+	 * to the WT_ENCRYPTOR::initialize function., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none"
+	 * or custom encryption engine name created with
 	 * WT_CONNECTION::add_encryptor.  See @ref encryption for more
 	 * information., a string; default \c none.}
-	 * @config{encryption_password, password key sent to callback., a
-	 * string; default empty.}
+	 * @config{ ),,}
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration., a boolean flag; default \c false.}
@@ -1970,6 +1973,15 @@ struct __wt_connection {
  * opened at a checkpoint (i.e: read only) to use \c O_DIRECT., a list\, with
  * values chosen from the following options: \c "checkpoint"\, \c "data"\, \c
  * "log"; default empty.}
+ * @config{encryption = (, configure an encryptor for system wide metadata and
+ * logs., a set of related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that is passed to the
+ * WT_ENCRYPTOR::initialize function., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none" or
+ * custom encryption engine name created with WT_CONNECTION::add_encryptor.  See
+ * @ref encryption for more information., a string; default \c none.}
+ * @config{
+ * ),,}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction = (, eviction configuration options., a set of related
@@ -2028,15 +2040,8 @@ struct __wt_connection {
  * a string; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable
  * logging subsystem., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;encryption_algorithm, Permitted values are \c
- * "none" or custom encryption engine name created with
- * WT_CONNECTION::add_encryptor.  See @ref encryption for more information., a
- * string; default \c none.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;encryption_password, logging password key
- * sent to encryption callback when operating on log records., a string; default
- * empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log
- * files., an integer between 100KB and 2GB; default \c 100MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
+ * integer between 100KB and 2GB; default \c 100MB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
  * log files are written.  If the value is not an absolute path name\, the files
  * are created relative to the database home., a string; default empty.}

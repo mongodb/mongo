@@ -296,6 +296,9 @@ struct __wt_connection_impl {
 
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
+	WT_ENCRYPTOR	*encryptor;     /* Encryptor for metadata and log */
+	int		 encryptor_owned; /* Encryptor must be freed */
+
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */
@@ -337,8 +340,6 @@ struct __wt_connection_impl {
 	int		 log_wrlsn_tid_set;/* Log write lsn thread set */
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
-	WT_ENCRYPTOR	*log_encryptor; /* Logging encryptor */
-	int		 log_encryptor_owned; /* Encryptor must be freed */
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 	uint32_t	 log_prealloc;	/* Log file pre-allocation */

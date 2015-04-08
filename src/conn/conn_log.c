@@ -44,7 +44,7 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 static int
 __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
-	WT_CONFIG_ITEM cval, passval;
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
@@ -62,14 +62,6 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &conn->log_compressor));
-
-	conn->log_encryptor = NULL;
-	WT_RET(__wt_config_gets_none(session, cfg, "log.encryption_algorithm",
-	    &cval));
-	WT_RET(__wt_config_gets_none(session, cfg, "log.encryption_password",
-	    &passval));
-	WT_RET(__wt_encryptor_config(session, "log:", &cval, &passval,
-	    &conn->log_encryptor, &conn->log_encryptor_owned));
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
@@ -714,12 +706,5 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
 	__wt_free(session, conn->log_path);
 	__wt_free(session, conn->log);
-	if (conn->log_encryptor_owned) {
-	       if (conn->log_encryptor->terminate != NULL)
-		       WT_TRET(conn->log_encryptor->terminate(
-			   conn->log_encryptor, &session->iface));
-	       conn->log_encryptor_owned = 0;
-	}
-
 	return (ret);
 }

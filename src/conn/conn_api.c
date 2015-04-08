@@ -613,8 +613,8 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, const char *uri,
 	WT_RET(__encryptor_confchk(session, cval, &encryptor));
 	if (encryptor == NULL) {
 		if (passval->len != 0)
-			WT_RET_MSG(session, EINVAL, "log.encryption_password "
-			    "requires log.encryption_algorithm to be set");
+			WT_RET_MSG(session, EINVAL, "encryption.keyid "
+			    "requires encryption.name to be set");
 		return (0);
 	}
 
@@ -675,7 +675,7 @@ err:	if (nenc != NULL) {
 
 /*
  * __wt_conn_remove_encryptor --
- *	remove encryptor added by WT_CONNECTION->add_encryptor, only used
+ *	remove encryptors added by WT_CONNECTION->add_encryptor, only used
  * internally.
  */
 int
@@ -686,6 +686,13 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 	WT_NAMED_ENCRYPTOR *nenc;
 
 	conn = S2C(session);
+
+	if (conn->encryptor_owned) {
+	       if (conn->encryptor->terminate != NULL)
+		       WT_TRET(conn->encryptor->terminate(
+			   conn->encryptor, &session->iface));
+	       conn->encryptor_owned = 0;
+	}
 
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
 		/* Call any termination method. */
@@ -698,7 +705,6 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 		__wt_free(session, nenc->name);
 		__wt_free(session, nenc);
 	}
-
 	return (ret);
 }
 
@@ -1734,7 +1740,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ NULL, 0 }
 	};
 
-	WT_CONFIG_ITEM cval, sval;
+	WT_CONFIG_ITEM cval, sval, passval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ITEM i1, i2, i3;
@@ -1924,6 +1930,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * library.
 	 */
 	WT_ERR(__conn_load_extensions(session, cfg));
+
+	/*
+	 * The metadata/log encryptor is configured after extensions, since
+	 * extensions may load encryptors.
+	 */
+	conn->encryptor = NULL;
+	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
+	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid",
+	    &passval));
+	WT_ERR(__wt_encryptor_config(session, NULL, &cval, &passval,
+	    &conn->encryptor, &conn->encryptor_owned));
 
 	/*
 	 * Configuration completed; optionally write the base configuration file

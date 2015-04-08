@@ -315,10 +315,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
-	WT_RET(__wt_config_gets_none(session,
-	    cfg, "encryption_algorithm", &cval));
-	WT_RET(__wt_config_gets_none(session,
-	    cfg, "encryption_password", &metadata));
+	WT_RET(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
+	WT_RET(__wt_config_gets_none(session, cfg, "encryption.keyid",
+	    &metadata));
 	WT_RET(__wt_encryptor_config(session, btree->dhandle->name, &cval,
 	    &metadata, &btree->encryptor, &btree->encryptor_owned));
 
