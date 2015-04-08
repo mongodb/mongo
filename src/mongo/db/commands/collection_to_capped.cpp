@@ -186,12 +186,11 @@ namespace {
             }
 
             Database* const db = autoDb.getDb();
-
             if (!db) {
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::NamespaceNotFound,
-                                                  str::stream() << "source database "
-                                                  << dbname << " does not exist"));
+                                                  str::stream() << "database " << dbname
+                                                                << " not found"));
             }
 
             Status status = cloneCollectionAsCapped(txn, db, from, to, size, temp, true);
@@ -255,11 +254,10 @@ namespace {
 
             Database* const db = autoDb.getDb();
             if (!db) {
-                return appendCommandStatus(
-                            result,
-                            Status(ErrorCodes::NamespaceNotFound,
-                                   str::stream() << "source database "
-                                                 << dbname << " does not exist"));
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::NamespaceNotFound,
+                                                  str::stream() << "database " << dbname
+                                                                << " not found"));
             }
 
             stopIndexBuilds(txn, db, jsobj);
