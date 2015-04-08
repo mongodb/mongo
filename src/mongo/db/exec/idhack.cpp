@@ -221,7 +221,7 @@ namespace mongo {
 
     // static
     bool IDHackStage::supportsQuery(const CanonicalQuery& query) {
-        return !query.getParsed().showDiskLoc()
+        return !query.getParsed().showRecordId()
             && query.getParsed().getHint().isEmpty()
             && 0 == query.getParsed().getSkip()
             && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())

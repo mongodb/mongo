@@ -26,7 +26,8 @@ for( i = 0; i < n; ++i ) {
     c = db[ ''+i ];
     res = c.insert({ b: big });
     if( !res.hasWriteError() ) {
-        assert.eq( 0, c.find()._addSpecial( "$showDiskLoc", true )[ 0 ].$diskLoc.file );
+        var recordId = c.find().showRecord()[0].$recordId;
+        assert.eq(0, recordId >> 32);
     }
 }
 

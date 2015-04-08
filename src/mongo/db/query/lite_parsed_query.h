@@ -77,10 +77,11 @@ namespace mongo {
         static bool isTextScoreMeta(BSONElement elt);
 
         /**
-         * Helper function to identify diskLoc projection
-         * Example: {a: {$meta: "diskloc"}}.
+         * Helper function to identify recordId projection.
+         *
+         * Example: {a: {$meta: "recordId"}}.
          */
-        static bool isDiskLocMeta(BSONElement elt);
+        static bool isRecordIdMeta(BSONElement elt);
 
         /**
          * Helper function to validate a sort object.
@@ -105,7 +106,7 @@ namespace mongo {
         static const std::string metaTextScore;
         static const std::string metaGeoNearDistance;
         static const std::string metaGeoNearPoint;
-        static const std::string metaDiskLoc;
+        static const std::string metaRecordId;
         static const std::string metaIndexKey;
 
         const std::string& ns() const { return _ns; }
@@ -133,7 +134,7 @@ namespace mongo {
         const BSONObj& getMax() const { return _max; }
 
         bool returnKey() const { return _returnKey; }
-        bool showDiskLoc() const { return _showDiskLoc; }
+        bool showRecordId() const { return _showRecordId; }
         bool isSnapshot() const { return _snapshot; }
         bool hasReadPref() const { return _hasReadPref; }
 
@@ -202,9 +203,9 @@ namespace mongo {
         void addReturnKeyMetaProj();
 
         /**
-         * Updates the projection object with a $meta projection for the showDiskLoc option.
+         * Updates the projection object with a $meta projection for the showRecordId option.
          */
-        void addShowDiskLocMetaProj();
+        void addShowRecordIdMetaProj();
 
         /**
          * Initializes options based on the value of the 'options' bit vector.
@@ -239,7 +240,7 @@ namespace mongo {
         BSONObj _max;
 
         bool _returnKey;
-        bool _showDiskLoc;
+        bool _showRecordId;
         bool _snapshot;
         bool _hasReadPref;
 

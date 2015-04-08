@@ -35,7 +35,8 @@ DBQuery.prototype.help = function () {
     print("\t.addOption(n) - adds op_query options -- see wire protocol")
     print("\t._addSpecial(name, value) - http://dochub.mongodb.org/core/advancedqueries#AdvancedQueries-Metaqueryoperators")
     print("\t.batchSize(n) - sets the number of docs to return per getMore")
-    print("\t.showDiskLoc() - adds a $diskLoc field to each returned object")
+    print("\t.showDiskLoc() - Deprecated. Use showRecordId().")
+    print("\t.showRecordId() - adds a $recordId field to each returned object")
     print("\t.min(idxDoc)")
     print("\t.max(idxDoc)")
     print("\t.comment(comment)")
@@ -187,7 +188,7 @@ DBQuery.prototype._convertToCommand = function() {
     }
 
     if (this._query.$showDiskLoc) {
-        cmd["showDiskLoc"] = this._query.$showDiskLoc;
+        cmd["showRecordId"] = this._query.$showDiskLoc;
     }
 
     if (this._query.$snapshot) {
@@ -389,8 +390,15 @@ DBQuery.prototype.max = function( max ) {
     return this._addSpecial( "$max" , max );
 }
 
+/**
+ * Deprecated. Use showRecordId().
+ */
 DBQuery.prototype.showDiskLoc = function() {
-    return this._addSpecial( "$showDiskLoc" , true );
+    return this.showRecordId();
+}
+
+DBQuery.prototype.showRecordId = function() {
+    return this._addSpecial("$showDiskLoc", true);
 }
 
 DBQuery.prototype.maxTimeMS = function( maxTimeMS ) {

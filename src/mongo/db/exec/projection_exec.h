@@ -56,7 +56,7 @@ namespace mongo {
             META_TEXT_SCORE,
             META_GEONEAR_DIST,
             META_GEONEAR_POINT,
-            META_DISKLOC,
+            META_RECORDID,
             META_IX_KEY,
         };
 

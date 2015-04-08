@@ -94,7 +94,7 @@ var $config = (function() {
                 // Since the document has at least doubled in size, and the default
                 // allocation strategy of mmapv1 is to use power of two sizes, the
                 // document will have always moved
-                assertWhenOwnColl.neq(before.$diskLoc, after.$diskLoc,
+                assertWhenOwnColl.neq(before.$recordId, after.$recordId,
                                       'document should have moved');
             }
         }

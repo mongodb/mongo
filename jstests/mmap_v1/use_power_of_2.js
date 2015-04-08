@@ -18,16 +18,16 @@ function checkStorageSize(expectedSize, sameLoc) {
     t.insert(doc);
     assert.eq(t.stats().size, expectedSize, "size should be expected");
 
-    var oldLoc = t.find()._addSpecial("$showDiskLoc" , true).toArray()[0].$diskLoc;
+    var oldLoc = t.find().showRecordId().toArray()[0].$recordId;
 
     // Remvoe smaller doc, insert a bigger one.
     t.remove(doc);
     t.insert(bigDoc);
 
-    var newLoc = t.find()._addSpecial("$showDiskLoc" , true).toArray()[0].$diskLoc;
+    var newLoc = t.find().showRecordId().toArray()[0].$recordId;
 
     // Check the diskloc of two docs.
-    assert.eq(oldLoc.file == newLoc.file && oldLoc.offset == newLoc.offset, sameLoc);
+    assert.eq(friendlyEqual(oldLoc, newLoc), sameLoc);
 }
 
 t.drop();
