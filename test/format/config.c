@@ -397,7 +397,7 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
-	uint64_t v;
+	uint32_t v;
 	char *p;
 	const char *ep;
 
@@ -447,7 +447,7 @@ config_single(const char *s, int perm)
 		return;
 	}
 
-	v = strtoul(ep, &p, 10);
+	v = (uint32_t)strtoul(ep, &p, 10);
 	if (*p != '\0') {
 		fprintf(stderr, "%s: %s: illegal numeric value\n",
 		    g.progname, s);
@@ -459,13 +459,13 @@ config_single(const char *s, int perm)
 			    g.progname, s);
 			exit(EXIT_FAILURE);
 		}
-	} else if ((uint32_t)v < cp->min || (uint32_t)v > cp->maxset) {
-		fprintf(stderr, "%s: %s: value of %" PRIu32
-		    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
-		    g.progname, s, *cp->v, cp->min, cp->maxset);
+	} else if (v < cp->min || v > cp->maxset) {
+		fprintf(stderr, "%s: %s: value outside min/max values of %"
+		    PRIu32 "-%" PRIu32 "\n",
+		    g.progname, s, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
-	*cp->v = (uint32_t)v;
+	*cp->v = v;
 }
 
 /*
