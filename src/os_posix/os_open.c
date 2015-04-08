@@ -184,7 +184,7 @@ setupfh:
 	}
 	if (!matched) {
 		WT_CONN_FILE_INSERT(conn, fh, bucket);
-		WT_STAT_FAST_CONN_INCR(session, file_open);
+		WT_STAT_ATOMIC_INCR(&conn->stats, file_open);
 
 		*fhp = fh;
 	}
@@ -230,7 +230,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	/* Remove from the list. */
 	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_FILE_REMOVE(conn, fh, bucket);
-	WT_STAT_FAST_CONN_DECR(session, file_open);
+	WT_STAT_ATOMIC_DECR(&conn->stats, file_open);
 
 	__wt_spin_unlock(session, &conn->fh_lock);
 

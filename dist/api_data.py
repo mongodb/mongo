@@ -377,7 +377,10 @@ connection_runtime_config = [
             before attempting to close it''', min=1, max=1000),
         Config('close_scan_interval', '10', r'''
             interval in seconds at which to check for files that are
-            inactive and close them''', min=1, max=1000)
+            inactive and close them''', min=1, max=1000),
+        Config('open_handles', '250', r'''
+            number of handles open before the file manager will look for handles
+            to close'''),
         ]),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management''',

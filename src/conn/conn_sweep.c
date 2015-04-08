@@ -171,6 +171,10 @@ __sweep_server(void *arg)
 		WT_ERR(__wt_cond_wait(session, conn->sweep_cond,
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
 
+		/* We require a minimum number of handles before we sweep. */
+		if (WT_CONN_STAT(session, file_open) < conn->sweep_handles)
+			continue;
+
 		/* Sweep the handles. */
 		WT_ERR(__sweep(session));
 	}
@@ -201,6 +205,10 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_scan_interval", &cval));
 	conn->sweep_interval = (time_t)cval.val;
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "file_manager.open_handles", &cval));
+	conn->sweep_handles = (u_int)cval.val;
 
 	return (0);
 }
