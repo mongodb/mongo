@@ -1,11 +1,11 @@
 // Test the downgrade of a replica set from latest version
-// to version 2.6 succeeds, while reads and writes continue.
+// to last-stable version succeeds, while reads and writes continue.
 
 load('./jstests/multiVersion/libs/multi_rs.js')
 load('./jstests/libs/test_background_ops.js')
 
 var newVersion = "latest";
-var oldVersion = "2.6";
+var oldVersion = "last-stable";
 
 var name = "replsetdowngrade";
 var nodes = {n1: {binVersion: newVersion},
