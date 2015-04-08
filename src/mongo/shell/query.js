@@ -77,15 +77,22 @@ DBQuery.prototype._checkModify = function(){
         throw Error("query already executed");
 }
 
+DBQuery.prototype._canUseFindCommand = function() {
+    // Since runCommand() is implemented by running a findOne() against the $cmd collection, we have
+    // to make sure that we don't try to run a find command against the $cmd collection.
+    //
+    // We also forbid queries with the exhaust option from running as find commands, because the
+    // find command does not support exhaust.
+    return (this._collection.getName().indexOf("$cmd") !== 0)
+        && (this._options & DBQuery.Option.exhaust) === 0;
+}
+
 DBQuery.prototype._exec = function(){
     if ( ! this._cursor ){
         assert.eq( 0 , this._numReturned );
         this._cursorSeen = 0;
 
-        if (this._mongo.useFindCommand() && this._collection.getName().indexOf("$cmd") !== 0) {
-            // Run the query as a find command. Since runCommand() is implemented by running
-            // a findOne() against the $cmd collection, we have to make sure that we don't try
-            // to run a find command against the $cmd collection.
+        if (this._mongo.useFindCommand() && this._canUseFindCommand()) {
             var findCmd = this._convertToCommand();
             var cmdRes = this._db.runCommand(findCmd);
             this._cursor = new DBCommandCursor(this._mongo, cmdRes);
@@ -205,10 +212,6 @@ DBQuery.prototype._convertToCommand = function() {
 
     if ((this._options & DBQuery.Option.awaitData) != 0) {
         cmd["awaitData"] = true;
-    }
-
-    if ((this._options & DBQuery.Option.exhaust) != 0) {
-        cmd["exhaust"] = true;
     }
 
     if ((this._options & DBQuery.Option.partial) != 0) {
