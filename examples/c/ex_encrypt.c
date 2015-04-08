@@ -42,6 +42,8 @@
 
 #include <wiredtiger.h>
 
+int add_my_encryptors(WT_CONNECTION *connection);
+
 static const char *home = NULL;
 
 /*! [encryption example callback implementation] */

@@ -545,7 +545,9 @@ common_wiredtiger_open = [
             WT_CONNECTION::add_encryptor.
             See @ref encryption for more information'''),
         Config('keyid', '', r'''
-            An identifier that is passed to the WT_ENCRYPTOR::initialize function'''),
+            An identifier that is passed to the WT_ENCRYPTOR::initialize function. It is stored in clear text, and thus is available when the wiredtiger database is reopened.'''),
+        Config('password', '', r'''
+            An identifier that is passed to the WT_ENCRYPTOR::initialize function. It is never stored in clear text, so must be given to any subsequent wiredtiger_open calls to reopen the database. It must also be provided to any "wt" commands used with this database.'''),
         ]),
     Config('extensions', '', r'''
         list of shared library extensions to load (using dlopen).

@@ -1976,12 +1976,18 @@ struct __wt_connection {
  * @config{encryption = (, configure an encryptor for system wide metadata and
  * logs., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that is passed to the
- * WT_ENCRYPTOR::initialize function., a string; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none" or
- * custom encryption engine name created with WT_CONNECTION::add_encryptor.  See
- * @ref encryption for more information., a string; default \c none.}
- * @config{
- * ),,}
+ * WT_ENCRYPTOR::initialize function.  It is stored in clear text\, and thus is
+ * available when the wiredtiger database is reopened., a string; default
+ * empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none"
+ * or custom encryption engine name created with WT_CONNECTION::add_encryptor.
+ * See @ref encryption for more information., a string; default \c none.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;password, An identifier that is passed to the
+ * WT_ENCRYPTOR::initialize function.  It is never stored in clear text\, so
+ * must be given to any subsequent wiredtiger_open calls to reopen the database.
+ * It must also be provided to any "wt" commands used with this database., a
+ * string; default empty.}
+ * @config{ ),,}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction = (, eviction configuration options., a set of related
