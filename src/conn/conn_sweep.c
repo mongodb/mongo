@@ -207,7 +207,7 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 	conn->sweep_interval = (time_t)cval.val;
 
 	WT_RET(__wt_config_gets(session,
-	    cfg, "file_manager.open_handles", &cval));
+	    cfg, "file_manager.close_handle_minimum", &cval));
 	conn->sweep_handles = (u_int)cval.val;
 
 	return (0);

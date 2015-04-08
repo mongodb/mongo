@@ -60,11 +60,11 @@ static const WT_CONFIG_CHECK confchk_eviction_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_file_manager_subconfigs[] = {
+	{ "close_handle_minimum", "string", NULL, NULL, NULL, 0 },
 	{ "close_idle_time", "int", NULL, "min=1,max=1000", NULL, 0 },
 	{ "close_scan_interval", "int",
 	    NULL, "min=1,max=1000",
 	    NULL, 0 },
-	{ "open_handles", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -703,10 +703,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "name=\"WiredTigerCheckpoint\",wait=0),error_prefix=,"
 	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,"
-	  "file_manager=(close_idle_time=30,close_scan_interval=10,"
-	  "open_handles=250),lsm_manager=(merge=,worker_thread_max=4),"
-	  "lsm_merge=,shared_cache=(chunk=10MB,name=,reserve=0,size=500MB),"
-	  "statistics=none,statistics_log=(on_close=0,"
+	  "file_manager=(close_handle_minimum=250,close_idle_time=30,"
+	  "close_scan_interval=10),lsm_manager=(merge=,worker_thread_max=4)"
+	  ",lsm_merge=,shared_cache=(chunk=10MB,name=,reserve=0,size=500MB)"
+	  ",statistics=none,statistics_log=(on_close=0,"
 	  "path=\"WiredTigerStat.%d.%H\",sources=,"
 	  "timestamp=\"%b %d %H:%M:%S\",wait=0),verbose=",
 	  confchk_connection_reconfigure, 16
@@ -833,8 +833,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "config_base=,create=0,direct_io=,error_prefix=,"
 	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
-	  "file_extend=,file_manager=(close_idle_time=30,"
-	  "close_scan_interval=10,open_handles=250),hazard_max=1000,"
+	  "file_extend=,file_manager=(close_handle_minimum=250,"
+	  "close_idle_time=30,close_scan_interval=10),hazard_max=1000,"
 	  "log=(archive=,compressor=,enabled=0,file_max=100MB,path=,"
 	  "prealloc=,recover=on),lsm_manager=(merge=,worker_thread_max=4),"
 	  "lsm_merge=,mmap=,multiprocess=0,session_max=100,"
@@ -852,8 +852,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "config_base=,create=0,direct_io=,error_prefix=,"
 	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
-	  "file_extend=,file_manager=(close_idle_time=30,"
-	  "close_scan_interval=10,open_handles=250),hazard_max=1000,"
+	  "file_extend=,file_manager=(close_handle_minimum=250,"
+	  "close_idle_time=30,close_scan_interval=10),hazard_max=1000,"
 	  "log=(archive=,compressor=,enabled=0,file_max=100MB,path=,"
 	  "prealloc=,recover=on),lsm_manager=(merge=,worker_thread_max=4),"
 	  "lsm_merge=,mmap=,multiprocess=0,session_max=100,"
@@ -871,8 +871,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "name=\"WiredTigerCheckpoint\",wait=0),checkpoint_sync=,"
 	  "direct_io=,error_prefix=,eviction=(threads_max=1,threads_min=1),"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
-	  "extensions=,file_extend=,file_manager=(close_idle_time=30,"
-	  "close_scan_interval=10,open_handles=250),hazard_max=1000,"
+	  "extensions=,file_extend=,file_manager=(close_handle_minimum=250,"
+	  "close_idle_time=30,close_scan_interval=10),hazard_max=1000,"
 	  "log=(archive=,compressor=,enabled=0,file_max=100MB,path=,"
 	  "prealloc=,recover=on),lsm_manager=(merge=,worker_thread_max=4),"
 	  "lsm_merge=,mmap=,multiprocess=0,session_max=100,"
@@ -889,8 +889,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "name=\"WiredTigerCheckpoint\",wait=0),checkpoint_sync=,"
 	  "direct_io=,error_prefix=,eviction=(threads_max=1,threads_min=1),"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
-	  "extensions=,file_extend=,file_manager=(close_idle_time=30,"
-	  "close_scan_interval=10,open_handles=250),hazard_max=1000,"
+	  "extensions=,file_extend=,file_manager=(close_handle_minimum=250,"
+	  "close_idle_time=30,close_scan_interval=10),hazard_max=1000,"
 	  "log=(archive=,compressor=,enabled=0,file_max=100MB,path=,"
 	  "prealloc=,recover=on),lsm_manager=(merge=,worker_thread_max=4),"
 	  "lsm_merge=,mmap=,multiprocess=0,session_max=100,"
