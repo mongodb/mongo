@@ -47,9 +47,8 @@ __wt_fallocate(
 		WT_RET_MSG(session,
 		    __wt_errno(), "%s SetFilePointerEx error", fh->name);
 
-	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE) {
+	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE)
 		return (0);
-	}
 
 	WT_RET_MSG(session, __wt_errno(), "%s SetEndOfFile error", fh->name);
 }
