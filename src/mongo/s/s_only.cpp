@@ -139,17 +139,15 @@ namespace mongo {
         try {
             ok = c->run( txn, dbname , cmdObj, queryOptions, errmsg, result, false );
         }
-        catch (DBException& e) {
+        catch (const DBException& e) {
             ok = false;
             int code = e.getCode();
             if (code == RecvStaleConfigCode) { // code for StaleConfigException
                 throw;
             }
 
-            stringstream ss;
-            ss << "exception: " << e.what();
-            errmsg = ss.str();
-            result.append( "code" , code );
+            errmsg = e.what();
+            result.append("code", code);
         }
 
         if ( !ok ) {

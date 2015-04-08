@@ -1325,18 +1325,15 @@ namespace mongo {
         try {
             return c->run(txn, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
         }
-        catch ( SendStaleConfigException& e ){
-            LOG(1) << "command failed because of stale config, can retry" << causedBy( e ) << endl;
+        catch (const SendStaleConfigException& e) {
+            LOG(1) << "command failed because of stale config, can retry" << causedBy(e);
             throw;
         }
-        catch ( DBException& e ) {
-
+        catch (const DBException& e) {
             // TODO: Rethrown errors have issues here, should divorce SendStaleConfigException from the DBException tree
 
-            stringstream ss;
-            ss << "exception: " << e.what();
-            result.append( "errmsg" , ss.str() );
-            result.append( "code" , e.getCode() );
+            result.append("errmsg", e.what());
+            result.append("code", e.getCode());
             return false;
         }
     }
