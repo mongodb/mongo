@@ -48,7 +48,6 @@ __wt_fallocate(
 		    __wt_errno(), "%s SetFilePointerEx error", fh->name);
 
 	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE) {
-		fh->size = fh->extend_size = len;
 		return (0);
 	}
 
