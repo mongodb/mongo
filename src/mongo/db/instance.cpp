@@ -210,10 +210,11 @@ namespace {
                                 Client& client,
                                 DbResponse& dbResponse,
                                 Message& message) {
-        invariant(nss.isCommand());
-        uassert(28617, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
 
-        MSGID responseTo = message.header().getId();
+        invariant(nss.isCommand());
+
+        const MSGID responseTo = message.header().getId();
+
         DbMessage dbMessage(message);
         QueryMessage queryMessage(dbMessage);
 
@@ -222,6 +223,12 @@ namespace {
         std::unique_ptr<Message> response(new Message());
 
         try {
+            // Do the namespace validity check under the try/catch block so it does not cause the
+            // connection to be terminated.
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid ns [" << nss.ns() << "]",
+                    nss.isValid());
+
             // Auth checking for Commands happens later.
             int nToReturn = queryMessage.ntoreturn;
             beginQueryOp(nss, queryMessage.query, nToReturn, queryMessage.ntoskip, op);

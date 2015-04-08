@@ -39,14 +39,4 @@ assert.eq( si.ns , "test.foo" );
 
 assert.eq( 3 , db.foo.find().length() , "after sharding, no split count failed" );
 
-// SERVER-4284, test modified because of SERVER-5020
-var invalidDB = s.getDB( "foobar" );
-// hack to bypass invalid database name checking at the DB constructor
-invalidDB._name = "foo bar";
-assert.throws(function() {
-    invalidDB.blah.insert({ x: 1 });
-});
-assert.isnull( s.config.databases.findOne( { _id : "foo bar" } ) );
-
-
 s.stop();

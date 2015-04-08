@@ -70,8 +70,6 @@ namespace mongo {
 
         void init();
 
-        void reset();
-
     private:
         ClientInfo* const _clientInfo;
 
