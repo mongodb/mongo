@@ -10,6 +10,10 @@ def source_files(skip_includes=False):
     for line in open('filelist', 'r'):
         if file_re.match(line):
             yield os.path.join('..', line.rstrip())
+    # Return only the Windows-specific files in the Windows filelist
+    for line in open('../build_win/filelist.win', 'r'):
+        if 'os_win' in line and file_re.match(line):
+            yield os.path.join('..', line.rstrip())
     for line in open('extlist', 'r'):
         if file_re.match(line):
             yield os.path.join('..', line.rstrip())
