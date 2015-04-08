@@ -27,16 +27,26 @@
  */
 
 #include <sys/types.h>
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
 
 #include <errno.h>
 #include <inttypes.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
+
+#ifdef _WIN32
+#include "windows_shim.h"
+#endif
 
 #include <wiredtiger.h>
 
