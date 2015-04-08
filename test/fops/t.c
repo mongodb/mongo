@@ -153,7 +153,14 @@ wt_startup(char *config_open)
 	int ret;
 	char config_buf[128];
 
-	if ((ret = system("rm -rf WT_TEST && mkdir WT_TEST")) != 0)
+#undef	CMD
+#ifdef _WIN32
+#define	CMD "rd /s /q WT_TEST & mkdir WT_TEST"
+#else
+#define	CMD "rm -rf WT_TEST && mkdir WT_TEST"
+#endif
+
+	if ((ret = system(CMD)) != 0)
 		die(ret, "directory cleanup call failed");
 
 	snprintf(config_buf, sizeof(config_buf),
@@ -189,7 +196,13 @@ shutdown(void)
 {
 	int ret;
 
-	if ((ret = system("rm -rf WT_TEST")) != 0)
+#undef	CMD
+#ifdef _WIN32
+#define	CMD "if exist WT_TEST rd /s /q WT_TEST"
+#else
+#define	CMD "rm -rf WT_TEST"
+#endif
+	if ((ret = system(CMD)) != 0)
 		die(ret, "directory cleanup call failed");
 }
 
