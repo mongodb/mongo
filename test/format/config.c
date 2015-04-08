@@ -397,7 +397,7 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
-	u_long v;
+	uint64_t v;
 	char *p;
 	const char *ep;
 
