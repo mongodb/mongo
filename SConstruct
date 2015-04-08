@@ -338,11 +338,12 @@ t = env.Program("t_huge",
     LIBS=[wtlib] + wtlibs)
 Default(t)
 
-#env.Program("t_fops",
-    #["test/fops/file.c",
-    #"test/fops/fops.c",
-    #"test/fops/t.c"],
-    #LIBS=[wtlib])
+t = env.Program("t_fops",
+    ["test/fops/file.c",
+    "test/fops/fops.c",
+    "test/fops/t.c"],
+    LIBS=[wtlib, shim] + wtlibs)
+Default(t)
 
 if useBdb:
     benv = env.Clone()

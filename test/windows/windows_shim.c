@@ -56,6 +56,23 @@ usleep(useconds_t useconds)
 	return (0);
 }
 
+int gettimeofday(struct timeval* tp, void* tzp)
+{
+	uint64_t ns100;
+	FILETIME time;
+
+	tzp = tzp;
+
+	GetSystemTimeAsFileTime(&time);
+
+	ns100 = (((int64_t)time.dwHighDateTime << 32) + time.dwLowDateTime)
+	    - 116444736000000000LL;
+	tp->tv_sec = ns100 / 10000000;
+	tp->tv_usec = (long)((ns100 % 10000000) / 10);
+
+	return (0);
+}
+
 int
 pthread_rwlock_destroy(pthread_rwlock_t *lock)
 {
