@@ -60,6 +60,16 @@ _Check_return_opt_ int __cdecl _wt_snprintf(
 #define	mkdir(path, mode) _mkdir(path)
 
 /*
+ * Emulate <sys/time.h>
+ */
+struct timeval {
+	time_t tv_sec;
+	int64_t tv_usec;
+};
+
+int gettimeofday(struct timeval* tp, void* tzp);
+
+/*
  * Emulate <sched.h>
  */
 int sched_yield(void);
