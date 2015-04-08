@@ -592,8 +592,9 @@ namespace {
             if ( !res.isOK() ) {
                 return res.getStatus();
             }
+            const std::unique_ptr<MatchExpression> filterExpr( res.getValue() );
 
-            Status status = _checkValidFilterExpressions(res.getValue());
+            Status status = _checkValidFilterExpressions( filterExpr.get() );
             if (!status.isOK()) {
                 return status;
             }
