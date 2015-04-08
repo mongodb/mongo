@@ -6,7 +6,7 @@ package json
 // stateUpperMi is the state after reading `Mi`.
 func stateUpperMi(s *scanner, c int) int {
 	if c == 'n' {
-		s.step = generateState("MinKey", []byte("Key"), stateEndValue)
+		s.step = generateState("MinKey", []byte("Key"), stateOptionalConstructor)
 		return scanContinue
 	}
 	return s.error(c, "in literal MinKey (expecting 'n')")

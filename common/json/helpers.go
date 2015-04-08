@@ -49,3 +49,28 @@ func generateState(name string, x []byte, accept func(*scanner, int) int) func(*
 		return s.error(c, fmt.Sprintf("in literal %v (expecting '%v')", name, string(x[0])))
 	}
 }
+
+// stateOptionalConstructor is the state where there is the possibility of entering an empty constructor.
+func stateOptionalConstructor(s *scanner, c int) int {
+	if c <= ' ' && isSpace(rune(c)) {
+		return scanContinue
+	}
+	if c == '(' {
+		s.step = stateInParen
+		return scanContinue
+	}
+	return stateEndValue(s, c)
+}
+
+// stateInParen is the state when inside a `(` waiting for a `)`
+func stateInParen(s *scanner, c int) int {
+	if c <= ' ' && isSpace(rune(c)) {
+		return scanContinue
+	}
+	if c == ')' {
+		s.step = stateEndValue
+		return scanContinue
+	}
+	return s.error(c, "expecting ')' as next character")
+
+}
