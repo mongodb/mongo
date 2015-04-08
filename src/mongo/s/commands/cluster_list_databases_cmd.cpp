@@ -36,7 +36,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/config.h"
 #include "mongo/s/shard.h"
 
 namespace mongo {
@@ -153,10 +152,19 @@ namespace {
                 bb.append(temp.obj());
             }
 
-            { // get config db from the config servers (first one)
-                ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
+            // obtain cached config shard
+            Shard configShard = Shard::findIfExists("config");
+            if (!configShard.ok()) {
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::ShardNotFound,
+                                                  "Couldn't find shard "
+                                                  "representing config server"));
+            }
+
+            {
+                // get config db from the config servers (first one)
                 BSONObj x;
-                if (conn->simpleCommand("config", &x, "dbstats")){
+                if (configShard.runCommand("config", "dbstats", x)) {
                     BSONObjBuilder b;
                     b.append("name", "config");
                     b.appendBool("empty", false);
@@ -169,15 +177,12 @@ namespace {
                 else {
                     bb.append(BSON("name" << "config"));
                 }
-                conn.done();
             }
 
             {
                 // get admin db from the config servers (first one)
-                ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-
                 BSONObj x;
-                if (conn->simpleCommand("admin", &x, "dbstats")) {
+                if (configShard.runCommand("admin", "dbstats", x)) {
                     BSONObjBuilder b;
                     b.append("name", "admin");
                     b.appendBool("empty", false);
@@ -194,8 +199,6 @@ namespace {
                 else {
                     bb.append(BSON("name" << "admin"));
                 }
-
-                conn.done();
             }
 
             bb.done();

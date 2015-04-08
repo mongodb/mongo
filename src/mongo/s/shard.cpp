@@ -441,18 +441,24 @@ namespace mongo {
     }
 
     BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
-        ScopedDbConnection conn(getConnString());
         BSONObj res;
-        bool ok = conn->runCommand( db , cmd , res );
+        bool ok = runCommand(db, cmd, res);
         if ( ! ok ) {
             stringstream ss;
             ss << "runCommand (" << cmd << ") on shard (" << _name << ") failed : " << res;
-            conn.done();
             throw UserException( 13136 , ss.str() );
         }
         res = res.getOwned();
-        conn.done();
         return res;
+    }
+
+    bool Shard::runCommand(const string& db,
+                           const BSONObj& cmd,
+                           BSONObj& res) const {
+        ScopedDbConnection conn(getConnString());
+        bool ok = conn->runCommand(db, cmd, res);
+        conn.done();
+        return ok;
     }
 
     string Shard::getShardMongoVersion(const string& shardHost) {

@@ -136,6 +136,20 @@ namespace mongo {
         BSONObj runCommand( const std::string& db , const BSONObj& cmd ) const ;
 
         /**
+         * Runs a command on this shard. This method signature matches that of
+         * the connection on which this method relies upon.
+         */
+        bool runCommand(const std::string& db,
+                        const BSONObj& cmd,
+                        BSONObj& res) const;
+
+        bool runCommand(const std::string& db,
+                        const std::string& simple,
+                        BSONObj& res) const {
+            return runCommand(db, BSON(simple << 1), res);
+        }
+
+        /**
          * Returns the version string from the shard based from the serverStatus command result.
          */
         static std::string getShardMongoVersion(const std::string& shardHost);
