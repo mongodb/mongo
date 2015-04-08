@@ -340,6 +340,10 @@ config_print(int error_display)
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 
 	fprintf(fp, "############################################\n");
+
+	/* Flush so we're up-to-date on error. */
+	(void)fflush(fp);
+
 	if (fp != stdout)
 		(void)fclose(fp);
 }

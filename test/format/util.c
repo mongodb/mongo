@@ -385,6 +385,10 @@ rng(void)
 	}
 
 	r = (uint32_t)rand();
-	fprintf(g.rand_log, "%" PRIu32 "\n", r);
+
+	/* Save and flush the random number so we're up-to-date on error. */
+	(void)fprintf(g.rand_log, "%" PRIu32 "\n", r);
+	(void)fflush(g.rand_log);
+
 	return (r);
 }
