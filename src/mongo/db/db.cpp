@@ -151,47 +151,6 @@ namespace mongo {
 
     QueryResult::View emptyMoreResult(long long);
 
-
-    /* todo: make this a real test.  the stuff in dbtests/ seem to do all dbdirectclient which exhaust doesn't support yet. */
-// QueryOption_Exhaust
-#define TESTEXHAUST 0
-#if( TESTEXHAUST )
-    void testExhaust() {
-        sleepsecs(1);
-        unsigned n = 0;
-        auto f = [&n](const BSONObj& o) {
-            verify( o.valid() );
-            //cout << o << endl;
-            n++;
-            bool testClosingSocketOnError = false;
-            if( testClosingSocketOnError )
-                verify(false);
-        };
-        DBClientConnection db(false);
-        db.connect("localhost");
-        const char *ns = "local.foo";
-        if( db.count(ns) < 10000 )
-            for( int i = 0; i < 20000; i++ )
-                db.insert(ns, BSON("aaa" << 3 << "b" << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
-
-        try {
-            db.query(f, ns, Query() );
-        }
-        catch(...) {
-            cout << "hmmm" << endl;
-        }
-
-        try {
-            db.query(f, ns, Query() );
-        }
-        catch(...) {
-            cout << "caught" << endl;
-        }
-
-        cout << n << endl;
-    };
-#endif
-
     class MyMessageHandler : public MessageHandler {
     public:
         virtual void connected( AbstractMessagingPort* p ) {
@@ -641,10 +600,6 @@ namespace mongo {
         PeriodicTask::startRunningPeriodicTasks();
 
         logStartup();
-
-#if(TESTEXHAUST)
-        boost::thread thr(testExhaust);
-#endif
 
         // MessageServer::run will return when exit code closes its socket
         server->run();
