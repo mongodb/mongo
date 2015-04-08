@@ -223,10 +223,6 @@ add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
 add_option( "endian" , "endianness of target platform" , 1 , False , "endian",
             type="choice", choices=["big", "little", "auto"], default="auto" )
 
-add_option( "cxx", "compiler to use" , 1 , True )
-add_option( "cc", "compiler to use for c" , 1 , True )
-add_option( "cc-use-shell-environment", "use $CC from shell for C compiler" , 0 , False )
-add_option( "cxx-use-shell-environment", "use $CXX from shell for C++ compiler" , 0 , False )
 add_option( "disable-minimum-compiler-version-enforcement",
             "allow use of unsupported older compilers (NEVER for production builds)",
             0, False )
@@ -347,6 +343,10 @@ add_option('cache-dir',
            "Specify the directory to use for caching objects if --cache is in use",
            1, False, default="$BUILD_ROOT/scons/cache")
 
+add_option('variables-files',
+           "Specify variables files to load",
+           1, False, default="")
+
 variable_parse_mode_choices=['auto', 'posix', 'other']
 add_option('variable-parse-mode',
            "Select which parsing mode is used to interpret command line variables",
@@ -406,11 +406,17 @@ def variable_tools_converter(val):
     tool_list = shlex.split(val)
     return tool_list + ["jsheader", "mergelib", "mongo_unittest", "textfile"]
 
-env_vars = Variables()
+env_vars = Variables(
+    files=variable_shlex_converter(get_option('variables-files')),
+    args=ARGUMENTS
+)
 
 env_vars.Add('ARFLAGS',
     help='Sets flags for the archiver',
     converter=variable_shlex_converter)
+
+env_vars.Add('CC',
+    help='Select the C compiler to use')
 
 env_vars.Add('CCFLAGS',
     help='Sets flags for the C and C++ compiler',
@@ -428,6 +434,9 @@ env_vars.Add('CPPDEFINES',
 env_vars.Add('CPPPATH',
     help='Adds paths to the preprocessor search path',
     converter=variable_shlex_converter)
+
+env_vars.Add('CXX',
+    help='Select the C++ compiler to use')
 
 env_vars.Add('CXXFLAGS',
     help='Sets flags for the C++ compiler',
@@ -483,8 +492,7 @@ env_vars.Add('TARGET_ARCH',
 
 env_vars.Add('TARGET_OS',
     help='Sets the target OS to build for',
-    default=get_running_os_name()
-)
+    default=get_running_os_name())
 
 env_vars.Add('TOOLS',
     help='Sets the list of SCons tools to add to the environment',
@@ -494,6 +502,26 @@ env_vars.Add('TOOLS',
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
+
+# -- Validate user provided options --
+
+# A dummy environment that should *only* have the variables we have set. In practice it has
+# some other things because SCons isn't quite perfect about keeping variable initialization
+# scoped to Tools, but it should be good enough to do validation on any Variable values that
+# came from the command line or from loaded files.
+variables_only_env = Environment(
+    # Disable platform specific variable injection
+    platform=(lambda x: ()),
+    # But do *not* load any tools, since those might actually set variables. Note that this
+    # causes the value of our TOOLS variable to have no effect.
+    tools=[],
+    # Use the Variables specified above.
+    variables=env_vars,
+)
+
+if ('CC' in variables_only_env) != ('CXX' in variables_only_env):
+    print('Cannot customize C compiler without customizing C++ compiler, and vice versa')
+    Exit(1)
 
 # --- environment setup ---
 
@@ -622,29 +650,6 @@ if unknown_vars:
 def set_config_header_define(env, varname, varval = 1):
     env['CONFIG_HEADER_DEFINES'][varname] = varval
 env.AddMethod(set_config_header_define, 'SetConfigHeaderDefine')
-
-if has_option( "cc-use-shell-environment" ) and has_option( "cc" ):
-    print("Cannot specify both --cc-use-shell-environment and --cc")
-    Exit(1)
-elif has_option( "cxx-use-shell-environment" ) and has_option( "cxx" ):
-    print("Cannot specify both --cxx-use-shell-environment and --cxx")
-    Exit(1)
-
-if has_option( "cxx-use-shell-environment" ):
-    env["CXX"] = os.getenv("CXX");
-if has_option( "cc-use-shell-environment" ):
-    env["CC"] = os.getenv("CC");
-
-if has_option( "cxx" ):
-    if not has_option( "cc" ):
-        print "Must specify C compiler when specifying C++ compiler"
-        Exit(1)
-    env["CXX"] = get_option( "cxx" )
-if has_option( "cc" ):
-    if not has_option( "cxx" ):
-        print "Must specify C++ compiler when specifying C compiler"
-        Exit(1)
-    env["CC"] = get_option( "cc" )
 
 detectEnv = env.Clone()
 
