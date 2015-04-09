@@ -337,25 +337,11 @@ add_my_encryptors(WT_CONNECTION *connection)
 	return (0);
 }
 
-static void
-print_record(WT_LSN *lsn, uint32_t opcount,
-   uint32_t rectype, uint32_t optype, uint64_t txnid, uint32_t fileid,
-   WT_ITEM *key, WT_ITEM *value)
-{
-	(void)lsn;		/* Unused */
-	(void)opcount;		/* Unused */
-	(void)optype;		/* Unused */
-	(void)txnid;		/* Unused */
-	(void)fileid;		/* Unused */
-	(void)key;		/* Unused */
-
-	if (rectype == WT_LOGREC_MESSAGE)
-		printf("Application Log Record: %s\n", (char *)value->data);
-}
-
 /*
  * simple_walk_log --
- *	A simple walk of the log.
+ *	A simple walk of the write-ahead log.
+ *	We wrote text messages into the log.  Print them.
+ *	This verifies we're decrypting properly.
  */
 static int
 simple_walk_log(WT_SESSION *session)
@@ -374,8 +360,9 @@ simple_walk_log(WT_SESSION *session)
 		ret = cursor->get_value(cursor, &txnid,
 		    &rectype, &optype, &fileid, &logrec_key, &logrec_value);
 
-		print_record(&lsn, opcount,
-		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
+		if (rectype == WT_LOGREC_MESSAGE)
+			printf("Application Log Record: %s\n",
+			    (char *)logrec_value.data);
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -416,6 +403,10 @@ main(void)
 	    "keyid=system_password)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
+
+	/*
+	 * Create and open some encrypted and not encrypted tables.
+	 */
 	ret = session->create(session, "table:crypto1",
 	    "encryption=(name=user1,keyid=test_password1),"
 	    "key_format=S,value_format=S");
@@ -425,11 +416,15 @@ main(void)
 	ret = session->create(session, "table:nocrypto",
 	    "key_format=S,value_format=S");
 
-	/* Insert a set of keys */
 	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
 	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
 	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
 
+	/* 
+	 * Insert a set of keys and values.  Insert the same data into
+	 * all tables so that we can verify they're all the same after
+	 * we decrypt on read.
+	 */
 	for (i = 0; i < MAX_KEYS; i++) {
 		snprintf(keybuf, sizeof(keybuf), "key%d", i);
 		c1->set_key(c1, keybuf);
@@ -461,6 +456,10 @@ main(void)
 	printf("CLOSE\n");
 	ret = conn->close(conn, NULL);
 
+	/*
+	 * We want to close and reopen so that we recreate the cache
+	 * by reading the data from disk, forcing decryption.
+	 */
 	printf("REOPEN and VERIFY encrypted data\n");
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
