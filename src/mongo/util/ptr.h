@@ -30,6 +30,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include <memory>
 
 namespace mongo {
 
@@ -49,17 +50,26 @@ namespace mongo {
         ptr(T* p) : _p(p) {} // needed for NULL
         template<typename U> ptr(U* p) : _p(p) {}
         template<typename U> ptr(const ptr<U>& p) : _p(p) {}
+        template<typename U> ptr(const std::unique_ptr<U>& p) : _p(p.get()) {}
         template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
         template<typename U> ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
-        //template<typename U> ptr(const std::auto_ptr<U>& p) : _p(p.get()) {}
 
         // assign to ptr<T>
         ptr& operator= (T* p) { _p = p; return *this; } // needed for NULL
         template<typename U> ptr& operator= (U* p) { _p = p; return *this; }
         template<typename U> ptr& operator= (const ptr<U>& p) { _p = p; return *this; }
-        template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) { _p = p.get(); return *this; }
-        template<typename U> ptr& operator= (const boost::scoped_ptr<U>& p) { _p = p.get(); return *this; }
-        //template<typename U> ptr& operator= (const std::auto_ptr<U>& p) { _p = p.get(); return *this; }
+        template<typename U> ptr& operator= (const std::unique_ptr<U>& p) {
+            _p = p.get();
+            return *this;
+        }
+        template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) {
+            _p = p.get();
+            return *this;
+        }
+        template<typename U> ptr& operator= (const boost::scoped_ptr<U>& p) {
+            _p = p.get();
+            return *this;
+        }
 
         // use
         T* operator->() const { return _p; }
