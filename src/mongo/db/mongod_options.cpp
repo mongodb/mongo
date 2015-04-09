@@ -1142,12 +1142,6 @@ namespace mongo {
             params["sharding.clusterRole"].as<std::string>() == "configsvr") {
             serverGlobalParams.configsvr = true;
             mmapv1GlobalOptions.smallfiles = true; // config server implies small files
-            if (replSettings.usingReplSets()
-                    || replSettings.master
-                    || replSettings.slave) {
-                return Status(ErrorCodes::BadValue,
-                              "replication should not be enabled on a config server");
-            }
 
             // If we haven't explicitly specified a journal option, default journaling to true for
             // the config server role
