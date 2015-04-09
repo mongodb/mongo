@@ -1,5 +1,21 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_254 Upgrading to Version 2.5.4
+<dl>
+<dt>File handle closing</dt>
+<dd>
+In WiredTiger, a separate thread of control periodically reviews open
+objects, closing ones which have been idle for some period of time and
+discarding them from the cache.  In previous WiredTiger releases, this
+review was independent of the number of open file handles. In this
+release, WiredTiger only reviews the file handles if at least 250 file
+handles are open. How often file handles are reviewed (the default is
+30 seconds), and how many file handles must be opened before review is
+triggered, can be configured using the \c file_manager configuration
+values to the ::wiredtiger_open call.
+</dd>
+
+</dl><hr>
 @section version_253 Upgrading to Version 2.5.3
 <dl>
 
