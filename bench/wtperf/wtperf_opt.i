@@ -145,7 +145,10 @@ DEF_OPT_AS_CONFIG_STRING(table_config,
     "table configuration string")
 DEF_OPT_AS_UINT32(table_count, 1,
     "number of tables to run operations over. Keys are divided evenly "
-    "over the tables. Default 1, maximum 99.")
+    "over the tables. Cursors are held open on all tables. Default 1, maximum "
+    "99999.")
+DEF_OPT_AS_UINT32(table_count_idle, 0,
+    "number of tables to create, that won't be populated. Default 0.")
 DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "entry is the total number of threads, and the 'insert', 'read' and "
     "'update' entries are the ratios of insert, read and update operations "
