@@ -28,7 +28,7 @@ __wt_map_error_to_windows_error(int error) {
 }
 
 /*
- * __wt_map_error_to_windows_error --
+ * __wt_map_windows_error_to_error --
  *	Return a positive integer, a decoded Windows error
  */
 static int

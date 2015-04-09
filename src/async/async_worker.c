@@ -75,8 +75,8 @@ retry:
 	 */
 	my_slot = my_consume % async->async_qsize;
 	prev_slot = last_consume % async->async_qsize;
-	*op = (WT_ASYNC_OP_IMPL*)WT_ATOMIC_STORE8(
-		async->async_queue[my_slot], NULL);
+	*op = async->async_queue[my_slot];
+	async->async_queue[my_slot] = NULL;
 
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
