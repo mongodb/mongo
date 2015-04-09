@@ -1,4 +1,4 @@
-var myShardingTest = new ShardingTest("sharding_passthrough", 2, 0, 1);
+var myShardingTest = new ShardingTest("sharding_passthrough", 1, 0, 1);
 myShardingTest.adminCommand({ enablesharding : "test" });
 
 var db = myShardingTest.getDB("test");
