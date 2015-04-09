@@ -23,6 +23,8 @@
 # - 'builder_num'
 # - 'builde
 
+stepback: true
+
 functions:
   "fetch source" :
     command: git.get_project
