@@ -78,12 +78,15 @@
     coll.drop();
     assert.commandWorked(coll.getDB().createCollection(coll.getName()));
     assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
+
     cursor = getListIndexesCursor(coll, {cursor: {batchSize: 2}});
     assert.eq(2, cursor.objsLeftInBatch());
     assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+
     cursor = getListIndexesCursor(coll, {cursor: {batchSize: 1}});
     assert.eq(1, cursor.objsLeftInBatch());
     assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+
     cursor = getListIndexesCursor(coll, {cursor: {batchSize: 0}});
     assert.eq(0, cursor.objsLeftInBatch());
     assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
@@ -109,19 +112,6 @@
     assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
 
     //
-    // Test for invalid values of "cursor" and "cursor.batchSize".
-    //
-
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: 0}); });
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: 'x'}); });
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: []}); });
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: {foo: 1}}); });
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: {batchSize: -1}}); });
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: {batchSize: 'x'}}); });
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: {batchSize: {}}}); });
-    assert.throws(function() { getListIndexesCursor(coll, {cursor: {batchSize: 2, foo: 1}}); });
-
-    //
     // Test more than 2 batches of results.
     //
 
@@ -130,36 +120,26 @@
     assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
     assert.commandWorked(coll.ensureIndex({b: 1}, {unique: true}));
     assert.commandWorked(coll.ensureIndex({c: 1}, {unique: true}));
+
     cursor = getListIndexesCursor(coll, {cursor: {batchSize: 0}}, 2);
     assert.eq(0, cursor.objsLeftInBatch());
     assert(cursor.hasNext());
     assert.eq(2, cursor.objsLeftInBatch());
+
     cursor.next();
     assert(cursor.hasNext());
     assert.eq(1, cursor.objsLeftInBatch());
+
     cursor.next();
     assert(cursor.hasNext());
     assert.eq(2, cursor.objsLeftInBatch());
+
     cursor.next();
     assert(cursor.hasNext());
     assert.eq(1, cursor.objsLeftInBatch());
+
     cursor.next();
     assert(!cursor.hasNext());
-
-    //
-    // Test on non-existent collection.
-    //
-
-    coll.drop();
-    assert.commandFailed(coll.runCommand("listIndexes"));
-
-    //
-    // Test on non-existent database.
-    //
-
-    var collOnNonExistentDB = db.getSiblingDB(coll.getName()).getCollection(coll.getName);
-    assert.commandWorked(collOnNonExistentDB.getDB().dropDatabase());
-    assert.commandFailed(collOnNonExistentDB.runCommand("listIndexes"));
 
     //
     // Test on collection with no indexes.
