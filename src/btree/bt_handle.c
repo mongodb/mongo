@@ -171,13 +171,12 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	}
 	btree->collator = NULL;
 
-	/*
-	 * Don't call encryptor->terminate here because there are
-	 * likely many tables using the same encryptor.  They will
-	 * all be terminated once, when the connection is closed.
-	 * This would be the place to add a call to a finalize callback.
-	 */
-	btree->encryptor_owned = 0;
+	if (btree->encryptor_owned) {
+		if (btree->encryptor->terminate != NULL)
+			WT_TRET(btree->encryptor->terminate(
+			    btree->encryptor, &session->iface));
+		btree->encryptor_owned = 0;
+	}
 	btree->encryptor = NULL;
 
 	btree->bulk_load_ok = 0;
