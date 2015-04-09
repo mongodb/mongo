@@ -336,7 +336,12 @@ namespace {
         if (_configServerConnectionString.type() == ConnectionString::MASTER) {
             _configServers.push_back(_configServerConnectionString);
         }
-        else if (_configServerConnectionString.type() == ConnectionString::SYNC) {
+        else if (_configServerConnectionString.type() == ConnectionString::SYNC ||
+                 (_configServerConnectionString.type() == ConnectionString::SET &&
+                         _configServerConnectionString.getServers().size() == 1)) {
+            // TODO(spencer): Remove second part of the above or statement that allows replset
+            // config server strings once we've separated the legacy catalog manager from the
+            // CSRS version.
             const vector<HostAndPort> configHPs = _configServerConnectionString.getServers();
             for (vector<HostAndPort>::const_iterator it = configHPs.begin();
                  it != configHPs.end();
