@@ -36,6 +36,23 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+    std::unique_ptr<SortedDataInterface> HarnessHelper::newSortedDataInterface(
+            bool unique,
+            std::initializer_list<IndexKeyEntry> toInsert) {
+        auto index = newSortedDataInterface(unique);
+        insertToIndex(this, index, toInsert);
+        return index;
+    }
+
+    void insertToIndex(ptr<OperationContext> txn,
+                       ptr<SortedDataInterface> index,
+                       std::initializer_list<IndexKeyEntry> toInsert) {
+        WriteUnitOfWork wuow(txn);
+        for (auto&& entry : toInsert) {
+            ASSERT_OK(index->insert(txn, entry.key, entry.loc, true));
+        }
+        wuow.commit();
+    }
 
     TEST( SortedDataInterface, InsertWithDups1 ) {
         const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
@@ -505,25 +522,17 @@ namespace mongo {
     }
 
     TEST( SortedDataInterface, Locate4 ) {
-        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        auto harnessHelper = newHarnessHelper();
+        auto sorted = harnessHelper->newSortedDataInterface(false, {
+            {BSON("" << 1), RecordId(1, 2)},
+            {BSON("" << 1), RecordId(1, 4)},
+            {BSON("" << 1), RecordId(1, 6)},
+            {BSON("" << 2), RecordId(1, 8)},
+        });
 
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId(1,2), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId(1,4), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), RecordId(1,6), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 2 ), RecordId(1,8), true ) );
-                uow.commit();
-            }
-        }
-
-        {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get()) );
+            auto opCtx = harnessHelper->newOperationContext();
+            auto cursor = sorted->newCursor(opCtx.get());
             ASSERT_EQ(cursor->seek(BSON("a" << 1), true),
                       IndexKeyEntry(BSON("" << 1), RecordId(1, 2)));
 
@@ -534,8 +543,8 @@ namespace mongo {
         }
 
         {
-            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            const std::unique_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor(opCtx.get(), false) );
+            auto opCtx = harnessHelper->newOperationContext();
+            auto cursor = sorted->newCursor(opCtx.get(), false);
             ASSERT_EQ(cursor->seek(BSON("a" << 1), true),
                       IndexKeyEntry(BSON("" << 1), RecordId(1, 6)));
 

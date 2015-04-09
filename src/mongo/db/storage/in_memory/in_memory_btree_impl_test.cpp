@@ -34,33 +34,32 @@
 
 #include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    using boost::shared_ptr;
-
-    class InMemoryHarnessHelper : public HarnessHelper {
+    class InMemoryHarnessHelper final : public HarnessHelper {
     public:
         InMemoryHarnessHelper()
             : _order( Ordering::make( BSONObj() ) ) {
         }
 
-        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
-            return getInMemoryBtreeImpl(_order, &_data);
+        std::unique_ptr<SortedDataInterface> newSortedDataInterface( bool unique ) final {
+            return std::unique_ptr<SortedDataInterface>(getInMemoryBtreeImpl(_order, &_data));
         }
 
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new InMemoryRecoveryUnit();
+        std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
+            return stdx::make_unique<InMemoryRecoveryUnit>();
         }
 
     private:
-        shared_ptr<void> _data; // used by InMemoryBtreeImpl
+        boost::shared_ptr<void> _data; // used by InMemoryBtreeImpl
         Ordering _order;
     };
 
-    HarnessHelper* newHarnessHelper() {
-        return new InMemoryHarnessHelper();
+    std::unique_ptr<HarnessHelper> newHarnessHelper() {
+        return stdx::make_unique<InMemoryHarnessHelper>();
     }
 
 }

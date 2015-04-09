@@ -37,27 +37,27 @@ namespace mongo {
 
     using std::auto_ptr;
 
-    class MyHarnessHelper : public HarnessHelper {
+    class MyHarnessHelper final : public HarnessHelper {
     public:
         MyHarnessHelper()
             : _recordStore("a.b"),
               _order(Ordering::make(BSONObj())) {
         }
 
-        virtual SortedDataInterface* newSortedDataInterface(bool unique) {
-            auto_ptr<SortedDataInterface> sorted(getMMAPV1Interface(&_headManager,
-                                                                    &_recordStore,
-                                                                    &_cursorRegistry,
-                                                                    _order,
-                                                                    "a_1",
-                                                                    1));
+        std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
+            std::unique_ptr<SortedDataInterface> sorted(getMMAPV1Interface(&_headManager,
+                                                                           &_recordStore,
+                                                                           &_cursorRegistry,
+                                                                           _order,
+                                                                           "a_1",
+                                                                           1));
             OperationContextNoop op;
             massertStatusOK(sorted->initAsEmpty(&op));
-            return sorted.release();
+            return sorted;
         }
 
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new HeapRecordStoreBtreeRecoveryUnit();
+        std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
+            return stdx::make_unique<HeapRecordStoreBtreeRecoveryUnit>();
         }
 
     private:
@@ -67,8 +67,8 @@ namespace mongo {
         Ordering _order;
     };
 
-    HarnessHelper* newHarnessHelper() {
-        return new MyHarnessHelper();
+    std::unique_ptr<HarnessHelper> newHarnessHelper() {
+        return stdx::make_unique<MyHarnessHelper>();
     }
 
 }

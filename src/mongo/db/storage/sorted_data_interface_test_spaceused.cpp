@@ -30,46 +30,44 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    using boost::scoped_ptr;
-
     // Verify that an empty index takes up no space.
     TEST( SortedDataInterface, GetSpaceUsedBytesEmpty ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         // SERVER-15416 mmapv1 test harness does not use SimpleRecordStoreV1 as its record store
         //              and HeapRecordStoreBtree::dataSize does not have an actual implementation
         // {
-        //     scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+        //     const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
         //     ASSERT( sorted->getSpaceUsedBytes( opCtx.get() ) == 0 );
         // }
     }
 
     // Verify that a nonempty index takes up some space.
     TEST( SortedDataInterface, GetSpaceUsedBytesNonEmpty ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
+        const std::unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        const std::unique_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT( sorted->isEmpty( opCtx.get() ) );
         }
 
         int nToInsert = 10;
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
@@ -80,7 +78,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, sorted->numEntries( opCtx.get() ) );
         }
 
@@ -88,7 +86,7 @@ namespace mongo {
         //              and HeapRecordStoreBtree::dataSize does not have an actual implementation
         // long long spaceUsedBytes;
         // {
-        //     scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+        //     const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
         //     spaceUsedBytes = sorted->getSpaceUsedBytes( opCtx.get() );
         //     ASSERT( spaceUsedBytes > 0 );
         // }
@@ -96,7 +94,7 @@ namespace mongo {
         // {
         //     // getSpaceUsedBytes() returns the same value when called multiple times
         //     // and there were not interleaved write operations.
-        //     scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+        //     const std::unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
         //     ASSERT_EQUALS( spaceUsedBytes, sorted->getSpaceUsedBytes( opCtx.get() ) );
         //     ASSERT_EQUALS( spaceUsedBytes, sorted->getSpaceUsedBytes( opCtx.get() ) );
         // }

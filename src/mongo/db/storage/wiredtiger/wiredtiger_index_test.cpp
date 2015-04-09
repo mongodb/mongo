@@ -42,6 +42,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -49,7 +50,7 @@ namespace mongo {
 
     using std::string;
 
-    class MyHarnessHelper : public HarnessHelper {
+    class MyHarnessHelper final : public HarnessHelper {
     public:
         MyHarnessHelper() : _dbpath( "wt_test" ), _conn( NULL ) {
 
@@ -60,14 +61,14 @@ namespace mongo {
             _sessionCache = new WiredTigerSessionCache( _conn );
         }
 
-        ~MyHarnessHelper() {
+        ~MyHarnessHelper() final {
             delete _sessionCache;
             _conn->close(_conn, NULL);
         }
 
-        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
+        std::unique_ptr<SortedDataInterface> newSortedDataInterface( bool unique ) final {
             std::string ns = "test.wt";
-            OperationContextNoop txn( newRecoveryUnit() );
+            OperationContextNoop txn( newRecoveryUnit().release() );
 
             BSONObj spec = BSON( "key" << BSON( "a" << 1 ) <<
                                  "name" << "testIndex" <<
@@ -82,12 +83,12 @@ namespace mongo {
             invariantWTOK( WiredTigerIndex::Create(&txn, uri, result.getValue()));
 
             if ( unique )
-                return new WiredTigerIndexUnique( &txn, uri, &desc );
-            return new WiredTigerIndexStandard( &txn, uri, &desc );
+                return stdx::make_unique<WiredTigerIndexUnique>( &txn, uri, &desc );
+            return stdx::make_unique<WiredTigerIndexStandard>( &txn, uri, &desc );
         }
 
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new WiredTigerRecoveryUnit( _sessionCache );
+        std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
+            return stdx::make_unique<WiredTigerRecoveryUnit>( _sessionCache );
         }
 
     private:
@@ -96,8 +97,8 @@ namespace mongo {
         WiredTigerSessionCache* _sessionCache;
     };
 
-    HarnessHelper* newHarnessHelper() {
-        return new MyHarnessHelper();
+    std::unique_ptr<HarnessHelper> newHarnessHelper() {
+        return stdx::make_unique<MyHarnessHelper>();
     }
 
     TEST(WiredTigerIndexTest, GenerateCreateStringEmptyDocument) {

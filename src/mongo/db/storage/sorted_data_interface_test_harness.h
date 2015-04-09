@@ -30,9 +30,15 @@
 
 #pragma once
 
+#include <initializer_list>
+#include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/ptr.h"
 
 namespace mongo {
 
@@ -65,20 +71,41 @@ namespace mongo {
     const RecordId loc8( 10, 56 );
 
     class RecoveryUnit;
-    class SortedDataInterface;
 
     class HarnessHelper {
     public:
         HarnessHelper(){}
-        virtual ~HarnessHelper(){}
+        virtual ~HarnessHelper() = default;
 
-        virtual SortedDataInterface* newSortedDataInterface( bool unique ) = 0;
-        virtual RecoveryUnit* newRecoveryUnit() = 0;
+        virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface( bool unique ) = 0;
+        virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
 
-        virtual OperationContext* newOperationContext() {
-            return new OperationContextNoop( newRecoveryUnit() );
+        virtual std::unique_ptr<OperationContext> newOperationContext() {
+            return stdx::make_unique<OperationContextNoop>(newRecoveryUnit().release());
         }
+
+        /**
+         * Creates a new SDI with some initial data.
+         */
+        std::unique_ptr<SortedDataInterface> newSortedDataInterface(
+            bool unique,
+            std::initializer_list<IndexKeyEntry> toInsert);
     };
 
-    HarnessHelper* newHarnessHelper();
+    /**
+     * Inserts all entries in toInsert into index.
+     * ASSERT_OKs the inserts.
+     * Always uses dupsAllowed=true.
+     */
+    void insertToIndex(ptr<OperationContext> txn,
+                       ptr<SortedDataInterface> index,
+                       std::initializer_list<IndexKeyEntry> toInsert);
+
+    inline void insertToIndex(ptr<HarnessHelper> harness,
+                              ptr<SortedDataInterface> index,
+                              std::initializer_list<IndexKeyEntry> toInsert) {
+        insertToIndex(harness->newOperationContext(), index, toInsert);
+    }
+
+    std::unique_ptr<HarnessHelper> newHarnessHelper();
 }
