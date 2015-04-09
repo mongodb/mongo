@@ -359,9 +359,8 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		tp->symbol = (uint32_t)symbol;
 		tp->frequency = (uint32_t)frequency;
 	}
+	ret = ferror(fp) ? WT_ERROR : 0;
 
-	if (ret == EOF)
-		ret = 0;
 	*entriesp = lineno - 1;
 	*tablep = table;
 
