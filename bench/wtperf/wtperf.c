@@ -419,7 +419,11 @@ worker(void *arg)
 			    "Error opening idle table %s", buf);
 			goto err;
 		}
-		tmp_cursor->close(tmp_cursor);
+		if ((ret = tmp_cursor->close(tmp_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error closing idle table %s", buf);
+			goto err;
+		}
 	}
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->open_cursor(session,
