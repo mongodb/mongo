@@ -172,7 +172,7 @@ __sweep_server(void *arg)
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
 
 		/* We require a minimum number of handles before we sweep. */
-		if (WT_CONN_STAT(session, file_open) < conn->sweep_handles)
+		if (conn->open_file_count < conn->sweep_handles_min)
 			continue;
 
 		/* Sweep the handles. */
@@ -208,7 +208,7 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_handle_minimum", &cval));
-	conn->sweep_handles = (u_int)cval.val;
+	conn->sweep_handles_min = (u_int)cval.val;
 
 	return (0);
 }
