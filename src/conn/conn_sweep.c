@@ -83,10 +83,6 @@ __sweep(WT_SESSION_IMPL *session)
 		if (WT_IS_METADATA(dhandle))
 			continue;
 
-		/* Stop if we reach the minimum number of handles. */
-		if (conn->open_file_count < conn->sweep_handles_min)
-			break;
-
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    dhandle->session_inuse == 0 && dhandle->session_ref == 0) {
 			++closed_handles;
@@ -100,6 +96,13 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_STAT_FAST_CONN_INCR(session, dh_conn_tod);
 			continue;
 		}
+
+		/*
+		 * Ignore in-use files once the open file count reaches the
+		 * minimum number of handles.
+		 */
+		if (conn->open_file_count < conn->sweep_handles_min)
+			continue;
 
 		/*
 		 * We have a candidate for closing; if it's open, acquire an
@@ -175,10 +178,6 @@ __sweep_server(void *arg)
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(session, conn->sweep_cond,
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
-
-		/* We require a minimum number of handles before we sweep. */
-		if (WT_CONN_STAT(session, file_open) < conn->sweep_handles)
-			continue;
 
 		/* Sweep the handles. */
 		WT_ERR(__sweep(session));
