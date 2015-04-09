@@ -352,7 +352,6 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 {
 	WT_COMPRESSOR *compressor;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_LOG_RECORD *logrec;
 	size_t result_len, skip;
 	uint32_t uncompressed_size;
@@ -362,14 +361,14 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	skip = WT_LOG_COMPRESS_SKIP;
 	compressor = conn->log_compressor;
 	if (compressor == NULL || compressor->decompress == NULL)
-		WT_ERR_MSG(session, WT_ERROR,
+		WT_RET_MSG(session, WT_ERROR,
 		    "log_read: Compressed record with "
 		    "no configured compressor");
 	uncompressed_size = logrec->mem_len;
-	WT_ERR(__wt_scr_alloc(session, 0, out));
-	WT_ERR(__wt_buf_initsize(session, *out, uncompressed_size));
+	WT_RET(__wt_scr_alloc(session, 0, out));
+	WT_RET(__wt_buf_initsize(session, *out, uncompressed_size));
 	memcpy((*out)->mem, in->mem, skip);
-	WT_ERR(compressor->decompress(compressor, &session->iface,
+	WT_RET(compressor->decompress(compressor, &session->iface,
 	    (uint8_t *)in->mem + skip, in->size - skip,
 	    (uint8_t *)(*out)->mem + skip,
 	    uncompressed_size - skip, &result_len));
@@ -380,9 +379,10 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * here after corruption happens.  If we're salvaging the file,
 	 * it's OK, otherwise it's really, really bad.
 	 */
-	if (ret != 0 || result_len != uncompressed_size - WT_LOG_COMPRESS_SKIP)
-		WT_ERR(WT_ERROR);
-err:	return (ret);
+	if (result_len != uncompressed_size - WT_LOG_COMPRESS_SKIP)
+		return (WT_ERROR);
+
+	return (0);
 }
 
 /*

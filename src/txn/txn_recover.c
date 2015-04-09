@@ -376,32 +376,30 @@ __recovery_free(WT_RECOVERY *r)
 static int
 __recovery_file_scan(WT_RECOVERY *r)
 {
-	WT_DECL_RET;
 	WT_CURSOR *c;
-	const char *uri, *config;
+	WT_DECL_RET;
 	int cmp;
+	const char *uri, *config;
 
 	/* Scan through all files in the metadata. */
 	c = r->files[0].c;
 	c->set_key(c, "file:");
 	if ((ret = c->search_near(c, &cmp)) != 0) {
 		/* Is the metadata empty? */
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		goto err;
+		WT_RET_NOTFOUND_OK(ret);
+		return (0);
 	}
 	if (cmp < 0)
-		WT_ERR_NOTFOUND_OK(c->next(c));
+		WT_RET_NOTFOUND_OK(c->next(c));
 	for (; ret == 0; ret = c->next(c)) {
-		WT_ERR(c->get_key(c, &uri));
+		WT_RET(c->get_key(c, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
-		WT_ERR(c->get_value(c, &config));
-		WT_ERR(__recovery_setup_file(r, uri, config));
+		WT_RET(c->get_value(c, &config));
+		WT_RET(__recovery_setup_file(r, uri, config));
 	}
-	WT_ERR_NOTFOUND_OK(ret);
-
-err:	return (ret);
+	WT_RET_NOTFOUND_OK(ret);
+	return (0);
 }
 
 /*
