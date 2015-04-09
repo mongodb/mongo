@@ -557,6 +557,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	const uint8_t *p;
 
 	copy.len = 0;
+	copy.v = 0;			/* -Werror=maybe-uninitialized */
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past

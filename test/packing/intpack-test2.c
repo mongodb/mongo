@@ -31,7 +31,7 @@
 #include "wt_internal.h"
 
 int
-main()
+main(void)
 {
 	uint8_t buf[10], *p, *end;
 	int64_t i;

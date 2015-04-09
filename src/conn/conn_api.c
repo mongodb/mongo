@@ -1701,7 +1701,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG));
 
 	/* Close any file handle left open, remove any temporary file. */
-err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_WRITE));
+err:	WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 
 	return (ret);
@@ -1742,8 +1742,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_CONFIG_ITEM cval, sval, passval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(i1);
+	WT_DECL_ITEM(i2);
+	WT_DECL_ITEM(i3);
 	WT_DECL_RET;
-	WT_ITEM i1, i2, i3;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 
@@ -1754,14 +1756,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
-
-	/*
-	 * We could use scratch buffers, but I'd rather the default session
-	 * not tie down chunks of memory past the open call.
-	 */
-	WT_CLEAR(i1);
-	WT_CLEAR(i2);
-	WT_CLEAR(i3);
 
 	WT_RET(__wt_library_init());
 
@@ -1817,12 +1811,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
 	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &i1));
+	WT_ERR(__wt_scr_alloc(session, 0, &i2));
+	WT_ERR(__wt_scr_alloc(session, 0, &i3));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open_all);
 	cfg[1] = NULL;
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, &i1));
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
 	__conn_config_append(cfg, config);
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, &i2));
-	WT_ERR(__conn_config_env(session, cfg, &i3));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
+	WT_ERR(__conn_config_env(session, cfg, i3));
 
 	/*
 	 * Configuration ...
@@ -1959,10 +1956,19 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-err:	/* Discard the configuration strings. */
-	__wt_buf_free(session, &i1);
-	__wt_buf_free(session, &i2);
-	__wt_buf_free(session, &i3);
+err:	/* Discard the scratch buffers. */
+	__wt_scr_free(session, &i1);
+	__wt_scr_free(session, &i2);
+	__wt_scr_free(session, &i3);
+
+	/*
+	 * We may have allocated scratch memory when using the dummy session or
+	 * the subsequently created real session, and we don't want to tie down
+	 * memory for the rest of the run in either of them.
+	 */
+	if (session != &conn->dummy_session)
+		__wt_scr_discard(session);
+	__wt_scr_discard(&conn->dummy_session);
 
 	if (ret != 0)
 		WT_TRET(__wt_connection_close(conn));

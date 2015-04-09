@@ -494,10 +494,10 @@ extern int __wt_read( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size
 extern int __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, const void *buf);
 extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
 extern int __wt_fopen(WT_SESSION_IMPL *session, const char *name, WT_FHANDLE_MODE mode_flag, u_int flags, FILE **fpp);
-extern int __wt_vfprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, va_list ap);
-extern int __wt_fprintf(WT_SESSION_IMPL *session, FILE *fp, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
-extern int __wt_fflush(WT_SESSION_IMPL *session, FILE *fp);
-extern int __wt_fclose(WT_SESSION_IMPL *session, FILE **fpp, WT_FHANDLE_MODE mode_flag);
+extern int __wt_vfprintf(FILE *fp, const char *fmt, va_list ap);
+extern int __wt_fprintf(FILE *fp, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 2, 3)));
+extern int __wt_fflush(FILE *fp);
+extern int __wt_fclose(FILE **fpp, WT_FHANDLE_MODE mode_flag);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg);
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid);
