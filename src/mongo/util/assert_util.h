@@ -250,6 +250,14 @@ namespace mongo {
         return std::move(sw.getValue());
     }
 
+    template<typename T>
+    inline T fassertStatusOK(int msgid, StatusWith<T> sw) {
+        if (MONGO_unlikely(!sw.isOK())) {
+            fassertFailedWithStatus(msgid, sw.getStatus());
+        }
+        return std::move(sw.getValue());
+    }
+
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) do {                                 \
         if (MONGO_unlikely(!(_Expression))) {                               \
