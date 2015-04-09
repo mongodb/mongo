@@ -174,8 +174,7 @@ namespace {
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,
-                  BSONObjBuilder& result,
-                  bool fromRepl) {
+                  BSONObjBuilder& result) {
 
             scoped_ptr<MatchExpression> filter;
             if ( cmdObj["filter"].isABSONObj() ) {

@@ -378,7 +378,7 @@ namespace {
         uassert(15908, errmsg,
                 tmpConn->connect(HostAndPort(host), errmsg) && replAuthenticate(tmpConn));
 
-        return cloner.copyCollection(txn, ns, BSONObj(), errmsg, true, false, true, false);
+        return cloner.copyCollection(txn, ns, BSONObj(), errmsg, true, false, true);
     }
 
     void syncFixUp(OperationContext* txn,

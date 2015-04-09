@@ -41,6 +41,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -224,8 +225,9 @@ namespace {
         }
 
 
-        bool shouldReplicateWrites = txn->writesAreReplicated();
+        const bool shouldReplicateWrites = txn->writesAreReplicated();
         txn->setReplicatedWrites(false);
+        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
         Status status = cloneCollectionAsCapped(txn,
                                                 db,
                                                 shortSource.toString(),
@@ -234,7 +236,6 @@ namespace {
                                                 true);
 
         if (!status.isOK()) {
-            txn->setReplicatedWrites(shouldReplicateWrites);
             return status;
         }
 

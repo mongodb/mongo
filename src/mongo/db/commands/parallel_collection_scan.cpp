@@ -71,9 +71,12 @@ namespace mongo {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int options,
-                          string& errmsg, BSONObjBuilder& result,
-                          bool fromRepl = false ) {
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result) {
 
             NamespaceString ns( dbname, cmdObj[name].String() );
 

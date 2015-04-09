@@ -74,8 +74,7 @@ namespace mongo {
                  BSONObj& jsobj,
                  int,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool /*fromRepl*/) {
+                 BSONObjBuilder& result) {
 
             vector< string > dbNames;
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();

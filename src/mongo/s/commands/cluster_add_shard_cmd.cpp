@@ -79,8 +79,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             // get replica set component hosts
             ConnectionString servers = ConnectionString::parse(

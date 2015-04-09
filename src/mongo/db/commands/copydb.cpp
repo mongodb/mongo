@@ -126,8 +126,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             string fromhost = cmdObj.getStringField("fromhost");
             bool fromSelf = fromhost.empty();
@@ -140,7 +139,6 @@ namespace mongo {
 
             CloneOptions cloneOptions;
             cloneOptions.fromDB = cmdObj.getStringField("fromdb");
-            cloneOptions.logForRepl = !fromRepl;
             cloneOptions.slaveOk = cmdObj["slaveOk"].trueValue();
             cloneOptions.useReplAuth = false;
             cloneOptions.snapshot = true;

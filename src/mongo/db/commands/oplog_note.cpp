@@ -67,8 +67,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
             if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
                 return appendCommandStatus(result, Status(
                         ErrorCodes::NoReplicationEnabled,

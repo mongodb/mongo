@@ -51,6 +51,7 @@
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -105,7 +106,6 @@ namespace mongo {
     using std::string;
     using std::stringstream;
 
-
     class CmdShutdownMongoD : public CmdShutdown {
     public:
         virtual void help(stringstream& help) const {
@@ -122,10 +122,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int options,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-
-            invariant(!fromRepl == txn->writesAreReplicated());
+                         BSONObjBuilder& result) {
             bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
             long long timeoutSecs = 0;
@@ -175,8 +172,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) {
+                 BSONObjBuilder& result) {
             // disallow dropping the config database
             if (serverGlobalParams.configsvr && (dbname == "config")) {
                 return appendCommandStatus(result,
@@ -258,8 +254,12 @@ namespace mongo {
             return allKilledIndexes;
         }
 
-        bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& cmdObj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             BSONElement e = cmdObj.firstElement();
             if ( e.numberInt() != 1 ) {
                 errmsg = "bad option";
@@ -347,10 +347,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
-
+                 BSONObjBuilder& result) {
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
             ScopedTransaction transaction(txn, MODE_IX);
@@ -406,7 +403,12 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& cmdObj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             const char* deprecationWarning =
                 "CMD diagLogging is deprecated and will be removed in a future release";
             warning() << deprecationWarning << startupWarningsLog;
@@ -455,9 +457,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+                         BSONObjBuilder& result) {
             const std::string nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
 
             if (nsToDrop.find('$') != string::npos) {
@@ -522,57 +522,9 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
-            BSONObjIterator it(cmdObj);
-
-            // Extract ns from first cmdObj element.
-            BSONElement firstElt = it.next();
-            uassert(15888,
-                    "must pass name of collection to create",
-                    firstElt.valuestrsafe()[0] != '\0');
-
-            Status status = userAllowedWriteNS( dbname, firstElt.valuestr() );
-            if ( !status.isOK() ) {
-                return appendCommandStatus( result, status );
-            }
-
-            const std::string ns = dbname + '.' + firstElt.valuestrsafe();
-
-            // Build options object from remaining cmdObj elements.
-            BSONObjBuilder optionsBuilder;
-            while (it.more()) {
-                optionsBuilder.append(it.next());
-            }
-
-            BSONObj options = optionsBuilder.obj();
-            uassert(14832,
-                    "specify size:<n> when capped is true",
-                    !options["capped"].trueValue() || options["size"].isNumber() ||
-                        options.hasField("$nExtents"));
-
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                ScopedTransaction transaction(txn, MODE_IX);
-                Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-                OldClientContext ctx(txn, ns);
-                if (!fromRepl &&
-                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
-                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
-                        << "Not primary while creating collection " << ns));
-                }
-
-                WriteUnitOfWork wunit(txn);
-
-                // Create collection.
-                status =  userCreateNS(txn, ctx.db(), ns.c_str(), options);
-                if ( !status.isOK() ) {
-                    return appendCommandStatus( result, status );
-                }
-
-                wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", ns);
-            return true;
+                         BSONObjBuilder& result) {
+            return appendCommandStatus(result,
+                                       createCollection(txn, dbname, cmdObj));
         }
     } cmdCreate;
 
@@ -607,8 +559,12 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
         }
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             const std::string ns = parseNs(dbname, jsobj);
 
             md5digest d;
@@ -761,8 +717,12 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             Timer timer;
 
             string ns = jsobj.firstElement().String();
@@ -886,8 +846,12 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             int scale = 1;
             if ( jsobj["scale"].isNumber() ) {
                 scale = jsobj["scale"].numberInt();
@@ -998,10 +962,7 @@ namespace mongo {
                  BSONObj& jsobj,
                  int,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
-
+                 BSONObjBuilder& result) {
             const std::string ns = parseNsCollectionRequired(dbname, jsobj);
             return appendCommandStatus(result,
                                        collMod(txn, NamespaceString(ns), jsobj, &result));
@@ -1032,8 +993,12 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
         }
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             int scale = 1;
             if ( jsobj["scale"].isNumber() ) {
                 scale = jsobj["scale"].numberInt();
@@ -1104,7 +1069,12 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result) {
             result << "you" << txn->getCurOp()->getRemoteString();
             return true;
         }
@@ -1130,8 +1100,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool) {
+                         BSONObjBuilder& result) {
             result << "options" << QueryOption_AllSupported;
             return true;
         }
@@ -1143,11 +1112,10 @@ namespace mongo {
                       BSONObj& cmdObj,
                       int queryOptions,
                       std::string& errmsg,
-                      BSONObjBuilder& result,
-                      bool fromRepl) {
+                      BSONObjBuilder& result) {
 
         try {
-            return c->run(txn, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
+            return c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
         }
         catch (const SendStaleConfigException& e) {
             LOG(1) << "command failed because of stale config, can retry" << causedBy(e);
@@ -1240,8 +1208,7 @@ namespace mongo {
                               int queryOptions,
                               const char *cmdns,
                               BSONObj& cmdObj,
-                              BSONObjBuilder& result,
-                              bool fromRepl ) {
+                              BSONObjBuilder& result) {
         std::string dbname = nsToDatabase( cmdns );
         scoped_ptr<MaintenanceModeSetter> mmSetter;
 
@@ -1285,7 +1252,10 @@ namespace mongo {
                                                        parsedUserNames,
                                                        parsedRoleNames);
 
-        Status status = _checkAuthorization(c, txn->getClient(), dbname, cmdObj, fromRepl);
+        Status status = _checkAuthorization(c,
+                                            txn->getClient(),
+                                            dbname,
+                                            cmdObj);
         if (!status.isOK()) {
             appendCommandStatus(result, status);
             return;
@@ -1295,8 +1265,8 @@ namespace mongo {
         bool canRunHere =
             replCoord->canAcceptWritesForDatabase(dbname) ||
             c->slaveOk() ||
-            ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
-            fromRepl;
+            ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) || 
+            !txn->writesAreReplicated();
 
         if ( ! canRunHere ) {
             result.append( "note" , "from execCommand" );
@@ -1329,9 +1299,7 @@ namespace mongo {
         }
 
         if (c->shouldAffectCommandCounter()) {
-            // If !fromRepl, globalOpCounters need to be incremented.  Otherwise, replOpCounters
-            // need to be incremented.
-            OpCounters* opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
+            OpCounters* opCounters = &globalOpCounters;
             opCounters->gotCommand();
         }
 
@@ -1365,7 +1333,7 @@ namespace mongo {
 
         c->_commandsExecuted.increment();
 
-        retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
+        retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result);
 
         if ( !retval ){
             c->_commandsFailed.increment();
@@ -1396,7 +1364,7 @@ namespace mongo {
                       BSONObj& _cmdobj,
                       BufBuilder& b,
                       BSONObjBuilder& anObjBuilder,
-                      bool fromRepl, int queryOptions) {
+                      int queryOptions) {
         string dbname = nsToDatabase( ns );
 
         const char *p = strchr(ns, '.');
@@ -1439,7 +1407,12 @@ namespace mongo {
 
         if ( c ) {
             LOG(2) << "run command " << ns << ' ' << c->getRedactedCopyForLogging(_cmdobj);
-            Command::execCommand(txn, c, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
+            Command::execCommand(txn,
+                                 c,
+                                 queryOptions,
+                                 ns,
+                                 jsobj,
+                                 anObjBuilder);
         }
         else {
             // In the absence of a Command object, no redaction is possible. Therefore
@@ -1466,10 +1439,9 @@ namespace mongo {
                      CurOp& curop,
                      BufBuilder& b,
                      BSONObjBuilder& anObjBuilder,
-                     bool fromRepl,
                      int queryOptions) {
         try {
-            return _runCommands(txn, ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
+            return _runCommands(txn, ns, jsobj, b, anObjBuilder, queryOptions);
         }
         catch (const SendStaleConfigException&){
             throw;

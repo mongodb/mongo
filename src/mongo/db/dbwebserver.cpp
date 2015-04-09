@@ -166,7 +166,7 @@ namespace {
                 string errmsg;
 
                 BSONObjBuilder sub;
-                if (!c->run(txn, "admin.$cmd", co, 0, errmsg, sub, false))
+                if (!c->run(txn, "admin.$cmd", co, 0, errmsg, sub))
                     buf.append(cmd, errmsg);
                 else
                     buf.append(cmd, sub.obj());
@@ -253,7 +253,7 @@ namespace {
             BSONObj cmdObj = BSON(cmd << 1);
 
             BSONObjBuilder result;
-            Command::execCommand(txn, c, 0, "admin.", cmdObj, result, false);
+            Command::execCommand(txn, c, 0, "admin.", cmdObj, result);
 
             responseCode = 200;
 

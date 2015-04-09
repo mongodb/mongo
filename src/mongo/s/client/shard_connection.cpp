@@ -107,8 +107,7 @@ namespace {
                          mongo::BSONObj& cmdObj,
                          int options,
                          std::string& errmsg,
-                         mongo::BSONObjBuilder& result,
-                         bool fromRepl) {
+                         mongo::BSONObjBuilder& result) {
 
             // Base pool info
             shardConnectionPool.appendInfo(result);

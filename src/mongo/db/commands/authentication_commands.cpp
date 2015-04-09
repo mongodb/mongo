@@ -113,7 +113,12 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn,
+                 const string&,
+                 BSONObj& cmdObj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             nonce64 n = getNextNonce();
             stringstream ss;
             ss << hex << n;
@@ -152,8 +157,7 @@ namespace mongo {
                               BSONObj& cmdObj,
                               int,
                               string& errmsg,
-                              BSONObjBuilder& result,
-                              bool fromRepl) {
+                              BSONObjBuilder& result) {
 
         if (!serverGlobalParams.quiet) {
             mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
@@ -413,8 +417,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) {
+                 BSONObjBuilder& result) {
             AuthorizationSession* authSession =
                     AuthorizationSession::get(ClientBasic::getCurrent());
             authSession->logoutDatabase(dbname);

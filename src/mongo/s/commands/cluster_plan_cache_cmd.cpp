@@ -86,8 +86,7 @@ namespace mongo {
                   BSONObj& cmdObj,
                   int options,
                   std::string& errmsg,
-                  BSONObjBuilder& result,
-                  bool fromRepl );
+                  BSONObjBuilder& result);
 
     public:
 
@@ -114,8 +113,7 @@ namespace mongo {
                                BSONObj& cmdObj,
                                int options,
                                std::string& errMsg,
-                               BSONObjBuilder& result,
-                               bool ) {
+                               BSONObjBuilder& result) {
         const std::string fullns = parseNs(dbName, cmdObj);
         NamespaceString nss(fullns);
 

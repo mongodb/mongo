@@ -52,7 +52,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
-                 BSONObjBuilder& result, bool fromRepl) {
+                 BSONObjBuilder& result) {
             AuthorizationSession* authSession =
                     AuthorizationSession::get(ClientBasic::getCurrent());
 

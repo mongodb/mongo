@@ -229,8 +229,7 @@ namespace {
                              BSONObj& cmdObj,
                              int options,
                              string& errmsg,
-                             BSONObjBuilder& result,
-                             bool fromRepl) {
+                             BSONObjBuilder& result) {
 
                 const string fullns = parseNs(dbName, cmdObj);
 
@@ -399,7 +398,12 @@ namespace {
         class ProfileCmd : public PublicGridCommand {
         public:
             ProfileCmd() :  PublicGridCommand("profile") {}
-            virtual bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn,
+                             const string& dbName,
+                             BSONObj& cmdObj,
+                             int options,
+                             string& errmsg,
+                             BSONObjBuilder& result) {
                 errmsg = "profile currently not supported via mongos";
                 return false;
             }
@@ -556,8 +560,7 @@ namespace {
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
-                     BSONObjBuilder& result,
-                     bool) {
+                     BSONObjBuilder& result) {
 
                 auto status = grid.implicitCreateDb(dbName);
                 if (!status.isOK()) {
@@ -587,8 +590,7 @@ namespace {
                      BSONObj& cmdObj,
                      int options,
                      string& errmsg,
-                     BSONObjBuilder& result,
-                     bool fromRepl) {
+                     BSONObjBuilder& result) {
 
                 auto status = grid.catalogCache()->getDatabase(dbName);
                 if (!status.isOK()) {
@@ -647,7 +649,12 @@ namespace {
             virtual bool adminOnly() const {
                 return true;
             }
-            bool run(OperationContext* txn, const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
                 const string fullnsFrom = cmdObj.firstElement().valuestrsafe();
                 const string dbNameFrom = nsToDatabase(fullnsFrom);
                 auto confFrom = uassertStatusOK(grid.catalogCache()->getDatabase(dbNameFrom));
@@ -683,10 +690,9 @@ namespace {
             bool run(OperationContext* txn,
                      const string& dbName,
                      BSONObj& cmdObj,
-                     int options,
+                     int,
                      string& errmsg,
-                     BSONObjBuilder& result,
-                     bool fromRepl) {
+                     BSONObjBuilder& result) {
 
                 const string todb = cmdObj.getStringField("todb");
                 uassert(ErrorCodes::EmptyFieldName, "missing todb argument", !todb.empty());
@@ -738,7 +744,13 @@ namespace {
                 actions.addAction(ActionType::collStats);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
                 const string fullns = parseNs(dbName, cmdObj);
 
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
@@ -960,10 +972,9 @@ namespace {
             bool run(OperationContext* txn,
                      const string& dbName,
                      BSONObj& cmdObj,
-                     int options,
+                     int,
                      string& errmsg,
-                     BSONObjBuilder& result,
-                     bool fromRepl) {
+                     BSONObjBuilder& result) {
 
                 const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
@@ -1055,7 +1066,12 @@ namespace {
                 actions.addAction(ActionType::find);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
-            bool run(OperationContext* txn, const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
                 const string fullns = parseNs(dbName, cmdObj);
 
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
@@ -1196,13 +1212,23 @@ namespace {
                 }
                 return Status::OK();
             }
-            virtual bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn,
+                             const string& dbName,
+                             BSONObj& cmdObj,
+                             int options,
+                             string& errmsg,
+                             BSONObjBuilder& result) {
                 string x = parseNs(dbName, cmdObj);
                 if ( ! str::startsWith( x , dbName ) ) {
                     errmsg = str::stream() << "doing a splitVector across dbs isn't supported via mongos";
                     return false;
                 }
-                return NotAllowedOnShardedCollectionCmd::run( txn, dbName , cmdObj , options , errmsg, result, false );
+                return NotAllowedOnShardedCollectionCmd::run(txn,
+                                                             dbName,
+                                                             cmdObj,
+                                                             options,
+                                                             errmsg,
+                                                             result);
             }
             virtual std::string parseNs(const string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
@@ -1225,7 +1251,13 @@ namespace {
                 actions.addAction(ActionType::find);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+
+            bool run(OperationContext* txn,
+                     const string& dbName ,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
                 const string fullns = parseNs(dbName, cmdObj);
 
                 auto status = grid.catalogCache()->getDatabase(dbName);
@@ -1301,7 +1333,12 @@ namespace {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
             }
 
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
                 const string fullns = parseNs(dbName, cmdObj);
 
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
@@ -1414,7 +1451,13 @@ namespace {
                 actions.addAction(ActionType::find);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
                 const string fullns = parseNs(dbName, cmdObj);
 
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
@@ -1611,11 +1654,21 @@ namespace {
                 }
             }
 
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
                 return run( txn, dbName, cmdObj, errmsg, result, 0 );
             }
 
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, int retry ) {
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     int retry) {
                 Timer t;
 
                 const string collection = cmdObj.firstElement().valuestrsafe();
@@ -1980,7 +2033,7 @@ namespace {
                 // applyOps can do pretty much anything, so require all privileges.
                 RoleGraph::generateUniversalPrivileges(out);
             }
-            virtual bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result) {
                 errmsg = "applyOps not allowed through mongos";
                 return false;
             }
@@ -1997,7 +2050,12 @@ namespace {
                 actions.addAction(ActionType::compact);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
-            virtual bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn,
+                             const string& dbName,
+                             BSONObj& cmdObj,
+                             int,
+                             string& errmsg,
+                             BSONObjBuilder& result) {
                 errmsg = "compact not allowed through mongos";
                 return false;
             }
@@ -2012,12 +2070,12 @@ namespace {
                 // $eval can do pretty much anything, so require all privileges.
                 RoleGraph::generateUniversalPrivileges(out);
             }
-            virtual bool run(OperationContext* txn, const string& dbName,
+            virtual bool run(OperationContext* txn,
+                             const string& dbName,
                              BSONObj& cmdObj,
                              int,
                              string& errmsg,
-                             BSONObjBuilder& result,
-                             bool) {
+                             BSONObjBuilder& result) {
 
                 RARELY {
                     warning() << "the eval command is deprecated" << startupWarningsLog;
@@ -2047,9 +2105,12 @@ namespace {
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out);
-            virtual bool run(OperationContext* txn, const string &dbName , BSONObj &cmdObj,
-                             int options, string &errmsg,
-                             BSONObjBuilder &result, bool fromRepl);
+            virtual bool run(OperationContext* txn,
+                             const string &dbName,
+                             BSONObj &cmdObj,
+                             int options,
+                             string &errmsg,
+                             BSONObjBuilder &result);
 
         private:
             DocumentSourceMergeCursors::CursorIds parseCursors(
@@ -2107,9 +2168,7 @@ namespace {
                                   BSONObj &cmdObj,
                                   int options,
                                   string &errmsg,
-                                  BSONObjBuilder &result,
-                                  bool fromRepl) {
-
+                                  BSONObjBuilder &result) {
             const string fullns = parseNs(dbName, cmdObj);
 
             intrusive_ptr<ExpressionContext> pExpCtx =
@@ -2465,12 +2524,12 @@ namespace {
                             dbname);
             }
 
-            bool run(OperationContext* txn, const string& dbName,
+            bool run(OperationContext* txn,
+                     const string& dbName,
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
-                     BSONObjBuilder& result,
-                     bool) {
+                     BSONObjBuilder& result) {
 
                 auto status = grid.catalogCache()->getDatabase(dbName);
                 if (!status.isOK()) {
@@ -2509,8 +2568,7 @@ namespace {
                      BSONObj& cmdObj,
                      int options,
                      string& errmsg,
-                     BSONObjBuilder& result,
-                     bool fromRepl) {
+                     BSONObjBuilder& result) {
 
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 bool retval = passthrough( conf, cmdObj, result );
@@ -2546,8 +2604,7 @@ namespace {
                            BSONObj& cmdObj,
                            int,
                            string& errmsg,
-                           BSONObjBuilder& result,
-                           bool) {
+                           BSONObjBuilder& result) {
               result << "options" << QueryOption_AllSupportedForSharding;
               return true;
           }

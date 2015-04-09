@@ -68,8 +68,7 @@ namespace mongo {
                          BSONObj& jsobj,
                          int,
                          std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl);
+                         BSONObjBuilder& result);
 
         virtual Status explain(OperationContext* txn,
                                const std::string& dbname,

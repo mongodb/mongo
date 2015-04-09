@@ -93,14 +93,12 @@ namespace repl {
     /**
      * take an op and apply locally
      * used for applying from an oplog
-     * @param fromRepl really from replication or for testing/internal/command/etc...
      * @param convertUpdateToUpsert convert some updates to upserts for idempotency reasons
      * Returns failure status if the op was an update that could not be applied.
      */
     Status applyOperation_inlock(OperationContext* txn,
                                  Database* db,
                                  const BSONObj& op,
-                                 bool fromRepl = true,
                                  bool convertUpdateToUpsert = false);
 
     /**

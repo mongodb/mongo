@@ -46,7 +46,12 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out);
 
-        virtual bool run(OperationContext* txn, const std::string& dbname , BSONObj& cmdObj, int, std::string& errmsg, BSONObjBuilder& result, bool);
+        virtual bool run(OperationContext* txn,
+                         const std::string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         std::string& errmsg,
+                         BSONObjBuilder& result);
 
         void wipeCacheForCollection(OperationContext* txn, StringData ns);
 

@@ -73,8 +73,7 @@ namespace {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) final {
+                 BSONObjBuilder& result) final {
 
             // The format of op is shardid:opid
             // This is different than the format passed to the mongod killOp command.

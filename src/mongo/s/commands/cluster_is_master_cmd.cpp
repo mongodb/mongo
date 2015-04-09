@@ -63,8 +63,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             result.appendBool("ismaster", true);
             result.append("msg", "isdbgrid");

@@ -74,8 +74,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          std::string& ignored,
-                         BSONObjBuilder& result,
-                         bool fromRepl);
+                         BSONObjBuilder& result);
 
         virtual void help(stringstream& help) const;
         virtual bool isWriteCommandForConfigServer() const { return false; }
@@ -97,8 +96,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          std::string& ignored,
-                         BSONObjBuilder& result,
-                         bool fromRepl);
+                         BSONObjBuilder& result);
 
         virtual void help(stringstream& help) const;
         virtual bool isWriteCommandForConfigServer() const { return false; }
@@ -273,8 +271,7 @@ namespace {
                            BSONObj& cmdObj,
                            int options,
                            std::string& ignored,
-                           BSONObjBuilder& result,
-                           bool fromRepl) {
+                           BSONObjBuilder& result) {
 
         ClientBasic* client = ClientBasic::getCurrent();
         AuthenticationSession::set(client, std::unique_ptr<AuthenticationSession>());
@@ -319,8 +316,7 @@ namespace {
                               BSONObj& cmdObj,
                               int options,
                               std::string& ignored,
-                              BSONObjBuilder& result,
-                              bool fromRepl) {
+                              BSONObjBuilder& result) {
 
         ClientBasic* client = ClientBasic::getCurrent();
         std::unique_ptr<AuthenticationSession> sessionGuard;

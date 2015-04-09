@@ -142,8 +142,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             BatchedCommandRequest request(_writeType);
             BatchedCommandResponse response;

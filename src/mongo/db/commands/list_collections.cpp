@@ -93,8 +93,7 @@ namespace mongo {
                  BSONObj& jsobj,
                  int,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool /*fromRepl*/) {
+                 BSONObjBuilder& result) {
             boost::scoped_ptr<MatchExpression> matcher;
             BSONElement filterElt = jsobj["filter"];
             if (!filterElt.eoo()) {

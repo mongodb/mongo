@@ -92,8 +92,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )
@@ -101,7 +100,6 @@ namespace mongo {
 
             CloneOptions opts;
             opts.fromDB = dbname;
-            opts.logForRepl = ! fromRepl;
             opts.slaveOk = cmdObj["slaveOk"].trueValue();
 
             // See if there's any collections we should ignore

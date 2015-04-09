@@ -112,9 +112,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+                         BSONObjBuilder& result) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
 
@@ -145,18 +143,16 @@ namespace mongo {
                 return false;
             }
 
-            if (!fromRepl) { // If it got through on the master, need to allow it here too
-                Status sourceStatus = userAllowedWriteNS(source);
-                if (!sourceStatus.isOK()) {
-                    errmsg = "error with source namespace: " + sourceStatus.reason();
-                    return false;
-                }
+            Status sourceStatus = userAllowedWriteNS(source);
+            if (!sourceStatus.isOK()) {
+                errmsg = "error with source namespace: " + sourceStatus.reason();
+                return false;
+            }
 
-                Status targetStatus = userAllowedWriteNS(target);
-                if (!targetStatus.isOK()) {
-                    errmsg = "error with target namespace: " + targetStatus.reason();
-                    return false;
-                }
+            Status targetStatus = userAllowedWriteNS(target);
+            if (!targetStatus.isOK()) {
+                errmsg = "error with target namespace: " + targetStatus.reason();
+                return false;
             }
 
             if (NamespaceString(source).coll() == "system.indexes"

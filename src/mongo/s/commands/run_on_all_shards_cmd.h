@@ -84,8 +84,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& output,
-                 bool fromRepl) final;
+                 BSONObjBuilder& output) final;
 
     private:
         bool _useShardConn; // use ShardConnection as opposed to ScopedDbConnection

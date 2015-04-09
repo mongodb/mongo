@@ -126,8 +126,12 @@ namespace mongo {
         : Command(name),
           helpText(helpText) { }
 
-    bool IndexFilterCommand::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int options,
-                           string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+    bool IndexFilterCommand::run(OperationContext* txn,
+                                 const string& dbname,
+                                 BSONObj& cmdObj,
+                                 int options,
+                                 string& errmsg,
+                                 BSONObjBuilder& result) {
         string ns = parseNs(dbname, cmdObj);
 
         Status status = runIndexFilterCommand(txn, ns, cmdObj, &result);

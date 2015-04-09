@@ -194,7 +194,12 @@ namespace mongo {
             actions.addAction(ActionType::top);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result) {
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );
                 b.append( "note", "all times in microseconds" );

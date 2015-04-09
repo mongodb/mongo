@@ -75,8 +75,7 @@ namespace mongo {
                                     BSONObj& cmdObj,
                                     int options,
                                     std::string& errmsg,
-                                    BSONObjBuilder& output,
-                                    bool fromRepl) {
+                                    BSONObjBuilder& output) {
 
         LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
         std::set<Shard> shards;

@@ -395,9 +395,9 @@ namespace {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) override {
-            invariant(!fromRepl);  // findAndModify command is not replicated directly.
+                 BSONObjBuilder& result) override {
+            // findAndModify command is not replicated directly.
+            invariant(txn->writesAreReplicated());
             const std::string fullNs = parseNsCollectionRequired(dbName, cmdObj);
 
             StatusWith<FindAndModifyRequest> parseStatus =

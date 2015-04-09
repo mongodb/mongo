@@ -91,8 +91,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             const NamespaceString nss(parseNs(dbname, cmdObj));
             if (nss.size() == 0) {

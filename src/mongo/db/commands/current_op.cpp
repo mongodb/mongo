@@ -74,8 +74,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) final {
+                 BSONObjBuilder& result) final {
 
             const bool includeAll = cmdObj["$all"].trueValue();
 

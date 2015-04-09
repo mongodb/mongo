@@ -199,8 +199,10 @@ namespace repl {
 
                 // For non-initial-sync, we convert updates to upserts
                 // to suppress errors when replaying oplog entries.
+                txn->setReplicatedWrites(false);
+
                 Status status =
-                    applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
+                    applyOperation_inlock(txn, ctx.db(), op, convertUpdateToUpsert);
                 opsAppliedStats.increment();
                 return status.isOK();
             }

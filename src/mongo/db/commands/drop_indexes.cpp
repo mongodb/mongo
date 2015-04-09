@@ -83,9 +83,12 @@ namespace mongo {
         }
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
-        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg,
-                 BSONObjBuilder& result, bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             const std::string ns = parseNsCollectionRequired(dbname, jsobj);
             return appendCommandStatus(result,
                                        dropIndexes(txn,
@@ -121,7 +124,12 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& jsobj,
+                 int,
+                 string& errmsg,
+                 BSONObjBuilder& result) {
             DBDirectClient db(txn);
 
             const std::string toDeleteNs = parseNsCollectionRequired(dbname, jsobj);

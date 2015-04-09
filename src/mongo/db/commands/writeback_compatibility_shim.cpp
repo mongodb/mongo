@@ -79,7 +79,11 @@ namespace mongo {
         }
 
         virtual bool run(OperationContext* opCtx,
-                         const string&, BSONObj&, int, string&, BSONObjBuilder& result, bool) {
+                         const string&,
+                         BSONObj&,
+                         int,
+                         string&,
+                         BSONObjBuilder& result) {
 
             string errMsg = stream()
                 << "Writeback functionality is no longer present in v3.0 mongod, "

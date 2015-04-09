@@ -701,6 +701,7 @@ env.Library('elapsed_tracker',
 # libs.
 serverOnlyFiles = [ "db/background.cpp",
                     "db/catalog/apply_ops.cpp",
+                    "db/catalog/create_collection.cpp",
                     "db/catalog/coll_mod.cpp",
                     "db/catalog/collection.cpp",
                     "db/catalog/collection_compact.cpp",

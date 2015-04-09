@@ -131,7 +131,7 @@ namespace mongo {
             uassert(ErrorCodes::NotMaster,
                     str::stream() << "Not primary while cloning collection " << from_collection.ns()
                                   << " to " << to_collection.ns(),
-                    !logForRepl ||
+                    !txn->writesAreReplicated() ||
                     repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(_dbName));
 
             // Make sure database still exists after we resume from the temp release
@@ -148,7 +148,6 @@ namespace mongo {
                          << to_collection.ns() << "]",
                          !createdCollection );
                 WriteUnitOfWork wunit(txn);
-                invariant(logForRepl == txn->writesAreReplicated());
                 collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
                 verify(collection);
 
@@ -179,7 +178,7 @@ namespace mongo {
                         globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
 
                         // Check if everything is still all right.
-                        if (logForRepl) {
+                        if (txn->writesAreReplicated()) {
                             uassert(28592,
                                     str::stream() << "Cannot write to db: " << _dbName
                                                   << " after yielding",
@@ -246,7 +245,6 @@ namespace mongo {
         NamespaceString from_collection;
         NamespaceString to_collection;
         time_t saveLast;
-        bool logForRepl;
         bool _mayYield;
         bool _mayBeInterrupted;
     };
@@ -257,7 +255,6 @@ namespace mongo {
                       const string& toDBName,
                       const NamespaceString& from_collection,
                       const NamespaceString& to_collection,
-                      bool logForRepl,
                       bool masterSameProcess,
                       bool slaveOk,
                       bool mayYield,
@@ -270,7 +267,6 @@ namespace mongo {
         f.from_collection = from_collection;
         f.to_collection = to_collection;
         f.saveLast = time( 0 );
-        f.logForRepl = logForRepl;
         f._mayYield = mayYield;
         f._mayBeInterrupted = mayBeInterrupted;
 
@@ -285,7 +281,7 @@ namespace mongo {
                 str::stream() << "Not primary while cloning collection " << from_collection.ns()
                               << " to " << to_collection.ns() << " with filter "
                               << query.toString(),
-                !logForRepl ||
+                !txn->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
     }
 
@@ -293,7 +289,6 @@ namespace mongo {
                              const string& toDBName,
                              const NamespaceString& from_collection,
                              const NamespaceString& to_collection,
-                             bool logForRepl,
                              bool masterSameProcess,
                              bool slaveOk,
                              bool mayYield,
@@ -317,7 +312,7 @@ namespace mongo {
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while copying indexes from " << from_collection.ns()
                               << " to " << to_collection.ns() << " (Cloner)",
-                !logForRepl ||
+                !txn->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
 
 
@@ -331,7 +326,6 @@ namespace mongo {
         Collection* collection = db->getCollection( to_collection );
         if ( !collection ) {
             WriteUnitOfWork wunit(txn);
-            invariant(logForRepl == txn->writesAreReplicated());
             collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
             invariant(collection);
             wunit.commit();
@@ -355,7 +349,7 @@ namespace mongo {
 
         WriteUnitOfWork wunit(txn);
         indexer.commit();
-        if (logForRepl) {
+        if (txn->writesAreReplicated()) {
             const string targetSystemIndexesCollectionName =
                 to_collection.getSystemIndexesCollection();
             const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
@@ -373,8 +367,7 @@ namespace mongo {
                                 string& errmsg,
                                 bool mayYield,
                                 bool mayBeInterrupted,
-                                bool shouldCopyIndexes,
-                                bool logForRepl) {
+                                bool shouldCopyIndexes) {
 
         const NamespaceString nss(ns);
         const string dbname = nss.db().toString();
@@ -384,7 +377,7 @@ namespace mongo {
 
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
-                !logForRepl ||
+                !txn->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname));
 
         Database* db = dbHolder().openDb(txn, dbname);
@@ -397,7 +390,6 @@ namespace mongo {
             BSONObj col = collList.front();
             if (col["options"].isABSONObj()) {
                 WriteUnitOfWork wunit(txn);
-                invariant(logForRepl == txn->writesAreReplicated());
                 Status status = userCreateNS(txn, db, ns, col["options"].Obj(), 0);
                 if ( !status.isOK() ) {
                     errmsg = status.toString();
@@ -410,7 +402,7 @@ namespace mongo {
         // main data
         copy(txn, dbname,
              nss, nss,
-             logForRepl, false, true, mayYield, mayBeInterrupted,
+             false, true, mayYield, mayBeInterrupted,
              Query(query).snapshot());
 
         /* TODO : copyIndexes bool does not seem to be implemented! */
@@ -421,7 +413,7 @@ namespace mongo {
         // indexes
         copyIndexes(txn, dbname,
                     NamespaceString(ns), NamespaceString(ns),
-                    logForRepl, false, true, mayYield,
+                    false, true, mayYield,
                     mayBeInterrupted);
 
         return true;
@@ -438,7 +430,9 @@ namespace mongo {
         if ( errCode ) {
             *errCode = 0;
         }
-        massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
+        massert(10289,
+                "useReplAuth is not written to replication log",
+                !opts.useReplAuth || !txn->writesAreReplicated());
 
         const ConnectionString cs = ConnectionString::parse(masterHost, errmsg);
         if (!cs.isValid()) {
@@ -559,7 +553,7 @@ namespace mongo {
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while cloning database " << opts.fromDB
                               << " (after getting list of collections to clone)",
-                !opts.logForRepl ||
+                !txn->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
 
         if ( opts.syncData ) {
@@ -579,7 +573,6 @@ namespace mongo {
 
                     // we defer building id index for performance - building it in batch is much
                     // faster
-                    invariant(opts.logForRepl == txn->writesAreReplicated());
                     Status createStatus = userCreateNS(txn, db, to_name.ns(), options, false);
                     if ( !createStatus.isOK() ) {
                         errmsg = str::stream() << "failed to create collection \""
@@ -600,7 +593,6 @@ namespace mongo {
                      toDBName,
                      from_name,
                      to_name,
-                     opts.logForRepl,
                      masterSameProcess,
                      opts.slaveOk,
                      opts.mayYield,
@@ -635,7 +627,11 @@ namespace mongo {
                         WriteUnitOfWork wunit(txn);
                         BSONObj id;
 
-                        c->deleteDocument(txn, *it, true, true, opts.logForRepl ? &id : NULL);
+                        c->deleteDocument(txn,
+                                          *it,
+                                          true,
+                                          true,
+                                          txn->writesAreReplicated() ? &id : nullptr);
                         wunit.commit();
                     }
 
@@ -645,7 +641,7 @@ namespace mongo {
 
                     WriteUnitOfWork wunit(txn);
                     indexer.commit();
-                    if (opts.logForRepl) {
+                    if (txn->writesAreReplicated()) {
                         getGlobalServiceContext()->getOpObserver()->onCreateIndex(
                                 txn,
                                 c->ns().getSystemIndexesCollection().c_str(),
@@ -671,7 +667,6 @@ namespace mongo {
                             toDBName,
                             from_name,
                             to_name,
-                            opts.logForRepl,
                             masterSameProcess,
                             opts.slaveOk,
                             opts.mayYield,

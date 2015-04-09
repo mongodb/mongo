@@ -65,15 +65,13 @@ namespace mongo {
                             std::string& errmsg,
                             bool mayYield,
                             bool mayBeInterrupted,
-                            bool copyIndexes = true,
-                            bool logForRepl = true );
+                            bool copyIndexes = true);
 
     private:
         void copy(OperationContext* txn,
                   const std::string& toDBName,
                   const NamespaceString& from_ns,
                   const NamespaceString& to_ns,
-                  bool logForRepl,
                   bool masterSameProcess,
                   bool slaveOk,
                   bool mayYield,
@@ -84,7 +82,6 @@ namespace mongo {
                          const std::string& toDBName,
                          const NamespaceString& from_ns,
                          const NamespaceString& to_ns,
-                         bool logForRepl,
                          bool masterSameProcess,
                          bool slaveOk,
                          bool mayYield,
@@ -103,7 +100,6 @@ namespace mongo {
      */
     struct CloneOptions {
         CloneOptions() {
-            logForRepl = true;
             slaveOk = false;
             useReplAuth = false;
             snapshot = true;
@@ -117,7 +113,6 @@ namespace mongo {
         std::string fromDB;
         std::set<std::string> collsToIgnore;
 
-        bool logForRepl;
         bool slaveOk;
         bool useReplAuth;
         bool snapshot;

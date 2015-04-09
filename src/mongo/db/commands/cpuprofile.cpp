@@ -100,8 +100,7 @@ namespace mongo {
                               BSONObj &cmdObj,
                               int options,
                               std::string &errmsg,
-                              BSONObjBuilder &result,
-                              bool fromRepl );
+                              BSONObjBuilder &result);
 
             static char const *const commandName;
         } cpuProfilerStartCommandInstance;
@@ -118,8 +117,7 @@ namespace mongo {
                               BSONObj &cmdObj,
                               int options,
                               std::string &errmsg,
-                              BSONObjBuilder &result,
-                              bool fromRepl );
+                              BSONObjBuilder &result);
 
             static char const *const commandName;
         } cpuProfilerStopCommandInstance;
@@ -132,8 +130,7 @@ namespace mongo {
                                            BSONObj &cmdObj,
                                            int options,
                                            std::string &errmsg,
-                                           BSONObjBuilder &result,
-                                           bool fromRepl ) {
+                                           BSONObjBuilder &result) {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
             // The lock here is just to prevent concurrency, nothing will write.
@@ -152,8 +149,7 @@ namespace mongo {
                                           BSONObj &cmdObj,
                                           int options,
                                           std::string &errmsg,
-                                          BSONObjBuilder &result,
-                                          bool fromRepl ) {
+                                          BSONObjBuilder &result) {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
             OldClientContext ctx(txn, db);

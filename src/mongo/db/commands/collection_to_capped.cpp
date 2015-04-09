@@ -82,9 +82,7 @@ namespace mongo {
                  BSONObj& jsobj,
                  int,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
+                 BSONObjBuilder& result) {
             string from = jsobj.getStringField( "cloneCollectionAsCapped" );
             string to = jsobj.getStringField( "toCollection" );
             double size = jsobj.getField( "size" ).number();
@@ -98,8 +96,7 @@ namespace mongo {
             ScopedTransaction transaction(txn, MODE_IX);
             AutoGetDb autoDb(txn, dbname, MODE_X);
 
-            if (!fromRepl &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
                 return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
                     << "Not primary while cloning collection " << from << " to " << to
                     << " (as capped)"));
@@ -156,8 +153,7 @@ namespace mongo {
                  BSONObj& jsobj,
                  int,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl ) {
+                 BSONObjBuilder& result) {
 
             string shortSource = jsobj.getStringField( "convertToCapped" );
             double size = jsobj.getField( "size" ).number();

@@ -118,12 +118,9 @@ namespace mongo {
                        BSONObj& cmdObj,
                        int options,
                        string& errMsg,
-                       BSONObjBuilder& result,
-                       bool fromRepl) {
-        invariant(!fromRepl == txn->writesAreReplicated());
-
-        // Can't be run on secondaries (logTheOp() == false, slaveOk() == false).
-        dassert( !fromRepl );
+                       BSONObjBuilder& result) {
+        // Can't be run on secondaries.
+        dassert(txn->writesAreReplicated());
         BatchedCommandRequest request( _writeType );
         BatchedCommandResponse response;
 

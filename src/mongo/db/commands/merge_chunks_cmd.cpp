@@ -88,8 +88,7 @@ namespace mongo {
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,
-                  BSONObjBuilder& result,
-                  bool ) {
+                  BSONObjBuilder& result) {
 
             string ns = parseNs(dbname, cmdObj);
 

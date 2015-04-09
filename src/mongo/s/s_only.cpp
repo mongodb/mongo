@@ -111,9 +111,8 @@ namespace mongo {
                               int queryOptions,
                               const char *ns,
                               BSONObj& cmdObj,
-                              BSONObjBuilder& result,
-                              bool fromRepl ) {
-        execCommandClientBasic(txn, c, *txn->getClient(), queryOptions, ns, cmdObj, result, fromRepl);
+                              BSONObjBuilder& result) {
+        execCommandClientBasic(txn, c, *txn->getClient(), queryOptions, ns, cmdObj, result);
     }
 
     void Command::execCommandClientBasic(OperationContext* txn,
@@ -122,8 +121,7 @@ namespace mongo {
                                          int queryOptions,
                                          const char *ns,
                                          BSONObj& cmdObj,
-                                         BSONObjBuilder& result,
-                                         bool fromRepl ) {
+                                         BSONObjBuilder& result) {
         std::string dbname = nsToDatabase(ns);
 
         if (cmdObj.getBoolField("help")) {
@@ -136,7 +134,7 @@ namespace mongo {
             return;
         }
 
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
+        Status status = _checkAuthorization(c, &client, dbname, cmdObj);
         if (!status.isOK()) {
             appendCommandStatus(result, status);
             return;
@@ -147,7 +145,7 @@ namespace mongo {
         std::string errmsg;
         bool ok;
         try {
-            ok = c->run( txn, dbname , cmdObj, queryOptions, errmsg, result, false );
+            ok = c->run(txn, dbname , cmdObj, queryOptions, errmsg, result);
         }
         catch (const DBException& e) {
             ok = false;
@@ -191,7 +189,7 @@ namespace mongo {
         }
 
         OperationContext* noTxn = NULL; // mongos doesn't use transactions SERVER-13931
-        execCommandClientBasic(noTxn, c, cc(), queryOptions, ns, jsobj, anObjBuilder, false);
+        execCommandClientBasic(noTxn, c, cc(), queryOptions, ns, jsobj, anObjBuilder);
     }
 
 } //namespace mongo

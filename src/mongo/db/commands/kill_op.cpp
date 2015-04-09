@@ -71,8 +71,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) final {
+                 BSONObjBuilder& result) final {
 
             long long op;
             uassertStatusOK(bsonExtractIntegerField(cmdObj, "op", &op));

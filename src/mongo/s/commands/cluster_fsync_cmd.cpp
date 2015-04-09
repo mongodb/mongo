@@ -67,8 +67,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             if (cmdObj["lock"].trueValue()) {
                 errmsg = "can't do lock through mongos";

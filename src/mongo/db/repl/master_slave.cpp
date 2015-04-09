@@ -374,8 +374,7 @@ namespace repl {
                          BSONObj& cmdObj,
                          int options,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             HandshakeArgs handshake;
             Status status = handshake.initialize(cmdObj);
@@ -477,7 +476,6 @@ namespace repl {
             int errCode = 0;
             CloneOptions cloneOptions;
             cloneOptions.fromDB = db;
-            cloneOptions.logForRepl = false;
             cloneOptions.slaveOk = true;
             cloneOptions.useReplAuth = true;
             cloneOptions.snapshot = true;

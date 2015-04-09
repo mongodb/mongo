@@ -143,7 +143,12 @@ namespace mongo {
         return hash;
     }
 
-    bool DBHashCmd::run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+    bool DBHashCmd::run(OperationContext* txn,
+                        const string& dbname,
+                        BSONObj& cmdObj,
+                        int,
+                        string& errmsg,
+                        BSONObjBuilder& result) {
         Timer timer;
 
         set<string> desiredCollections;

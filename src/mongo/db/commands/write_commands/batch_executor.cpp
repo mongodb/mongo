@@ -1238,8 +1238,7 @@ namespace mongo {
                 cmd,
                 0,
                 errmsg,
-                resultBuilder,
-                false /* fromrepl */);
+                resultBuilder);
         Command::appendCommandStatus(resultBuilder, success, errmsg);
         BSONObj cmdResult = resultBuilder.done();
         uassertStatusOK(Command::getStatusFromCommandResult(cmdResult));

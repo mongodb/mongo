@@ -136,7 +136,6 @@ namespace mongo {
                         repl::applyOperation_inlock(txn,
                                                     ctx.db(),
                                                     temp,
-                                                    !txn->writesAreReplicated(),
                                                     alwaysUpsert);
                     break;
                 }

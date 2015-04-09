@@ -247,7 +247,6 @@ namespace mongo {
                    << " updatedFields: " << updatedFields
                    << " immutableAndSingleValueFields.size:"
                    << (immutableAndSingleValueFields ? immutableAndSingleValueFields->size() : 0)
-                   << " fromRepl: " << opts.fromReplication
                    << " validate:" << opts.enforceOkForStorage;
 
             // 1.) Loop through each updated field and validate for storage

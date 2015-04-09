@@ -364,10 +364,9 @@ namespace mongo {
     static Status _checkAuthorizationImpl(Command* c,
                                           ClientBasic* client,
                                           const std::string& dbname,
-                                          const BSONObj& cmdObj,
-                                          bool fromRepl) {
+                                          const BSONObj& cmdObj) {
         namespace mmb = mutablebson;
-        if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
+        if ( c->adminOnly() && dbname != "admin" ) {
             return Status(ErrorCodes::Unauthorized, str::stream() << c->name <<
                           " may only be run against the admin database.");
         }
@@ -397,10 +396,9 @@ namespace mongo {
     Status Command::_checkAuthorization(Command* c,
                                         ClientBasic* client,
                                         const std::string& dbname,
-                                        const BSONObj& cmdObj,
-                                        bool fromRepl) {
+                                        const BSONObj& cmdObj) {
         namespace mmb = mutablebson;
-        Status status = _checkAuthorizationImpl(c, client, dbname, cmdObj, fromRepl);
+        Status status = _checkAuthorizationImpl(c, client, dbname, cmdObj);
         if (!status.isOK()) {
             log(LogComponent::kAccessControl) << status << std::endl;
         }
@@ -434,7 +432,12 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        virtual bool run(OperationContext* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         mongo::BSONObj&,
+                         int,
+                         std::string&,
+                         mongo::BSONObjBuilder& result) {
             shardConnectionPool.flush();
             pool.flush();
             return true;
@@ -457,7 +460,12 @@ namespace mongo {
             actions.addAction(ActionType::connPoolStats);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(OperationContext* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         mongo::BSONObj&,
+                         int,
+                         std::string&,
+                         mongo::BSONObjBuilder& result) {
             pool.appendInfo( result );
             result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
             result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );

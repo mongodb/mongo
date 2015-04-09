@@ -175,8 +175,7 @@ namespace {
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) {
+                 BSONObjBuilder& result) {
 
             if (cmdObj["nolock"].trueValue()) {
                 return dbEval(txn, dbname, cmdObj, result, errmsg);

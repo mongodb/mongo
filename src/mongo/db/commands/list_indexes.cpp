@@ -91,8 +91,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int,
                  string& errmsg,
-                 BSONObjBuilder& result,
-                 bool /*fromRepl*/) {
+                 BSONObjBuilder& result) {
 
             BSONElement first = cmdObj.firstElement();
             uassert(

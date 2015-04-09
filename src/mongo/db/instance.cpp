@@ -241,7 +241,12 @@ namespace {
             bb.skip(sizeof(QueryResult::Value));
 
             BSONObjBuilder cmdResBuf;
-            if (!runCommands(txn, queryMessage.ns, queryMessage.query, *op, bb, cmdResBuf, false,
+            if (!runCommands(txn,
+                             queryMessage.ns,
+                             queryMessage.query,
+                             *op,
+                             bb,
+                             cmdResBuf,
                              queryMessage.queryOptions)) {
                 uasserted(13530, "bad or malformed command request?");
             }
@@ -1068,8 +1073,7 @@ namespace {
                         0, /* what should I use for query option? */
                         d.getns(),
                         cmdObj,
-                        resultBuilder,
-                        false /* fromRepl */);
+                        resultBuilder);
                 uassertStatusOK(Command::getStatusFromCommandResult(resultBuilder.done()));
             }
             catch (const DBException& ex) {

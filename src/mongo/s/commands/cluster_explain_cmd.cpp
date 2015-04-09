@@ -91,19 +91,12 @@ namespace mongo {
             return commToExplain->checkAuthForCommand(client, dbname, explainObj);
         }
 
-        virtual bool run(OperationContext* txn, const std::string& dbName,
+        virtual bool run(OperationContext* txn,
+                         const std::string& dbName,
                          BSONObj& cmdObj,
                          int options,
                          std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-
-            // Should never get explain commands issued from replication.
-            if (fromRepl) {
-                Status commandStat(ErrorCodes::IllegalOperation,
-                                   "explain command should not be from repl");
-                return appendCommandStatus(result, commandStat);
-            }
+                         BSONObjBuilder& result) {
 
             ExplainCommon::Verbosity verbosity;
             Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);

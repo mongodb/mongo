@@ -80,10 +80,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-            invariant(!fromRepl == txn->writesAreReplicated());
-
+                         BSONObjBuilder& result) {
             if ( cmdObj.firstElement().type() != Array ) {
                 errmsg = "ops has to be an array";
                 return false;

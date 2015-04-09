@@ -67,15 +67,7 @@ namespace mongo {
                          const string& dbname,
                          BSONObj& cmdObj, int options,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-        // Should never get explain commands issued from replication.
-        if (fromRepl) {
-            Status commandStat(ErrorCodes::IllegalOperation,
-                               "explain command should not be from repl");
-            appendCommandStatus(result, commandStat);
-            return false;
-        }
+                         BSONObjBuilder& result) {
 
         ExplainCommon::Verbosity verbosity;
         Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);

@@ -81,8 +81,7 @@ namespace mongo {
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
             const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
             const NamespaceString nss(ns);

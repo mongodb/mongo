@@ -58,8 +58,7 @@ namespace {
                          BSONObj& cmdObj,
                          int options,
                          std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             result.append("isdbgrid", 1);
             result.append("hostname", getHostNameCached());

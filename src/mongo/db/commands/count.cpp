@@ -114,8 +114,7 @@ namespace mongo {
                          const string& dbname,
                          BSONObj& cmdObj,
                          int, string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+                         BSONObjBuilder& result) {
 
             CountRequest request;
             Status parseStatus = parseRequest(dbname, cmdObj, &request);

@@ -78,8 +78,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl);
+                 BSONObjBuilder& result);
 
         // Write commands can be explained.
         virtual Status explain(OperationContext* txn,

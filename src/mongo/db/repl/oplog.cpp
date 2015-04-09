@@ -43,8 +43,16 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/apply_ops.h"
+#include "mongo/db/catalog/capped_utils.h"
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/catalog/drop_database.h"
+#include "mongo/db/catalog/drop_indexes.h"
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -440,17 +448,107 @@ namespace {
 
     // -------------------------------------
 
-    // @param fromRepl false if from ApplyOpsCmd
+namespace {
+    NamespaceString parseNs(const string& dbname, const BSONObj& cmdObj) {
+        BSONElement first = cmdObj.firstElement();
+        uassert(28631,
+                "no collection name specified",
+                first.canonicalType() == canonicalizeBSONType(mongo::String)
+                && first.valuestrsize() > 0);
+        std::string coll = first.valuestr();
+        return NamespaceString(NamespaceString(dbname).db().toString(), coll);
+    }
+
+    using opApplyFn = stdx::function<Status (OperationContext*, const char*, BSONObj&)>;
+
+    std::map<std::string, opApplyFn> opsMap = {
+        {"create",
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                return createCollection(txn, NamespaceString(dbName).db().toString(), cmd);
+            }
+        },
+        {"collMod",
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                BSONObjBuilder resultWeDontCareAbout;
+                return collMod(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            }
+        },
+        {"dropDatabase", 
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                return dropDatabase(txn, NamespaceString(dbName).db().toString());
+            }
+        },
+        {"drop", 
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                BSONObjBuilder resultWeDontCareAbout;
+                return dropCollection(txn, parseNs(dbName, cmd), resultWeDontCareAbout);
+            }
+        },
+        // deleteIndex(es) is deprecated but still works as of April 10, 2015
+        {"deleteIndex", 
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                BSONObjBuilder resultWeDontCareAbout;
+                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            }
+        },
+        {"deleteIndexes", 
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                BSONObjBuilder resultWeDontCareAbout;
+                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            }
+        },
+        {"dropIndex",
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                BSONObjBuilder resultWeDontCareAbout;
+                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            }
+        },
+        {"dropIndexes", 
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                BSONObjBuilder resultWeDontCareAbout;
+                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            }
+        },
+        {"renameCollection",
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                return renameCollection(txn,
+                                        NamespaceString(cmd.firstElement().valuestrsafe()),
+                                        NamespaceString(cmd["to"].valuestrsafe()),
+                                        cmd["stayTemp"].trueValue(),
+                                        cmd["dropTarget"].trueValue());
+            }
+        },
+        {"applyOps",
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                BSONObjBuilder resultWeDontCareAbout;
+                return applyOps(txn, dbName, cmd, &resultWeDontCareAbout);
+            }
+        },
+        {"convertToCapped",
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                return convertToCapped(txn,
+                                       parseNs(dbName, cmd),
+                                       cmd["size"].number());
+            }
+        },
+        {"emptycapped",
+            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
+                return emptyCapped(txn, parseNs(dbName, cmd));
+            }
+        },
+    };
+
+} // namespace
+
     // @return failure status if an update should have happened and the document DNE.
     // See replset initial sync code.
     Status applyOperation_inlock(OperationContext* txn,
                                Database* db,
                                const BSONObj& op,
-                               bool fromRepl,
                                bool convertUpdateToUpsert) {
         LOG(3) << "applying op: " << op << endl;
 
-        OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
+        OpCounters * opCounters = txn->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
         const char *names[] = { "o", "ns", "op", "b", "o2" };
         BSONElement fields[5];
@@ -618,18 +716,14 @@ namespace {
                 verify( opType[1] == 'b' ); // "db" advertisement
         }
         else if ( *opType == 'c' ) {
+            // Applying commands in repl is done under Global W-lock, so it is safe to not
+            // perform the current DB checks after reacquiring the lock.
+            invariant(txn->lockState()->isW());
+            
             bool done = false;
+
             while (!done) {
-                BufBuilder bb;
-                BSONObjBuilder runCommandResult;
-
-                // Applying commands in repl is done under Global W-lock, so it is safe to not
-                // perform the current DB checks after reacquiring the lock.
-                invariant(txn->lockState()->isW());
-
-                _runCommands(txn, ns, o, bb, runCommandResult, true, 0);
-                // _runCommands takes care of adjusting opcounters for command counting.
-                Status status = Command::getStatusFromCommandResult(runCommandResult.done());
+                Status status = opsMap.find(o.firstElementFieldName())->second(txn, ns, o);
                 switch (status.code()) {
                 case ErrorCodes::WriteConflict: {
                     // Need to throw this up to a higher level where it will be caught and the

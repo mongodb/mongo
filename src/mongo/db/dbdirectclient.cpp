@@ -187,8 +187,7 @@ namespace mongo {
 
         std::string errmsg;
         BSONObjBuilder result;
-        bool fromRepl = false;
-        bool runRetval = countCmd->run(_txn, dbname, cmdObj, options, errmsg, result, fromRepl);
+        bool runRetval = countCmd->run(_txn, dbname, cmdObj, options, errmsg, result);
         if (!runRetval) {
             Command::appendCommandStatus(result, runRetval, errmsg);
             Status commandStatus = Command::getStatusFromCommandResult(result.obj());

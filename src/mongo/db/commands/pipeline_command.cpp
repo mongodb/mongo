@@ -180,8 +180,12 @@ namespace mongo {
             Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
         }
 
-        virtual bool run(OperationContext* txn, const string &db, BSONObj &cmdObj, int options,
-                         string &errmsg, BSONObjBuilder &result, bool fromRepl) {
+        virtual bool run(OperationContext* txn,
+                         const string &db,
+                         BSONObj &cmdObj,
+                         int options,
+                         string &errmsg,
+                         BSONObjBuilder &result) {
             NamespaceString nss(parseNs(db, cmdObj));
             if (nss.coll().empty()) {
                 errmsg = "missing collection name";

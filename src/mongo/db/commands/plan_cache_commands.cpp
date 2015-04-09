@@ -124,8 +124,12 @@ namespace mongo {
           helpText(helpText),
           actionType(actionType) { }
 
-    bool PlanCacheCommand::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int options,
-                               string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+    bool PlanCacheCommand::run(OperationContext* txn,
+                               const string& dbname,
+                               BSONObj& cmdObj,
+                               int options,
+                               string& errmsg,
+                               BSONObjBuilder& result) {
         string ns = parseNs(dbname, cmdObj);
 
         Status status = runPlanCacheCommand(txn, ns, cmdObj, &result);

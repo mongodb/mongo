@@ -132,8 +132,7 @@ namespace mongo {
                            BSONObj& cmdObj,
                            int,
                            std::string& errmsg,
-                           BSONObjBuilder& out,
-                           bool fromRepl) {
+                           BSONObjBuilder& out) {
         GroupRequest groupRequest;
         Status parseRequestStatus = parseRequest(dbname, cmdObj, &groupRequest);
         if (!parseRequestStatus.isOK()) {

@@ -96,8 +96,7 @@ namespace {
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,
-                  BSONObjBuilder& result,
-                  bool ) {
+                  BSONObjBuilder& result) {
 
             vector<BSONObj> bounds;
             if ( !FieldParser::extract( cmdObj, boundsField, &bounds, &errmsg ) ) {

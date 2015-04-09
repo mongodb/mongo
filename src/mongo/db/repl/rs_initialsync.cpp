@@ -169,7 +169,6 @@ namespace {
             int errCode;
             CloneOptions options;
             options.fromDB = db;
-            options.logForRepl = false;
             options.slaveOk = true;
             options.useReplAuth = true;
             options.snapshot = false;

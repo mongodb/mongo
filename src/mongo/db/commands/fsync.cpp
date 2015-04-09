@@ -105,7 +105,12 @@ namespace mongo {
             actions.addAction(ActionType::fsync);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result) {
 
             if (txn->lockState()->isLocked()) {
                 errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
@@ -191,8 +196,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) override {
+                 BSONObjBuilder& result) override {
 
             log() << "command: unlock requested";
 

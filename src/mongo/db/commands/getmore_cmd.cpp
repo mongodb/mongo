@@ -110,8 +110,7 @@ namespace mongo {
                  BSONObj& cmdObj,
                  int options,
                  std::string& errmsg,
-                 BSONObjBuilder& result,
-                 bool fromRepl) override {
+                 BSONObjBuilder& result) override {
             // Counted as a getMore, not as a command.
             globalOpCounters.gotGetMore();
 

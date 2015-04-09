@@ -88,8 +88,7 @@ namespace mongo {
                 BSONObj& cmdObj,
                 int,
                 string& errmsg,
-                BSONObjBuilder& result,
-                bool fromRepl) {
+                BSONObjBuilder& result) {
             const string failPointName(cmdObj.firstElement().str());
             FailPointRegistry* registry = getGlobalFailPointRegistry();
             FailPoint* failPoint = registry->getFailPoint(failPointName);
