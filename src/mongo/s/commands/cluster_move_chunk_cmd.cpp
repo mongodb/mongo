@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/audit.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/grid.h"
@@ -48,6 +50,7 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
     using boost::scoped_ptr;
     using std::string;
 
@@ -111,18 +114,32 @@ namespace {
             ShardConnection::sync();
 
             Timer t;
-            string ns = parseNs(dbname, cmdObj);
-            if (ns.size() == 0) {
-                errmsg = "no ns";
-                return false;
+
+            const NamespaceString nss(parseNs(dbname, cmdObj));
+
+            boost::shared_ptr<DBConfig> config;
+
+            {
+                if (nss.size() == 0) {
+                    return appendCommandStatus(result, Status(ErrorCodes::InvalidNamespace,
+                                                              "no namespace specified"));
+                }
+
+                auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status.getStatus());
+                }
+
+                config = status.getValue();
             }
 
-            DBConfigPtr config = grid.getDBConfig(ns);
-            if (!config->isSharded(ns)) {
+            if (!config->isSharded(nss.ns())) {
                 config->reload();
-                if (!config->isSharded(ns)) {
-                    errmsg = "ns not sharded.  have to shard before we can move a chunk";
-                    return false;
+
+                if (!config->isSharded(nss.ns())) {
+                    return appendCommandStatus(result,
+                                               Status(ErrorCodes::NamespaceNotSharded,
+                                                      "ns [" + nss.ns() + " is not sharded."));
                 }
             }
 
@@ -135,7 +152,7 @@ namespace {
             Shard to = Shard::findIfExists(toString);
             if (!to.ok()) {
                 string msg(str::stream() <<
-                           "Could not move chunk in '" << ns <<
+                           "Could not move chunk in '" << nss.ns() <<
                            "' to shard '" << toString <<
                            "' because that shard does not exist");
                 log() << msg;
@@ -159,7 +176,7 @@ namespace {
             }
 
             // This refreshes the chunk metadata if stale.
-            ChunkManagerPtr info = config->getChunkManager(ns, true);
+            ChunkManagerPtr info = config->getChunkManager(nss.ns(), true);
             ChunkPtr chunk;
 
             if (!find.isEmpty()) {

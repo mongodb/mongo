@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -116,12 +117,8 @@ namespace {
                 audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
             }
 
-            // Make sure to update any stale metadata
-            DBConfigPtr db = grid.getDBConfig(dbname);
-            if (!db->load()) {
-                status = Status(ErrorCodes::OperationFailed,
-                                str::stream() << "error loading database info for db: " << dbname);
-            }
+            // Make sure to force update of any stale metadata
+            grid.catalogCache()->invalidate(dbname);
 
             return appendCommandStatus(result, status);
         }

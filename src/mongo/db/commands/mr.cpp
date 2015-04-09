@@ -57,6 +57,7 @@
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
@@ -70,6 +71,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
     using std::auto_ptr;
     using std::endl;
     using std::set;
@@ -1602,25 +1604,28 @@ namespace mongo {
                         result.append( "result" , config.outputOptions.collectionName );
                 }
 
-                // fetch result from other shards 1 chunk at a time
-                // it would be better to do just one big $or query, but then the sorting would not be efficient
-                string shardName = shardingState.getShardName();
-                DBConfigPtr confOut = grid.getDBConfig( dbname , false );
-
-                if (!confOut) {
-                    log() << "Sharding metadata for output database: " << dbname
-                          << " does not exist";
-                    return false;
+                auto status = grid.catalogCache()->getDatabase(dbname);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status.getStatus());
                 }
+
+                shared_ptr<DBConfig> confOut = status.getValue();
 
                 vector<ChunkPtr> chunks;
                 if ( confOut->isSharded(config.outputOptions.finalNamespace) ) {
                     ChunkManagerPtr cm = confOut->getChunkManager(
                             config.outputOptions.finalNamespace);
+
+                    // Fetch result from other shards 1 chunk at a time. It would be better to do
+                    // just one big $or query, but then the sorting would not be efficient.
+                    const string shardName = shardingState.getShardName();
                     const ChunkMap& chunkMap = cm->getChunkMap();
+
                     for ( ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it ) {
                         ChunkPtr chunk = it->second;
-                        if (chunk->getShard().getName() == shardName) chunks.push_back(chunk);
+                        if (chunk->getShard().getName() == shardName) {
+                            chunks.push_back(chunk);
+                        }
                     }
                 }
 

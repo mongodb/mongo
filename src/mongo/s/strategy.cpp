@@ -49,6 +49,7 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/bson_serializable.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client_info.h"
@@ -72,6 +73,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
     using std::endl;
     using std::set;
     using std::string;
@@ -85,14 +87,18 @@ namespace mongo {
     /**
      * Returns true if request is a query for sharded indexes.
      */
-    static bool doShardedIndexQuery( Request& r, const QuerySpec& qSpec ) {
-
+    static bool doShardedIndexQuery(Request& r, const QuerySpec& qSpec) {
         // Extract the ns field from the query, which may be embedded within the "query" or
         // "$query" field.
-        string indexNSQuery(qSpec.filter()["ns"].str());
-        DBConfigPtr config = grid.getDBConfig( r.getns() );
+        const NamespaceString indexNSSQuery(qSpec.filter()["ns"].str());
 
-        if ( !config->isSharded( indexNSQuery )) {
+        auto status = grid.catalogCache()->getDatabase(indexNSSQuery.db().toString());
+        if (!status.isOK()) {
+            return false;
+        }
+
+        shared_ptr<DBConfig> config = status.getValue();
+        if (!config->isSharded(indexNSSQuery.ns())) {
             return false;
         }
 
@@ -102,7 +108,7 @@ namespace mongo {
 
         ShardPtr shard;
         ChunkManagerPtr cm;
-        config->getChunkManagerOrPrimary( indexNSQuery, cm, shard );
+        config->getChunkManagerOrPrimary(indexNSSQuery.ns(), cm, shard);
         if ( cm ) {
             set<Shard> shards;
             cm->getAllShards( shards );
@@ -533,15 +539,15 @@ namespace mongo {
 
         // Note that this implementation will not handle targeting retries and fails when the
         // sharding metadata is too stale
-
-        DBConfigPtr conf = grid.getDBConfig(db , false);
-        if (!conf) {
+        auto status = grid.catalogCache()->getDatabase(db);
+        if (!status.isOK()) {
             mongoutils::str::stream ss;
             ss << "Passthrough command failed: " << command.toString()
-               << " on ns " << versionedNS << ". Cannot find db config info.";
+               << " on ns " << versionedNS << ". Caused by " << causedBy(status.getStatus());
             return Status(ErrorCodes::IllegalOperation, ss);
         }
 
+        shared_ptr<DBConfig> conf = status.getValue();
         if (conf->isSharded(versionedNS)) {
             mongoutils::str::stream ss;
             ss << "Passthrough command failed: " << command.toString()
@@ -577,14 +583,26 @@ namespace mongo {
     }
 
     void Strategy::getMore( Request& r ) {
-
         Timer getMoreTimer;
 
-        const char *ns = r.getns();
+        const char* ns = r.getns();
+        const int ntoreturn = r.d().pullInt();
+        const long long id = r.d().pullInt64();
 
         // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
         // for now has same semantics as legacy request
-        DBConfigPtr config = grid.getDBConfig( ns );
+        const NamespaceString nss(ns);
+        auto statusGetDb = grid.catalogCache()->getDatabase(nss.db().toString());
+        if (statusGetDb == ErrorCodes::DatabaseNotFound) {
+            cursorCache.remove(id);
+            replyToQuery(ResultFlag_CursorNotFound, r.p(), r.m(), 0, 0, 0);
+            return;
+        }
+
+        uassertStatusOK(statusGetDb);
+
+        shared_ptr<DBConfig> config = statusGetDb.getValue();
+
         ShardPtr primary;
         ChunkManagerPtr info;
         config->getChunkManagerOrPrimary( ns, info, primary );
@@ -592,10 +610,7 @@ namespace mongo {
         //
         // TODO: Cleanup cursor cache, consolidate into single codepath
         //
-
-        int ntoreturn = r.d().pullInt();
-        long long id = r.d().pullInt64();
-        string host = cursorCache.getRef( id );
+        const string host = cursorCache.getRef(id);
         ShardedClientCursorPtr cursor = cursorCache.get( id );
         int cursorMaxTimeMS = cursorCache.getMaxTimeMS( id );
 

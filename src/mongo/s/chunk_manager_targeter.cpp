@@ -40,12 +40,12 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+    using mongoutils::str::stream;
     using std::map;
     using std::set;
     using std::string;
     using std::vector;
-
-    using mongoutils::str::stream;
 
 namespace {
 
@@ -63,25 +63,6 @@ namespace {
     // TODO: Centralize this behavior better by refactoring config reload in mongos
     boost::thread_specific_ptr<Backoff> perThreadBackoff;
     const int maxWaitMillis = 500;
-
-    /**
-     * Helper to get the DBConfigPtr object in an exception-safe way.
-     */
-    bool getDBConfigSafe(StringData db, DBConfigPtr& config, string* errMsg) {
-        try {
-            config = grid.getDBConfig(db, true);
-            if (config) {
-                return true;
-            }
-
-            *errMsg = stream() << "could not load or create database " << db;
-        }
-        catch (const DBException& ex) {
-            *errMsg = ex.toString();
-        }
-
-        return false;
-    }
 
     /**
      * There are two styles of update expressions:
@@ -297,14 +278,12 @@ namespace {
     }
 
     Status ChunkManagerTargeter::init() {
-        DBConfigPtr config;
-
-        string errMsg;
-        if (!getDBConfigSafe(_nss.db(), config, &errMsg)) {
-            return Status(ErrorCodes::DatabaseNotFound, errMsg);
+        auto status = grid.implicitCreateDb(_nss.db().toString());
+        if (!status.isOK()) {
+            return status.getStatus();
         }
 
-        // Get either the chunk manager or primary shard
+        shared_ptr<DBConfig> config = status.getValue();
         config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
 
         return Status::OK();
@@ -668,8 +647,9 @@ namespace {
     Status ChunkManagerTargeter::refreshIfNeeded( bool *wasChanged ) {
 
         bool dummy;
-        if ( !wasChanged )
+        if (!wasChanged) {
             wasChanged = &dummy;
+        }
 
         *wasChanged = false;
 
@@ -677,7 +657,9 @@ namespace {
         // Did we have any stale config or targeting errors at all?
         //
 
-        if ( !_needsTargetingRefresh && _remoteShardVersions.empty() ) return Status::OK();
+        if (!_needsTargetingRefresh && _remoteShardVersions.empty()) {
+            return Status::OK();
+        }
 
         //
         // Get the latest metadata information from the cache if there were issues
@@ -686,14 +668,12 @@ namespace {
         ChunkManagerPtr lastManager = _manager;
         ShardPtr lastPrimary = _primary;
 
-        DBConfigPtr config;
-
-        string errMsg;
-        if ( !getDBConfigSafe( _nss.db(), config, &errMsg ) ) {
-            return Status( ErrorCodes::DatabaseNotFound, errMsg );
+        auto status = grid.implicitCreateDb(_nss.db().toString());
+        if (!status.isOK()) {
+            return status.getStatus();
         }
 
-        // Get either the chunk manager or primary shard
+        shared_ptr<DBConfig> config = status.getValue();
         config->getChunkManagerOrPrimary( _nss.ns(), _manager, _primary );
 
         // We now have the latest metadata from the cache.
@@ -757,12 +737,12 @@ namespace {
     }
 
     Status ChunkManagerTargeter::refreshNow( RefreshType refreshType ) {
-        DBConfigPtr config;
-
-        string errMsg;
-        if ( !getDBConfigSafe( _nss.db(), config, &errMsg ) ) {
-            return Status( ErrorCodes::DatabaseNotFound, errMsg );
+        auto status = grid.implicitCreateDb(_nss.db().toString());
+        if (!status.isOK()) {
+            return status.getStatus();
         }
+
+        shared_ptr<DBConfig> config = status.getValue();
 
         // Try not to spam the configs
         refreshBackoff();

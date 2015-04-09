@@ -28,56 +28,62 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/grid.h"
+
+#include <boost/make_shared.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/config.h"
+#include "mongo/s/type_database.h"
 
 namespace mongo {
-namespace {
 
-    class FlushRouterConfigCmd : public Command {
-    public:
-        FlushRouterConfigCmd() : Command("flushRouterConfig", false, "flushrouterconfig") { }
+    using boost::shared_ptr;
+    using std::string;
 
-        virtual bool slaveOk() const {
-            return true;
+
+    CatalogCache::CatalogCache(CatalogManager* catalogManager)
+            : _catalogManager(catalogManager) {
+
+        invariant(_catalogManager);
+    }
+
+    StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(const string& dbName) {
+        boost::lock_guard<boost::mutex> guard(_mutex);
+
+        ShardedDatabasesMap::iterator it = _databases.find(dbName);
+        if (it != _databases.end()) {
+            return it->second;
         }
 
-        virtual bool adminOnly() const {
-            return true;
+        // Need to load from the store
+        StatusWith<DatabaseType> status = _catalogManager->getDatabase(dbName);
+        if (!status.isOK()) {
+            return status.getStatus();
         }
 
-        virtual bool isWriteCommandForConfigServer() const {
-            return false;
+        shared_ptr<DBConfig> db = boost::make_shared<DBConfig>(dbName, status.getValue());
+        db->load();
+
+        invariant(_databases.insert(std::make_pair(dbName, db)).second);
+
+        return db;
+    }
+
+    void CatalogCache::invalidate(const string& dbName) {
+        boost::lock_guard<boost::mutex> guard(_mutex);
+
+        ShardedDatabasesMap::iterator it = _databases.find(dbName);
+        if (it != _databases.end()) {
+            _databases.erase(it);
         }
+    }
 
-        virtual void help(std::stringstream& help) const {
-            help << "flush all router config";
-        }
+    void CatalogCache::invalidateAll() {
+        boost::lock_guard<boost::mutex> guard(_mutex);
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::flushRouterConfig);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
+        _databases.clear();
+    }
 
-        virtual bool run(OperationContext* txn,
-                         const std::string& dbname,
-                         BSONObj& cmdObj,
-                         int options,
-                         std::string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
-
-            grid.catalogCache()->invalidateAll();
-
-            result.appendBool("flushed", true);
-            return true;
-        }
-
-    } flushRouterConfigCmd;
-
-} // namespace
 } // namespace mongo

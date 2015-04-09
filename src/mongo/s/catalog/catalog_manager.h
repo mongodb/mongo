@@ -43,6 +43,7 @@ namespace mongo {
     class ConnectionString;
     class DatabaseType;
     class OperationContext;
+    class Shard;
     class ShardType;
     class Status;
     template<typename T> class StatusWith;
@@ -109,13 +110,35 @@ namespace mongo {
                                                             const std::string& name) = 0;
 
         /**
+         * Creates a new database entry for the specified database name in the configuration
+         * metadata and sets the specified shard as primary.
+         *
+         * @param dbName name of the database (case sensitive)
+         * @param shard Optional shard to use as primary. If NULL is specified, one will be picked
+         *      by the system.
+         *
+         * Returns Status::OK on success or any error code indicating the failure. These are some
+         * of the known failures:
+         *  - NamespaceExists - database already exists
+         *  - DatabaseDifferCaseCode - database already exists, but with a different case
+         *  - ShardNotFound - could not find a shard to place the DB on
+         */
+        virtual Status createDatabase(const std::string& dbName, const Shard* shard) = 0;
+
+        /**
          * Updates the metadata for a given database. Currently, if the specified DB entry does
          * not exist, it will be created.
          */
         virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db) = 0;
 
         /**
-         * Retrieves the metadata for a given database.
+         * Retrieves the metadata for a given database, if it exists.
+         *
+         * @param dbName name of the database (case sensitive)
+         *
+         * Returns Status::OK along with the database information or any error code indicating the
+         * failure. These are some of the known failures:
+         *  - DatabaseNotFound - database does not exist
          */
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName) = 0;
 

@@ -82,9 +82,6 @@ namespace mongo {
         }
 
         _clientInfo->getAuthorizationSession()->startRequest(NULL);
-
-        grid.getDBConfig(getns());
-
         _didInit = true;
     }
 

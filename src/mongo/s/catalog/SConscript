@@ -19,7 +19,8 @@ env.Library(
 env.Library(
     target='catalog_manager',
     source=[
-        'catalog_manager.cpp'
+        'catalog_cache.cpp',
+        'catalog_manager.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',

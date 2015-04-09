@@ -32,8 +32,9 @@
 
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 
-#include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 #include <string>
 
 #include "mongo/client/dbclientinterface.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
@@ -55,20 +57,18 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
     using std::endl;
     using std::vector;
 
 namespace {
 
-    ScopedDbConnection* getConnectionForAuthzCollection(const NamespaceString& ns) {
-        //
+    ScopedDbConnection* getConnectionForAuthzCollection(const NamespaceString& nss) {
         // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
         // If the primary for the collection moves, this approach may throw rather than handle
         // version exceptions.
-        //
-
-        DBConfigPtr config = grid.getDBConfig(ns.ns());
-        Shard s = config->getShard(ns.ns());
+        auto config = uassertStatusOK(grid.catalogCache()->getDatabase(nss.db().toString()));
+        Shard s = config->getShard(nss.ns());
 
         return new ScopedDbConnection(s.getConnString(), 30.0);
     }

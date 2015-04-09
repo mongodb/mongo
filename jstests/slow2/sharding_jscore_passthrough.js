@@ -72,6 +72,7 @@ files.forEach(function(x) {
         'profile\\d*|' +
         'dbhash|' +
         'dbhash2|' +
+        'explain_missing_database|' +
         'median|' +
         'evalb|' +
         'evald|' +

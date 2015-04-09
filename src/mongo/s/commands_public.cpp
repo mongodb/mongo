@@ -52,7 +52,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_explain.h"
@@ -85,6 +86,24 @@ namespace mongo {
     using std::string;
     using std::stringstream;
     using std::vector;
+
+namespace {
+
+    bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns) {
+        invariant(!status.isOK());
+
+        if (status == ErrorCodes::DatabaseNotFound) {
+            result << "result" << BSONArray()
+                   << "cursor" << BSON("id" << 0LL <<
+                                       "ns" << ns <<
+                                       "firstBatch" << BSONArray());
+            return true;
+        }
+
+        return Command::appendCommandStatus(result, status);
+    }
+
+}
 
     namespace dbgrid_pub_cmds {
 
@@ -181,12 +200,12 @@ namespace mongo {
             }
 
             virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
-                string fullns = dbName + '.' + cmdObj.firstElement().valuestrsafe();
+                const string fullns = dbName + '.' + cmdObj.firstElement().valuestrsafe();
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                uassert(28588,
-                        str::stream() << "Failed to load db sharding metadata for " << fullns,
-                        conf);
+                auto status = grid.catalogCache()->getDatabase(dbName);
+                uassertStatusOK(status.getStatus());
+
+                shared_ptr<DBConfig> conf = status.getValue();
 
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     shards.insert(conf->getShard(fullns));
@@ -204,25 +223,27 @@ namespace mongo {
         public:
             NotAllowedOnShardedCollectionCmd( const char * n ) : PublicGridCommand( n ) {}
 
-            // TODO(spencer): remove this in favor of using parseNs
-            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) = 0;
+            virtual bool run(OperationContext* txn,
+                             const string& dbName,
+                             BSONObj& cmdObj,
+                             int options,
+                             string& errmsg,
+                             BSONObjBuilder& result,
+                             bool fromRepl) {
 
-            virtual bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
-                string fullns = getFullNS( dbName , cmdObj );
+                const string fullns = parseNs(dbName, cmdObj);
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
-
-
-                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+                auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
+                if (!conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , options, result );
                 }
-                errmsg = "can't do command: " + name + " on sharded collection";
-                return false;
+
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::IllegalOperation,
+                                                  str::stream() << "can't do command: " << name
+                                                                << " on sharded collection"));
             }
+
         };
 
         // ----
@@ -524,20 +545,24 @@ namespace mongo {
 
                 return Status(ErrorCodes::Unauthorized, "unauthorized");
             }
-            bool run(OperationContext* txn, const string& dbName,
+            bool run(OperationContext* txn,
+                     const string& dbName,
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
                      BSONObjBuilder& result,
                      bool) {
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
+
+                auto status = grid.implicitCreateDb(dbName);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status.getStatus());
                 }
 
-                return passthrough( conf , cmdObj , result );
+                shared_ptr<DBConfig> conf = status.getValue();
+
+                return passthrough(conf, cmdObj, result);
             }
+
         } createCmd;
 
         class DropCmd : public PublicGridCommand {
@@ -550,18 +575,28 @@ namespace mongo {
                 actions.addAction(ActionType::dropCollection);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
-            bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl) {
 
-                log() << "DROP: " << fullns << endl;
+                auto status = grid.catalogCache()->getDatabase(dbName);
+                if (!status.isOK()) {
+                    if (status == ErrorCodes::DatabaseNotFound) {
+                        return true;
+                    }
 
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
+                    return appendCommandStatus(result, status.getStatus());
                 }
+
+                shared_ptr<DBConfig> conf = status.getValue();
+
+                const string fullns = dbName + "." + cmdObj.firstElement().valuestrsafe();
+                log() << "DROP: " << fullns;
 
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     log() << "\tdrop going to do passthrough" << endl;
@@ -607,15 +642,14 @@ namespace mongo {
                 return true;
             }
             bool run(OperationContext* txn, const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string fullnsFrom = cmdObj.firstElement().valuestrsafe();
-                string dbNameFrom = nsToDatabase( fullnsFrom );
-                DBConfigPtr confFrom = grid.getDBConfig( dbNameFrom , false );
+                const string fullnsFrom = cmdObj.firstElement().valuestrsafe();
+                const string dbNameFrom = nsToDatabase(fullnsFrom);
+                auto confFrom = uassertStatusOK(grid.catalogCache()->getDatabase(dbNameFrom));
 
-                string fullnsTo = cmdObj["to"].valuestrsafe();
-                string dbNameTo = nsToDatabase( fullnsTo );
-                DBConfigPtr confTo = grid.getDBConfig( dbNameTo , false );
+                const string fullnsTo = cmdObj["to"].valuestrsafe();
+                const string dbNameTo = nsToDatabase(fullnsTo);
+                auto confTo = uassertStatusOK(grid.catalogCache()->getDatabase(dbNameTo));
 
-                uassert(13140, "Don't recognize source or target DB", confFrom && confTo);
                 uassert(13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom));
                 uassert(13139, "You can't rename to a sharded collection", !confTo->isSharded(fullnsTo));
 
@@ -639,30 +673,45 @@ namespace mongo {
                                                const BSONObj& cmdObj) {
                 return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
             }
-            bool run(OperationContext* txn, const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string todb = cmdObj.getStringField("todb");
-                uassert(13402, "need a todb argument", !todb.empty());
 
-                DBConfigPtr confTo = grid.getDBConfig( todb );
-                uassert(13398, "cant copy to sharded DB", !confTo->isShardingEnabled());
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl) {
 
-                string fromhost = cmdObj.getStringField("fromhost");
+                const string todb = cmdObj.getStringField("todb");
+                uassert(ErrorCodes::EmptyFieldName, "missing todb argument", !todb.empty());
+                uassert(ErrorCodes::InvalidNamespace, "invalid todb argument", nsIsDbOnly(todb));
+
+                auto confTo = uassertStatusOK(grid.implicitCreateDb(todb));
+                uassert(ErrorCodes::IllegalOperation,
+                        "cannot copy to a sharded database",
+                        !confTo->isShardingEnabled());
+
+                const string fromhost = cmdObj.getStringField("fromhost");
                 if (!fromhost.empty()) {
                     return adminPassthrough( confTo , cmdObj , result );
                 }
                 else {
-                    string fromdb = cmdObj.getStringField("fromdb");
+                    const string fromdb = cmdObj.getStringField("fromdb");
                     uassert(13399, "need a fromdb argument", !fromdb.empty());
 
-                    DBConfigPtr confFrom = grid.getDBConfig( fromdb , false );
+                    shared_ptr<DBConfig> confFrom =
+                            uassertStatusOK(grid.catalogCache()->getDatabase(fromdb));
+
                     uassert(13400, "don't know where source DB is", confFrom);
                     uassert(13401, "cant copy from sharded DB", !confFrom->isShardingEnabled());
 
                     BSONObjBuilder b;
                     BSONForEach(e, cmdObj) {
-                        if (strcmp(e.fieldName(), "fromhost") != 0)
+                        if (strcmp(e.fieldName(), "fromhost") != 0) {
                             b.append(e);
+                        }
                     }
+
                     b.append("fromhost", confFrom->getPrimary().getConnString());
                     BSONObj fixed = b.obj();
 
@@ -684,20 +733,16 @@ namespace mongo {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
+                const string fullns = parseNs(dbName, cmdObj);
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
-
+                auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     result.appendBool("sharded", false);
                     result.append( "primary" , conf->getPrimary().getName() );
+
                     return passthrough( conf , cmdObj , result);
                 }
+
                 result.appendBool("sharded", true);
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
@@ -846,16 +891,20 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
             }
-            bool run(OperationContext* txn, const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
+            bool run(OperationContext* txn,
+                     const string& dbName,
+                     BSONObj& cmdObj,
+                     int options,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool fromRepl) {
 
+                const string fullns = parseNs(dbName, cmdObj);
+
+                // findAndModify should only be creating database if upsert is true, but this
+                // would require that the parsing be pulled into this function.
+                auto conf = uassertStatusOK(grid.implicitCreateDb(dbName));
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , result);
                 }
@@ -869,8 +918,9 @@ namespace mongo {
                     cm->getShardKeyPattern().extractShardKeyFromQuery(filter);
 
                 // Bad query
-                if (!status.isOK())
+                if (!status.isOK()) {
                     return appendCommandStatus(result, status.getStatus());
+                }
 
                 BSONObj shardKey = status.getValue();
                 uassert(13343, "query for sharded findAndModify must have shardkey",
@@ -912,14 +962,9 @@ namespace mongo {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(OperationContext* txn, const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string fullns = cmdObj.firstElement().String();
+                const string fullns = parseNs(dbName, cmdObj);
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
-
+                auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , result);
                 }
@@ -984,10 +1029,6 @@ namespace mongo {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
 
-            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
-                return dbName + "." + cmdObj.firstElement().valuestrsafe();
-            }
-
         } convertToCappedCmd;
 
 
@@ -1001,10 +1042,9 @@ namespace mongo {
                 actions.addAction(ActionType::find);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
+
             virtual bool passOptions() const { return true; }
-            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
-                return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
-            }
+
             virtual std::string parseNs(const std::string& dbName, const BSONObj& cmdObj) const {
                 return dbName + "." + cmdObj.firstElement()
                                             .embeddedObjectUserCheck()["ns"]
@@ -1073,9 +1113,6 @@ namespace mongo {
             virtual std::string parseNs(const string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
-                return parseNs(dbName, cmdObj);
-            }
 
         } splitVectorCmd;
 
@@ -1095,17 +1132,16 @@ namespace mongo {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
+                const string fullns = parseNs(dbName, cmdObj);
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
+                auto status = grid.catalogCache()->getDatabase(dbName);
+                if (!status.isOK()) {
+                    return appendEmptyResultSet(result, status.getStatus(), fullns);
                 }
 
+                shared_ptr<DBConfig> conf = status.getValue();
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-                    return passthrough( conf , cmdObj , options, result );
+                    return passthrough(conf, cmdObj, options, result);
                 }
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
@@ -1172,13 +1208,9 @@ namespace mongo {
             }
 
             bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                const std::string fullns = parseNs(dbName, cmdObj);
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
+                const string fullns = parseNs(dbName, cmdObj);
 
+                auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , result );
                 }
@@ -1289,15 +1321,9 @@ namespace mongo {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
+                const string fullns = parseNs(dbName, cmdObj);
 
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
-
+                auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , options, result );
                 }
@@ -1498,16 +1524,17 @@ namespace mongo {
             bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, int retry ) {
                 Timer t;
 
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
+                const string collection = cmdObj.firstElement().valuestrsafe();
+                const string fullns = dbName + "." + collection;
 
                 // Abort after two retries, m/r is an expensive operation
-                if( retry > 2 ){
+                if( retry > 2 ) {
                     errmsg = "shard version errors preventing parallel mapreduce, check logs for further info";
                     return false;
                 }
+
                 // Re-check shard version after 1st retry
-                if( retry > 0 ){
+                if( retry > 0 ) {
                     versionManager.forceRemoteCheckShardVersionCB( fullns );
                 }
 
@@ -1532,24 +1559,35 @@ namespace mongo {
                     finalColLong = outDB + "." + finalColShort;
                 }
 
-                DBConfigPtr confIn = grid.getDBConfig( dbName , false );
-                if (!confIn) {
-                    errmsg = str::stream() << "Sharding metadata for input database: " << dbName
-                                           << " does not exist";
-                    return false;
+                // Ensure the input database exists
+                auto status = grid.catalogCache()->getDatabase(dbName);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status.getStatus());
                 }
 
-                DBConfigPtr confOut = confIn;
+                shared_ptr<DBConfig> confIn = status.getValue();
+                shared_ptr<DBConfig> confOut;
+
                 if (customOutDB) {
-                    confOut = grid.getDBConfig( outDB , true );
+                    // Create the output database implicitly
+                    confOut = uassertStatusOK(grid.implicitCreateDb(outDB));
+                }
+                else {
+                    confOut = confIn;
                 }
 
-                bool shardedInput = confIn && confIn->isShardingEnabled() && confIn->isSharded( fullns );
+                bool shardedInput = confIn && confIn->isShardingEnabled() && confIn->isSharded(fullns);
                 bool shardedOutput = customOut.getBoolField("sharded");
 
-                if (!shardedOutput)
-                    uassert( 15920 ,  "Cannot output to a non-sharded collection, a sharded collection exists" , !confOut->isSharded(finalColLong) );
-                // should we also prevent going from non-sharded to sharded? during the transition client may see partial data
+                if (!shardedOutput) {
+                    uassert(15920,
+                            "Cannot output to a non-sharded collection because "
+                                "sharded collection exists already",
+                            !confOut->isSharded(finalColLong));
+
+                    // TODO: Should we also prevent going from non-sharded to sharded? During the
+                    //       transition client may see partial data.
+                }
 
                 long long maxChunkSizeBytes = 0;
                 if (shardedOutput) {
@@ -1568,7 +1606,10 @@ namespace mongo {
                 // modify command to run on shards with output to tmp collection
                 string badShardedField;
                 verify( maxChunkSizeBytes < 0x7fffffff );
-                BSONObj shardedCommand = fixForShards( cmdObj , shardResultCollection , badShardedField, static_cast<int>(maxChunkSizeBytes) );
+                BSONObj shardedCommand = fixForShards(cmdObj,
+                                                      shardResultCollection,
+                                                      badShardedField,
+                                                      static_cast<int>(maxChunkSizeBytes));
 
                 if ( ! shardedInput && ! shardedOutput && ! customOutDB ) {
                     LOG(1) << "simple MR, just passthrough" << endl;
@@ -1887,12 +1928,12 @@ namespace mongo {
 
                 // $eval isn't allowed to access sharded collections, but we need to leave the
                 // shard to detect that.
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
+                auto status = grid.catalogCache()->getDatabase(dbName);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status.getStatus());
                 }
 
+                shared_ptr<DBConfig> conf = status.getValue();
                 return passthrough( conf , cmdObj , result );
             }
         } evalCmd;
@@ -1964,9 +2005,14 @@ namespace mongo {
             Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
         }
 
-        bool PipelineCommand::run(OperationContext* txn, const string &dbName , BSONObj &cmdObj,
-                                  int options, string &errmsg,
-                                  BSONObjBuilder &result, bool fromRepl) {
+        bool PipelineCommand::run(OperationContext* txn,
+                                  const string &dbName,
+                                  BSONObj &cmdObj,
+                                  int options,
+                                  string &errmsg,
+                                  BSONObjBuilder &result,
+                                  bool fromRepl) {
+
             const string fullns = parseNs(dbName, cmdObj);
 
             intrusive_ptr<ExpressionContext> pExpCtx =
@@ -1980,15 +2026,18 @@ namespace mongo {
             if (!pPipeline.get())
                 return false; // there was some parsing error
 
-            /*
-              If the system isn't running sharded, or the target collection
-              isn't sharded, pass this on to a mongod.
-            */
-            DBConfigPtr conf = grid.getDBConfig(dbName , true);
-            massert(17015, "getDBConfig shouldn't return NULL",
-                    conf);
-            if (!conf->isShardingEnabled() || !conf->isSharded(fullns))
+            // If the system isn't running sharded, or the target collection isn't sharded, pass
+            // this on to a mongod.
+            auto status = grid.catalogCache()->getDatabase(dbName);
+            if (!status.isOK()) {
+                return appendEmptyResultSet(result, status.getStatus(), fullns);
+            }
+
+            shared_ptr<DBConfig> conf = status.getValue();
+
+            if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                 return aggPassthrough(conf, cmdObj, result, options);
+            }
 
             /* split the pipeline into pieces for mongods and this mongos */
             intrusive_ptr<Pipeline> pShardPipeline(pPipeline->splitForSharded());
@@ -2325,12 +2374,15 @@ namespace mongo {
                      string& errmsg,
                      BSONObjBuilder& result,
                      bool) {
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
+
+                auto status = grid.catalogCache()->getDatabase(dbName);
+                if (!status.isOK()) {
+                    return appendEmptyResultSet(result,
+                                                status.getStatus(),
+                                                dbName + ".$cmd.listCollections");
                 }
 
+                shared_ptr<DBConfig> conf = status.getValue();
                 bool retval = passthrough( conf, cmdObj, result );
 
                 Status storeCursorStatus = storePossibleCursor(conf->getPrimary().getConnString(),
@@ -2355,18 +2407,15 @@ namespace mongo {
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
 
-            bool run(OperationContext* txn, const string& dbName,
+            bool run(OperationContext* txn,
+                     const string& dbName,
                      BSONObj& cmdObj,
-                     int,
+                     int options,
                      string& errmsg,
                      BSONObjBuilder& result,
-                     bool) {
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
+                     bool fromRepl) {
 
+                auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 bool retval = passthrough( conf, cmdObj, result );
 
                 Status storeCursorStatus = storePossibleCursor(conf->getPrimary().getConnString(),

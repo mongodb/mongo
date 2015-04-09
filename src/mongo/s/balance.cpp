@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
@@ -64,6 +65,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
     using std::auto_ptr;
     using std::endl;
     using std::map;
@@ -119,10 +121,13 @@ namespace mongo {
             // at the moment.
             // TODO: Handle all these things more cleanly, since they're expected problems
             const CandidateChunk& chunkInfo = *it->get();
-            try {
+            const NamespaceString nss(chunkInfo.ns);
 
-                DBConfigPtr cfg = grid.getDBConfig( chunkInfo.ns );
-                verify( cfg );
+            try {
+                auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+                fassert(28628, status.getStatus());
+
+                shared_ptr<DBConfig> cfg = status.getValue();
 
                 // NOTE: We purposely do not reload metadata here, since _doBalanceRound already
                 // tried to do so once.
@@ -470,11 +475,15 @@ namespace mongo {
             }
             cursor.reset();
 
-            DBConfigPtr cfg = grid.getDBConfig( ns );
-            if ( !cfg ) {
-                warning() << "could not load db config to balance " << ns << " collection" << endl;
+            const NamespaceString nss(ns);
+            auto statusGetDb = grid.catalogCache()->getDatabase(nss.db().toString());
+            if (!statusGetDb.isOK()) {
+                warning() << "could not load db config to balance " << ns
+                          << ", collection: " << statusGetDb.getStatus();
                 continue;
             }
+
+            shared_ptr<DBConfig> cfg = statusGetDb.getValue();
 
             // This line reloads the chunk manager once if this process doesn't know the collection
             // is sharded yet.

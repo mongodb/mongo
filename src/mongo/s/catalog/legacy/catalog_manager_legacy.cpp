@@ -362,50 +362,83 @@ namespace {
     Status CatalogManagerLegacy::enableSharding(const std::string& dbName) {
         invariant(nsIsDbOnly(dbName));
 
-        try {
-            DatabaseType db;
+        DatabaseType db;
 
-            // Check for case sensitivity violations
-            Status status = _checkDbDoesNotExist(dbName);
-            if (status.isOK()) {
-                // Database does not exist, create a new entry
-                const Shard primary = Shard::pick();
-                if (primary.ok()) {
-                    log() << "Placing [" << dbName << "] on: " << primary;
+        // Check for case sensitivity violations
+        Status status = _checkDbDoesNotExist(dbName);
+        if (status.isOK()) {
+            // Database does not exist, create a new entry
+            const Shard primary = Shard::pick();
+            if (primary.ok()) {
+                log() << "Placing [" << dbName << "] on: " << primary;
 
-                    db.setName(dbName);
-                    db.setPrimary(primary.getName());
-                    db.setSharded(true);
-                }
-                else {
-                    return Status(ErrorCodes::ShardNotFound, "can't find a shard to put new db on");
-                }
-            }
-            else if (status.code() == ErrorCodes::NamespaceExists) {
-                // Database exists, so just update it
-                StatusWith<DatabaseType> dbStatus = getDatabase(dbName);
-                if (!dbStatus.isOK()) {
-                    return dbStatus.getStatus();
-                }
-
-                db = dbStatus.getValue();
+                db.setName(dbName);
+                db.setPrimary(primary.getName());
                 db.setSharded(true);
             }
             else {
-                // Some fatal error
-                return status;
+                return Status(ErrorCodes::ShardNotFound, "can't find a shard to put new db on");
+            }
+        }
+        else if (status.code() == ErrorCodes::NamespaceExists) {
+            // Database exists, so just update it
+            StatusWith<DatabaseType> dbStatus = getDatabase(dbName);
+            if (!dbStatus.isOK()) {
+                return dbStatus.getStatus();
             }
 
-            log() << "Enabling sharding for database [" << dbName << "] in config db";
-
-            return updateDatabase(dbName, db);
+            db = dbStatus.getValue();
+            db.setSharded(true);
         }
-        catch (DBException& e) {
-            e.addContext("error creating initial database config information");
-            warning() << e.what();
-
-            return e.toStatus();
+        else {
+            // Some fatal error
+            return status;
         }
+
+        log() << "Enabling sharding for database [" << dbName << "] in config db";
+
+        return updateDatabase(dbName, db);
+    }
+
+    Status CatalogManagerLegacy::createDatabase(const std::string& dbName, const Shard* shard) {
+        invariant(nsIsDbOnly(dbName));
+
+        // The admin and config databases should never be explicitly created. They "just exist",
+        // i.e. getDatabase will always return an entry for them.
+        invariant(dbName != "admin");
+        invariant(dbName != "config");
+
+        // Check for case sensitivity violations
+        Status status = _checkDbDoesNotExist(dbName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Database does not exist, pick a shard and create a new entry
+        const Shard primaryShard = (shard ? *shard : Shard::pick());
+        if (!primaryShard.ok()) {
+            return Status(ErrorCodes::ShardNotFound, "can't find a shard to put new db on");
+        }
+
+        log() << "Placing [" << dbName << "] on: " << primaryShard;
+
+        DatabaseType db;
+        db.setName(dbName);
+        db.setPrimary(primaryShard.getName());
+        db.setSharded(false);
+
+        BatchedCommandResponse response;
+        status = insert(DatabaseType::ConfigNS, db.toBSON(), &response);
+        if (status.isOK()) {
+            return status;
+        }
+
+        if (status.code() == ErrorCodes::DuplicateKey) {
+            return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
+        }
+
+        return Status(status.code(), str::stream() << "database metadata write failed for "
+                                                   << dbName << ". Error: " << response.toBSON());
     }
 
     StatusWith<string> CatalogManagerLegacy::addShard(const string& name,
@@ -645,13 +678,25 @@ namespace {
     }
 
     StatusWith<DatabaseType> CatalogManagerLegacy::getDatabase(const std::string& dbName) {
+        invariant(nsIsDbOnly(dbName));
+
+        // The two databases that are hosted on the config server are config and admin
+        if (dbName == "config" || dbName == "admin") {
+            DatabaseType dbt;
+            dbt.setName(dbName);
+            dbt.setSharded(false);
+            dbt.setPrimary("config");
+
+            return dbt;
+        }
+
         ScopedDbConnection conn(_configServerConnectionString, 30.0);
 
         BSONObj dbObj = conn->findOne(DatabaseType::ConfigNS, BSON(DatabaseType::name(dbName)));
         if (dbObj.isEmpty()) {
             conn.done();
             return Status(ErrorCodes::DatabaseNotFound,
-                          stream() <<  "database " << dbName << " not found.");
+                          stream() <<  "database " << dbName << " not found");
         }
 
         return DatabaseType::fromBSON(dbObj);

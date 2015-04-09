@@ -28,16 +28,22 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
+
 namespace {
 
     class GetShardVersion : public Command {
@@ -87,19 +93,24 @@ namespace {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            const std::string ns = parseNs(dbname, cmdObj);
-            if (ns.size() == 0) {
-                errmsg = "need to specify full namespace";
-                return false;
+            const NamespaceString nss(parseNs(dbname, cmdObj));
+            if (nss.size() == 0) {
+                return appendCommandStatus(result, Status(ErrorCodes::InvalidNamespace,
+                                                          "no namespace specified"));
             }
 
-            DBConfigPtr config = grid.getDBConfig(ns);
-            if (!config->isSharded(ns)) {
-                errmsg = "ns not sharded.";
-                return false;
+            auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status.getStatus());
             }
 
-            ChunkManagerPtr cm = config->getChunkManagerIfExists(ns);
+            boost::shared_ptr<DBConfig> config = status.getValue();
+            if (!config->isSharded(nss.ns())) {
+                return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotSharded,
+                                                   "ns [" + nss.ns() + " is not sharded."));
+            }
+
+            ChunkManagerPtr cm = config->getChunkManagerIfExists(nss.ns());
             if (!cm) {
                 errmsg = "no chunk manager?";
                 return false;

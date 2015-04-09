@@ -38,6 +38,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_connection.h"
@@ -309,7 +310,11 @@ namespace {
     }
 
     ChunkManagerPtr ChunkManager::reload(bool force) const {
-        return grid.getDBConfig(getns())->getChunkManager(getns(), force);
+        const NamespaceString nss(_ns);
+        auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+        shared_ptr<DBConfig> config = uassertStatusOK(status);
+
+        return config->getChunkManager(getns(), force);
     }
 
     bool ChunkManager::_isValid(const ChunkMap& chunkMap) {

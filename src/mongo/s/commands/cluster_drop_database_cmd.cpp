@@ -30,13 +30,19 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
+
 namespace {
 
     class DropDatabaseCmd : public Command {
@@ -85,43 +91,28 @@ namespace {
                 return 0;
             }
 
-            DBConfigPtr conf = grid.getDBConfig(dbname, false);
+            // Refresh the database metadata
+            grid.catalogCache()->invalidate(dbname);
+
+            auto status = grid.catalogCache()->getDatabase(dbname);
+            if (!status.isOK()) {
+                if (status == ErrorCodes::DatabaseNotFound) {
+                    result.append("info", "database does not exist");
+                    return true;
+                }
+
+                return appendCommandStatus(result, status.getStatus());
+            }
 
             log() << "DROP DATABASE: " << dbname;
 
-            if (!conf) {
-                result.append("info", "database didn't exist");
-                return true;
-            }
-
-            //
-            // Reload the database configuration so that we're sure a database entry exists
-            // TODO: This won't work with parallel dropping
-            //
-
-            grid.removeDBIfExists(*conf);
-            grid.getDBConfig(dbname);
+            shared_ptr<DBConfig> conf = status.getValue();
 
             // TODO: Make dropping logic saner and more tolerant of partial drops.  This is
             // particularly important since a database drop can be aborted by *any* collection
             // with a distributed namespace lock taken (migrates/splits)
 
-            //
-            // Create a copy of the DB config object to drop, so that no one sees a weird
-            // intermediate version of the info
-            //
-
-            DBConfig confCopy(conf->name());
-            if (!confCopy.load()) {
-                errmsg = "could not load database info to drop";
-                return false;
-            }
-
-            // Enable sharding so we can correctly retry failed drops
-            // This will re-drop old sharded entries if they exist
-            confCopy.enableSharding(false);
-
-            if (!confCopy.dropDatabase(errmsg)) {
+            if (!conf->dropDatabase(errmsg)) {
                 return false;
             }
 

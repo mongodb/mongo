@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_manager_targeter.h"
@@ -50,6 +51,7 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
     using std::auto_ptr;
     using std::vector;
     using std::map;
@@ -111,25 +113,23 @@ namespace mongo {
         /**
          * Splits the chunks touched based from the targeter stats if needed.
          */
-        void splitIfNeeded(const string& ns, const TargeterStats& stats) {
+        void splitIfNeeded(const NamespaceString& nss, const TargeterStats& stats) {
             if (!Chunk::ShouldAutoSplit) {
                 return;
             }
 
-            DBConfigPtr config;
-
-            try {
-                config = grid.getDBConfig(ns);
-            }
-            catch (const DBException& ex) {
-                warning() << "failed to get database config for " << ns
-                          << " while checking for auto-split: " << causedBy(ex);
+            auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+            if (!status.isOK()) {
+                warning() << "failed to get database config for " << nss
+                          << " while checking for auto-split: " << status.getStatus();
                 return;
             }
 
+            shared_ptr<DBConfig> config = status.getValue();
+
             ChunkManagerPtr chunkManager;
             ShardPtr dummyShard;
-            config->getChunkManagerOrPrimary(ns, chunkManager, dummyShard);
+            config->getChunkManagerOrPrimary(nss, chunkManager, dummyShard);
 
             if (!chunkManager) {
                 return;
@@ -270,7 +270,7 @@ namespace mongo {
             exec.executeBatch(request, response);
 
             if (_autoSplit) {
-                splitIfNeeded(request.getNS(), *targeter.getStats());
+                splitIfNeeded(request.getNSS(), *targeter.getStats());
             }
 
             _stats->setShardStats(exec.releaseStats());

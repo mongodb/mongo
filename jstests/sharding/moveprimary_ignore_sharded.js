@@ -49,7 +49,7 @@ st.printShardingStatus();
 jsTest.log( "Running movePrimary for foo through mongosA ..." )
 
 // MongosA should already know about all the collection states
-printjson( adminA.runCommand({ movePrimary : "foo", to : fooOtherShard._id }) )
+printjson( adminA.runCommand({ movePrimary : "foo", to : fooOtherShard._id }) );
 
 // All collections still correctly sharded / unsharded
 assert.neq( null, mongosA.getCollection("foo.coll0").findOne() );
@@ -75,6 +75,11 @@ assert.eq( 1, realCollectionCount( new Mongo( fooOtherShard.host ).getDB( "foo" 
 
 jsTest.log( "Running movePrimary for bar through mongosB ..." );
 printjson( adminB.runCommand({ movePrimary : "bar", to : barOtherShard._id }) );
+
+// We need to flush the cluster config on mongosA, so it can discover that database 'bar' got
+// moved. Otherwise since the collections are not sharded, we have no way of discovering this.
+// See SERVER-8059.
+adminA.runCommand({ flushRouterConfig : 1 });
 
 // All collections still correctly sharded / unsharded
 assert.neq( null, mongosA.getCollection("bar.coll0").findOne() );

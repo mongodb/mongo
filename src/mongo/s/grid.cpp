@@ -34,30 +34,24 @@
 
 #include "mongo/s/grid.h"
 
-#include <pcrecpp.h>
-
+#include "mongo/base/status_with.h"
 #include "mongo/client/connpool.h"
-#include "mongo/db/client.h"
-#include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/write_concern.h"
+#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/cluster_write.h"
-#include "mongo/s/mongos_options.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/type_collection.h"
-#include "mongo/s/type_database.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
+    using boost::shared_ptr;
     using std::endl;
     using std::map;
     using std::set;
+    using std::string;
     using std::vector;
 
     MONGO_FP_DECLARE(neverBalance);
@@ -75,139 +69,26 @@ namespace mongo {
         }
 
         _catalogManager.reset(cm.release());
+        _catalogCache.reset(new CatalogCache(_catalogManager.get()));
         return true;
     }
 
-    DBConfigPtr Grid::getDBConfig( StringData ns , bool create , const string& shardNameHint ) {
-        string database = nsToDatabase( ns );
-        uassert( 15918,
-                 str::stream() << "invalid database name: " << database,
-                 NamespaceString::validDBName( database ) );
-
-        boost::lock_guard<boost::mutex> l( _lock );
-
-        DBConfigPtr& dbConfig = _databases[database];
-        if( ! dbConfig ){
-
-            dbConfig.reset(new DBConfig( database ));
-
-            // Protect initial load from connectivity errors, otherwise we won't be able
-            // to perform any task.
-            bool loaded = false;
-            try {
-                try {
-                    loaded = dbConfig->load();
-                }
-                catch ( const DBException& ) {
-                    // Retry again, if the config server are now up, the previous call should have
-                    // cleared all the bad connections in the pool and this should succeed.
-                    loaded = dbConfig->load();
-                }
-            }
-            catch( DBException& e ){
-                e.addContext( "error loading initial database config information" );
-                warning() << e.what() << endl;
-                dbConfig.reset();
-                throw;
-            }
-
-            if( ! loaded ){
-
-                if( create ){
-
-                    // Protect creation of initial db doc from connectivity errors
-                    try{
-
-                        // note here that cc->primary == 0.
-                        log() << "couldn't find database [" << database << "] in config db" << endl;
-
-                        {
-                            // lets check case
-                            ScopedDbConnection conn(configServer.modelServer(), 30);
-
-                            BSONObjBuilder b;
-                            b.appendRegex( "_id" , (string)"^" +
-                                           pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
-                            BSONObj dbObj = conn->findOne( DatabaseType::ConfigNS , b.obj() );
-                            conn.done();
-
-                            // If our name is exactly the same as the name we want, try loading
-                            // the database again.
-                            if (!dbObj.isEmpty() &&
-                                dbObj[DatabaseType::name()].String() == database)
-                            {
-                                if (dbConfig->load()) return dbConfig;
-                            }
-
-                            // TODO: This really shouldn't fall through, but without metadata
-                            // management there's no good way to make sure this works all the time
-                            // when the database is getting rapidly created and dropped.
-                            // For now, just do exactly what we used to do.
-
-                            if ( ! dbObj.isEmpty() ) {
-                                uasserted( DatabaseDifferCaseCode, str::stream()
-                                    <<  "can't have 2 databases that just differ on case "
-                                    << " have: " << dbObj[DatabaseType::name()].String()
-                                    << " want to add: " << database );
-                            }
-                        }
-
-                        Shard primary;
-                        if (database == "admin" || database == "config") {
-                            primary = configServer.getPrimary();
-                        }
-                        else if ( shardNameHint.empty() ) {
-                            primary = Shard::pick();
-                        }
-                        else {
-                            // use the shard name if provided
-                            Shard shard;
-                            shard.reset( shardNameHint );
-                            primary = shard;
-                        }
-
-                        if ( primary.ok() ) {
-                            dbConfig->setPrimary( primary.getName() ); // saves 'cc' to configDB
-                            log() << "\t put [" << database << "] on: " << primary << endl;
-                        }
-                        else {
-                            uasserted( 10185 ,  "can't find a shard to put new db on" );
-                        }
-                    }
-                    catch( DBException& e ){
-                        e.addContext( "error creating initial database config information" );
-                        warning() << e.what() << endl;
-                        dbConfig.reset();
-                        throw;
-                    }
-                }
-                else {
-                    dbConfig.reset();
-                }
-            }
+    StatusWith<shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
+        auto status = catalogCache()->getDatabase(dbName);
+        if (status.isOK()) {
+            return status;
         }
 
-        return dbConfig;
-    }
+        if (status == ErrorCodes::DatabaseNotFound) {
+            auto statusCreateDb = catalogManager()->createDatabase(dbName, NULL);
+            if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
+                return catalogCache()->getDatabase(dbName);
+            }
 
-    void Grid::removeDB( const std::string& database ) {
-        uassert( 10186 ,  "removeDB expects db name" , database.find( '.' ) == string::npos );
-        boost::lock_guard<boost::mutex> l( _lock );
-        _databases.erase( database );
-
-    }
-
-    void Grid::removeDBIfExists(const DBConfig& database) {
-        boost::lock_guard<boost::mutex> l(_lock);
-
-        map<string, DBConfigPtr>::iterator it = _databases.find(database.name());
-        if (it != _databases.end() && it->second.get() == &database) {
-            _databases.erase(it);
-            log() << "erased database " << database.name() << " from local registry";
+            return statusCreateDb;
         }
-        else {
-            log() << database.name() << "already erased from local registry";
-        }
+
+        return status;
     }
 
     bool Grid::allowLocalHost() const {
@@ -348,11 +229,6 @@ namespace mongo {
         }
 
         return false;
-    }
-
-    void Grid::flushConfig() {
-        boost::lock_guard<boost::mutex> lk( _lock );
-        _databases.clear();
     }
 
     BSONObj Grid::getConfigSetting( const std::string& name ) const {

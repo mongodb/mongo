@@ -1,37 +1,30 @@
-// config.h
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects
-*    for all of the code used other than as permitted herein. If you modify
-*    file(s) with this exception, you may extend this exception to your
-*    version of the file(s), but you are not obligated to do so. If you do not
-*    wish to do so, delete this exception statement from your version. If you
-*    delete this exception statement from all source files in the program,
-*    then also delete it in the license file.
-*/
-
-/* This file is things related to the "grid configuration":
-   - what machines make up the db component of our cloud
-   - where various ranges of things live
-*/
+ *    Copyright (C) 2008-2015 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #pragma once
 
@@ -46,6 +39,7 @@ namespace mongo {
 
     class ChunkManager;
     class ConfigServer;
+    class DatabaseType;
     class DBConfig;
 
     typedef boost::shared_ptr<DBConfig> DBConfigPtr;
@@ -57,17 +51,22 @@ namespace mongo {
      */
     class DBConfig  {
     public:
-        DBConfig(std::string name);
-        virtual ~DBConfig();
-
-        const std::string& name() const { return _name; };
+        DBConfig(std::string name, const DatabaseType& dbt);
 
         /**
-         * @return if anything in this db is partitioned or not
+         * The name of the database which this entry caches.
          */
-        bool isShardingEnabled() {
-            return _shardingEnabled;
-        }
+        const std::string& name() const { return _name; }
+
+        /**
+         * Whether sharding is enabled for this database.
+         */
+        bool isShardingEnabled() const { return _shardingEnabled; }
+
+        /**
+         * Reference to the primary shard for this database.
+         */
+        const Shard& getPrimary() const { return _primary; }
 
         void enableSharding( bool save = true );
 
@@ -109,11 +108,6 @@ namespace mongo {
          */
         ShardPtr getShardIfExists( const std::string& ns );
 
-        const Shard& getPrimary() const {
-            uassert( 8041 , (std::string)"no primary shard configured for db: " + _name , _primary.ok() );
-            return _primary;
-        }
-
         void setPrimary( const std::string& s );
 
         bool load();
@@ -121,12 +115,8 @@ namespace mongo {
 
         bool dropDatabase( std::string& errmsg );
 
-        // model stuff
-
-        // lockless loading
-        void getAllShards(std::set<Shard>& shards) const;
-
-        void getAllShardedCollections(std::set<std::string>& namespaces) const;
+        void getAllShards(std::set<Shard>& shards);
+        void getAllShardedCollections(std::set<std::string>& namespaces);
 
     protected:
         struct CollectionInfo {
@@ -183,15 +173,22 @@ namespace mongo {
         void _save( bool db = true, bool coll = true );
 
 
-        const std::string _name; // e.g. "alleyinsider"
+        // Name of the database which this entry caches
+        const std::string _name;
 
-        Shard _primary; // e.g. localhost , mongo.foo.com:9999
+        // Primary shard name
+        Shard _primary;
+
+        // Whether sharding has been enabled for this database
         bool _shardingEnabled;
 
+        // Set of collections and lock to protect access
+        mongo::mutex _lock;
         CollectionInfoMap _collections;
 
-        mutable mongo::mutex _lock; // TODO: change to r/w lock ??
-        mutable mongo::mutex _hitConfigServerLock;
+        // Ensures that only one thread at a time loads collection configuration data from
+        // the config server
+        mongo::mutex _hitConfigServerLock;
     };
 
 
@@ -235,9 +232,7 @@ namespace mongo {
 
         void reloadSettings();
 
-        ConnectionString getConnectionString() const {
-            return ConnectionString( _primary.getConnString() , ConnectionString::SYNC );
-        }
+        ConnectionString getConnectionString() const;
 
         void replicaSetChange(const std::string& setName, const std::string& newConnectionString);
 

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/shared_ptr.hpp>
 #include <list>
 #include <set>
 #include <vector>
@@ -44,6 +45,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
@@ -52,6 +54,7 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
     using std::list;
     using std::set;
     using std::string;
@@ -115,20 +118,26 @@ namespace {
             }
 
             const NamespaceString nsStr(ns);
-            if (!nsStr.isValid()){
-                errmsg = str::stream() << "bad ns[" << ns << "]";
-                return false;
+            if (!nsStr.isValid()) {
+                return appendCommandStatus(
+                            result,
+                            Status(ErrorCodes::InvalidNamespace,
+                                   "invalid collection namespace [" + ns + "]"));
             }
 
-            DBConfigPtr config = grid.getDBConfig(ns);
+            auto config = uassertStatusOK(grid.catalogCache()->getDatabase(nsStr.db().toString()));
             if (!config->isShardingEnabled()) {
-                errmsg = "sharding not enabled for db";
-                return false;
+                return appendCommandStatus(
+                            result,
+                            Status(ErrorCodes::IllegalOperation,
+                                   str::stream() << "sharding not enabled for db " << nsStr.db()));
             }
 
             if (config->isSharded(ns)) {
-                errmsg = "already sharded";
-                return false;
+                return appendCommandStatus(
+                            result,
+                            Status(ErrorCodes::IllegalOperation,
+                                   str::stream() << "sharding already enabled for collection " << ns));
             }
 
             // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj
