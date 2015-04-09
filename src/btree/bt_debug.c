@@ -131,7 +131,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	}
 
 	/* Close any file we opened. */
-	(void)__wt_fclose(session, &ds->fp, WT_FHANDLE_WRITE);
+	(void)__wt_fclose(&ds->fp, WT_FHANDLE_WRITE);
 }
 
 /*
@@ -395,7 +395,7 @@ __debug_dsk_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 }
 
 /*
- * __debug_shape_info --
+ * __debug_tree_shape_info --
  *	Pretty-print information about a page.
  */
 static char *

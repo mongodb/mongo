@@ -649,7 +649,7 @@ __wt_conn_dhandle_close_all(
 	WT_ASSERT(session, session->dhandle == NULL);
 
 	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], l) {
+	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl) {
 		if (strcmp(dhandle->name, name) != 0)
 			continue;
 

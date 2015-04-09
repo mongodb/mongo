@@ -96,7 +96,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 
 	F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
-err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_READ));
+err:	WT_TRET(__wt_fclose(&fp, WT_FHANDLE_READ));
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &value);
 	return (ret);
@@ -259,7 +259,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	/* Copy the value for the caller. */
 	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
-err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_READ));
+err:	WT_TRET(__wt_fclose(&fp, WT_FHANDLE_READ));
 	__wt_scr_free(session, &buf);
 	return (ret);
 }

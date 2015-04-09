@@ -72,6 +72,23 @@ tasks:
 
             scons.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100" wiredtiger.dll libwiredtiger.lib
 
+  - name: fops-windows
+    commands:
+      - func: "fetch source"
+      - command: git.apply_patch
+        params:
+          directory: wiredtiger
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
+
+            cmd.exe /c t_fops.exe
+
 buildvariants:
 - name: ubuntu1404
   display_name: Ubuntu 14.04
@@ -99,12 +116,13 @@ buildvariants:
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
-  - windows-64-vs2013-compile
+  - windows-64-vs2013-test
   expansions:
     smp_command: -j$(grep -c ^processor /proc/cpuinfo)
   tasks:
     - name: compile-windows
     - name: compile-windows-alt
+    - name: fops-windows
 
 - name: osx-108
   display_name: OS X 10.8

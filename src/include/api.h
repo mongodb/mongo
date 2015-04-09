@@ -24,9 +24,9 @@
 	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
-	WT_ERR(((config) != NULL) ?					\
-	    __wt_config_check((s),					\
-	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0);		\
+	if ((config) != NULL)						\
+		WT_ERR(__wt_config_check((s),				\
+		    WT_CONFIG_REF(session, h##_##n), (config), 0));	\
 	WT_ERR(__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n))
 
 #define	API_END(s, ret)							\

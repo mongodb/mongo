@@ -299,7 +299,7 @@ path_setup(const char *home)
 	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"cd %s && del /s /q * && rd /s /q KVS"
+#define	CMD	"cd %s && del /s /q * >:nul && rd /s /q KVS"
 #else
 #define	CMD	"cd %s > /dev/null && rm -rf `ls | sed /rand/d`"
 #endif
@@ -311,7 +311,7 @@ path_setup(const char *home)
 	/* Backup directory initialize command, remove and re-create it. */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"del /s && mkdir %s"
+#define	CMD	"del /s /q >:nul && mkdir %s"
 #else
 #define	CMD	"rm -rf %s && mkdir %s"
 #endif
@@ -330,9 +330,9 @@ path_setup(const char *home)
 #undef	CMD
 #ifdef _WIN32
 #define	CMD								\
-	"cd %s "							\
+	"cd %s && "							\
 	"rd /q /s slvg.copy & mkdir slvg.copy && "			\
-	"copy WiredTiger* slvg.copy\\ && copy wt* slvg.copy\\"
+	"copy WiredTiger* slvg.copy\\ >:nul && copy wt* slvg.copy\\ >:nul"
 #else
 #define	CMD								\
 	"cd %s > /dev/null && "						\
@@ -385,6 +385,10 @@ rng(void)
 	}
 
 	r = (uint32_t)rand();
-	fprintf(g.rand_log, "%" PRIu32 "\n", r);
+
+	/* Save and flush the random number so we're up-to-date on error. */
+	(void)fprintf(g.rand_log, "%" PRIu32 "\n", r);
+	(void)fflush(g.rand_log);
+
 	return (r);
 }

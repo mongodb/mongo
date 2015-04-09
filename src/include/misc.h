@@ -134,17 +134,6 @@
 #define	WT_VERBOSE_ISSET(session, f)	0
 #endif
 
-/*
- * Clear a structure, two flavors: inline when we want to guarantee there's
- * no function call or setup/tear-down of a loop, and the default where the
- * compiler presumably chooses.  Gcc 4.3 is supposed to get this right, but
- * we've seen problems when calling memset to clear structures in performance
- * critical paths.
- */
-#define	WT_CLEAR_INLINE(type, s) do {					\
-	static const type __clear;					\
-	s = __clear;							\
-} while (0)
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 

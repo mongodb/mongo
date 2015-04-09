@@ -1238,7 +1238,8 @@ err:
 int
 __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     int (*func)(WT_SESSION_IMPL *session,
-    WT_ITEM *record, WT_LSN *lsnp, void *cookie, int firstrecord), void *cookie)
+    WT_ITEM *record, WT_LSN *lsnp, WT_LSN *next_lsnp,
+    void *cookie, int firstrecord), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(uncitem);
@@ -1247,7 +1248,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_ITEM buf;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
-	WT_LSN end_lsn, rd_lsn, start_lsn;
+	WT_LSN end_lsn, next_lsn, rd_lsn, start_lsn;
 	wt_off_t log_size;
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
@@ -1370,6 +1371,7 @@ advance:
 			WT_ERR(__log_openfile(
 			    session, 0, &log_fh, WT_LOG_FILENAME, rd_lsn.file));
 			WT_ERR(__log_filesize(session, log_fh, &log_size));
+			eol = 0;
 			continue;
 		}
 		/*
@@ -1432,6 +1434,12 @@ advance:
 			 */
 			if (log != NULL)
 				log->trunc_lsn = rd_lsn;
+			/*
+			 * If the user asked for a specific LSN and it is not
+			 * a valid LSN, return WT_NOTFOUND.
+			 */
+			if (LF_ISSET(WT_LOGSCAN_ONE))
+				ret = WT_NOTFOUND;
 			break;
 		}
 
@@ -1440,23 +1448,25 @@ advance:
 		 * header, invoke the callback.
 		 */
 		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
+		next_lsn = rd_lsn;
+		next_lsn.offset += (wt_off_t)rdup_len;
 		if (rd_lsn.offset != 0) {
 			if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
 				WT_ERR(__log_decompress(session, &buf,
 				    &uncitem));
 				WT_ERR((*func)(session, uncitem, &rd_lsn,
-				    cookie, firstrecord));
+				    &next_lsn, cookie, firstrecord));
 				__wt_scr_free(session, &uncitem);
 			} else
-				WT_ERR((*func)(session, &buf, &rd_lsn, cookie,
-				    firstrecord));
+				WT_ERR((*func)(session, &buf,
+				    &rd_lsn, &next_lsn, cookie, firstrecord));
 
 			firstrecord = 0;
 
 			if (LF_ISSET(WT_LOGSCAN_ONE))
 				break;
 		}
-		rd_lsn.offset += (wt_off_t)rdup_len;
+		rd_lsn = next_lsn;
 	}
 
 	/* Truncate if we're in recovery. */

@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int config_check(
-    WT_SESSION_IMPL *, const WT_CONFIG_CHECK *, const char *, size_t);
+    WT_SESSION_IMPL *, const WT_CONFIG_CHECK *, u_int, const char *, size_t);
 
 /*
  * __conn_foc_add --
@@ -161,12 +161,14 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	if (check != NULL)
 		WT_ERR(__wt_strdup(session, check, &newcheck->checks));
 	entry->checks = checks;
+	entry->checks_entries = 0;
 
 	/*
 	 * Confirm the configuration string passes the new set of
 	 * checks.
 	 */
-	WT_ERR(config_check(session, entry->checks, config, 0));
+	WT_ERR(config_check(
+	    session, entry->checks, entry->checks_entries, config, 0));
 
 	/*
 	 * The next time this configuration is updated, we don't want to figure
@@ -229,8 +231,50 @@ __wt_config_check(WT_SESSION_IMPL *session,
 	 * Callers don't check, it's a fast call without a configuration or
 	 * check array.
 	 */
-	return (config == NULL || entry->checks == NULL ?
-	    0 : config_check(session, entry->checks, config, config_len));
+	return (config == NULL || entry->checks == NULL ? 0 :
+	    config_check(session,
+	    entry->checks, entry->checks_entries, config, config_len));
+}
+
+/*
+ * config_check_search --
+ *	Search a set of checks for a matching name.
+ */
+static inline int
+config_check_search(WT_SESSION_IMPL *session,
+    const WT_CONFIG_CHECK *checks, u_int entries,
+    const char *str, size_t len, int *ip)
+{
+	u_int base, indx, limit;
+	int cmp;
+
+	/*
+	 * For standard sets of configuration information, we know how many
+	 * entries and that they're sorted, do a binary search. Else, do it
+	 * the slow way.
+	 */
+	if (entries == 0) {
+		for (indx = 0; checks[indx].name != NULL; indx++)
+			if (WT_STRING_MATCH(checks[indx].name, str, len)) {
+				*ip = (int)indx;
+				return (0);
+			}
+	} else
+		for (base = 0, limit = entries; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+			cmp = strncmp(checks[indx].name, str, len);
+			if (cmp == 0 && checks[indx].name[len] == '\0') {
+				*ip = (int)indx;
+				return (0);
+			}
+			if (cmp < 0) {
+				base = indx + 1;
+				--limit;
+			}
+		}
+
+	WT_RET_MSG(session, EINVAL,
+	    "unknown configuration key: '%.*s'", (int)len, str);
 }
 
 /*
@@ -240,7 +284,8 @@ __wt_config_check(WT_SESSION_IMPL *session,
  */
 static int
 config_check(WT_SESSION_IMPL *session,
-    const WT_CONFIG_CHECK *checks, const char *config, size_t config_len)
+    const WT_CONFIG_CHECK *checks, u_int checks_entries,
+    const char *config, size_t config_len)
 {
 	WT_CONFIG parser, cparser, sparser;
 	WT_CONFIG_ITEM k, v, ck, cv, dummy;
@@ -263,13 +308,8 @@ config_check(WT_SESSION_IMPL *session,
 			    (int)k.len, k.str);
 
 		/* Search for a matching entry. */
-		for (i = 0; checks[i].name != NULL; i++)
-			if (WT_STRING_MATCH(checks[i].name, k.str, k.len))
-				break;
-		if (checks[i].name == NULL)
-			WT_RET_MSG(session, EINVAL,
-			    "unknown configuration key: '%.*s'",
-			    (int)k.len, k.str);
+		WT_RET(config_check_search(
+		    session, checks, checks_entries, k.str, k.len, &i));
 
 		if (strcmp(checks[i].type, "boolean") == 0) {
 			badtype = (v.type != WT_CONFIG_ITEM_BOOL &&
@@ -278,7 +318,7 @@ config_check(WT_SESSION_IMPL *session,
 		} else if (strcmp(checks[i].type, "category") == 0) {
 			/* Deal with categories of the form: XXX=(XXX=blah). */
 			ret = config_check(session,
-			    checks[i].subconfigs,
+			    checks[i].subconfigs, checks[i].subconfigs_entries,
 			    k.str + strlen(checks[i].name) + 1, v.len);
 			if (ret != EINVAL)
 				badtype = 0;

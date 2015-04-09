@@ -269,6 +269,8 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 		__wt_free(session, *bufp);
 	}
 
+	session->scratch_alloc = 0;
+	session->scratch_cached = 0;
 	__wt_free(session, session->scratch);
 #ifdef HAVE_DIAGNOSTIC
 	__wt_free(session, session->scratch_track);

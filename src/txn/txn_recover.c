@@ -263,13 +263,15 @@ __txn_commit_apply(
  */
 static int
 __txn_log_recover(WT_SESSION_IMPL *session,
-    WT_ITEM *logrec, WT_LSN *lsnp, void *cookie, int firstrecord)
+    WT_ITEM *logrec, WT_LSN *lsnp, WT_LSN *next_lsnp,
+    void *cookie, int firstrecord)
 {
 	WT_RECOVERY *r;
 	const uint8_t *end, *p;
 	uint64_t txnid;
 	uint32_t rectype;
 
+	WT_UNUSED(next_lsnp);
 	r = cookie;
 	p = LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;

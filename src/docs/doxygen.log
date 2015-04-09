@@ -1,0 +1,37 @@
+/mnt/fast/alexg/work/amz/wiredtiger/src/include/wiredtiger.in:857: warning: The following parameters of WT_SESSION::open_cursor(WT_SESSION *session, const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp) are not documented:
+  parameter 'to_dup'
+  parameter 'config'
+  parameter 'cursorp'
+/mnt/fast/alexg/work/amz/wiredtiger/src/include/wiredtiger.in:857: warning: return type of member WT_SESSION::open_cursor is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/src/include/wiredtiger.in:1451: warning: block marked with [Snapshot example] for \snippet should appear twice in file ex_all.c, found it 0 times
+
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/AsyncCallback.java:36: warning: return type of member com.wiredtiger.db.AsyncCallback.notify is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackFormatInputStream.java:42: warning: Member format (variable) of class com::wiredtiger::db::PackFormatInputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackFormatInputStream.java:43: warning: Member formatOff (variable) of class com::wiredtiger::db::PackFormatInputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackFormatInputStream.java:44: warning: Member formatRepeatCount (variable) of class com::wiredtiger::db::PackFormatInputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackFormatInputStream.java:65: warning: return type of member com.wiredtiger.db.PackFormatInputStream.available is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackFormatInputStream.java:171: warning: return type of member com.wiredtiger.db.PackFormatInputStream.getLengthFromFormat is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackFormatInputStream.java:82: warning: return type of member com.wiredtiger.db.PackFormatInputStream.getType is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackFormatInputStream.java:58: warning: return type of member com.wiredtiger.db.PackFormatInputStream.toString is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:42: warning: Member format (variable) of class com::wiredtiger::db::PackInputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:43: warning: Member value (variable) of class com::wiredtiger::db::PackInputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:44: warning: Member valueOff (variable) of class com::wiredtiger::db::PackInputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:45: warning: Member valueLen (variable) of class com::wiredtiger::db::PackInputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:89: warning: return type of member com.wiredtiger.db.PackInputStream.getByte is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:126: warning: return type of member com.wiredtiger.db.PackInputStream.getByteArray is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:75: warning: return type of member com.wiredtiger.db.PackInputStream.getFormat is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:170: warning: return type of member com.wiredtiger.db.PackInputStream.getInt is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:185: warning: return type of member com.wiredtiger.db.PackInputStream.getLong is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:199: warning: return type of member com.wiredtiger.db.PackInputStream.getRecord is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:209: warning: return type of member com.wiredtiger.db.PackInputStream.getShort is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:223: warning: return type of member com.wiredtiger.db.PackInputStream.getString is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackInputStream.java:82: warning: return type of member com.wiredtiger.db.PackInputStream.getValue is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackOutputStream.java:42: warning: Member format (variable) of class com::wiredtiger::db::PackOutputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackOutputStream.java:43: warning: Member packed (variable) of class com::wiredtiger::db::PackOutputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackOutputStream.java:44: warning: Member intBuf (variable) of class com::wiredtiger::db::PackOutputStream is not documented.
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackOutputStream.java:59: warning: return type of member com.wiredtiger.db.PackOutputStream.getFormat is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/PackOutputStream.java:66: warning: return type of member com.wiredtiger.db.PackOutputStream.getValue is not documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/WiredTigerException.java:35: warning: parameters of member com.wiredtiger.db.WiredTigerException.WiredTigerException are not (all) documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/WiredTigerPackingException.java:36: warning: parameters of member com.wiredtiger.db.WiredTigerPackingException.WiredTigerPackingException are not (all) documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/WiredTigerPanicException.java:37: warning: parameters of member com.wiredtiger.db.WiredTigerPanicException.WiredTigerPanicException are not (all) documented
+/mnt/fast/alexg/work/amz/wiredtiger/lang/java/src/com/wiredtiger/db/WiredTigerRollbackException.java:36: warning: parameters of member com.wiredtiger.db.WiredTigerRollbackException.WiredTigerRollbackException are not (all) documented

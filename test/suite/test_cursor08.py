@@ -26,41 +26,62 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_cursor07.py
-# Log cursors
+# test_cursor08.py
+# Log cursors with compression
 #
 
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open, stat
-from wtscenario import check_scenarios
+from wiredtiger import wiredtiger_open, stat, WiredTigerError
+from wtscenario import multiply_scenarios, number_scenarios, check_scenarios
 import wttest
 
-class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
+class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
-    tablename = 'test_cursor07'
+    tablename = 'test_cursor08'
     uri = 'table:' + tablename
-    #  A large number of keys will force a log file change which will
-    # test that scenario for log cursors.
-    nkeys = 7000
+    nkeys = 500
 
-    scenarios = check_scenarios([
+    reopens = check_scenarios([
         ('regular', dict(reopen=False)),
         ('reopen', dict(reopen=True))
     ])
+    compress = check_scenarios([
+        ('bzip2', dict(compress='bzip2')),
+        ('nop', dict(compress='nop')),
+        ('snappy', dict(compress='snappy')),
+        ('zlib', dict(compress='zlib')),
+        ('none', dict(compress='none')),
+    ])
+    scenarios = number_scenarios(multiply_scenarios('.', reopens, compress))
+
+    # Return the wiredtiger_open extension argument for a shared library.
+    def extensionArg(self, name):
+        if name == None or name == 'none':
+            return ''
+
+        testdir = os.path.dirname(__file__)
+        extdir = os.path.join(run.wt_builddir, 'ext/compressors')
+        extfile = os.path.join(
+            extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
+        if not os.path.exists(extfile):
+            self.skipTest('compression extension "' + extfile + '" not built')
+        return ',extensions=["' + extfile + '"]'
 
     # Overrides WiredTigerTestCase - add logging
     def setUpConnectionOpen(self, dir):
         self.home = dir
         self.txn_sync = '(method=dsync,enabled)'
         conn_params = \
-                'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
+                'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
+                'compressor=%s)' % self.compress + \
                 ',create,error_prefix="%s: ",' % self.shortid() + \
-                'transaction_sync="%s",' % self.txn_sync
+                'transaction_sync="%s",' % self.txn_sync + \
+                self.extensionArg(self.compress)
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         try:
             conn = wiredtiger_open(dir, conn_params)
-        except wiredtiger.WiredTigerError as e:
+        except WiredTigerError as e:
             print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
         self.pr(`conn`)
         self.session2 = conn.open_session()
