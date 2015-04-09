@@ -1318,15 +1318,15 @@ def main():
     parser.add_option('--temp-path', dest='temp_path', default=None,
                       help='If present, passed as --tempPath to unittests and dbtests or TestData.tmpPath to mongo')
     # Buildlogger invocation from command line
-    parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
+    parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=os.getenv("BUILDLOGGER_BUILDER"),
                       action="store", help='Set the "builder name" for buildlogger')
-    parser.add_option('--buildlogger-buildnum', dest='buildlogger_buildnum', default=None,
+    parser.add_option('--buildlogger-buildnum', dest='buildlogger_buildnum', default=os.getenv("BUILDLOGGER_NUMBER"),
                       action="store", help='Set the "build number" for buildlogger')
-    parser.add_option('--buildlogger-url', dest='buildlogger_url', default=None,
+    parser.add_option('--buildlogger-url', dest='buildlogger_url', default=os.getenv('BUILDLOGGER_URL'),
                       action="store", help='Set the url root for the buildlogger service')
-    parser.add_option('--buildlogger-credentials', dest='buildlogger_credentials', default=None,
+    parser.add_option('--buildlogger-credentials', dest='buildlogger_credentials', default=os.getenv("BUILDLOGGER_CREDENTIALS"),
                       action="store", help='Path to Python file containing buildlogger credentials')
-    parser.add_option('--buildlogger-phase', dest='buildlogger_phase', default=None,
+    parser.add_option('--buildlogger-phase', dest='buildlogger_phase', default=os.getenv("BUILDLOGGER_PHASE"),
                       action="store", help='Set the "phase" for buildlogger (e.g. "core", "auth") for display in the webapp (optional)')
     parser.add_option('--report-file', dest='report_file', default=None,
                       action='store',

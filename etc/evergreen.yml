@@ -221,11 +221,18 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
+
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           rm -rf ${install_directory|/data/mongo-install-directory}
           ${scons|scons} ${compile_flags|} --use-new-tools all dist ${msi_target|}
           ${python|python} -c "ver = open('version.txt','r').read().strip(); print 'suffix: latest' if ver[-1] == '-' else 'suffix: ' + ver; print 'version: ' + ver"  > compile_expansions.yml
           if [ "${has_debugsymbols|}" = "true" ]; then ${scons|scons} ${compile_flags|} --nostrip --use-new-tools dist; original_filename=$(ls | grep debugsymbols); mv $original_filename $(echo $original_filename | sed 's/debugsymbols-//' | sed 's/mongodb/debugsymbols-mongodb/'); fi
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mode files --from-file build/unittests.txt --dont-start-mongod  --report-file report.json --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} core
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mode files --from-file build/unittests.txt --dont-start-mongod  --report-file report.json core
           mv mongodb*.${ext|tgz} mongodb-binaries.tgz
           mv debugsymbols-*.${ext|tgz} mongo-debugsymbols.tgz || true
     - command: archive.targz_pack
@@ -303,8 +310,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} aggregation
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} aggregation
 
 - name: aggregation_auth
   depends_on:
@@ -319,8 +332,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --auth aggregation
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth aggregation
 
 - name: aggregation_WT
   depends_on:
@@ -335,8 +354,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger aggregation
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger aggregation
 
 - name: audit
   depends_on:
@@ -351,8 +376,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} audit
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} audit
 
 - name: audit_WT
   depends_on:
@@ -367,8 +398,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger audit
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger audit
 
 - name: auth
   depends_on:
@@ -383,8 +420,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} auth
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} auth
 
 - name: auth_WT
   depends_on:
@@ -399,8 +442,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger auth
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger auth
 
 - name: dbtest
   depends_on:
@@ -415,8 +464,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} dbtest
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} dbtest
 
 - name: dbtest_WT
   depends_on:
@@ -431,8 +486,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger dbtest
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger dbtest
 
 - name: disk
   depends_on:
@@ -447,8 +508,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} disk
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} disk
 
 - name: durability
   depends_on:
@@ -463,8 +530,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} dur
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} dur
 
 - name: failpoints
   depends_on:
@@ -479,8 +552,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} failPoint
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} failPoint
 
 - name: failpoints_auth
   depends_on:
@@ -495,8 +574,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --auth failPoint
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth failPoint
 
 - name: gle_auth
   depends_on:
@@ -511,8 +596,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} gle --auth
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} gle --auth
 
 - name: gle_auth_WT
   depends_on:
@@ -527,8 +618,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger gle --auth
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger gle --auth
 
 - name: gle_auth_write_cmd
   depends_on:
@@ -543,8 +640,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} gle --auth --shell-write-mode commands
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} gle --auth --shell-write-mode commands
 
 - name: gle_auth_write_cmd_WT
   depends_on:
@@ -559,8 +662,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger gle --auth --shell-write-mode commands
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger gle --auth --shell-write-mode commands
 
 - name: inMemoryExperiment
   depends_on:
@@ -575,8 +684,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --storageEngine=inMemoryExperiment --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} js
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --storageEngine=inMemoryExperiment --report-file report.json ${test_flags|} js
 
 - name: jsCore
   depends_on:
@@ -591,8 +706,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands jsCore
 
 - name: jsCore_WT
   depends_on:
@@ -607,8 +728,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --storageEngine=wiredTiger jsCore
 
 - name: jsCore_compatibility
   depends_on:
@@ -623,8 +750,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility jsCore
 
 - name: jsCore_compatibility_WT
   depends_on:
@@ -639,8 +772,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  --storageEngine=wiredTiger jsCore
 
 - name: jsCore_auth
   depends_on:
@@ -655,8 +794,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --auth jsCore
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --auth jsCore
 
 - name: jsCore_small_oplog
   depends_on:
@@ -671,8 +816,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --small-oplog jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog jsCore
 
 - name: jsCore_small_oplog_WT
   depends_on:
@@ -687,8 +838,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --small-oplog --storageEngine=wiredTiger jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog --storageEngine=wiredTiger jsCore
 
 - name: jsCore_small_oplog_rs
   depends_on:
@@ -703,8 +860,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --small-oplog-rs jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog-rs jsCore
 
 - name: jsCore_small_oplog_rs_WT
   depends_on:
@@ -719,8 +882,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --small-oplog-rs --storageEngine=wiredTiger jsCore
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog-rs --storageEngine=wiredTiger jsCore
 
 
 - name: mongo-perf
@@ -757,8 +926,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} mmap_v1
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} mmap_v1
 
 - name: mongosTest
   depends_on:
@@ -773,8 +948,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} mongosTest
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} mongosTest
 
 - name: mongosTest_WT
   depends_on:
@@ -789,8 +970,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger mongosTest
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger mongosTest
 
 - name: mongosTest_auth
   depends_on:
@@ -805,8 +992,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --auth mongosTest
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth mongosTest
 
 - name: multiversion
   depends_on:
@@ -821,10 +1014,16 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
           rm -rf /data/install /data/multiversion
           ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6" "3.0"
-          PATH=$PATH:/data/multiversion ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} multiVersion
+          PATH=$PATH:/data/multiversion ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} multiVersion
 
 - name: noPassthrough
   depends_on:
@@ -839,8 +1038,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} noPassthrough
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} noPassthrough
 
 - name: noPassthrough_WT
   depends_on:
@@ -855,8 +1060,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger noPassthrough
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger noPassthrough
 
 - name: noPassthroughWithMongod
   depends_on:
@@ -871,8 +1082,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} noPassthroughWithMongod
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} noPassthroughWithMongod
 
 - name: noPassthroughWithMongod_WT
   depends_on:
@@ -887,8 +1104,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger noPassthroughWithMongod
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger noPassthroughWithMongod
 
 - name: slow1
   depends_on:
@@ -903,8 +1126,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} slow1
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} slow1
 
 - name: slow1_WT
   depends_on:
@@ -919,8 +1148,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger slow1
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger slow1
 
 - name: slow2
   depends_on:
@@ -936,8 +1171,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --clean-every=1 --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} slow2
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --clean-every=1 --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} slow2
 
 - name: slow2_WT
   depends_on:
@@ -953,8 +1194,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --clean-every=1 --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger slow2
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --clean-every=1 --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger slow2
 
 - name: parallel
   depends_on:
@@ -969,8 +1216,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} parallel
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} parallel
 
 - name: parallel_WT
   depends_on:
@@ -985,8 +1238,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G parallel
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G parallel
 
 - name: parallel_compatibility
   depends_on:
@@ -1001,8 +1260,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} parallel
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  parallel
 
 - name: parallel_compatibility_WT
   depends_on:
@@ -1017,8 +1282,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G parallel
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G parallel
 
 - name: concurrency
   depends_on:
@@ -1033,8 +1304,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} concurrency
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} concurrency
 
 - name: concurrency_WT
   depends_on:
@@ -1049,8 +1326,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G concurrency
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G concurrency
 
 - name: concurrency_compatibility
   depends_on:
@@ -1065,8 +1348,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} concurrency
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  concurrency
 
 - name: concurrency_compatibility_WT
   depends_on:
@@ -1081,8 +1370,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G concurrency
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G concurrency
 
 - name: replicasets
   depends_on:
@@ -1097,8 +1392,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} replSets
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} replSets
 
 - name: replicasets_WT
   depends_on:
@@ -1113,8 +1414,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger replSets
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger replSets
 
 - name: replicasets_auth
   depends_on:
@@ -1129,8 +1436,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --auth replSets
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth replSets
 
 - name: replication
   depends_on:
@@ -1145,8 +1458,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} repl
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} repl
 
 - name: replication_WT
   depends_on:
@@ -1161,8 +1480,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger repl
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger repl
 
 - name: replication_auth
   depends_on:
@@ -1177,8 +1502,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --auth repl
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth repl
 
 - name: sasl
   depends_on:
@@ -1193,8 +1524,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} sasl
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} sasl
 
 - name: sharding
   depends_on:
@@ -1209,8 +1546,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} sharding
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} sharding
 
 - name: sharding_WT
   depends_on:
@@ -1225,8 +1568,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger sharding
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger sharding
 
 - name: sharding_auth
   depends_on:
@@ -1241,8 +1590,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --auth sharding
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth sharding
 
 - name: snmp
   depends_on:
@@ -1257,10 +1612,16 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
           mkdir -p snmpconf
           cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-          SNMPCONFPATH=snmpconf ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} snmp
+          SNMPCONFPATH=snmpconf ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} snmp
 
 - name: snmp_WT
   depends_on:
@@ -1275,10 +1636,16 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
           mkdir -p snmpconf
           cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-          SNMPCONFPATH=snmpconf ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger snmp
+          SNMPCONFPATH=snmpconf ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger snmp
 
 - name: ssl
   depends_on:
@@ -1293,8 +1660,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} ssl --use-ssl
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} ssl --use-ssl
 
 - name: sslSpecial
   depends_on:
@@ -1309,8 +1682,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} sslSpecial
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} sslSpecial
 
 - name: tool
   depends_on:
@@ -1325,8 +1704,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} tool
 
 - name: tool_WT
   depends_on:
@@ -1341,8 +1726,14 @@ tasks:
       params:
         working_dir: src
         script: |
+          export BUILDLOGGER_BUILDER=MCI_${build_variant}
+          export BUILDLOGGER_NUMBER=${builder_num|}
+          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
+          export BUILDLOGGER_PHASE="${task_name}_${execution}"
+
           cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --storageEngine=wiredTiger tool
+          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger tool
 
 - name: push
   depends_on:
