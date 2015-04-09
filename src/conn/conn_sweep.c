@@ -82,6 +82,11 @@ __sweep(WT_SESSION_IMPL *session)
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
+
+		/* Stop if we reach the minimum number of handles. */
+		if (conn->open_file_count < conn->sweep_handles_min)
+			break;
+
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    dhandle->session_inuse == 0 && dhandle->session_ref == 0) {
 			++closed_handles;
