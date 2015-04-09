@@ -1916,15 +1916,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session = conn->default_session;
 
 	/*
-	 * Check on the turtle and metadata files, creating them if necessary
-	 * (which avoids application threads racing to create the metadata file
-	 * later).  Once the metadata file exists, get a reference to it in
-	 * the connection's session.
-	 */
-	WT_ERR(__wt_turtle_init(session));
-	WT_ERR(__wt_metadata_open(session));
-
-	/*
 	 * Load the extensions after initialization completes; extensions expect
 	 * everything else to be in place, and the extensions call back into the
 	 * library.
@@ -1933,7 +1924,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/*
 	 * The metadata/log encryptor is configured after extensions, since
-	 * extensions may load encryptors.
+	 * extensions may load encryptors.  We have to do this before creating
+	 * the metadata file.
 	 */
 	conn->encryptor = NULL;
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
@@ -1941,6 +1933,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    &passval));
 	WT_ERR(__wt_encryptor_config(session, NULL, &cval, &passval,
 	    &conn->encryptor, &conn->encryptor_owned));
+
+	/*
+	 * Check on the turtle and metadata files, creating them if necessary
+	 * (which avoids application threads racing to create the metadata file
+	 * later).  Once the metadata file exists, get a reference to it in
+	 * the connection's session.
+	 */
+	WT_ERR(__wt_turtle_init(session));
+	WT_ERR(__wt_metadata_open(session));
 
 	/*
 	 * Configuration completed; optionally write the base configuration file

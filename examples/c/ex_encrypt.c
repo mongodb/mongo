@@ -255,7 +255,11 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	++my_crypto->num_calls;		/* Call count */
 
-	*customp = encryptor;
+	/*
+	 * Set to NULL since we did not allocate a new encryptor
+	 * structure for this invocation.
+	 */
+	*customp = NULL;
 	return (0);
 }
 

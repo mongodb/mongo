@@ -194,6 +194,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval, metadata;
+	WT_CONNECTION_IMPL *conn;
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
@@ -201,6 +202,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
+	conn = S2C(session);
 
 	/* Dump out format information. */
 	if (WT_VERBOSE_ISSET(session, WT_VERB_VERSION)) {
@@ -316,11 +318,18 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
-	WT_RET(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
-	WT_RET(__wt_config_gets_none(session, cfg, "encryption.keyid",
-	    &metadata));
-	WT_RET(__wt_encryptor_config(session, btree->dhandle->name, &cval,
-	    &metadata, &btree->encryptor, &btree->encryptor_owned));
+	if (WT_IS_METADATA(btree->dhandle) && conn->encryptor != NULL) {
+		btree->encryptor = conn->encryptor;
+		btree->encryptor_owned = 0;
+	} else {
+		WT_RET(__wt_config_gets_none(
+		    session, cfg, "encryption.name", &cval));
+		WT_RET(__wt_config_gets_none(
+		    session, cfg, "encryption.keyid", &metadata));
+		WT_RET(__wt_encryptor_config(
+		    session, btree->dhandle->name, &cval, &metadata,
+		    &btree->encryptor, &btree->encryptor_owned));
+	}
 
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(
