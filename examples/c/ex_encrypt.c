@@ -57,9 +57,9 @@ typedef struct {
 	char *alg_name;		/* Encryption algorithm name */
 	char *password;		/* Saved password */
 	char *uri;		/* Saved uri */
-} EX_ENCRYPTOR;
+} MY_CRYPTO;
 
-EX_ENCRYPTOR my_encryptors[MAX_TENANTS];
+MY_CRYPTO my_cryptos[MAX_TENANTS];
 
 #define	CHKSUM_LEN	4
 #define	IV_LEN		16
@@ -132,11 +132,11 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
+	MY_CRYPTO *my_crypto = (MY_CRYPTO *)encryptor;
 	uint32_t i;
 
 	(void)session;		/* Unused */
-	++ex_encryptor->num_calls;
+	++my_crypto->num_calls;
 
 	if (src == NULL)
 		return (0);
@@ -164,7 +164,7 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * !!! Most implementations would need the IV too.
 	 */
-	do_rotate(&dst[0], dst_len, 26 - ex_encryptor->rot_N);
+	do_rotate(&dst[0], dst_len, 26 - my_crypto->rot_N);
 	*result_lenp = dst_len;
 	return (0);
 }
@@ -179,11 +179,11 @@ rotate_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
+	MY_CRYPTO *my_crypto = (MY_CRYPTO *)encryptor;
 	uint32_t i;
 
 	(void)session;		/* Unused */
-	++ex_encryptor->num_calls;
+	++my_crypto->num_calls;
 
 	if (src == NULL)
 		return (0);
@@ -197,7 +197,7 @@ rotate_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * destination buffer.  Send in src_len as the length of
 	 * the text.
 	 */
-	do_rotate(&dst[i], src_len, ex_encryptor->rot_N);
+	do_rotate(&dst[i], src_len, my_crypto->rot_N);
 	/*
 	 * Checksum the encrypted buffer and add the IV.
 	 */
@@ -217,11 +217,11 @@ static int
 rotate_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     size_t *expansion_constantp)
 {
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
+	MY_CRYPTO *my_crypto = (MY_CRYPTO *)encryptor;
 
 	(void)session;				/* Unused parameters */
 
-	++ex_encryptor->num_calls;		/* Call count */
+	++my_crypto->num_calls;		/* Call count */
 
 	*expansion_constantp = CHKSUM_LEN + IV_LEN;
 	return (0);
@@ -235,25 +235,25 @@ static int
 rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
 {
-	EX_ENCRYPTOR *ex_encryptor;
+	MY_CRYPTO *my_crypto;
 
 	(void)session;				/* Unused parameters */
 	(void)uri;				/* Unused parameters */
 
-	ex_encryptor = (EX_ENCRYPTOR *)encryptor;
+	my_crypto = (MY_CRYPTO *)encryptor;
 
 	/* Stash the password from the configuration string. */
-	if ((ex_encryptor->password = malloc(passcfg->len + 1)) == NULL)
+	if ((my_crypto->password = malloc(passcfg->len + 1)) == NULL)
 		return (errno);
-	strncpy(ex_encryptor->password, passcfg->str, passcfg->len + 1);
-	ex_encryptor->password[passcfg->len] = '\0';
+	strncpy(my_crypto->password, passcfg->str, passcfg->len + 1);
+	my_crypto->password[passcfg->len] = '\0';
 	if (uri != NULL) {
-		if ((ex_encryptor->uri = malloc(strlen(uri) + 1)) == NULL)
+		if ((my_crypto->uri = malloc(strlen(uri) + 1)) == NULL)
 			return (errno);
-		strncpy(ex_encryptor->uri, uri, strlen(uri) + 1);
+		strncpy(my_crypto->uri, uri, strlen(uri) + 1);
 	}
 
-	++ex_encryptor->num_calls;		/* Call count */
+	++my_crypto->num_calls;		/* Call count */
 
 	*customp = encryptor;
 	return (0);
@@ -266,24 +266,24 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 static int
 rotate_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 {
-	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
+	MY_CRYPTO *my_crypto = (MY_CRYPTO *)encryptor;
 
 	(void)session;				/* Unused parameters */
 
-	++ex_encryptor->num_calls;		/* Call count */
+	++my_crypto->num_calls;		/* Call count */
 
 	/* Free the allocated memory. */
-	if (ex_encryptor->alg_name != NULL) {
-		free(ex_encryptor->alg_name);
-		ex_encryptor->alg_name = NULL;
+	if (my_crypto->alg_name != NULL) {
+		free(my_crypto->alg_name);
+		my_crypto->alg_name = NULL;
 	}
-	if (ex_encryptor->password != NULL) {
-		free(ex_encryptor->password);
-		ex_encryptor->password = NULL;
+	if (my_crypto->password != NULL) {
+		free(my_crypto->password);
+		my_crypto->password = NULL;
 	}
-	if (ex_encryptor->uri != NULL) {
-		free(ex_encryptor->uri);
-		ex_encryptor->uri = NULL;
+	if (my_crypto->uri != NULL) {
+		free(my_crypto->uri);
+		my_crypto->uri = NULL;
 	}
 
 	return (0);
@@ -296,7 +296,7 @@ rotate_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 int
 add_my_encryptors(WT_CONNECTION *connection)
 {
-	EX_ENCRYPTOR *e;
+	MY_CRYPTO *m;
 	WT_ENCRYPTOR *wt;
 	int i, ret;
 	char *buf;
@@ -305,8 +305,8 @@ add_my_encryptors(WT_CONNECTION *connection)
 	 * Initialize our various encryptors.
 	 */
 	for (i = 0; i < MAX_TENANTS; i++) {
-		e = &my_encryptors[i];
-		wt = (WT_ENCRYPTOR *)&e->encryptor;
+		m = &my_cryptos[i];
+		wt = (WT_ENCRYPTOR *)&m->encryptor;
 		wt->encrypt = rotate_encrypt;
 		wt->decrypt = rotate_decrypt;
 		wt->sizing = rotate_sizing;
@@ -322,16 +322,16 @@ add_my_encryptors(WT_CONNECTION *connection)
 		 * Start at 13 for the system rot.  This assumes a small
 		 * number for MAX_TENANTS so we don't go over 25.
 		 */
-		e->rot_N = 13 + i;
-		e->num_calls = 0;
-		e->alg_name = buf;
+		m->rot_N = 13 + i;
+		m->num_calls = 0;
+		m->alg_name = buf;
 		if (i == 0)
 			snprintf(buf, BUFSIZE, "system");
 		else
 			snprintf(buf, BUFSIZE, "user%d", i);
 		fprintf(stderr, "Add encryptor: %s\n", buf);
 		if ((ret = connection->add_encryptor(
-		    connection, buf, (WT_ENCRYPTOR *)e, NULL)) != 0)
+		    connection, buf, (WT_ENCRYPTOR *)m, NULL)) != 0)
 			return (ret);
 	}
 	return (0);
