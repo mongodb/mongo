@@ -16,7 +16,7 @@
 
     assert.eq(res.errmsg,
               isSharded ? "no such cmd: cloneCollectionAsCapped"
-                        : "source database " + dbname + " does not exist",
+                        : "database " + dbname + " not found",
               "converting a nonexistent to capped failed but for the wrong reason");
 
     // Database exists, but collection doesn't
