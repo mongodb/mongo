@@ -89,25 +89,9 @@ namespace mongo {
             return version;
         }
 
-        static bool isDroppedVersion( const ChunkVersion& version ) {
-            return version.majorVersion() == 0 && version.minorVersion() == 0
-                   && version.epoch() == DROPPED().epoch();
-        }
-
-        static bool isUnshardedVersion( const ChunkVersion& version ) {
-            return isDroppedVersion( version );
-        }
-
         static bool isIgnoredVersion( const ChunkVersion& version ) {
             return version.majorVersion() == 0 && version.minorVersion() == 0
                    && version.epoch() == IGNORED().epoch();
-        }
-
-        void inc( bool major ) {
-            if ( major )
-                incMajor();
-            else
-                incMinor();
         }
 
         void incMajor() {

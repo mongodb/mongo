@@ -54,7 +54,6 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
