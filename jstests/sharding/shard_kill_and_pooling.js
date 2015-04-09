@@ -7,9 +7,8 @@
 for ( var test = 0; test < 2; test++ ) {
 
 var killWith = (test == 0 ? 15 : 9);
-var options = { separateConfig : true };
 
-var st = new ShardingTest({shards : 2, mongos : 1, other : options});
+var st = new ShardingTest({shards : 2, mongos : 1});
 
 // Stop balancer to eliminate weird conn stuff
 st.stopBalancer();

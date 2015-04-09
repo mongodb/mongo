@@ -8,6 +8,7 @@
 var MaxSizeMB = 1;
 
 var s = new ShardingTest({ shards: 2, other: { chunksize: 1, manualAddShard: true }});
+var db = s.getDB( "test" );
 s.stopBalancer();
 
 var names = s.getConnNames();
@@ -16,9 +17,9 @@ s.adminCommand({ addshard: names[0] });
 s.adminCommand({ addshard: names[1], maxSize: MaxSizeMB });
 
 s.adminCommand({ enablesharding: "test" });
-s.adminCommand({ movePrimary: 'test', to: names[0] });
+var res = db.adminCommand({ movePrimary: 'test', to: names[0] });
+assert(res.ok || res.errmsg == "it is already the primary");
 
-var db = s.getDB( "test" );
 
 var bigString = "";
 while ( bigString.length < 10000 )

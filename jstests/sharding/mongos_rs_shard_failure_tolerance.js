@@ -11,9 +11,7 @@
 // (connection connected after shard change).
 //
 
-var options = {separateConfig : true,
-               rs : true,
-               rsOptions : { nodes : 2 }};
+var options = {rs : true, rsOptions : { nodes : 2 }};
 
 var st = new ShardingTest({shards : 3, mongos : 1, other : options});
 st.stopBalancer();

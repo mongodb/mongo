@@ -3,8 +3,7 @@
 //
 
 var st = new ShardingTest({ shards : 2, mongos : 1,
-                            other : { separateConfig : true,
-                                      mongosOptions : { noAutoSplit : "" },
+                            other : { mongosOptions : { noAutoSplit : "" },
                                       shardOptions : { /* binVersion : "latest" */ } } });
 st.stopBalancer()
 

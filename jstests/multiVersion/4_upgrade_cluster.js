@@ -24,8 +24,7 @@ var options = {
     mongosOptions : { binVersion : oldVersion },
     configOptions : { binVersion : oldVersion },
     shardOptions : { binVersion : oldVersion },
-    
-    separateConfig : true,
+
     sync : true,
     rs : isRSCluster
 }

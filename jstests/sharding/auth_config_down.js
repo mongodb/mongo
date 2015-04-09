@@ -6,7 +6,7 @@ var st = new ShardingTest({ shards : 1,
                             mongos : 1,
                             verbose : 1,
                             keyFile : "jstests/libs/key1",
-                            other : { separateConfig : true, sync : true } })
+                            other : { sync : true } })
 
 var mongos = st.s0
 var configs = st._configServers

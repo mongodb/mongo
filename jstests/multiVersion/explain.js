@@ -135,6 +135,8 @@ coll = testDb.standalone;
 coll.drop();
 
 assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName()}));
+var res = testDb.adminCommand({movePrimary: testDb.getName(), to: 'shard0001'});
+assert(res.ok || res.errmsg == "it is already the primary");
 testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 
 // Disable the balancer and pre-split in order to ensure chunks on both shards.

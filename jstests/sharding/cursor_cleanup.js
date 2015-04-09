@@ -2,7 +2,7 @@
 // Tests cleanup of sharded and unsharded cursors
 //
 
-var st = new ShardingTest({ shards : 2, mongos : 1, other : { separateConfig : true } });
+var st = new ShardingTest({ shards : 2, mongos : 1 });
 st.stopBalancer();
 
 var mongos = st.s0;

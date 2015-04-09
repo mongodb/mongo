@@ -2,7 +2,7 @@
 // Tests that only a correct major-version is needed to connect to a shard via mongos
 //
 
-var st = new ShardingTest({ shards : 1, mongos : 2, other : { separateConfig : true } })
+var st = new ShardingTest({ shards : 1, mongos : 2 })
 st.stopBalancer()
 
 var mongos = st.s0

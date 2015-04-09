@@ -3,9 +3,7 @@
 // SERVER-13413
 //
 
-var options = { separateConfig : true };
-
-var st = new ShardingTest({ shards : 1, mongos : 2, other : options });
+var st = new ShardingTest({ shards : 1, mongos : 2 });
 st.stopBalancer();
 
 var mongos = st.s0;

@@ -11,8 +11,7 @@
 // (connection connected after shard change).
 //
 
-var options = { separateConfig : true,
-                rs : true,
+var options = { rs : true,
                 rsOptions : { nodes : 2 },
                 keyFile : "jstests/libs/key1" };
 

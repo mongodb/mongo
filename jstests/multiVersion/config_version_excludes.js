@@ -11,8 +11,7 @@ var options = {
     mongosOptions : { },
     configOptions : {  },
     shardOptions : { },
-    
-    separateConfig : true,
+
     sync : false
 }
 

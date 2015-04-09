@@ -8,8 +8,7 @@
 
 var s = new ShardingTest({shards: 2,
                           mongos: 1,
-                          verbose:1,
-                          other: {separateConfig: true}});
+                          verbose:1});
 var db = s.getDB("test");   // db variable name is required due to startParallelShell()
 var numDocs = 10000;
 db.foo.drop();

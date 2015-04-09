@@ -5,7 +5,7 @@
 
 var NODE_COUNT = 3;
 var st = new ShardingTest({ shards: { rs0: { nodes: NODE_COUNT, oplogSize: 10 }},
-    separateConfig: true, config : 3 });
+                            config : 3, sync: true });
 var replTest = st.rs0;
 var mongos = st.s;
 

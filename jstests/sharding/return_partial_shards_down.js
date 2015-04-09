@@ -4,8 +4,7 @@
 
 var st = new ShardingTest({shards : 3,
                            mongos : 1,
-                           other : {mongosOptions : {verbose : 2},
-                                    separateConfig : true}});
+                           other : {mongosOptions : {verbose : 2}}});
 
 // Stop balancer, we're doing our own manual chunk distribution
 st.stopBalancer();

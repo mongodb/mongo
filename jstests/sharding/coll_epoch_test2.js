@@ -4,7 +4,7 @@
 // operation on a mongos may be active when it happens.  All operations should handle gracefully.
 //
 
-var st = new ShardingTest({ shards : 2, mongos : 5, verbose : 1, separateConfig : 1  })
+var st = new ShardingTest({ shards : 2, mongos : 5, verbose : 1 })
 // Stop balancer, it'll interfere
 st.stopBalancer()
 

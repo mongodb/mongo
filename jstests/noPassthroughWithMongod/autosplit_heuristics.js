@@ -5,8 +5,7 @@
 
 var st = new ShardingTest({ shards : 1, 
                             mongos : 1, 
-                            other : { mongosOptions : { chunkSize : 1, verbose : 2 }, 
-                            separateConfig : true } });
+                            other : { mongosOptions : { chunkSize : 1, verbose : 2 }}});
 
 // The balancer may interfere unpredictably with the chunk moves/splits depending on timing.
 st.stopBalancer();

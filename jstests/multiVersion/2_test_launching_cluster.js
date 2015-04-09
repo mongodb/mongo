@@ -21,7 +21,6 @@ for( var i = 0; i < versionsToCheck.length; i++ ){
     var st = new ShardingTest({ shards : 2, 
                                 mongos : 2,
                                 other : { 
-                                    separateConfig : true,
                                     mongosOptions : { binVersion : version },
                                     configOptions : { binVersion : version },
                                     shardOptions : { binVersion : version }
@@ -48,7 +47,6 @@ st = new ShardingTest({ shards : 2,
                             other : {
                                 
                                 // Three config servers
-                                separateConfig : true,
                                 sync : true,
                                 
                                 mongosOptions : { binVersion : versionsToCheck },
@@ -92,7 +90,6 @@ st = new ShardingTest({ shards : 2,
                             other : {
                                 
                                 // Three config servers
-                                separateConfig : true,
                                 sync : true,
                                 
                                 // Replica set shards

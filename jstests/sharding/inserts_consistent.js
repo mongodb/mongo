@@ -1,6 +1,6 @@
 // Test write re-routing on version mismatch.
 
-var st = new ShardingTest({ shards : 2, mongos : 2, verbose : 2, other : { separateConfig : true } })
+var st = new ShardingTest({ shards : 2, mongos : 2, verbose : 2 })
 
 jsTest.log( "Doing test setup..." )
 

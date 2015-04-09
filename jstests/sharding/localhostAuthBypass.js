@@ -163,7 +163,6 @@ var start = function(useHostName) {
         shards: numShards, 
         chunksize: 1, 
         config: numConfigs, 
-        separateConfig: true,
         other : { 
             nopreallocj: 1, 
             useHostName: useHostName 

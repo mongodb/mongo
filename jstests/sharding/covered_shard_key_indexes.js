@@ -6,9 +6,7 @@
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
 
-var options = { separateConfig : true };
-
-var st = new ShardingTest({ shards : 1, other : options });
+var st = new ShardingTest({ shards : 1 });
 st.stopBalancer();
 
 var mongos = st.s0;

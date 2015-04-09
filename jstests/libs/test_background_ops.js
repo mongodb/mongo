@@ -271,7 +271,7 @@ var RandomFunctionContext = function( context ){
         var rs = false //Random.randBool()
         var st = new ShardingTest({ shards : numShards, 
                                     mongos : 4, 
-                                    other : { separateConfig : true, rs : rs } })
+                                    other : { rs : rs } })
         
         return st
     }

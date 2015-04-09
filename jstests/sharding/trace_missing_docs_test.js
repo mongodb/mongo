@@ -7,8 +7,7 @@ load('jstests/libs/trace_missing_docs.js')
 
 var testDocMissing = function( useReplicaSet ) {
 
-var options = { separateConfig : true, 
-                rs : useReplicaSet,
+var options = { rs : useReplicaSet,
                 shardOptions : { master : "", oplogSize : 10 },
                 rsOptions : { nodes : 1, oplogSize : 10 } };
 

@@ -6,7 +6,7 @@
 
 // Only reason for using localhost name is to make the test consistent with naming host so it
 // will be easier to check for the host name inside error objects.
-var options = { separateConfig : true, sync : true, configOptions: { useHostName: false }};
+var options = { sync : true, configOptions: { useHostName: false }};
 var st = new ShardingTest({shards: 2, mongos: 1, other: options});
 st.stopBalancer();
 

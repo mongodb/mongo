@@ -5,8 +5,7 @@
 
 // Options for a cluster with two replica set shards, the first with two nodes the second with one
 // This lets us try a number of GLE scenarios
-var options = { separateConfig : true,
-                rs : true,
+var options = { rs : true,
                 rsOptions : { nojournal : "" },
                 // Options for each replica set shard
                 rs0 : { nodes : 3 },

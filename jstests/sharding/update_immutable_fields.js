@@ -1,8 +1,7 @@
 // Tests that updates can't change immutable fields (used in sharded system)
 var st = new ShardingTest({shards : 2,
                            mongos : 1,
-                           verbose : 0,
-                           other : {separateConfig : 1}})
+                           verbose : 0})
 st.stopBalancer();
 
 var mongos = st.s;

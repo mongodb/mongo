@@ -1,6 +1,6 @@
 // Tests whether new sharding is detected on insert by mongos
 
-var st = new ShardingTest( name = "test", shards = 1, verbose = 2, mongos = 2, other = { separateConfig : true } )
+var st = new ShardingTest( name = "test", shards = 1, verbose = 2, mongos = 2 );
 
 var mongos = st.s
 var config = mongos.getDB("config")

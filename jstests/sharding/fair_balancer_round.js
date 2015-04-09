@@ -2,7 +2,7 @@
 // Tests that a balancer round loads newly sharded collection data
 //
 
-var options = {separateConfig : true, mongosOptions : {verbose : 1}};
+var options = {mongosOptions : {verbose : 1}};
 
 var st = new ShardingTest({shards : 2, mongos : 2, other : options});
 

@@ -26,9 +26,8 @@
  *       configuration object(s)(*). @see MongoRunner.runMongod
  *     
  *     config {number|Object|Array.<Object>}: number of config server or
- *       config server configuration object(s)(*). The presence of this field
- *       implies other.separateConfig = true, and if has 3 or more members,
- *       implies other.sync = true. @see MongoRunner.runMongod
+ *       config server configuration object(s)(*). If this field has 3 or
+ *       more members, it implies other.sync = true. @see MongoRunner.runMongod
  * 
  *     (*) There are two ways For multiple configuration objects.
  *       (1) Using the object format. Example:
@@ -53,9 +52,6 @@
  * 
  *       sync {boolean}: Use SyncClusterConnection, and readies
  *          3 config servers.
- *       separateConfig {boolean}: if false, recycle one of the running mongod
- *          as a config server. The config property can override this. False by
- *          default.
  *       configOptions {Object}: same as the config property above.
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.
@@ -150,9 +146,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             for( var i = 0; i < params.config.length; i++ ){
                 otherParams[ "c" + i ] = params.config[i];
             }
-                
-            // If we're specifying explicit config options, we need separate config servers
-            otherParams.separateConfig = true;
+
             if( params.config.length == 3 ) otherParams.sync = true;
             else otherParams.sync = false;
         }
@@ -162,14 +156,11 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                 otherParams[ i ] = params.config[i];
                 tempCount++;
             }
-            
-            // If we're specifying explicit config options, we need separate config servers
-            otherParams.separateConfig = true;
+
             if( params.config.length == 3 ) otherParams.sync = true;
             else otherParams.sync = false;
         }
         else if( params.config && params.config == 3 ) {
-            otherParams.separateConfig = otherParams.separateConfig || true;
             otherParams.sync = true;
         }
     }
@@ -192,7 +183,6 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
     
     if( hasRS ){
-        otherParams.separateConfig = true
         otherParams.useHostname = otherParams.useHostname == undefined ? true : otherParams.useHostname
     }
     
@@ -206,11 +196,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     for ( var i = 0; i < numShards; i++ ) {
         if( otherParams.rs || otherParams["rs" + i] ){
-            
-            otherParams.separateConfig = true
-            
             var setName = testName + "-rs" + i;
-            
+
             rsDefaults = { useHostname : otherParams.useHostname,
                            noJournalPrealloc : otherParams.nopreallocj, 
                            oplogSize : 40,
@@ -289,44 +276,33 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     this._configServers = []
     this._configNames = []
-    
-    if ( otherParams.sync && ! otherParams.separateConfig && numShards < 3 )
-        throw Error("if you want sync, you need at least 3 servers");
-    
+
     for ( var i = 0; i < ( otherParams.sync ? 3 : 1 ) ; i++ ) {
+
+        var options = { useHostname : otherParams.useHostname, 
+                        noJournalPrealloc : otherParams.nopreallocj, 
+                        port : 29000 + i,
+                        pathOpts : Object.merge( pathOpts, { config : i } ),
+                        dbpath : "$testName-config$config",
+                        keyFile : keyFile,
+                        configsvr : ""
+                      }
         
-        var conn = null
+        options = Object.merge( options, ShardingTest.configOptions || {} )
         
-        if( otherParams.separateConfig ){
-            
-            var options = { useHostname : otherParams.useHostname, 
-                            noJournalPrealloc : otherParams.nopreallocj, 
-                            port : 29000 + i,
-                            pathOpts : Object.merge( pathOpts, { config : i } ),
-                            dbpath : "$testName-config$config",
-                            keyFile : keyFile,
-                            configsvr : ""
-                          }
-            
-            options = Object.merge( options, ShardingTest.configOptions || {} )
-            
-            if( otherParams.configOptions && otherParams.configOptions.binVersion ){
-                otherParams.configOptions.binVersion = 
-                    MongoRunner.versionIterator( otherParams.configOptions.binVersion )
-            }
-            
-            options = Object.merge( options, otherParams.configOptions )
-            options = Object.merge( options, otherParams["c" + i] )
-                        
-            var conn = MongoRunner.runMongod( options )
-            
-            // TODO:  Needed?
-            this._alldbpaths.push( testName + "-config" + i )
-        }
-        else{
-            conn = this["shard" + i]
+        if( otherParams.configOptions && otherParams.configOptions.binVersion ){
+            otherParams.configOptions.binVersion = 
+                MongoRunner.versionIterator( otherParams.configOptions.binVersion )
         }
         
+        options = Object.merge( options, otherParams.configOptions )
+        options = Object.merge( options, otherParams["c" + i] )
+        
+        var conn = MongoRunner.runMongod( options )
+        
+        // TODO:  Needed?
+        this._alldbpaths.push( testName + "-config" + i )
+
         this._configServers.push( conn );
         this._configNames.push( conn.name )
         this["config" + i] = conn
@@ -558,10 +534,8 @@ ShardingTest.prototype.stop = function(){
             if( this._rs[i] ) this._rs[i].test.stopSet( 15 );
         }
     }
-    if( this._otherParams.separateConfig ){
-        for ( var i=0; i<this._configServers.length; i++ ){
-            MongoRunner.stopMongod( this._configServers[i] )
-        }
+    for ( var i=0; i<this._configServers.length; i++ ){
+        MongoRunner.stopMongod( this._configServers[i] )
     }
     if ( this._alldbpaths ){
         for( i=0; i<this._alldbpaths.length; i++ ){

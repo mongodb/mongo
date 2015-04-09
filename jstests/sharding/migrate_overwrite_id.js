@@ -2,9 +2,7 @@
 // Tests that a migration does not overwrite duplicate _ids on data transfer
 //
 
-var options = { separateConfig : true };
-
-var st = new ShardingTest({ shards : 2, mongos : 1, other : options });
+var st = new ShardingTest({ shards : 2, mongos : 1 });
 st.stopBalancer();
 
 var mongos = st.s0;

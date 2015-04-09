@@ -2,9 +2,7 @@
 // Tests that multi-writes (update/delete) target *all* shards and not just shards in the collection
 //
 
-var options = { separateConfig : true };
-
-var st = new ShardingTest({ shards : 3, mongos : 2, other : options });
+var st = new ShardingTest({ shards : 3, mongos : 2 });
 st.stopBalancer();
 
 var mongos = st.s0;

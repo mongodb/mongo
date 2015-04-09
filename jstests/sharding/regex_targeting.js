@@ -5,8 +5,7 @@
 
 var options = { mongosOptions : { binVersion : "" },
                 shardOptions : { binVersion : "" },
-                configOptions : { binVersion : "" },
-                separateConfig : true };
+                configOptions : { binVersion : "" } };
 
 var st = new ShardingTest({ shards : 2, other : options });
 st.stopBalancer();

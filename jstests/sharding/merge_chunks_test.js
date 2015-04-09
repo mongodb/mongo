@@ -2,7 +2,7 @@
 // Tests that merging chunks via mongos works/doesn't work with different chunk configurations
 //
 
-var options = { separateConfig : true, shardOptions : { verbose : 0 } };
+var options = { shardOptions : { verbose : 0 } };
 
 var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
 st.stopBalancer();

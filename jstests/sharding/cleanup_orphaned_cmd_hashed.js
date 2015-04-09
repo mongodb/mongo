@@ -3,7 +3,7 @@
 // @tags : [ hashed ]
 //
 
-var options = { separateConfig : true, shardOptions : { verbose : 2 } };
+var options = { shardOptions : { verbose : 2 } };
 
 var st = new ShardingTest({ shards : 2, mongos : 1, other : options });
 st.stopBalancer();

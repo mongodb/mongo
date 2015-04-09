@@ -6,8 +6,7 @@ jsTest.log("Starting sharded cluster...")
 
 var st = new ShardingTest({shards : 2,
                            mongos : 2,
-                           verbose : 0,
-                           separateConfig : 1})
+                           verbose : 0})
 
 st.stopBalancer();
 

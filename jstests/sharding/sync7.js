@@ -2,8 +2,8 @@
 
 s = new ShardingTest( "moveDistLock", 3, 0, undefined, { sync : true } );
 
-s._connections[0].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : 15000 } )
-s._connections[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : -32000 } )
+s._configServers[0].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : 15000 } )
+s._configServers[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : -32000 } )
 
 // We need to start another mongos after skewing the clock, since the first mongos will have already
 // tested the config servers (via the balancer) before we manually skewed them
@@ -44,7 +44,7 @@ printjson(result);
 assert.eq( result.ok, 0, "Split command should not have succeeded!")
 
 // Adjust clock back in bounds
-s._connections[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : 0 } )
+s._configServers[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew : 0 } )
 print("  Clock adjusted back to in-bounds. ");
 
 // Make sure we can now split

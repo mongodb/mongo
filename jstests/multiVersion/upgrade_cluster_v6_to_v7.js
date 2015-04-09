@@ -24,8 +24,7 @@ var options = {
     shardOptions : { binVersion : "2.6" },
     
     rsOptions : { binVersion : "2.6" /*, oplogSize : 100, smallfiles : null */ },
-    
-    separateConfig : true,
+
     sync : isSyncCluster,
     rs : isRSCluster
 }

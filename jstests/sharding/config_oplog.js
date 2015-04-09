@@ -2,7 +2,7 @@
 
 print( "Start config_oplog.js" );
 
-var test = new ShardingTest( {mongos : 1, shards : 1, config : 1, other: {separateConfig:true}} );
+var test = new ShardingTest( {mongos : 1, shards : 1, config : 1} );
 var oplogCol = test.config0.getDB( "local" ).getCollection( "oplog.$main" );
 var stats = oplogCol.stats( );
 

@@ -19,7 +19,7 @@ var shardedAggTest = new ShardingTest({
     shards: 2,
     verbose: 2,
     mongos: 1,
-    other: { chunksize : 1, separateConfig : true }
+    other: { chunksize : 1 }
     }
 );
 

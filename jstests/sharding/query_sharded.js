@@ -4,8 +4,7 @@
 
 var st = new ShardingTest({shards : 1,
                            mongos : 1,
-                           verbose : 0,
-                           separateConfig : 1});
+                           verbose : 0});
 
 var mongos = st.s0;
 var coll = mongos.getCollection("foo.bar");

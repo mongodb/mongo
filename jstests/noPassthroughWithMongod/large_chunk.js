@@ -3,7 +3,7 @@
 // Starts a new sharding environment limiting the chunksize to 1GB (highest value allowed).
 // Note that early splitting will start with a 1/4 of max size currently.  
 var s = new ShardingTest({ name: 'large_chunk', shards: 2, verbose: 2,
-                           other: { chunkSize: 1024, separateConfig: true }});
+                           other: { chunkSize: 1024 }});
 
 // take the balancer out of the equation
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );

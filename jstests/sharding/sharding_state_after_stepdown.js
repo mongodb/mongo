@@ -2,9 +2,7 @@
 // Tests the state of sharding data after a replica set reconfig
 //
 
-var options = { separateConfig : true,
-                rs : true,
-                rsOptions : { nodes : 1 } };
+var options = { rs : true, rsOptions : { nodes : 1 } };
 
 var st = new ShardingTest({ shards : 2, mongos : 1, other : options });
 st.stopBalancer();

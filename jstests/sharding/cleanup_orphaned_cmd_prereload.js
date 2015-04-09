@@ -2,7 +2,7 @@
 // Tests failed cleanup of orphaned data when we have pending chunks
 //
 
-var options = { separateConfig : true, shardOptions : { verbose : 2 } };
+var options = { shardOptions : { verbose : 2 } };
 
 var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
 st.stopBalancer();
