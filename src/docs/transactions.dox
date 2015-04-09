@@ -129,22 +129,22 @@ re-configured on a per-session basis:
 
 @section transaction_named_snapshots Named Snapshots
 
-Applications can create named snapshots by calling WT_SESSION::checkpoint
-with a configuration that includes <code>"snapshot=(name=foo)"</code>.
+Applications can create named snapshots by calling WT_SESSION::snapshot
+with a configuration that includes <code>"name=foo"</code>.
 This configuration creates a new named snapshot, as if a snapshot isolation
-transaction were started at the time of the WT_SESSION::checkpoint call.
+transaction were started at the time of the WT_SESSION::snapshot call.
 
-Subsequent transactions can be starts "as of" that snapshot by calling
+Subsequent transactions can be started "as of" that snapshot by calling
 WT_SESSION::begin_transaction with a configuration that includes
 <code>snapshot=foo</code>.  That transaction will run at snapshot isolation
-as if the transaction started at the time of the WT_SESSION::checkpoint
+as if the transaction started at the time of the WT_SESSION::snapshot
 call that created the snapshot.
 
 Named snapshots keep data pinned in cache as if a real transaction were
 running for the time that the named transaction is active.  The resources
 associated with a named snapshot are released by calling
-WT_SESSION::checkpoint with a configuration that includes
-<code>"snapshot=(drop_to=foo)"</code>.
+WT_SESSION::snapshot with a configuration that includes
+<code>"drop=(to=foo)"</code>.
 
 Named snapshots are not durable: they do not survive WT_CONNECTION::close.
  */
