@@ -618,6 +618,9 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, const char *uri,
 		return (0);
 	}
 
+	WT_RET(encryptor->sizing(encryptor, &session->iface,
+	    &encryptor->size_const));
+
 	if (encryptor->customize != NULL) {
 		WT_RET(encryptor->customize(encryptor, &session->iface,
 		    uri, passval, encryptorp));

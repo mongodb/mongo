@@ -3281,6 +3281,7 @@ struct __wt_encryptor {
 	 * @snippet nop_encrypt.c WT_ENCRYPTOR terminate
 	 */
 	int (*terminate)(WT_ENCRYPTOR *encryptor, WT_SESSION *session);
+	size_t size_const;
 };
 
 /*!

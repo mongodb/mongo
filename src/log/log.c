@@ -378,7 +378,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_LOG_RECORD *logrec;
-	size_t decrypted_size, extra_size, header_skip, result_len;
+	size_t decrypted_size, header_skip, result_len;
 
 	conn = S2C(session);
 	logrec = (WT_LOG_RECORD *)in->mem;
@@ -388,8 +388,6 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "log_read: Encrypted record with "
 		    "no configured decrypt method");
-	extra_size = 0;
-	WT_ERR(encryptor->sizing(encryptor, &session->iface, &extra_size));
 
 	/*
 	 * There are a lot of sizes and offsets to keep track of here.
@@ -399,7 +397,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * logrec->mem_len: the size of the log record in memory.  This is
 	 *	essentially in->size minus any padding.  This length does
 	 *	include the log record header space.
-	 * extra_size: the constant space added to the record by then
+	 * size_const: the constant space added to the record by then
 	 *	encrypt function.
 	 * decrypted_size: the final size of the original data written
 	 *	less the log header.
@@ -413,7 +411,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * dst: output buffer after log header.
 	 * dst_len: final decrypted size.
 	 */
-	decrypted_size = logrec->mem_len - header_skip - extra_size;
+	decrypted_size = logrec->mem_len - header_skip - encryptor->size_const;
 	WT_ERR(__wt_scr_alloc(session, 0, out));
 	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size + header_skip));
 	memcpy((*out)->mem, in->mem, header_skip);
@@ -1739,8 +1737,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
 		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;
 
-		WT_ERR(encryptor->sizing(encryptor,
-		    &session->iface, &len));
+		len = encryptor->size_const;
 
 		size = src_len + WT_LOG_ENCRYPT_SKIP + len;
 		WT_ERR(__wt_scr_alloc(session, size, &eitem));

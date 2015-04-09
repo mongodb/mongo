@@ -21,7 +21,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	const WT_PAGE_HEADER *dsk;
-	size_t extra_size, result_len, skip;
+	size_t result_len, skip;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -52,8 +52,6 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		skip = WT_BLOCK_ENCRYPT_SKIP;
-		WT_ERR(btree->encryptor->sizing(btree->encryptor,
-		    &session->iface, &extra_size));
 		/*
 		 * We're allocating the exact number of bytes we're expecting
 		 * from decryption plus the unencrypted header.
@@ -63,7 +61,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		memcpy(buf->mem, tmp->data, skip);
 		ret = btree->encryptor->decrypt(
 		    btree->encryptor, &session->iface,
-		    (uint8_t *)tmp->data + skip, dsk->mem_size + extra_size,
+		    (uint8_t *)tmp->data + skip,
+		    dsk->mem_size + btree->encryptor->size_const,
 		    (uint8_t *)buf->mem + skip, dsk->mem_size, &result_len);
 
 		/*
@@ -302,9 +301,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		/*
 		 * Compute the size needed for the destination buffer.
 		 */
-		len = 0;
-		WT_ERR(btree->encryptor->sizing(btree->encryptor,
-		    &session->iface, &len));
+		len = btree->encryptor->size_const;
 
 		size = ip->size + len;
 		WT_ERR(bm->write_size(bm, session, &size));
