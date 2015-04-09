@@ -197,6 +197,7 @@ namespace mongo {
         fastmod = false;
         fastmodinsert = false;
         upsert = false;
+        cursorExhausted = false;
         keyUpdates = 0;  // unsigned, so -1 not possible
         writeConflicts = 0;
         planSummary = "";
@@ -267,6 +268,7 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP_BOOL( fastmod );
         OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
         OPDEBUG_TOSTRING_HELP_BOOL( upsert );
+        OPDEBUG_TOSTRING_HELP_BOOL( cursorExhausted );
         OPDEBUG_TOSTRING_HELP( keyUpdates );
         OPDEBUG_TOSTRING_HELP( writeConflicts );
         
@@ -374,6 +376,7 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( fastmod );
         OPDEBUG_APPEND_BOOL( fastmodinsert );
         OPDEBUG_APPEND_BOOL( upsert );
+        OPDEBUG_APPEND_BOOL( cursorExhausted );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
         OPDEBUG_APPEND_NUMBER( writeConflicts );
         b.appendNumber("numYield", curop.numYields());

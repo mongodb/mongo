@@ -171,6 +171,7 @@ namespace mongo {
         bool fastmod;
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert
+        bool cursorExhausted; // true if the cursor has been closed at end a find/getMore operation
         int keyUpdates;
         long long writeConflicts;
         ThreadSafeString planSummary; // a brief std::string describing the query solution

@@ -47,6 +47,7 @@ try {
                   [ "nscanned", 0 ],
                   [ "keyUpdates", 0 ],
                   [ "nreturned", 0 ],
+                  [ "cursorExhausted", true],
                   [ "responseLength", 20 ] ] );
     
     // check write lock stats are set
@@ -103,6 +104,26 @@ try {
     t.find( bigOrQuery ).itcount();
     o = lastOp();
     assert.neq( undefined, o.execStats.summary, tojson( o.execStats ) );
+
+    // Confirm "cursorExhausted" not set when cursor is open.
+    t.drop();
+    t.insert([{_id:0},{_id:1},{_id:2},{_id:3},{_id:4}]);
+    t.find().batchSize(2).next(); // Query performed leaving open cursor
+    var operation = lastOp();
+    assert.eq("query", operation.op);
+    assert(!("cursorExhausted" in operation));
+
+    var cursor = t.find().batchSize(2);
+    cursor.next(); // Perform initial query and consume first of 2 docs returned.
+    cursor.next(); // Consume second of 2 docs from initial query.
+    cursor.next(); // getMore performed, leaving open cursor.
+    operation = lastOp();
+    assert.eq("getmore", operation.op);
+    assert(!("cursorExhausted" in operation));
+
+    // Exhaust cursor and confirm getMore has "cursorExhausted:true".
+    cursor.itcount();
+    checkLastOp( [ [ "cursorExhausted", true] ] );
 
     db.setProfilingLevel(0);
     db.system.profile.drop();    

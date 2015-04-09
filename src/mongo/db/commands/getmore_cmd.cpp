@@ -257,6 +257,9 @@ namespace mongo {
                     ruSwapper.dismiss();
                 }
             }
+            else {
+                txn->getCurOp()->debug().cursorExhausted = true;
+            }
 
             Command::appendGetMoreResponseObject(respondWithId, request.nss.ns(), nextBatch.arr(),
                                                  &result);
