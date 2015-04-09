@@ -188,7 +188,7 @@ namespace {
             Database* const db = autoDb.getDb();
             if (!db) {
                 return appendCommandStatus(result,
-                                           Status(ErrorCodes::NamespaceNotFound,
+                                           Status(ErrorCodes::DatabaseNotFound,
                                                   str::stream() << "database " << dbname
                                                                 << " not found"));
             }
@@ -255,7 +255,7 @@ namespace {
             Database* const db = autoDb.getDb();
             if (!db) {
                 return appendCommandStatus(result,
-                                           Status(ErrorCodes::NamespaceNotFound,
+                                           Status(ErrorCodes::DatabaseNotFound,
                                                   str::stream() << "database " << dbname
                                                                 << " not found"));
             }
