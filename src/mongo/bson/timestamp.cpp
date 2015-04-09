@@ -25,15 +25,14 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 
-#include <cstring>
 #include <ctime>
 #include <iostream>
 #include <limits>
 #include <sstream>
 
-#include "mongo/bson/bsontypes.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
 
@@ -46,36 +45,29 @@ namespace mongo {
     }
 
     void Timestamp::append(BufBuilder& builder, const StringData& fieldName) const {
-        // No endian conversions needed, since we store in-memory representation
-        // in little endian format, regardless of target endian.
-        builder.appendNum( static_cast<char>(bsonTimestamp) );
-        builder.appendStr( fieldName );
-        builder.appendBuf(&_data, sizeof(_data));
-    }
-
-    const void* Timestamp::readFrom(const void* bytes) {
-        // No endian conversions needed, since we store in-memory representation
-        // in little endian format, regardless of target endian.
-        std::memcpy(&_data, bytes, sizeof(_data));
-        return reinterpret_cast<const char*>(bytes) + sizeof(_data);
+	// No endian conversions needed, since we store in-memory representation
+	// in little endian format, regardless of target endian.
+	builder.appendNum( static_cast<char>(bsonTimestamp) );
+	builder.appendStr( fieldName );
+	builder.appendNum( asULL() );
     }
 
     std::string Timestamp::toStringLong() const {
         std::stringstream ss;
-        ss << time_t_to_String_short(getSecs()) << ' ';
-        ss << std::hex << getSecs() << ':' << getInc();
+        ss << time_t_to_String_short(secs) << ' ';
+        ss << std::hex << secs << ':' << i;
         return ss.str();
     }
 
     std::string Timestamp::toStringPretty() const {
         std::stringstream ss;
-        ss << time_t_to_String_short(getSecs()) << ':' << std::hex << getInc();
+        ss << time_t_to_String_short(secs) << ':' << std::hex << i;
         return ss.str();
     }
 
     std::string Timestamp::toString() const {
         std::stringstream ss;
-        ss << std::hex << getSecs() << ':' << getInc();
+        ss << std::hex << secs << ':' << i;
         return ss.str();
     }
 

@@ -83,7 +83,7 @@ namespace {
                                             needle));
         }
 
-        void makeSelfPrimary(const Timestamp& electionOpTime = Timestamp(0, 0)) {
+        void makeSelfPrimary(const Timestamp& electionOpTime = Timestamp(0,0)) {
             getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionOpTime);
             getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
         }
@@ -204,7 +204,7 @@ namespace {
 
     TEST_F(TopoCoordTest, ChooseSyncSourceBasic) {
         // if we do not have an index in the config, we should get an empty syncsource
-        HostAndPort newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        HostAndPort newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_TRUE(newSyncSource.empty());
 
         updateConfig(BSON("_id" << "rs0" <<
@@ -217,49 +217,49 @@ namespace {
         setSelfMemberState(MemberState::RS_SECONDARY);
 
         // member h2 is the furthest ahead
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1, 0));
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1,0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
 
         // We start with no sync source
         ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
         // Fail due to insufficient number of pings
-        newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(getTopoCoord().getSyncSourceAddress(), newSyncSource);
         ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
         // Record 2nd round of pings to allow choosing a new sync source; all members equidistant
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1, 0));
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1,0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
 
         // Should choose h2, since it is furthest ahead
-        newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(getTopoCoord().getSyncSourceAddress(), newSyncSource);
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
         
         // h3 becomes further ahead, so it should be chosen
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(2, 0));
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(2,0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
         // h3 becomes an invalid candidate for sync source; should choose h2 again
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_RECOVERING, Timestamp(2, 0));
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_RECOVERING, Timestamp(2,0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
         // h3 back in SECONDARY and ahead
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(2, 0));
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(2,0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
         // h3 goes down
         receiveDownHeartbeat(HostAndPort("h3"), "rs0", Timestamp());
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
         // h3 back up and ahead
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(2, 0));
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(2,0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     }
@@ -282,7 +282,7 @@ namespace {
                      0);
 
         setSelfMemberState(MemberState::RS_SECONDARY);
-        Timestamp lastOpTimeWeApplied = Timestamp(100, 0);
+        Timestamp lastOpTimeWeApplied = Timestamp(100,0);
 
         heartbeatFromMember(HostAndPort("h1"), "rs0", MemberState::RS_SECONDARY,
                             Timestamp(501, 0), Milliseconds(700));
@@ -384,7 +384,7 @@ namespace {
                             Timestamp(0, 0), Milliseconds(300));
 
         // No primary situation: should choose no sync source.
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT(getTopoCoord().getSyncSourceAddress().empty());
         
         // Add primary
@@ -395,7 +395,7 @@ namespace {
 
         // h3 is primary and should be chosen as sync source, despite being further away than h2
         // and the primary (h3) being behind our most recently applied optime
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(10, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(10,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     }
@@ -421,7 +421,7 @@ namespace {
                             Timestamp(0, 0), Milliseconds(300));
 
         // No primary situation: should choose h2 sync source.
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
         // Become primary
@@ -454,18 +454,18 @@ namespace {
                             Timestamp(2, 0), Milliseconds(100));
 
         // force should overrule other defaults
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
         getTopoCoord().setForceSyncSourceIndex(1);
         // force should cause shouldChangeSyncSource() to return true
         // even if the currentSource is the force target
         ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h2"), now()));
         ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h3"), now()));
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
         // force should only work for one call to chooseNewSyncSource
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
     }
 
@@ -489,17 +489,17 @@ namespace {
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
                             Timestamp(2, 0), Milliseconds(100));
 
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
         
         Date_t expireTime = 100;
         getTopoCoord().blacklistSyncSource(HostAndPort("h3"), expireTime);
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         // Should choose second best choice now that h3 is blacklisted.
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
         // After time has passed, should go back to original sync source
-        getTopoCoord().chooseNewSyncSource(expireTime, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(expireTime, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
     }
 
@@ -526,17 +526,17 @@ namespace {
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
                             Timestamp(2, 0), Milliseconds(100));
 
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
         Date_t expireTime = 100;
         getTopoCoord().blacklistSyncSource(HostAndPort("h2"), expireTime);
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         // Can't choose any sync source now.
         ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
         // After time has passed, should go back to the primary
-        getTopoCoord().chooseNewSyncSource(expireTime, Timestamp(0, 0));
+        getTopoCoord().chooseNewSyncSource(expireTime, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
     }
 
@@ -562,20 +562,20 @@ namespace {
                             Timestamp(2, 0), Milliseconds(100));
 
         ASSERT_EQUALS(HostAndPort("h3"),
-                      getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0)));
+                      getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0)));
         ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
         // Good state setup done
 
         // Mark nodes down, ensure that we have no source and are secondary
         receiveDownHeartbeat(HostAndPort("h2"), "rs0", Timestamp(), ErrorCodes::NetworkTimeout);
         receiveDownHeartbeat(HostAndPort("h3"), "rs0", Timestamp(), ErrorCodes::NetworkTimeout);
-        ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0)).empty());
+        ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0)).empty());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 
         // Mark nodes down + unauth, ensure that we have no source and are secondary
         receiveDownHeartbeat(HostAndPort("h2"), "rs0", Timestamp(), ErrorCodes::NetworkTimeout);
         receiveDownHeartbeat(HostAndPort("h3"), "rs0", Timestamp(), ErrorCodes::Unauthorized);
-        ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0)).empty());
+        ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0)).empty());
         ASSERT_EQUALS(MemberState::RS_RECOVERING, getTopoCoord().getMemberState().s);
 
         // Having an auth error but with another node up should bring us out of RECOVERING
@@ -732,7 +732,7 @@ namespace {
         ASSERT_FALSE(response10Obj.hasField("warning"));
         ASSERT_EQUALS(HostAndPort("h6").toString(), response10Obj["prevSyncTarget"].String());
         receiveDownHeartbeat(HostAndPort("h6"), "rs0", Timestamp());
-        HostAndPort syncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        HostAndPort syncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h6"), syncSource);
 
         // Try to sync from a member that is unauth'd
@@ -753,7 +753,7 @@ namespace {
         getTopoCoord().prepareSyncFromResponse(
                 cbData(), HostAndPort("h6"), ourOpTime, &response12, &result);
         ASSERT_OK(result);
-        syncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        syncSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h6"), syncSource);
     }
 
@@ -793,7 +793,7 @@ namespace {
                                                 Milliseconds(0),
                                                 member,
                                                 hbResponse,
-                                                Timestamp(0, 0));
+                                                Timestamp(0,0));
 
         member = HostAndPort("test1:1234");
         ReplSetHeartbeatResponse hb;
@@ -810,7 +810,7 @@ namespace {
                                                 Milliseconds(4000),
                                                 member,
                                                 hbResponse,
-                                                Timestamp(0, 0));
+                                                Timestamp(0,0));
         makeSelfPrimary();
 
         // Now node 0 is down, node 1 is up, and for node 2 we have no heartbeat data yet.
@@ -1135,11 +1135,7 @@ namespace {
 
         BSONObjBuilder responseBuilder10;
         Status status10 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(args,
-                                            Date_t(),
-                                            ourOpTime,
-                                            &responseBuilder10,
-                                            &status10);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder10, &status10);
         ASSERT_OK(status10);
         BSONObj response10 = responseBuilder10.obj();
         ASSERT_FALSE(response10.hasField("info"));
@@ -1299,7 +1295,7 @@ namespace {
     };
 
     TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataNodeBelivesWeAreDown) {
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         // request heartbeat
         std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
@@ -1325,7 +1321,7 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataMemberNotInConfig) {
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         // request heartbeat
         std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
@@ -1350,7 +1346,7 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataSameConfig) {
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         // request heartbeat
         std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
@@ -1389,7 +1385,7 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataOldConfig) {
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         // request heartbeat
         std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
@@ -1462,7 +1458,7 @@ namespace {
         electedMoreRecentlyResponse.setSetName("rs0");
         electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
         electedMoreRecentlyResponse.setElectable(true);
-        electedMoreRecentlyResponse.setElectionTime(Timestamp(3, 0));
+        electedMoreRecentlyResponse.setElectionTime(Timestamp(3,0));
         electedMoreRecentlyResponse.setVersion(5);
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
@@ -1470,7 +1466,7 @@ namespace {
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
-                    Timestamp(0, 0));  // We've never applied anything.
+                    Timestamp(0,0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, action.getAction());
         ASSERT_EQUALS(1, action.getPrimaryConfigIndex());
         ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
@@ -1494,7 +1490,7 @@ namespace {
         electedMoreRecentlyResponse.setSetName("rs0");
         electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
         electedMoreRecentlyResponse.setElectable(false);
-        electedMoreRecentlyResponse.setElectionTime(Timestamp(10, 0));
+        electedMoreRecentlyResponse.setElectionTime(Timestamp(10,0));
         electedMoreRecentlyResponse.setVersion(5);
         action =
             getTopoCoord().processHeartbeatResponse(
@@ -1520,8 +1516,8 @@ namespace {
         // action.
         
         // acknowledge the other member so that we see a majority
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
         HeartbeatResponseAction action = receiveUpHeartbeat(HostAndPort("host3"),
                                                             "rs0",
                                                             MemberState::RS_SECONDARY,
@@ -1590,7 +1586,7 @@ namespace {
         electedMoreRecentlyResponse.setSetName("rs0");
         electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
         electedMoreRecentlyResponse.setElectable(true);
-        electedMoreRecentlyResponse.setElectionTime(Timestamp(3, 0));
+        electedMoreRecentlyResponse.setElectionTime(Timestamp(3,0));
         electedMoreRecentlyResponse.setVersion(5);
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
@@ -1598,7 +1594,7 @@ namespace {
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
-                    Timestamp(0, 0));  // We've never applied anything.
+                    Timestamp(0,0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, action.getAction());
         ASSERT_EQUALS(1, action.getPrimaryConfigIndex());
         ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
@@ -1622,7 +1618,7 @@ namespace {
         electedMoreRecentlyResponse.setSetName("rs0");
         electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
         electedMoreRecentlyResponse.setElectable(false);
-        electedMoreRecentlyResponse.setElectionTime(Timestamp(10, 0));
+        electedMoreRecentlyResponse.setElectionTime(Timestamp(10,0));
         electedMoreRecentlyResponse.setVersion(5);
         action =
             getTopoCoord().processHeartbeatResponse(
@@ -1648,8 +1644,8 @@ namespace {
         // action.
 
         // acknowledge the other member so that we see a majority
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
         HeartbeatResponseAction action = receiveUpHeartbeat(HostAndPort("host3"),
                                                             "rs0",
                                                             MemberState::RS_SECONDARY,
@@ -1730,7 +1726,7 @@ namespace {
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataNewPrimary) {
         Timestamp election = Timestamp(5,0);
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -1746,8 +1742,8 @@ namespace {
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {
         Timestamp election = Timestamp(5,0);
-        Timestamp election2 = Timestamp(4, 0);
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp election2 = Timestamp(4,0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -1772,9 +1768,9 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {
-        Timestamp election = Timestamp(4, 0);
+        Timestamp election = Timestamp(4,0);
         Timestamp election2 = Timestamp(5,0);
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -1802,8 +1798,8 @@ namespace {
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         makeSelfPrimary(Timestamp(5,0));
 
-        Timestamp election = Timestamp(4, 0);
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp election = Timestamp(4,0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         ASSERT_EQUALS(0, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -1832,9 +1828,9 @@ namespace {
                      0);
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(13, 0);
-        Timestamp slightlyLessFreshLastOpTimeApplied = Timestamp(3, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(13,0);
+        Timestamp slightlyLessFreshLastOpTimeApplied = Timestamp(3,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -1868,7 +1864,7 @@ namespace {
                               BSON("_id" << 2 << "host" << "host3:27017" << "priority" << 3)) <<
                           "settings" << BSON("heartbeatTimeoutSecs" << 5)),
                      0);
-        Timestamp election = Timestamp(1000, 0);
+        Timestamp election = Timestamp(1000,0);
 
         getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -1913,8 +1909,8 @@ namespace {
                               BSON("_id" << 2 << "host" << "host3:27017" << "priority" << 3)) <<
                           "settings" << BSON("heartbeatTimeoutSecs" << 5)),
                      0);
-        Timestamp election = Timestamp(1000, 0);
-        Timestamp staleTime = Timestamp(0, 0);
+        Timestamp election = Timestamp(1000,0);
+        Timestamp staleTime = Timestamp(0,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         makeSelfPrimary(election);
@@ -1942,8 +1938,8 @@ namespace {
                      0);
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        Timestamp election = Timestamp(1000, 0);
-        Timestamp stale = Timestamp(0, 0);
+        Timestamp election = Timestamp(1000,0);
+        Timestamp stale = Timestamp(0,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -1965,10 +1961,10 @@ namespace {
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-        makeSelfPrimary(Timestamp(2, 0));
+        makeSelfPrimary(Timestamp(2,0));
 
-        Timestamp election = Timestamp(4, 0);
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp election = Timestamp(4,0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         ASSERT_EQUALS(0, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -1991,8 +1987,8 @@ namespace {
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownNoMajority) {
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -2021,8 +2017,8 @@ namespace {
                               BSON("_id" << 2 << "host" << "host3:27017"))),
                      0);
 
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -2052,8 +2048,8 @@ namespace {
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {
         setSelfMemberState(MemberState::RS_STARTUP);
 
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -2082,8 +2078,8 @@ namespace {
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {
         setSelfMemberState(MemberState::RS_RECOVERING);
 
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -2104,8 +2100,8 @@ namespace {
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -2145,8 +2141,8 @@ namespace {
                               BSON("_id" << 2 << "host" << "host3:27017"))),
                      0);
 
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
 
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
                                                                 "rs0",
@@ -2175,7 +2171,7 @@ namespace {
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajority) {
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        Timestamp election = Timestamp(400, 0);
+        Timestamp election = Timestamp(400,0);
         Timestamp lastOpTimeApplied = Timestamp(399,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -2219,8 +2215,8 @@ namespace {
         now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
                         // else some Date_t math goes horribly awry
 
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(130, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(130,0);
         OID round = OID::gen();
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -2289,9 +2285,9 @@ namespace {
         now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
                         // else some Date_t math goes horribly awry
 
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(100, 0);
-        Timestamp fresherOpApplied = Timestamp(200, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(100,0);
+        Timestamp fresherOpApplied = Timestamp(200,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -2384,7 +2380,7 @@ namespace {
         // now lose election and ensure _electionTime and _electionId are 0'd out 
         getTopoCoord().processLoseElection();
         ASSERT_EQUALS(OID(), getTopoCoord().getElectionId());
-        ASSERT_EQUALS(Timestamp(0, 0), getTopoCoord().getElectionTime());
+        ASSERT_EQUALS(Timestamp(0,0), getTopoCoord().getElectionTime());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         ASSERT_EQUALS(2, getCurrentPrimaryIndex());
     }
@@ -2407,9 +2403,9 @@ namespace {
         now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
                         // else some Date_t math goes horribly awry
 
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(100, 0);
-        Timestamp fresherLastOpTimeApplied = Timestamp(200, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(100,0);
+        Timestamp fresherLastOpTimeApplied = Timestamp(200,0);
         OID round = OID::gen();
         OID remoteRound = OID::gen();
 
@@ -2504,9 +2500,9 @@ namespace {
         now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
                         // else some Date_t math goes horribly awry
 
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(100, 0);
-        Timestamp fresherLastOpTimeApplied = Timestamp(200, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(100,0);
+        Timestamp fresherLastOpTimeApplied = Timestamp(200,0);
         OID round = OID::gen();
         OID remoteRound = OID::gen();
 
@@ -2598,8 +2594,8 @@ namespace {
 
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        Timestamp election = Timestamp(400, 0);
-        Timestamp lastOpTimeApplied = Timestamp(300, 0);
+        Timestamp election = Timestamp(400,0);
+        Timestamp lastOpTimeApplied = Timestamp(300,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
@@ -2638,14 +2634,14 @@ namespace {
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataRelinquishPrimaryDueToNodeDisappearing) {
         // become PRIMARY
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-        makeSelfPrimary(Timestamp(2, 0));
+        makeSelfPrimary(Timestamp(2,0));
         ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
         // become aware of other nodes
-        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1, 0));
-        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1, 0));
-        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
-        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1,0));
+        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1,0));
+        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
+        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
 
         // lose that awareness and be sure we are going to stepdown
         HeartbeatResponseAction nextAction = receiveDownHeartbeat(HostAndPort("host2"),
@@ -2666,7 +2662,7 @@ namespace {
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataRemoteDoesNotExist) {
         Timestamp election = Timestamp(5,0);
-        Timestamp lastOpTimeApplied = Timestamp(3, 0);
+        Timestamp lastOpTimeApplied = Timestamp(3,0);
 
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host9"),
@@ -2751,11 +2747,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2784,11 +2776,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2817,11 +2805,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2851,11 +2835,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2884,11 +2864,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2913,16 +2889,12 @@ namespace {
         args.cfgver = 10;
         args.whoid = 1;
 
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(1, 0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, jsTime());
 
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2954,11 +2926,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status::OK();
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_EQUALS(1, response["vote"].Int());
@@ -2977,11 +2945,7 @@ namespace {
         BSONObjBuilder responseBuilder1;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args,
-                                            now += 60000,
-                                            Timestamp(),
-                                            &responseBuilder1,
-                                            &result);
+        getTopoCoord().prepareElectResponse(args, now += 60000, Timestamp(), &responseBuilder1, &result);
         stopCapturingLogMessages();
         BSONObj response1 = responseBuilder1.obj();
         ASSERT_OK(result);
@@ -3138,7 +3102,7 @@ namespace {
         BSONObjBuilder response;
         getTopoCoord().prepareSyncFromResponse(cbData(),
                                                HostAndPort("host2:27017"),
-                                               Timestamp(0, 0),
+                                               Timestamp(0,0),
                                                &response,
                                                &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
@@ -3152,7 +3116,7 @@ namespace {
         getTopoCoord().prepareStatusResponse(cbData(),
                                              Date_t(0),
                                              0,
-                                             Timestamp(0, 0),
+                                             Timestamp(0,0),
                                              &response,
                                              &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
@@ -3195,7 +3159,7 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         ASSERT_EQUALS(ErrorCodes::BadValue, result);
         ASSERT_EQUALS("replset: incompatible replset protocol version: 3", result.reason());
         ASSERT_EQUALS("", response.getHbMsg());
@@ -3209,7 +3173,7 @@ namespace {
         args.setSenderId(10);
         ReplSetHeartbeatResponse response;
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         ASSERT_EQUALS(ErrorCodes::BadValue, result);
         ASSERT(result.reason().find("from member with the same member ID as our self")) <<
                 "Actual string was \"" << result.reason() << '"';
@@ -3225,7 +3189,7 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         startCapturingLogMessages();
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         stopCapturingLogMessages();
         ASSERT_EQUALS(ErrorCodes::InconsistentReplicaSetNames, result);
         ASSERT(result.reason().find("repl set names do not match")) << "Actual string was \"" <<
@@ -3247,12 +3211,12 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(0, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3270,12 +3234,12 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(0, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3293,13 +3257,13 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_TRUE(response.hasConfig());
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(0, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3317,13 +3281,13 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_FALSE(response.hasConfig());
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(0, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3341,12 +3305,12 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(0, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(0,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(0, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3356,7 +3320,7 @@ namespace {
 
     TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderUp) {
         // set up args and acknowledge sender
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
         ReplSetHeartbeatArgs args;
         args.setProtocolVersion(1);
         args.setConfigVersion(1);
@@ -3366,13 +3330,13 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(100, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(100,0), &response, &result);
         ASSERT_OK(result);
         // this change to true because we can now see a majority, unlike in the previous cases
         ASSERT_TRUE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(100, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(100,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3391,14 +3355,14 @@ namespace {
         Status result = getTopoCoord().prepareHeartbeatResponse(now()++,
                                                                 args,
                                                                 "rs0",
-                                                                Timestamp(0, 0),
+                                                                Timestamp(0,0),
                                                                 &response);
         ASSERT_OK(result);
         // this change to true because we can now see a majority, unlike in the previous cases
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_STARTUP, response.getState().s);
-        ASSERT_EQUALS(Timestamp(0, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("", response.getReplicaSetName());
@@ -3406,8 +3370,8 @@ namespace {
     }
 
     TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseAsPrimary) {
-        makeSelfPrimary(Timestamp(10, 0));
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
+        makeSelfPrimary(Timestamp(10,0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
 
         ReplSetHeartbeatArgs args;
         args.setProtocolVersion(1);
@@ -3418,14 +3382,14 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(11, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(11,0), &response, &result);
         ASSERT_OK(result);
         // electable because we are already primary
         ASSERT_TRUE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(11, 0), response.getOpTime());
-        ASSERT_EQUALS(Timestamp(10, 0), response.getElectionTime());
+        ASSERT_EQUALS(Timestamp(11,0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(10,0), response.getElectionTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3434,11 +3398,11 @@ namespace {
 
     TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseWithSyncSource) {
         // get a sync source
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0, 0));
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1, 0));
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1, 0));
-        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0, 0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, Timestamp(0,0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1,0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(1,0));
+        getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
 
         // set up args
         ReplSetHeartbeatArgs args;
@@ -3450,12 +3414,12 @@ namespace {
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
         // prepare response and check the results
-        prepareHeartbeatResponse(args, Timestamp(100, 0), &response, &result);
+        prepareHeartbeatResponse(args, Timestamp(100,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_TRUE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
-        ASSERT_EQUALS(Timestamp(100, 0), response.getOpTime());
+        ASSERT_EQUALS(Timestamp(100,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         // changed to a syncing message because our sync source changed recently
         ASSERT_EQUALS("syncing from: h2:27017", response.getHbMsg());
@@ -3592,7 +3556,7 @@ namespace {
         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 
         // win election and primary
-        getTopoCoord().processWinElection(OID::gen(), Timestamp(0, 0));
+        getTopoCoord().processWinElection(OID::gen(), Timestamp(0,0));
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
@@ -3622,7 +3586,7 @@ namespace {
         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 
         // win election and primary
-        getTopoCoord().processWinElection(OID::gen(), Timestamp(0, 0));
+        getTopoCoord().processWinElection(OID::gen(), Timestamp(0,0));
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
@@ -3653,7 +3617,7 @@ namespace {
          ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 
          // win election and primary
-         getTopoCoord().processWinElection(OID::gen(), Timestamp(0, 0));
+         getTopoCoord().processWinElection(OID::gen(), Timestamp(0,0));
          ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
          ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
@@ -3667,7 +3631,7 @@ namespace {
                                BSON("_id" << 2 << "host" << "host3:27017"))),
                       0,
                       Date_t(-1),
-                      Timestamp(10, 0));
+                      Timestamp(10,0));
          ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
          ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
@@ -3682,7 +3646,7 @@ namespace {
                                     "tags" <<  BSON("dc" << "NA" << "rack" << "rack1")))),
                       0,
                       Date_t(-1),
-                      Timestamp(10, 0));
+                      Timestamp(10,0));
          ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
          ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
      }
@@ -3712,8 +3676,8 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTest, ReconfigBetweenHeartbeatRequestAndRepsonse) {
-        Timestamp election = Timestamp(14, 0);
-        Timestamp lastOpTimeApplied = Timestamp(13, 0);
+        Timestamp election = Timestamp(14,0);
+        Timestamp lastOpTimeApplied = Timestamp(13,0);
 
         // all three members up and secondaries
         setSelfMemberState(MemberState::RS_SECONDARY);
@@ -3763,8 +3727,8 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTest, ReconfigNodeRemovedBetweenHeartbeatRequestAndRepsonse) {
-        Timestamp election = Timestamp(14, 0);
-        Timestamp lastOpTimeApplied = Timestamp(13, 0);
+        Timestamp election = Timestamp(14,0);
+        Timestamp lastOpTimeApplied = Timestamp(13,0);
 
         // all three members up and secondaries
         setSelfMemberState(MemberState::RS_SECONDARY);
@@ -3829,8 +3793,8 @@ namespace {
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherHappierMemberExists) {
         // In this test, the TopologyCoordinator should tell us to change sync sources away from 
         // "host2" and to "host3" since "host2" is more than maxSyncSourceLagSecs(30) behind "host3"
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(4, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(4,0);
         // ahead by more than maxSyncSourceLagSecs (30)
         Timestamp fresherLastOpTimeApplied = Timestamp(3005,0);
 
@@ -3862,8 +3826,8 @@ namespace {
         // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
         // "host3", since "host3" is blacklisted
         // Then, confirm that unblacklisting only works if time has passed the blacklist time.
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(400, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(400,0);
         // ahead by more than maxSyncSourceLagSecs (30)
         Timestamp fresherLastOpTimeApplied = Timestamp(3005,0);
 
@@ -3900,11 +3864,11 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsDown) {
-        // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
         // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
         // "host3", since "host3" is down
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(400, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(400,0);
         // ahead by more than maxSyncSourceLagSecs (30)
         Timestamp fresherLastOpTimeApplied = Timestamp(3005,0);
 
@@ -3931,11 +3895,11 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsNotReadable) {
-        // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
         // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
         // "host3", since "host3" is in a non-readable mode (RS_ROLLBACK)
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(4, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(4,0);
         // ahead by more than maxSyncSourceLagSecs (30)
         Timestamp fresherLastOpTimeApplied = Timestamp(3005,0);
 
@@ -3960,11 +3924,11 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexes) {
-        // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
         // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
         // "host3", since "host3" does not build indexes
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(4, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(4,0);
         // ahead by more than maxSyncSourceLagSecs (30)
         Timestamp fresherLastOpTimeApplied = Timestamp(3005,0);
 
@@ -3999,8 +3963,8 @@ namespace {
         // In this test, the TopologyCoordinator should tell us to change sync sources away from 
         // "host2" and to "host3" despite "host3" not building indexes because we do not build
         // indexes either and "host2" is more than maxSyncSourceLagSecs(30) behind "host3"
-        Timestamp election = Timestamp(0, 0);
-        Timestamp lastOpTimeApplied = Timestamp(4, 0);
+        Timestamp election = Timestamp(0,0);
+        Timestamp lastOpTimeApplied = Timestamp(4,0);
         // ahead by more than maxSyncSourceLagSecs (30)
         Timestamp fresherLastOpTimeApplied = Timestamp(3005,0);
 
@@ -4045,8 +4009,8 @@ namespace {
                      0);
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_PRIMARY, Timestamp(1, 0));
-        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(0, 0)));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_PRIMARY, Timestamp(1,0));
+        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(0,0)));
     }
 
     TEST_F(TopoCoordTest, CheckShouldStandForElectionNotCloseEnoughToLastOptime) {
@@ -4059,12 +4023,8 @@ namespace {
                      0);
         setSelfMemberState(MemberState::RS_SECONDARY);
 
-        heartbeatFromMember(HostAndPort("h2"),
-                            "rs0",
-                            MemberState::RS_SECONDARY,
-                            Timestamp(10000,
-                                      0));
-        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(100, 0)));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(10000,0));
+        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(100,0)));
     }
 
     TEST_F(TopoCoordTest, VoteForMyselfFailsWhileNotCandidate) {
@@ -4093,7 +4053,7 @@ namespace {
     TEST_F(TopoCoordTest, UnelectableIfAbsentFromConfig) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
         startCapturingLogMessages();
-        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(10, 0)));
+        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(10,0)));
         stopCapturingLogMessages();
         ASSERT_EQUALS(1, countLogLinesContaining("not a member of a valid replica set config"));
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
@@ -4108,7 +4068,7 @@ namespace {
                               BSON("_id" << 30 << "host" << "h3"))),
                      0);
         setSelfMemberState(MemberState::RS_SECONDARY);
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(100, 0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, Timestamp(100,0));
 
         // vote for another node
         OID remoteRound = OID::gen();
@@ -4123,7 +4083,7 @@ namespace {
         BSONObjBuilder electResponseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         getTopoCoord().prepareElectResponse(
-                electArgs, now()++, Timestamp(100, 0), &electResponseBuilder, &result);
+                electArgs, now()++, Timestamp(100,0), &electResponseBuilder, &result);
         BSONObj response = electResponseBuilder.obj();
         ASSERT_OK(result);
         std::cout << response;
@@ -4132,7 +4092,7 @@ namespace {
 
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
         startCapturingLogMessages();
-        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(10, 0)));
+        ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, Timestamp(10,0)));
         stopCapturingLogMessages();
         ASSERT_EQUALS(1, countLogLinesContaining("I recently voted for "));
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());

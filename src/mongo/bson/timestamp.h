@@ -27,74 +27,57 @@
 
 #pragma once
 
-#include <type_traits>
-
-#include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-    class StringData;
 
-    /**
-     * Timestamp: A combination of current second plus an ordinal value, held together in a
-     * single 64-bit integer, stored in memory as little endian, regardless of local endianness.
+    /* Timestamp: A combination of current second plus an ordinal value.
      */
+#pragma pack(4)
     class Timestamp {
-     public:
-
-        Timestamp() = default;
-
-        explicit Timestamp(Date_t date) {
-            _data = endian::nativeToLittle(date.millis);
-            dassert(static_cast<int>(getSecs()) >= 0);
+        unsigned i; // ordinal comes first so we can do a single 64 bit compare on little endian
+        unsigned secs;
+    public:
+        unsigned getSecs() const {
+            return secs;
+        }
+        unsigned getInc() const {
+            return i;
         }
 
-        Timestamp(unsigned secs, unsigned inc) {
-            DataCursor(reinterpret_cast<char*>(&_data))
-                .writeLEAndAdvance<uint32_t>(inc)
-                .writeLE<uint32_t>(secs);
+        Timestamp(Date_t date) {
+            reinterpret_cast<unsigned long long&>(*this) = date.millis;
+            dassert( (int)secs >= 0 );
+        }
+
+        Timestamp(unsigned a, unsigned b) {
+            secs = a;
+            i = b;
+            dassert( (int)secs >= 0 );
+        }
+        Timestamp( const Timestamp& other ) { 
+            secs = other.secs;
+            i = other.i;
+            dassert( (int)secs >= 0 );
+        }
+        Timestamp() {
+            secs = 0;
+            i = 0;
         }
 
         // Maximum Timestamp value.
         static Timestamp max();
 
-        unsigned getSecs() const {
-            static_assert(sizeof(unsigned) == sizeof(uint32_t), "unsigned must be uint32");
-            return ConstDataCursor(reinterpret_cast<const char*>(&_data))
-                .skip<uint32_t>()
-                .readLE<uint32_t>();
-        }
-
-        unsigned getInc() const {
-            static_assert(sizeof(unsigned) == sizeof(uint32_t), "unsigned must be uint32");
-            return ConstDataCursor(reinterpret_cast<const char*>(&_data))
-                .readLE<uint32_t>();
-        }
-
         unsigned long long asULL() const {
-            return endian::littleToNative(_data);
+            return reinterpret_cast<const unsigned long long*>(&i)[0];
         }
-
         long long asLL() const {
-            const unsigned long long val = endian::littleToNative(_data);
-            return static_cast<long long>(val);
+            return reinterpret_cast<const long long*>(&i)[0];
         }
 
-        bool isNull() const {
-            return getSecs() == 0;
-        }
-
-        // Append the BSON representation of this Timestamp to the given BufBuilder with the given
-        // name. This lives here because Timestamp manages its own serialization format.
-        void append(BufBuilder& builder, const StringData& fieldName) const;
-
-        // Set the value of this Timestamp to match that of the pointed to bytes. The
-        // return value points to the first byte not consumed by the read operation.
-        const void* readFrom(const void* bytes);
+        bool isNull() const { return secs == 0; }
 
         std::string toStringLong() const;
 
@@ -102,35 +85,32 @@ namespace mongo {
 
         std::string toString() const;
 
-    private:
-        uint64_t _data = 0;
-    };
-
-    inline bool operator==(const Timestamp& lhs, const Timestamp& rhs) {
-        return (lhs.getInc() == rhs.getInc()) && (lhs.getSecs() == rhs.getSecs());
-    }
-
-    inline bool operator!=(const Timestamp& lhs, const Timestamp& rhs) {
-        return !(lhs == rhs);
-    }
-
-    inline bool operator<(const Timestamp& lhs, const Timestamp& rhs) {
-        if ( lhs.getSecs() != rhs.getSecs() ) {
-            return lhs.getSecs() < rhs.getSecs();
+        bool operator==(const Timestamp& r) const {
+            return i == r.i && secs == r.secs;
         }
-        return lhs.getInc() < rhs.getInc();
-    }
+        bool operator!=(const Timestamp& r) const {
+            return !(*this == r);
+        }
+        bool operator<(const Timestamp& r) const {
+            if ( secs != r.secs )
+                return secs < r.secs;
+            return i < r.i;
+        }
+        bool operator<=(const Timestamp& r) const {
+            return *this < r || *this == r;
+        }
+        bool operator>(const Timestamp& r) const {
+            return !(*this <= r);
+        }
+        bool operator>=(const Timestamp& r) const {
+            return !(*this < r);
+        }
 
-    inline bool operator<=(const Timestamp& lhs, const Timestamp& rhs) {
-        return (lhs < rhs) || (lhs == rhs);
-    }
+        // Append the BSON representation of this Timestamp to the given BufBuilder with the given
+        // name. This lives here because Timestamp manages its own serialization format.
+        void append(BufBuilder& builder, const StringData& fieldName) const;
 
-    inline bool operator>(const Timestamp& lhs, const Timestamp& rhs) {
-        return !(lhs <= rhs);
-    }
-
-    inline bool operator>=(const Timestamp& lhs, const Timestamp& rhs) {
-        return !(lhs < rhs);
-    }
+    };
+#pragma pack()
 
 } // namespace mongo

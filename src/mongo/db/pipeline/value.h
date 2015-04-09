@@ -328,9 +328,7 @@ namespace mongo {
 
     inline Timestamp Value::getTimestamp() const {
         verify(getType() == bsonTimestamp);
-        Timestamp ts;
-        ts.readFrom(&_storage.timestampValue);
-        return ts;
+        return Date_t(_storage.timestampValue);
     }
 
     inline const char* Value::getRegex() const {
