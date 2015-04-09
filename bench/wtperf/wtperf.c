@@ -412,7 +412,7 @@ worker(void *arg)
 		goto err;
 	}
 	for (i = 0; i < cfg->table_count_idle; i++) {
-		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], i);
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
 		if ((ret = session->open_cursor(
 		    session, buf, NULL, NULL, &tmp_cursor)) != 0) {
 			lprintf(cfg, ret, 0,
@@ -1654,7 +1654,7 @@ create_tables(CONFIG *cfg)
 	}
 
 	for (i = 0; i < cfg->table_count_idle; i++) {
-		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], i);
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
 		if ((ret = session->create(
 		    session, buf, cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
