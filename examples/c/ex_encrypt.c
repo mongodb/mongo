@@ -46,13 +46,20 @@ int add_my_encryptors(WT_CONNECTION *connection);
 
 static const char *home = NULL;
 
+#define	BUFSIZE		16
+#define	MAX_TENANTS	3
+
 /*! [encryption example callback implementation] */
 typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
+	uint32_t rot_N;		/* rotN value */
 	uint32_t num_calls;	/* Count of calls */
+	char *alg_name;		/* Encryption algorithm name */
 	char *password;		/* Saved password */
 	char *uri;		/* Saved uri */
 } EX_ENCRYPTOR;
+
+EX_ENCRYPTOR my_encryptors[MAX_TENANTS];
 
 #define	CHKSUM_LEN	4
 #define	IV_LEN		16
@@ -92,35 +99,35 @@ make_iv(uint8_t *dst)
 }
 
 /*
- * ROT13 encryption functions.
+ * Rotate encryption functions.
  */
 /*
- * do_rot13 --
- *	Perform rot-13 on the buffer given.
+ * do_rotate --
+ *	Perform rot-N on the buffer given.
  */
 static void
-do_rot13(uint8_t *buf, size_t len)
+do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 {
 	uint32_t i;
 	/*
-	 * Now rot13
+	 * Now rotate
 	 */
 	for (i = 0; i < len; i++) {
 		if (isalpha(buf[i])) {
-			if (tolower(buf[i]) < 'n')
-				buf[i] += 13;
+			if (islower(buf[i]))
+				buf[i] = (buf[i] - 'a' + rotn) % 26 + 'a';
 			else
-				buf[i] -= 13;
+				buf[i] = (buf[i] - 'A' + rotn) % 26 + 'A';
 		}
 	}
 }
 
 /*
- * rot13_decrypt --
- *	A simple rot13 decryption.
+ * rotate_decrypt --
+ *	A simple rotate decryption.
  */
 static int
-rot13_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
@@ -137,7 +144,7 @@ rot13_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Make sure it is big enough.
 	 */
 	if (dst_len < src_len - CHKSUM_LEN - IV_LEN) {
-		fprintf(stderr, "ROT13: ENOMEM ERROR\n");
+		fprintf(stderr, "Rotate: ENOMEM ERROR\n");
 		return (ENOMEM);
 	}
 
@@ -151,23 +158,23 @@ rot13_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[0], &src[i], dst_len);
 	/*
-	 * Call common rot13 function on the text portion of the
+	 * Call common rotate function on the text portion of the
 	 * buffer.  Send in dst_len as the length of the text.
 	 */
 	/*
 	 * !!! Most implementations would need the IV too.
 	 */
-	do_rot13(&dst[0], dst_len);
+	do_rotate(&dst[0], dst_len, 26 - ex_encryptor->rot_N);
 	*result_lenp = dst_len;
 	return (0);
 }
 
 /*
- * rot13_encrypt --
- *	A simple rot13 encryption.
+ * rotate_encrypt --
+ *	A simple rotate encryption.
  */
 static int
-rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+rotate_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
@@ -186,11 +193,11 @@ rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[i], &src[0], src_len);
 	/*
-	 * Call common rot13 function on the text portion of the
+	 * Call common rotate function on the text portion of the
 	 * destination buffer.  Send in src_len as the length of
 	 * the text.
 	 */
-	do_rot13(&dst[i], src_len);
+	do_rotate(&dst[i], src_len, ex_encryptor->rot_N);
 	/*
 	 * Checksum the encrypted buffer and add the IV.
 	 */
@@ -203,11 +210,11 @@ rot13_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 }
 
 /*
- * rot13_sizing --
+ * rotate_sizing --
  *	A sizing example returns the header size needed.
  */
 static int
-rot13_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+rotate_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     size_t *expansion_constantp)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
@@ -221,11 +228,11 @@ rot13_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 }
 
 /*
- * rot13_customize --
+ * rotate_customize --
  *	The customize function creates a customized encryptor
  */
 static int
-rot13_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
 {
 	EX_ENCRYPTOR *ex_encryptor;
@@ -233,10 +240,7 @@ rot13_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;				/* Unused parameters */
 	(void)uri;				/* Unused parameters */
 
-	/* Allocate our customized encryptor and set up callback functions. */
-	if ((ex_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
-		return (errno);
-	ex_encryptor->encryptor = *encryptor;
+	ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 
 	/* Stash the password from the configuration string. */
 	if ((ex_encryptor->password = malloc(passcfg->len + 1)) == NULL)
@@ -251,16 +255,16 @@ rot13_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	++ex_encryptor->num_calls;		/* Call count */
 
-	*customp = &ex_encryptor->encryptor;
+	*customp = encryptor;
 	return (0);
 }
 
 /*
- * rot13_terminate --
- *	WiredTiger rot13 encryption termination.
+ * rotate_terminate --
+ *	WiredTiger rotate encryption termination.
  */
 static int
-rot13_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
+rotate_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 {
 	EX_ENCRYPTOR *ex_encryptor = (EX_ENCRYPTOR *)encryptor;
 
@@ -269,9 +273,18 @@ rot13_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 	++ex_encryptor->num_calls;		/* Call count */
 
 	/* Free the allocated memory. */
-	free(ex_encryptor->password);
-	free(ex_encryptor->uri);
-	free(ex_encryptor);
+	if (ex_encryptor->alg_name != NULL) {
+		free(ex_encryptor->alg_name);
+		ex_encryptor->alg_name = NULL;
+	}
+	if (ex_encryptor->password != NULL) {
+		free(ex_encryptor->password);
+		ex_encryptor->password = NULL;
+	}
+	if (ex_encryptor->uri != NULL) {
+		free(ex_encryptor->uri);
+		ex_encryptor->uri = NULL;
+	}
 
 	return (0);
 }
@@ -283,31 +296,45 @@ rot13_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 int
 add_my_encryptors(WT_CONNECTION *connection)
 {
-	WT_ENCRYPTOR *rot13_encryptor;
-
-	if ((rot13_encryptor = calloc(1, sizeof(EX_ENCRYPTOR))) == NULL)
-		return (errno);
+	EX_ENCRYPTOR *e;
+	WT_ENCRYPTOR *wt;
+	int i, ret;
+	char *buf;
 
 	/*
-	 * Allocate a local encryptor structure, with a WT_ENCRYPTOR structure
-	 * as the first field, allowing us to treat references to either type of
-	 * structure as a reference to the other type.
-	 *
-	 * This could be simplified if only a single database is opened in the
-	 * application, we could use a static WT_ENCRYPTOR structure, and a
-	 * static reference to the WT_EXTENSION_API methods, then we don't need
-	 * to allocate memory when the encryptor is initialized or free it when
-	 * the encryptor is terminated.  However, this approach is more general
-	 * purpose and supports multiple databases per application.
+	 * Initialize our various encryptors.
 	 */
-	rot13_encryptor->encrypt = rot13_encrypt;
-	rot13_encryptor->decrypt = rot13_decrypt;
-	rot13_encryptor->sizing = rot13_sizing;
-	rot13_encryptor->customize = rot13_customize;
-	rot13_encryptor->terminate = rot13_terminate;
-
-	return (connection->add_encryptor(
-	    connection, "rot13", (WT_ENCRYPTOR *)rot13_encryptor, NULL));
+	for (i = 0; i < MAX_TENANTS; i++) {
+		e = &my_encryptors[i];
+		wt = (WT_ENCRYPTOR *)&e->encryptor;
+		wt->encrypt = rotate_encrypt;
+		wt->decrypt = rotate_decrypt;
+		wt->sizing = rotate_sizing;
+		wt->customize = rotate_customize;
+		wt->terminate = rotate_terminate;
+		/*
+		 * Allocate the name for this encryptor.
+		 */
+		if ((buf = calloc(BUFSIZE, sizeof(char))) == NULL)
+			return (errno);
+		/*
+		 * Pick different rot_N values.  Could be more random.
+		 * Start at 13 for the system rot.  This assumes a small
+		 * number for MAX_TENANTS so we don't go over 25.
+		 */
+		e->rot_N = 13 + i;
+		e->num_calls = 0;
+		e->alg_name = buf;
+		if (i == 0)
+			snprintf(buf, BUFSIZE, "system");
+		else
+			snprintf(buf, BUFSIZE, "user%d", i);
+		fprintf(stderr, "Add encryptor: %s\n", buf);
+		if ((ret = connection->add_encryptor(
+		    connection, buf, (WT_ENCRYPTOR *)e, NULL)) != 0)
+			return (ret);
+	}
+	return (0);
 }
 
 static void
@@ -323,7 +350,7 @@ print_record(WT_LSN *lsn, uint32_t opcount,
 	(void)key;		/* Unused */
 
 	if (rectype == WT_LOGREC_MESSAGE)
-		printf("Application Record: %s\n", (char *)value->data);
+		printf("Application Log Record: %s\n", (char *)value->data);
 }
 
 /*
@@ -365,10 +392,10 @@ main(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	WT_CURSOR *c1, *c2;
+	WT_CURSOR *c1, *c2, *nc;
 	int i, ret;
 	char keybuf[16], valbuf[16];
-	char *key, *val;
+	char *key1, *key2, *key3, *val1, *val2, *val3;
 
 	/*
 	 * Create a clean test directory for this run of the test program if the
@@ -385,62 +412,104 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=rot13,"
-	    "keyid=test_password1)", &conn);
+	    "log=(enabled=true),encryption=(name=system,"
+	    "keyid=system_password)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->create(session, "table:crypto",
-	    "encryption=(name=rot13,keyid=test_password2),"
+	ret = session->create(session, "table:crypto1",
+	    "encryption=(name=user1,keyid=test_password1),"
 	    "key_format=S,value_format=S");
-	ret = session->create(
-	    session, "table:nocrypto",
+	ret = session->create(session, "table:crypto2",
+	    "encryption=(name=user2,keyid=test_password2),"
+	    "key_format=S,value_format=S");
+	ret = session->create(session, "table:nocrypto",
 	    "key_format=S,value_format=S");
 
 	/* Insert a set of keys */
-	ret = session->open_cursor(session, "table:crypto", NULL, NULL, &c1);
-	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &c2);
+	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
+	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
+	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
 
 	for (i = 0; i < MAX_KEYS; i++) {
 		snprintf(keybuf, sizeof(keybuf), "key%d", i);
 		c1->set_key(c1, keybuf);
 		c2->set_key(c2, keybuf);
+		nc->set_key(nc, keybuf);
 
 		snprintf(valbuf, sizeof(valbuf), "value%d", i);
 		c1->set_value(c1, valbuf);
 		c2->set_value(c2, valbuf);
+		nc->set_value(nc, valbuf);
 
 		ret = c1->insert(c1);
 		ret = c2->insert(c2);
+		ret = nc->insert(nc);
 		if (i % 5 == 0)
 			ret = session->log_printf(session,
 			    "Wrote %d records", i);
 	}
 	ret = session->log_printf(session,
 	    "Done. Wrote %d total records", i);
-	simple_walk_log(session);
 
 	while (c1->next(c1) == 0) {
-		ret = c1->get_key(c1, &key);
-		ret = c1->get_value(c1, &val);
+		ret = c1->get_key(c1, &key1);
+		ret = c1->get_value(c1, &val1);
 
-		printf("Read key %s; value %s\n", key, val);
+		printf("Read key %s; value %s\n", key1, val1);
 	}
+	simple_walk_log(session);
+	printf("CLOSE\n");
 	ret = conn->close(conn, NULL);
+
+	printf("REOPEN and VERIFY encrypted data\n");
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=rot13,"
-	    "keyid=test_password1)", &conn);
+	    "log=(enabled=true),encryption=(name=system,"
+	    "keyid=system_password)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->open_cursor(session, "table:crypto", NULL, NULL, &c1);
+	/*
+	 * Verify we can read the encrypted log after restart.
+	 */
+	simple_walk_log(session);
+	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
+	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
+	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
 
-	printf("REOPEN\n");
+	/*
+	 * Read the same data from each cursor.  All should be identical.
+	 */
 	while (c1->next(c1) == 0) {
-		ret = c1->get_key(c1, &key);
-		ret = c1->get_value(c1, &val);
+		c2->next(c2);
+		nc->next(nc);
+		ret = c1->get_key(c1, &key1);
+		ret = c1->get_value(c1, &val1);
+		ret = c2->get_key(c2, &key2);
+		ret = c2->get_value(c2, &val2);
+		ret = nc->get_key(nc, &key3);
+		ret = nc->get_value(nc, &val3);
 
-		printf("Read key %s; value %s\n", key, val);
+		if (strcmp(key1, key2) != 0)
+			fprintf(stderr, "Key1 %s and Key2 %s do not match\n",
+			    key1, key2);
+		if (strcmp(key1, key3) != 0)
+			fprintf(stderr, "Key1 %s and Key3 %s do not match\n",
+			    key1, key3);
+		if (strcmp(key2, key3) != 0)
+			fprintf(stderr, "Key2 %s and Key3 %s do not match\n",
+			    key2, key3);
+		if (strcmp(val1, val2) != 0)
+			fprintf(stderr, "Val1 %s and Val2 %s do not match\n",
+			    val1, val2);
+		if (strcmp(val1, val3) != 0)
+			fprintf(stderr, "Val1 %s and Val3 %s do not match\n",
+			    val1, val3);
+		if (strcmp(val2, val3) != 0)
+			fprintf(stderr, "Val2 %s and Val3 %s do not match\n",
+			    val2, val3);
+
+		printf("Read key %s; value %s\n", key1, val1);
 	}
 	ret = conn->close(conn, NULL);
 	return (ret);
