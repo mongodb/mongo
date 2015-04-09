@@ -31,6 +31,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <memory>
+#include <type_traits>
 
 namespace mongo {
 
@@ -43,30 +44,60 @@ namespace mongo {
      */
     template <typename T>
     struct ptr {
+        // Removes conversions from overload resolution if the underlying pointer types aren't
+        // convertible. This makes this class behave more like a bare pointer.
+        template <typename U>
+        using IfConvertible = typename std::enable_if<std::is_convertible<U*, T*>::value>::type;
 
         ptr() : _p(NULL) {}
 
         // convert to ptr<T>
         ptr(T* p) : _p(p) {} // needed for NULL
-        template<typename U> ptr(U* p) : _p(p) {}
-        template<typename U> ptr(const ptr<U>& p) : _p(p) {}
-        template<typename U> ptr(const std::unique_ptr<U>& p) : _p(p.get()) {}
-        template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
-        template<typename U> ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr(U* p) : _p(p) {}
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr(const ptr<U>& p) : _p(p) {}
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr(const std::unique_ptr<U>& p) : _p(p.get()) {}
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
 
         // assign to ptr<T>
-        ptr& operator= (T* p) { _p = p; return *this; } // needed for NULL
-        template<typename U> ptr& operator= (U* p) { _p = p; return *this; }
-        template<typename U> ptr& operator= (const ptr<U>& p) { _p = p; return *this; }
-        template<typename U> ptr& operator= (const std::unique_ptr<U>& p) {
+        ptr& operator=(T* p) { _p = p; return *this; } // needed for NULL
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr& operator=(U* p) {
+            _p = p;
+            return *this;
+        }
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr& operator=(const ptr<U>& p) {
+            _p = p;
+            return *this;
+        }
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr& operator=(const std::unique_ptr<U>& p) {
             _p = p.get();
             return *this;
         }
-        template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) {
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr& operator=(const boost::shared_ptr<U>& p) {
             _p = p.get();
             return *this;
         }
-        template<typename U> ptr& operator= (const boost::scoped_ptr<U>& p) {
+
+        template<typename U, typename = IfConvertible<U>>
+        ptr& operator=(const boost::scoped_ptr<U>& p) {
             _p = p.get();
             return *this;
         }
