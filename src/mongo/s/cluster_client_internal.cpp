@@ -123,6 +123,8 @@ namespace mongo {
             return e.toStatus("could not read mongos pings collection");
         }
 
+        connPtr->done();
+
         //
         // Load shards from config server
         //
@@ -130,35 +132,23 @@ namespace mongo {
         vector<HostAndPort> servers;
 
         try {
-            ScopedDbConnection& conn = *connPtr;
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ShardType::ConfigNS,
-                                                                      Query())));
+            vector<ShardType> shards;
+            Status status = grid.catalogManager()->getAllShards(&shards);
+            if (!status.isOK()) {
+                return status;
+            }
 
-            while (cursor->more()) {
-
-                BSONObj shardDoc = cursor->next();
-
-                StatusWith<ShardType> shardRes = ShardType::fromBSON(shardDoc);
-                if (!shardRes.isOK()) {
-                    connPtr->done();
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  stream() << "invalid shard " << shardDoc
-                                           << " read from the config server"
-                                           << causedBy(shardRes.getStatus()));
-                }
-                ShardType shard = shardRes.getValue();
+            for (const ShardType& shard : shards) {
                 Status status = shard.validate();
                 if (!status.isOK()) {
-                    connPtr->done();
                     return Status(ErrorCodes::UnsupportedFormat,
-                                  stream() << "shard " << shardDoc
+                                  stream() << "shard " << shard.toBSON()
                                            << " failed validation: " << causedBy(status));
                 }
 
                 string errMsg;
                 ConnectionString shardLoc = ConnectionString::parse(shard.getHost(), errMsg);
                 if (shardLoc.type() == ConnectionString::INVALID) {
-                    connPtr->done();
                     return Status(ErrorCodes::UnsupportedFormat,
                                   stream() << "invalid shard host " << shard.getHost()
                                            << " read from the config server" << causedBy(errMsg));
@@ -171,8 +161,6 @@ namespace mongo {
         catch (const DBException& e) {
             return e.toStatus("could not read shards collection");
         }
-
-        connPtr->done();
 
         // Add config servers to list of servers to check version against
         vector<HostAndPort> configServers = configLoc.getServers();

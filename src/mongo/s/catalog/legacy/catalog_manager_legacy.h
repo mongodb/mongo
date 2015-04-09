@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/catalog_manager.h"
 
@@ -73,6 +74,10 @@ namespace mongo {
 
         virtual Status getAllShards(std::vector<ShardType>* shards);
 
+        virtual bool isShardHost(const ConnectionString& shardConnectionString);
+
+        virtual bool doShardsExist();
+
         virtual void logChange(OperationContext* txn,
                                const std::string& what,
                                const std::string& ns,
@@ -93,6 +98,13 @@ namespace mongo {
          * where <xxxx> is an autoincrementing value and <xxxx> < 10000
          */
         StatusWith<std::string> _getNewShardName() const;
+
+        /**
+         * Returns the number of shards recognized by the config servers
+         * in this sharded cluster.
+         * Optional: use query parameter to filter shard count.
+         */
+        size_t _getShardCount(const BSONObj& query = {}) const;
 
         // Parsed config server hosts, as specified on the command line.
         ConnectionString _configServerConnectionString;

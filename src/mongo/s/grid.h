@@ -79,11 +79,6 @@ namespace mongo {
         void setAllowLocalHost( bool allow );
 
         /**
-         * @return true if the config database knows about a host 'name'
-         */
-        bool knowAboutShard( const std::string& name ) const;
-
-        /**
          * Returns true if the balancer should be running. Caller is responsible
          * for making sure settings has the balancer key.
          */

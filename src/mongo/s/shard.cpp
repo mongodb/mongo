@@ -49,10 +49,11 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/scc_fast_query_handler.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
@@ -90,23 +91,13 @@ namespace mongo {
     public:
         void reload() {
 
-            list<BSONObj> all;
-            {
-                ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-                auto_ptr<DBClientCursor> c = conn->query(ShardType::ConfigNS , Query());
-                massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
+            vector<ShardType> shards;
+            Status status = grid.catalogManager()->getAllShards(&shards);
+            massert(13632, "couldn't get updated shard list from config server", status.isOK());
 
-                int numShards = 0;
-                while ( c->more() ) {
-                    all.push_back( c->next().getOwned() );
-                    ++numShards;
-                }
+            int numShards = shards.size();
 
-                LOG( 1 ) << "found " << numShards << " shards listed on config server(s): "
-                         << conn.get()->toString() << endl;
-
-                conn.done();
-            }
+            LOG(1) << "found " << numShards << " shards listed on config server(s)";
 
             boost::lock_guard<boost::mutex> lk( _mutex );
 
@@ -126,11 +117,7 @@ namespace mongo {
             }
             _rsLookup.clear();
             
-            for (list<BSONObj>::const_iterator iter = all.begin(); iter != all.end(); ++iter) {
-                StatusWith<ShardType> shardRes = ShardType::fromBSON(*iter);
-                uassertStatusOK(shardRes.getStatus());
-
-                ShardType shardData = shardRes.getValue();
+            for (const ShardType& shardData : shards) {
                 uassertStatusOK(shardData.validate());
 
                 ShardPtr shard = boost::make_shared<Shard>(shardData.getName(),

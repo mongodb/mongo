@@ -35,9 +35,10 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/s/balancer_policy.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/type_tags.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
@@ -243,19 +244,13 @@ namespace mongo {
 
     Status DistributionStatus::populateShardInfoMap(ShardInfoMap* shardInfo) {
         try {
-            ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
+            vector<ShardType> shards;
+            Status status = grid.catalogManager()->getAllShards(&shards);
+            if (!status.isOK()) {
+                return status;
+            }
 
-            auto_ptr<DBClientCursor> cursor(conn->query(ShardType::ConfigNS , Query()));
-            uassert(28597, "Failed to load shard config", cursor.get() != NULL);
-
-            while (cursor->more()) {
-                StatusWith<ShardType> shardRes = ShardType::fromBSON(cursor->next());
-
-                if (!shardRes.isOK()) {
-                    return shardRes.getStatus();
-                }
-                ShardType shard = shardRes.getValue();
-
+            for (const ShardType& shard : shards) {
                 std::set<std::string> dummy;
                 ShardInfo newShardEntry(shard.getMaxSize(),
                                         Shard::getShardDataSizeBytes(shard.getHost()) /
@@ -273,8 +268,6 @@ namespace mongo {
 
                 shardInfo->insert(make_pair(shard.getName(), newShardEntry));
             }
-
-            conn.done();
         }
         catch (const DBException& ex) {
             return ex.toStatus();

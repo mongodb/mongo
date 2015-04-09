@@ -99,13 +99,6 @@ namespace mongo {
         _allowLocalShard = allow;
     }
 
-    bool Grid::knowAboutShard( const string& name ) const {
-        ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-        BSONObj shard = conn->findOne(ShardType::ConfigNS, BSON(ShardType::host(name)));
-        conn.done();
-        return ! shard.isEmpty();
-    }
-
     /*
      * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
      * collection.

@@ -163,6 +163,18 @@ namespace mongo {
         virtual Status getAllShards(std::vector<ShardType>* shards) = 0;
 
         /**
+         * Returns true if host is being used as a shard.
+         * Otherwise, returns false.
+         */
+        virtual bool isShardHost(const ConnectionString& shardConnectionString) = 0;
+
+        /**
+         * Returns true if there are any shards in the sharded cluster.
+         * Otherwise, returns false.
+         */
+        virtual bool doShardsExist() = 0;
+
+        /**
          * Logs a diagnostic event locally and on the config server.
          *
          * NOTE: This method is best effort so it should never throw.
@@ -189,7 +201,6 @@ namespace mongo {
          */
         virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
                                              BatchedCommandResponse* response) = 0;
-
 
         /**
          * Directly inserts a document in the specified namespace on the config server (only the

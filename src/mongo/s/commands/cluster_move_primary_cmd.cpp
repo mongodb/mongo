@@ -145,7 +145,7 @@ namespace {
                 return false;
             }
 
-            if (!grid.knowAboutShard(s.getConnString())) {
+            if (!grid.catalogManager()->isShardHost(s.getAddress())) {
                 errmsg = "that server isn't known to me";
                 return false;
             }

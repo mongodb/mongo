@@ -1070,7 +1070,8 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count(ShardType::ConfigNS) || conn.count( DatabaseType::ConfigNS ) ) {
+            if (grid.catalogManager()->doShardsExist() ||
+                conn.count(DatabaseType::ConfigNS)) {
                 version = 1;
             }
         }

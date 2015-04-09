@@ -518,17 +518,8 @@ namespace {
         }
         BSONObj shardDoc = b.obj();
 
-        {
-            ScopedDbConnection conn(_configServerConnectionString, 30);
-
-            // check whether the set of hosts (or single host) is not an already a known shard
-            BSONObj old = conn->findOne(ShardType::ConfigNS,
-                                        BSON(ShardType::host(shardConnectionString.toString())));
-
-            if (!old.isEmpty()) {
-                conn.done();
-                return Status(ErrorCodes::OperationFailed, "host already used");
-            }
+        if (isShardHost(shardConnectionString)) {
+            return Status(ErrorCodes::OperationFailed, "host already used");
         }
 
         log() << "going to add shard: " << shardDoc;
@@ -808,6 +799,14 @@ namespace {
         return Status::OK();
     }
 
+    bool CatalogManagerLegacy::isShardHost(const ConnectionString& connectionString) {
+        return _getShardCount(BSON(ShardType::host(connectionString.toString())));
+    }
+
+    bool CatalogManagerLegacy::doShardsExist() {
+        return _getShardCount() > 0;
+    }
+
     void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& request,
                                                        BatchedCommandResponse* response) {
 
@@ -903,6 +902,14 @@ namespace {
 
         return Status(ErrorCodes::OperationFailed,
                       "unable to generate new shard name");
+    }
+
+    size_t CatalogManagerLegacy::_getShardCount(const BSONObj& query) const {
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+        long long shardCount = conn->count(ShardType::ConfigNS, query);
+        conn.done();
+
+        return shardCount;
     }
 
 } // namespace mongo
