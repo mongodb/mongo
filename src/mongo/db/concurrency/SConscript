@@ -21,9 +21,12 @@ env.Library(
         'lock_stats.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/background_job',
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/foundation',
         '$BUILD_DIR/mongo/global_environment_experiment',
+        # Temporary crutch since the ssl cleanup is hard coded in background.cpp
+        '$BUILD_DIR/mongo/network',
         "$BUILD_DIR/mongo/server_parameters",
         '$BUILD_DIR/mongo/spin_lock',
         '$BUILD_DIR/third_party/shim_boost',

@@ -37,6 +37,7 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/background.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
@@ -867,6 +868,26 @@ namespace {
     AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {
         release();
     }
+
+
+namespace {
+    /**
+     *  Periodically purges unused lock buckets. The first time the lock is used again after
+     *  cleanup it needs to be allocated, and similarly, every first use by a client for an intent
+     *  mode may need to create a partitioned lock head. Cleanup is done roughtly once a minute.
+     */
+    class UnusedLockCleaner : PeriodicTask {
+    public:
+        std::string taskName() const {
+            return "UnusedLockCleaner";
+        }
+
+        void taskDoWork() {
+            LOG(2) << "cleaning up unused lock buckets of the global lock manager";
+            getGlobalLockManager()->cleanupUnusedLocks();
+        }
+    } unusedLockCleaner;
+} // namespace
 
 
     //
