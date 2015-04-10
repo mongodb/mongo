@@ -142,14 +142,21 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 	    !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
 	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
-		if (strcmp(name, dhandle->name) == 0 &&
-		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
-		    (ckpt != NULL && dhandle->checkpoint != NULL &&
-		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
-			session->dhandle = dhandle;
-			return (0);
-		}
+	if (ckpt == NULL) {
+		SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
+			if (dhandle->checkpoint == NULL &&
+			    strcmp(name, dhandle->name) == 0) {
+				session->dhandle = dhandle;
+				return (0);
+			}
+	} else
+		SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
+			if (dhandle->checkpoint != NULL &&
+			    strcmp(name, dhandle->name) == 0 &&
+			    strcmp(ckpt, dhandle->checkpoint) == 0) {
+				session->dhandle = dhandle;
+				return (0);
+			}
 
 	return (WT_NOTFOUND);
 }
