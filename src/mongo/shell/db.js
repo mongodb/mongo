@@ -691,7 +691,18 @@ DB.prototype.currentOp = function( arg ){
         else if ( arg )
             q["$all"] = true;
     }
-    return this.$cmd.sys.inprog.findOne( q );
+
+    // always send currentOp with default (null) read preference (SERVER-17951)
+    var _readPref = this.getMongo().getReadPrefMode();
+
+    try { 
+        this.getMongo().setReadPref(null);
+        var results = this.$cmd.sys.inprog.findOne( q );
+    } finally { 
+        this.getMongo().setReadPref(_readPref);
+    }
+
+    return results 
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
@@ -703,8 +714,16 @@ DB.prototype.killOp = function(op) {
         (res.errmsg.startsWith("no such cmd") ||
          res.errmsg.startsWith("no such command")) ||
          res.code === 59) {
+
         // fall back for old servers
-        res = this.$cmd.sys.killop.findOne({'op': op});
+        var _readPref = this.getMongo().getReadPrefMode();
+
+        try {
+            this.getMongo().setReadPref(null);
+            res = this.$cmd.sys.killop.findOne({'op': op});
+        } finally {
+            this.getMongo().setReadPref(_readPref);
+        }
     }
     return res;
 }
@@ -993,7 +1012,14 @@ DB.prototype.fsyncUnlock = function() {
          res.errmsg.startsWith("no such command") ||
          res.code === 59)) {
         // fallback for old servers
-        res = this.getSiblingDB("admin").$cmd.sys.unlock.findOne();
+
+        var _readPref = this.getMongo().getReadPrefMode();
+        try {
+            this.getMongo().setReadPref(null);
+            res = this.getSiblingDB("admin").$cmd.sys.unlock.findOne();
+        } finally {
+            this.getMongo().setReadPref(_readPref);
+        }
     }
     return res;
 }
