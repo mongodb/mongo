@@ -182,6 +182,8 @@ struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
+struct __wt_keyed_encryptor;
+    typedef struct __wt_keyed_encryptor WT_KEYED_ENCRYPTOR;
 struct __wt_log_desc;
     typedef struct __wt_log_desc WT_LOG_DESC;
 struct __wt_log_op_desc;

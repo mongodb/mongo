@@ -565,13 +565,13 @@ __wt_conn_remove_data_source(WT_SESSION_IMPL *session)
  */
 static int
 __encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
-    WT_ENCRYPTOR **encryptorp)
+    WT_NAMED_ENCRYPTOR **nencryptorp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_ENCRYPTOR *nenc;
 
-	if (encryptorp != NULL)
-		*encryptorp = NULL;
+	if (nencryptorp != NULL)
+		*nencryptorp = NULL;
 
 	if (cval->len == 0 || WT_STRING_MATCH("none", cval->str, cval->len))
 		return (0);
@@ -579,10 +579,11 @@ __encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	conn = S2C(session);
 	TAILQ_FOREACH(nenc, &conn->encryptqh, q)
 		if (WT_STRING_MATCH(nenc->name, cval->str, cval->len)) {
-			if (encryptorp != NULL)
-				*encryptorp = nenc->encryptor;
+			if (nencryptorp != NULL)
+				*nencryptorp = nenc;
 			return (0);
 		}
+
 	WT_RET_MSG(session, EINVAL,
 	    "unknown encryptor '%.*s'", (int)cval->len, cval->str);
 }
@@ -602,35 +603,57 @@ __wt_encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
  *	Given a configuration, configure the encryptor.
  */
 int
-__wt_encryptor_config(WT_SESSION_IMPL *session, const char *uri,
-    WT_CONFIG_ITEM *cval, WT_CONFIG_ITEM *passval, WT_ENCRYPTOR **encryptorp,
-    int *ownp)
+__wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
+    WT_CONFIG_ITEM *keyid, WT_ENCRYPTOR **encryptorp)
 {
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
+	WT_KEYED_ENCRYPTOR *kenc;
+	WT_NAMED_ENCRYPTOR *nenc;
 
-	*ownp = 0;
+	*encryptorp = NULL;
+	conn = S2C(session);
+	kenc = NULL;
 
-	WT_RET(__encryptor_confchk(session, cval, &encryptor));
-	if (encryptor == NULL) {
-		if (passval->len != 0)
+	WT_RET(__encryptor_confchk(session, cval, &nenc));
+	if (nenc == NULL) {
+		if (keyid->len != 0)
 			WT_RET_MSG(session, EINVAL, "encryption.keyid "
 			    "requires encryption.name to be set");
 		return (0);
 	}
 
+	TAILQ_FOREACH(kenc, &nenc->keyedqh, q)
+		if (WT_STRING_MATCH(kenc->keyid, keyid->str, keyid->len)) {
+			*encryptorp = kenc->encryptor;
+			return (0);
+		}
+
+	WT_ERR(__wt_calloc_one(session, &kenc));
+	WT_ERR(__wt_strndup(session, keyid->str, keyid->len, &kenc->keyid));
+	encryptor = nenc->encryptor;
+	if (encryptor->customize != NULL) {
+		WT_ERR(encryptor->customize(encryptor, &session->iface,
+		    keyid, S2C(session)->encrypt_secret_key, &encryptor));
+		if (encryptor == NULL)
+			encryptor = nenc->encryptor;
+		else
+			kenc->owned = 1;
+	}
+	kenc->encryptor = encryptor;
+
+	TAILQ_INSERT_TAIL(&nenc->keyedqh, kenc, q);
 	WT_RET(encryptor->sizing(encryptor, &session->iface,
 	    &encryptor->size_const));
 
-	if (encryptor->customize != NULL) {
-		WT_RET(encryptor->customize(encryptor, &session->iface,
-		    uri, passval, encryptorp));
+	*encryptorp = encryptor;
+	kenc = NULL;
+
+err:	if (kenc != NULL) {
+		__wt_free(session, kenc->keyid);
+		__wt_free(session, kenc);
 	}
-
-	if (*encryptorp == NULL)
-		*encryptorp = encryptor;
-	else
-		*ownp = 1;
-
 	return (0);
 }
 
@@ -659,9 +682,21 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 		WT_ERR_MSG(session, EINVAL,
 		    "invalid name for an encryptor: %s", name);
 
+	/*
+	 * Verify that terminate is set if customize is set.
+	 * We could relax this restriction and return an error
+	 * if customize returns an encryptor and terminate
+	 * is not set. That seems more prone to mistakes.
+	 */
+	if (encryptor->customize != NULL &&
+	    encryptor->terminate == NULL)
+		WT_ERR_MSG(session, EINVAL,
+		    "encryptor: %s: has customize but no terminate", name);
+
 	WT_ERR(__wt_calloc_one(session, &nenc));
 	WT_ERR(__wt_strdup(session, name, &nenc->name));
 	nenc->encryptor = encryptor;
+	TAILQ_INIT(&nenc->keyedqh);
 
 	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->encryptqh, nenc, q);
@@ -686,18 +721,24 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 
 	conn = S2C(session);
 
-	if (conn->encryptor_owned) {
-	       if (conn->encryptor->terminate != NULL)
-		       WT_TRET(conn->encryptor->terminate(
-			   conn->encryptor, &session->iface));
-	       conn->encryptor_owned = 0;
-	}
-
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
+		while ((kenc = TAILQ_FIRST(&nenc->keyedqh)) != NULL) {
+			/* Call any termination method. */
+			if (kenc->owned && kenc->encryptor->terminate != NULL)
+				WT_TRET(kenc->encryptor->terminate(
+				    kenc->encryptor, (WT_SESSION *)session));
+
+			/* Remove from the connection's list, free memory. */
+			TAILQ_REMOVE(&nenc->keyedqh, kenc, q);
+			__wt_free(session, kenc->keyid);
+			__wt_free(session, kenc);
+		}
+
 		/* Call any termination method. */
 		if (nenc->encryptor->terminate != NULL)
 			WT_TRET(nenc->encryptor->terminate(
@@ -708,6 +749,7 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 		__wt_free(session, nenc->name);
 		__wt_free(session, nenc);
 	}
+	__wt_free(session, conn->encrypt_secret_key);
 	return (ret);
 }
 
@@ -1743,7 +1785,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ NULL, 0 }
 	};
 
-	WT_CONFIG_ITEM cval, sval, passval;
+	WT_CONFIG_ITEM cval, sval, secretval, keyid;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(i1);
 	WT_DECL_ITEM(i2);
@@ -1929,10 +1971,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	conn->encryptor = NULL;
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
-	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid",
-	    &passval));
-	WT_ERR(__wt_encryptor_config(session, NULL, &cval, &passval,
-	    &conn->encryptor, &conn->encryptor_owned));
+	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
+	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.secretkey",
+	    &secretval));
+	if (secretval.len != 0)
+		WT_ERR(__wt_strndup(session, secretval.str, secretval.len,
+		    &conn->encrypt_secret_key));
+	WT_ERR(__wt_encryptor_config(session, &cval, &keyid, &conn->encryptor));
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary

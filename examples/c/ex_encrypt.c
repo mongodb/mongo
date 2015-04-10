@@ -54,12 +54,11 @@ typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
 	uint32_t rot_N;		/* rotN value */
 	uint32_t num_calls;	/* Count of calls */
-	char *alg_name;		/* Encryption algorithm name */
+	char *keyid;		/* Saved keyid */
 	char *password;		/* Saved password */
-	char *uri;		/* Saved uri */
 } MY_CRYPTO;
 
-MY_CRYPTO my_cryptos[MAX_TENANTS];
+MY_CRYPTO my_crypto_global;
 
 #define	CHKSUM_LEN	4
 #define	IV_LEN		16
@@ -233,33 +232,48 @@ rotate_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
  */
 static int
 rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    const char *uri, WT_CONFIG_ITEM *passcfg, WT_ENCRYPTOR **customp)
+    WT_CONFIG_ITEM *keyid, const char *secret, WT_ENCRYPTOR **customp)
 {
+	const MY_CRYPTO *orig_crypto;
 	MY_CRYPTO *my_crypto;
+	char *keyidstr;
 
 	(void)session;				/* Unused parameters */
-	(void)uri;				/* Unused parameters */
 
-	my_crypto = (MY_CRYPTO *)encryptor;
-
-	/* Stash the password from the configuration string. */
-	if ((my_crypto->password = malloc(passcfg->len + 1)) == NULL)
+	orig_crypto = (const MY_CRYPTO *)encryptor;
+	if ((my_crypto = malloc(sizeof(MY_CRYPTO))) == NULL)
 		return (errno);
-	strncpy(my_crypto->password, passcfg->str, passcfg->len + 1);
-	my_crypto->password[passcfg->len] = '\0';
-	if (uri != NULL) {
-		if ((my_crypto->uri = malloc(strlen(uri) + 1)) == NULL)
+	*my_crypto = *orig_crypto;
+
+	/* Stash the keyid and the (optional) secret key
+	 * from the configuration string.
+	 */
+	if ((keyidstr = malloc(keyid->len + 1)) == NULL)
+		return (errno);
+	strncpy(keyidstr, keyid->str, keyid->len + 1);
+	keyidstr[keyid->len] = '\0';
+	my_crypto->keyid = keyidstr;
+	if (secret != NULL) {
+		if ((my_crypto->password = malloc(strlen(secret) + 1)) == NULL)
 			return (errno);
-		strncpy(my_crypto->uri, uri, strlen(uri) + 1);
+		strncpy(my_crypto->password, secret, strlen(secret) + 1);
 	}
+
+	/* Presumably we'd have some sophisticated key management
+	 * here that maps the id onto a secret key.
+	 */
+	if (strcmp(keyidstr, "system") == 0)
+		my_crypto->rot_N = 13;
+	else if (strcmp(keyidstr, "user0") == 0)
+		my_crypto->rot_N = 14;
+	else if (strcmp(keyidstr, "user1") == 0)
+		my_crypto->rot_N = 15;
+	else
+		return (EINVAL);
 
 	++my_crypto->num_calls;		/* Call count */
 
-	/*
-	 * Set to NULL since we did not allocate a new encryptor
-	 * structure for this invocation.
-	 */
-	*customp = NULL;
+	*customp = &my_crypto->encryptor;
 	return (0);
 }
 
@@ -277,18 +291,17 @@ rotate_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 	++my_crypto->num_calls;		/* Call count */
 
 	/* Free the allocated memory. */
-	if (my_crypto->alg_name != NULL) {
-		free(my_crypto->alg_name);
-		my_crypto->alg_name = NULL;
-	}
 	if (my_crypto->password != NULL) {
 		free(my_crypto->password);
 		my_crypto->password = NULL;
 	}
-	if (my_crypto->uri != NULL) {
-		free(my_crypto->uri);
-		my_crypto->uri = NULL;
+	if (my_crypto->keyid != NULL) {
+		free(my_crypto->keyid);
+		my_crypto->keyid = NULL;
 	}
+
+	if (encryptor != &my_crypto_global.encryptor)
+		free(encryptor);
 
 	return (0);
 }
@@ -302,42 +315,24 @@ add_my_encryptors(WT_CONNECTION *connection)
 {
 	MY_CRYPTO *m;
 	WT_ENCRYPTOR *wt;
-	int i, ret;
-	char *buf;
+	int ret;
 
 	/*
-	 * Initialize our various encryptors.
+	 * Initialize our one encryptor.
 	 */
-	for (i = 0; i < MAX_TENANTS; i++) {
-		m = &my_cryptos[i];
-		wt = (WT_ENCRYPTOR *)&m->encryptor;
-		wt->encrypt = rotate_encrypt;
-		wt->decrypt = rotate_decrypt;
-		wt->sizing = rotate_sizing;
-		wt->customize = rotate_customize;
-		wt->terminate = rotate_terminate;
-		/*
-		 * Allocate the name for this encryptor.
-		 */
-		if ((buf = calloc(BUFSIZE, sizeof(char))) == NULL)
-			return (errno);
-		/*
-		 * Pick different rot_N values.  Could be more random.
-		 * Start at 13 for the system rot.  This assumes a small
-		 * number for MAX_TENANTS so we don't go over 25.
-		 */
-		m->rot_N = 13 + i;
-		m->num_calls = 0;
-		m->alg_name = buf;
-		if (i == 0)
-			snprintf(buf, BUFSIZE, "system");
-		else
-			snprintf(buf, BUFSIZE, "user%d", i);
-		fprintf(stderr, "Add encryptor: %s\n", buf);
-		if ((ret = connection->add_encryptor(
-		    connection, buf, (WT_ENCRYPTOR *)m, NULL)) != 0)
-			return (ret);
-	}
+	m = &my_crypto_global;
+	wt = (WT_ENCRYPTOR *)&m->encryptor;
+	wt->encrypt = rotate_encrypt;
+	wt->decrypt = rotate_decrypt;
+	wt->sizing = rotate_sizing;
+	wt->customize = rotate_customize;
+	wt->terminate = rotate_terminate;
+	m->num_calls = 0;
+	fprintf(stderr, "Add encryptor: rotn\n");
+	if ((ret = connection->add_encryptor(
+	    connection, "rotn", (WT_ENCRYPTOR *)m, NULL)) != 0)
+		return (ret);
+
 	return (0);
 }
 
@@ -403,8 +398,8 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=system,"
-	    "keyid=system_password)", &conn);
+	    "log=(enabled=true),encryption=(name=rotn,"
+	    "keyid=system)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
@@ -412,10 +407,10 @@ main(void)
 	 * Create and open some encrypted and not encrypted tables.
 	 */
 	ret = session->create(session, "table:crypto1",
-	    "encryption=(name=user1,keyid=test_password1),"
+	    "encryption=(name=rotn,keyid=user1),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:crypto2",
-	    "encryption=(name=user2,keyid=test_password2),"
+	    "encryption=(name=rotn,keyid=user2),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:nocrypto",
 	    "key_format=S,value_format=S");
@@ -468,8 +463,8 @@ main(void)
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=system,"
-	    "keyid=system_password)", &conn);
+	    "log=(enabled=true),encryption=(name=rotn,"
+	    "keyid=system)", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	/*

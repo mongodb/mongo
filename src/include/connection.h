@@ -23,6 +23,18 @@ struct __wt_process {
 extern WT_PROCESS __wt_process;
 
 /*
+ * WT_KEYED_ENCRYPTOR --
+ *	An list entry for an encryptor with a unique (name, keyid).
+ */
+struct __wt_keyed_encryptor {
+	const char *keyid;		/* Key id of encryptor */
+	int owned;			/* Encryptor needs to be terminated */
+	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
+					/* Linked list of encryptors */
+	TAILQ_ENTRY(__wt_keyed_encryptor) q;
+};
+
+/*
  * WT_NAMED_COLLATOR --
  *	A collator list entry
  */
@@ -61,6 +73,8 @@ struct __wt_named_data_source {
 struct __wt_named_encryptor {
 	const char *name;		/* Name of encryptor */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
+					/* Locked: list of encryptors by key */
+	TAILQ_HEAD(__wt_keyed_qh, __wt_keyed_encryptor) keyedqh;
 					/* Linked list of encryptors */
 	TAILQ_ENTRY(__wt_named_encryptor) q;
 };
@@ -297,7 +311,7 @@ struct __wt_connection_impl {
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
 	WT_ENCRYPTOR	*encryptor;     /* Encryptor for metadata and log */
-	int		 encryptor_owned; /* Encryptor must be freed */
+	char		*encrypt_secret_key;/* Encrypt secret key */
 
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */

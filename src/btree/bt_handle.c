@@ -170,13 +170,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 		btree->collator_owned = 0;
 	}
 	btree->collator = NULL;
-
-	if (btree->encryptor_owned) {
-		if (btree->encryptor->terminate != NULL)
-			WT_TRET(btree->encryptor->terminate(
-			    btree->encryptor, &session->iface));
-		btree->encryptor_owned = 0;
-	}
 	btree->encryptor = NULL;
 
 	btree->bulk_load_ok = 0;
@@ -317,17 +310,15 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
-	if (WT_IS_METADATA(btree->dhandle) && conn->encryptor != NULL) {
+	if (WT_IS_METADATA(btree->dhandle) && conn->encryptor != NULL)
 		btree->encryptor = conn->encryptor;
-		btree->encryptor_owned = 0;
-	} else {
+	else {
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "encryption.name", &cval));
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "encryption.keyid", &metadata));
-		WT_RET(__wt_encryptor_config(
-		    session, btree->dhandle->name, &cval, &metadata,
-		    &btree->encryptor, &btree->encryptor_owned));
+		WT_RET(__wt_encryptor_config(session, &cval, &metadata,
+		    &btree->encryptor));
 	}
 
 	/* Initialize locks. */

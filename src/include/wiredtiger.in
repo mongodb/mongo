@@ -1029,8 +1029,12 @@ struct __wt_session {
 	 * than or equal to 0; default \c 0.}
 	 * @config{encryption = (, configure an encryptor for file blocks., a
 	 * set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that is passed
-	 * to the WT_ENCRYPTOR::initialize function., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that identifies
+	 * a unique instance of the encryptor.  It is stored in clear text\, and
+	 * thus is available when the wiredtiger database is reopened.  On the
+	 * first use of a (name\, keyid) combination\, the
+	 * WT_ENCRYPTOR::customize function is called with the keyid as an
+	 * argument., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none"
 	 * or custom encryption engine name created with
 	 * WT_CONNECTION::add_encryptor.  See @ref encryption for more
@@ -1975,17 +1979,18 @@ struct __wt_connection {
  * "log"; default empty.}
  * @config{encryption = (, configure an encryptor for system wide metadata and
  * logs., a set of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that is passed to the
- * WT_ENCRYPTOR::initialize function.  It is stored in clear text\, and thus is
- * available when the wiredtiger database is reopened., a string; default
- * empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none"
- * or custom encryption engine name created with WT_CONNECTION::add_encryptor.
- * See @ref encryption for more information., a string; default \c none.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;password, An identifier that is passed to the
- * WT_ENCRYPTOR::initialize function.  It is never stored in clear text\, so
- * must be given to any subsequent wiredtiger_open calls to reopen the database.
- * It must also be provided to any "wt" commands used with this database., a
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that identifies a unique
+ * instance of the encryptor.  It is stored in clear text\, and thus is
+ * available when the wiredtiger database is reopened.  On the first use of a
+ * (name\, keyid) combination\, the WT_ENCRYPTOR::customize function is called
+ * with the keyid as an argument., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none" or
+ * custom encryption engine name created with WT_CONNECTION::add_encryptor.  See
+ * @ref encryption for more information., a string; default \c none.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;secretkey, A string that is passed to the
+ * WT_ENCRYPTOR::customize function.  It is never stored in clear text\, so must
+ * be given to any subsequent wiredtiger_open calls to reopen the database.  It
+ * must also be provided to any "wt" commands used with this database., a
  * string; default empty.}
  * @config{ ),,}
  * @config{error_prefix, prefix string for error messages., a string; default
@@ -3253,8 +3258,6 @@ struct __wt_encryptor {
 	 * The callback should set \c expansion_constantp to the additional
 	 * number of bytes needed.
 	 *
-	 * @param[in] src the data to encrypt
-	 * @param[in] src_len the length of the data to encrypt
 	 * @param[out] expansion_constantp the additional number of bytes needed
 	 *             when encrypting.
 	 * @returns zero for success, non-zero to indicate an error.
@@ -3265,12 +3268,23 @@ struct __wt_encryptor {
 	    size_t *expansion_constantp);
 
 	/*!
-	 * If non-NULL, this callback is called to customize the encryptor for
-	 * each index.  If the callback returns a non-NULL encryptor, that
-	 * instance is used instead of this one for all comparisons.
+	 * If non-NULL, this callback is called to customize the encryptor.
+	 * The customize function is called whenever a keyid is used for the
+	 * first time with this encryptor, whether it be in the wiredtiger_open
+	 * call or the WT_SESSION::create call. This gives the algorithm an
+	 * opportunity to retrieve and save keys in a customized encryptor.
+	 * If the callback returns a non-NULL encryptor, that instance
+	 * is used instead of this one for any callbacks.
+	 * @param[in] keyid configuration value of "keyid" in the
+	 * wiredtiger_open or WT_SESSION::create call.
+	 * @param[in] the configuration value of "secretkey" from the
+	 * connection's wiredtiger_open call.
+	 * @param[out] customp the new modified encryptor, or NULL.
+	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*customize)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_ENCRYPTOR **customp);
+	    WT_CONFIG_ITEM *keyid, const char *secretkey,
+	    WT_ENCRYPTOR **customp);
 
 	/*!
 	 * If non-NULL, a callback performed when the database is closed.

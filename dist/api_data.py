@@ -168,7 +168,11 @@ file_config = format_meta + [
             WT_CONNECTION::add_encryptor.
             See @ref encryption for more information'''),
         Config('keyid', '', r'''
-            An identifier that is passed to the WT_ENCRYPTOR::initialize function'''),
+            An identifier that identifies a unique instance of the encryptor.
+            It is stored in clear text, and thus is available when
+            the wiredtiger database is reopened.  On the first use
+            of a (name, keyid) combination, the WT_ENCRYPTOR::customize
+            function is called with the keyid as an argument.'''),
         ]),
     Config('format', 'btree', r'''
         the file format''',
@@ -545,9 +549,17 @@ common_wiredtiger_open = [
             WT_CONNECTION::add_encryptor.
             See @ref encryption for more information'''),
         Config('keyid', '', r'''
-            An identifier that is passed to the WT_ENCRYPTOR::initialize function. It is stored in clear text, and thus is available when the wiredtiger database is reopened.'''),
-        Config('password', '', r'''
-            An identifier that is passed to the WT_ENCRYPTOR::initialize function. It is never stored in clear text, so must be given to any subsequent wiredtiger_open calls to reopen the database. It must also be provided to any "wt" commands used with this database.'''),
+            An identifier that identifies a unique instance of the encryptor.
+            It is stored in clear text, and thus is available when
+            the wiredtiger database is reopened.  On the first use
+            of a (name, keyid) combination, the WT_ENCRYPTOR::customize
+            function is called with the keyid as an argument.'''),
+        Config('secretkey', '', r'''
+            A string that is passed to the WT_ENCRYPTOR::customize function.
+            It is never stored in clear text, so must be given to any
+            subsequent wiredtiger_open calls to reopen the database.
+            It must also be provided to any "wt" commands used with
+            this database.'''),
         ]),
     Config('extensions', '', r'''
         list of shared library extensions to load (using dlopen).
