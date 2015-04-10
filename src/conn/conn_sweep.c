@@ -82,6 +82,7 @@ __sweep(WT_SESSION_IMPL *session)
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
+
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    dhandle->session_inuse == 0 && dhandle->session_ref == 0) {
 			++closed_handles;
@@ -95,6 +96,13 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_STAT_FAST_CONN_INCR(session, dh_conn_tod);
 			continue;
 		}
+
+		/*
+		 * Ignore in-use files once the open file count reaches the
+		 * minimum number of handles.
+		 */
+		if (conn->open_file_count < conn->sweep_handles_min)
+			continue;
 
 		/*
 		 * We have a candidate for closing; if it's open, acquire an
@@ -201,6 +209,10 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_scan_interval", &cval));
 	conn->sweep_interval = (time_t)cval.val;
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "file_manager.close_handle_minimum", &cval));
+	conn->sweep_handles_min = (u_int)cval.val;
 
 	return (0);
 }

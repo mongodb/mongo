@@ -63,7 +63,8 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         # That matches the ratio of the default 10 and 30 seconds.
         conn_params = \
                 ',create,error_prefix="%s: ",' % self.shortid() + \
-                'file_manager=(close_idle_time=6,close_scan_interval=2),' + \
+                'file_manager=(close_handle_minimum=0,' + \
+                'close_idle_time=6,close_scan_interval=2),' + \
                 'checkpoint=(wait=%d),' % self.ckpt + \
                 'statistics=(fast),'
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
@@ -76,7 +77,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         return conn
 
     def test_ops(self):
-
         #
         # Set up numfiles with numkv entries.  We just want some data in there
         # we don't care what it is.
@@ -174,8 +174,9 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print "ref1: " + str(ref1) + " ref2: " + str(ref2)
             print "XX: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         self.assertEqual(nfile2 < nfile1, True)
-        # The only files that should be left is the metadata and the active one.
-        if (nfile2 != 2):
+        # The only files that should be left is the metadata, the lock file
+        # and the active file.
+        if (nfile2 != 3):
             print "close1: " + str(close1) + " close2: " + str(close2)
             print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
             print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
@@ -183,7 +184,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print "tod1: " + str(tod1) + " tod2: " + str(tod2)
             print "ref1: " + str(ref1) + " ref2: " + str(ref2)
             print "XX2: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
-        self.assertEqual(nfile2 == 2, True)
+        self.assertEqual(nfile2 == 3, True)
 
 if __name__ == '__main__':
     wttest.run()

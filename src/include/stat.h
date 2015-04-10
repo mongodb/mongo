@@ -23,7 +23,7 @@ struct __wt_stats {
 #define	WT_STAT_ATOMIC_INCRV(stats, fld, value) do {			\
 	(void)WT_ATOMIC_ADD8(WT_STAT(stats, fld), (value));		\
 } while (0)
-#define	WT_STAT_ATOMIC_INCR(stats, fld) WT_ATOMIC_ADD(WT_STAT(stats, fld), 1)
+#define	WT_STAT_ATOMIC_INCR(stats, fld) WT_STAT_ATOMIC_INCRV(stats, fld, 1)
 #define	WT_STAT_DECRV(stats, fld, value) do {				\
 	(stats)->fld.v -= (value);					\
 } while (0)
