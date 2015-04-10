@@ -16,6 +16,7 @@ shardCommand = { shardcollection : "test.foo" , key : { num : 1 } };
 assert.throws( function(){ s.adminCommand( shardCommand ); } );
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 assert.eq( 3 , db.foo.find().length() , "after partitioning count failed" );
 
 s.adminCommand( shardCommand );

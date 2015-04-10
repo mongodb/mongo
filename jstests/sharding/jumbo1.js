@@ -3,6 +3,7 @@
 s = new ShardingTest( "jump1" , 2 /* numShards */, 2 /* verboseLevel */, 1 /* numMongos */, { chunksize : 1 } )
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
 
 db = s.getDB( "test" );

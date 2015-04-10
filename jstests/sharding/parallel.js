@@ -4,6 +4,7 @@ s = new ShardingTest( "parallel" , numShards , 2 , 2 , { sync : true } );
 s.setBalancer( false )
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } ); 
 
 db = s.getDB( "test" );

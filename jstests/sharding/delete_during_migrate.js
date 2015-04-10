@@ -14,15 +14,19 @@ var ns = dbname + "." + coll;
 var s = st.s0;
 var t = s.getDB( dbname ).getCollection( coll );
 
+s.adminCommand({ enablesharding: dbname });
+st.ensurePrimaryShard(dbname, 'shard0001');
+
 // Create fresh collection with lots of docs
 t.drop();
-for ( i=0; i<200000; i++ ){
-    t.insert( { a : i  } );
+var bulk = t.initializeUnorderedBulkOp();
+for (var i = 0; i < 200000; i++) {
+    bulk.insert({ a: i  });
 }
+assert.writeOK(bulk.execute());
 
 // enable sharding of the collection. Only 1 chunk.
 t.ensureIndex( { a : 1 } );
-s.adminCommand( { enablesharding : dbname } );
 s.adminCommand( { shardcollection : ns , key: { a : 1 } } );
 
 // start a parallel shell that deletes things

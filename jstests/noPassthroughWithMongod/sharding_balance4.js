@@ -6,6 +6,7 @@ s = new ShardingTest( "slow_sharding_balance4" , 2 , 1 , 1 , { chunksize : 1 } )
 s.stopBalancer();
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.eq( 1 , s.config.chunks.count()  , "setup1" );
 

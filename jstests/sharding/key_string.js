@@ -5,6 +5,7 @@ s.stopBalancer();
 
 db = s.getDB( "test" );
 s.adminCommand( { enablesharding : "test" } )
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { name : 1 } } );
 
 primary = s.getServer( "test" ).getDB( "test" );

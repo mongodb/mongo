@@ -40,6 +40,7 @@
 var st = new ShardingTest({ shards: 2 });
 
 st.adminCommand({ enablesharding: "test" });
+st.ensurePrimaryShard('test', 'shard0001');
 st.adminCommand({ shardcollection: "test.col0", key: { a: 1, b: 1 }});
 st.adminCommand({ shardcollection: "test.col1", key: { 'x.a': 1 }});
 

@@ -6,6 +6,7 @@ function setupMoveChunkTest(st) {
     var testcoll = testdb.foo;
 
     st.adminCommand( { enablesharding : "test" } );
+    st.ensurePrimaryShard('test', 'shard0001');
     st.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
     var str = "";

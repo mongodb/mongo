@@ -28,6 +28,7 @@ config.shards.find().forEach( function( doc ){
 jsTest.log( "Enabling sharding for the first time..." )
 
 admin.runCommand({ enableSharding : coll.getDB() + "" })
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 admin.runCommand({ shardCollection : coll  + "", key : { _id : 1 } })
 
 var bulk = insertMongos.getCollection( coll + "" ).initializeUnorderedBulkOp();
@@ -47,6 +48,7 @@ coll.drop()
 jsTest.log( "Re-enabling sharding with a different key..." )
 
 admin.runCommand({ enableSharding : coll.getDB() + "" })
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 coll.ensureIndex({ notId : 1 })
 admin.runCommand({ shardCollection : coll  + "", key : { notId : 1 } })
 

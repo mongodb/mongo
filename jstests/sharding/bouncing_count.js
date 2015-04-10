@@ -13,7 +13,8 @@ var collA = mongosA.getCollection( "foo.bar" )
 var collB = mongosB.getCollection( "" + collA )
 var collC = mongosB.getCollection( "" + collA )
 
-admin.runCommand({ enableSharding : "" + collA.getDB() })
+admin.runCommand({ enableSharding : "" + collA.getDB() });
+st.ensurePrimaryShard(collA.getDB().getName(), 'shard0001');
 admin.runCommand({ shardCollection : "" + collA, key : { _id : 1 } })
 
 var shards = config.shards.find().sort({ _id : 1 }).toArray()

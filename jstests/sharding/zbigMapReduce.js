@@ -17,6 +17,7 @@ function setupTest() {
     config.settings.save({_id: "chunksize", value: 1});
 
     s.adminCommand( { enablesharding : "test" } )
+    s.ensurePrimaryShard('test', 'test-rs0');
     s.adminCommand( { shardcollection : "test.foo", key : { "_id" : 1 } } )
     return s;
 }

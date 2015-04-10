@@ -8,6 +8,7 @@ s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , tr
 
 s.adminCommand( { enablesharding : "test" } );
 db = s.getDB( "test" )
+s.ensurePrimaryShard('test', 'shard0001');
 t = db.foo
 
 bigString = ""

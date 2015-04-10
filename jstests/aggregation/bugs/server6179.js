@@ -3,6 +3,7 @@
 // Set up a sharding test.
 s = new ShardingTest( "aggregation_multiple_group", 2, 0, 2 );
 s.adminCommand( { enablesharding:"test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection:"test.data", key:{ _id:1 } } );
 s.stopBalancer()
 

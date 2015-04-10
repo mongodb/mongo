@@ -44,6 +44,7 @@ if (Array.contains(storageEngines, "wiredTiger")) {
     checkCollectionOptions(db);
 
     assert.commandWorked(db.adminCommand({ enableSharding: 'test' }));
+    st.ensurePrimaryShard('test', 'shard0001');
     assert.commandWorked(db.adminCommand({ shardCollection: coll + '', key: { x: 1 }}));
 
     coll.insert({x: 0});

@@ -29,6 +29,7 @@ var result;
 
 var coll = mongos.getCollection("foo.bar");
 assert.commandWorked(admin.runCommand({ enableSharding : coll.getDB().toString() }));
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 assert.commandWorked(admin.runCommand({ shardCollection : coll.toString(),
                                         key : { _id : 1 } }));
 

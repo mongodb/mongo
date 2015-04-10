@@ -6,6 +6,7 @@
 
 var s = new ShardingTest("shard_targeting", 2, 0, 1);
 s.adminCommand({ enablesharding : "test" });
+s.ensurePrimaryShard('test', 'shard0001');
 s.stopBalancer();
 
 var db = s.getDB("test");

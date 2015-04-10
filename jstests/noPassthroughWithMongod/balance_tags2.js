@@ -6,14 +6,15 @@ s = new ShardingTest( "balance_tags2" , 3 , 1 , 1 ,
 s.config.settings.save({ _id: "balancer" });
 
 db = s.getDB( "test" );
+
+sh.enableSharding("test");
+s.ensurePrimaryShard('test', 'shard0001');
 var bulk = db.foo.initializeUnorderedBulkOp();
-for ( i=0; i<21; i++ ) {
+for (i = 0; i < 21; i++) {
     bulk.insert({ _id: i, x: i });
 }
 assert.writeOK(bulk.execute());
 
-// enable sharding, shard, and stop balancer
-sh.enableSharding("test");
 sh.shardCollection("test.foo" , { _id : 1 });
 sh.stopBalancer();
 

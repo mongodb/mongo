@@ -6,6 +6,7 @@ st.stopBalancer();
 
 var configDB = st.s.getDB('config');
 configDB.adminCommand({ enableSharding: 'test' });
+st.ensurePrimaryShard('test', 'shard0001');
 configDB.adminCommand({ shardCollection: 'test.user', key: { x: 'hashed' }, numInitialChunks: 2 });
 
 var metadata = st.d0.getDB('admin').runCommand({ getShardVersion: 'test.user',

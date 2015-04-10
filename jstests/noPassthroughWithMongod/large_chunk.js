@@ -14,6 +14,10 @@ db = s.getDB( "test" );
 // Step 1 - Test moving a large chunk
 //
 
+// Turn on sharding on the 'test.foo' collection and generate a large chunk
+s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
+
 bigString = ""
 while ( bigString.length < 10000 )
     bigString += "asdasdasdasdadasdasdasdasdasdasdasdasda";
@@ -27,8 +31,6 @@ while ( inserted < ( 400 * 1024 * 1024 ) ){
 }
 assert.writeOK(bulk.execute());
 
-// Turn on sharding on the 'test.foo' collection and generate a large chunk
-s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
 assert.eq( 1 , s.config.chunks.count() , "step 1 - need one large chunk" );

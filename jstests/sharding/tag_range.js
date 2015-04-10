@@ -10,6 +10,7 @@ s = new ShardingTest( "tag_range" , 2 , 0 , 1 , { nopreallocj : true } );
 db = s.getDB( "tag_range" );
 
 s.adminCommand( { enableSharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardCollection : "test.tag_range" , key : { _id : 1 } } );
 
 assert.eq( 1 , s.config.chunks.count() );

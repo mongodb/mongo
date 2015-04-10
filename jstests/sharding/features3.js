@@ -18,6 +18,7 @@ s.stopBalancer()
 
 // shard test.foo and add a split point
 s.adminCommand({enablesharding: "test"});
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand({shardcollection : "test.foo", key: {_id: 1}});
 s.adminCommand({split : "test.foo", middle: {_id: numDocs/2}});
 

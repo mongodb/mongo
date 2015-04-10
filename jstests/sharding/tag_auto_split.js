@@ -5,6 +5,7 @@ s = new ShardingTest( "tag_auto_split", 2, 0, 1, { nopreallocj : true, enableBal
 db = s.getDB( "test" );
 
 s.adminCommand( { enablesharding : "test" } )
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
 assert.eq( 1, s.config.chunks.count() );
@@ -29,6 +30,7 @@ s = new ShardingTest( "tag_auto_split2", 2, 0, 1, { nopreallocj : true, enableBa
 db = s.getDB( "test" );
 
 s.adminCommand( { enablesharding : "test" } )
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1, a : 1 } } );
 
 assert.eq( 1, s.config.chunks.count() );

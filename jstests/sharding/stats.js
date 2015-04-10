@@ -5,6 +5,7 @@ a = s._connections[0].getDB( "test" );
 b = s._connections[1].getDB( "test" );
 
 db = s.getDB( "test" );
+s.ensurePrimaryShard('test', 'shard0001');
 
 function numKeys(o){
     var num = 0;

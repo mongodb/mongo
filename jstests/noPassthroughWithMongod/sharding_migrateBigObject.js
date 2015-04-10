@@ -5,6 +5,9 @@ var admin = mongos.getDB("admin");
 db = mongos.getDB("test");
 var coll = db.getCollection("stuff")
 
+assert.commandWorked(admin.runCommand({ enablesharding : coll.getDB().getName() }));
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+
 var data = "x"
 var nsq = 16
 var n = 255
@@ -23,8 +26,6 @@ assert.writeOK(bulk.execute());
 assert.eq( 40 , coll.count() , "prep1" );
 
 printjson( coll.stats() )
-
-admin.runCommand({ enablesharding : "" + coll.getDB() })
 
 admin.printShardingStatus()
 

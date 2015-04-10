@@ -8,7 +8,7 @@
      var passST = new ShardingTest({ name : "passST", shards : 2, mongos : 1 });
      var passMongos = passST.s0;
      assert.commandWorked(passMongos.getDB("admin").runCommand({ enableSharding : "testSharded" }));
-
+     passST.ensurePrimaryShard('testSharded', 'shard0001');
      // Remember the global 'db' var
      var lastDB = db;
 

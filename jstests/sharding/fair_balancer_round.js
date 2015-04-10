@@ -15,6 +15,7 @@ var coll = mongos.getCollection("foo.bar");
 
 // Shard collection through first mongos
 assert(mongos.adminCommand({enableSharding : coll.getDB() + ""}).ok);
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 assert(mongos.adminCommand({shardCollection : coll + "", key : {_id : 1}}).ok);
 
 // Create a bunch of chunks

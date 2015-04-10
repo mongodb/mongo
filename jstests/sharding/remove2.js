@@ -71,16 +71,15 @@ addShard = function(st, replTest) {
     print( "Shard added successfully" );
 };
 
-var st = new ShardingTest( testName = "remove2",
-                           numShards = 2,
-                           verboseLevel = 0,
-                           numMongos = 1,
-                           { chunkSize : 1,
-                             rs : true,
-                             rs0 : { nodes : 2 },
-                             rs1 : { nodes : 2 },
-                             enableBalancer: true
-                           });
+var st = new ShardingTest({ shards: {
+                                rs0: { nodes: 2 },
+                                rs1: { nodes: 2 }
+                            },
+                            verbose: 0,
+                            other: {
+                                chunkSize: 1,
+                                enableBalancer: true
+                            }});
 
 // Pending resolution of SERVER-8598, we need to wait for deletion after chunk migrations to avoid
 // a pending delete re-creating a database after it was dropped.
@@ -104,6 +103,7 @@ for( var i = 0; i < rst0.nodes.length; i++ ) {
 }
 
 st.admin.runCommand({ enableSharding : coll.getDB().getName() });
+st.ensurePrimaryShard(coll.getDB().getName(), 'test-rs0');
 st.admin.runCommand({ shardCollection : coll.getFullName(), key: { i : 1 }});
 
 // Setup initial data

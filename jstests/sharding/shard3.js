@@ -9,6 +9,7 @@ s2 = s._mongos[1];
 
 db = s.getDB( "test" )
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
 assert( sh.getBalancerState() , "A1" )
@@ -145,6 +146,7 @@ assert.eq( 0 , doCounts( "after dropDatabase called" ) )
 // ---- retry commands SERVER-1471 ----
 
 s.adminCommand( { enablesharding : "test2" } );
+s.ensurePrimaryShard('test2', 'shard0000')
 s.adminCommand( { shardcollection : "test2.foo" , key : { num : 1 } } );
 dba = s.getDB( "test2" );
 dbb = s2.getDB( "test2" );

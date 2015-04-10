@@ -14,6 +14,7 @@ var shards = mongos.getCollection( "config.shards" ).find().toArray();
 var coll = mongos.getCollection( "foo.bar" );
 
 assert( admin.runCommand({ enableSharding : coll.getDB() + "" }).ok );
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 
 var upsertedResult = function(query, expr) {
     coll.remove({});

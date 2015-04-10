@@ -6,6 +6,9 @@ var s = new ShardingTest({ shards: { rs0: { nodes: 2 }, rs1: { nodes: 2 }},
 db = s.getDB( "test" )
 t = db.foo
 
+s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'test-rs0');
+
 // -------------------------------------------------------------------------------------------
 // ---------- test that config server updates when replica set config changes ----------------
 // -------------------------------------------------------------------------------------------
@@ -114,7 +117,6 @@ gc(); gc(); gc();
 
 assert.eq( 100 , db.foo.count() , "C1" )
 
-s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
 
 // We're doing some manual chunk stuff, so stop the balancer first

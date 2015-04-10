@@ -2,14 +2,16 @@
 s = new ShardingTest( "balance_tags1" , 3 , 1 , 1 , { sync:true, chunksize : 1 , nopreallocj : true } )
 s.config.settings.update({ _id: "balancer" }, { $set: { stopped: false }}, true);
 
+s.adminCommand({ enablesharding: "test" });
+s.ensurePrimaryShard('test', 'shard0001');
+
 db = s.getDB( "test" );
 var bulk = db.foo.initializeUnorderedBulkOp();
-for ( i=0; i<21; i++ ) {
+for (i = 0; i < 21; i++) {
     bulk.insert({ _id: i, x: i });
 }
 assert.writeOK(bulk.execute());
 
-s.adminCommand( { enablesharding : "test" } )
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
 s.stopBalancer();

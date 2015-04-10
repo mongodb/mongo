@@ -7,6 +7,7 @@ s = new ShardingTest( "features2" , 2 , 1 , 1 );
 s.stopBalancer()
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 
 a = s._connections[0].getDB( "test" );
 b = s._connections[1].getDB( "test" );
