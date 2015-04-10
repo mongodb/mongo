@@ -380,7 +380,7 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR **cursors, *cursor;
+	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i;
@@ -388,6 +388,7 @@ worker(void *arg)
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key_buf, *value;
+	char buf[512];
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -409,6 +410,20 @@ worker(void *arg)
 		lprintf(cfg, ENOMEM, 0,
 		    "worker: couldn't allocate cursor array");
 		goto err;
+	}
+	for (i = 0; i < cfg->table_count_idle; i++) {
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
+		if ((ret = session->open_cursor(
+		    session, buf, NULL, NULL, &tmp_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error opening idle table %s", buf);
+			goto err;
+		}
+		if ((ret = tmp_cursor->close(tmp_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error closing idle table %s", buf);
+			goto err;
+		}
 	}
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->open_cursor(session,
@@ -1602,20 +1617,18 @@ create_uris(CONFIG *cfg)
 		goto err;
 	}
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = calloc(base_uri_len + 3, 1);
+		uri = cfg->uris[i] = calloc(base_uri_len + 5, 1);
 		if (uri == NULL) {
 			ret = ENOMEM;
 			goto err;
 		}
-		memcpy(uri, cfg->base_uri, base_uri_len);
 		/*
 		 * If there is only one table, just use base name.
 		 */
-		if (cfg->table_count > 1) {
-			uri[base_uri_len] = uri[base_uri_len + 1] = '0';
-			uri[base_uri_len] = '0' + (i / 10);
-			uri[base_uri_len + 1] = '0' + (i % 10);
-		}
+		if (cfg->table_count == 1)
+			memcpy(uri, cfg->base_uri, base_uri_len);
+		else
+			sprintf(uri, "%s%05d", cfg->base_uri, i);
 	}
 err:	if (ret != 0 && cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)
@@ -1632,6 +1645,7 @@ create_tables(CONFIG *cfg)
 	WT_SESSION *session;
 	size_t i;
 	int ret;
+	char buf[512];
 
 	if (cfg->create == 0)
 		return (0);
@@ -1641,6 +1655,16 @@ create_tables(CONFIG *cfg)
 		lprintf(cfg, ret, 0,
 		    "Error opening a session on %s", cfg->home);
 		return (ret);
+	}
+
+	for (i = 0; i < cfg->table_count_idle; i++) {
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
+		if ((ret = session->create(
+		    session, buf, cfg->table_config)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error creating idle table %s", buf);
+			return (ret);
+		}
 	}
 
 	for (i = 0; i < cfg->table_count; i++)

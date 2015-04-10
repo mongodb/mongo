@@ -210,7 +210,10 @@ session configuration string
 table configuration string
 @par table_count (unsigned int, default=1)
 number of tables to run operations over. Keys are divided evenly over
-the tables. Default 1, maximum 99.
+the tables. Cursors are held open on all tables. Default 1, maximum
+99999.
+@par table_count_idle (unsigned int, default=0)
+number of tables to create, that won't be populated. Default 0.
 @par threads (string, default=)
 workload configuration: each 'count' entry is the total number of
 threads, and the 'insert', 'read' and 'update' entries are the ratios
