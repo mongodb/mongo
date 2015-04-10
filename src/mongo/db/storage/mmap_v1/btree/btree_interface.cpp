@@ -209,6 +209,9 @@ namespace {
 
             void savePositioned() override {
                 _txn = nullptr;
+
+                if (!_lastMoveWasRestore) _savedEOF = isEOF();
+
                 if (!isEOF()) {
                     _saved.bucket = _bucket;
                     _btree->savedCursors()->registerCursor(&_saved);
@@ -227,10 +230,12 @@ namespace {
                 if (!_saved.bucket.isNull()) _btree->savedCursors()->unregisterCursor(&_saved);
 
                 _saved.bucket = DiskLoc();
-                markEOF();
+                _savedEOF = true;
             }
 
             void restore(OperationContext* txn) override {
+                // guard against accidental double restore
+                invariant(!_txn);
                 _txn = txn;
 
                 // Always do a full seek on restore. We cannot use our last position since index
@@ -238,11 +243,10 @@ namespace {
                 // over them.
                 seekEndCursor();
 
-                if (isEOF()) return;
-
-                // guard against accidental double restore
-                invariant(!_saved.bucket.isNull());
-                _saved.bucket = DiskLoc();
+                if (_savedEOF) {
+                    markEOF();
+                    return;
+                }
 
                 if (_btree->savedCursors()->unregisterCursor(&_saved)) {
                     // We can use the fast restore mechanism.
@@ -330,6 +334,7 @@ namespace {
             bool _lastMoveWasRestore = false;
 
             // Only used by save/restore() if _bucket is non-Null.
+            bool _savedEOF = false;
             SavedCursorRegistry::SavedCursor _saved;
         };
 

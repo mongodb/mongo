@@ -30,6 +30,7 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -39,6 +40,9 @@ namespace mongo {
     std::unique_ptr<SortedDataInterface> HarnessHelper::newSortedDataInterface(
             bool unique,
             std::initializer_list<IndexKeyEntry> toInsert) {
+        invariant(std::is_sorted(toInsert.begin(), toInsert.end(),
+                  IndexEntryComparison(Ordering::make(BSONObj()))));
+
         auto index = newSortedDataInterface(unique);
         insertToIndex(this, index, toInsert);
         return index;
@@ -50,6 +54,16 @@ namespace mongo {
         WriteUnitOfWork wuow(txn);
         for (auto&& entry : toInsert) {
             ASSERT_OK(index->insert(txn, entry.key, entry.loc, true));
+        }
+        wuow.commit();
+    }
+
+    void removeFromIndex(ptr<OperationContext> txn,
+                         ptr<SortedDataInterface> index,
+                         std::initializer_list<IndexKeyEntry> toRemove) {
+        WriteUnitOfWork wuow(txn);
+        for (auto&& entry : toRemove) {
+            index->unindex(txn, entry.key, entry.loc, true);
         }
         wuow.commit();
     }

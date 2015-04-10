@@ -61,14 +61,14 @@ namespace mongo {
     const BSONObj compoundKey3b = BSON( "" << 3 << "" << "b" );
     const BSONObj compoundKey3c = BSON( "" << 3 << "" << "c" );
 
-    const RecordId loc1( 10, 42 );
-    const RecordId loc2( 10, 44 );
-    const RecordId loc3( 10, 46 );
-    const RecordId loc4( 10, 48 );
-    const RecordId loc5( 10, 50 );
-    const RecordId loc6( 10, 52 );
-    const RecordId loc7( 10, 54 );
-    const RecordId loc8( 10, 56 );
+    const RecordId loc1( 0, 42 );
+    const RecordId loc2( 0, 44 );
+    const RecordId loc3( 0, 46 );
+    const RecordId loc4( 0, 48 );
+    const RecordId loc5( 0, 50 );
+    const RecordId loc6( 0, 52 );
+    const RecordId loc7( 0, 54 );
+    const RecordId loc8( 0, 56 );
 
     class RecoveryUnit;
 
@@ -86,6 +86,8 @@ namespace mongo {
 
         /**
          * Creates a new SDI with some initial data.
+         *
+         * For clarity to readers, toInsert must be sorted.
          */
         std::unique_ptr<SortedDataInterface> newSortedDataInterface(
             bool unique,
@@ -96,6 +98,8 @@ namespace mongo {
      * Inserts all entries in toInsert into index.
      * ASSERT_OKs the inserts.
      * Always uses dupsAllowed=true.
+     *
+     * Should be used for declaring and changing conditions, not for testing inserts.
      */
     void insertToIndex(ptr<OperationContext> txn,
                        ptr<SortedDataInterface> index,
@@ -105,6 +109,22 @@ namespace mongo {
                               ptr<SortedDataInterface> index,
                               std::initializer_list<IndexKeyEntry> toInsert) {
         insertToIndex(harness->newOperationContext(), index, toInsert);
+    }
+
+    /**
+     * Removes all entries in toRemove from index.
+     * Always uses dupsAllowed=true.
+     *
+     * Should be used for declaring and changing conditions, not for testing removes.
+     */
+    void removeFromIndex(ptr<OperationContext> txn,
+                         ptr<SortedDataInterface> index,
+                         std::initializer_list<IndexKeyEntry> toRemove);
+
+    inline void removeFromIndex(ptr<HarnessHelper> harness,
+                               ptr<SortedDataInterface> index,
+                               std::initializer_list<IndexKeyEntry> toRemove) {
+        removeFromIndex(harness->newOperationContext(), index, toRemove);
     }
 
     std::unique_ptr<HarnessHelper> newHarnessHelper();
