@@ -39,7 +39,9 @@ for( var i = 0; i < 3; i++ ){
 
 // Enable sharding
 printjson( adminA.runCommand({ enableSharding : collsFooA[0].getDB() + "" }) )
+st.ensurePrimaryShard('foo', 'shard0001');
 printjson( adminA.runCommand({ enableSharding : collsBarA[0].getDB() + "" }) )
+st.ensurePrimaryShard('bar', 'shard0000');
 
 printjson( adminA.runCommand({ shardCollection : collsFooA[1] + "", key : { _id : 1 } }) )
 printjson( adminA.runCommand({ shardCollection : collsFooA[2] + "", key : { _id : 1 } }) )

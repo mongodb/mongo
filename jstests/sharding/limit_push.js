@@ -15,6 +15,7 @@ assert.eq( 100 , db.limit_push.find().length() , "Incorrect number of documents"
 
 // Shard the collection
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.limit_push" , key : { x : 1 } } );
 
 // Now split the and move the data between the shards

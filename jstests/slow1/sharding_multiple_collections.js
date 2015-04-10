@@ -3,8 +3,8 @@
 s = new ShardingTest( "multcollections" , 2 , 1 , 1 , { chunksize : 1, enableBalancer : true }  );
 
 s.adminCommand( { enablesharding : "test" } );
-
 db = s.getDB( "test" )
+s.ensurePrimaryShard('test', 'shard0001');
 
 N = 100000
 

@@ -17,6 +17,7 @@ var shard0 = new Mongo( shards[0].host );
 var shard1 = new Mongo( shards[1].host );
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 
 //******************Part 1********************
 

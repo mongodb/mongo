@@ -27,6 +27,7 @@ s.stopBalancer()
 db = s.getDB( "test" );
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 assert.eq( 1 , s.config.chunks.count()  , "sanity check 1" );
 

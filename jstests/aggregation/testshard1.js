@@ -29,6 +29,7 @@ var shardedAggTest = new ShardingTest({
 
 shardedAggTest.adminCommand( { enablesharding : "aggShard" } );
 db = shardedAggTest.getDB( "aggShard" );
+shardedAggTest.ensurePrimaryShard('aggShard', 'shard0000');
 
 /* make sure its cleaned up */
 db.ts1.drop();

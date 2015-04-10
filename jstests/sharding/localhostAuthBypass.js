@@ -54,7 +54,7 @@ var assertCannotRunCommands = function(mongo, st) {
     assert.writeError(test.foo.remove({ _id: 0 }));
 
     // Multi-shard
-    assert.throws(function() { 
+    assert.throws(function() {
         test.foo.mapReduce(
             function() { emit(1, 1); }, 
             function(id, count) { return Array.sum(count); },
@@ -145,9 +145,12 @@ var authenticate = function(mongo) {
     mongo.getDB("admin").auth(username, password);
 };
 
-var setupSharding = function(mongo) {
+var setupSharding = function(shardingTest) {
+    var mongo = shardingTest.s;
+
     print("============ enabling sharding on test.foo.");
     mongo.getDB("admin").runCommand({enableSharding : "test"});
+    shardingTest.ensurePrimaryShard('test', 'shard0001');
     mongo.getDB("admin").runCommand({shardCollection : "test.foo", key : {_id : 1}});
 
     var test = mongo.getDB("test");
@@ -225,10 +228,10 @@ var runTest = function(useHostName) {
     createUser(mongo);
 
     authenticate(mongo);
-    setupSharding(mongo);
+    authenticate(st.s);
+    setupSharding(st);
 
     addUsersToEachShard(st);
-    authenticate(st.s);
     st.printShardingStatus();
 
     assertCanRunCommands(mongo, st);

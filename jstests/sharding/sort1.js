@@ -3,6 +3,7 @@ s = new ShardingTest( "sort1" , 2 , 0 , 2 )
 s.stopBalancer();
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.data" , key : { 'sub.num' : 1 } } );
 
 db = s.getDB( "test" );

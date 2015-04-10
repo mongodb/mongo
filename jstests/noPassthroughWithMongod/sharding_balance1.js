@@ -4,6 +4,7 @@
 s = new ShardingTest( "slow_sharding_balance1" , 2 , 1 , 1 , { chunksize : 1, enableBalancer : true } )
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 
 s.config.settings.find().forEach( printjson )
 

@@ -14,6 +14,7 @@ serverName = s.getServerName( "test" )
 other = s.config.shards.findOne( { _id : { $ne : serverName } } );
 
 s.adminCommand( { enablesharding : "test" } )
+s.ensurePrimaryShard('test', 'test-rs0');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
 for ( i=0; i<20; i++ )

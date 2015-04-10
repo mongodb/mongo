@@ -123,7 +123,7 @@ test(db, false, '2dsphere');
 var sharded = new ShardingTest({shards: 3, verbose: 0, mongos: 1});
 sharded.stopBalancer();
 sharded.adminCommand( { enablesharding : "test" } );
-
+sharded.ensurePrimaryShard('test', 'shard0001');
 test(sharded.getDB('test'), true, '2d');
 test(sharded.getDB('test'), true, '2dsphere');
 

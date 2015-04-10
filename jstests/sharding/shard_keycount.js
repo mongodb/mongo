@@ -17,6 +17,7 @@ for(var i = 0; i < 10; i++){
 
 // Enable sharding on DB
 s.adminCommand( { enablesharding : dbName } );
+s.ensurePrimaryShard(dbName, 'shard0001');
 
 // Enable sharding on collection
 s.adminCommand( { shardcollection : ns, key : { _id : 1 } } );

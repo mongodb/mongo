@@ -32,6 +32,7 @@ config.shards.find().forEach( function( doc ){
 jsTest.log( "Enabling sharding for the first time..." )
 
 admin.runCommand({ enableSharding : coll.getDB() + "" })
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 admin.runCommand({ shardCollection : coll  + "", key : { _id : 1 } })
     
 assert.writeOK(coll.insert({ hello : "world" }));
@@ -78,6 +79,7 @@ assert(droppedCollDoc.lastmodEpoch.equals(new ObjectId("000000000000000000000000
        "epoch not zero: " + droppedCollDoc.lastmodEpoch);
 
 admin.runCommand({ enableSharding : coll.getDB() + "" })
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 admin.runCommand({ shardCollection : coll  + "", key : { _id : 1 } })
 
 var bulk = coll.initializeUnorderedBulkOp();

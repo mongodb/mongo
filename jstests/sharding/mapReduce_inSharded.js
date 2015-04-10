@@ -10,6 +10,7 @@ var st = new ShardingTest({ shards : 2, verbose : 1, mongos : 1, other : { chunk
 st.startBalancer();
 
 st.adminCommand( { enablesharding : "mrShard" } )
+st.ensurePrimaryShard('mrShard', 'shard0001');
 st.adminCommand( { shardcollection : "mrShard.srcSharded", key : { "_id" : 1 } } )
 
 var db = st.getDB( "mrShard" );

@@ -12,6 +12,7 @@ adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles
 adminDB.auth('admin', 'password');
 
 adminDB.runCommand({enableSharding : "test"});
+st.ensurePrimaryShard('test', 'shard0001');
 adminDB.runCommand({shardCollection : "test.foo", key : {x : 1}});
 st.stopBalancer();
 

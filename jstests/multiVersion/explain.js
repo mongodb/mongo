@@ -49,6 +49,7 @@ coll = testDb.standalone;
 coll.drop();
 
 assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName()}));
+st.ensurePrimaryShard(testDb.getName(), 'shard0001');
 testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 
 coll.insert({_id: 1, a: 1});
@@ -92,6 +93,7 @@ coll = testDb.standalone;
 coll.drop();
 
 assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName()}));
+st.ensurePrimaryShard(testDb.getName(), 'shard0001');
 testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 
 coll.insert({_id: 1, a: 1});
@@ -135,6 +137,7 @@ coll = testDb.standalone;
 coll.drop();
 
 assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName()}));
+st.ensurePrimaryShard(testDb.getName(), 'shard0001');
 testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 
 // Disable the balancer and pre-split in order to ensure chunks on both shards.

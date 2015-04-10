@@ -4,6 +4,7 @@
 s = new ShardingTest( "auto1" , 2 , 1 , 1 );
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 // repeat same tests with hashed shard key, to ensure identical behavior
 s.adminCommand( { shardcollection : "test.update0" , key : { key : 1 } } );
 s.adminCommand( { shardcollection : "test.update1" , key : { key : "hashed" } } );

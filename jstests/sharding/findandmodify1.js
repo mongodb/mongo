@@ -2,6 +2,7 @@ s = new ShardingTest( "find_and_modify_sharded" , 2 , 2);
 
 s.adminCommand( { enablesharding : "test" } );
 db = s.getDB( "test" );
+s.ensurePrimaryShard('test', 'shard0001');
 primary = s.getServer( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 

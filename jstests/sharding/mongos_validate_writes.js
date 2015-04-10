@@ -26,6 +26,7 @@ var staleCollA = staleMongosA.getCollection( coll + "" )
 var staleCollB = staleMongosB.getCollection( coll + "" )
 
 printjson( admin.runCommand({ enableSharding : coll.getDB() + "" }) )
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 coll.ensureIndex({ a : 1 })
 printjson( admin.runCommand({ shardCollection : coll + "", key : { a : 1 } }) )
 

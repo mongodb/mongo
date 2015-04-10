@@ -16,6 +16,7 @@ t = s.getDB( dbname ).getCollection( coll );
 
 // enable sharding of the collection. Only 1 chunk initially
 s.adminCommand( { enablesharding : dbname } );
+s.ensurePrimaryShard(dbname, 'shard0001');
 s.adminCommand( { shardcollection : ns , key: { _id : 1 } } );
 
 // insert 24 docs, with timestamps at one hour intervals

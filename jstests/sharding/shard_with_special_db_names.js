@@ -5,11 +5,13 @@ var specialDB = "[a-z]+";
 var specialNS = specialDB + ".special";
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.data" , key : { num : 1 } } );
 
 // Test that the database will not complain "cannot have 2 database names that
 // differs on case"
 s.adminCommand( { enablesharding : specialDB } );
+s.ensurePrimaryShard(specialDB, 'shard0000');
 s.adminCommand( { shardcollection :  specialNS, key : { num : 1 } } );
 
 var exists = s.getDB("config").collections.find( { _id: specialNS } ).count();

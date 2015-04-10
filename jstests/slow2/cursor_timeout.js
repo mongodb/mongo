@@ -21,6 +21,7 @@ var configDB = st.config;
 var coll = st.s.getDB( 'test' ).user;
 
 adminDB.runCommand({ enableSharding: coll.getDB().getName() });
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
 adminDB.runCommand({ shardCollection: coll.getFullName(), key: { x: 1 }});
 
 var data = 'c';

@@ -1,6 +1,7 @@
 var st = new ShardingTest({ shards: 2 });
 
 st.adminCommand({ enablesharding: "test" });
+st.ensurePrimaryShard('test', 'shard0001');
 st.adminCommand({ shardcollection: "test.offerChange", key: { "categoryId": 1, "store": 1, "_id": 1 } });
 
 var db = st.s.getDB('test');

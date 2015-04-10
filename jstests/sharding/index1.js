@@ -18,7 +18,10 @@ for ( var i = 0; i < 19; i++ ) {
     }
     assert.writeOK(bulk.execute());
 
-    if(i == 0) s.adminCommand( { enablesharding : "" + coll._db } );
+    if (i == 0) {
+        s.adminCommand({ enablesharding: "" + coll._db });
+        s.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+    }
 
     print("\n\n\n\n\nTest # " + i)
     

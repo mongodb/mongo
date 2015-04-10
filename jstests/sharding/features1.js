@@ -5,6 +5,7 @@ s = new ShardingTest( "features1" , 2 , 1 , 1 );
 s.stopBalancer();
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 
 // ---- can't shard system namespaces ----
 

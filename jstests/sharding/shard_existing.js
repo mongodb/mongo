@@ -23,6 +23,7 @@ var dataSize = db.data.stats().size;
 assert.lte(totalSize, dataSize);
 
 s.adminCommand( { enablesharding : "test" } );
+s.ensurePrimaryShard('test', 'shard0001');
 res = s.adminCommand( { shardcollection : "test.data" , key : { _id : 1 } } );
 printjson(res);
 

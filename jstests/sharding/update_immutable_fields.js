@@ -11,6 +11,7 @@ var coll = mongos.getCollection(jsTestName() + ".coll1");
 var shard0 = st.shard0;
 
 printjson(config.adminCommand({enableSharding : coll.getDB() + ""}))
+st.ensurePrimaryShard(coll.getDB().getName(), 'shard0000');
 printjson(config.adminCommand({shardCollection : "" + coll, key : {a : 1}}))
 
 var getDirectShardedConn = function( st, collName ) {

@@ -7,6 +7,7 @@ s1 = new ShardingTest( "multi_mongos1" , 2 , 1 , 2 );
 s2 = s1._mongos[1];
 
 s1.adminCommand( { enablesharding : "test" } );
+s1.ensurePrimaryShard('test', 'shard0001');
 s1.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
 s1.config.databases.find().forEach( printjson )
