@@ -2,42 +2,48 @@
 // Tests basic mongos GLE behavior
 //
 
-var passST = new ShardingTest({ name : "passST", shards : 2, mongos : 1 });
-var passMongos = passST.s0;
-assert.commandWorked(passMongos.getDB("admin").runCommand({ enableSharding : "testSharded" }));
+(function() {
+     "use strict"
 
-// Remember the global 'db' var
-var lastDB = db;
+     var passST = new ShardingTest({ name : "passST", shards : 2, mongos : 1 });
+     var passMongos = passST.s0;
+     assert.commandWorked(passMongos.getDB("admin").runCommand({ enableSharding : "testSharded" }));
 
-var coreTests = listFiles("jstests/gle/core");
+     // Remember the global 'db' var
+     var lastDB = db;
 
-var testsToSkip = new RegExp('[\\/\\\\](' +
-        'error1|' + // getPrevError not supported in sharding
-        'remove5|' +
-        'unique2|' +
-        'update4' +
-        ')\.js$');
+     var coreTests = listFiles("jstests/gle/core");
 
-coreTests.forEach( function(file) {
+     var testsToSkip = new RegExp('[\\/\\\\](' +
+                                  'error1|' + // getPrevError not supported in sharding
+                                  'remove5|' +
+                                  'unique2|' +
+                                  'update4' +
+                                  ')\.js$');
 
-    // Reset global 'db' var
-    db = passMongos.getDB("testBasicMongosGLE");
+     coreTests.forEach(
+         function(file) {
 
-    if (testsToSkip.test(file.name)) {
-        print(" !!!!!!!!!!!!!!! skipping test " + file.name);
-        return;
-    }
+             // Reset global 'db' var
+             db = passMongos.getDB("testBasicMongosGLE");
 
-    print(" *******************************************");
-    print("         Test : " + file.name + " ...");
+             if (testsToSkip.test(file.name)) {
+                 print(" !!!!!!!!!!!!!!! skipping test " + file.name);
+                 return;
+             }
+
+             print(" *******************************************");
+             print("         Test : " + file.name + " ...");
 
 
-    var testTime = Date.timeFunc( function() { load(file.name); }, 1);
-    print("                " + testTime + "ms");
-});
+             var testTime = Date.timeFunc( function() { load(file.name); }, 1);
+             print("                " + testTime + "ms");
+         });
 
-print("Tests completed.");
+     print("Tests completed.");
 
-// Restore 'db' var
-db = lastDB;
-passST.stop();
+     // Restore 'db' var
+     db = lastDB;
+     passST.stop();
+
+}());

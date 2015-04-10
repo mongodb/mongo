@@ -2,27 +2,31 @@
 // Tests the core GLE behavior
 //
 
-var conn = MongoRunner.runMongod({});
+(function() {
+     "use strict"
 
-// Remember the global 'db' var
-var lastDB = db;
+     var conn = MongoRunner.runMongod({});
 
-var coreTests = listFiles("jstests/gle/core");
+     // Remember the global 'db' var
+     var lastDB = db;
 
-coreTests.forEach( function(file) {
+     var coreTests = listFiles("jstests/gle/core");
 
-    // Reset global 'db' var
-    db = conn.getDB("testBasicGLE");
+     coreTests.forEach( function(file) {
 
-    print(" *******************************************");
-    print("         Test : " + file.name + " ...");
+                            // Reset global 'db' var
+                            db = conn.getDB("testBasicGLE");
 
-    var testTime = Date.timeFunc( function() { load(file.name); }, 1);
-    print("                " + testTime + "ms");
-});
+                            print(" *******************************************");
+                            print("         Test : " + file.name + " ...");
 
-print("Tests completed.");
+                            var testTime = Date.timeFunc( function() { load(file.name); }, 1);
+                            print("                " + testTime + "ms");
+                        });
 
-// Restore 'db' var
-db = lastDB;
-MongoRunner.stopMongod(conn);
+     print("Tests completed.");
+
+     // Restore 'db' var
+     db = lastDB;
+     MongoRunner.stopMongod(conn);
+ }());

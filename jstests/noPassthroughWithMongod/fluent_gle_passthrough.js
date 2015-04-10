@@ -2,40 +2,44 @@
 // Tests the behavior of the shell's fluent (bulk) API under legacy opcode writes
 //
 
-var conn = MongoRunner.runMongod({});
+(function() {
+     "use strict"
 
-// Explicitly disable write commands over this connection
-conn.useWriteCommands = function() { return false; };
-// Remember the global 'db' var
-var lastDB = db;
+     var conn = MongoRunner.runMongod({});
 
-// The fluent API tests are a subset of the standard suite
-var coreTests = listFiles("jstests/core");
-var fluentTests = [];
+     // Explicitly disable write commands over this connection
+     conn.useWriteCommands = function() { return false; };
+     // Remember the global 'db' var
+     var lastDB = db;
 
-var isFluentAPITest = function(fileName) {
-    return /(^fluent_)|(^bulk_)/.test(fileName) && /\.js$/.test(fileName);
-};
+     // The fluent API tests are a subset of the standard suite
+     var coreTests = listFiles("jstests/core");
+     var fluentTests = [];
 
-coreTests.forEach( function(file) {
-    if (isFluentAPITest(file.baseName))
-        fluentTests.push(file);
-});
+     var isFluentAPITest = function(fileName) {
+         return /(^fluent_)|(^bulk_)/.test(fileName) && /\.js$/.test(fileName);
+     };
 
-fluentTests.forEach( function(file) {
+     coreTests.forEach( function(file) {
+                            if (isFluentAPITest(file.baseName))
+                                fluentTests.push(file);
+                        });
 
-    // Reset global 'db' var
-    db = conn.getDB("testFluent");
+     fluentTests.forEach( function(file) {
 
-    print(" *******************************************");
-    print("         Test : " + file.name + " ...");
+                              // Reset global 'db' var
+                              db = conn.getDB("testFluent");
 
-    var testTime = Date.timeFunc( function() { load(file.name); }, 1);
-    print("                " + testTime + "ms");
-});
+                              print(" *******************************************");
+                              print("         Test : " + file.name + " ...");
 
-print("Tests completed.");
+                              var testTime = Date.timeFunc( function() { load(file.name); }, 1);
+                              print("                " + testTime + "ms");
+                          });
 
-// Restore 'db' var
-db = lastDB;
-MongoRunner.stopMongod(conn);
+     print("Tests completed.");
+
+     // Restore 'db' var
+     db = lastDB;
+     MongoRunner.stopMongod(conn);
+}());
