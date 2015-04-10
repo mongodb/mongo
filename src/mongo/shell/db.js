@@ -633,14 +633,33 @@ DB.prototype.currentOp = function( arg ){
         else if ( arg )
             q["$all"] = true;
     }
-    return this.$cmd.sys.inprog.findOne( q );
+
+    // don't send any read preference with psudo commands
+    var _readPref = this.getMongo().getReadPrefMode();
+    try {
+        this.getMongo().setReadPref(null);
+        var results = this.$cmd.sys.inprog.findOne( q );
+    } finally {
+        this.getMongo().setReadPref(_readPref);
+    }
+
+    return results
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
     if( !op ) 
         throw "no opNum to kill specified";
-    return this.$cmd.sys.killop.findOne({'op':op});
+
+    var _readPref = this.getMongo().getReadPrefMode();
+    try {
+        this.getMongo().setReadPref(null);
+        var results = this.$cmd.sys.killop.findOne({'op':op});
+    } finally {
+        this.getMongo().setReadPref(_readPref);
+    }
+
+    return results
 }
 DB.prototype.killOP = DB.prototype.killOp;
 
@@ -866,7 +885,15 @@ DB.prototype.fsyncLock = function() {
 }
 
 DB.prototype.fsyncUnlock = function() {
-    return this.getSiblingDB("admin").$cmd.sys.unlock.findOne()
+    var _readPref = this.getMongo().getReadPrefMode();
+    try {
+        this.getMongo().setReadPref(null);
+        var results = this.getSiblingDB("admin").$cmd.sys.unlock.findOne();
+    } finally {
+        this.getMongo().setReadPref(_readPref);
+    }
+
+    return results
 }
 
 DB.autocomplete = function(obj){
