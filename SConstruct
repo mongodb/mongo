@@ -313,10 +313,6 @@ add_option('build-fast-and-loose', "looser dependency checking, ignored for --re
 
 add_option('disable-warnings-as-errors', "Don't add -Werror to compiler command line", 0, False)
 
-add_option('propagate-shell-environment',
-           "Pass shell environment to sub-processes (NEVER for production builds)",
-           0, False)
-
 add_option('variables-help',
            "Print the help text for SCons variables", 0, False)
 
@@ -441,6 +437,11 @@ env_vars.Add('CXX',
 env_vars.Add('CXXFLAGS',
     help='Sets flags for the C++ compiler',
     converter=variable_shlex_converter)
+
+# Note: This probably is only really meaningful when configured via a variables file. It will
+# also override whatever the SCons platform defaults would be.
+env_vars.Add('ENV',
+    help='Sets the environment for subprocesses')
 
 env_vars.Add('HOST_ARCH',
     help='Sets the native architecture of the compiler',
@@ -825,9 +826,6 @@ if has_option("cache"):
 
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
-
-if has_option("propagate-shell-environment"):
-    env['ENV'] = dict(os.environ);
 
 # Ignore requests to build fast and loose for release builds.
 if get_option('build-fast-and-loose') == "on" and not has_option('release'):
