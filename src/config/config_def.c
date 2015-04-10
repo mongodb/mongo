@@ -61,9 +61,11 @@ static const WT_CONFIG_CHECK confchk_eviction_subconfigs[] = {
 
 static const WT_CONFIG_CHECK confchk_file_manager_subconfigs[] = {
 	{ "close_handle_minimum", "string", NULL, NULL, NULL, 0 },
-	{ "close_idle_time", "int", NULL, "min=1,max=1000", NULL, 0 },
+	{ "close_idle_time", "int",
+	    NULL, "min=1,max=100000",
+	    NULL, 0 },
 	{ "close_scan_interval", "int",
-	    NULL, "min=1,max=1000",
+	    NULL, "min=1,max=100000",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
