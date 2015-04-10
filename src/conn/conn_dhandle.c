@@ -132,14 +132,15 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	uint64_t bucket;
 
-	WT_UNUSED(flags);	/* Only used in diagnostic builds */
 	conn = S2C(session);
 
-	/* We must be holding the handle list lock at a higher level. */
+	/*
+	 * We must be holding the handle list lock at a higher level, and not
+	 * have a reference.
+	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) &&
 	    !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
-	/* Increment the reference count if we already have the btree open. */
 	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
 	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
 		if (strcmp(name, dhandle->name) == 0 &&
