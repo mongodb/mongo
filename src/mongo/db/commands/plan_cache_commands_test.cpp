@@ -179,6 +179,7 @@ namespace {
 
     TEST(PlanCacheCommandsTest, Canonicalize) {
         // Invalid parameters
+        PlanCache planCache;
         CanonicalQuery* cqRaw;
         OperationContextNoop txn;
 
@@ -201,31 +202,31 @@ namespace {
         // Equivalent query should generate same key.
         ASSERT_OK(PlanCacheCommand::canonicalize(&txn, ns, fromjson("{query: {b: 1, a: 1}}"), &cqRaw));
         scoped_ptr<CanonicalQuery> equivQuery(cqRaw);
-        ASSERT_EQUALS(query->getPlanCacheKey(), equivQuery->getPlanCacheKey());
+        ASSERT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*equivQuery));
 
         // Sort query should generate different key from unsorted query.
         ASSERT_OK(PlanCacheCommand::canonicalize(&txn, ns,
             fromjson("{query: {a: 1, b: 1}, sort: {a: 1, b: 1}}"), &cqRaw));
         scoped_ptr<CanonicalQuery> sortQuery1(cqRaw);
-        ASSERT_NOT_EQUALS(query->getPlanCacheKey(), sortQuery1->getPlanCacheKey());
+        ASSERT_NOT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*sortQuery1));
 
         // Confirm sort arguments are properly delimited (SERVER-17158)
         ASSERT_OK(PlanCacheCommand::canonicalize(&txn, ns,
             fromjson("{query: {a: 1, b: 1}, sort: {aab: 1}}"), &cqRaw));
         scoped_ptr<CanonicalQuery> sortQuery2(cqRaw);
-        ASSERT_NOT_EQUALS(sortQuery1->getPlanCacheKey(), sortQuery2->getPlanCacheKey());
+        ASSERT_NOT_EQUALS(planCache.computeKey(*sortQuery1), planCache.computeKey(*sortQuery2));
 
         // Changing order and/or value of predicates should not change key
         ASSERT_OK(PlanCacheCommand::canonicalize(&txn, ns,
             fromjson("{query: {b: 3, a: 3}, sort: {a: 1, b: 1}}"), &cqRaw));
         scoped_ptr<CanonicalQuery> sortQuery3(cqRaw);
-        ASSERT_EQUALS(sortQuery1->getPlanCacheKey(), sortQuery3->getPlanCacheKey());
+        ASSERT_EQUALS(planCache.computeKey(*sortQuery1), planCache.computeKey(*sortQuery3));
 
         // Projected query should generate different key from unprojected query.
         ASSERT_OK(PlanCacheCommand::canonicalize(&txn, ns,
             fromjson("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}"), &cqRaw));
         scoped_ptr<CanonicalQuery> projectionQuery(cqRaw);
-        ASSERT_NOT_EQUALS(query->getPlanCacheKey(), projectionQuery->getPlanCacheKey());
+        ASSERT_NOT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*projectionQuery));
     }
 
     /**

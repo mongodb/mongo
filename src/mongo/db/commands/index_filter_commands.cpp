@@ -275,7 +275,7 @@ namespace mongo {
             }
 
             scoped_ptr<CanonicalQuery> cq(cqRaw);
-            querySettings->removeAllowedIndices(*cq);
+            querySettings->removeAllowedIndices(planCache->computeKey(*cq));
 
             // Remove entry from plan cache
             planCache->remove(*cq);
@@ -391,7 +391,7 @@ namespace mongo {
         scoped_ptr<CanonicalQuery> cq(cqRaw);
 
         // Add allowed indices to query settings, overriding any previous entries.
-        querySettings->setAllowedIndices(*cq, indexes);
+        querySettings->setAllowedIndices(*cq, planCache->computeKey(*cq), indexes);
 
         // Remove entry from plan cache.
         planCache->remove(*cq);

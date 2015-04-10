@@ -82,11 +82,9 @@ namespace mongo {
         _clear();
     }
 
-    bool QuerySettings::getAllowedIndices(const CanonicalQuery& query,
+    bool QuerySettings::getAllowedIndices(const PlanCacheKey& key,
                                           AllowedIndices** allowedIndicesOut) const {
         invariant(allowedIndicesOut);
-
-        const PlanCacheKey& key = query.getPlanCacheKey();
 
         boost::lock_guard<boost::mutex> cacheLock(_mutex);
         AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
@@ -116,6 +114,7 @@ namespace mongo {
     }
 
     void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
+                                          const PlanCacheKey& key,
                                           const std::vector<BSONObj>& indexes) {
         const LiteParsedQuery& lpq = canonicalQuery.getParsed();
         const BSONObj& query = lpq.getFilter();
@@ -123,7 +122,6 @@ namespace mongo {
         const BSONObj& projection = lpq.getProj();
         AllowedIndexEntry* entry = new AllowedIndexEntry(query, sort, projection, indexes);
 
-        const PlanCacheKey& key = canonicalQuery.getPlanCacheKey();
         boost::lock_guard<boost::mutex> cacheLock(_mutex);
         AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
         // Replace existing entry.
@@ -134,8 +132,7 @@ namespace mongo {
         _allowedIndexEntryMap[key] = entry;
     }
 
-    void QuerySettings::removeAllowedIndices(const CanonicalQuery& canonicalQuery) {
-        const PlanCacheKey& key = canonicalQuery.getPlanCacheKey();
+    void QuerySettings::removeAllowedIndices(const PlanCacheKey& key) {
         boost::lock_guard<boost::mutex> cacheLock(_mutex);
         AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
 

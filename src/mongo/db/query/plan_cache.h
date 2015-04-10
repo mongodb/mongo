@@ -42,6 +42,9 @@
 
 namespace mongo {
 
+    // A PlanCacheKey is a string-ified version of a query's predicate/projection/sort.
+    typedef std::string PlanCacheKey;
+
     struct PlanRankingDecision;
     struct QuerySolution;
     struct QuerySolutionNode;
@@ -332,6 +335,15 @@ namespace mongo {
          * Remove *all* entries.
          */
         void clear();
+
+        /**
+         * Get the cache key corresponding to the given canonical query.  The query need not already
+         * be cached.
+         *
+         * This is provided in the public API simply as a convenience for consumers who need some
+         * description of query shape (e.g. index filters).
+         */
+        PlanCacheKey computeKey(const CanonicalQuery&) const;
 
         /**
          * Returns a copy of a cache entry.

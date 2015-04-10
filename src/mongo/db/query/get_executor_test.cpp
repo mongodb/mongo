@@ -75,23 +75,24 @@ namespace {
     void testAllowedIndices(const char* hintKeyPatterns[],
                             const char* indexCatalogKeyPatterns[],
                             const char* expectedFilteredKeyPatterns[]) {
+         PlanCache planCache;
          QuerySettings querySettings;
          AllowedIndices *allowedIndicesRaw;
 
          // getAllowedIndices should return false when query shape is not yet in query settings.
          auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
-         ASSERT_FALSE(querySettings.getAllowedIndices(*cq, &allowedIndicesRaw));
+         PlanCacheKey key = planCache.computeKey(*cq);
+         ASSERT_FALSE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
 
          // Add entry to query settings.
-         const PlanCacheKey& key = cq->getPlanCacheKey();
          std::vector<BSONObj> indexKeyPatterns;
          for (int i=0; hintKeyPatterns[i] != NULL; ++i) {
              indexKeyPatterns.push_back(fromjson(hintKeyPatterns[i]));
          }
-         querySettings.setAllowedIndices(*cq, indexKeyPatterns);
+         querySettings.setAllowedIndices(*cq, key, indexKeyPatterns);
 
          // Index entry vector should contain 1 entry after filtering.
-         ASSERT_TRUE(querySettings.getAllowedIndices(*cq, &allowedIndicesRaw));
+         ASSERT_TRUE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
          ASSERT_FALSE(key.empty());
          ASSERT(NULL != allowedIndicesRaw);
          auto_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);

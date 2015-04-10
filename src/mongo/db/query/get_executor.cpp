@@ -159,10 +159,12 @@ namespace mongo {
         // If query supports index filters, filter params.indices by indices in query settings.
         QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
         AllowedIndices* allowedIndicesRaw;
+        PlanCacheKey planCacheKey =
+            collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
 
         // Filter index catalog if index filters are specified for query.
         // Also, signal to planner that application hint should be ignored.
-        if (querySettings->getAllowedIndices(*canonicalQuery, &allowedIndicesRaw)) {
+        if (querySettings->getAllowedIndices(planCacheKey, &allowedIndicesRaw)) {
             boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
             filterAllowedIndexEntries(*allowedIndices, &plannerParams->indices);
             plannerParams->indexFiltersApplied = true;

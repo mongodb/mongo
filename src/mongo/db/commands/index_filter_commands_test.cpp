@@ -159,8 +159,7 @@ namespace {
                                                    entry->projection, &cqRaw));
             scoped_ptr<CanonicalQuery> currentQuery(cqRaw);
 
-            const PlanCacheKey& currentKey = currentQuery->getPlanCacheKey();
-            if (currentKey == cq->getPlanCacheKey()) {
+            if (planCache.computeKey(*currentQuery) == planCache.computeKey(*cq)) {
                 found = true;
             }
             // Release resources for cache entry after extracting key.

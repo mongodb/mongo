@@ -39,9 +39,6 @@
 
 namespace mongo {
 
-    // TODO: Is this binary data really?
-    typedef std::string PlanCacheKey;
-
     class CanonicalQuery {
     public:
         /**
@@ -165,11 +162,6 @@ namespace mongo {
         const LiteParsedQuery& getParsed() const { return *_pq; }
         const ParsedProjection* getProj() const { return _proj.get(); }
 
-        /**
-         * Get the cache key for this canonical query.
-         */
-        const PlanCacheKey& getPlanCacheKey() const;
-
         // Debugging
         std::string toString() const;
         std::string toStringShort() const;
@@ -217,12 +209,6 @@ namespace mongo {
         CanonicalQuery() { }
 
         /**
-         * Computes and stores the cache key / query shape
-         * for this query.
-         */
-        void generateCacheKey(void);
-
-        /**
          * Takes ownership of 'root' and 'lpq'.
          */
         Status init(LiteParsedQuery* lpq,
@@ -235,12 +221,6 @@ namespace mongo {
         boost::scoped_ptr<MatchExpression> _root;
 
         boost::scoped_ptr<ParsedProjection> _proj;
-
-        /**
-         * Cache key is a string-ified combination of the query and sort obfuscated
-         * for minimal user comprehension.
-         */
-        PlanCacheKey _cacheKey;
     };
 
 }  // namespace mongo

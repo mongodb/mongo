@@ -500,10 +500,12 @@ namespace mongo {
         // field will always be false in the case of EOF or idhack plans.
         bool indexFilterSet = false;
         if (exec->collection() && exec->getCanonicalQuery()) {
-            const Collection* collection = exec->collection();
-            QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
+            const CollectionInfoCache* infoCache = exec->collection()->infoCache();
+            const QuerySettings* querySettings = infoCache->getQuerySettings();
+            PlanCacheKey planCacheKey =
+                infoCache->getPlanCache()->computeKey(*exec->getCanonicalQuery());
             AllowedIndices* allowedIndicesRaw;
-            if (querySettings->getAllowedIndices(*exec->getCanonicalQuery(), &allowedIndicesRaw)) {
+            if (querySettings->getAllowedIndices(planCacheKey, &allowedIndicesRaw)) {
                 // Found an index filter set on the query shape.
                 boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
                 indexFilterSet = true;

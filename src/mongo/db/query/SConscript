@@ -25,6 +25,7 @@ env.Library(
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/expression_algo",
         "$BUILD_DIR/mongo/expressions",
         "$BUILD_DIR/mongo/expressions_text",
         "$BUILD_DIR/mongo/index_names",
@@ -48,7 +49,6 @@ env.Library(
         "internal_plans",
         "query_planner",
         "query_planner_test_lib",
-        "$BUILD_DIR/mongo/expression_algo",
         "$BUILD_DIR/mongo/db/exec/exec"
     ],
 )
