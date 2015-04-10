@@ -281,7 +281,6 @@ namespace {
     // to execute the real command from the legacy pseudo-command codepath.
     // TODO: remove after MongoDB 3.2 is released
     void receivedPseudoCommand(OperationContext* txn,
-                               const NamespaceString& nss,
                                Client& client,
                                DbResponse& dbResponse,
                                Message& message,
@@ -293,7 +292,13 @@ namespace {
         auto cmdParams = originalDbm.nextJsObj();
 
         Message interposed;
-        NamespaceString interposedNss(nss.db(), "$cmd");
+        // HACK:
+        // legacy pseudo-commands could run on any database. The command replacements
+        // can only run on 'admin'. To avoid breaking old shells and a multitude
+        // of third-party tools, we rewrite the namespace. As auth is checked
+        // later in Command::_checkAuthorizationImpl, we will still properly
+        // reject the request if the client is not authorized.
+        NamespaceString interposedNss("admin", "$cmd");
 
         BSONObjBuilder cmdBob;
         cmdBob.append(realCommandName, 1);
@@ -395,22 +400,15 @@ namespace {
                 opwrite(m);
 
                 if (nsString.coll() == "$cmd.sys.inprog") {
-                    // HACK:
-                    // legacy inprog could run on any database. The currentOp command
-                    // can only run on 'admin'. To avoid breaking old shells and a multitude
-                    // of third-party tools, we rewrite the namespace. As auth is checked
-                    // later in Command::_checkAuthorizationImpl, we will still properly
-                    // reject the request if the client is not authorized.
-                    NamespaceString adminKludge("admin", nsString.coll());
-                    receivedPseudoCommand(txn, adminKludge, c, dbresponse, m, "currentOp");
+                    receivedPseudoCommand(txn, c, dbresponse, m, "currentOp");
                     return;
                 }
                 if (nsString.coll() == "$cmd.sys.killop") {
-                    receivedPseudoCommand(txn, nsString, c, dbresponse, m, "killOp");
+                    receivedPseudoCommand(txn, c, dbresponse, m, "killOp");
                     return;
                 }
                 if (nsString.coll() == "$cmd.sys.unlock") {
-                    receivedPseudoCommand(txn, nsString, c, dbresponse, m, "fsyncUnlock");
+                    receivedPseudoCommand(txn, c, dbresponse, m, "fsyncUnlock");
                     return;
                 }
             }
