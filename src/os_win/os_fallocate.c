@@ -36,9 +36,21 @@ __wt_fallocate(
 {
 	WT_DECL_RET;
 	LARGE_INTEGER largeint;
+	wt_off_t size;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
+
+	WT_RET(__wt_filesize(session, fh, &size));
+
+	/*
+	 * If the new size is smaller then the current size,
+	 * then there is nothing to do since fallocate ignores
+	 * truncation requests.
+	 */
+	if ((offset + len) <= size) {
+		return (0);
+	}
 
 	largeint.QuadPart = offset + len;
 
