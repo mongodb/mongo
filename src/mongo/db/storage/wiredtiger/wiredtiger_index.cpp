@@ -609,16 +609,8 @@ namespace {
             // Advance on a cursor at the end is a no-op
             if (_eof) return {};
 
-            if (_lastMoveWasRestore) {
-                // Return current position rather than advancing.
-                updatePosition();
-            }
-            else {
-                advanceWTCursor();
-                updatePosition(/*checkEndPosition*/false);
-                if (!_eof && atEndPoint()) _eof = true;
-            }
-
+            if (!_lastMoveWasRestore) advanceWTCursor();
+            updatePosition();
             return curr(parts);
         }
 
@@ -626,7 +618,7 @@ namespace {
             TRACE_CURSOR << "setEndPosition inclusive: " << inclusive << ' ' << key;
             if (key.isEmpty()) {
                 // This means scan to end of index.
-                _endState.reset();
+                _endPosition.reset();
                 return;
             }
 
@@ -634,9 +626,8 @@ namespace {
             // end after the key if inclusive and before if exclusive.
             const auto discriminator = _forward == inclusive ? KeyString::kExclusiveAfter
                                                              : KeyString::kExclusiveBefore;
-            _endState = stdx::make_unique<EndState>();
-            _endState->query.resetToKey(stripFieldNames(key), _idx.ordering(), discriminator);
-            seekEndCursor();
+            _endPosition = stdx::make_unique<KeyString>();
+            _endPosition->resetToKey(stripFieldNames(key), _idx.ordering(), discriminator);
         }
 
         boost::optional<IndexKeyEntry> seek(const BSONObj& key, bool inclusive,
@@ -675,7 +666,6 @@ namespace {
             if (!wt_keeptxnopen()) {
                 try {
                     _cursor.reset();
-                    if (_endState && _endState->cursor) _endState->cursor->reset();
                 }
                 catch (const WriteConflictException& wce) {
                     // Ignore since this is only called when we are about to kill our transaction
@@ -700,7 +690,6 @@ namespace {
             _txn = txn;
 
             if (!wt_keeptxnopen()) {
-                seekEndCursor();
                 if (!_eof) {
                     // Ensure an active session exists, so any restored cursors will bind to it
                     WiredTigerRecoveryUnit::get(txn)->getSession(txn);
@@ -731,25 +720,13 @@ namespace {
             return {{std::move(bson), _loc}};
         }
 
-        bool atEndPoint() const {
-            if (_cursorAtEof || !_endState || !_endState->cursor) return false;
-
-            // TODO verify that _cursor->equals is actually faster now that we are using KeyString.
-            //      In particular is it fast enough to make up for overhead of maintaining an extra
-            //      cursor.
-            int equal;
-            invariantWTOK(_cursor->equals(_cursor.get(), _endState->cursor->get(), &equal));
-            dassert(bool(equal) == atOrPastEndPointAfterSeeking());
-            return equal;
-        }
-
         bool atOrPastEndPointAfterSeeking() const {
             if (_eof) return true;
-            if (!_endState) return false;
+            if (!_endPosition) return false;
 
-            const int cmp = _key.compare(_endState->query);
+            const int cmp = _key.compare(*_endPosition);
 
-            // We set up _endState->query to be in between the last in-range value and the first
+            // We set up _endPosition to be in between the last in-range value and the first
             // out-of-range value. In particular, it is constructed to never equal any legal index
             // key.
             dassert(cmp != 0);
@@ -762,45 +739,6 @@ namespace {
                 // We may have landed before the end point.
                 return cmp < 0;
             }
-        }
-
-        void seekEndCursor() {
-            if (!_endState) return;
-
-            if (!_endState->cursor) {
-                _endState->cursor.reset(new WiredTigerCursor(_idx.uri(),
-                                                             _idx.instanceId(),
-                                                             false,
-                                                             _txn));
-            }
-
-            WT_CURSOR* c = _endState->cursor->get();
-            WiredTigerItem keyItem(_endState->query.getBuffer(), _endState->query.getSize());
-            c->set_key(c, keyItem.Get());
-
-            int cmp = 0;
-            int ret = WT_OP_CHECK(c->search_near(c, &cmp));
-            TRACE_CURSOR << "seekEndCursor() search_near"
-                         << " fwd: " << _forward
-                         << " ret:" << ret
-                         << " cmp:" << cmp;
-
-            if (ret != WT_NOTFOUND) {
-                invariantWTOK(ret);
-
-                // Need to land after/before query for forward/reverse cursors
-                if ( _forward && cmp < 0) ret = WT_OP_CHECK(c->next(c));
-                if (!_forward && cmp > 0) ret = WT_OP_CHECK(c->prev(c));
-
-                TRACE_CURSOR << "seekEndCursor() ret:" << ret;
-            }
-
-            if (ret == WT_NOTFOUND) {
-                _endState->cursor.reset();
-                return;
-            }
-
-            invariantWTOK(ret);
         }
 
         void advanceWTCursor() {
@@ -851,7 +789,7 @@ namespace {
          * be called after a restore that did not restore to original state since that does not
          * logically move the cursor until the following call to next().
          */
-        void updatePosition(bool checkEndPosition = true) {
+        void updatePosition() {
             _lastMoveWasRestore = false;
             if (_cursorAtEof) {
                 _eof = true;
@@ -866,7 +804,7 @@ namespace {
             invariantWTOK(c->get_key(c, &item));
             _key.resetFromBuffer(item.data, item.size);
 
-            if (checkEndPosition && atOrPastEndPointAfterSeeking()) {
+            if (atOrPastEndPointAfterSeeking()) {
                 _eof = true;
                 return;
             }
@@ -899,11 +837,7 @@ namespace {
 
         KeyString _query;
 
-        struct EndState {
-            KeyString query;
-            std::unique_ptr<WiredTigerCursor> cursor;
-        };
-        std::unique_ptr<EndState> _endState;
+        std::unique_ptr<KeyString> _endPosition;
     };
 
     class WiredTigerIndexStandardCursor final : public WiredTigerIndexCursorBase {
