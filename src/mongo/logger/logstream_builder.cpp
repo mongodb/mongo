@@ -62,6 +62,17 @@ namespace {
     TSP_DECLARE(OwnedOstreamVector, threadOstreamCache);
     TSP_DEFINE(OwnedOstreamVector, threadOstreamCache);
 
+namespace {
+    // During unittests, where we don't use quickExit(), static finalization may destroy the
+    // cache before its last use, so mark it as not initialized in that case.
+    // This must be after the TSP_DEFINE so that it is destroyed first.
+    struct ThreadOstreamCacheFinalizer {
+        ~ThreadOstreamCacheFinalizer() {
+            isThreadOstreamCacheInitialized = false;
+        }
+    } threadOstreamCacheFinalizer;
+} // namespace
+
 namespace logger {
 
     LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
