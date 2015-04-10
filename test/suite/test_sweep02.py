@@ -61,6 +61,10 @@ class test_sweep02(wttest.WiredTigerTestCase):
             self.base_config + "file_manager=(close_idle_time=1)")
 
     def test_config04(self):
+        self.conn = wiredtiger_open(self.dir,
+            self.base_config + "file_manager=(close_handle_minimum=500)")
+
+    def test_config05(self):
         self.conn = wiredtiger_open(self.dir, self.base_config + \
             "file_manager=(close_scan_interval=1,close_idle_time=1)")
 
