@@ -37,14 +37,14 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
-#include "mongo/client/export_macros.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
-    class OpTime;
     class BSONObj;
     class BSONElement;
     class BSONObjBuilder;
+    class Timestamp;
 
     typedef BSONElement be;
     typedef BSONObj bo;
@@ -67,7 +67,7 @@ namespace mongo {
         value()
         type()
     */
-    class MONGO_CLIENT_API BSONElement {
+    class BSONElement {
     public:
         /** These functions, which start with a capital letter, throw a MsgAssertionException if the
             element is not of the required type. Example:
@@ -114,6 +114,19 @@ namespace mongo {
         */
         bool ok() const { return !eoo(); }
 
+        /**
+         * True if this element has a value (ie not EOO).
+         *
+         * Makes it easier to check for a field's existence and use it:
+         * if (auto elem = myObj["foo"]) {
+         *     // Use elem
+         * }
+         * else {
+         *     // default behavior
+         * }
+         */
+        explicit operator bool() const { return ok(); }
+
         std::string toString( bool includeFieldName = true, bool full=false) const;
         void toString(StringBuilder& s, bool includeFieldName = true, bool full=false, int depth=0) const;
         std::string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
@@ -148,7 +161,7 @@ namespace mongo {
         BSONObj wrap() const;
 
         /** Wrap this element up as a singleton object with a new name. */
-        BSONObj wrap( const StringData& newName) const;
+        BSONObj wrap( StringData newName) const;
 
         /** field name of the element.  e.g., for
             name : "Joe"
@@ -440,6 +453,12 @@ namespace mongo {
             }
         }
 
+        Timestamp timestamp() const {
+            if( type() == mongo::Date || type() == bsonTimestamp )
+                return Timestamp(ConstDataView(value()).readLE<unsigned long long>());
+            return Timestamp();
+        }
+
         Date_t timestampTime() const {
             unsigned long long t = ConstDataView(value() + 4).readLE<unsigned int>();
             return t * 1000;
@@ -512,7 +531,6 @@ namespace mongo {
         }
 
         std::string _asCode() const;
-        OpTime _opTime() const;
 
         template<typename T> bool coerce( T* out ) const;
 

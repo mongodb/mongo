@@ -18,4 +18,4 @@ assert.eq(1, m.getDB("local").auth({user: "__system", pwd: "foopdedoop", mechani
 m.getDB("test").createUser({user: "guest" , pwd: "guest", roles: jsTest.readOnlyUserRoles});
 assert.eq(0, m.getDB("test").auth("guest", "guest"));
 
-stopMongod(port);
+MongoRunner.stopMongod(port);

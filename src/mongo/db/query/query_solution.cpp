@@ -77,6 +77,8 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "language = " << language << '\n';
         addIndent(ss, indent + 1);
+        *ss << "caseSensitive= " << caseSensitive << '\n';
+        addIndent(ss, indent + 1);
         *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
@@ -93,6 +95,7 @@ namespace mongo {
         copy->indexKeyPattern = this->indexKeyPattern;
         copy->query = this->query;
         copy->language = this->language;
+        copy->caseSensitive = this->caseSensitive;
         copy->indexPrefix = this->indexPrefix;
 
         return copy;

@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/config.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/server_options.h"
 #include "mongo/shell/shell_utils.h"
@@ -107,7 +108,7 @@ namespace mongo {
                 "enable IPv6 support (disabled by default)");
 
         Status ret = Status::OK();
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         ret = addSSLClientOptions(options);
         if (!ret.isOK()) {
             return ret;
@@ -142,10 +143,16 @@ namespace mongo {
                                    "mode to determine how writes are done:"
                                    " commands, compatibility, legacy").hidden();
 
+        options->addOptionChaining("readMode",
+                                   "readMode",
+                                   moe::String,
+                                   "mode to determine how .find() queries are done:"
+                                   " commands, compatibility").hidden();
+
         return Status::OK();
     }
 
-    std::string getMongoShellHelp(const StringData& name, const moe::OptionSection& options) {
+    std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
         StringBuilder sb;
         sb << "MongoDB shell version: " << mongo::versionString << "\n";
         sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
@@ -178,7 +185,7 @@ namespace mongo {
         if (params.count("quiet")) {
             mongo::serverGlobalParams.quiet = true;
         }
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         Status ret = storeSSLClientOptions(params);
         if (!ret.isOK()) {
             return ret;
@@ -260,6 +267,16 @@ namespace mongo {
             }
             shellGlobalParams.writeMode = mode;
         }
+        if (params.count("readMode")) {
+            std::string mode = params["readMode"].as<string>();
+            if (mode != "commands" && mode != "compatibility") {
+                throw MsgAssertionException(17397,
+                                            mongoutils::str::stream()
+                                            << "Unknown readMode option: '" << mode
+                                            << "'. Valid modes are: {commands, compatibility}");
+            }
+            shellGlobalParams.readMode = mode;
+        }
 
         /* This is a bit confusing, here are the rules:
          *
@@ -297,7 +314,7 @@ namespace mongo {
     }
 
     Status validateMongoShellOptions(const moe::Environment& params) {
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         Status ret = validateSSLMongoShellOptions(params);
         if (!ret.isOK()) {
             return ret;

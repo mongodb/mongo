@@ -31,6 +31,11 @@ then
   ln -s 6 "$repodir/yum/redhat/6Server"
 fi
 
+if [ ! -e "$repodir/yum/redhat/7Server" ]
+then
+  ln -s 7 "$repodir/yum/redhat/7Server"
+fi
+
 if [ ! -e "$repodir/yum/redhat/5Server" ]
 then
   ln -s 5 "$repodir/yum/redhat/5Server"

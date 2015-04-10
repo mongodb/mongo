@@ -78,14 +78,14 @@ namespace repl {
         bool hasState() const { return _stateSet; }
         MemberState getState() const;
         bool hasElectionTime() const { return _electionTimeSet; }
-        OpTime getElectionTime() const;
+        Timestamp getElectionTime() const;
         bool hasIsElectable() const { return _electableSet; }
         bool isElectable() const;
         const std::string& getHbMsg() const { return _hbmsg; }
         bool hasTime() const { return _timeSet; }
         Seconds getTime() const;
         bool hasOpTime() const { return _opTimeSet; }
-        OpTime getOpTime() const;
+        Timestamp getOpTime() const;
         const std::string& getSyncingTo() const { return _syncingTo; }
         int getVersion() const { return _version; }
         bool hasConfig() const { return _configSet; }
@@ -122,9 +122,9 @@ namespace repl {
         void setState(MemberState state) { _stateSet = true; _state = state; }
 
         /**
-         * Sets the optional "electionTime" field to the given OpTime.
+         * Sets the optional "electionTime" field to the given Timestamp.
          */
-        void setElectionTime(OpTime time) { _electionTimeSet = true; _electionTime = time; }
+        void setElectionTime(Timestamp time) { _electionTimeSet = true; _electionTime = time; }
 
         /**
          * Sets _electable to "electable" and sets _electableSet to true to indicate
@@ -147,7 +147,7 @@ namespace repl {
          * Sets _opTime to "time" and sets _opTimeSet to true to indicate that the value
          * of _opTime has been modified.
          */
-        void setOpTime(OpTime time) { _opTimeSet = true; _opTime = time; }
+        void setOpTime(Timestamp time) { _opTimeSet = true; _opTime = time; }
 
         /**
          * Sets _syncingTo to "syncingTo".
@@ -166,13 +166,13 @@ namespace repl {
 
     private:
         bool _electionTimeSet;
-        OpTime _electionTime;
+        Timestamp _electionTime;
 
         bool _timeSet;
         Seconds _time;  // Seconds since UNIX epoch.
 
         bool _opTimeSet;
-        OpTime _opTime;
+        Timestamp _opTime;
 
         bool _electableSet;
         bool _electable;

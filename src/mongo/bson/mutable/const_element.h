@@ -60,9 +60,9 @@ namespace mutablebson {
         inline ConstElement parent() const;
         inline ConstElement findNthChild(size_t n) const;
         inline ConstElement operator[](size_t n) const;
-        inline ConstElement findFirstChildNamed(const StringData& name) const;
-        inline ConstElement operator[](const StringData& n) const;
-        inline ConstElement findElementNamed(const StringData& name) const;
+        inline ConstElement findFirstChildNamed(StringData name) const;
+        inline ConstElement operator[](StringData n) const;
+        inline ConstElement findElementNamed(StringData name) const;
 
         inline size_t countSiblingsLeft() const;
         inline size_t countSiblingsRight() const;
@@ -82,7 +82,7 @@ namespace mutablebson {
         inline bool isValueNull() const;
         inline StringData getValueSymbol() const;
         inline int32_t getValueInt() const;
-        inline OpTime getValueTimestamp() const;
+        inline Timestamp getValueTimestamp() const;
         inline int64_t getValueLong() const;
         inline bool isValueMinKey() const;
         inline bool isValueMaxKey() const;

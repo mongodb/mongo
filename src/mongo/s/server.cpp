@@ -34,6 +34,7 @@
 
 #include "mongo/s/server.h"
 
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 
@@ -42,6 +43,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/config.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -49,17 +51,16 @@
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/dbwebserver.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/global_environment_noop.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
@@ -70,13 +71,13 @@
 #include "mongo/s/request.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/gcov.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_server.h"
@@ -111,7 +112,6 @@ namespace mongo {
     static ExitCode initService();
 #endif
 
-    Database *database = 0;
     string mongosCommand;
     bool dbexitCalled = false;
 
@@ -139,7 +139,7 @@ namespace mongo {
         virtual ~ShardedMessageHandler() {}
 
         virtual void connected( AbstractMessagingPort* p ) {
-            ClientInfo::create(p);
+            ClientInfo::create(getGlobalServiceContext(), p);
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {
@@ -239,13 +239,18 @@ static ExitCode runMongosServer( bool doUpgrade ) {
         dbexit(EXIT_BADOPTIONS);
     }
 
-    if (!configServer.init(mongosGlobalParams.configdbs)) {
-        mongo::log(LogComponent::kDefault) << "couldn't resolve config db address" << endl;
+    if (!grid.initCatalogManager(mongosGlobalParams.configdbs)) {
+        mongo::log(LogComponent::kSharding) << "couldn't initialize catalog manager";
         return EXIT_SHARDING_ERROR;
     }
 
-    if ( ! configServer.ok( true ) ) {
-        mongo::log(LogComponent::kDefault) << "configServer connection startup check failed" << endl;
+    if (!configServer.init(mongosGlobalParams.configdbs)) {
+        mongo::log(LogComponent::kSharding) << "couldn't resolve config db address" << endl;
+        return EXIT_SHARDING_ERROR;
+    }
+
+    if (!configServer.ok(true)) {
+        mongo::log(LogComponent::kSharding) << "configServer connection startup check failed" << endl;
         return EXIT_SHARDING_ERROR;
     }
 
@@ -285,13 +290,18 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     mongo::signalForkSuccess();
 #endif
 
-    if (serverGlobalParams.isHttpInterfaceEnabled)
-        boost::thread web( stdx::bind(&webServerThread,
-                                       new NoAdminAccess())); // takes ownership
+    if (serverGlobalParams.isHttpInterfaceEnabled) {
+        boost::shared_ptr<DbWebServer> dbWebServer(
+                                new DbWebServer(serverGlobalParams.bind_ip,
+                                                serverGlobalParams.port + 1000,
+                                                new NoAdminAccess()));
+        dbWebServer->setupSockets();
 
-    OperationContextNoop txn;
+        boost::thread web(stdx::bind(&webServerListenThread, dbWebServer));
+        web.detach();
+    }
 
-    Status status = getGlobalAuthorizationManager()->initialize(&txn);
+    Status status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {
         mongo::log(LogComponent::kDefault) << "Initializing authorization data failed: " << status;
         return EXIT_SHARDING_ERROR;
@@ -403,11 +413,11 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
 }
 
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalEnvironment(new GlobalEnvironmentNoop());
+    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
     return Status::OK();
 }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, 
                           MONGO_NO_PREREQUISITES, 
                           ("SSLManager"))(InitializerContext* context) {
@@ -478,6 +488,11 @@ int main(int argc, char* argv[], char** envp) {
 
 #undef exit
 
+void mongo::signalShutdown() {
+    // Notify all threads shutdown has started
+    dbexitCalled = true;
+}
+
 void mongo::exitCleanly(ExitCode code) {
     // TODO: do we need to add anything?
     mongo::dbexit( code );
@@ -486,7 +501,11 @@ void mongo::exitCleanly(ExitCode code) {
 void mongo::dbexit( ExitCode rc, const char *why ) {
     dbexitCalled = true;
     audit::logShutdown(ClientBasic::getCurrent());
+
 #if defined(_WIN32)
+    // Windows Service Controller wants to be told when we are done shutting down
+    // and call quickExit itself.
+    //
     if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
         log() << "dbexit: exiting because Windows service was stopped" << endl;
         return;
@@ -495,6 +514,5 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
     log() << "dbexit: " << why
           << " rc:" << rc
           << endl;
-    flushForGcov();
     quickExit(rc);
 }

@@ -34,7 +34,6 @@
 #include "mongo/base/initializer_context.h"
 #include "mongo/base/initializer_dependency_graph.h"
 #include "mongo/base/status.h"
-#include "mongo/client/export_macros.h"
 
 namespace mongo {
 
@@ -46,7 +45,7 @@ namespace mongo {
      * edges to the graph.  Then, one executes the process, causing each initialization operation to
      * execute in an order that respects the programmer-established prerequistes.
      */
-    class MONGO_CLIENT_API Initializer {
+    class Initializer {
         MONGO_DISALLOW_COPYING(Initializer);
     public:
         Initializer();
@@ -80,17 +79,17 @@ namespace mongo {
      * This means that the few initializers that might want to terminate the program by failing
      * should probably arrange to terminate the process themselves.
      */
-    MONGO_CLIENT_API Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
+    Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
                                                   const InitializerContext::EnvironmentMap& env);
 
-    MONGO_CLIENT_API Status runGlobalInitializers(
+    Status runGlobalInitializers(
             int argc, const char* const* argv, const char* const* envp);
 
     /**
      * Same as runGlobalInitializers(), except prints a brief message to std::cerr
      * and terminates the process on failure.
      */
-    MONGO_CLIENT_API void runGlobalInitializersOrDie(
+    void runGlobalInitializersOrDie(
             int argc, const char* const* argv, const char* const* envp);
 
 }  // namespace mongo

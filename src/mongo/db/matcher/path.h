@@ -35,14 +35,13 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {
 
     class ElementPath {
     public:
-        Status init( const StringData& path );
+        Status init( StringData path );
 
         void setTraverseNonleafArrays( bool b ) { _shouldTraverseNonleafArrays = b; }
         void setTraverseLeafArray( bool b ) { _shouldTraverseLeafArray = b; }
@@ -149,7 +148,7 @@ namespace mongo {
             bool more();
             BSONElement next();
 
-            bool isArrayOffsetMatch( const StringData& fieldName ) const;
+            bool isArrayOffsetMatch( StringData fieldName ) const;
             bool nextEntireRest() const { return nextPieceOfPath.size() == restOfPath.size(); }
 
             std::string restOfPath;

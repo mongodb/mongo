@@ -87,7 +87,8 @@ namespace {
             managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
             authzManager.reset(new AuthorizationManager(managerState));
             sessionState = new AuthzSessionExternalStateMock(authzManager.get());
-            authzSession.reset(new AuthorizationSession(sessionState));
+            authzSession.reset(new AuthorizationSession(
+                                       std::unique_ptr<AuthzSessionExternalState>(sessionState)));
             authzManager->setAuthEnabled(true);
         }
     };

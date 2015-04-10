@@ -33,18 +33,19 @@
 #include <iostream>
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/global_optime.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/global_timestamp.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -125,7 +126,7 @@ namespace QueryTests {
         OperationContextImpl _txn;
         ScopedTransaction _scopedXact;
         Lock::GlobalWrite _lk;
-        Client::Context _context;
+        OldClientContext _context;
 
         Database* _database;
         Collection* _collection;
@@ -183,7 +184,7 @@ namespace QueryTests {
             // an empty object (one might be allowed inside a reserved namespace at some point).
             ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  "unittests.querytests" );
+            OldClientContext ctx(&_txn,  "unittests.querytests" );
 
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -192,7 +193,7 @@ namespace QueryTests {
                     _collection = NULL;
                     db->dropCollection( &_txn, ns() );
                 }
-                _collection = db->createCollection( &_txn, ns(), CollectionOptions(), true, false );
+                _collection = db->createCollection( &_txn, ns(), CollectionOptions(), false );
                 wunit.commit();
             }
             ASSERT( _collection );
@@ -276,7 +277,7 @@ namespace QueryTests {
 
             {
                 // Check internal server handoff to getmore.
-                Client::WriteContext ctx(&_txn,  ns);
+                OldClientWriteContext ctx(&_txn,  ns);
                 ClientCursorPin clientCursor( ctx.getCollection()->getCursorManager(), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
                 // ASSERT( clientCursor.c()->pq );
@@ -297,7 +298,7 @@ namespace QueryTests {
     class GetMoreKillOp : public ClientBase {
     public:
         ~GetMoreKillOp() {
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             _client.dropCollection( "unittests.querytests.GetMoreKillOp" );
         }
         void run() {
@@ -320,13 +321,13 @@ namespace QueryTests {
             
             // Set the killop kill all flag, forcing the next get more to fail with a kill op
             // exception.
-            getGlobalEnvironment()->setKillAllOperations();
+            getGlobalServiceContext()->setKillAllOperations();
             while( cursor->more() ) {
                 cursor->next();
             }
             
             // Revert the killop kill all flag.
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
 
             // Check that the cursor has been removed.
             {
@@ -349,7 +350,7 @@ namespace QueryTests {
     class GetMoreInvalidRequest : public ClientBase {
     public:
         ~GetMoreInvalidRequest() {
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             _client.dropCollection( "unittests.querytests.GetMoreInvalidRequest" );
         }
         void run() {
@@ -656,7 +657,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
             ScopedTransaction transaction(&_txn, MODE_IX);
             Lock::DBLock lk(_txn.lockState(), "unittests", MODE_X);
-            Client::Context ctx(&_txn,  ns );
+            OldClientContext ctx(&_txn,  ns );
 
             BSONObj info;
             _client.runCommand( "unittests",
@@ -664,9 +665,9 @@ namespace QueryTests {
                                      "capped" << true << "size" << 8192 ),
                                 info );
 
-            Date_t one = getNextGlobalOptime().asDate();
-            Date_t two = getNextGlobalOptime().asDate();
-            Date_t three = getNextGlobalOptime().asDate();
+            Date_t one = getNextGlobalTimestamp().asULL();
+            Date_t two = getNextGlobalTimestamp().asULL();
+            Date_t three = getNextGlobalTimestamp().asULL();
             insert( ns, BSON( "ts" << one ) );
             insert( ns, BSON( "ts" << two ) );
             insert( ns, BSON( "ts" << three ) );
@@ -679,7 +680,7 @@ namespace QueryTests {
             
             ClientCursorPin clientCursor( ctx.db()->getCollection( ns )->getCursorManager(),
                                           cursorId );
-            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
+            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asULL() );
         }
     };
 
@@ -822,7 +823,6 @@ namespace QueryTests {
             _client.dropCollection( "unittests.querytests.AutoResetIndexCache" );
         }
         static const char *ns() { return "unittests.querytests.AutoResetIndexCache"; }
-        static const char *idxNs() { return "unittests.system.indexes"; }
         void index() { ASSERT_EQUALS(2u, _client.getIndexSpecs(ns()).size()); }
         void noIndex() { ASSERT_EQUALS(0u, _client.getIndexSpecs(ns()).size()); }
         void checkIndex() {
@@ -1097,7 +1097,7 @@ namespace QueryTests {
         void run() {
             ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn, "unittests.DirectLocking");
+            OldClientContext ctx(&_txn, "unittests.DirectLocking");
             _client.remove( "a.b", BSONObj() );
             ASSERT_EQUALS( "unittests", ctx.db()->name() );
         }
@@ -1222,7 +1222,7 @@ namespace QueryTests {
         }
         void run() {
             string err;
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             // note that extents are always at least 4KB now - so this will get rounded up
             // a bit.
@@ -1276,7 +1276,7 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  ns());
+            OldClientWriteContext ctx(&_txn,  ns());
 
             for ( int i=0; i<50; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1289,10 +1289,10 @@ namespace QueryTests {
                                      BSON("_id" << 20) , res , true));
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
+            ASSERT( Helpers::findById( &_txn, ctx.db(), ns() , BSON( "_id" << 20 ) , res ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( ! Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 200 ) , res ) );
+            ASSERT( ! Helpers::findById( &_txn, ctx.db(), ns() , BSON( "_id" << 200 ) , res ) );
 
             long long slow;
             long long fast;
@@ -1327,7 +1327,7 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  ns());
+            OldClientWriteContext ctx(&_txn,  ns());
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1350,7 +1350,7 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1471,6 +1471,7 @@ namespace QueryTests {
         void run() {
             BSONObj result;
             _client.runCommand( "admin", BSON( "whatsmyuri" << 1 ), result );
+            SockAddr unknownAddress("0.0.0.0", 0);
             ASSERT_EQUALS( unknownAddress.toString(), result[ "you" ].str() );
         }
     };
@@ -1488,7 +1489,7 @@ namespace QueryTests {
     private:
         ScopedTransaction _scopedXact;
         Lock::DBLock _lk;
-        Client::Context _ctx;
+        OldClientContext _ctx;
     };
     
     class Exhaust : public CollectionInternalBase {
@@ -1508,8 +1509,8 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            string exhaust = runQuery( &_txn, message, queryMessage, NamespaceString(ns()),
-                                       *cc().curop(), result, false );
+            string exhaust = runQuery(&_txn, queryMessage, NamespaceString(ns()), *CurOp::get(cc()),
+                                      result);
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );
         }
@@ -1566,8 +1567,8 @@ namespace QueryTests {
             long long cursorId = cursor->getCursorId();
             
             {
-                Client::WriteContext ctx(&_txn,  ns() );
-                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( ns() )
+                OldClientWriteContext ctx(&_txn,  ns() );
+                ClientCursorPin pinCursor( ctx.db()->getCollection( ns() )
                                                          ->getCursorManager(),
                                            cursorId );
                 string expectedAssertion =

@@ -5,7 +5,6 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-out=wtstats.html.template
 # We require npm which may not be installed.
 type npm > /dev/null 2>&1 || {
         echo 's_wtstats: npm not found' >&2
@@ -13,25 +12,33 @@ type npm > /dev/null 2>&1 || {
         exit 1
 }
 
-cd ../tools/template || exit 1
-rm -f ./$out
-# Note: we don't do the npm install here, it downloads files
+cd ../tools/wtstats/template || exit 1
+
+out=wtstats.html.template
+rm -f $out
+
+# Run npm install.
 test -d ./node_modules || {
-        echo 's_wtstats: missing node_modules directory, install by:' >&2
-        echo '    cd ../tools/template; npm install' >&2
-        exit 1
+	echo 'Running: npm install'
+	npm --quiet install >$t 2>&1 || {
+		echo "s_wtstats: npm install failed" >&2
+		cat $t
+		exit 1
+	}
 }
-npm run build >$t 2>&1 || {
-        echo "s_wtstats: npm failed" >&2
+echo 'Running: npm run build'
+npm --quiet run build >$t 2>&1 || {
+        echo "s_wtstats: npm run build failed" >&2
         cat $t
         exit 1
 }
-test -f ./$out || {
+test -f $out || {
         echo "s_wtstats: $out not created" >&2
         cat $t
         exit 1
 }
+
 f=../$out
-cmp ./$out $f > /dev/null 2>&1 ||
-        (echo "Building tools/$out" && rm -f $f && cp ./$out $f)
+cmp $out $f > /dev/null 2>&1 ||
+        (echo "Building $out" && rm -f $f && cp $out $f)
 exit 0

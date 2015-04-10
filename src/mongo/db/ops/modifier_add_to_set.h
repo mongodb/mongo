@@ -59,7 +59,7 @@ namespace mongo {
          *  valid array to set-union to, othwise returns a status describing the error.
          */
         virtual Status prepare(mutablebson::Element root,
-                               const StringData& matchedField,
+                               StringData matchedField,
                                ExecInfo* execInfo);
 
         /** Updates the Element used in prepare with the effects of the $addToSet operation. */

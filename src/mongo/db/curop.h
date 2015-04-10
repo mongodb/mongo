@@ -95,7 +95,7 @@ namespace mongo {
             return _get();
         }
 
-        void append( BSONObjBuilder& b , const StringData& name ) const {
+        void append( BSONObjBuilder& b , StringData name ) const {
             scoped_spinlock lk(_lock);
             BSONObj temp = _get();
             b.append( name , temp );
@@ -129,13 +129,17 @@ namespace mongo {
 
         void recordStats();
 
-        std::string report( const CurOp& curop ) const;
+        std::string report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const;
 
         /**
-         * Appends information about the current operation to "builder".  "curop" must be a
-         * reference to the CurOp that owns this OpDebug.
+         * Appends information about the current operation to "builder"
+         *
+         * @param curop reference to the CurOp that owns this OpDebug
+         * @param lockStats lockStats object containing locking information about the operation
          */
-        void append(const CurOp& curop, BSONObjBuilder& builder) const;
+        void append(const CurOp& curop,
+                    const SingleThreadedLockStats& lockStats,
+                    BSONObjBuilder& builder) const;
 
         // -------------------
         
@@ -168,7 +172,7 @@ namespace mongo {
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert
         int keyUpdates;
-        int writeConflicts;
+        long long writeConflicts;
         ThreadSafeString planSummary; // a brief std::string describing the query solution
 
         // New Query Framework debugging/profiling info
@@ -189,12 +193,15 @@ namespace mongo {
     */
     class CurOp : boost::noncopyable {
     public:
-        CurOp( Client * client , CurOp * wrapped = 0 );
+        static CurOp* get(const Client* client);
+        static CurOp* get(const Client& client);
+
+        explicit CurOp(Client* client);
         ~CurOp();
 
         bool haveQuery() const { return _query.have(); }
         BSONObj query() const { return _query.get();  }
-        void appendQuery( BSONObjBuilder& b , const StringData& name ) const { _query.append( b , name ); }
+        void appendQuery( BSONObjBuilder& b , StringData name ) const { _query.append( b , name ); }
         
         void enter(const char* ns, int dbProfileLevel);
         void reset();
@@ -274,11 +281,10 @@ namespace mongo {
         int elapsedSeconds() { return elapsedMillis() / 1000; }
 
         void setQuery(const BSONObj& query) { _query.set( query ); }
-        Client * getClient() const { return _client; }
-        
+
         Command * getCommand() const { return _command; }
         void setCommand(Command* command) { _command = command; }
-        
+
         void reportState(BSONObjBuilder* builder);
 
         // Fetches less information than "info()"; used to search for ops with certain criteria
@@ -296,7 +302,7 @@ namespace mongo {
                                   int secondsBetween = 3);
         std::string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
-        CurOp *parent() const { return _wrapped; }
+        CurOp *parent() const { return _parent; }
         void kill(); 
         bool killPendingStrict() const { return _killPending.load(); }
         bool killPending() const { return _killPending.loadRelaxed(); }
@@ -313,15 +319,20 @@ namespace mongo {
          * generally the Context should set this up
          * but sometimes you want to do it ahead of time
          */
-        void setNS( const StringData& ns );
+        void setNS( StringData ns );
 
     private:
-        friend class Client;
+        class ClientCuropStack;
+
+        static const Client::Decoration<ClientCuropStack> _curopStack;
+
+        explicit CurOp(ClientCuropStack*);
+
         void _reset();
 
         static AtomicUInt32 _nextOpNum;
-        Client * _client;
-        CurOp * _wrapped;
+        ClientCuropStack* _stack;
+        CurOp* _parent = nullptr;
         Command * _command;
         long long _start;
         long long _end;

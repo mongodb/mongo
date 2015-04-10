@@ -38,7 +38,8 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/random.h"
@@ -315,7 +316,7 @@ namespace mongo {
     // --------------------------
 
 
-    CursorManager::CursorManager( const StringData& ns )
+    CursorManager::CursorManager( StringData ns )
         : _nss( ns ),
           _mutex( "CursorManager" ) {
         _collectionCacheRuntimeId = globalCursorIdCache->created( _nss.ns() );

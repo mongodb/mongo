@@ -88,7 +88,7 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setCollName(const StringData& collName);
+        void setCollName(StringData collName);
         void setCollNameNS(const NamespaceString& collName);
         const std::string& getCollName() const;
         const NamespaceString& getCollNameNS() const;

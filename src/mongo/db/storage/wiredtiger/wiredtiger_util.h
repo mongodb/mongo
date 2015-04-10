@@ -113,17 +113,17 @@ namespace mongo {
          * Gets entire metadata string for collection/index at URI.
          */
         static StatusWith<std::string> getMetadata(OperationContext* opCtx,
-                                                   const StringData& uri);
+                                                   StringData uri);
 
         /**
          * Reads app_metadata for collection/index at URI as a BSON document.
          */
         static Status getApplicationMetadata(OperationContext* opCtx,
-                                             const StringData& uri,
+                                             StringData uri,
                                              BSONObjBuilder* bob);
 
         static StatusWith<BSONObj> getApplicationMetadata(OperationContext* opCtx,
-                                                          const StringData& uri);
+                                                          StringData uri);
 
         /**
          * Validates formatVersion in application metadata for 'uri'.
@@ -131,7 +131,7 @@ namespace mongo {
          * URI is used in error messages only.
          */
         static Status checkApplicationMetadataFormatVersion(OperationContext* opCtx,
-                                                            const StringData& uri,
+                                                            StringData uri,
                                                             int64_t minimumVersion,
                                                             int64_t maximumVersion);
         /**
@@ -164,8 +164,26 @@ namespace mongo {
                                                            int statisticsKey,
                                                            ResultType maximumResultType);
 
-        static int64_t getIdentSize(WT_SESSION* s,
-                                    const std::string& uri );
+        static int64_t getIdentSize(WT_SESSION* s, const std::string& uri );
+
+        /**
+         * Returns a WT_EVENT_HANDER with MongoDB's default handlers.
+         * The default handlers just log so it is recommended that you consider calling them even if
+         * you are capturing the output.
+         *
+         * There is no default "close" handler. You only need to provide one if you need to call a
+         * destructor.
+         */
+        static WT_EVENT_HANDLER defaultEventHandlers();
+
+        /**
+         * Calls WT_SESSION::validate() on a side-session to ensure that your current transaction
+         * isn't left in an invalid state.
+         *
+         * If errors is non-NULL, all error messages will be appended to the array.
+         */
+        static int verifyTable(OperationContext* txn, const std::string& uri,
+                               std::vector<std::string>* errors = NULL);
 
     private:
         /**
@@ -186,7 +204,7 @@ namespace mongo {
     class WiredTigerConfigParser {
         MONGO_DISALLOW_COPYING(WiredTigerConfigParser);
     public:
-        WiredTigerConfigParser(const StringData& config) {
+        WiredTigerConfigParser(StringData config) {
             invariantWTOK(wiredtiger_config_parser_open(NULL, config.rawData(), config.size(),
                                                         &_parser));
         }

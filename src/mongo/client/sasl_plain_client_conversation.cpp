@@ -44,7 +44,7 @@ namespace mongo {
 
     SaslPLAINClientConversation::~SaslPLAINClientConversation() {};
 
-    StatusWith<bool> SaslPLAINClientConversation::step(const StringData& inputData,
+    StatusWith<bool> SaslPLAINClientConversation::step(StringData inputData,
                                                        std::string* outputData) {
         // Create PLAIN message on the form: user\0user\0pwd
 

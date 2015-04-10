@@ -235,7 +235,7 @@ namespace {
         sasl_dispose(&_saslConnection);
     }
 
-    void CyrusSaslClientSession::setParameter(Parameter id, const StringData& value) {
+    void CyrusSaslClientSession::setParameter(Parameter id, StringData value) {
         fassert(18665, id >= 0 && id < numParameters);
         if (id == parameterPassword) {
             // The parameterPassword is stored as a sasl_secret_t,  while other
@@ -277,7 +277,7 @@ namespace {
         return Status::OK();
     }
 
-    Status CyrusSaslClientSession::step(const StringData& inputData, std::string* outputData) {
+    Status CyrusSaslClientSession::step(StringData inputData, std::string* outputData) {
         const char* output = NULL;
         unsigned outputSize = 0xFFFFFFFF;
 

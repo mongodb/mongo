@@ -49,9 +49,8 @@ namespace mongo {
     public:
         ShardingState();
 
-        bool enabled() const { return _enabled; }
-        const std::string& getConfigServer() const { return _configServer; }
-        void enable( const std::string& server );
+        bool enabled();
+        std::string getConfigServer();
 
         // Initialize sharding state and begin authenticating outgoing connections and handling
         // shard versions.  If this is not run before sharded operations occur auth will not work
@@ -60,7 +59,7 @@ namespace mongo {
 
         void gotShardName( const std::string& name );
         bool setShardName( const std::string& name ); // Same as above, does not throw
-        std::string getShardName() { scoped_lock lk(_mutex); return _shardName; }
+        std::string getShardName();
 
         // Helpers for SetShardVersion which report the host name sent to this shard when the shard
         // name does not match.  Do not use in other places.
@@ -68,14 +67,16 @@ namespace mongo {
         void gotShardNameAndHost( const std::string& name, const std::string& host );
         bool setShardNameAndHost( const std::string& name, const std::string& host );
 
-        /** Reverts back to a state where this mongod is not sharded. */
-        void resetShardingState(); 
+        /**
+         * Clears the collection metadata cache after step down.
+         */
+        void clearCollectionMetadata();
 
         // versioning support
 
         bool hasVersion( const std::string& ns );
         bool hasVersion( const std::string& ns , ChunkVersion& version );
-        const ChunkVersion getVersion( const std::string& ns ) const;
+        ChunkVersion getVersion(const std::string& ns);
 
         /**
          * If the metadata for 'ns' at this shard is at or above the requested version,
@@ -265,6 +266,8 @@ namespace mongo {
 
     private:
 
+        void _initialize(const std::string& server);
+
         /**
          * Refreshes collection metadata by asking the config server for the latest information.
          * May or may not be based on a requested version.
@@ -275,14 +278,15 @@ namespace mongo {
                                   bool useRequestedVersion,
                                   ChunkVersion* latestShardVersion );
 
+        // protects state below
+        mongo::mutex _mutex;
+
+        // Whether ::initialize has been called
         bool _enabled;
 
-        std::string _configServer;
-
+        // Sets the shard name for this host (comes through setShardVersion)
         std::string _shardName;
 
-        // protects state below
-        mutable mongo::mutex _mutex;
         // protects accessing the config server
         // Using a ticket holder so we can have multiple redundant tries at any given time
         mutable TicketHolder _configServerTickets;

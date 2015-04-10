@@ -119,58 +119,15 @@ function runTest(conn) {
                  }
                  var res = db.killOp(opid);
                  printjson(res);
-                 passed = !res.err && !res['$err'];
+                 passed = res.ok && !res.errmsg && !res.err && !res['$err'];
              } catch (e) {
                  passed = false;
              }
-
              assert.eq(shouldPass, passed);
          }
 
          testProperAuthorization(testFunc, roles, privilege);
     })();
-
-    (function testKillop() {
-         jsTestLog("Testing killOp");
-
-         var roles = {read: false,
-                      readAnyDatabase: false,
-                      readWrite: false,
-                      readWriteAnyDatabase: false,
-                      dbAdmin: false,
-                      dbAdminAnyDatabase: false,
-                      dbOwner: false,
-                      clusterMonitor: false,
-                      clusterManager: false,
-                      hostManager: true,
-                      clusterAdmin: true,
-                      root: true,
-                      __system: true
-                     };
-
-         var privilege = { resource: {cluster: true}, actions: ['killop'] };
-
-         var testFunc = function(shouldPass) {
-             var passed = true;
-             try {
-                 var opid;
-                 if (isMongos(db)) { // opid format different between mongos and mongod
-                     opid = "shard0000:1234";
-                 } else {
-                     opid = 1234;
-                 }
-                 var res = db.killOp(opid);
-                 printjson(res);
-                 passed = !res.err && !res['$err'];
-             } catch (e) {
-                 passed = false;
-             }
-
-             assert.eq(shouldPass, passed);
-         }
-
-         testProperAuthorization(testFunc, roles, privilege);
-     })();
 
     (function testUnlock() {
          if (isMongos(db)) {

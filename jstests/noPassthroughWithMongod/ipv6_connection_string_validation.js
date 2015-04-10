@@ -9,17 +9,12 @@ if ("undefined" == typeof inner_mode) {
 
     // Start a mongod with --ipv6
     port = allocatePorts( 1 )[ 0 ];
-    var baseName = "jstests_slowNightly_ipv6_connection_string_validation";
     jsTest.log("Outer mode test starting mongod with --ipv6");
     // NOTE: bind_ip arg is present to test if it can parse ipv6 addresses (::1 in this case).
     // Unfortunately, having bind_ip = ::1 won't work in the test framework (But does work when
     // tested manually), so 127.0.0.1 is also present so the test mongo shell can connect
     // with that address.
-    var mongod = startMongod("--port", port,
-                            "--ipv6",
-                            "--bind_ip", "::1,127.0.0.1",
-                            "--dbpath",
-                            MongoRunner.dataPath + baseName );
+    var mongod = MongoRunner.runMongod({port: port, ipv6: "", bind_ip: "::1,127.0.0.1"});
     var args = ["mongo",
                 "--nodb",
                 "--ipv6",
@@ -32,7 +27,7 @@ if ("undefined" == typeof inner_mode) {
 
     // Stop the server we started
     jsTest.log("Outer mode test stopping server");
-    stopMongod(port, 15);
+    MongoRunner.stopMongod(port, 15);
 
     // Pass the inner test's exit code back as the outer test's exit code
     quit(exitCode);

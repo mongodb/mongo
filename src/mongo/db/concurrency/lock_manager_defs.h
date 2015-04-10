@@ -33,6 +33,7 @@
 #include <limits>
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/hash_namespace.h"
 
@@ -171,7 +172,7 @@ namespace mongo {
 
     public:
         ResourceId() : _fullHash(0) { }
-        ResourceId(ResourceType type, const StringData& ns);
+        ResourceId(ResourceType type, StringData ns);
         ResourceId(ResourceType type, const std::string& ns);
         ResourceId(ResourceType type, uint64_t hashId);
 
@@ -202,14 +203,14 @@ namespace mongo {
 
         static uint64_t fullHash(ResourceType type, uint64_t hashId);
 
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         // Keep the complete namespace name for debugging purposes (TODO: this will be
         // removed once we are confident in the robustness of the lock manager).
         std::string _nsCopy;
 #endif
     };
 
-#ifndef _DEBUG
+#ifndef MONGO_CONFIG_DEBUG_BUILD
     // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
     // not spend too much time doing comparisons for hashing.
     BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
@@ -276,6 +277,9 @@ namespace mongo {
             STATUS_GRANTED,
             STATUS_WAITING,
             STATUS_CONVERTING,
+
+            // Counts the rest. Always insert new status types above this entry.
+            StatusCount
         };
 
         /**
@@ -356,6 +360,11 @@ namespace mongo {
         // that conversion cannot be immediately granted.
         LockMode convertMode;
     };
+
+    /**
+     * Returns a human readable status name for the specified LockRequest status.
+     */
+    const char* lockRequestStatusName(LockRequest::Status status);
 
 } // namespace mongo
 

@@ -37,7 +37,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 
 
 namespace mongo {
@@ -81,11 +81,11 @@ namespace mongo {
         ValueStorage(BSONType t, int i)                    { zero(); type = t; intValue = i; }
         ValueStorage(BSONType t, long long l)              { zero(); type = t; longValue = l; }
         ValueStorage(BSONType t, double d)                 { zero(); type = t; doubleValue = d; }
-        ValueStorage(BSONType t, ReplTime r)               { zero(); type = t; timestampValue = r; }
+        ValueStorage(BSONType t, Timestamp r)     { zero(); type = t; timestampValue = r.asULL(); }
         ValueStorage(BSONType t, bool b)                   { zero(); type = t; boolValue = b; }
         ValueStorage(BSONType t, const Document& d)        { zero(); type = t; putDocument(d); }
         ValueStorage(BSONType t, const RCVector* a)        { zero(); type = t; putVector(a); }
-        ValueStorage(BSONType t, const StringData& s)      { zero(); type = t; putString(s); }
+        ValueStorage(BSONType t, StringData s)      { zero(); type = t; putString(s); }
         ValueStorage(BSONType t, const BSONBinData& bd)    { zero(); type = t; putBinData(bd); }
         ValueStorage(BSONType t, const BSONRegEx& re)      { zero(); type = t; putRegEx(re); }
         ValueStorage(BSONType t, const BSONCodeWScope& cs) { zero(); type = t; putCodeWScope(cs); }
@@ -130,7 +130,7 @@ namespace mongo {
         }
 
         /// These are only to be called during Value construction on an empty Value
-        void putString(const StringData& s);
+        void putString(StringData s);
         void putVector(const RCVector* v);
         void putDocument(const Document& d);
         void putRegEx(const BSONRegEx& re);
@@ -249,7 +249,7 @@ namespace mongo {
                             bool boolValue;
                             int intValue;
                             long long longValue;
-                            ReplTime timestampValue;
+                            unsigned long long timestampValue;
                             long long dateValue;
                         };
                     };

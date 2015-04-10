@@ -50,7 +50,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 clearRawMongoProgramOutput();
 replTest.restart(BID);
 assert.soon(function() {
-    return rawMongoProgramOutput().match("replSet error cannot rollback a collMod command");
+    return rawMongoProgramOutput().match("cannot rollback a collMod command");
 }, "B failed to fassert");
 
 replTest.stopSet();

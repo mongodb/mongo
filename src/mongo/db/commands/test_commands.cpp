@@ -34,14 +34,16 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer_context.h"
+#include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -73,10 +75,11 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn,  ns );
+            OldClientContext ctx(txn,  ns );
             Database* db = ctx.db();
 
             WriteUnitOfWork wunit(txn);
+            txn->setReplicatedWrites(false);
             Collection* collection = db->getCollection( ns );
             if ( !collection ) {
                 collection = db->createCollection( txn, ns );
@@ -158,7 +161,7 @@ namespace mongo {
             int n = cmdObj.getIntField( "n" );
             bool inc = cmdObj.getBoolField( "inc" ); // inclusive range?
 
-            Client::WriteContext ctx(txn,  nss.ns() );
+            OldClientWriteContext ctx(txn,  nss.ns() );
             Collection* collection = ctx.getCollection();
             massert( 13417, "captrunc collection not found or empty", collection);
 
@@ -193,53 +196,18 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db, 
-                                                     const BSONObj& cmdObj) {
-            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-        }
-
-        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
             const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
-            ScopedTransaction scopedXact(txn, MODE_IX);
-            AutoGetDb autoDb(txn, dbname, MODE_X);
-
-            if (!fromRepl &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
-                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
-                    << "Not primary while truncating collection " << ns));
-            }
-
-            Database* db = autoDb.getDb();
-            massert(13429, "no such database", db);
-
-            Collection* collection = db->getCollection(ns);
-            massert(28584, "no such collection", collection);
-
-            std::vector<BSONObj> indexes = stopIndexBuilds(txn, db, cmdObj);
-
-            WriteUnitOfWork wuow(txn);
-
-            Status status = collection->truncate(txn);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            IndexBuilder::restoreIndexes(txn, indexes);
-
-            if (!fromRepl) {
-                repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
-            }
-
-            wuow.commit();
-
-            return true;
+            return appendCommandStatus(result, emptyCapped(txn, NamespaceString(ns)));
         }
+
     };
 
     // ----------------------------

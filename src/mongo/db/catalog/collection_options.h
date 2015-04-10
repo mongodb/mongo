@@ -43,6 +43,16 @@ namespace mongo {
         void reset();
 
         /**
+         * Returns true if collection options validates successfully.
+         */
+        bool isValid() const;
+
+        /**
+         * Confirms that collection options can be converted to BSON and back without errors.
+         */
+        Status validate() const;
+
+        /**
          * Updates fields based on BSON document from client.
          * If document contains a 'storageEngine' field, ensures that 'storageEngine'
          * contains a single field of Object type.
@@ -76,7 +86,11 @@ namespace mongo {
         } autoIndexId;
 
         // user flags
-        int flags;
+        enum UserFlags {
+            Flag_UsePowerOf2Sizes = 1 << 0,
+            Flag_NoPadding = 1 << 1,
+        };
+        int flags; // a bitvector of UserFlags
         bool flagsSet;
 
         bool temp;

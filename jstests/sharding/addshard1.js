@@ -4,7 +4,7 @@ assert.eq( 1, s.config.shards.count(), "initial server count wrong" );
 
 // create a shard and add a database; if the database is not duplicated the mongod should accepted
 // it as shard
-conn1 = startMongodTest( 29000 );
+conn1 = MongoRunner.runMongod({});
 
 db1 = conn1.getDB( "testDB" );
 numObjs = 0;
@@ -14,10 +14,11 @@ for (i=0; i<3; i++){
 }
 
 newShard = "myShard";
-assert( s.admin.runCommand( { addshard: "localhost:29000" , name: newShard } ).ok, "did not accepted non-duplicated shard" );
+assert( s.admin.runCommand( { addshard: "localhost:" + conn1.port , name: newShard } ).ok,
+        "did not accept non-duplicated shard" );
 
 // a mongod with an existing database name should not be allowed to become a shard
-conn2 = startMongodTest( 29001 );
+conn2 = MongoRunner.runMongod({});
 db2 = conn2.getDB( "otherDB" );
 assert.writeOK(db2.foo.save({ a: 1 }));
 db3 = conn2.getDB( "testDB" );
@@ -25,7 +26,8 @@ assert.writeOK(db3.foo.save({ a: 1 } ));
 
 s.config.databases.find().forEach( printjson )
 rejectedShard = "rejectedShard";
-assert( ! s.admin.runCommand( { addshard: "localhost:29001" , name : rejectedShard } ).ok, "accepted mongod with duplicate db" );
+assert( ! s.admin.runCommand( { addshard: "localhost:" + conn2.port , name : rejectedShard } ).ok,
+        "accepted mongod with duplicate db" );
 
 // check that all collection that were local to the mongod's are accessible through the mongos
 sdb1 = s.getDB( "testDB" );
@@ -48,6 +50,6 @@ s.adminCommand( { split : "testDB.foo", middle: { a : Math.floor(numObjs/2) } } 
 assert.eq( 2 , s.config.chunks.count(), "wrong chunk number after splitting collection that existed before" );
 assert.eq( numObjs , sdb1.foo.count() , "wrong count after splitting collection that existed before" );
 
-stopMongod( 29000 );
-stopMongod( 29001 );
+MongoRunner.stopMongod(conn1);
+MongoRunner.stopMongod(conn2);
 s.stop();

@@ -52,7 +52,7 @@ namespace mongo {
 
         /** Decides which portion of the array items will be removed from the provided element */
         virtual Status prepare(mutablebson::Element root,
-                               const StringData& matchedField,
+                               StringData matchedField,
                                ExecInfo* execInfo);
 
         /** Updates the Element used in prepare with the effects of the $pull operation. */

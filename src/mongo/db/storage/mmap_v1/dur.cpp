@@ -325,7 +325,7 @@ namespace {
         // See SERVER-5723 for performance improvement.
         // See SERVER-5680 to see why this code is necessary on Windows.
         // See SERVER-8795 to see why this code is necessary on Solaris.
-#if defined(_WIN32) || defined(__sunos__)
+#if defined(_WIN32) || defined(__sun)
         LockMongoFilesExclusive lk;
 #else
         LockMongoFilesShared lk;
@@ -709,7 +709,7 @@ namespace {
             }
 
             try {
-                boost::mutex::scoped_lock lock(flushMutex);
+                boost::unique_lock<boost::mutex> lock(flushMutex);
 
                 for (unsigned i = 0; i <= 2; i++) {
                     if (flushRequested.timed_wait(lock, Milliseconds(oneThird))) {
@@ -769,10 +769,20 @@ namespace {
                     // would wipe out their changes without ever being committed.
                     commitJob.committingReset();
 
+                    double systemMemoryPressurePercentage =
+                        ProcessInfo::getSystemMemoryPressurePercentage();
+
                     // Now that the in-memory modifications have been collected, we can potentially
                     // release the flush lock if remap is not necessary.
+                    // When we remap due to memory pressure, we look at two criteria
+                    // 1. If the amount of 4k pages touched exceeds 512 MB,
+                    //    a reasonable estimate of memory pressure on Linux.
+                    // 2. Check if the amount of free memory on the machine is running low,
+                    //    since #1 is underestimates the memory pressure on Windows since
+                    //    commits in 64MB chunks.
                     const bool shouldRemap =
                         (estimatedPrivateMapSize >= UncommittedBytesLimit) ||
+                        (systemMemoryPressurePercentage > 0.0) ||
                         (commitCounter % NumCommitsBeforeRemap == 0) ||
                         (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalAlwaysRemap);
 
@@ -794,11 +804,12 @@ namespace {
                         }
                         else {
                             // We don't want to get close to the UncommittedBytesLimit
-                            const double f =
+                            const double remapMemFraction =
                                 estimatedPrivateMapSize / ((double)UncommittedBytesLimit);
-                            if (f > remapFraction) {
-                                remapFraction = f;
-                            }
+
+                            remapFraction = std::max(remapMemFraction, remapFraction);
+
+                            remapFraction = std::max(systemMemoryPressurePercentage, remapFraction);
                         }
                     }
                     else {

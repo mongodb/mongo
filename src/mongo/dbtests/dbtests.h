@@ -54,13 +54,13 @@ namespace dbtests {
      * Creates an index if it does not already exist.
      */
     Status createIndex(OperationContext* txn,
-                       const StringData &ns,
+                       StringData ns,
                        const BSONObj& keys,
                        bool unique = false);
 
     /**
      * Creates an index from a BSON spec, if it does not already exist.
      */
-    Status createIndexFromSpec(OperationContext* txn, const StringData& ns, const BSONObj& spec);
+    Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& spec);
 }  // namespace dbtests
 }  // namespace mongo

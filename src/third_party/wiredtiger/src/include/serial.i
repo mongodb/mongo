@@ -255,8 +255,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * obsolete check at a time, and to protect updates from disappearing
 	 * under reconciliation.
 	 */
-	if (upd->next != NULL &&
-	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
+	if (upd->next != NULL) {
 		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
 		/* If we can't lock it, don't scan, that's okay. */
 		if (ret != 0)

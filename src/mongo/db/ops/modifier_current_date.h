@@ -62,7 +62,7 @@ namespace mongo {
         /** Evaluates the validity of applying $currentDate.
          */
         virtual Status prepare(mutablebson::Element root,
-                               const StringData& matchedField,
+                               StringData matchedField,
                                ExecInfo* execInfo);
 
         /** Updates the node passed in prepare with the results from prepare */

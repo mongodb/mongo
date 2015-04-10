@@ -31,32 +31,25 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/index/btree_based_access_method.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class IndexCursor;
     class IndexDescriptor;
 
     /**
      * The IndexAccessMethod for a Btree index.
      * Any index created with {field: 1} or {field: -1} uses this.
      */
-    class BtreeAccessMethod : public BtreeBasedAccessMethod {
+    class BtreeAccessMethod : public IndexAccessMethod {
     public:
-        // Every Btree-based index needs these.  We put them in the BtreeBasedAccessMethod
-        // superclass and subclasses (like this) can use them.
-        using BtreeBasedAccessMethod::_descriptor;
-
-        BtreeAccessMethod(IndexCatalogEntry* btreeState,
-                          SortedDataInterface* btree );
-        virtual ~BtreeAccessMethod() { }
+        BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree );
 
     private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         // Our keys differ for V0 and V1.
         boost::scoped_ptr<BtreeKeyGenerator> _keyGenerator;

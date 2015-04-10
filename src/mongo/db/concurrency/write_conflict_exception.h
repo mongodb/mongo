@@ -65,8 +65,8 @@ namespace mongo {
          * @param operation - e.g. "update"
          */
         static void logAndBackoff(int attempt,
-                                  const StringData& operation,
-                                  const StringData& ns);
+                                  StringData operation,
+                                  StringData ns);
 
         /**
          * If true, will call printStackTrace on every WriteConflictException created.

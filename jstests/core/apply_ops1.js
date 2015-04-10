@@ -52,11 +52,23 @@
     );
 
     assert.eq(0, t.find().count() , "Non-zero amount of documents in collection to start");
+    assert.commandFailed(db.adminCommand(
+      {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
+    ),
+        "Applying an insert operation on a non-existent collection should fail");
+
+    assert.commandWorked(db.createCollection(t.getName()));
     var a = db.adminCommand(
       {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
     );
     assert.eq(1, t.find().count() , "Valid insert failed");
     assert.eq(true, a.results[0], "Bad result value for valid insert");
+
+    a = db.adminCommand(
+      {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
+    );
+    assert.eq(1, t.find().count() , "Duplicate insert failed");
+    assert.eq(true, a.results[0], "Bad result value for duplicate insert");
 
     var o = {_id: 5, x: 17};
     assert.eq(o , t.findOne() , "Mismatching document inserted.");

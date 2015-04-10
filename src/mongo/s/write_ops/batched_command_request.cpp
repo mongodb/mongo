@@ -28,7 +28,7 @@
 
 #include "mongo/s/write_ops/batched_command_request.h"
 
-#include "mongo/bson/bsonobjiterator.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -206,7 +206,7 @@ namespace mongo {
         INVOKE( setCollNameNS, nss );
     }
 
-    void BatchedCommandRequest::setNS( const StringData& collName ) {
+    void BatchedCommandRequest::setNS( StringData collName ) {
         INVOKE( setCollName, collName );
     }
 

@@ -49,7 +49,7 @@ namespace mongo {
         WhereNoOpMatchExpression() : MatchExpression( WHERE ){ }
         virtual ~WhereNoOpMatchExpression(){}
 
-        Status init( const StringData& theCode );
+        Status init( StringData theCode );
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const {
             return false;
@@ -80,7 +80,7 @@ namespace mongo {
         string _code;
     };
 
-    Status WhereNoOpMatchExpression::init(const StringData& theCode ) {
+    Status WhereNoOpMatchExpression::init(StringData theCode ) {
         if ( theCode.size() == 0 )
             return Status( ErrorCodes::BadValue, "code for $where cannot be empty" );
 

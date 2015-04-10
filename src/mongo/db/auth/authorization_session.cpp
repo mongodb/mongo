@@ -57,10 +57,10 @@ namespace {
     const std::string ADMIN_DBNAME = "admin";
 }  // namespace
 
-    AuthorizationSession::AuthorizationSession(AuthzSessionExternalState* externalState) 
-        : _impersonationFlag(false) {
-        _externalState.reset(externalState);
-    }
+    AuthorizationSession::AuthorizationSession(
+            std::unique_ptr<AuthzSessionExternalState> externalState)
+        : _externalState(std::move(externalState)),
+          _impersonationFlag(false) {}
 
     AuthorizationSession::~AuthorizationSession() {
         for (UserSet::iterator it = _authenticatedUsers.begin();
@@ -159,6 +159,7 @@ namespace {
 
             ActionSet setupServerConfigActionSet;
             setupServerConfigActionSet.addAction(ActionType::addShard);
+            setupServerConfigActionSet.addAction(ActionType::getCmdLineOpts);
             setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
             setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
             Privilege setupServerConfigPrivilege =
@@ -447,7 +448,7 @@ namespace {
         return size;
     }
 
-    bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) {
+    bool AuthorizationSession::isAuthorizedToChangeAsUser(const UserName& userName, ActionType actionType) {
         User* user = lookupUser(userName);
         if (!user) {
             return false;
@@ -461,24 +462,15 @@ namespace {
         for (int i = 0; i < resourceSearchListLength; ++i) {
             actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
         }
-        return actions.contains(ActionType::changeOwnPassword);
+        return actions.contains(actionType);
+    }
+
+    bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) {
+        return AuthorizationSession::isAuthorizedToChangeAsUser(userName, ActionType::changeOwnPassword);
     }
 
     bool AuthorizationSession::isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) {
-        User* user = lookupUser(userName);
-        if (!user) {
-            return false;
-        }
-        ResourcePattern resourceSearchList[resourceSearchListCapacity];
-        const int resourceSearchListLength =
-                buildResourceSearchList(ResourcePattern::forDatabaseName(userName.getDB()),
-                                        resourceSearchList);
-
-        ActionSet actions;
-        for (int i = 0; i < resourceSearchListLength; ++i) {
-            actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
-        }
-        return actions.contains(ActionType::changeOwnCustomData);
+        return AuthorizationSession::isAuthorizedToChangeAsUser(userName, ActionType::changeOwnCustomData);
     }
 
     bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleName) {

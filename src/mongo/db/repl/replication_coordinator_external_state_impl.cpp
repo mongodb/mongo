@@ -38,19 +38,21 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs_sync.h"
-#include "mongo/db/repl/scoped_conn.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_state.h"
 #include "mongo/stdx/functional.h"
@@ -110,11 +112,13 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* txn) {
         createOplog(txn);
-        logOpInitiate(txn, BSON("msg" << "initiating set"));
-    }
 
-    void ReplicationCoordinatorExternalStateImpl::forwardSlaveHandshake() {
-        _syncSourceFeedback.forwardSlaveHandshake();
+        ScopedTransaction scopedXact(txn, MODE_X);
+        Lock::GlobalWrite globalWrite(txn->lockState());
+
+        WriteUnitOfWork wuow(txn);
+        getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, BSON("msg" << "initiating set"));
+        wuow.commit();
     }
 
     void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
@@ -182,38 +186,38 @@ namespace {
         }
     }
 
-    void ReplicationCoordinatorExternalStateImpl::setGlobalOpTime(const OpTime& newTime) {
+    void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
         setNewOptime(newTime);
     }
 
-    StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
+    StatusWith<Timestamp> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
             OperationContext* txn) {
 
         try {
             BSONObj oplogEntry;
-            if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
-                return StatusWith<OpTime>(
+            if (!Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry)) {
+                return StatusWith<Timestamp>(
                         ErrorCodes::NoMatchingDocument,
-                        str::stream() << "Did not find any entries in " << rsoplog);
+                        str::stream() << "Did not find any entries in " << rsOplogName);
             }
             BSONElement tsElement = oplogEntry[tsFieldName];
             if (tsElement.eoo()) {
-                return StatusWith<OpTime>(
+                return StatusWith<Timestamp>(
                         ErrorCodes::NoSuchKey,
-                        str::stream() << "Most recent entry in " << rsoplog << " missing \"" <<
+                        str::stream() << "Most recent entry in " << rsOplogName << " missing \"" <<
                         tsFieldName << "\" field");
             }
-            if (tsElement.type() != Timestamp) {
-                return StatusWith<OpTime>(
+            if (tsElement.type() != bsonTimestamp) {
+                return StatusWith<Timestamp>(
                         ErrorCodes::TypeMismatch,
                         str::stream() << "Expected type of \"" << tsFieldName <<
-                        "\" in most recent " << rsoplog <<
+                        "\" in most recent " << rsOplogName <<
                         " entry to have type Timestamp, but found " << typeName(tsElement.type()));
             }
-            return StatusWith<OpTime>(tsElement._opTime());
+            return StatusWith<Timestamp>(tsElement.timestamp());
         }
         catch (const DBException& ex) {
-            return StatusWith<OpTime>(ex.toStatus());
+            return StatusWith<Timestamp>(ex.toStatus());
         }
     }
 
@@ -228,16 +232,17 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::closeConnections() {
-        MessagingPort::closeAllSockets(ScopedConn::keepOpen);
+        MessagingPort::closeAllSockets(
+            ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen);
     }
 
     void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* txn) {
-        GlobalEnvironmentExperiment* environment = getGlobalEnvironment();
+        ServiceContext* environment = getGlobalServiceContext();
         environment->killAllUserOperations(txn);
     }
 
     void ReplicationCoordinatorExternalStateImpl::clearShardingState() {
-        shardingState.resetShardingState();
+        shardingState.clearCollectionMetadata();
     }
 
     void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
@@ -252,7 +257,7 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {
         std::vector<std::string> dbNames;
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->listDatabases(&dbNames);
 
         for (std::vector<std::string>::iterator it = dbNames.begin(); it != dbNames.end(); ++it) {

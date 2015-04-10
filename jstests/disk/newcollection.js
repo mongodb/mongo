@@ -1,9 +1,7 @@
 // SERVER-594 test
 
-port = allocatePorts( 1 )[ 0 ]
 var baseName = "jstests_disk_newcollection";
-var m = startMongod( "--noprealloc", "--smallfiles", "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
-//var m = db.getMongo();
+var m = MongoRunner.runMongod({noprealloc: "", smallfiles: ""});
 db = m.getDB( "test" );
 
 var t = db[baseName];

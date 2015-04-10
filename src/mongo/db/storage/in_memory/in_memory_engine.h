@@ -43,25 +43,25 @@ namespace mongo {
         virtual RecoveryUnit* newRecoveryUnit();
 
         virtual Status createRecordStore( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
+                                          StringData ns,
+                                          StringData ident,
                                           const CollectionOptions& options );
 
         virtual RecordStore* getRecordStore( OperationContext* opCtx,
-                                             const StringData& ns,
-                                             const StringData& ident,
+                                             StringData ns,
+                                             StringData ident,
                                              const CollectionOptions& options );
 
         virtual Status createSortedDataInterface( OperationContext* opCtx,
-                                                  const StringData& ident,
+                                                  StringData ident,
                                                   const IndexDescriptor* desc );
 
         virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             const StringData& ident,
+                                                             StringData ident,
                                                              const IndexDescriptor* desc );
 
         virtual Status dropIdent( OperationContext* opCtx,
-                                  const StringData& ident );
+                                  StringData ident );
 
         virtual bool supportsDocLocking() const { return false; }
 
@@ -73,16 +73,16 @@ namespace mongo {
         virtual bool isDurable() const { return true; }
 
         virtual int64_t getIdentSize( OperationContext* opCtx,
-                                      const StringData& ident );
+                                      StringData ident );
 
         virtual Status repairIdent( OperationContext* opCtx,
-                                    const StringData& ident ) {
+                                    StringData ident ) {
             return Status::OK();
         }
 
         virtual void cleanShutdown() {};
 
-        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const {
+        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const {
             return _dataMap.find(ident) != _dataMap.end();;
         }
 

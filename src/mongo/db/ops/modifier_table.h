@@ -58,7 +58,7 @@ namespace modifiertable {
      * Returns the modifier type for 'typeStr', if it was recognized as an existing update
      * mod, or MOD_UNKNOWN otherwise.
      */
-    ModifierType getType(const StringData& typeStr);
+    ModifierType getType(StringData typeStr);
 
     /**
      * Instantiate an update mod that corresponds to 'modType' or NULL if 'modType' is not

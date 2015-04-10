@@ -36,7 +36,7 @@ namespace mongo {
     namespace fts {
 
         TEST( English, Basic1 ) {
-            const StopWords* englishStopWords = StopWords::getStopWords( languageEnglishV2 );
+            const StopWords* englishStopWords = StopWords::getStopWords( &languageEnglishV2 );
             ASSERT( englishStopWords->isStopWord( "the" ) );
             ASSERT( !englishStopWords->isStopWord( "computer" ) );
         }

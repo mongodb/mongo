@@ -478,7 +478,7 @@ namespace {
     }
 
     static void assertContains(const EqualityMatches& equalities,
-                               const StringData& path,
+                               StringData path,
                                int value) {
         assertContains(equalities, BSON(path << value));
     }
@@ -750,7 +750,7 @@ namespace {
     //
 
     static void assertParent(const EqualityMatches& equalities,
-                             const StringData& pathStr,
+                             StringData pathStr,
                              const BSONObj& wrapped) {
 
         FieldRef path(pathStr);
@@ -779,13 +779,13 @@ namespace {
     }
 
     static void assertParent(const EqualityMatches& equalities,
-                             const StringData& path,
-                             const StringData& parentPath,
+                             StringData path,
+                             StringData parentPath,
                              int value) {
         assertParent(equalities, path, BSON(parentPath << value));
     }
 
-    static void assertNoParent(const EqualityMatches& equalities, const StringData& pathStr) {
+    static void assertNoParent(const EqualityMatches& equalities, StringData pathStr) {
 
         FieldRef path(pathStr);
 

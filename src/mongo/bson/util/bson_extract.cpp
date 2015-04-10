@@ -33,7 +33,7 @@
 namespace mongo {
 
     Status bsonExtractField(const BSONObj& object,
-                            const StringData& fieldName,
+                            StringData fieldName,
                             BSONElement* outElement) {
         BSONElement element = object.getField(fieldName);
         if (element.eoo())
@@ -45,7 +45,7 @@ namespace mongo {
     }
 
     Status bsonExtractTypedField(const BSONObj& object,
-                                 const StringData& fieldName,
+                                 StringData fieldName,
                                  BSONType type,
                                  BSONElement* outElement) {
         Status status = bsonExtractField(object, fieldName, outElement);
@@ -61,7 +61,7 @@ namespace mongo {
     }
 
     Status bsonExtractBooleanField(const BSONObj& object,
-                                   const StringData& fieldName,
+                                   StringData fieldName,
                                    bool* out) {
         BSONElement element;
         Status status = bsonExtractTypedField(object, fieldName, Bool, &element);
@@ -72,7 +72,7 @@ namespace mongo {
     }
 
     Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
-                                              const StringData& fieldName,
+                                              StringData fieldName,
                                               bool defaultValue,
                                               bool* out) {
         BSONElement value;
@@ -96,7 +96,7 @@ namespace mongo {
     }
 
     Status bsonExtractStringField(const BSONObj& object,
-                                  const StringData& fieldName,
+                                  StringData fieldName,
                                   std::string* out) {
         BSONElement element;
         Status status = bsonExtractTypedField(object, fieldName, String, &element);
@@ -106,19 +106,19 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status bsonExtractOpTimeField(const BSONObj& object,
-                                  const StringData& fieldName,
-                                  OpTime* out) {
+    Status bsonExtractTimestampField(const BSONObj& object,
+                                  StringData fieldName,
+                                  Timestamp* out) {
         BSONElement element;
-        Status status = bsonExtractTypedField(object, fieldName, Timestamp, &element);
+        Status status = bsonExtractTypedField(object, fieldName, bsonTimestamp, &element);
         if (!status.isOK())
             return status;
-        *out = element._opTime();
+        *out = element.timestamp();
         return Status::OK();
     }
 
     Status bsonExtractOIDField(const BSONObj& object,
-                               const StringData& fieldName,
+                               StringData fieldName,
                                OID* out) {
         BSONElement element;
         Status status = bsonExtractTypedField(object, fieldName, jstOID, &element);
@@ -129,7 +129,7 @@ namespace mongo {
     }
 
     Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
-                                          const StringData& fieldName,
+                                          StringData fieldName,
                                           const OID& defaultValue,
                                           OID* out) {
         Status status = bsonExtractOIDField(object, fieldName, out);
@@ -143,8 +143,8 @@ namespace mongo {
     }
 
     Status bsonExtractStringFieldWithDefault(const BSONObj& object,
-                                             const StringData& fieldName,
-                                             const StringData& defaultValue,
+                                             StringData fieldName,
+                                             StringData defaultValue,
                                              std::string* out) {
         Status status = bsonExtractStringField(object, fieldName, out);
         if (status == ErrorCodes::NoSuchKey) {
@@ -157,7 +157,7 @@ namespace mongo {
     }
 
     Status bsonExtractIntegerField(const BSONObj& object,
-                                   const StringData& fieldName,
+                                   StringData fieldName,
                                    long long* out) {
         BSONElement value;
         Status status = bsonExtractField(object, fieldName, &value);
@@ -180,7 +180,7 @@ namespace mongo {
     }
 
     Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
-                                              const StringData& fieldName,
+                                              StringData fieldName,
                                               long long defaultValue,
                                               long long* out) {
         Status status = bsonExtractIntegerField(object, fieldName, out);

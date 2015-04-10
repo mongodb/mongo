@@ -27,10 +27,12 @@
  *    then also delete it in the license file.
  */
 
-
 #pragma once
 
+#include <boost/thread/mutex.hpp>
+
 #include "mongo/db/jsobj.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -77,6 +79,10 @@ namespace mongo {
         };
         
         extern ConnectionRegistry connectionRegistry;
+
+        // This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
+        // it also protects the global dbexitCalled.
+        extern boost::mutex &mongoProgramOutputMutex;
 
         // Helper to tell if a file exists cross platform
         // TODO: Remove this when we have a cross platform file utility library

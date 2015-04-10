@@ -33,6 +33,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_state.h"
-
 
 namespace mongo {
 

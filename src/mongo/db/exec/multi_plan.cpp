@@ -38,13 +38,13 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
@@ -120,7 +120,7 @@ namespace mongo {
         StageState state = bestPlan.root->work(out);
 
         if (PlanStage::FAILURE == state && hasBackupPlan()) {
-            QLOG() << "Best plan errored out switching to backup\n";
+            LOG(5) << "Best plan errored out switching to backup\n";
             // Uncache the bad solution if we fall back
             // on the backup solution.
             //
@@ -138,7 +138,7 @@ namespace mongo {
         }
 
         if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-            QLOG() << "Best plan had a blocking stage, became unblocked\n";
+            LOG(5) << "Best plan had a blocking stage, became unblocked\n";
             _backupPlanIdx = kNoSuchPlan;
         }
 
@@ -149,21 +149,20 @@ namespace mongo {
         else if (PlanStage::NEED_TIME == state) {
             _commonStats.needTime++;
         }
-        else if (PlanStage::NEED_FETCH == state) {
-            _commonStats.needFetch++;
+        else if (PlanStage::NEED_YIELD == state) {
+            _commonStats.needYield++;
         }
 
         return state;
     }
 
     Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
-        // There are two conditions which cause us to yield during plan selection if we have a
-        // YIELD_AUTO policy:
+        // These are the conditions which can cause us to yield:
         //   1) The yield policy's timer elapsed, or
-        //   2) some stage requested a yield due to a document fetch (NEED_FETCH).
-        // In both cases, the actual yielding happens here.
-        if (NULL != yieldPolicy && (yieldPolicy->shouldYield() || NULL != _fetcher.get())) {
-            // Here's where we yield.
+        //   2) some stage requested a yield due to a document fetch, or
+        //   3) we need to yield and retry due to a WriteConflictException.
+        // In all cases, the actual yielding happens here.
+        if (yieldPolicy->shouldYield()) {
             bool alive = yieldPolicy->yield(_fetcher.get());
 
             if (!alive) {
@@ -241,15 +240,15 @@ namespace mongo {
         std::list<WorkingSetID>& alreadyProduced = bestCandidate.results;
         QuerySolution* bestSolution = bestCandidate.solution;
 
-        QLOG() << "Winning solution:\n" << bestSolution->toString() << endl;
+        LOG(5) << "Winning solution:\n" << bestSolution->toString() << endl;
         LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
 
         _backupPlanIdx = kNoSuchPlan;
         if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
-            QLOG() << "Winner has blocking stage, looking for backup plan...\n";
+            LOG(5) << "Winner has blocking stage, looking for backup plan...\n";
             for (size_t ix = 0; ix < _candidates.size(); ++ix) {
                 if (!_candidates[ix].solution->hasBlockingStage) {
-                    QLOG() << "Candidate " << ix << " is backup child\n";
+                    LOG(5) << "Candidate " << ix << " is backup child\n";
                     _backupPlanIdx = ix;
                     break;
                 }
@@ -294,12 +293,30 @@ namespace mongo {
             }
         }
 
+        // If the winning plan produced no results during the ranking period (and, therefore, no
+        // plan produced results during the ranking period), then we will not create a plan cache
+        // entry.
+        if (alreadyProduced.empty() && NULL != _collection) {
+            size_t winnerIdx = ranking->candidateOrder[0];
+            LOG(1) << "Winning plan had zero results. Not caching."
+                   << " ns: " << _collection->ns()
+                   << " " << _query->toStringShort()
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: "
+                   << Explain::getPlanSummary(_candidates[winnerIdx].root);
+        }
+
         // Store the choice we just made in the cache. In order to do so,
-        //   1) the query must be of a type that is safe to cache, and
-        //   2) two or more plans cannot have tied for the win. Caching in the
-        //   case of ties can cause successive queries of the same shape to
-        //   use a bad index.
-        if (PlanCache::shouldCacheQuery(*_query) && !ranking->tieForBest) {
+        //   1) the query must be of a type that is safe to cache,
+        //   2) two or more plans cannot have tied for the win. Caching in the case of ties can
+        //   cause successive queries of the same shape to use a bad index.
+        //   3) Furthermore, the winning plan must have returned at least one result. Plans which
+        //   return zero results cannot be reliably ranked. Such query shapes are generally
+        //   existence type queries, and a winning plan should get cached once the query finds a
+        //   result.
+        if (PlanCache::shouldCacheQuery(*_query)
+            && !ranking->tieForBest
+            && !alreadyProduced.empty()) {
             // Create list of candidate solutions for the cache with
             // the best solution at the front.
             std::vector<QuerySolution*> solutions;
@@ -318,7 +335,7 @@ namespace mongo {
             bool validSolutions = true;
             for (size_t ix = 0; ix < solutions.size(); ++ix) {
                 if (NULL == solutions[ix]->cacheData.get()) {
-                    QLOG() << "Not caching query because this solution has no cache data: "
+                    LOG(5) << "Not caching query because this solution has no cache data: "
                            << solutions[ix]->toString();
                     validSolutions = false;
                     break;
@@ -378,13 +395,22 @@ namespace mongo {
                 // Assumes that the ranking will pick this plan.
                 doneWorking = true;
             }
-            else if (PlanStage::NEED_FETCH == state) {
-                // Yielding for a NEED_FETCH is handled above. Here we just make sure that the
-                // WSM is fetchable as a sanity check.
-                WorkingSetMember* member = candidate.ws->get(id);
-                invariant(member->hasFetcher());
-                // Transfer ownership of the fetcher and yield.
-                _fetcher.reset(member->releaseFetcher());
+            else if (PlanStage::NEED_YIELD == state) {
+                if (id == WorkingSet::INVALID_ID) {
+                    if (!yieldPolicy->allowedToYield())
+                        throw WriteConflictException();
+                }
+                else {
+                    WorkingSetMember* member = candidate.ws->get(id);
+                    invariant(member->hasFetcher());
+                    // Transfer ownership of the fetcher and yield.
+                    _fetcher.reset(member->releaseFetcher());
+                }
+
+                if (yieldPolicy->allowedToYield()) {
+                    yieldPolicy->forceYield();
+                }
+
                 if (!(tryYield(yieldPolicy)).isOK()) {
                     return false;
                 }

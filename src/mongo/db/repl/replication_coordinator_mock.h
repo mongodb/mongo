@@ -66,7 +66,7 @@ namespace repl {
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
                 const OperationContext* txn,
-                const OpTime& ts,
+                const Timestamp& ts,
                 const WriteConcernOptions& writeConcern);
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
@@ -80,7 +80,7 @@ namespace repl {
 
         virtual bool isMasterForReportingPurposes();
 
-        virtual bool canAcceptWritesForDatabase(const StringData& dbName);
+        virtual bool canAcceptWritesForDatabase(StringData dbName);
 
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
@@ -91,15 +91,15 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptimeForSlave(const OID& rid, const OpTime& ts);
+        virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 
-        virtual void setMyLastOptime(const OpTime& ts);
+        virtual void setMyLastOptime(const Timestamp& ts);
 
         virtual void resetMyLastOptime();
 
         virtual void setMyHeartbeatMessage(const std::string& msg);
 
-        virtual OpTime getMyLastOptime() const;
+        virtual Timestamp getMyLastOptime() const;
 
         virtual OID getElectionId();
 
@@ -117,14 +117,13 @@ namespace repl {
 
         virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
-        virtual void prepareReplSetUpdatePositionCommandHandshakes(
-                std::vector<BSONObj>* handshakes);
-
         virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual void fillIsMasterForReplSet(IsMasterResponse* result);
 
         virtual void appendSlaveInfoData(BSONObjBuilder* result);
+
+        virtual ReplicaSetConfig getConfig() const;
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
@@ -158,13 +157,14 @@ namespace repl {
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates);
+        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
+                                                    long long* configVersion);
 
         virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake);
 
         virtual bool buildsIndexes();
 
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op);
 
         virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
 
@@ -180,6 +180,7 @@ namespace repl {
 
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
+        virtual Timestamp getLastCommittedOpTime() const;
     private:
 
         const ReplSettings _settings;

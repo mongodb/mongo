@@ -33,6 +33,7 @@
 #include <cstring>
 
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/platform/bits.h"
 #include "mongo/util/debug_util.h"
@@ -275,12 +276,12 @@ namespace mongo {
     }
 
     // These need to be outside the ps namespace due to the way they are defined
-#if defined(MONGO_HAVE___THREAD)
+#if defined(MONGO_CONFIG_HAVE___THREAD)
     __thread PointerTable::Data _pointerTableData;
     PointerTable::Data* PointerTable::getData() {
         return &_pointerTableData;
     }
-#elif defined(MONGO_HAVE___DECLSPEC_THREAD)
+#elif defined(MONGO_CONFIG_HAVE___DECLSPEC_THREAD)
     __declspec( thread ) PointerTable::Data _pointerTableData;
     PointerTable::Data* PointerTable::getData() {
         return &_pointerTableData;

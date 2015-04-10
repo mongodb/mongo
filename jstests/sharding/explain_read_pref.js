@@ -6,8 +6,6 @@
 
 load("jstests/replsets/rslib.js");
 
-var NODE_COUNT = 2;
-
 var testAllModes = function(conn, isMongos) {
 
     // The primary is tagged with { tag: 'one' } and the secondary with
@@ -40,7 +38,7 @@ var testAllModes = function(conn, isMongos) {
     ].forEach(function(args) {
         var mode = args[0], tagSets = args[1], secExpected = args[2];
 
-        var testDB = conn.getDB('test');
+        var testDB = conn.getDB('TestDB');
         conn.setSlaveOk(false); // purely rely on readPref
         jsTest.log('Testing mode: ' + mode + ', tag sets: ' + tojson(tagSets));
 
@@ -69,7 +67,7 @@ var testAllModes = function(conn, isMongos) {
     });
 };
 
-var st = new ShardingTest({ shards: { rs0: { nodes: NODE_COUNT }}});
+var st = new ShardingTest({ shards: { rs0: { nodes: 2 }}});
 st.stopBalancer();
 
 ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
@@ -103,10 +101,10 @@ catch(e) {
 
 st.rs0.awaitSecondaryNodes();
 
-// Force mongos to reconnect after our reconfig
+// Force mongos to reconnect after our reconfig and also create the test database
 assert.soon(function() {
     try {
-        st.s.getDB('foo').runCommand({ create: 'foo' });
+        st.s.getDB('TestDB').runCommand({ create: 'TestColl' });
         return true;
     }
     catch (x) {

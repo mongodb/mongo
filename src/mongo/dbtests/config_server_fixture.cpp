@@ -28,21 +28,18 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/dbtests/config_server_fixture.h"
 
 #include <boost/scoped_ptr.hpp>
 #include <list>
 
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/s/config.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/distlock.h"
-#include "mongo/s/type_changelog.h"
-#include "mongo/s/type_chunk.h"
-#include "mongo/s/type_collection.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/type_config_version.h"
-#include "mongo/s/type_database.h"
-#include "mongo/s/type_mongos.h"
-#include "mongo/s/type_shard.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -56,6 +53,14 @@ namespace mongo {
         : _client(&_txn),
           _connectHook(NULL) {
 
+    }
+
+    ConnectionString ConfigServerFixture::configSvr() {
+        return ConnectionString(HostAndPort("$dummy:10000"));
+    }
+
+    string ConfigServerFixture::shardName() {
+        return "TestShardName";
     }
 
     void ConfigServerFixture::setUp() {
@@ -77,7 +82,9 @@ namespace mongo {
                                        ChunkType::ConfigNS,
                                        BSON( ChunkType::ns() << 1 <<
                                              ChunkType::DEPRECATED_lastmod() << 1 )));
-        configServer.init(configSvr().toString());
+
+        shardingState.initialize(configSvr().toString());
+        shardingState.gotShardName(shardName());
     }
 
     void ConfigServerFixture::clearServer() {
@@ -88,32 +95,7 @@ namespace mongo {
         _client.dropCollection(VersionType::ConfigNS);
     }
 
-    void ConfigServerFixture::clearShards() {
-        _client.dropCollection(ShardType::ConfigNS);
-    }
-
-    void ConfigServerFixture::clearDatabases() {
-        _client.dropCollection(DatabaseType::ConfigNS);
-    }
-
-    void ConfigServerFixture::clearCollections() {
-        _client.dropCollection(CollectionType::ConfigNS);
-    }
-
-    void ConfigServerFixture::clearChunks() {
-        _client.dropCollection(ChunkType::ConfigNS);
-    }
-
-    void ConfigServerFixture::clearPings() {
-        _client.dropCollection(MongosType::ConfigNS);
-    }
-
-    void ConfigServerFixture::clearChangelog() {
-        _client.dropCollection(ChangelogType::ConfigNS);
-    }
-
     void ConfigServerFixture::dumpServer() {
-
         log() << "Dumping virtual config server to log..." << endl;
 
         list<string> collectionNames(_client.getCollectionNames("config"));
@@ -135,7 +117,7 @@ namespace mongo {
     }
 
     void ConfigServerFixture::tearDown() {
-
+        shardingState.clearCollectionMetadata();
         clearServer();
 
         // Reset the pinger

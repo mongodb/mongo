@@ -37,16 +37,14 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/s/chunk.h"
-#include "mongo/s/chunk_version.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
@@ -511,8 +509,13 @@ namespace mongo {
 
         int tries = ++_staleNSMap[ staleNS ];
 
-        if( tries >= 5 ) throw SendStaleConfigException( staleNS, str::stream() << "too many retries of stale version info",
-                                                         e.getVersionReceived(), e.getVersionWanted() );
+        if (tries >= 5) {
+            throw SendStaleConfigException(staleNS,
+                                           str::stream()
+                                                << "too many retries of stale version info",
+                                           e.getVersionReceived(),
+                                           e.getVersionWanted());
+        }
 
         forceReload = tries > 2;
     }
@@ -1274,15 +1277,15 @@ namespace mongo {
 
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
+
                     // Version is zero b/c this is deprecated codepath
-                    staleConfigExs.push_back(
-                            str::stream() << "stale config detected for "
-                                          << RecvStaleConfigException( _ns,
-                                                                       "ParallelCursor::_init",
-                                                                       ChunkVersion( 0, 0, OID() ),
-                                                                       ChunkVersion( 0, 0, OID() ),
-                                                                       true ).what()
-                                          << errLoc );
+                    staleConfigExs.push_back(str::stream()
+                                    << "stale config detected for "
+                                    << RecvStaleConfigException(_ns,
+                                                                "ParallelCursor::_init",
+                                                                ChunkVersion(0, 0, OID()),
+                                                                ChunkVersion( 0, 0, OID())).what()
+                                    << errLoc);
                     break;
                 }
 
@@ -1436,18 +1439,19 @@ namespace mongo {
                 errMsg << *i;
             }
 
-            if( throwException && staleConfigExs.size() > 0 ){
+            if (throwException && staleConfigExs.size() > 0) {
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( _ns,
-                                                errMsg.str(),
-                                                ChunkVersion( 0, 0, OID() ),
-                                                ChunkVersion( 0, 0, OID() ),
-                                                !allConfigStale );
+                throw RecvStaleConfigException(_ns,
+                                               errMsg.str(),
+                                               ChunkVersion( 0, 0, OID() ),
+                                               ChunkVersion( 0, 0, OID() ));
             }
-            else if( throwException )
-                throw DBException( errMsg.str(), 14827 );
-            else
+            else if (throwException) {
+                throw DBException(errMsg.str(), 14827);
+            }
+            else {
                 warning() << errMsg.str() << endl;
+            }
         }
 
         if( retries > 0 )

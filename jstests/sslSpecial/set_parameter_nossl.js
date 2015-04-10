@@ -17,7 +17,7 @@ function testTransition(newSSLMode, newClusterAuthMode) {
     var res = adminDB.runCommand({ "setParameter" : 1,
                                    "clusterAuthMode" : newClusterAuthMode });
     assert(!res["ok"]);
-    stopMongod(port);
+    MongoRunner.stopMongod(port);
 }
 
 testTransition("allowSSL", "sendKeyFile");

@@ -142,7 +142,7 @@ namespace mongo {
         return Document();
     }
 
-    Variables::Id VariablesParseState::defineVariable(const StringData& name) {
+    Variables::Id VariablesParseState::defineVariable(StringData name) {
         // caller should have validated before hand by using Variables::uassertValidNameForUserWrite
         massert(17275, "Can't redefine ROOT",
                 name != "ROOT");
@@ -152,7 +152,7 @@ namespace mongo {
         return id;
     }
 
-    Variables::Id VariablesParseState::getVariable(const StringData& name) const {
+    Variables::Id VariablesParseState::getVariable(StringData name) const {
         StringMap<Variables::Id>::const_iterator it = _variables.find(name);
         if (it != _variables.end())
             return it->second;

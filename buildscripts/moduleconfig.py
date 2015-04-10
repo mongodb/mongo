@@ -30,12 +30,15 @@ import imp
 import inspect
 import os
 
-def discover_modules(module_root):
+def discover_modules(module_root, allowed_modules):
     """Scans module_root for subdirectories that look like MongoDB modules.
 
     Returns a list of imported build.py module objects.
     """
     found_modules = []
+
+    if allowed_modules is not None:
+        allowed_modules = allowed_modules.split(',')
 
     if not os.path.isdir(module_root):
         return found_modules
@@ -47,6 +50,10 @@ def discover_modules(module_root):
 
         build_py = os.path.join(root, 'build.py')
         module = None
+
+        if allowed_modules is not None and name not in allowed_modules:
+            print "skipping module: %s" % name
+            continue
 
         if os.path.isfile(build_py):
             print "adding module: %s" % name

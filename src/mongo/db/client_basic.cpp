@@ -39,8 +39,8 @@ namespace mongo {
 
     using boost::scoped_ptr;
 
-    ClientBasic::ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {
-    }
+    ClientBasic::ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort) :
+        _serviceContext(serviceContext), _messagingPort(messagingPort) {}
     ClientBasic::~ClientBasic() {}
 
     AuthenticationSession* ClientBasic::getAuthenticationSession() {
@@ -70,11 +70,12 @@ namespace mongo {
             return _authorizationSession.get();
     }
 
-    void ClientBasic::setAuthorizationSession(AuthorizationSession* authorizationSession) {
+    void ClientBasic::setAuthorizationSession(
+            std::unique_ptr<AuthorizationSession> authorizationSession) {
         massert(16477,
                 "An AuthorizationManager has already been set up for this connection",
                 !hasAuthorizationSession());
-        _authorizationSession.reset(authorizationSession);
+        _authorizationSession = std::move(authorizationSession);
     }
 
 }  // namespace mongo

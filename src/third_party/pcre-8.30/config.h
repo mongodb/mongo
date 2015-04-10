@@ -189,7 +189,7 @@ them both to 0; an emulation function will be used. */
    --disable-stack-for-recursion). */
 /* #undef NO_RECURSE */
 /* mongodb: don't recurse, don't want to use much stack or blow stack */
-#ifndef __sunos__
+#ifndef __sun
 /* TODO this doesn't compile on sunos?? */
 #define NO_RECURSE 1
 #endif

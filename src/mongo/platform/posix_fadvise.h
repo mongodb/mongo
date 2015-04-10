@@ -31,7 +31,7 @@
 
 #include <fcntl.h>
 
-#if defined(__sunos__)
+#if defined(__sun)
 
 #include <sys/types.h>
 

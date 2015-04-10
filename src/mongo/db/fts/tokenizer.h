@@ -44,7 +44,7 @@ namespace mongo {
 
         struct Token {
             enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
-            Token( Type type, const StringData& data, unsigned offset, bool previousWhiteSpace )
+            Token( Type type, StringData data, unsigned offset, bool previousWhiteSpace )
                 : type( type ),
                   data( data ),
                   offset( offset ),
@@ -59,9 +59,10 @@ namespace mongo {
         };
 
         class Tokenizer {
+            MONGO_DISALLOW_COPYING( Tokenizer );
         public:
 
-            Tokenizer( const FTSLanguage& language, const StringData& str );
+            Tokenizer( const FTSLanguage* language, StringData str );
 
             bool more() const;
             Token next();

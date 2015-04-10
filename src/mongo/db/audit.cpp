@@ -38,7 +38,7 @@ namespace mongo {
 namespace audit {
 
     void logAuthentication(ClientBasic* client,
-                           const StringData& mechanism,
+                           StringData mechanism,
                            const UserName& user,
                            ErrorCodes::Error result) MONGO_AUDIT_STUB
 
@@ -111,7 +111,7 @@ namespace audit {
                      const UserName& username) MONGO_AUDIT_STUB
 
     void logDropAllUsersFromDatabase(ClientBasic* client,
-                                     const StringData& dbname) MONGO_AUDIT_STUB
+                                     StringData dbname) MONGO_AUDIT_STUB
 
     void logUpdateUser(ClientBasic* client,
                        const UserName& username,
@@ -141,7 +141,7 @@ namespace audit {
                      const RoleName& role) MONGO_AUDIT_STUB
 
     void logDropAllRolesFromDatabase(ClientBasic* client,
-                                     const StringData& dbname) MONGO_AUDIT_STUB
+                                     StringData dbname) MONGO_AUDIT_STUB
 
     void logGrantRolesToRole(ClientBasic* client,
                              const RoleName& role,
@@ -164,49 +164,49 @@ namespace audit {
                             const BSONObj* newConfig) MONGO_AUDIT_STUB
 
     void logApplicationMessage(ClientBasic* client,
-                               const StringData& msg) MONGO_AUDIT_STUB
+                               StringData msg) MONGO_AUDIT_STUB
 
     void logShutdown(ClientBasic* client) MONGO_AUDIT_STUB
 
     void logCreateIndex(ClientBasic* client,
                         const BSONObj* indexSpec,
-                        const StringData& indexname,
-                        const StringData& nsname) MONGO_AUDIT_STUB
+                        StringData indexname,
+                        StringData nsname) MONGO_AUDIT_STUB
 
     void logCreateCollection(ClientBasic* client,
-                             const StringData& nsname) MONGO_AUDIT_STUB
+                             StringData nsname) MONGO_AUDIT_STUB
 
     void logCreateDatabase(ClientBasic* client,
-                           const StringData& dbname) MONGO_AUDIT_STUB
+                           StringData dbname) MONGO_AUDIT_STUB
 
 
     void logDropIndex(ClientBasic* client,
-                      const StringData& indexname,
-                      const StringData& nsname) MONGO_AUDIT_STUB
+                      StringData indexname,
+                      StringData nsname) MONGO_AUDIT_STUB
 
     void logDropCollection(ClientBasic* client,
-                           const StringData& nsname) MONGO_AUDIT_STUB
+                           StringData nsname) MONGO_AUDIT_STUB
 
     void logDropDatabase(ClientBasic* client,
-                         const StringData& dbname) MONGO_AUDIT_STUB
+                         StringData dbname) MONGO_AUDIT_STUB
 
     void logRenameCollection(ClientBasic* client,
-                             const StringData& source,
-                             const StringData& target) MONGO_AUDIT_STUB
+                             StringData source,
+                             StringData target) MONGO_AUDIT_STUB
 
     void logEnableSharding(ClientBasic* client,
-                           const StringData& dbname) MONGO_AUDIT_STUB
+                           StringData dbname) MONGO_AUDIT_STUB
 
     void logAddShard(ClientBasic* client,
-                     const StringData& name,
+                     StringData name,
                      const std::string& servers,
                      long long maxSize) MONGO_AUDIT_STUB
 
     void logRemoveShard(ClientBasic* client,
-                        const StringData& shardname) MONGO_AUDIT_STUB
+                        StringData shardname) MONGO_AUDIT_STUB
 
     void logShardCollection(ClientBasic* client,
-                            const StringData& ns,
+                            StringData ns,
                             const BSONObj& keyPattern,
                             bool unique) MONGO_AUDIT_STUB
 

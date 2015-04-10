@@ -120,7 +120,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setName(const StringData& name) {
+        void setName(StringData name) {
             _name = name.toString();
             _isNameSet = true;
         }

@@ -30,7 +30,6 @@
 
 #include "mongo/db/matcher/expression.h"
 
-#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 

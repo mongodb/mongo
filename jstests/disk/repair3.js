@@ -39,7 +39,7 @@ if ( doIt ) {
     }
 
     check();
-    stopMongod( port );
+    MongoRunner.stopMongod( port );
 
     resetDbpath( repairpath );
     rc = runMongoProgram( "mongod", "--nssize", "8", "--noprealloc", "--smallfiles", "--repair", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
@@ -47,6 +47,6 @@ if ( doIt ) {
     m = startMongoProgram( "mongod", "--nssize", "8", "--noprealloc", "--smallfiles", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
     db = m.getDB( baseName );
     check();
-    stopMongod( port );
+    MongoRunner.stopMongod( port );
 
 }

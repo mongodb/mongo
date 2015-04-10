@@ -31,9 +31,10 @@
 
 #include <string>
 
+#include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -124,6 +125,13 @@ namespace mongo {
         static bool blockCheckSupported();
 
         static bool blockInMemory(const void* start);
+
+        /**
+         * Returns a positive floating point number between 0.0 and 1.0 to inform MMapV1 how much it
+         * must remap pages to bring the system page file implementation back below a certain 
+         * threshold. A number of 1.0 means remap everything.
+         */
+        static double getSystemMemoryPressurePercentage();
 
         /**
          * @return a pointer aligned to the start of the page the provided pointer belongs to.

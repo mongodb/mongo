@@ -29,7 +29,7 @@
  */
 
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/global_optime.h"
+#include "mongo/db/global_timestamp.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -53,7 +53,7 @@ namespace mongo {
             while ( i.more() ) {
                 BSONElement e = i.next();
 
-                if ( e.type() == Timestamp && e.timestampValue() == 0 ) {
+                if ( e.type() == bsonTimestamp && e.timestampValue() == 0 ) {
                     // we replace Timestamp(0,0) at the top level with a correct value
                     // in the fast pass, we just mark that we want to swap
                     hasTimestampToFix = true;
@@ -122,8 +122,8 @@ namespace mongo {
             if ( hadId && e.fieldNameStringData() == "_id" ) {
                 // no-op
             }
-            else if ( e.type() == Timestamp && e.timestampValue() == 0 ) {
-                b.append( e.fieldName(), getNextGlobalOptime() );
+            else if ( e.type() == bsonTimestamp && e.timestampValue() == 0 ) {
+                b.append( e.fieldName(), getNextGlobalTimestamp() );
             }
             else {
                 b.append( e );
@@ -132,7 +132,7 @@ namespace mongo {
         return StatusWith<BSONObj>( b.obj() );
     }
 
-    Status userAllowedWriteNS( const StringData& ns ) {
+    Status userAllowedWriteNS( StringData ns ) {
         return userAllowedWriteNS( nsToDatabaseSubstring( ns ), nsToCollectionSubstring( ns ) );
     }
 
@@ -140,7 +140,7 @@ namespace mongo {
         return userAllowedWriteNS( ns.db(), ns.coll() );
     }
 
-    Status userAllowedWriteNS( const StringData& db, const StringData& coll ) {
+    Status userAllowedWriteNS( StringData db, StringData coll ) {
         // validity checking
 
         if ( db.size() == 0 )

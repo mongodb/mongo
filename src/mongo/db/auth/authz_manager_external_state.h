@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,8 @@
 
 namespace mongo {
 
+    class AuthorizationManager;
+    class AuthzSessionExternalState;
     class OperationContext;
 
     /**
@@ -61,6 +64,13 @@ namespace mongo {
          * than Status::OK().
          */
         virtual Status initialize(OperationContext* txn) = 0;
+
+        /**
+         * Creates an external state manipulator for an AuthorizationSession whose
+         * AuthorizationManager uses this object as its own external state manipulator.
+         */
+        virtual std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+                AuthorizationManager* authzManager) = 0;
 
         /**
          * Retrieves the schema version of the persistent data describing users and roles.
@@ -220,7 +230,7 @@ namespace mongo {
          * admin.system.version collections.  This serializes all writers to the authorization
          * documents, but does not impact readers.
          */
-        virtual bool tryAcquireAuthzUpdateLock(const StringData& why) = 0;
+        virtual bool tryAcquireAuthzUpdateLock(StringData why) = 0;
 
         /**
          * Releases the lock guarding modifications to persistent authorization data, which must
@@ -229,11 +239,11 @@ namespace mongo {
         virtual void releaseAuthzUpdateLock() = 0;
 
         virtual void logOp(
+                OperationContext* txn,
                 const char* op,
                 const char* ns,
                 const BSONObj& o,
-                BSONObj* o2,
-                bool* b) {}
+                BSONObj* o2) {}
 
 
     protected:

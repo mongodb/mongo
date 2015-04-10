@@ -70,7 +70,7 @@ namespace mongo {
         virtual const StringData path() const { return _path; }
 
     protected:
-        Status initPath( const StringData& path );
+        Status initPath( StringData path );
 
     private:
         StringData _path;
@@ -84,7 +84,7 @@ namespace mongo {
     public:
         ComparisonMatchExpression( MatchType type ) : LeafMatchExpression( type ){}
 
-        Status init( const StringData& path, const BSONElement& rhs );
+        Status init( StringData path, const BSONElement& rhs );
 
         virtual ~ComparisonMatchExpression(){}
 
@@ -193,8 +193,8 @@ namespace mongo {
         RegexMatchExpression();
         ~RegexMatchExpression();
 
-        Status init( const StringData& path, const StringData& regex, const StringData& options );
-        Status init( const StringData& path, const BSONElement& e );
+        Status init( StringData path, StringData regex, StringData options );
+        Status init( StringData path, const BSONElement& e );
 
         virtual LeafMatchExpression* shallowClone() const {
             RegexMatchExpression* e = new RegexMatchExpression();
@@ -228,7 +228,7 @@ namespace mongo {
     public:
         ModMatchExpression() : LeafMatchExpression( MOD ){}
 
-        Status init( const StringData& path, int divisor, int remainder );
+        Status init( StringData path, int divisor, int remainder );
 
         virtual LeafMatchExpression* shallowClone() const {
             ModMatchExpression* m = new ModMatchExpression();
@@ -259,7 +259,7 @@ namespace mongo {
     public:
         ExistsMatchExpression() : LeafMatchExpression( EXISTS ){}
 
-        Status init( const StringData& path );
+        Status init( StringData path );
 
         virtual LeafMatchExpression* shallowClone() const {
             ExistsMatchExpression* e = new ExistsMatchExpression();
@@ -326,7 +326,7 @@ namespace mongo {
     class InMatchExpression : public LeafMatchExpression {
     public:
         InMatchExpression() : LeafMatchExpression( MATCH_IN ){}
-        Status init( const StringData& path );
+        Status init( StringData path );
 
         virtual LeafMatchExpression* shallowClone() const;
 
@@ -361,7 +361,7 @@ namespace mongo {
     public:
         TypeMatchExpression() : MatchExpression( TYPE_OPERATOR ){}
 
-        Status init( const StringData& path, int type );
+        Status init( StringData path, int type );
 
         virtual MatchExpression* shallowClone() const {
             TypeMatchExpression* e = new TypeMatchExpression();
@@ -390,7 +390,7 @@ namespace mongo {
         virtual const StringData path() const { return _path; }
 
     private:
-        bool _matches( const StringData& path,
+        bool _matches( StringData path,
                        const MatchableDocument* doc,
                        MatchDetails* details = 0 ) const;
 

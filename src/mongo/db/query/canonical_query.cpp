@@ -55,7 +55,7 @@ namespace {
      * Encode user-provided string. Cache key delimiters seen in the
      * user string are escaped with a backslash.
      */
-    void encodeUserString(const StringData& s, mongoutils::str::stream* os) {
+    void encodeUserString(StringData s, mongoutils::str::stream* os) {
         for (size_t i = 0; i < s.size(); ++i) {
             char c = s[i];
             switch (c) {
@@ -275,6 +275,11 @@ namespace {
                 *os << "d";
             }
             encodeUserString(elt.fieldName(), os);
+
+            // Sort argument separator
+            if (it.more()) {
+                *os << ",";
+            }
         }
     }
 
@@ -531,7 +536,6 @@ namespace mongo {
     Status CanonicalQuery::init(LiteParsedQuery* lpq,
                                 const MatchExpressionParser::WhereCallback& whereCallback,
                                 MatchExpression* root) {
-        _isForWrite = false;
         _pq.reset(lpq);
 
         // Normalize, sort and validate tree.

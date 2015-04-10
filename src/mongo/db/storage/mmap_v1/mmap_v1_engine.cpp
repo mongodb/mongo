@@ -61,7 +61,7 @@ namespace mongo {
 
 namespace {
 
-#if !defined(__sunos__)
+#if !defined(__sun)
     // if doingRepair is true don't consider unclean shutdown an error
     void acquirePathLock(MMAPV1Engine* storageEngine,
                          bool doingRepair,
@@ -153,7 +153,7 @@ namespace {
             uasserted(13618, "can't start without --journal enabled when journal/ files are present");
         }
     }
-#endif  //  !defined(__sunos__)
+#endif  //  !defined(__sun)
 
 
     /// warn if readahead > 256KB (gridfs chunk size)
@@ -251,9 +251,9 @@ namespace {
     }
 
     DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                                 const StringData& db ) {
+                                                                 StringData db ) {
         {
-            boost::mutex::scoped_lock lk(_entryMapMutex);
+            boost::lock_guard<boost::mutex> lk(_entryMapMutex);
             EntryMap::const_iterator iter = _entryMap.find(db.toString());
             if (iter != _entryMap.end()) {
                 return iter->second;
@@ -271,7 +271,7 @@ namespace {
                                            storageGlobalParams.directoryperdb,
                                            false);
 
-        boost::mutex::scoped_lock lk(_entryMapMutex);
+        boost::lock_guard<boost::mutex> lk(_entryMapMutex);
 
         // Sanity check that we are not overwriting something
         invariant(_entryMap.insert(EntryMap::value_type(db.toString(), entry)).second);
@@ -279,20 +279,20 @@ namespace {
         return entry;
     }
 
-    Status MMAPV1Engine::closeDatabase( OperationContext* txn, const StringData& db ) {
+    Status MMAPV1Engine::closeDatabase( OperationContext* txn, StringData db ) {
         // Before the files are closed, flush any potentially outstanding changes, which might
         // reference this database. Otherwise we will assert when subsequent applications of the
         // global journal entries occur, which happen to have write intents for the removed files.
         getDur().syncDataAndTruncateJournal(txn);
 
-        boost::mutex::scoped_lock lk( _entryMapMutex );
+        boost::lock_guard<boost::mutex> lk( _entryMapMutex );
         MMAPV1DatabaseCatalogEntry* entry = _entryMap[db.toString()];
         delete entry;
         _entryMap.erase( db.toString() );
         return Status::OK();
     }
 
-    Status MMAPV1Engine::dropDatabase( OperationContext* txn, const StringData& db ) {
+    Status MMAPV1Engine::dropDatabase( OperationContext* txn, StringData db ) {
         Status status = closeDatabase( txn, db );
         if ( !status.isOK() )
             return status;

@@ -57,14 +57,8 @@ namespace mongo {
             directoryperdb(false),
             syncdelay(60.0) {
             dur = false;
-#if defined(_DURABLEDEFAULTON)
-            dur = true;
-#endif
             if (sizeof(void*) == 8)
                 dur = true;
-#if defined(_DURABLEDEFAULTOFF)
-            dur = false;
-#endif
         }
 
         // --storageEngine

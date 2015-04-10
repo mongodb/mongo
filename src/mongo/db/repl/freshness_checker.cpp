@@ -33,13 +33,13 @@
 #include "mongo/db/repl/freshness_checker.h"
 
 #include "mongo/base/status.h"
-#include "mongo/bson/optime.h"
-#include "mongo/db/get_status_from_command_result.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -47,7 +47,7 @@ namespace mongo {
 namespace repl {
 
     FreshnessChecker::Algorithm::Algorithm(
-            OpTime lastOpTimeApplied,
+            Timestamp lastOpTimeApplied,
             const ReplicaSetConfig& rsConfig,
             int selfIndex,
             const std::vector<HostAndPort>& targets) :
@@ -88,7 +88,7 @@ namespace repl {
         BSONObjBuilder freshCmdBuilder;
         freshCmdBuilder.append("replSetFresh", 1);
         freshCmdBuilder.append("set", _rsConfig.getReplSetName());
-        freshCmdBuilder.append("opTime", Date_t(_lastOpTimeApplied.asDate()));
+        freshCmdBuilder.append("opTime", Date_t(_lastOpTimeApplied.asULL()));
         freshCmdBuilder.append("who", selfConfig.getHostAndPort().toString());
         freshCmdBuilder.appendIntOrLL("cfgver", _rsConfig.getConfigVersion());
         freshCmdBuilder.append("id", selfConfig.getId());
@@ -169,7 +169,7 @@ namespace repl {
             _abortReason = FresherNodeFound;
             return;
         }
-        OpTime remoteTime(res["opTime"].date());
+        Timestamp remoteTime(res["opTime"].date());
         if (remoteTime == _lastOpTimeApplied) {
             _abortReason = FreshnessTie;
         }
@@ -216,7 +216,7 @@ namespace repl {
 
     StatusWith<ReplicationExecutor::EventHandle> FreshnessChecker::start(
             ReplicationExecutor* executor,
-            const OpTime& lastOpTimeApplied,
+            const Timestamp& lastOpTimeApplied,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
             const std::vector<HostAndPort>& targets,

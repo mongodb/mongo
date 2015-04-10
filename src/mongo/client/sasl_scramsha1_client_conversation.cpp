@@ -59,7 +59,7 @@ namespace mongo {
         memset(_saltedPassword, 0, scram::hashSize);
     }
 
-    StatusWith<bool> SaslSCRAMSHA1ClientConversation::step(const StringData& inputData,
+    StatusWith<bool> SaslSCRAMSHA1ClientConversation::step(StringData inputData,
                                                            std::string* outputData) {
         std::vector<std::string> input = StringSplitter::split(inputData.toString(), ",");
         _step++;
@@ -94,6 +94,10 @@ namespace mongo {
      * n,a=authzid,n=encoded-username,r=client-nonce
      */
     StatusWith<bool> SaslSCRAMSHA1ClientConversation::_firstStep(std::string* outputData) {
+        if (_saslClientSession->getParameter(SaslClientSession::parameterPassword).empty()) {
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Empty client password provided");
+        }
         
         // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
         const int nonceLenQWords = 3;

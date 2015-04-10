@@ -44,12 +44,12 @@ namespace mongo {
         locker.unlock(resId);
 
         // Make sure that the waits/blocks are zero
-        LockStats stats;
+        SingleThreadedLockStats stats;
         reportGlobalLockingStats(&stats);
 
-        ASSERT_EQUALS(1, stats.get(resId).stats[MODE_X].numAcquisitions.load());
-        ASSERT_EQUALS(0, stats.get(resId).stats[MODE_X].numWaits.load());
-        ASSERT_EQUALS(0, stats.get(resId).stats[MODE_X].combinedWaitTimeMicros.load());
+        ASSERT_EQUALS(1, stats.get(resId, MODE_X).numAcquisitions);
+        ASSERT_EQUALS(0, stats.get(resId, MODE_X).numWaits);
+        ASSERT_EQUALS(0, stats.get(resId, MODE_X).combinedWaitTimeMicros);
     }
 
     TEST(LockStats, Wait) {
@@ -70,16 +70,16 @@ namespace mongo {
         }
 
         // Make sure that the waits/blocks are non-zero
-        LockStats stats;
+        SingleThreadedLockStats stats;
         reportGlobalLockingStats(&stats);
 
-        ASSERT_EQUALS(1, stats.get(resId).stats[MODE_X].numAcquisitions.load());
-        ASSERT_EQUALS(0, stats.get(resId).stats[MODE_X].numWaits.load());
-        ASSERT_EQUALS(0, stats.get(resId).stats[MODE_X].combinedWaitTimeMicros.load());
+        ASSERT_EQUALS(1, stats.get(resId, MODE_X).numAcquisitions);
+        ASSERT_EQUALS(0, stats.get(resId, MODE_X).numWaits);
+        ASSERT_EQUALS(0, stats.get(resId, MODE_X).combinedWaitTimeMicros);
 
-        ASSERT_EQUALS(1, stats.get(resId).stats[MODE_S].numAcquisitions.load());
-        ASSERT_EQUALS(1, stats.get(resId).stats[MODE_S].numWaits.load());
-        ASSERT_GREATER_THAN(stats.get(resId).stats[MODE_S].combinedWaitTimeMicros.load(), 0);
+        ASSERT_EQUALS(1, stats.get(resId, MODE_S).numAcquisitions);
+        ASSERT_EQUALS(1, stats.get(resId, MODE_S).numWaits);
+        ASSERT_GREATER_THAN(stats.get(resId, MODE_S).combinedWaitTimeMicros, 0);
     }
 
     TEST(LockStats, Reporting) {
@@ -92,7 +92,7 @@ namespace mongo {
         locker.unlock(resId);
 
         // Make sure that the waits/blocks are zero
-        LockStats stats;
+        SingleThreadedLockStats stats;
         reportGlobalLockingStats(&stats);
 
         BSONObjBuilder builder;

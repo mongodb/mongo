@@ -55,7 +55,7 @@ namespace {
     /**
      * Converts UTF-8 encoded "utf8Str" to std::wstring.
      */
-    std::wstring utf8ToWide(const StringData& utf8Str) {
+    std::wstring utf8ToWide(StringData utf8Str) {
         if (utf8Str.empty())
             return std::wstring();
 
@@ -89,7 +89,7 @@ namespace {
         Win32FileStreambuf();
         virtual ~Win32FileStreambuf();
 
-        bool open(const StringData& fileName, bool append);
+        bool open(StringData fileName, bool append);
         bool is_open() { return _fileHandle != INVALID_HANDLE_VALUE; }
 
     private:
@@ -131,7 +131,7 @@ namespace {
         }
     }
 
-    bool Win32FileStreambuf::open(const StringData& fileName, bool append) {
+    bool Win32FileStreambuf::open(StringData fileName, bool append) {
         _fileHandle = CreateFileW(
                 utf8ToWide(fileName).c_str(),         // lpFileName
                 GENERIC_WRITE,                        // dwDesiredAccess

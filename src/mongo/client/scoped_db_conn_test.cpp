@@ -62,7 +62,7 @@ namespace {
     const string TARGET_HOST = "localhost:27017";
     const int TARGET_PORT = 27017;
 
-    mongo::mutex shutDownMutex("shutDownMutex");
+    mongo::mutex shutDownMutex;
     bool shuttingDown = false;
 }
 
@@ -73,15 +73,17 @@ namespace mongo {
     // Symbols defined to build the binary correctly.
 
     bool inShutdown() {
-        scoped_lock sl(shutDownMutex);
+        boost::lock_guard<boost::mutex> sl(shutDownMutex);
         return shuttingDown;
     }
+
+    void signalShutdown() {}
 
     DBClientBase* createDirectClient(OperationContext* txn) { return NULL; }
 
     void dbexit(ExitCode rc, const char *why){
         {
-            scoped_lock sl(shutDownMutex);
+            boost::lock_guard<boost::mutex> sl(shutDownMutex);
             shuttingDown = true;
         }
 
@@ -157,7 +159,7 @@ namespace mongo_test {
             options.port = _port;
 
             {
-                mongo::mutex::scoped_lock sl(shutDownMutex);
+                boost::lock_guard<boost::mutex> sl(shutDownMutex);
                 shuttingDown = false;
             }
 
@@ -174,7 +176,7 @@ namespace mongo_test {
             }
 
             {
-                mongo::mutex::scoped_lock sl(shutDownMutex);
+                boost::lock_guard<boost::mutex> sl(shutDownMutex);
                 shuttingDown = true;
             }
 

@@ -40,7 +40,6 @@
 #include "mongo/client/dbclientinterface.h"   // For QueryOption_foobar
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -92,7 +91,7 @@ namespace mongo {
         }
 
         // Tailable cursors won't get cached, just turn into collscans.
-        if (query.getParsed().getOptions().tailable) {
+        if (query.getParsed().isTailable()) {
             return false;
         }
 

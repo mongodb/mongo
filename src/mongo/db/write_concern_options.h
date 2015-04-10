@@ -44,7 +44,6 @@ namespace mongo {
 
         static const BSONObj Default;
         static const BSONObj Acknowledged;
-        static const BSONObj AllConfigs;
         static const BSONObj Unacknowledged;
 
         WriteConcernOptions() { reset(); }

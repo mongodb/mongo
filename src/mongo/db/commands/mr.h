@@ -335,7 +335,7 @@ namespace mongo {
             void switchMode(bool jsMode);
             void bailFromJS();
 
-            Collection* getCollectionOrUassert(Database* db, const StringData& ns);
+            Collection* getCollectionOrUassert(Database* db, StringData ns);
 
             const Config& _config;
             DBDirectClient _db;

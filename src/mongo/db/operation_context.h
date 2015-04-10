@@ -33,6 +33,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
@@ -40,7 +41,6 @@ namespace mongo {
     class CurOp;
     class ProgressMeter;
     class StringData;
-
     /**
      * This class encompasses the state required by an operation.
      *
@@ -110,12 +110,6 @@ namespace mongo {
         virtual std::string getNS() const = 0;
 
         /**
-         * Returns true if this operation is under a GodScope.  Only used by DBDirectClient.
-         * TODO(spencer): SERVER-10228 Remove this
-         */
-        virtual bool isGod() const = 0;
-
-        /**
          * Returns the client under which this context runs.
          */
         virtual Client* getClient() const = 0;
@@ -135,10 +129,34 @@ namespace mongo {
         /**
          * @return true if this instance is primary for this namespace
          */
-        virtual bool isPrimaryFor( const StringData& ns ) = 0;
+        virtual bool isPrimaryFor( StringData ns ) = 0;
+
+        /**
+         * Returns WriteConcernOptions of the current operation
+         */
+        const WriteConcernOptions& getWriteConcern() const {
+            return _writeConcern;
+        }
+
+        void setWriteConcern(const WriteConcernOptions& writeConcern) {
+            _writeConcern = writeConcern;
+        }
+
+        /**
+         * Set whether or not operations should generate oplog entries.
+         */
+        virtual void setReplicatedWrites(bool writesAreReplicated = true) = 0;
+
+        /**
+         * Returns true if operations should generate oplog entries.
+         */
+        virtual bool writesAreReplicated() const = 0;
 
     protected:
         OperationContext() { }
+
+    private:
+        WriteConcernOptions _writeConcern;
     };
 
     class WriteUnitOfWork {
@@ -178,7 +196,7 @@ namespace mongo {
 
     /**
      * RAII-style class to mark the scope of a transaction. ScopedTransactions may be nested.
-     * An outermost ScopedTransaction calls commitAndRestart() on destruction, so that the storage 
+     * An outermost ScopedTransaction calls commitAndRestart() on destruction, so that the storage
      * engine can release resources, such as snapshots or locks, that it may have acquired during
      * the transaction. Note that any writes are committed in nested WriteUnitOfWork scopes,
      * so write conflicts cannot happen on completing a ScopedTransaction.

@@ -23,13 +23,7 @@ dbname2 = "NOT_"+dbname;
 
 db.dropDatabase();
 
-// MMapV1 always sets newcollectionsusepowerof2sizes, WT does not
-defaultFlags = { "flags" : 1 }
-var ss = db.serverStatus();
-
-if (ss.storageEngine.name != "mmapv1") {
-    defaultFlags = {};
-}
+var defaultFlags = {}
 
 var options = { capped: true, size: 4096, autoIndexId: true };
 db.createCollection('capped', options);

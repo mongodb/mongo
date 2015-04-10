@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <third_party/gperftools-2.2/src/gperftools/malloc_extension.h>
+#include "gperftools/malloc_extension.h"
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"

@@ -1,10 +1,8 @@
 // check that there is preallocation, and there are 2 files
 
-port = allocatePorts( 1 )[ 0 ];
-
 var baseName = "jstests_preallocate";
 
-var m = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
+var m = MongoRunner.runMongod({});
 
 var getTotalNonLocalSize = function() {
     var totalNonLocalDBSize = 0;
@@ -33,9 +31,9 @@ assert.soon(function() { return getTotalNonLocalSize() >= expectedMB * 1024 * 10
             "\n\n\nFAIL preallocate.js expected second file to bring total size over " +
             expectedMB + "MB" );
 
-stopMongod( port );
+MongoRunner.stopMongod(m);
 
-var m = startMongoProgram( "mongod", "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
+m = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: m.dbpath});
 
 size = getTotalNonLocalSize();
 

@@ -424,7 +424,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         );
     }
 
-    if (jsTestOptions().keyFile || jsTestOptions().useX509) {
+    if (jsTestOptions().keyFile) {
         jsTest.authenticate( this._configConnection );
         jsTest.authenticateNodes( this._configServers );
         jsTest.authenticateNodes( this._mongos );
@@ -548,10 +548,10 @@ ShardingTest.prototype.getFirstOther = function( one ){
 
 ShardingTest.prototype.stop = function(){
     for ( var i=0; i<this._mongos.length; i++ ){
-        stopMongoProgram( 31000 - i - 1 );
+        _stopMongoProgram( 31000 - i - 1 );
     }
     for ( var i=0; i<this._connections.length; i++){
-        stopMongod( 30000 + i );
+        _stopMongoProgram( 30000 + i );
     }
     if ( this._rs ){
         for ( var i=0; i<this._rs.length; i++ ){

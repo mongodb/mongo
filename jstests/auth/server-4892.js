@@ -24,7 +24,7 @@ function with_mongod( extra_mongod_args, operation ) {
     try {
         operation( mongod );
     } finally {
-        stopMongod( port );
+        MongoRunner.stopMongod( port );
     }
 }
 

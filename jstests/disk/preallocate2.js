@@ -1,10 +1,8 @@
 // check that there is preallocation on insert
 
-port = allocatePorts( 1 )[ 0 ];
-
 var baseName = "jstests_preallocate2";
 
-var m = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
+var m = MongoRunner.runMongod({});
 
 m.getDB( baseName )[ baseName ].save( {i:1} );
 

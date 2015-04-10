@@ -27,16 +27,17 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -96,6 +97,35 @@ namespace QueryStageSortTests {
                 member.obj = coll->docFor(&_txn, *it);
                 ms->pushBack(member);
             }
+        }
+
+        /*
+         * Wraps a sort stage with a QueuedDataStage in a plan executor. Returns the plan executor,
+         * which is owned by the caller.
+         */
+        PlanExecutor* makePlanExecutorWithSortStage(Collection* coll) {
+            PlanExecutor* exec;
+            // Build the mock scan stage which feeds the data.
+            std::auto_ptr<WorkingSet> ws(new WorkingSet());
+            auto_ptr<QueuedDataStage> ms(new QueuedDataStage(ws.get()));
+            insertVarietyOfObjects(ms.get(), coll);
+
+            SortStageParams params;
+            params.collection = coll;
+            params.pattern = BSON("foo" << 1);
+            params.limit = limit();
+            auto_ptr<SortStage> ss(new SortStage(params, ws.get(), ms.release()));
+
+            // The PlanExecutor will be automatically registered on construction due to the auto
+            // yield policy, so it can receive invalidations when we remove documents later.
+            Status execStatus = PlanExecutor::make(&_txn,
+                                                   ws.release(),
+                                                   ss.release(),
+                                                   coll,
+                                                   PlanExecutor::YIELD_AUTO,
+                                                   &exec);
+            invariant(execStatus.isOK());
+            return exec;
         }
 
         // Return a value in the set {-1, 0, 1} to represent the sign of parameter i.  Used to
@@ -191,8 +221,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -211,8 +241,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -240,8 +270,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 10000; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -254,14 +284,15 @@ namespace QueryStageSortTests {
         }
     };
 
-    // Invalidation of everything fed to sort.
-    class QueryStageSortInvalidation : public QueryStageSortTestBase {
+    // Mutation invalidation of docs fed to sort.
+    class QueryStageSortMutationInvalidation : public QueryStageSortTestBase {
     public:
         virtual int numObj() { return 2000; }
+        virtual int limit() const { return 10; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -269,26 +300,129 @@ namespace QueryStageSortTests {
                 wuow.commit();
             }
 
-            fillData();
+            {
+                WriteUnitOfWork wuow(&_txn);
+                fillData();
+                wuow.commit();
+            }
 
             // The data we're going to later invalidate.
             set<RecordId> locs;
             getLocs(&locs, coll);
 
-            // Build the mock scan stage which feeds the data.
-            WorkingSet ws;
-            auto_ptr<QueuedDataStage> ms(new QueuedDataStage(&ws));
-            insertVarietyOfObjects(ms.get(), coll);
+            std::auto_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
+            SortStage * ss = static_cast<SortStage*>(exec->getRootStage());
+            QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0]);
 
-            SortStageParams params;
-            params.collection = coll;
-            params.pattern = BSON("foo" << 1);
-            params.limit = limit();
-            auto_ptr<SortStage> ss(new SortStage(params, &ws, ms.get()));
+            // Have sort read in data from the queued data stage.
+            const int firstRead = 5;
+            for (int i = 0; i < firstRead; ++i) {
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState status = ss->work(&id);
+                ASSERT_NOT_EQUALS(PlanStage::ADVANCED, status);
+            }
+
+            // We should have read in the first 'firstRead' locs.  Invalidate the first one.
+            // Since it's in the WorkingSet, the updates should not be reflected in the output.
+            exec->saveState();
+            set<RecordId>::iterator it = locs.begin();
+            Snapshotted<BSONObj> oldDoc = coll->docFor(&_txn, *it);
+
+            OID updatedId = oldDoc.value().getField("_id").OID();
+            SnapshotId idBeforeUpdate = oldDoc.snapshotId();
+            // We purposefully update the document to have a 'foo' value greater than limit().
+            // This allows us to check that we don't return the new copy of a doc by asserting
+            // foo < limit().
+            BSONObj newDoc = BSON("_id" << updatedId << "foo" << limit() + 10);
+            oplogUpdateEntryArgs args;
+            {
+                WriteUnitOfWork wuow(&_txn);
+                coll->updateDocument(&_txn, *it, oldDoc, newDoc, false, false, NULL, args);
+                wuow.commit();
+            }
+            exec->restoreState(&_txn);
+
+            // Read the rest of the data from the queued data stage.
+            while (!ms->isEOF()) {
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                ss->work(&id);
+            }
+
+            // Let's just invalidate everything now. Already read into ss, so original values
+            // should be fetched.
+            exec->saveState();
+            while (it != locs.end()) {
+                oldDoc = coll->docFor(&_txn, *it);
+                {
+                    WriteUnitOfWork wuow(&_txn);
+                    coll->updateDocument(&_txn, *it++, oldDoc, newDoc, false, false, NULL, args);
+                    wuow.commit();
+                }
+            }
+            exec->restoreState(&_txn);
+
+            // Verify that it's sorted, the right number of documents are returned, and they're all
+            // in the expected range.
+            int count = 0;
+            int lastVal = 0;
+            int thisVal;
+            while (!ss->isEOF()) {
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState status = ss->work(&id);
+                if (PlanStage::ADVANCED != status) {
+                    ASSERT_NE(status, PlanStage::FAILURE);
+                    ASSERT_NE(status, PlanStage::DEAD);
+                    continue;
+                }
+                WorkingSetMember* member = exec->getWorkingSet()->get(id);
+                ASSERT(member->hasObj());
+                if (member->obj.value().getField("_id").OID() == updatedId) {
+                    ASSERT(idBeforeUpdate == member->obj.snapshotId());
+                }
+                thisVal = member->obj.value().getField("foo").Int();
+                ASSERT_LTE(lastVal, thisVal);
+                // Expect docs in range [0, limit)
+                ASSERT_LTE(0, thisVal);
+                ASSERT_LT(thisVal, limit());
+                lastVal = thisVal;
+                ++count;
+            }
+            // Returns all docs.
+            ASSERT_EQUALS(limit(), count);
+        }
+    };
+
+    // Deletion invalidation of everything fed to sort.
+    class QueryStageSortDeletionInvalidation : public QueryStageSortTestBase {
+    public:
+        virtual int numObj() { return 2000; }
+
+        void run() {
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
+                coll = db->createCollection(&_txn, ns());
+                wuow.commit();
+            }
+
+            {
+                WriteUnitOfWork wuow(&_txn);
+                fillData();
+                wuow.commit();
+            }
+
+            // The data we're going to later invalidate.
+            set<RecordId> locs;
+            getLocs(&locs, coll);
+
+            std::auto_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
+            SortStage * ss = static_cast<SortStage*>(exec->getRootStage());
+            QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0]);
 
             const int firstRead = 10;
-
-            // Have sort read in data from the mock stage.
+            // Have sort read in data from the queued data stage.
             for (int i = 0; i < firstRead; ++i) {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ss->work(&id);
@@ -296,36 +430,44 @@ namespace QueryStageSortTests {
             }
 
             // We should have read in the first 'firstRead' locs.  Invalidate the first.
-            ss->saveState();
+            exec->saveState();
             set<RecordId>::iterator it = locs.begin();
-            ss->invalidate(&_txn, *it++, INVALIDATION_DELETION);
-            ss->restoreState(&_txn);
+            {
+                WriteUnitOfWork wuow(&_txn);
+                coll->deleteDocument(&_txn, *it++, false, false, NULL);
+                wuow.commit();
+            }
+            exec->restoreState(&_txn);
 
-            // Read the rest of the data from the mock stage.
+            // Read the rest of the data from the queued data stage.
             while (!ms->isEOF()) {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 ss->work(&id);
             }
 
-            // Release to prevent double-deletion.
-            ms.release();
-
             // Let's just invalidate everything now.
-            ss->saveState();
+            exec->saveState();
             while (it != locs.end()) {
-                ss->invalidate(&_txn, *it++, INVALIDATION_DELETION);
+                {
+                    WriteUnitOfWork wuow(&_txn);
+                    coll->deleteDocument(&_txn, *it++, false, false, NULL);
+                    wuow.commit();
+                }
             }
-            ss->restoreState(&_txn);
+            exec->restoreState(&_txn);
 
-            // Invalidation of data in the sort stage fetches it but passes it through.
+            // Regardless of storage engine, all the documents should come back with their objects
             int count = 0;
             while (!ss->isEOF()) {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ss->work(&id);
-                if (PlanStage::ADVANCED != status) { continue; }
-                WorkingSetMember* member = ws.get(id);
+                if (PlanStage::ADVANCED != status) {
+                    ASSERT_NE(status, PlanStage::FAILURE);
+                    ASSERT_NE(status, PlanStage::DEAD);
+                    continue;
+                }
+                WorkingSetMember* member = exec->getWorkingSet()->get(id);
                 ASSERT(member->hasObj());
-                ASSERT(!member->hasLoc());
                 ++count;
             }
 
@@ -334,12 +476,13 @@ namespace QueryStageSortTests {
         }
     };
 
-    // Invalidation of everything fed to sort with limit enabled.
+    // Deletion invalidation of everything fed to sort with limit enabled.
     // Limit size of working set within sort stage to a small number
     // Sort stage implementation should not try to invalidate DiskLocc that
     // are no longer in the working set.
+
     template<int LIMIT>
-    class QueryStageSortInvalidationWithLimit : public QueryStageSortInvalidation {
+    class QueryStageSortDeletionInvalidationWithLimit : public QueryStageSortDeletionInvalidation {
     public:
         virtual int limit() const {
             return LIMIT;
@@ -352,8 +495,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
@@ -368,12 +511,13 @@ namespace QueryStageSortTests {
                 WorkingSetMember member;
                 member.state = WorkingSetMember::OWNED_OBJ;
 
-                member.obj = Snapshotted<BSONObj>(SnapshotId(),
-                                                  fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}"));
+                member.obj = Snapshotted<BSONObj>(
+                    SnapshotId(),
+                    fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}")
+                );
                 ms->pushBack(member);
 
-                member.obj = Snapshotted<BSONObj>(SnapshotId(),
-                                                  fromjson("{a:1, b:1, c:1}"));
+                member.obj = Snapshotted<BSONObj>( SnapshotId(), fromjson("{a:1, b:1, c:1}"));
                 ms->pushBack(member);
             }
 
@@ -410,9 +554,10 @@ namespace QueryStageSortTests {
             // and a special case for limit == 1
             add<QueryStageSortDecWithLimit<1> >();
             add<QueryStageSortExt>();
-            add<QueryStageSortInvalidation>();
-            add<QueryStageSortInvalidationWithLimit<10> >();
-            add<QueryStageSortInvalidationWithLimit<1> >();
+            add<QueryStageSortMutationInvalidation>();
+            add<QueryStageSortDeletionInvalidation>();
+            add<QueryStageSortDeletionInvalidationWithLimit<10> >();
+            add<QueryStageSortDeletionInvalidationWithLimit<1> >();
             add<QueryStageSortParallelArrays>();
         }
     };
@@ -420,4 +565,3 @@ namespace QueryStageSortTests {
     SuiteInstance<All> queryStageSortTest;
 
 }  // namespace
-

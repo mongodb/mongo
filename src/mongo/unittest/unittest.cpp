@@ -400,10 +400,7 @@ namespace {
             return *this;
         }
 
-        TestAssertionFailure::~TestAssertionFailure()
-#if __cplusplus >= 201103
-        noexcept(false)
-#endif
+        TestAssertionFailure::~TestAssertionFailure() BOOST_NOEXCEPT_IF(false)
         {
             if (!_enabled) {
                 invariant(_stream.str().empty());

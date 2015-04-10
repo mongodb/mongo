@@ -131,8 +131,8 @@ namespace mongo {
                     if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
                         _meta[e.fieldName()] = META_TEXT_SCORE;
                     }
-                    else if (e2.valuestr() == LiteParsedQuery::metaDiskLoc) {
-                        _meta[e.fieldName()] = META_DISKLOC;
+                    else if (e2.valuestr() == LiteParsedQuery::metaRecordId) {
+                        _meta[e.fieldName()] = META_RECORDID;
                     }
                     else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
                         _meta[e.fieldName()] = META_GEONEAR_POINT;
@@ -338,12 +338,8 @@ namespace mongo {
                     bob.append(it->first, 0.0);
                 }
             }
-            else if (META_DISKLOC == it->second) {
-                // For compatibility with old versions, we output as a split DiskLoc.
-                const int64_t repr = member->loc.repr();
-                BSONObjBuilder sub(bob.subobjStart(it->first));
-                sub.append("file", int(repr >> 32));
-                sub.append("offset", int(uint32_t(repr)));
+            else if (META_RECORDID == it->second) {
+                bob.append(it->first, static_cast<long long>(member->loc.repr()));
             }
         }
 

@@ -31,6 +31,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace {
+    using namespace mongo;
 
     TEST(BSONObjToString, EmptyArray) {
         const char text[] = "{ x: [] }";
@@ -180,6 +181,26 @@ namespace {
             ASSERT_LT(BSON("" << minLL), BSON("" << closestAbove));
             ASSERT_GT(BSON("" << minLL), BSON("" << closestBelow));
         }
+    }
+
+    TEST(Looping, Cpp11Basic) {
+        int count = 0;
+        for (BSONElement e : BSON("a" << 1 << "a" << 2 << "a" << 3)) {
+            ASSERT_EQUALS( e.fieldNameStringData() , "a" );
+            count += e.Int();
+        }
+
+        ASSERT_EQUALS( count , 1 + 2 + 3 );
+    }
+
+    TEST(Looping, Cpp11Auto) {
+        int count = 0;
+        for (auto e : BSON("a" << 1 << "a" << 2 << "a" << 3)) {
+            ASSERT_EQUALS( e.fieldNameStringData() , "a" );
+            count += e.Int();
+        }
+
+        ASSERT_EQUALS( count , 1 + 2 + 3 );
     }
 
 } // unnamed namespace

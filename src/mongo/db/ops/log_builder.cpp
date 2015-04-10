@@ -89,7 +89,7 @@ namespace mongo {
         return addToSection(elt, &_setAccumulator, kSet);
     }
 
-    Status LogBuilder::addToSetsWithNewFieldName(const StringData& name,
+    Status LogBuilder::addToSetsWithNewFieldName(StringData name,
                                                  const mutablebson::Element val) {
         mutablebson::Element elemToSet =
                 _logRoot.getDocument().makeElementWithNewFieldName(name, val);
@@ -103,7 +103,7 @@ namespace mongo {
         return addToSets(elemToSet);
     }
 
-    Status LogBuilder::addToSetsWithNewFieldName(const StringData& name,
+    Status LogBuilder::addToSetsWithNewFieldName(StringData name,
                                                  const BSONElement& val){
         mutablebson::Element elemToSet =
                 _logRoot.getDocument().makeElementWithNewFieldName(name, val);
@@ -117,7 +117,7 @@ namespace mongo {
         return addToSets(elemToSet);
     }
 
-    Status LogBuilder::addToSets(const StringData& name, const SafeNum& val){
+    Status LogBuilder::addToSets(StringData name, const SafeNum& val){
         mutablebson::Element elemToSet = _logRoot.getDocument().makeElementSafeNum(name, val);
         if (!elemToSet.ok())
             return Status(ErrorCodes::InternalError,

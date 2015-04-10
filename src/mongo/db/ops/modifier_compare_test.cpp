@@ -63,13 +63,13 @@ namespace {
             , _mod((modObj.firstElement().fieldNameStringData() == "$min") ?
                                                                 ModifierCompare::MIN :
                                                                 ModifierCompare::MAX) {
-            const StringData& modName = modObj.firstElement().fieldName();
+            StringData modName = modObj.firstElement().fieldName();
             ASSERT_OK(_mod.init(modObj[modName].embeddedObject().firstElement(),
                                 ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
-                       const StringData& matchedField,
+                       StringData matchedField,
                        ModifierInterface::ExecInfo* execInfo) {
             return _mod.prepare(root, matchedField, execInfo);
         }

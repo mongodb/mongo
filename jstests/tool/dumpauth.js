@@ -1,9 +1,8 @@
 // dumpauth.js
 // test mongodump with authentication
-port = allocatePorts( 1 )[ 0 ];
 baseName = "tool_dumpauth";
 
-m = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+var m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
 db = m.getDB( "admin" );
 
 db.createUser({user:  "testuser" , pwd: "testuser", roles: jsTest.adminUserRoles});
@@ -21,7 +20,7 @@ x = runMongoProgram( "mongodump",
                      "--authenticationDatabase=admin",
                      "-u", "testuser",
                      "-p", "testuser",
-                     "-h", "127.0.0.1:"+port,
+                     "-h", "127.0.0.1:"+m.port,
                      "--collection", "testcol" );
 assert.eq(x, 0, "mongodump should succeed with authentication");
 
@@ -31,7 +30,7 @@ x = runMongoProgram( "mongodump",
                      "--authenticationDatabase=admin",
                      "-u", "testuser",
                      "-p", "testuser",
-                     "-h", "127.0.0.1:"+port,
+                     "-h", "127.0.0.1:"+m.port,
                      "--collection", "testcol",
                      "--out", "-" );
 assert.eq(x, 0, "mongodump should succeed with authentication while using '--out'");

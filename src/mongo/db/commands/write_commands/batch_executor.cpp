@@ -37,35 +37,40 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/update.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_create.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update.h"
+#include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -109,11 +114,9 @@ namespace mongo {
     using mongoutils::str::stream;
 
     WriteBatchExecutor::WriteBatchExecutor( OperationContext* txn,
-                                            const WriteConcernOptions& wc,
                                             OpCounters* opCounters,
                                             LastError* le ) :
         _txn(txn),
-        _defaultWriteConcern( wc ),
         _opCounters( opCounters ),
         _le( le ),
         _stats( new WriteBatchStats ) {
@@ -195,44 +198,6 @@ namespace mongo {
             return;
         }
 
-        // Validate write concern
-        // TODO: Lift write concern parsing out of this entirely
-        WriteConcernOptions writeConcern;
-
-        BSONObj wcDoc;
-        if ( request.isWriteConcernSet() ) {
-            wcDoc = request.getWriteConcern();
-        }
-
-        Status wcStatus = Status::OK();
-        if ( wcDoc.isEmpty() ) {
-
-            // The default write concern if empty is w : 1
-            // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
-            writeConcern = _defaultWriteConcern;
-
-            if ( writeConcern.wNumNodes == 0 && writeConcern.wMode.empty() ) {
-                writeConcern.wNumNodes = 1;
-            }
-        }
-        else {
-            wcStatus = writeConcern.parse( wcDoc );
-        }
-
-        if ( wcStatus.isOK() ) {
-            wcStatus = validateWriteConcern( writeConcern );
-        }
-
-        if ( !wcStatus.isOK() ) {
-            toBatchError( wcStatus, response );
-            return;
-        }
-
-        if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL ||
-             writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
-            _txn->recoveryUnit()->goingToAwaitCommit();
-        }
-
         if ( request.sizeWriteOps() == 0u ) {
             toBatchError( Status( ErrorCodes::InvalidLength,
                                   "no write ops were included in the batch" ),
@@ -253,6 +218,7 @@ namespace mongo {
         // End validation
         //
 
+        const WriteConcernOptions& writeConcern = _txn->getWriteConcern();
         bool silentWC = writeConcern.wMode.empty() && writeConcern.wNumNodes == 0
                         && writeConcern.syncMode == WriteConcernOptions::NONE;
 
@@ -286,7 +252,10 @@ namespace mongo {
             _txn->getCurOp()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
-            Status status = waitForWriteConcern( _txn, writeConcern, _txn->getClient()->getLastOp(), &res );
+            Status status = waitForWriteConcern(
+                    _txn,
+                    repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(),
+                    &res);
 
             if ( !status.isOK() ) {
                 wcError.reset( toWriteConcernError( status, res ) );
@@ -385,7 +354,8 @@ namespace mongo {
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
             const repl::ReplicationCoordinator::Mode replMode = replCoord->getReplicationMode();
             if (replMode != repl::ReplicationCoordinator::modeNone) {
-                response->setLastOp( _txn->getClient()->getLastOp() );
+                response->setLastOp(
+                        repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp());
                 if (replMode == repl::ReplicationCoordinator::modeReplSet) {
                     response->setElectionId(replCoord->getElectionId());
                 }
@@ -642,7 +612,10 @@ namespace mongo {
                        > ( serverGlobalParams.slowMS + currentOp->getExpectedLatencyMs() );
 
         if ( logAll || logSlow ) {
-            LOG(0) << currentOp->debug().report( *currentOp ) << endl;
+            Locker::LockerInfo lockerInfo;
+            txn->lockState()->getLockerInfo(&lockerInfo);
+
+            LOG(0) << currentOp->debug().report(*currentOp, lockerInfo.stats);
         }
 
         if (currentOp->shouldDBProfile(executionTime)) {
@@ -750,7 +723,7 @@ namespace mongo {
 
         // Context object on the target database.  Must appear after writeLock, so that it is
         // destroyed in proper order.
-        scoped_ptr<Client::Context> _context;
+        scoped_ptr<OldClientContext> _context;
 
         // Target collection.
         Collection* _collection;
@@ -760,11 +733,34 @@ namespace mongo {
                                           std::vector<BatchedUpsertDetail*>* upsertedIds,
                                           std::vector<WriteErrorDetail*>* errors ) {
 
+        WriteConcernOptions originalWC = _txn->getWriteConcern();
+
+        // We adjust the write concern attached to the OperationContext to not wait for
+        // journal.  Later, the code will restore the write concern to wait for journal on
+        // the last write of the batch.
+        if (request.sizeWriteOps() > 1
+            && originalWC.syncMode == WriteConcernOptions::JOURNAL)
+        {
+            WriteConcernOptions writeConcern = originalWC;
+            writeConcern.syncMode = WriteConcernOptions::NONE;
+            _txn->setWriteConcern(writeConcern);
+        }
+
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
-            execInserts( request, errors );
+            execInserts( request, originalWC, errors );
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
+
+                if ( i + 1 == request.sizeWriteOps() ) {
+                    // For the last write in the batch, restore the write concern back to the
+                    // original provided one; this may set WriteConcernOptions::JOURNAL back
+                    // to true.
+                    _txn->setWriteConcern(originalWC);
+                    // Use the original write concern to possibly await the commit of this write,
+                    // in order to flush the journal as requested.
+                    setupSynchronousCommit( _txn );
+                }
 
                 WriteErrorDetail* error = NULL;
                 BSONObj upsertedId;
@@ -787,6 +783,16 @@ namespace mongo {
         else {
             dassert( request.getBatchType() == BatchedCommandRequest::BatchType_Delete );
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
+
+                if ( i + 1 == request.sizeWriteOps() ) {
+                    // For the last write in the batch, restore the write concern back to the
+                    // original provided one; this may set WriteConcernOptions::JOURNAL back
+                    // to true.
+                    _txn->setWriteConcern(originalWC);
+                    // Use the original write concern to possibly await the commit of this write,
+                    // in order to flush the journal as requested.
+                    setupSynchronousCommit( _txn );
+                }
 
                 WriteErrorDetail* error = NULL;
                 execRemove( BatchItemRef( &request, i ), &error );
@@ -829,6 +835,7 @@ namespace mongo {
     }
 
     void WriteBatchExecutor::execInserts( const BatchedCommandRequest& request,
+                                          const WriteConcernOptions& originalWC,
                                           std::vector<WriteErrorDetail*>* errors ) {
 
         // Theory of operation:
@@ -853,6 +860,17 @@ namespace mongo {
         ExecInsertsState state(_txn, &request);
         normalizeInserts(request, &state.normalizedInserts);
 
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            if (request.isMetadataSet() && request.getMetadata()->isShardVersionSet()) {
+                info->setVersion(request.getTargetingNS(),
+                                 request.getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(request.getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
+
         // Yield frequency is based on the same constants used by PlanYieldPolicy.
         ElapsedTracker elapsedTracker(internalQueryExecYieldIterations,
                                       internalQueryExecYieldPeriodMS);
@@ -860,6 +878,16 @@ namespace mongo {
         for (state.currIndex = 0;
              state.currIndex < state.request->sizeWriteOps();
              ++state.currIndex) {
+
+            if (state.currIndex + 1 == state.request->sizeWriteOps()) {
+                // For the last write in the batch, restore the write concern back to the
+                // original provided one; this may set WriteConcernOptions::JOURNAL back
+                // to true.
+                _txn->setWriteConcern(originalWC);
+                // Use the original write concern to possibly await the commit of this write,
+                // in order to flush the journal as requested.
+                setupSynchronousCommit(_txn);
+            }
 
             if (elapsedTracker.intervalHasElapsed()) {
                 // Yield between inserts.
@@ -894,9 +922,23 @@ namespace mongo {
                                          WriteErrorDetail** error ) {
 
         // BEGIN CURRENT OP
-        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        CurOp currentOp(_txn->getClient());
         beginCurrentOp( &currentOp, _txn->getClient(), updateItem );
         incOpStats( updateItem );
+
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            auto rootRequest = updateItem.getRequest();
+            if (!updateItem.getUpdate()->getMulti() &&
+                    rootRequest->isMetadataSet() &&
+                    rootRequest->getMetadata()->isShardVersionSet()) {
+                info->setVersion(rootRequest->getTargetingNS(),
+                                 rootRequest->getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
 
         WriteOpResult result;
 
@@ -924,9 +966,23 @@ namespace mongo {
         // Removes are similar to updates, but page faults are handled externally
 
         // BEGIN CURRENT OP
-        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        CurOp currentOp(_txn->getClient());
         beginCurrentOp( &currentOp, _txn->getClient(), removeItem );
         incOpStats( removeItem );
+
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        if (info) {
+            auto rootRequest = removeItem.getRequest();
+            if (removeItem.getDelete()->getLimit() == 1 &&
+                    rootRequest->isMetadataSet() &&
+                    rootRequest->getMetadata()->isShardVersionSet()) {
+                info->setVersion(rootRequest->getTargetingNS(),
+                                 rootRequest->getMetadata()->getShardVersion());
+            }
+            else {
+                info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
+            }
+        }
 
         WriteOpResult result;
 
@@ -961,7 +1017,7 @@ namespace mongo {
     bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result,
                                                                  bool intentLock) {
         if (hasLock()) {
-            // TODO: Client::Context legacy, needs to be removed
+            // TODO: OldClientContext legacy, needs to be removed
             txn->getCurOp()->enter(_context->ns(),
                                    _context->db() ? _context->db()->getProfilingLevel() : 0);
             return true;
@@ -999,7 +1055,7 @@ namespace mongo {
         }
 
         _context.reset();
-        _context.reset(new Client::Context(txn, nss, false));
+        _context.reset(new OldClientContext(txn, nss, false));
 
         Database* database = _context->db();
         dassert(database);
@@ -1021,10 +1077,6 @@ namespace mongo {
                                             request->getTargetingNS())));
                 return false;
             }
-            repl::logOp(txn,
-                        "c",
-                        (database->name() + ".$cmd").c_str(),
-                        BSON("create" << nsToCollectionSubstring(request->getTargetingNS())));
             wunit.commit();
         }
         return true;
@@ -1083,6 +1135,14 @@ namespace mongo {
                                                        state->getCollection()->ns().ns() :
                                                        "index" );
             }
+            catch (const StaleConfigException& staleExcep) {
+                result->setError(new WriteErrorDetail);
+                result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+                buildStaleError(staleExcep.getVersionReceived(),
+                                staleExcep.getVersionWanted(),
+                                result->getError());
+                break;
+            }
             catch (const DBException& ex) {
                 Status status(ex.toStatus());
                 if (ErrorCodes::isInterruption(status.code()))
@@ -1101,7 +1161,7 @@ namespace mongo {
 
     void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
         BatchItemRef currInsertItem(state->request, state->currIndex);
-        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        CurOp currentOp(_txn->getClient());
         beginCurrentOp( &currentOp, _txn->getClient(), currInsertItem );
         incOpStats(currInsertItem);
 
@@ -1140,7 +1200,6 @@ namespace mongo {
             result->setError(toWriteError(status.getStatus()));
         }
         else {
-            repl::logOp( txn, "i", insertNS.c_str(), docToInsert );
             result->getStats().n = 1;
             wunit.commit();
         }
@@ -1199,7 +1258,6 @@ namespace mongo {
         request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
         request.setMulti(isMulti);
         request.setUpsert(updateItem.getUpdate()->getUpsert());
-        request.setUpdateOpLog(true);
         UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
         request.setLifecycle(&updateLifecycle);
 
@@ -1218,20 +1276,25 @@ namespace mongo {
             }
 
             if ( createCollection ) {
-                ScopedTransaction transaction(txn, MODE_IX);
-                Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
-                Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
-                Database* db = ctx.db();
-                if ( db->getCollection( nsString.ns() ) ) {
-                    // someone else beat us to it
-                }
-                else {
-                    WriteUnitOfWork wuow(txn);
-                    uassertStatusOK( userCreateNS( txn, db,
-                                                   nsString.ns(), BSONObj(),
-                                                   !request.isFromReplication() ) );
-                    wuow.commit();
-                }
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    ScopedTransaction transaction(txn, MODE_IX);
+                    Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+                    OldClientContext ctx(txn, nsString.ns(), false /* don't check version */);
+
+                    if (!checkIsMasterForDatabase(nsString, result)) {
+                        return;
+                    }
+
+                    Database* db = ctx.db();
+                    if ( db->getCollection( nsString.ns() ) ) {
+                        // someone else beat us to it
+                    }
+                    else {
+                        WriteUnitOfWork wuow(txn);
+                        uassertStatusOK(userCreateNS(txn, db, nsString.ns(), BSONObj()));
+                        wuow.commit();
+                    }
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "update", nsString.ns());
             }
 
             ///////////////////////////////////////////
@@ -1239,8 +1302,12 @@ namespace mongo {
             Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(),
                                          nsString.ns(),
-                                         MODE_IX);
+                                         parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
             ///////////////////////////////////////////
+
+            if (!checkIsMasterForDatabase(nsString, result)) {
+                return;
+            }
 
             if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
                 return;
@@ -1269,7 +1336,7 @@ namespace mongo {
                 continue;
             }
 
-            Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
+            OldClientContext ctx(txn, nsString.ns(), false /* don't check version */);
             Collection* collection = db->getCollection(nsString.ns());
 
             if ( collection == NULL ) {
@@ -1329,6 +1396,13 @@ namespace mongo {
 
                 WriteConflictException::logAndBackoff( attempt++, "update", nsString.ns() );
             }
+            catch (const StaleConfigException& staleExcep) {
+                result->setError(new WriteErrorDetail);
+                result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+                buildStaleError(staleExcep.getVersionReceived(),
+                                staleExcep.getVersionWanted(),
+                                result->getError());
+            }
             catch (const DBException& ex) {
                 Status status = ex.toStatus();
                 if (ErrorCodes::isInterruption(status.code())) {
@@ -1353,7 +1427,6 @@ namespace mongo {
         DeleteRequest request(nss);
         request.setQuery( removeItem.getDelete()->getQuery() );
         request.setMulti( removeItem.getDelete()->getLimit() != 1 );
-        request.setUpdateOpLog(true);
         request.setGod( false );
 
         // Deletes running through the write commands path can yield.
@@ -1376,8 +1449,14 @@ namespace mongo {
                     break;
                 }
 
-                Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IX);
+                Lock::CollectionLock collLock(txn->lockState(),
+                                              nss.ns(),
+                                              parsedDelete.isIsolated() ? MODE_X : MODE_IX);
 
+                // getExecutorDelete() also checks if writes are allowed.
+                if (!checkIsMasterForDatabase(nss, result)) {
+                    return;
+                }
                 // Check version once we're locked
 
                 if (!checkShardVersion(txn, &shardingState, *removeItem.getRequest(), result)) {
@@ -1387,7 +1466,7 @@ namespace mongo {
 
                 // Context once we're locked, to set more details in currentOp()
                 // TODO: better constructor?
-                Client::Context ctx(txn, nss.ns(), false /* don't check version */);
+                OldClientContext ctx(txn, nss.ns(), false /* don't check version */);
 
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorDelete(txn,
@@ -1405,6 +1484,14 @@ namespace mongo {
             catch ( const WriteConflictException& dle ) {
                 txn->getCurOp()->debug().writeConflicts++;
                 WriteConflictException::logAndBackoff( attempt++, "delete", nss.ns() );
+            }
+            catch (const StaleConfigException& staleExcep) {
+                result->setError(new WriteErrorDetail);
+                result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+                buildStaleError(staleExcep.getVersionReceived(),
+                                staleExcep.getVersionWanted(),
+                                result->getError());
+                return;
             }
             catch ( const DBException& ex ) {
                 Status status = ex.toStatus();

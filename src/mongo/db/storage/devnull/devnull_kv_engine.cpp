@@ -52,7 +52,7 @@ namespace mongo {
 
     class DevNullRecordStore : public RecordStore {
     public:
-        DevNullRecordStore( const StringData& ns, const CollectionOptions& options )
+        DevNullRecordStore( StringData ns, const CollectionOptions& options )
             : RecordStore( ns ), _options( options ) {
             _numInserts = 0;
             _dummy = BSON( "_id" << 1 );
@@ -159,12 +159,6 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL ) {
-            return Status::OK();
-        }
-
         virtual void updateStatsAfterRepair(OperationContext* txn,
                                             long long numRecords,
                                             long long dataSize) {
@@ -222,8 +216,9 @@ namespace mongo {
 
         virtual bool isEmpty(OperationContext* txn) { return true; }
 
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
-            return NULL;
+        virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+                                                                       bool isForward) const {
+            return {};
         }
 
         virtual Status initAsEmpty(OperationContext* txn) { return Status::OK(); }
@@ -231,8 +226,8 @@ namespace mongo {
 
 
     RecordStore* DevNullKVEngine::getRecordStore( OperationContext* opCtx,
-                                                  const StringData& ns,
-                                                  const StringData& ident,
+                                                  StringData ns,
+                                                  StringData ident,
                                                   const CollectionOptions& options ) {
         if ( ident == "_mdb_catalog" ) {
             return new InMemoryRecordStore( ns, &_catalogInfo );
@@ -241,7 +236,7 @@ namespace mongo {
     }
 
     SortedDataInterface* DevNullKVEngine::getSortedDataInterface( OperationContext* opCtx,
-                                                                  const StringData& ident,
+                                                                  StringData ident,
                                                                   const IndexDescriptor* desc ) {
         return new DevNullSortedDataInterface();
     }

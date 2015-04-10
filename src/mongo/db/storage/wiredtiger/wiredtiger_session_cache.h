@@ -120,6 +120,8 @@ namespace mongo {
 
         void shuttingDown();
 
+        WT_CONNECTION* conn() const { return _conn; }
+
     private:
         typedef std::vector<WiredTigerSession*> SessionPool;
 

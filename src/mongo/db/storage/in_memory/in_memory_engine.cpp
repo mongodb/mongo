@@ -42,18 +42,18 @@ namespace mongo {
     }
 
     Status InMemoryEngine::createRecordStore(OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
+                                          StringData ns,
+                                          StringData ident,
                                           const CollectionOptions& options) {
         // All work done in getRecordStore
         return Status::OK();
     }
 
     RecordStore* InMemoryEngine::getRecordStore(OperationContext* opCtx,
-                                             const StringData& ns,
-                                             const StringData& ident,
+                                             StringData ns,
+                                             StringData ident,
                                              const CollectionOptions& options) {
-        boost::mutex::scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         if (options.capped) {
             return new InMemoryRecordStore(ns,
                                            &_dataMap[ident],
@@ -67,7 +67,7 @@ namespace mongo {
     }
 
     Status InMemoryEngine::createSortedDataInterface(OperationContext* opCtx,
-                                                  const StringData& ident,
+                                                  StringData ident,
                                                   const IndexDescriptor* desc) {
 
         // All work done in getSortedDataInterface
@@ -75,28 +75,28 @@ namespace mongo {
     }
 
     SortedDataInterface* InMemoryEngine::getSortedDataInterface(OperationContext* opCtx,
-                                                             const StringData& ident,
+                                                             StringData ident,
                                                              const IndexDescriptor* desc) {
-        boost::mutex::scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         return getInMemoryBtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
     }
 
     Status InMemoryEngine::dropIdent(OperationContext* opCtx,
-                                     const StringData& ident) {
-        boost::mutex::scoped_lock lk(_mutex);
+                                     StringData ident) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
         _dataMap.erase(ident);
         return Status::OK();
     }
 
     int64_t InMemoryEngine::getIdentSize( OperationContext* opCtx,
-                                       const StringData& ident ) {
+                                       StringData ident ) {
         return 1;
     }
 
     std::vector<std::string> InMemoryEngine::getAllIdents( OperationContext* opCtx ) const {
         std::vector<std::string> all;
         {
-            boost::mutex::scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             for ( DataMap::const_iterator it = _dataMap.begin(); it != _dataMap.end(); ++it ) {
                 all.push_back( it->first );
             }

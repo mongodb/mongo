@@ -32,7 +32,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 
 namespace mongo {
 

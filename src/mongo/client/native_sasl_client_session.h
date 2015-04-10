@@ -27,7 +27,6 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/client/export_macros.h"
 #include "mongo/client/sasl_client_session.h"
 
 namespace mongo {
@@ -38,7 +37,7 @@ namespace mongo {
      * Implementation of the client side of a SASL authentication conversation using the
      * native SASL implementation.
      */
-    class MONGO_CLIENT_API NativeSaslClientSession : public SaslClientSession {
+    class NativeSaslClientSession : public SaslClientSession {
         MONGO_DISALLOW_COPYING(NativeSaslClientSession);
     public:
 
@@ -47,7 +46,7 @@ namespace mongo {
 
         virtual Status initialize();
 
-        virtual Status step(const StringData& inputData, std::string* outputData);
+        virtual Status step(StringData inputData, std::string* outputData);
 
         virtual bool isDone() const { return _done; }
 

@@ -26,11 +26,13 @@
  *    it in the license file.
  */
 
-#ifndef MONGO_SSL
+#include "mongo/platform/basic.h"
+
+#include "mongo/config.h"
+
+#ifndef MONGO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds
 #endif
-
-#include "mongo/platform/basic.h"
 
 #include <openssl/sha.h>
 #include <openssl/evp.h>

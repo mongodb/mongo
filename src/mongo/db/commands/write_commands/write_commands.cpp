@@ -36,6 +36,7 @@
 #include "mongo/db/commands/write_commands/batch_executor.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/delete_request.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/s/d_state.h"
 
 namespace mongo {
@@ -66,11 +68,11 @@ namespace mongo {
 
     } // namespace
 
-    WriteCmd::WriteCmd( const StringData& name, BatchedCommandRequest::BatchType writeType ) :
+    WriteCmd::WriteCmd( StringData name, BatchedCommandRequest::BatchType writeType ) :
         Command( name ), _writeType( writeType ) {
     }
 
-    void WriteCmd::redactTooLongLog( mutablebson::Document* cmdObj, const StringData& fieldName ) {
+    void WriteCmd::redactTooLongLog( mutablebson::Document* cmdObj, StringData fieldName ) {
         namespace mmb = mutablebson;
         mmb::Element root = cmdObj->root();
         mmb::Element field = root.findFirstChildNamed( fieldName );
@@ -118,6 +120,7 @@ namespace mongo {
                        string& errMsg,
                        BSONObjBuilder& result,
                        bool fromRepl) {
+        invariant(!fromRepl == txn->writesAreReplicated());
 
         // Can't be run on secondaries (logTheOp() == false, slaveOk() == false).
         dassert( !fromRepl );
@@ -136,11 +139,14 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNSS(nss);
 
-        WriteConcernOptions defaultWriteConcern =
-            repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
+        StatusWith<WriteConcernOptions> wcStatus = extractWriteConcern(cmdObj);
+
+        if (!wcStatus.isOK()) {
+            return appendCommandStatus(result, wcStatus.getStatus());
+        }
+        txn->setWriteConcern(wcStatus.getValue());
 
         WriteBatchExecutor writeBatchExecutor(txn,
-                                              defaultWriteConcern,
                                               &globalOpCounters,
                                               lastError.get());
 
@@ -202,7 +208,6 @@ namespace mongo {
             updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
             updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
             updateRequest.setUpsert( batchItem.getUpdate()->getUpsert() );
-            updateRequest.setUpdateOpLog( true );
             UpdateLifecycleImpl updateLifecycle( true, updateRequest.getNamespaceString() );
             updateRequest.setLifecycle( &updateLifecycle );
             updateRequest.setExplain();
@@ -223,7 +228,7 @@ namespace mongo {
             AutoGetDb autoDb( txn, nsString.db(), MODE_IX );
             Lock::CollectionLock colLock( txn->lockState(), nsString.ns(), MODE_IX );
 
-            // We check the shard version explicitly here rather than using Client::Context,
+            // We check the shard version explicitly here rather than using OldClientContext,
             // as Context can do implicit database creation if the db does not exist. We want
             // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
             // or collections.
@@ -250,7 +255,6 @@ namespace mongo {
             DeleteRequest deleteRequest( nsString );
             deleteRequest.setQuery( batchItem.getDelete()->getQuery() );
             deleteRequest.setMulti( batchItem.getDelete()->getLimit() != 1 );
-            deleteRequest.setUpdateOpLog(true);
             deleteRequest.setGod( false );
             deleteRequest.setExplain();
 
@@ -268,7 +272,7 @@ namespace mongo {
             AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-            // We check the shard version explicitly here rather than using Client::Context,
+            // We check the shard version explicitly here rather than using OldClientContext,
             // as Context can do implicit database creation if the db does not exist. We want
             // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
             // or collections.

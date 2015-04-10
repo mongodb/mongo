@@ -84,7 +84,7 @@ namespace mongo {
          * 'false' for those two options.
          */
         virtual Status prepare(mutablebson::Element root,
-                               const StringData& matchedField,
+                               StringData matchedField,
                                ExecInfo* execInfo);
 
         /**

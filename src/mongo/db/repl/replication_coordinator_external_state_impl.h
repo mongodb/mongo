@@ -49,14 +49,13 @@ namespace repl {
         virtual void startMasterSlave(OperationContext* txn);
         virtual void shutdown();
         virtual void initiateOplog(OperationContext* txn);
-        virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();
         virtual OID ensureMe(OperationContext* txn);
         virtual bool isSelf(const HostAndPort& host);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-        virtual void setGlobalOpTime(const OpTime& newTime);
-        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
+        virtual void setGlobalTimestamp(const Timestamp& newTime);
+        virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual void closeConnections();
         virtual void killAllUserOperations(OperationContext* txn);

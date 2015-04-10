@@ -70,7 +70,7 @@ namespace mongo {
          *   -- Neither 'to' nor 'from' have an array ancestor
          */
         virtual Status prepare(mutablebson::Element root,
-                               const StringData& matchedField,
+                               StringData matchedField,
                                ExecInfo* execInfo);
 
         /**

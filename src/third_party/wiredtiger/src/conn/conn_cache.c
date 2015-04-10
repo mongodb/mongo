@@ -9,36 +9,32 @@
 #include "wt_internal.h"
 
 /*
- * __wt_cache_config --
+ * __cache_config_local --
  *	Configure the underlying cache.
  */
-int
-__wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	uint32_t evict_workers_max, evict_workers_min;
 
 	conn = S2C(session);
 	cache = conn->cache;
 
 	/*
 	 * If not using a shared cache configure the cache size, otherwise
-	 * check for a reserved size.
+	 * check for a reserved size. All other settings are independent of
+	 * whether we are using a shared cache or not.
 	 */
-	if (!F_ISSET(conn, WT_CONN_CACHE_POOL)) {
+	if (!shared) {
 		WT_RET(__wt_config_gets(session, cfg, "cache_size", &cval));
 		conn->cache_size = (uint64_t)cval.val;
-		WT_RET(__wt_config_gets(session, cfg, "cache_overhead", &cval));
-		conn->cache_overhead = (int)cval.val;
-	} else {
-		WT_RET(__wt_config_gets(
-		    session, cfg, "shared_cache.reserve", &cval));
-		if (cval.val == 0)
-			WT_RET(__wt_config_gets(
-			    session, cfg, "shared_cache.chunk", &cval));
-		cache->cp_reserved = (uint64_t)cval.val;
 	}
+
+	WT_RET(__wt_config_gets(session, cfg, "cache_overhead", &cval));
+	cache->overhead_pct = (u_int)cval.val;
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction_target", &cval));
 	cache->eviction_target = (u_int)cval.val;
@@ -56,16 +52,64 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	conn->evict_workers_max = (u_int)cval.val - 1;
+	evict_workers_max = (uint32_t)cval.val - 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_min", &cval));
 	WT_ASSERT(session, cval.val > 0);
-	conn->evict_workers_min = (u_int)cval.val - 1;
+	evict_workers_min = (uint32_t)cval.val - 1;
 
-	if (conn->evict_workers_min > conn->evict_workers_max)
+	if (evict_workers_min > evict_workers_max)
 		WT_RET_MSG(session, EINVAL,
 		    "eviction=(threads_min) cannot be greater than "
 		    "eviction=(threads_max)");
+	conn->evict_workers_max = evict_workers_max;
+	conn->evict_workers_min = evict_workers_min;
+
+	return (0);
+}
+
+/*
+ * __wt_cache_config --
+ *	Configure or reconfigure the current cache and shared cache.
+ */
+int
+__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	int now_shared, was_shared;
+
+	conn = S2C(session);
+
+	WT_ASSERT(session, conn->cache != NULL);
+
+	WT_RET(__wt_config_gets_none(session, cfg, "shared_cache.name", &cval));
+	now_shared = cval.len != 0;
+	was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
+
+	/* Cleanup if reconfiguring */
+	if (reconfigure && was_shared && !now_shared)
+		/* Remove ourselves from the pool if necessary */
+		WT_RET(__wt_conn_cache_pool_destroy(session));
+	else if (reconfigure && !was_shared && now_shared)
+		/*
+		 * Cache size will now be managed by the cache pool - the
+		 * start size always needs to be zero to allow the pool to
+		 * manage how much memory is in-use.
+		 */
+		conn->cache_size = 0;
+
+	/*
+	 * Always setup the local cache - it's used even if we are
+	 * participating in a shared cache.
+	 */
+	WT_RET(__cache_config_local(session, now_shared, cfg));
+	if (now_shared) {
+		WT_RET(__wt_cache_pool_config(session, cfg));
+		WT_ASSERT(session, F_ISSET(conn, WT_CONN_CACHE_POOL));
+		if (!was_shared)
+			WT_RET(__wt_conn_cache_pool_open(session));
+	}
 
 	return (0);
 }
@@ -83,19 +127,14 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
-	WT_ASSERT(session, conn->cache == NULL ||
-	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
+	WT_ASSERT(session, conn->cache == NULL);
 
 	WT_RET(__wt_calloc_one(session, &conn->cache));
 
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(session, cfg));
-
-	/* Add the configured cache to the cache pool. */
-	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		WT_RET(__wt_conn_cache_pool_open(session));
+	WT_RET(__wt_cache_config(session, 0, cfg));
 
 	/*
 	 * The target size must be lower than the trigger size or we will never
@@ -145,12 +184,18 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(stats, cache_bytes_max, conn->cache_size);
 	WT_STAT_SET(stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
 
-	WT_STAT_SET(stats, cache_overhead, conn->cache_overhead);
+	WT_STAT_SET(stats, cache_overhead, cache->overhead_pct);
 	WT_STAT_SET(stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
-	WT_STAT_SET(stats, cache_bytes_dirty, cache->bytes_dirty);
+	WT_STAT_SET(stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
 	WT_STAT_SET(stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
 	WT_STAT_SET(stats, cache_pages_dirty, cache->pages_dirty);
+
+	/* Figure out internal, leaf and overflow stats */
+	WT_STAT_SET(stats, cache_bytes_internal, cache->bytes_internal);
+	WT_STAT_SET(stats, cache_bytes_leaf,
+	    conn->cache_size - (cache->bytes_internal + cache->bytes_overflow));
+	WT_STAT_SET(stats, cache_bytes_overflow, cache->bytes_overflow);
 }
 
 /*

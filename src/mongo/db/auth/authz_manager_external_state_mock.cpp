@@ -35,12 +35,14 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -100,6 +102,13 @@ namespace {
                           BSONObj()));
     }
 
+    std::unique_ptr<AuthzSessionExternalState>
+    AuthzManagerExternalStateMock::makeAuthzSessionExternalState(
+            AuthorizationManager* authzManager) {
+
+        return stdx::make_unique<AuthzSessionExternalStateMock>(authzManager);
+    }
+
     Status AuthzManagerExternalStateMock::findOne(
             OperationContext* txn,
             const NamespaceString& collectionName,
@@ -152,14 +161,16 @@ namespace {
             toInsert = document.copy();
         }
         _documents[collectionName].push_back(toInsert);
+
         if (_authzManager) {
             _authzManager->logOp(
+                    txn,
                     "i",
                     collectionName.ns().c_str(),
                     toInsert,
-                    NULL,
                     NULL);
         }
+
         return Status::OK();
     }
 
@@ -190,14 +201,16 @@ namespace {
             BSONObj newObj = document.getObject().copy();
             *iter = newObj;
             BSONObj idQuery = driver.makeOplogEntryQuery(newObj, false);
+
             if (_authzManager) {
                 _authzManager->logOp(
+                        txn,
                         "u",
                         collectionName.ns().c_str(),
                         logObj,
-                        &idQuery,
-                        NULL);
+                        &idQuery);
             }
+
             return Status::OK();
         }
         else if (status == ErrorCodes::NoMatchingDocument && upsert) {
@@ -243,20 +256,22 @@ namespace {
             BSONObj idQuery = (*iter)["_id"].wrap();
             _documents[collectionName].erase(iter);
             ++n;
+
             if (_authzManager) {
                 _authzManager->logOp(
+                        txn,
                         "d",
                         collectionName.ns().c_str(),
                         idQuery,
-                        NULL,
                         NULL);
             }
+
         }
         *numRemoved = n;
         return Status::OK();
     }
 
-    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock(const StringData&) {
+    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock(StringData) {
         return true;
     }
 

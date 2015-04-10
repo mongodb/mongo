@@ -40,6 +40,91 @@ namespace mongo {
 
     class OperationContext;
 
+    class ScopedRecoveryUnitSwapper {
+    public:
+        ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn);
+
+        ~ScopedRecoveryUnitSwapper();
+
+        /**
+         * Dismissing the RU swapper causes it to simply free the recovery unit rather than swapping
+         * it back into the ClientCursor.
+         */
+        void dismiss();
+
+    private:
+        ClientCursor* _cc;
+        OperationContext* _txn;
+        bool _dismissed;
+
+        std::unique_ptr<RecoveryUnit> _txnPreviousRecoveryUnit;
+    };
+
+    /**
+     * Returns true if enough results have been prepared to stop adding more to the first batch.
+     *
+     * Should be called *after* adding to the result set rather than before.
+     */
+    bool enoughForFirstBatch(const LiteParsedQuery& pq, int numDocs, int bytesBuffered);
+
+    /**
+     * Returns true if enough results have been prepared to stop adding more to a getMore batch.
+     *
+     * Should be called *after* adding to the result set rather than before.
+     */
+    bool enoughForGetMore(int ntoreturn, int numDocs, int bytesBuffered);
+
+    /**
+     * Whether or not the ClientCursor* is tailable.
+     */
+    bool isCursorTailable(const ClientCursor* cursor);
+
+    /**
+     * Returns true if we should keep a cursor around because we're expecting to return more query
+     * results.
+     *
+     * If false, the caller should close the cursor and indicate this to the client by sending back
+     * a cursor ID of 0.
+     */
+    bool shouldSaveCursor(OperationContext* txn,
+                          const Collection* collection,
+                          PlanExecutor::ExecState finalState,
+                          PlanExecutor* exec);
+
+    /**
+     * Similar to shouldSaveCursor(), but used in getMore to determine whether we should keep
+     * the cursor around for additional getMores().
+     *
+     * If false, the caller should close the cursor and indicate this to the client by sending back
+     * a cursor ID of 0.
+     */
+    bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
+                                 PlanExecutor* exec,
+                                 bool isTailable);
+
+    /**
+     * Fills out CurOp with information about this query.
+     */
+    void beginQueryOp(const NamespaceString& nss,
+                      const BSONObj& queryObj,
+                      int ntoreturn,
+                      int ntoskip,
+                      CurOp* curop);
+
+    /**
+     * Fills out CurOp with information regarding this query's execution.
+     *
+     * Uses explain functionality to extract stats from 'exec'.
+     *
+     * The database profiling level, 'dbProfilingLevel', is used to conditionalize whether or not we
+     * do expensive stats gathering.
+     */
+    void endQueryOp(PlanExecutor* exec,
+                    int dbProfilingLevel,
+                    int numResults,
+                    CursorId cursorId,
+                    CurOp* curop);
+
     /**
      * Constructs a PlanExecutor for a query with the oplogReplay option set to true,
      * for the query 'cq' over the collection 'collection'. The PlanExecutor will
@@ -65,18 +150,15 @@ namespace mongo {
                               CurOp& curop,
                               int pass,
                               bool& exhaust,
-                              bool* isCursorAuthorized,
-                              bool fromDBDirectClient);
+                              bool* isCursorAuthorized);
 
     /**
      * Run the query 'q' and place the result in 'result'.
      */
     std::string runQuery(OperationContext* txn,
-                         Message& m,
                          QueryMessage& q,
                          const NamespaceString& ns,
                          CurOp& curop,
-                         Message &result,
-                         bool fromDBDirectClient);
+                         Message &result);
 
 }  // namespace mongo

@@ -460,8 +460,7 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     this.awaitSecondaryNodes(timeout);
 
     // Setup authentication if running test with authentication
-    if ((jsTestOptions().keyFile || jsTestOptions().useX509) && 
-          cmdKey == 'replSetInitiate') {
+    if ((jsTestOptions().keyFile) && cmdKey == 'replSetInitiate') {
         master = this.getMaster();
         jsTest.authenticateNodes(this.nodes);
     }
@@ -731,7 +730,7 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     this.stop(n, signal, options);
     started = this.start( n , options , true, wait );
 
-    if (jsTestOptions().keyFile || jsTestOptions().useX509) {
+    if (jsTestOptions().keyFile) {
         if (started.length) {
              // if n was an array of conns, start will return an array of connections
             for (var i = 0; i < started.length; i++) {
@@ -979,7 +978,7 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     
     var lastTime = null
     var currTime = new Date().getTime()
-    var status = undefined
+    var status = undefined;
 
     var self = this;
     assert.soon(function() {
@@ -988,7 +987,6 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             if (!conn) conn = self.liveNodes.slaves[0];
             if (!conn) return false; // Try again to load connection
 
-            var status = null;
             var getStatusFunc = function() {
                 status = conn.getDB('admin').runCommand({replSetGetStatus: 1});
             };

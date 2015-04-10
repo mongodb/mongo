@@ -19,7 +19,7 @@ ReplSetBridge.prototype.start = function() {
 
 ReplSetBridge.prototype.stop = function() {
     print("ReplSetBridge stopping: " + this.port);
-    stopMongod(this.port, 9);
+    _stopMongoProgram(this.port, 9);
 };
 
 ReplSetBridge.prototype.toString = function() {

@@ -32,7 +32,6 @@
 
 #include "mongo/db/operation_context.h"
 
-
 namespace mongo {
 
     class OperationContextImpl : public OperationContext  {
@@ -54,8 +53,6 @@ namespace mongo {
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween);
 
-        virtual bool isGod() const;
-
         virtual std::string getNS() const;
 
         virtual Client* getClient() const;
@@ -67,12 +64,16 @@ namespace mongo {
         virtual void checkForInterrupt() const;
         virtual Status checkForInterruptNoAssert() const;
 
-        virtual bool isPrimaryFor( const StringData& ns );
+        virtual bool isPrimaryFor( StringData ns );
+
+        virtual void setReplicatedWrites(bool writesAreReplicated = true);
+        virtual bool writesAreReplicated() const;
 
     private:
         std::auto_ptr<RecoveryUnit> _recovery;
         Client* const _client; // cached, not owned
         Locker* const _locker; // cached, not owned
+        bool _writesAreReplicated;
     };
 
 }  // namespace mongo

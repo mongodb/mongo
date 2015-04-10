@@ -38,14 +38,17 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authz_session_external_state_d.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
-#include "mongo/db/dbhelpers.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -57,6 +60,13 @@ namespace mongo {
 
     AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
+
+    std::unique_ptr<AuthzSessionExternalState>
+    AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(
+            AuthorizationManager* authzManager) {
+
+        return stdx::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+    }
 
     Status AuthzManagerExternalStateMongod::query(
             OperationContext* txn,
@@ -179,7 +189,7 @@ namespace mongo {
         }
     }
 
-    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(const StringData& why) {
+    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(StringData why) {
         LOG(2) << "Attempting to lock user data for: " << why << endl;
         return _authzDataUpdateLock.timed_lock(
                 boost::posix_time::milliseconds(_authzUpdateLockAcquisitionTimeoutMillis));

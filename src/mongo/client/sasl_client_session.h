@@ -33,7 +33,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/client/export_macros.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -51,7 +50,7 @@ namespace mongo {
      * parameters must be UTF-8 encoded strings with no embedded NUL characters.  The
      * parameterPassword parameter is not constrained.
      */
-    class MONGO_CLIENT_API SaslClientSession {
+    class SaslClientSession {
         MONGO_DISALLOW_COPYING(SaslClientSession);
     public:
         typedef stdx::function<SaslClientSession* (const std::string&)> SaslClientSessionFactoryFn;
@@ -81,7 +80,7 @@ namespace mongo {
          *
          * The session object makes and owns a copy of the data in "value".
          */
-        virtual void setParameter(Parameter id, const StringData& value);
+        virtual void setParameter(Parameter id, StringData value);
 
         /**
          * Returns true if "id" identifies a parameter previously set by a call to setParameter().
@@ -122,7 +121,7 @@ namespace mongo {
          * determine if the conversation has completed.  When step() returns Status::OK() and
          * isDone() returns true, authentication has completed successfully.
          */
-        virtual Status step(const StringData& inputData, std::string* outputData) = 0;
+        virtual Status step(StringData inputData, std::string* outputData) = 0;
 
         /**
          * Returns true if the authentication completed successfully.

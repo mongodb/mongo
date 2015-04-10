@@ -171,7 +171,7 @@ namespace mongo {
          */
         class DBLock {
         public:
-            DBLock(Locker* locker, const StringData& db, LockMode mode);
+            DBLock(Locker* locker, StringData db, LockMode mode);
             ~DBLock();
 
             /**
@@ -213,7 +213,7 @@ namespace mongo {
         class CollectionLock {
             MONGO_DISALLOW_COPYING(CollectionLock);
         public:
-            CollectionLock(Locker* lockState, const StringData& ns, LockMode mode);
+            CollectionLock(Locker* lockState, StringData ns, LockMode mode);
             ~CollectionLock();
 
             void relockWithMode(LockMode mode, Lock::DBLock& dblock);

@@ -39,7 +39,7 @@ namespace mongo {
     class BSONObj;
     class BSONElement;
     class OID;
-    class OpTime;
+    class Timestamp;
 
     /**
      * Finds an element named "fieldName" in "object".
@@ -48,7 +48,7 @@ namespace mongo {
      * ErrorCodes::NoSuchKey if there are no matches.
      */
     Status bsonExtractField(const BSONObj& object,
-                            const StringData& fieldName,
+                            StringData fieldName,
                             BSONElement* outElement);
 
     /**
@@ -60,7 +60,7 @@ namespace mongo {
      * Status::OK(), the resulting value of "*outElement" is undefined.
      */
     Status bsonExtractTypedField(const BSONObj& object,
-                                 const StringData& fieldName,
+                                 StringData fieldName,
                                  BSONType type,
                                  BSONElement* outElement);
 
@@ -73,7 +73,7 @@ namespace mongo {
      * than Status::OK(), the resulting value of "*out" is undefined.
      */
     Status bsonExtractBooleanField(const BSONObj& object,
-                                   const StringData& fieldName,
+                                   StringData fieldName,
                                    bool* out);
 
     /**
@@ -87,7 +87,7 @@ namespace mongo {
      * undefined.
      */
     Status bsonExtractIntegerField(const BSONObj& object,
-                                   const StringData& fieldName,
+                                   StringData fieldName,
                                    long long* out);
 
     /**
@@ -99,20 +99,20 @@ namespace mongo {
      * Status::OK(), the resulting value of "*out" is undefined.
      */
     Status bsonExtractStringField(const BSONObj& object,
-                                  const StringData& fieldName,
+                                  StringData fieldName,
                                   std::string* out);
 
     /**
-     * Finds an OpTime-typed element named "fieldName" in "object" and stores its value in "out".
+     * Finds an Timestamp-typed element named "fieldName" in "object" and stores its value in "out".
      *
-     * Returns Status::OK() and sets *out to the found element's OpTime value on success.  Returns
+     * Returns Status::OK() and sets *out to the found element's Timestamp value on success. Returns
      * ErrorCodes::NoSuchKey if there are no matches for "fieldName", and ErrorCodes::TypeMismatch
-     * if the type of the matching element is not OpTime.  For return values other than
+     * if the type of the matching element is not Timestamp.  For return values other than
      * Status::OK(), the resulting value of "*out" is undefined.
      */
-    Status bsonExtractOpTimeField(const BSONObj& object,
-                                  const StringData& fieldName,
-                                  OpTime* out);
+    Status bsonExtractTimestampField(const BSONObj& object,
+                                     StringData fieldName,
+                                     Timestamp* out);
 
     /**
      * Finds an OID-typed element named "fieldName" in "object" and stores its value in "out".
@@ -123,7 +123,7 @@ namespace mongo {
      * the resulting value of "*out" is undefined.
      */
     Status bsonExtractOIDField(const BSONObj& object,
-                               const StringData& fieldName,
+                               StringData fieldName,
                                OID* out);
 
     /**
@@ -137,7 +137,7 @@ namespace mongo {
      * boolean or number, returns ErrorCodes::TypeMismatch.
      */
     Status bsonExtractBooleanFieldWithDefault(const BSONObj& object,
-                                              const StringData& fieldName,
+                                              StringData fieldName,
                                               bool defaultValue,
                                               bool* out);
 
@@ -152,7 +152,7 @@ namespace mongo {
      * ErrorCodes::BadValue.
      */
     Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
-                                              const StringData& fieldName,
+                                              StringData fieldName,
                                               long long defaultValue,
                                               long long* out);
 
@@ -167,8 +167,8 @@ namespace mongo {
      * string, returns ErrorCodes::TypeMismatch.
      */
     Status bsonExtractStringFieldWithDefault(const BSONObj& object,
-                                             const StringData& fieldName,
-                                             const StringData& defaultValue,
+                                             StringData fieldName,
+                                             StringData defaultValue,
                                              std::string* out);
 
     /**
@@ -180,7 +180,7 @@ namespace mongo {
      * values other than Status::OK(), the resulting value of *out is undefined.
      */
     Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
-                                          const StringData& fieldName,
+                                          StringData fieldName,
                                           const OID& defaultValue,
                                           OID* out);
 

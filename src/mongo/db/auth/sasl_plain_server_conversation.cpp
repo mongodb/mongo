@@ -43,7 +43,7 @@ namespace mongo {
 
     SaslPLAINServerConversation::~SaslPLAINServerConversation() {};
 
-    StatusWith<bool> SaslPLAINServerConversation::step(const StringData& inputData,
+    StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData,
                                                        std::string* outputData) {
         // Expecting user input on the form: user\0user\0pwd
         std::string input = inputData.toString();

@@ -9,7 +9,6 @@ EXPORTS
     wiredtiger_pack_str
     wiredtiger_pack_uint
     wiredtiger_strerror
-    wiredtiger_strerror_r
     wiredtiger_struct_pack
     wiredtiger_struct_size
     wiredtiger_struct_unpack

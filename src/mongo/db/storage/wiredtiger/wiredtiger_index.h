@@ -113,6 +113,8 @@ namespace mongo {
 
         virtual bool unique() const = 0;
 
+        Status dupKeyError(const BSONObj& key);
+
     protected:
 
         virtual Status _insert( WT_CURSOR* c,
@@ -132,6 +134,8 @@ namespace mongo {
         const Ordering _ordering;
         std::string _uri;
         uint64_t _instanceId;
+        std::string _collectionNamespace;
+        std::string _indexName;
     };
 
 
@@ -141,20 +145,23 @@ namespace mongo {
                                const std::string& uri,
                                const IndexDescriptor* desc );
 
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
-        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
+        std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+                                                               bool forward) const override;
 
-        virtual bool unique() const { return true; }
+        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                   bool dupsAllowed) override;
 
-        virtual Status _insert( WT_CURSOR* c,
-                                const BSONObj& key,
-                                const RecordId& loc,
-                                bool dupsAllowed );
+        bool unique() const override { return true; }
 
-        virtual void _unindex( WT_CURSOR* c,
-                               const BSONObj& key,
-                               const RecordId& loc,
-                               bool dupsAllowed );
+        Status _insert(WT_CURSOR* c,
+                       const BSONObj& key,
+                       const RecordId& loc,
+                       bool dupsAllowed) override;
+
+        void _unindex(WT_CURSOR* c,
+                      const BSONObj& key,
+                      const RecordId& loc,
+                      bool dupsAllowed) override;
     };
 
     class WiredTigerIndexStandard : public WiredTigerIndex {
@@ -163,20 +170,23 @@ namespace mongo {
                                  const std::string& uri,
                                  const IndexDescriptor* desc );
 
-        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
-        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
+        std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+                                                               bool forward) const override;
 
-        virtual bool unique() const { return false; }
+        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                   bool dupsAllowed) override;
 
-        virtual Status _insert( WT_CURSOR* c,
-                                const BSONObj& key,
-                                const RecordId& loc,
-                                bool dupsAllowed );
+        bool unique() const override { return false; }
 
-        virtual void _unindex( WT_CURSOR* c,
-                               const BSONObj& key,
-                               const RecordId& loc,
-                               bool dupsAllowed );
+        Status _insert(WT_CURSOR* c,
+                       const BSONObj& key,
+                       const RecordId& loc,
+                       bool dupsAllowed) override;
+
+        void _unindex(WT_CURSOR* c,
+                      const BSONObj& key,
+                      const RecordId& loc,
+                      bool dupsAllowed) override;
 
     };
 

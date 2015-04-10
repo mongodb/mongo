@@ -33,16 +33,15 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/index/btree_based_bulk_access_method.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/platform/cstdint.h"
-
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/platform/cstdint.h"
 
 namespace IndexUpdateTests {
 
@@ -65,7 +64,7 @@ namespace IndexUpdateTests {
         }
         ~IndexBuildBase() {
             _client.dropCollection( _ns );
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
         }
         Collection* collection() {
             return _ctx.getCollection();
@@ -121,7 +120,7 @@ namespace IndexUpdateTests {
         }
 
         OperationContextImpl _txn;
-        Client::WriteContext _ctx;
+        OldClientWriteContext _ctx;
         DBDirectClient _client;
     };
 
@@ -346,7 +345,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -384,7 +383,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -419,7 +418,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             RecordId loc1;
             RecordId loc2;
@@ -468,7 +467,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -486,12 +485,12 @@ namespace IndexUpdateTests {
             // Initialize curop.
             _txn.getCurOp()->reset();
             // Request an interrupt.
-            getGlobalEnvironment()->setKillAllOperations();
+            getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
             // The call is interrupted because mayInterrupt == true.
             ASSERT_TRUE(buildIndexInterrupted(indexInfo, true));
             // only want to interrupt the index build
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             // The new index is not listed in the index catalog because the index build failed.
             ASSERT( !coll->getIndexCatalog()->findIndexByName( &_txn, "a_1" ) );
         }
@@ -502,7 +501,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Create a new collection.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -519,12 +518,12 @@ namespace IndexUpdateTests {
             // Initialize curop.
             _txn.getCurOp()->reset();
             // Request an interrupt.
-            getGlobalEnvironment()->setKillAllOperations();
+            getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
             // The call is not interrupted because mayInterrupt == false.
             ASSERT_FALSE(buildIndexInterrupted(indexInfo, false));
             // only want to interrupt the index build
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             // The new index is listed in the index catalog because the index build completed.
             ASSERT( coll->getIndexCatalog()->findIndexByName( &_txn, "a_1" ) );
         }
@@ -535,7 +534,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -555,14 +554,14 @@ namespace IndexUpdateTests {
             // Initialize curop.
             _txn.getCurOp()->reset();
             // Request an interrupt.
-            getGlobalEnvironment()->setKillAllOperations();
+            getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
                                       "ns" << _ns <<
                                       "name" << "_id_" );
             // The call is interrupted because mayInterrupt == true.
             ASSERT_TRUE(buildIndexInterrupted(indexInfo, true));
             // only want to interrupt the index build
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             // The new index is not listed in the index catalog because the index build failed.
             ASSERT( !coll->getIndexCatalog()->findIndexByName( &_txn, "_id_" ) );
         }
@@ -573,7 +572,7 @@ namespace IndexUpdateTests {
     public:
         void run() {
             // Recreate the collection as capped, without an _id index.
-            Database* db = _ctx.ctx().db();
+            Database* db = _ctx.db();
             Collection* coll;
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -593,14 +592,14 @@ namespace IndexUpdateTests {
             // Initialize curop.
             _txn.getCurOp()->reset();
             // Request an interrupt.
-            getGlobalEnvironment()->setKillAllOperations();
+            getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
                                       "ns" << _ns <<
                                       "name" << "_id_" );
             // The call is not interrupted because mayInterrupt == false.
             ASSERT_FALSE(buildIndexInterrupted(indexInfo, false));
             // only want to interrupt the index build
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             // The new index is listed in the index catalog because the index build succeeded.
             ASSERT( coll->getIndexCatalog()->findIndexByName( &_txn, "_id_" ) );
         }
@@ -620,11 +619,11 @@ namespace IndexUpdateTests {
             // Initialize curop.
             _txn.getCurOp()->reset();
             // Request an interrupt.
-            getGlobalEnvironment()->setKillAllOperations();
+            getGlobalServiceContext()->setKillAllOperations();
             // The call is not interrupted.
             Helpers::ensureIndex( &_txn, collection(), BSON( "a" << 1 ), false, "a_1" );
             // only want to interrupt the index build
-            getGlobalEnvironment()->unsetKillAllOperations();
+            getGlobalServiceContext()->unsetKillAllOperations();
             // The new index is listed in getIndexSpecs because the index build completed.
             ASSERT_EQUALS( 2U, _client.getIndexSpecs(_ns).size());
         }
@@ -868,7 +867,7 @@ namespace IndexUpdateTests {
             const std::string storageEngineName = "wiredTiger";
 
             // Run 'wiredTiger' tests if the storage engine is supported.
-            if (getGlobalEnvironment()->isRegisteredStorageEngine(storageEngineName)) {
+            if (getGlobalServiceContext()->isRegisteredStorageEngine(storageEngineName)) {
                 // Every field under "storageEngine" has to be an object.
                 ASSERT_NOT_OK(createIndex("unittest", _createSpec(BSON(storageEngineName << 1))));
 

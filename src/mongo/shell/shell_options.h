@@ -66,9 +66,12 @@ namespace mongo {
         bool useWriteCommandsDefault;
         std::string writeMode;
 
+        std::string readMode;
+
         ShellGlobalParams() : autoKillOp(false),
                               useWriteCommandsDefault(true),
-                              writeMode("commands") {
+                              writeMode("commands"),
+                              readMode("compatibility") {
         }
     };
 
@@ -76,7 +79,7 @@ namespace mongo {
 
     Status addMongoShellOptions(moe::OptionSection* options);
 
-    std::string getMongoShellHelp(const StringData& name, const moe::OptionSection& options);
+    std::string getMongoShellHelp(StringData name, const moe::OptionSection& options);
 
     /**
      * Handle options that should come before validation, such as "help".

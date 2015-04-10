@@ -18,8 +18,8 @@ __async_op_dequeue(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session,
     WT_ASYNC_OP_IMPL **op)
 {
 	WT_ASYNC *async;
-	long sleep_usec;
 	uint64_t cur_tail, last_consume, my_consume, my_slot, prev_slot;
+	uint64_t sleep_usec;
 	uint32_t tries;
 
 	async = conn->async;
@@ -75,7 +75,8 @@ retry:
 	 */
 	my_slot = my_consume % async->async_qsize;
 	prev_slot = last_consume % async->async_qsize;
-	*op = WT_ATOMIC_STORE8(async->async_queue[my_slot], NULL);
+	*op = (WT_ASYNC_OP_IMPL*)WT_ATOMIC_STORE8(
+		async->async_queue[my_slot], NULL);
 
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
@@ -278,10 +279,10 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 }
 
 /*
- * __async_worker --
+ * __wt_async_worker --
  *	The async worker threads.
  */
-void *
+WT_THREAD_RET
 __wt_async_worker(void *arg)
 {
 	WT_ASYNC *async;
@@ -354,5 +355,5 @@ err:		WT_PANIC_MSG(session, ret, "async worker error");
 		__wt_free(session, ac);
 		ac = acnext;
 	}
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }

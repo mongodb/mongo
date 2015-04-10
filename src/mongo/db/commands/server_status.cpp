@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client_basic.h"
+#include "mongo/config.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_internal.h"
@@ -276,7 +277,7 @@ namespace mongo {
                 
         } network;
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         class Security : public ServerStatusSection {
         public:
             Security() : ServerStatusSection( "security" ) {}

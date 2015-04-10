@@ -33,15 +33,15 @@
 
 namespace mongo {
     class RecordId;
-    class OpTime;
+    class Timestamp;
 
 namespace oploghack {
 
     /**
-     * Converts OpTime to a RecordId in an unspecified manor that is safe to use as the key to in a
-     * RecordStore.
+     * Converts Timestamp to a RecordId in an unspecified manor that is safe to use as the key to
+     * in a RecordStore.
      */
-    StatusWith<RecordId> keyForOptime(const OpTime& opTime);
+    StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
 
     /**
      * data and len must be the arguments from RecordStore::insert() on an oplog collection.

@@ -39,7 +39,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/file_allocator.h"
@@ -53,7 +53,7 @@ namespace mongo {
 
 namespace {
 
-    StringData _todb(const StringData& ns) {
+    StringData _todb(StringData ns) {
         size_t i = ns.find('.');
         if (i == std::string::npos) {
             uassert(13074, "db name can't be empty", ns.size());
@@ -80,7 +80,7 @@ namespace {
 
 
     Database* DatabaseHolder::get(OperationContext* txn,
-                                  const StringData& ns) const {
+                                  StringData ns) const {
 
         const StringData db = _todb(ns);
         invariant(txn->lockState()->isDbLockedForMode(db, MODE_IS));
@@ -95,7 +95,7 @@ namespace {
     }
 
     Database* DatabaseHolder::openDb(OperationContext* txn,
-                                     const StringData& ns,
+                                     StringData ns,
                                      bool* justCreated) {
 
         const StringData dbname = _todb(ns);
@@ -122,7 +122,7 @@ namespace {
             uasserted(DatabaseDifferCaseCode, ss.str());
         }
 
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         invariant(storageEngine);
 
         DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
@@ -149,7 +149,7 @@ namespace {
     }
 
     void DatabaseHolder::close(OperationContext* txn,
-                               const StringData& ns) {
+                               StringData ns) {
         // TODO: This should be fine if only a DB X-lock
         invariant(txn->lockState()->isW());
 
@@ -166,7 +166,7 @@ namespace {
         delete it->second;
         _dbs.erase(it);
 
-        getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase(txn, dbName.toString());
+        getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(txn, dbName.toString());
     }
 
     bool DatabaseHolder::closeAll(OperationContext* txn, BSONObjBuilder& result, bool force) {
@@ -200,7 +200,7 @@ namespace {
 
             _dbs.erase( name );
 
-            getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase( txn, name );
+            getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase( txn, name );
 
             bb.append( name );
         }

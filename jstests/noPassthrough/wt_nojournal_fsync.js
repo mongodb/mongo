@@ -19,11 +19,13 @@ function writeDataAndRestart(doFsync) {
     }
 
     jsTestLog("kill -9");
-    stopMongod(port, /*signal*/ 9);
+    MongoRunner.stopMongod(conn, /*signal*/ 9);
 
     jsTestLog("restart node");
-    conn = startMongodNoReset("--port", port, "--dbpath", MongoRunner.dataPath + name,
-                            "--storageEngine", "wiredTiger", "--nojournal");
+    conn = MongoRunner.runMongod({restart: true,
+                                  cleanData: false,
+                                  storageEngine: "wiredTiger",
+                                  nojournal: ""});
     return conn;
 }
 
@@ -35,23 +37,21 @@ if ( typeof(TestData) != "object" ||
     jsTestLog("Skipping test because storageEngine is not wiredTiger");
 }
 else {
-    var port = allocatePorts( 1 )[ 0 ];
     var name = "wt_nojournal_fsync";
 
     jsTestLog("run mongod without journaling");
-    conn = startMongodEmpty("--port", port, "--dbpath", MongoRunner.dataPath + name,
-                            "--storageEngine", "wiredTiger", "--nojournal");
+    conn = MongoRunner.runMongod({storageEngine: "wiredTiger", nojournal: ""});
 
     // restart node without fsync and --nojournal.  Data should not be there after restart
-    writeDataAndRestart(false);
+    conn = writeDataAndRestart(false);
     jsTestLog("check data is not in collection foo");
     assert.eq(conn.getDB(name).foo.count(), 0);
 
     // restart node with fsync and --nojournal.  Data should be there after restart
-    writeDataAndRestart(true);
+    conn = writeDataAndRestart(true);
     jsTestLog("check data is in collection foo");
     assert.eq(conn.getDB(name).foo.count(), 100);
 
-    stopMongod(port);
+    MongoRunner.stopMongod(conn);
     jsTestLog("Success!");
 }

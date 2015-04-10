@@ -34,11 +34,11 @@
 
 #include "mongo/s/version_manager.h"
 
-#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/util/log.h"
 
@@ -59,12 +59,8 @@ namespace mongo {
      */
     struct ConnectionShardStatus {
 
-        ConnectionShardStatus()
-            : _mutex( "ConnectionShardStatus" ) {
-        }
-
         bool hasAnySequenceSet(DBClientBase* conn) {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             SequenceMap::const_iterator seenConnIt = _map.find(conn->getConnectionId());
             return seenConnIt != _map.end() && seenConnIt->second.size() > 0;
@@ -74,7 +70,7 @@ namespace mongo {
                          const string& ns,
                          unsigned long long* sequence) {
 
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             SequenceMap::const_iterator seenConnIt = _map.find(conn->getConnectionId());
             if (seenConnIt == _map.end())
@@ -89,12 +85,12 @@ namespace mongo {
         }
 
         void setSequence( DBClientBase * conn , const string& ns , const unsigned long long& s ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _map[conn->getConnectionId()][ns] = s;
         }
 
         void reset( DBClientBase * conn ) {
-            scoped_lock lk( _mutex );
+            boost::lock_guard<boost::mutex> lk( _mutex );
             _map.erase( conn->getConnectionId() );
         }
 
@@ -187,7 +183,13 @@ namespace mongo {
 
             LOG(1) << "initializing shard connection to " << shard.toString() << endl;
 
-            ok = setShardVersion(*conn, "", ChunkVersion(), ChunkManagerPtr(), true, result);
+            ok = setShardVersion(*conn,
+                                 "",
+                                 configServer.modelServer(),
+                                 ChunkVersion(),
+                                 NULL,
+                                 true,
+                                 result);
         }
         catch( const DBException& ) {
 
@@ -341,9 +343,15 @@ namespace mongo {
                << ", current chunk manager iteration is " << officialSequenceNumber;
 
         BSONObj result;
-        if ( setShardVersion( *conn , ns , version , manager , authoritative , result ) ) {
-            // success!
-            LOG(1) << "      setShardVersion success: " << result << endl;
+        if (setShardVersion(*conn,
+                            ns,
+                            configServer.modelServer(),
+                            version,
+                            manager.get(),
+                            authoritative,
+                            result)) {
+
+            LOG(1) << "      setShardVersion success: " << result;
             connectionShardStatus.setSequence( conn , ns , officialSequenceNumber );
             return true;
         }
@@ -363,8 +371,8 @@ namespace mongo {
         if ( result["reloadConfig"].trueValue() ) {
             if( result["version"].timestampTime() == 0 ){
 
-                warning() << "reloading full configuration for " << conf->getName()
-                          << ", connection state indicates significant version changes" << endl;
+                warning() << "reloading full configuration for " << conf->name()
+                          << ", connection state indicates significant version changes";
 
                 // reload db
                 conf->reload();

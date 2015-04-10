@@ -196,7 +196,7 @@ DB.prototype.shutdownServer = function(opts) {
         return "shutdown command only works with the admin database; try 'use admin'";
     }
 
-    cmd = {"shutdown" : 1};
+    var cmd = {'shutdown' : 1};
     opts = opts || {};
     for (var o in opts) {
         cmd[o] = opts[o];
@@ -204,13 +204,17 @@ DB.prototype.shutdownServer = function(opts) {
 
     try {
         var res = this.runCommand(cmd);
-        if( res )
-            throw Error( "shutdownServer failed: " + res.errmsg );
-        throw Error( "shutdownServer failed" );
+        if (!res.ok) {
+            throw Error('shutdownServer failed: ' + tojson(res));
+        }
+        throw Error('shutdownServer failed: server is still up.');
     }
-    catch ( e ){
-        assert( tojson( e ).indexOf( "error doing query: failed" ) >= 0 , "unexpected error: " + tojson( e ) );
-        print( "server should be down..." );
+    catch (e) {
+        if (tojson(e).indexOf('error doing query: failed') >= 0) {
+            print('server should be down...');
+            return;
+        }
+        throw e;
     }
 }
 
@@ -329,7 +333,7 @@ DB.prototype.help = function() {
     print("\tdb.createUser(userDocument)");
     print("\tdb.currentOp() displays currently executing operations in the db");
     print("\tdb.dropDatabase()");
-    print("\tdb.eval(func, args) run code server-side");
+    print("\tdb.eval() - deprecated");
     print("\tdb.fsyncLock() flush data to disk and lock server for backups");
     print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
@@ -430,8 +434,9 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
 }
 
 /**
+ * @deprecated
  *  <p> Evaluate a js expression at the database server.</p>
- * 
+ *
  * <p>Useful if you need to touch a lot of data lightly; in such a scenario
  *  the network transfer of the data could be a bottleneck.  A good example
  *  is "select count(*)" -- can be done server side via this mechanism.
@@ -441,15 +446,17 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
  * If the eval fails, an exception is thrown of the form:
  * </p>
  * <code>{ dbEvalException: { retval: functionReturnValue, ok: num [, errno: num] [, errmsg: str] } }</code>
- * 
+ *
  * <p>Example: </p>
  * <code>print( "mycount: " + db.eval( function(){db.mycoll.find({},{_id:ObjId()}).length();} );</code>
  *
  * @param {Function} jsfunction Javascript function to run on server.  Note this it not a closure, but rather just "code".
  * @return result of your function, or null if error
- * 
+ *
  */
 DB.prototype.eval = function(jsfunction) {
+    print("WARNING: db.eval is deprecated");
+
     var cmd = { $eval : jsfunction };
     if ( arguments.length > 1 ) {
         cmd.args = argumentsToArray( arguments ).slice(1);
@@ -684,14 +691,41 @@ DB.prototype.currentOp = function( arg ){
         else if ( arg )
             q["$all"] = true;
     }
-    return this.$cmd.sys.inprog.findOne( q );
+
+    // always send currentOp with default (null) read preference (SERVER-17951)
+    var _readPref = this.getMongo().getReadPrefMode();
+
+    try { 
+        this.getMongo().setReadPref(null);
+        var results = this.$cmd.sys.inprog.findOne( q );
+    } finally { 
+        this.getMongo().setReadPref(_readPref);
+    }
+
+    return results 
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
     if( !op ) 
         throw Error("no opNum to kill specified");
-    return this.$cmd.sys.killop.findOne({'op':op});
+    var res = this.adminCommand({'killOp': 1, 'op': op});
+    if (!res.ok &&
+        (res.errmsg.startsWith("no such cmd") ||
+         res.errmsg.startsWith("no such command")) ||
+         res.code === 59) {
+
+        // fall back for old servers
+        var _readPref = this.getMongo().getReadPrefMode();
+
+        try {
+            this.getMongo().setReadPref(null);
+            res = this.$cmd.sys.killop.findOne({'op': op});
+        } finally {
+            this.getMongo().setReadPref(_readPref);
+        }
+    }
+    return res;
 }
 DB.prototype.killOP = DB.prototype.killOp;
 
@@ -971,7 +1005,23 @@ DB.prototype.fsyncLock = function() {
 }
 
 DB.prototype.fsyncUnlock = function() {
-    return this.getSiblingDB("admin").$cmd.sys.unlock.findOne()
+    var res = this.adminCommand({fsyncUnlock: 1});
+    if (!res.ok &&
+        // handle both error messages for nonexistent command...
+        (res.errmsg.startsWith("no such cmd") ||
+         res.errmsg.startsWith("no such command") ||
+         res.code === 59)) {
+        // fallback for old servers
+
+        var _readPref = this.getMongo().getReadPrefMode();
+        try {
+            this.getMongo().setReadPref(null);
+            res = this.getSiblingDB("admin").$cmd.sys.unlock.findOne();
+        } finally {
+            this.getMongo().setReadPref(_readPref);
+        }
+    }
+    return res;
 }
 
 DB.autocomplete = function(obj){

@@ -1,9 +1,8 @@
 // test that "show log dbname" and "show logs" have good err messages when unauthorized
 
-var port = allocatePorts( 1 )[ 0 ];
 var baseName = "jstests_show_log_auth";
 
-var m = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" , "--smallfiles" );
+var m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1", nojournal: "", smallfiles: ""});
 var db = m.getDB( "admin" );
 
 db.createUser({user: "admin" , pwd: "pass", roles: jsTest.adminUserRoles});

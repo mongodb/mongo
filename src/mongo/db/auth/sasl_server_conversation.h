@@ -73,7 +73,7 @@ namespace mongo {
          * A return of false means that the authentication process has more steps.
          *
          */
-        virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData) = 0;
+        virtual StatusWith<bool> step(StringData inputData, std::string* outputData) = 0;
 
         /**
          * Gets the SASL principal id (user name) for the conversation

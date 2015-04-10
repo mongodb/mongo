@@ -41,10 +41,12 @@ using namespace std;
 #endif
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 
@@ -118,7 +120,7 @@ namespace mongo {
         log() << "warning assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;
         logContext();
         assertionCount.condrollover( ++assertionCount.warning );
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
         quickExit(EXIT_ABRUPT);
@@ -133,7 +135,7 @@ namespace mongo {
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
         breakpoint();
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
         quickExit(EXIT_ABRUPT);
@@ -270,6 +272,22 @@ namespace mongo {
         free(niceName);
         return s;
 #endif
+    }
+
+    Status exceptionToStatus() {
+        try {
+            throw;
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        } catch (const std::exception& ex) {
+            return Status(ErrorCodes::UnknownError,
+                          mongoutils::str::stream() << "Caught exception of type "
+                                                    << demangleName(typeid(ex))
+                                                    << ": "
+                                                    << ex.what());
+        } catch (...) {
+            return Status(ErrorCodes::UnknownError, "Caught unknown exception");
+        }
     }
 
     string ExceptionInfo::toString() const {

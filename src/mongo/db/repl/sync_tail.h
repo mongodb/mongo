@@ -57,7 +57,7 @@ namespace repl {
         /**
          * Runs _applyOplogUntil(stopOpTime)
          */
-        virtual void oplogApplication(OperationContext* txn, const OpTime& stopOpTime);
+        virtual void oplogApplication(OperationContext* txn, const Timestamp& stopOpTime);
 
         void oplogApplication();
         bool peek(BSONObj* obj);
@@ -101,14 +101,14 @@ namespace repl {
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.
         // Returns the last OpTime applied.
-        OpTime multiApply(OperationContext* txn, std::deque<BSONObj>& ops);
+        Timestamp multiApply(OperationContext* txn, std::deque<BSONObj>& ops);
 
         /**
          * Applies oplog entries until reaching "endOpTime".
          *
          * NOTE:Will not transition or check states
          */
-        void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
+        void _applyOplogUntil(OperationContext* txn, const Timestamp& endOpTime);
 
     private:
         BackgroundSyncInterface* _networkQueue;
@@ -124,8 +124,11 @@ namespace repl {
         // Doles out all the work to the writer pool threads and waits for them to complete
         void applyOps(const std::vector< std::vector<BSONObj> >& writerVectors);
 
+        // mustAwaitCommit is an out-parameter and indicates that at least one of the ops
+        // in 'ops' had j:true.
         void fillWriterVectors(const std::deque<BSONObj>& ops, 
-                               std::vector< std::vector<BSONObj> >* writerVectors);
+                               std::vector< std::vector<BSONObj> >* writerVectors,
+                               bool* mustAwaitCommit);
         void handleSlaveDelay(const BSONObj& op);
 
         // persistent pool of worker threads for writing ops to the databases

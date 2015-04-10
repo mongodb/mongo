@@ -10,6 +10,9 @@
 /* Build the LevelDB API with Basho LevelDB support. */
 /* #undef HAVE_BASHOLEVELDB */
 
+/* LZ4 support automatically loaded. */
+/* #undef HAVE_BUILTIN_EXTENSION_LZ4 */
+
 /* Snappy support automatically loaded. */
 /* #undef HAVE_BUILTIN_EXTENSION_SNAPPY */
 
@@ -54,6 +57,9 @@
 
 /* Define to 1 if you have the `dl' library (-ldl). */
 /* #undef HAVE_LIBDL */
+
+/* Define to 1 if you have the `lz4' library (-llz4). */
+/* #undef HAVE_LIBLZ4 */
 
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 /* #undef HAVE_LIBPTHREAD */

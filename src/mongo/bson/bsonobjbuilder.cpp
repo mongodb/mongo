@@ -33,14 +33,14 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
     using std::string;
 
-    void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
+    void BSONObjBuilder::appendMinForType( StringData fieldName , int t ) {
         switch ( t ) {
                 
         // Shared canonical types
@@ -56,7 +56,7 @@ namespace mongo {
             appendBool(fieldName, true);
             //appendDate( fieldName , numeric_limits<long long>::min() ); 
             return;
-        case Timestamp:
+        case bsonTimestamp:
             appendTimestamp( fieldName , 0 ); return;
         case Undefined: // shared with EOO
             appendUndefined( fieldName ); return;
@@ -97,7 +97,7 @@ namespace mongo {
         uassert( 10061 ,  "type not supported for appendMinElementForType" , false );
     }
 
-    void BSONObjBuilder::appendMaxForType( const StringData& fieldName , int t ) {
+    void BSONObjBuilder::appendMaxForType( StringData fieldName , int t ) {
         switch ( t ) {
                 
         // Shared canonical types
@@ -110,8 +110,8 @@ namespace mongo {
             appendMinForType( fieldName, Object ); return;
         case Date:
             appendDate( fieldName , std::numeric_limits<long long>::max() ); return;
-        case Timestamp:
-            append( fieldName , OpTime::max() ); return;
+        case bsonTimestamp:
+            append( fieldName , Timestamp::max() ); return;
         case Undefined: // shared with EOO
             appendUndefined( fieldName ); return;
 
@@ -150,7 +150,7 @@ namespace mongo {
     }
 
 
-    bool BSONObjBuilder::appendAsNumber( const StringData& fieldName , const string& data ) {
+    bool BSONObjBuilder::appendAsNumber( StringData fieldName , const string& data ) {
         if ( data.size() == 0 || data == "-" || data == ".")
             return false;
 
@@ -195,15 +195,14 @@ namespace mongo {
         }
     }
 
-    BSONObjBuilder& BSONObjBuilder::appendDate(const StringData& fieldName, Date_t dt) {
+    BSONObjBuilder& BSONObjBuilder::appendDate(StringData fieldName, Date_t dt) {
         /* easy to pass a time_t to this and get a bad result.  thus this warning. */
-#if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
-        if( dt > 0 && dt <= 0xffffffff ) {
+        if ( kDebugBuild && dt > 0 && dt <= 0xffffffff ) {
             static int n;
             if( n++ == 0 )
                 log() << "DEV WARNING appendDate() called with a tiny (but nonzero) date" << std::endl;
         }
-#endif
+
         _b.appendNum((char) Date);
         _b.appendStr(fieldName);
         _b.appendNum(dt);
@@ -256,7 +255,7 @@ namespace mongo {
         return BSONObjIterator( s , e );
     }
 
-    bool BSONObjBuilder::hasField( const StringData& name ) const {
+    bool BSONObjBuilder::hasField( StringData name ) const {
         BSONObjIterator i = iterator();
         while ( i.more() )
             if ( name == i.next().fieldName() )

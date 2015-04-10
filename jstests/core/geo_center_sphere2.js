@@ -28,7 +28,7 @@ for ( var test = 0; test < numTests; test++ ) {
     Random.srand( 1337 + test );
 
     var radius = 5000 * Random.rand(); // km
-    radius = radius / 6371; // radians;
+    radius = radius / 6378.1; // radians; earth radius from geoconstants.h
     var numDocs = Math.floor( 400 * Random.rand() );
     // TODO: Wrapping uses the error value to figure out what would overlap...
     var bits = Math.floor( 5 + Random.rand() * 28 );

@@ -35,6 +35,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
+#include "mongo/config.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
@@ -341,7 +342,7 @@ namespace mongo {
 
                 // The debug builds are too slow to run these tests.
                 // Among other things, MSVC++ makes all heap functions O(N) not O(logN).
-#if !defined(_DEBUG)
+#if !defined(MONGO_CONFIG_DEBUG_BUILD)
                 { // merge all data ASC
                     boost::shared_ptr<IWSorter> sorters[] = {
                         makeSorter(opts, IWComparator(ASC)),

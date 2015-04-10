@@ -33,8 +33,8 @@
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/type_chunk.h"
 #include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
@@ -101,7 +101,7 @@ namespace mongo {
 
             // Open a cursor for the diff chunks
             std::auto_ptr<DBClientCursor> cursor = conn->query(
-                    ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( DEBUG_BUILD ? 2 : 1000000 ) );
+                    ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( kDebugBuild ? 2 : 1000000 ) );
             verify( cursor.get() );
 
             int diff = calculateConfigDiff( *cursor.get() );

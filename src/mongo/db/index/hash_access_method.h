@@ -33,7 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/hasher.h"  // For HashSeed.
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/btree_based_access_method.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -41,15 +41,12 @@ namespace mongo {
     /**
      * This is the access method for "hashed" indices.
      */
-    class HashAccessMethod : public BtreeBasedAccessMethod {
+    class HashAccessMethod : public IndexAccessMethod {
     public:
-        using BtreeBasedAccessMethod::_descriptor;
-
         HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree);
-        virtual ~HashAccessMethod() { }
 
     private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         // Only one of our fields is hashed.  This is the field name for it.
         std::string _hashedField;

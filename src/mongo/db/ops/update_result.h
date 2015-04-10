@@ -43,7 +43,8 @@ namespace mongo {
                       bool modifiers_,
                       unsigned long long numDocsModified_,
                       unsigned long long numMatched_,
-                      const BSONObj& upsertedObject_ );
+                      const BSONObj& upsertedObject_,
+                      const BSONObj& newObj_ );
 
 
         // if existing objects were modified
@@ -61,13 +62,18 @@ namespace mongo {
         // if something was upserted, the new _id of the object
         BSONObj upserted;
 
+        // For a non-multi update, the new version of the document. If we did an insert, this
+        // is the full document that got inserted (whereas 'upserted' is just the _id field).
+        BSONObj newObj;
+
         const std::string toString() const {
             return str::stream()
                         << " upserted: " << upserted
                         << " modifiers: " << modifiers
                         << " existing: " << existing
                         << " numDocsModified: " << numDocsModified
-                        << " numMatched: " << numMatched;
+                        << " numMatched: " << numMatched
+                        << " newObj: " << newObj;
         }
     };
 

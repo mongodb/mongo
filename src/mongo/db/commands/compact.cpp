@@ -40,8 +40,9 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
@@ -153,7 +154,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::Context ctx(txn, ns);
+            OldClientContext ctx(txn, ns);
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
 
             if ( collection->isCapped() ) {

@@ -326,7 +326,9 @@ namespace {
             ofs.write(obj.objdata()+4, obj.objsize()-4);
             ofs.flush();
         }
-        ASSERT_THROWS(StorageEngineMetadata::validate(tempDir.path(), "engine2"), UserException);
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(tempDir.path(), "engine2");
+        ASSERT_FALSE(metadata.get());
     }
 
     TEST(StorageEngineMetadataTest, ValidateStorageEngineOption) {

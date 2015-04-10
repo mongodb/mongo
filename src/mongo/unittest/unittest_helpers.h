@@ -31,11 +31,11 @@
 #include <ostream>
 
 namespace mongo {
-    class OpTime;
+    class Timestamp;
     struct Date_t;
 
-    // So that you can ASSERT_EQUALS two OpTimes
-    std::ostream& operator<<(std::ostream& s, const OpTime& ot);
+    // So that you can ASSERT_EQUALS two Timestamps
+    std::ostream& operator<<(std::ostream& s, const Timestamp& ot);
 
     // So that you can ASSERT_EQUALS two Date_ts
     std::ostream& operator<<(std::ostream& s, const Date_t& t);

@@ -11,10 +11,14 @@
 const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
-const char *usage_prefix = "[-Vv] [-C config] [-h home]";
+const char *usage_prefix = "[-Vv] [-R] [-C config] [-h home]";
 int verbose;					/* Verbose flag */
 
 static const char *command;			/* Command name */
+
+#define	REC_ERROR	"log=(recover=error)"
+#define	REC_LOGOFF	"log=(enabled=false)"
+#define	REC_RECOVER	"log=(recover=on)"
 
 static int usage(void);
 
@@ -26,8 +30,9 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
+	int logoff, recover;
 	char *p;
-	const char *cmd_config, *config;
+	const char *cmd_config, *config, *rec_config;
 
 	conn = NULL;
 	p = NULL;
@@ -52,15 +57,31 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	/* Check for standard options. */
 	cmd_config = config = NULL;
-	while ((ch = __wt_getopt(progname, argc, argv, "C:h:Vv")) != EOF)
+	/*
+	 * We default to returning an error if recovery needs to be run.
+	 * Generally we expect this to be run after a clean shutdown.
+	 * The printlog command disables logging entirely.  If recovery is
+	 * needed, the user can specify -R to run recovery.
+	 */
+	rec_config = REC_ERROR;
+	logoff = recover = 0;
+	/* Check for standard options. */
+	while ((ch = __wt_getopt(progname, argc, argv, "C:h:LRVv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			cmd_config = __wt_optarg;
 			break;
 		case 'h':			/* home directory */
 			home = __wt_optarg;
+			break;
+		case 'L':			/* no logging */
+			rec_config = REC_LOGOFF;
+			logoff = 1;
+			break;
+		case 'R':			/* recovery */
+			rec_config = REC_RECOVER;
+			recover = 1;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
@@ -72,6 +93,10 @@ main(int argc, char *argv[])
 		default:
 			return (usage());
 		}
+	if (logoff && recover) {
+		fprintf(stderr, "Only one of -L and -R is allowed.\n");
+		return (EXIT_FAILURE);
+	}
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
@@ -118,8 +143,10 @@ main(int argc, char *argv[])
 		}
 		break;
 	case 'p':
-		if (strcmp(command, "printlog") == 0)
+		if (strcmp(command, "printlog") == 0) {
 			func = util_printlog;
+			rec_config = REC_LOGOFF;
+		}
 		break;
 	case 'r':
 		if (strcmp(command, "read") == 0)
@@ -153,27 +180,30 @@ main(int argc, char *argv[])
 	if (func == NULL)
 		return (usage());
 
-	/* Build the configuration string, as necessary. */
-	if (config == NULL)
-		config = cmd_config;
-	else if (cmd_config != NULL) {
-		len = strlen(cmd_config) + strlen(config) + 10;
-		if ((p = malloc(len)) == NULL) {
-			ret = util_err(errno, NULL);
-			goto err;
-		}
-		(void)snprintf(p, len, "%s,%s", config, cmd_config);
-		config = p;
+	/* Build the configuration string. */
+	len = 10;					/* some slop */
+	if (config != NULL)
+		len += strlen(config);
+	if (cmd_config != NULL)
+		len += strlen(cmd_config);
+	len += strlen(rec_config);
+	if ((p = malloc(len)) == NULL) {
+		ret = util_err(NULL, errno, NULL);
+		goto err;
 	}
+	(void)snprintf(p, len, "%s,%s,%s",
+	    config == NULL ? "" : config,
+	    cmd_config == NULL ? "" : cmd_config, rec_config);
+	config = p;
 
 	/* Open the database and a session. */
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0) {
-		ret = util_err(ret, NULL);
+		ret = util_err(NULL, ret, NULL);
 		goto err;
 	}
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		ret = util_err(ret, NULL);
+		ret = util_err(NULL, ret, NULL);
 		goto err;
 	}
 
@@ -199,10 +229,12 @@ usage(void)
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 	fprintf(stderr,
 	    "global options:\n"
-	    "\t" "-C\twiredtiger_open configuration\n"
-	    "\t" "-h\tdatabase directory\n"
-	    "\t" "-V\tdisplay library version and exit\n"
-	    "\t" "-v\tverbose\n");
+	    "\t" "-C\t" "wiredtiger_open configuration\n"
+	    "\t" "-h\t" "database directory\n"
+	    "\t" "-L\t" "turn logging off for debug-mode\n"
+	    "\t" "-R\t" "run recovery if configured\n"
+	    "\t" "-V\t" "display library version and exit\n"
+	    "\t" "-v\t" "verbose\n");
 	fprintf(stderr,
 	    "commands:\n"
 	    "\t" "backup\t  database backup\n"
@@ -231,7 +263,7 @@ usage(void)
  *	Build a name.
  */
 char *
-util_name(const char *s, const char *type)
+util_name(WT_SESSION *session, const char *s, const char *type)
 {
 	size_t len;
 	char *name;
@@ -247,7 +279,7 @@ util_name(const char *s, const char *type)
 
 	len = strlen(type) + strlen(s) + 2;
 	if ((name = calloc(len, 1)) == NULL) {
-		(void)util_err(errno, NULL);
+		(void)util_err(session, errno, NULL);
 		return (NULL);
 	}
 

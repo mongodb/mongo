@@ -43,6 +43,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/logger/log_component.h"
@@ -471,7 +472,7 @@ namespace {
         }
 #endif
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         Status ret = validateSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;
@@ -942,7 +943,7 @@ namespace {
                 (ServerGlobalParams::ClusterAuthMode_keyFile);
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         ret = storeSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;

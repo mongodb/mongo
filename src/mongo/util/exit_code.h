@@ -65,4 +65,12 @@ namespace mongo {
      */
     void exitCleanly(ExitCode code);
 
+    /**
+     * Signal main or  ServiceMain thread to exit
+     * Important for the ServiceMain thread to do the exit when mongod/s are running as NT Services
+     * on Windows.
+     * It is not required to be called before exitCleanly in the general case, only for
+     * proper NT Service shutdown.
+     */
+    void signalShutdown();
 }  // namespace mongo

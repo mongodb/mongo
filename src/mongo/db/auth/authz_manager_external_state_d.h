@@ -50,6 +50,9 @@ namespace mongo {
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
 
+        std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
+                AuthorizationManager* authzManager) override;
+
         virtual Status findOne(OperationContext* txn,
                                const NamespaceString& collectionName,
                                const BSONObj& query,
@@ -76,7 +79,7 @@ namespace mongo {
                               const BSONObj& query,
                               const BSONObj& writeConcern,
                               int* numRemoved);
-        virtual bool tryAcquireAuthzUpdateLock(const StringData& why);
+        virtual bool tryAcquireAuthzUpdateLock(StringData why);
         virtual void releaseAuthzUpdateLock();
 
     private:

@@ -89,7 +89,8 @@ replTest.stopSet();
 // Need to start a single server manually to keep this test in the jstests/replsets test suite
 var port = allocatePorts(1)[0];
 var baseName = "SERVER-9005";
-var mongod = startMongod("--port", port, "--dbpath", MongoRunner.dataPath + baseName);
+
+var mongod = MongoRunner.runMongod({port: port});
 var sdb = new Mongo("localhost:"+port).getDB("test");
 
 sdb.foo.drop();
@@ -112,4 +113,4 @@ printjson(gle);
 assert.eq(gle.ok, 0);
 assert(gle.badGLE);
 
-stopMongod(port);
+MongoRunner.stopMongod(mongod);

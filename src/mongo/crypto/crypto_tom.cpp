@@ -26,11 +26,13 @@
  *    it in the license file.
  */
 
-#ifdef MONGO_SSL
+#include "mongo/platform/basic.h"
+
+#include "mongo/config.h"
+
+#ifdef MONGO_CONFIG_SSL
 #error This file should not be included if compiling with SSL support
 #endif
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/crypto/tom/tomcrypt.h"
 
@@ -65,6 +67,10 @@ namespace crypto {
                   const size_t inputLen,
                   unsigned char* output,
                   unsigned int* outputLen) {
+        if (!key || !input || !output) {
+            return false;
+        }
+
         static int hashId = -1;
         if (hashId == -1) {
             register_hash (&sha1_desc);

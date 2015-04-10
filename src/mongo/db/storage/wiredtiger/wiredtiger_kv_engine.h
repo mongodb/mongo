@@ -69,41 +69,41 @@ namespace mongo {
         virtual RecoveryUnit* newRecoveryUnit();
 
         virtual Status createRecordStore( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
+                                          StringData ns,
+                                          StringData ident,
                                           const CollectionOptions& options );
 
         virtual RecordStore* getRecordStore( OperationContext* opCtx,
-                                             const StringData& ns,
-                                             const StringData& ident,
+                                             StringData ns,
+                                             StringData ident,
                                              const CollectionOptions& options );
 
         virtual Status createSortedDataInterface( OperationContext* opCtx,
-                                                  const StringData& ident,
+                                                  StringData ident,
                                                   const IndexDescriptor* desc );
 
         virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             const StringData& ident,
+                                                             StringData ident,
                                                              const IndexDescriptor* desc );
 
         virtual Status dropIdent( OperationContext* opCtx,
-                                  const StringData& ident );
+                                  StringData ident );
 
         virtual Status okToRename( OperationContext* opCtx,
-                                   const StringData& fromNS,
-                                   const StringData& toNS,
-                                   const StringData& ident,
+                                   StringData fromNS,
+                                   StringData toNS,
+                                   StringData ident,
                                    const RecordStore* originalRecordStore ) const;
 
         virtual int flushAllFiles( bool sync );
 
         virtual int64_t getIdentSize( OperationContext* opCtx,
-                                      const StringData& ident );
+                                      StringData ident );
 
         virtual Status repairIdent( OperationContext* opCtx,
-                                    const StringData& ident );
+                                    StringData ident );
 
-        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const;
+        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const;
 
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
 
@@ -131,12 +131,12 @@ namespace mongo {
     private:
 
         Status _salvageIfNeeded(const char* uri);
-        void _checkIdentPath( const StringData& ident );
+        void _checkIdentPath( StringData ident );
 
         bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 
-        std::string _uri( const StringData& ident ) const;
-        bool _drop( const StringData& ident );
+        std::string _uri( StringData ident ) const;
+        bool _drop( StringData ident );
 
         WT_CONNECTION* _conn;
         WT_EVENT_HANDLER _eventHandler;

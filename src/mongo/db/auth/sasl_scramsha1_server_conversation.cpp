@@ -60,7 +60,7 @@ namespace mongo {
         _nonce("") {
     }
 
-    StatusWith<bool> SaslSCRAMSHA1ServerConversation::step(const StringData& inputData,
+    StatusWith<bool> SaslSCRAMSHA1ServerConversation::step(StringData inputData,
                                                            std::string* outputData) {
 
         std::vector<std::string> input = StringSplitter::split(inputData.toString(), ",");

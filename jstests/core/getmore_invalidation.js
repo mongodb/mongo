@@ -191,4 +191,39 @@
     assert.neq([15, 15], nextDoc.geo);
     assert(nextDoc.geo[0] === 0 || nextDoc.geo[1] === 0);
 
+    // Case #10: sort with deletion invalidation.
+    t.drop();
+    t.ensureIndex({a: 1});
+    t.insert({a: 1, b: 2});
+    t.insert({a: 3, b: 3});
+    t.insert({a: 2, b: 1});
+
+    cursor = t.find({a: {$in: [1,2,3]}}).sort({b: 1}).batchSize(2);
+    cursor.next();
+    cursor.next();
+
+    assert.writeOK(t.remove({a: 2}));
+
+    if (cursor.hasNext()) {
+        assert.eq(cursor.next().b, 3);
+    }
+
+    // Case #11: sort with mutation invalidation.
+    t.drop();
+    t.ensureIndex({a: 1});
+    t.insert({a: 1, b: 2});
+    t.insert({a: 3, b: 3});
+    t.insert({a: 2, b: 1});
+
+    cursor = t.find({a: {$in: [1,2,3]}}).sort({b: 1}).batchSize(2);
+    cursor.next();
+    cursor.next();
+
+    assert.writeOK(t.update({a: 2}, {$set: {a: 4}}));
+
+    count = cursor.itcount();
+    if (cursor.hasNext()) {
+        assert.eq(cursor.next().b, 3);
+    }
+
 })();

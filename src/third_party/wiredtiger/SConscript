@@ -2,7 +2,7 @@
 import re
 import textwrap
 
-Import("env windows darwin solaris linux freebsd openbsd debugBuild")
+Import("env debugBuild")
 
 env = env.Clone()
 env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
@@ -18,17 +18,17 @@ if debugBuild:
         "HAVE_VERBOSE",
         ])
 
-if windows:
+if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
-elif darwin:
+elif env.TargetOSIs('osx'):
     env.Append(CPPPATH=["build_darwin"])
-elif solaris:
+elif env.TargetOSIs('solaris'):
     env.Append(CPPPATH=["build_solaris"])
-elif freebsd:
+elif env.TargetOSIs('freebsd'):
     env.Append(CPPPATH=["build_freebsd"])
-elif openbsd:
+elif env.TargetOSIs('openbsd'):
     env.Append(CPPPATH=["build_openbsd"])
-elif linux:
+elif env.TargetOSIs('linux'):
     env.Append(CPPPATH=["build_linux"])
     env.Append(CPPDEFINES=["_GNU_SOURCE"])
 else:
@@ -75,7 +75,8 @@ replacements = {
     '@VERSION_STRING@' : VERSION_STRING,
     '@uintmax_t_decl@': "",
     '@uintptr_t_decl@': "",
-    '@off_t_decl@' : 'typedef int64_t wt_off_t;' if windows else "typedef off_t wt_off_t;",
+    '@off_t_decl@' : 'typedef int64_t wt_off_t;' if env.TargetOSIs('windows')
+        else "typedef off_t wt_off_t;",
     '@wiredtiger_includes_decl@': wiredtiger_includes
 }
 
@@ -89,7 +90,7 @@ env.Substfile(
 #
 # WiredTiger library
 #
-filelistfile = "build_win/filelist.win" if windows else 'dist/filelist'
+filelistfile = "build_win/filelist.win" if env.TargetOSIs('windows') else 'dist/filelist'
 
 wtsources = []
 

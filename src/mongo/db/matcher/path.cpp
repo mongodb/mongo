@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-    Status ElementPath::init( const StringData& path ) {
+    Status ElementPath::init( StringData path ) {
         _shouldTraverseNonleafArrays = true;
         _shouldTraverseLeafArray = true;
         _fieldRef.parse( path );
@@ -122,7 +122,7 @@ namespace mongo {
         }
     }
 
-    bool BSONElementIterator::ArrayIterationState::isArrayOffsetMatch( const StringData& fieldName ) const {
+    bool BSONElementIterator::ArrayIterationState::isArrayOffsetMatch( StringData fieldName ) const {
         if ( !nextPieceOfPathIsNumber )
             return false;
         return nextPieceOfPath == fieldName;

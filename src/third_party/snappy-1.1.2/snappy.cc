@@ -940,16 +940,16 @@ size_t Compress(Source* reader, Sink* writer) {
     // Compress input_fragment and append to dest
     const int max_output = MaxCompressedLength(num_to_read);
 
-    // Need a scratch buffer for the output, in case the byte sink doesn't
-    // have room for us directly.
-    if (scratch_output == NULL) {
-      scratch_output = new char[max_output];
-    } else {
-      // Since we encode kBlockSize regions followed by a region
-      // which is <= kBlockSize in length, a previously allocated
-      // scratch_output[] region is big enough for this iteration.
-    }
+    // If the byte sink doesn't have room for us directly, allocate a scratch
+    // buffer.
+    //
+    // Since we encode kBlockSize regions followed by a region
+    // which is <= kBlockSize in length, a previously allocated
+    // scratch_output[] region is big enough for this iteration.
     char* dest = writer->GetAppendBuffer(max_output, scratch_output);
+    if (dest == NULL) {
+      dest = scratch_output = new char[max_output];
+    }
     char* end = internal::CompressFragment(fragment, fragment_size,
                                            dest, table, table_size);
     writer->Append(dest, end - dest);

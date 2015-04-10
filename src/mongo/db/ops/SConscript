@@ -69,7 +69,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/expressions',
-        '$BUILD_DIR/mongo/global_optime',
+        '$BUILD_DIR/mongo/global_timestamp',
         'update_common',
     ],
 )

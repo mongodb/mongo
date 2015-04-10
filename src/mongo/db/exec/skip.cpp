@@ -85,12 +85,12 @@ namespace mongo {
         else if (PlanStage::NEED_TIME == status) {
             ++_commonStats.needTime;
         }
-        else if (PlanStage::NEED_FETCH == status) {
-            ++_commonStats.needFetch;
+        else if (PlanStage::NEED_YIELD == status) {
+            ++_commonStats.needYield;
             *out = id;
         }
 
-        // NEED_TIME, NEED_FETCH, ERROR, IS_EOF
+        // NEED_TIME, NEED_YIELD, ERROR, IS_EOF
         return status;
     }
 

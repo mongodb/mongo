@@ -32,13 +32,17 @@
 
 #include "mongo/db/repl/rs_initialsync.h"
 
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
@@ -46,6 +50,7 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -60,17 +65,17 @@ namespace {
 
     /**
      * Truncates the oplog (removes any documents) and resets internal variables that were
-     * originally initialized or affected by using values from the oplog at startup time.  These 
+     * originally initialized or affected by using values from the oplog at startup time.  These
      * include the last applied optime, the last fetched optime, and the sync source blacklist.
      * Also resets the bgsync thread so that it reconnects its sync source after the oplog has been
      * truncated.
      */
-    void truncateAndResetOplog(OperationContext* txn, 
+    void truncateAndResetOplog(OperationContext* txn,
                                ReplicationCoordinator* replCoord,
                                BackgroundSync* bgsync) {
         AutoGetDb autoDb(txn, "local", MODE_X);
         massert(28585, "no local database found", autoDb.getDb());
-        invariant(txn->lockState()->isCollectionLockedForMode(rsoplog, MODE_X));
+        invariant(txn->lockState()->isCollectionLockedForMode(rsOplogName, MODE_X));
         // Note: the following order is important.
         // The bgsync thread uses an empty optime as a sentinel to know to wait
         // for initial sync; thus, we must
@@ -83,12 +88,65 @@ namespace {
         replCoord->clearSyncSourceBlacklist();
 
         // Truncate the oplog in case there was a prior initial sync that failed.
-        Collection* collection = autoDb.getDb()->getCollection(rsoplog);
+        Collection* collection = autoDb.getDb()->getCollection(rsOplogName);
         fassert(28565, collection);
         WriteUnitOfWork wunit(txn);
         Status status = collection->truncate(txn);
         fassert(28564, status);
         wunit.commit();
+    }
+
+    /**
+     * Confirms that the "admin" database contains a supported version of the auth
+     * data schema.  Terminates the process if the "admin" contains clearly incompatible
+     * auth data.
+     */
+    void checkAdminDatabasePostClone(OperationContext* txn, Database* adminDb) {
+        // Assumes txn holds MODE_X or MODE_S lock on "admin" database.
+        if (!adminDb) {
+            return;
+        }
+        Collection* const usersCollection =
+            adminDb->getCollection(AuthorizationManager::usersCollectionNamespace);
+        const bool hasUsers = usersCollection &&
+            !Helpers::findOne(txn, usersCollection, BSONObj(), false).isNull();
+        Collection* const adminVersionCollection =
+            adminDb->getCollection(AuthorizationManager::versionCollectionNamespace);
+        BSONObj authSchemaVersionDocument;
+        if (!adminVersionCollection || !Helpers::findOne(txn,
+                                                         adminVersionCollection,
+                                                         AuthorizationManager::versionDocumentQuery,
+                                                         authSchemaVersionDocument)) {
+            if (!hasUsers) {
+                // It's OK to have no auth version document if there are no user documents.
+                return;
+            }
+            severe() << "During initial sync, found documents in " <<
+                AuthorizationManager::usersCollectionNamespace <<
+                " but could not find an auth schema version document in " <<
+                AuthorizationManager::versionCollectionNamespace;
+            severe() << "This indicates that the primary of this replica set was not successfully "
+                "upgraded to schema version " << AuthorizationManager::schemaVersion26Final <<
+                ", which is the minimum supported schema version in this version of MongoDB";
+            fassertFailedNoTrace(28620);
+        }
+        long long foundSchemaVersion;
+        Status status = bsonExtractIntegerField(authSchemaVersionDocument,
+                                                AuthorizationManager::schemaVersionFieldName,
+                                                &foundSchemaVersion);
+        if (!status.isOK()) {
+            severe() << "During initial sync, found malformed auth schema version document: " <<
+                status << "; document: " << authSchemaVersionDocument;
+            fassertFailedNoTrace(28618);
+        }
+        if ((foundSchemaVersion != AuthorizationManager::schemaVersion26Final) &&
+            (foundSchemaVersion != AuthorizationManager::schemaVersion28SCRAM)) {
+            severe() << "During initial sync, found auth schema version " << foundSchemaVersion <<
+                ", but this version of MongoDB only supports schema versions " <<
+                AuthorizationManager::schemaVersion26Final << " and " <<
+                AuthorizationManager::schemaVersion28SCRAM;
+            fassertFailedNoTrace(28619);
+        }
     }
 
     bool _initialSyncClone(OperationContext* txn,
@@ -101,7 +159,7 @@ namespace {
             const string db = *i;
             if ( db == "local" )
                 continue;
-            
+
             if ( dataPass )
                 log() << "initial sync cloning db: " << db;
             else
@@ -130,6 +188,10 @@ namespace {
                       << ".  " << (err.empty() ? "" : err + ".  ");
                 return false;
             }
+
+            if (db == "admin") {
+                checkAdminDatabasePostClone(txn, dbHolder().get(txn, db));
+            }
         }
 
         return true;
@@ -145,7 +207,7 @@ namespace {
     bool _initialSyncApplyOplog( OperationContext* ctx,
                                  repl::SyncTail& syncer,
                                  OplogReader* r) {
-        const OpTime startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime();
+        const Timestamp startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime();
         BSONObj lastOp;
         try {
             // It may have been a long time since we last used this connection to
@@ -153,17 +215,17 @@ namespace {
             // A common problem is that TCP keepalives are set too infrequent, and thus
             // our connection here is terminated by a firewall due to inactivity.
             // Solution is to increase the TCP keepalive frequency.
-            lastOp = r->getLastOp(rsoplog);
+            lastOp = r->getLastOp(rsOplogName);
         } catch ( SocketException & ) {
             HostAndPort host = r->getHost();
-            log() << "connection lost to " << host.toString() << 
+            log() << "connection lost to " << host.toString() <<
                 "; is your tcp keepalive interval set appropriately?";
             if ( !r->connect(host) ) {
                 error() << "initial sync couldn't connect to " << host.toString();
                 throw;
             }
             // retry
-            lastOp = r->getLastOp(rsoplog);
+            lastOp = r->getLastOp(rsOplogName);
         }
 
         if (lastOp.isEmpty()) {
@@ -172,7 +234,7 @@ namespace {
             return false;
         }
 
-        OpTime stopOpTime = lastOp["ts"]._opTime();
+        Timestamp stopOpTime = lastOp["ts"].timestamp();
 
         // If we already have what we need then return.
         if (stopOpTime == startOpTime)
@@ -192,7 +254,7 @@ namespace {
             }
         }
         catch (const DBException&) {
-            log() << "replSet initial sync failed during oplog application phase, and will retry";
+            warning() << "initial sync failed during oplog application phase, and will retry";
 
             getGlobalReplicationCoordinator()->resetMyLastOptime();
             BackgroundSync::get()->setLastAppliedHash(0);
@@ -200,7 +262,7 @@ namespace {
             sleepsecs(5);
             return false;
         }
-        
+
         return true;
     }
 
@@ -266,12 +328,13 @@ namespace {
 
         BackgroundSync* bgsync(BackgroundSync::get());
         OperationContextImpl txn;
+        txn.setReplicatedWrites(false);
         ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 
         truncateAndResetOplog(&txn, replCoord, bgsync);
 
         OplogReader r;
-        OpTime now(Milliseconds(curTimeMillis64()).total_seconds(), 0);
+        Timestamp now(Milliseconds(curTimeMillis64()).total_seconds(), 0);
 
         while (r.getHost().empty()) {
             // We must prime the sync source selector so that it considers all candidates regardless
@@ -292,31 +355,12 @@ namespace {
         InitialSync init(bgsync);
         init.setHostname(r.getHost().toString());
 
-        BSONObj lastOp = r.getLastOp(rsoplog);
+        BSONObj lastOp = r.getLastOp(rsOplogName);
         if ( lastOp.isEmpty() ) {
             std::string msg = "initial sync couldn't read remote oplog";
             log() << msg;
             sleepsecs(15);
             return Status(ErrorCodes::InitialSyncFailure, msg);
-        }
-
-        if (getGlobalReplicationCoordinator()->getSettings().fastsync) {
-            log() << "fastsync: skipping database clone";
-
-            // prime oplog
-            try {
-                _tryToApplyOpWithRetry(&txn, &init, lastOp);
-                std::deque<BSONObj> ops;
-                ops.push_back(lastOp);
-                writeOpsToOplog(&txn, ops);
-                return Status::OK();
-            } catch (DBException& e) {
-                // Return if in shutdown
-                if (inShutdown()) {
-                    return Status(ErrorCodes::ShutdownInProgress, "shutdown in progress");
-                }
-                throw;
-            }
         }
 
         // Add field to minvalid document to tell us to restart initial sync if we crash
@@ -328,6 +372,13 @@ namespace {
         log() << "initial sync clone all databases";
 
         list<string> dbs = r.conn()->getDatabaseNames();
+        {
+            // Clone admin database first, to catch schema errors.
+            list<string>::iterator admin = std::find(dbs.begin(), dbs.end(), "admin");
+            if (admin != dbs.end()) {
+                dbs.splice(dbs.begin(), dbs, admin);
+            }
+        }
 
         Cloner cloner;
         if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
@@ -340,7 +391,11 @@ namespace {
         _tryToApplyOpWithRetry(&txn, &init, lastOp);
         std::deque<BSONObj> ops;
         ops.push_back(lastOp);
-        writeOpsToOplog(&txn, ops);
+
+        Timestamp lastOptime = writeOpsToOplog(&txn, ops);
+        ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
+        replCoord->setMyLastOptime(lastOptime);
+        setNewOptime(lastOptime);
 
         std::string msg = "oplog sync 1 of 3";
         log() << msg;
@@ -375,7 +430,7 @@ namespace {
             return Status(ErrorCodes::InitialSyncFailure,
                           str::stream() << "initial sync failed: " << msg);
         }
-        
+
         // ---------
 
         Status status = getGlobalAuthorizationManager()->initialize(&txn);
@@ -389,8 +444,8 @@ namespace {
         {
             ScopedTransaction scopedXact(&txn, MODE_IX);
             AutoGetDb autodb(&txn, "local", MODE_X);
-            OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
-            log() << "replSet set minValid=" << lastOpTimeWritten;
+            Timestamp lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
+            log() << "set minValid=" << lastOpTimeWritten;
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.

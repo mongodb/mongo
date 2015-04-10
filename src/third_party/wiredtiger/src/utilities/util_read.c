@@ -31,13 +31,13 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining arguments are a uri followed by a list of keys. */
 	if (argc < 2)
 		return (usage());
-	if ((uri = util_name(*argv, "table")) == NULL)
+	if ((uri = util_name(session, *argv, "table")) == NULL)
 		return (1);
 
 	/* Open the object. */
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, NULL, &cursor)) != 0)
-		return (util_err(ret, "%s: session.open", uri));
+		return (util_err(session, ret, "%s: session.open", uri));
 
 	/*
 	 * A simple search only makes sense if the key format is a string or a
@@ -66,7 +66,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	 */
 	for (rval = 0; *++argv != NULL;) {
 		if (rkey) {
-			if (util_str2recno(*argv, &recno))
+			if (util_str2recno(session, *argv, &recno))
 				return (1);
 			cursor->set_key(cursor, recno);
 		} else
@@ -75,16 +75,16 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 		switch (ret = cursor->search(cursor)) {
 		case 0:
 			if ((ret = cursor->get_value(cursor, &value)) != 0)
-				return (util_cerr(uri, "get_value", ret));
+				return (util_cerr(cursor, "get_value", ret));
 			if (printf("%s\n", value) < 0)
-				return (util_err(EIO, NULL));
+				return (util_err(session, EIO, NULL));
 			break;
 		case WT_NOTFOUND:
-			(void)util_err(0, "%s: not found", *argv);
+			(void)util_err(session, 0, "%s: not found", *argv);
 			rval = 1;
 			break;
 		default:
-			return (util_cerr(uri, "search", ret));
+			return (util_cerr(cursor, "search", ret));
 		}
 	}
 

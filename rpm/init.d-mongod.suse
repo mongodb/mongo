@@ -25,8 +25,8 @@ CONFIGFILE="/etc/mongod.conf"
 OPTIONS=" -f $CONFIGFILE"
 SYSCONFIG="/etc/sysconfig/mongod"
 
-DBPATH=`awk -F= '/^dbpath[[:blank:]]*=[[:blank:]]*/{print $2}' "$CONFIGFILE"`
-PIDFILEPATH=`awk -F= '/^pidfilepath[[:blank:]]*=[[:blank:]]*/{print $2}' "$CONFIGFILE"`
+PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d "[:blank:]\"'"`
+
 mongod=${MONGOD-/usr/bin/mongod}
 
 MONGO_USER=mongod
@@ -62,7 +62,7 @@ start()
   ulimit -v unlimited
   ulimit -n 64000
   ulimit -m unlimited
-  ulimit -u 32000
+  ulimit -u 64000
 
   echo -n "Starting mongod: "
   $NUMACTL /sbin/start_daemon -u "$MONGO_USER" -p "$PIDFILEPATH" $mongod $OPTIONS >/dev/null 2>&1

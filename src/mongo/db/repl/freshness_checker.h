@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
@@ -59,7 +59,7 @@ namespace repl {
 
         class Algorithm : public ScatterGatherAlgorithm {
         public:
-            Algorithm(OpTime lastOpTimeApplied,
+            Algorithm(Timestamp lastOpTimeApplied,
                       const ReplicaSetConfig& rsConfig,
                       int selfIndex,
                       const std::vector<HostAndPort>& targets);
@@ -84,8 +84,8 @@ namespace repl {
             // Number of failed voter responses so far.
             int _failedVoterResponses;
 
-            // Last OpTime applied by the caller; used in the Fresh command 
-            const OpTime _lastOpTimeApplied;
+            // Last Timestamp applied by the caller; used in the Fresh command 
+            const Timestamp _lastOpTimeApplied;
 
             // Config to use for this check
             const ReplicaSetConfig _rsConfig;
@@ -124,7 +124,7 @@ namespace repl {
          **/
         StatusWith<ReplicationExecutor::EventHandle> start(
             ReplicationExecutor* executor,
-            const OpTime& lastOpTimeApplied,
+            const Timestamp& lastOpTimeApplied,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
             const std::vector<HostAndPort>& targets,

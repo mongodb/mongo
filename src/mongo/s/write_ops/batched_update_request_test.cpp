@@ -44,7 +44,7 @@ namespace {
     using mongo::BSONArrayBuilder;
     using mongo::BSONObj;
     using mongo::OID;
-    using mongo::OpTime;
+    using mongo::Timestamp;
 
     TEST(RoundTrip, Normal) {
         BSONArray updateArray =
@@ -65,7 +65,7 @@ namespace {
 
         // The BSON_ARRAY macro doesn't support Timestamps.
         BSONArrayBuilder arrBuilder;
-        arrBuilder.appendTimestamp(OpTime(1,1).asDate());
+        arrBuilder.append(Timestamp(1,1));
         arrBuilder.append(OID::gen());
         BSONArray shardVersionArray = arrBuilder.arr();
 

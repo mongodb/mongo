@@ -42,7 +42,6 @@
 #include <iostream>
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
@@ -241,7 +240,7 @@ namespace mongo {
     }
 
     void BenchRunState::waitForState(State awaitedState) {
-        boost::mutex::scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
 
         switch ( awaitedState ) {
         case BRS_RUNNING:
@@ -265,7 +264,7 @@ namespace mongo {
     }
 
     void BenchRunState::assertFinished() {
-        boost::mutex::scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         verify(0 == _numUnstartedWorkers + _numActiveWorkers);
     }
 
@@ -274,7 +273,7 @@ namespace mongo {
     }
 
     void BenchRunState::onWorkerStarted() {
-        boost::mutex::scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         verify( _numUnstartedWorkers > 0 );
         --_numUnstartedWorkers;
         ++_numActiveWorkers;
@@ -284,7 +283,7 @@ namespace mongo {
     }
 
     void BenchRunState::onWorkerFinished() {
-        boost::mutex::scoped_lock lk(_mutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         verify( _numActiveWorkers > 0 );
         --_numActiveWorkers;
         if (_numActiveWorkers + _numUnstartedWorkers == 0) {
@@ -377,8 +376,7 @@ namespace mongo {
                 bool check = ! e["check"].eoo();
                 if( check ){
                     if ( e["check"].type() == CodeWScope || e["check"].type() == Code || e["check"].type() == String ) {
-                        OperationContextNoop txn;
-                        scope = globalScriptEngine->getPooledScope(&txn, ns, "benchrun");
+                        scope = globalScriptEngine->getPooledScope(NULL, ns, "benchrun");
                         verify( scope.get() );
 
                         if ( e.type() == CodeWScope ) {
@@ -761,7 +759,7 @@ namespace mongo {
           _config(config) {
 
         _oid.init();
-        boost::mutex::scoped_lock lk(_staticMutex);
+        boost::lock_guard<boost::mutex> lk(_staticMutex);
          _activeRuns[_oid] = this;
      }
 
@@ -825,7 +823,7 @@ namespace mongo {
          }
 
          {
-             boost::mutex::scoped_lock lk(_staticMutex);
+             boost::lock_guard<boost::mutex> lk(_staticMutex);
              _activeRuns.erase( _oid );
          }
      }
@@ -836,7 +834,7 @@ namespace mongo {
      }
 
      BenchRunner* BenchRunner::get( OID oid ) {
-         boost::mutex::scoped_lock lk(_staticMutex);
+         boost::lock_guard<boost::mutex> lk(_staticMutex);
          return _activeRuns[ oid ];
      }
 

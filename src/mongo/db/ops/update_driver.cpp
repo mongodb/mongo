@@ -221,7 +221,7 @@ namespace mongo {
         return status;
     }
 
-    Status UpdateDriver::update(const StringData& matchedField,
+    Status UpdateDriver::update(StringData matchedField,
                                 mutablebson::Document* doc,
                                 BSONObj* logOpRec,
                                 FieldRefSet* updatedFields,

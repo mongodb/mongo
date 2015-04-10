@@ -4166,7 +4166,7 @@ namespace {
         // Hex values
         argv = std::vector<std::string>();
         argv.push_back("binaryname");
-#if !(defined(_WIN32) || defined(__sunos__))
+#if !(defined(_WIN32) || defined(__sun))
         // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
         // build, so we cannot read hex doubles from the command line on those platforms.
         // See SERVER-14131.
@@ -4185,7 +4185,7 @@ namespace {
         environment = moe::Environment();
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 
-#if !(defined(_WIN32) || defined(__sunos__))
+#if !(defined(_WIN32) || defined(__sun))
         // See SERVER-14131.
         ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
         ASSERT_OK(value.get(&doubleVal));
@@ -4317,7 +4317,7 @@ namespace {
         argv.push_back("binaryname");
         argv.push_back("--config");
         argv.push_back("config.ini");
-#if !(defined(_WIN32) || defined(__sunos__))
+#if !(defined(_WIN32) || defined(__sun))
         // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
         // build, so we cannot read hex doubles from a config file on those platforms.
         // See SERVER-14131.
@@ -4331,7 +4331,7 @@ namespace {
         environment = moe::Environment();
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 
-#if !(defined(_WIN32) || defined(__sunos__))
+#if !(defined(_WIN32) || defined(__sun))
         // See SERVER-14131.
         ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
         ASSERT_OK(value.get(&doubleVal));
@@ -4463,7 +4463,7 @@ namespace {
         argv.push_back("binaryname");
         argv.push_back("--config");
         argv.push_back("config.yaml");
-#if !(defined(_WIN32) || defined(__sunos__))
+#if !(defined(_WIN32) || defined(__sun))
         // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
         // build, so we cannot read hex doubles from a config file on those platforms.
         // See SERVER-14131.
@@ -4477,7 +4477,7 @@ namespace {
         environment = moe::Environment();
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 
-#if !(defined(_WIN32) || defined(__sunos__))
+#if !(defined(_WIN32) || defined(__sun))
         // See SERVER-14131.
         ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
         ASSERT_OK(value.get(&doubleVal));

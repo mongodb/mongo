@@ -38,7 +38,7 @@
 #include <sys/un.h>
 #include <errno.h>
 
-#ifdef __openbsd__
+#ifdef __OpenBSD__
 # include <sys/uio.h>
 #endif
 
@@ -50,6 +50,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/config.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"
@@ -57,7 +58,7 @@
 
 namespace mongo {
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
     class SSLManagerInterface;
     class SSLConnection;
 #endif
@@ -138,8 +139,6 @@ namespace mongo {
         struct sockaddr_storage sa;
         bool _isValid;
     };
-
-    extern SockAddr unknownAddress; // ( "0.0.0.0", 0 )
 
     /** this is not cache and does a syscall */
     std::string getHostName();
@@ -255,7 +254,7 @@ namespace mongo {
             return _awaitingHandshake;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         /** secures inline 
          *  ssl - Pointer to the global SSLManager.
          *  remoteHost - The hostname of the remote server.
@@ -310,7 +309,7 @@ namespace mongo {
         long long _bytesOut;
         time_t _lastValidityCheckAtSecs;
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         boost::scoped_ptr<SSLConnection> _sslConnection;
         SSLManagerInterface* _sslManager;
 #endif

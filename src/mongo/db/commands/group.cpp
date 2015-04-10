@@ -38,6 +38,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/group.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/get_executor.h"

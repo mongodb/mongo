@@ -1,14 +1,12 @@
+var shardA = MongoRunner.runMongod({shardsvr: "", nopreallocj: ""});
+var shardB = MongoRunner.runMongod({shardsvr: "", nopreallocj: ""});
+var config = MongoRunner.runMongod({configsvr: "", nopreallocj: ""});
+var mongos = MongoRunner.runMongos({configdb : "localhost:" + config.port });
 
-var shardA = startMongodEmpty("--shardsvr", "--port", 30001, "--dbpath", MongoRunner.dataDir + "/migrateBigger0", "--nopreallocj");
-var shardB = startMongodEmpty("--shardsvr", "--port", 30002, "--dbpath", MongoRunner.dataDir + "/migrateBigger1", "--nopreallocj");
-var config = startMongodEmpty("--configsvr", "--port", 29999, "--dbpath", MongoRunner.dataDir + "/migrateBiggerC", "--nopreallocj");
+var admin = mongos.getDB("admin");
 
-var mongos = startMongos({ port : 30000, configdb : "localhost:29999" })
-
-var admin = mongos.getDB("admin")
-
-admin.runCommand({ addshard : "localhost:30001" })
-admin.runCommand({ addshard : "localhost:30002" })
+admin.runCommand({ addshard : "localhost:" + shardA.port });
+admin.runCommand({ addshard : "localhost:" + shardB.port });
 
 db = mongos.getDB("test");
 var coll = db.getCollection("stuff")
@@ -67,9 +65,9 @@ assert.soon(
     } , 
     "never migrated" , 10 * 60 * 1000 , 1000 );
 
-stopMongod( 30000 );
-stopMongod( 29999 );
-stopMongod( 30001 );
-stopMongod( 30002 );
+MongoRunner.stopMongos(mongos);
+MongoRunner.stopMongod(config);
+MongoRunner.stopMongod(shardA);
+MongoRunner.stopMongod(shardB);
 
 

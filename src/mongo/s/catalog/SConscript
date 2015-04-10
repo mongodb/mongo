@@ -1,0 +1,43 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='catalog_types',
+    source=[
+        'type_changelog.cpp',
+        'type_chunk.cpp',
+        'type_shard.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
+
+env.Library(
+    target='catalog_manager',
+    source=[
+        'catalog_manager.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/s/batch_write_types',
+        '$BUILD_DIR/mongo/s/catalog/catalog_types'
+    ],
+)
+
+env.CppUnitTest(
+    target='catalog_types_test',
+    source=[
+        'type_changelog_test.cpp',
+        'type_chunk_test.cpp',
+        'type_shard_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/catalog_types'
+    ]
+)

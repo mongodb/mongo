@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
+    typedef boost::lock_guard<boost::recursive_mutex> recursive_scoped_lock;
     class ClientCursor;
     class Collection;
     class CurOp;
@@ -132,20 +132,13 @@ namespace mongo {
         }
 
         //
-        // Sharding-specific data.  TODO: Document.
-        //
-
-        void setCollMetadata( CollectionMetadataPtr metadata ){ _collMetadata = metadata; }
-        CollectionMetadataPtr getCollMetadata(){ return _collMetadata; }
-
-        //
         // Replication-related stuff.  TODO: Document and clean.
         //
 
-        void updateSlaveLocation(OperationContext* txn, CurOp& curop);
-        void slaveReadTill( const OpTime& t ) { _slaveReadTill = t; }
+        void updateSlaveLocation(OperationContext* txn);
+        void slaveReadTill( const Timestamp& t ) { _slaveReadTill = t; }
         /** Just for testing. */
-        OpTime getSlaveReadTill() const { return _slaveReadTill; }
+        Timestamp getSlaveReadTill() const { return _slaveReadTill; }
 
         //
         // Query-specific functionality that may be adapted for the PlanExecutor.
@@ -257,7 +250,7 @@ namespace mongo {
         bool _isNoTimeout;
 
         // TODO: document better.
-        OpTime _slaveReadTill;
+        Timestamp _slaveReadTill;
 
         // How long has the cursor been idle?
         int _idleAgeMillis;

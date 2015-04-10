@@ -1,0 +1,69 @@
+/**
+*    Copyright (C) 2015 MongoDB Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*
+*    As a special exception, the copyright holders give permission to link the
+*    code of portions of this program with the OpenSSL library under certain
+*    conditions as described in each individual source file and distribute
+*    linked combinations including the program with the OpenSSL library. You
+*    must comply with the GNU Affero General Public License in all respects for
+*    all of the code used other than as permitted herein. If you modify file(s)
+*    with this exception, you may extend this exception to your version of the
+*    file(s), but you are not obligated to do so. If you do not wish to do so,
+*    delete this exception statement from your version. If you delete this
+*    exception statement from all source files in the program, then also delete
+*    it in the license file.
+*/
+
+#pragma once
+
+// Define to target byte order (1234 vs 4321)
+@mongo_config_byte_order@
+
+// Define if building a debug build
+@mongo_config_debug_build@
+
+// Defined if __declspec(thread) is available
+@mongo_config_have___declspec_thread@
+
+// Defined if GCC thread-local storage is available
+@mongo_config_have___thread@
+
+// Defined if execinfo.h and backtrace are available
+@mongo_config_have_execinfo_backtrace@
+
+// Defined if unitstd.h is available
+@mongo_config_have_header_unistd_h@
+
+// Defined if a POSIX monotonic clock is available
+@mongo_config_have_posix_monotonic_clock@
+
+// Defined if std::is_trivially_copyable is available
+@mongo_config_have_std_is_trivially_copyable@
+
+// Defined if std::make_unique is available
+@mongo_config_have_std_make_unique@
+
+// Defined if building an optimized build
+@mongo_config_optimized_build@
+
+// Defined if SSL support is enabled
+@mongo_config_ssl@
+
+// Defined if SSL FIPS mode is enabled
+@mongo_config_ssl_fips@
+
+// Defined if gdbserver support is enabled
+@mongo_config_use_gdbserver@
+

@@ -53,6 +53,7 @@
 #include <snappy.h>
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/atomic_word.h"
@@ -90,7 +91,7 @@ namespace mongo {
 
         template<typename Data, typename Comparator>
         void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
-#if defined(_DEBUG) && !defined(_MSC_VER)
+#if defined(MONGO_CONFIG_DEBUG_BUILD) && !defined(_MSC_VER)
             // MSVC++ already does similar verification in debug mode in addition to using
             // algorithms that do more comparisons. Doing our own verification in addition makes
             // debug builds considerably slower without any additional safety.

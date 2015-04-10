@@ -2,12 +2,9 @@
 
 if ( 0 ) { // SERVER-3420
 
-port = allocatePorts( 1 )[ 0 ];
-
 baseName = "jstests_disk_quota2";
-dbpath = MongoRunner.dataPath + baseName;
 
-m = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--quotaFiles", "2", "--smallfiles" );
+var m = MongoRunner.runMongod({quotaFiles: 2, smallfiles: ""});
 db = m.getDB( baseName );
 
 big = new Array( 10000 ).toString();
@@ -29,7 +26,8 @@ for( i = 0; i < n; ++i ) {
     c = db[ ''+i ];
     res = c.insert({ b: big });
     if( !res.hasWriteError() ) {
-        assert.eq( 0, c.find()._addSpecial( "$showDiskLoc", true )[ 0 ].$diskLoc.file );
+        var recordId = c.find().showRecord()[0].$recordId;
+        assert.eq(0, recordId >> 32);
     }
 }
 

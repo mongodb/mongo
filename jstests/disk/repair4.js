@@ -39,6 +39,6 @@ if ( doIt ) {
     }
     
     check();
-    stopMongod( port );
+    MongoRunner.stopMongod( port );
 
 }

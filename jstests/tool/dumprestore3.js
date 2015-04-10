@@ -30,8 +30,7 @@ var master = replTest.getMaster();
 
 {
     step("dump & restore a db into a slave");
-    var port = 30020;
-    var conn = startMongodTest(port, name + "-other");
+    var conn = MongoRunner.runMongod({});
     var c = conn.getDB("foo").bar;
     c.save({ a: 22 });
     assert.eq(1, c.count(), "setup2");
@@ -41,7 +40,7 @@ step("try mongorestore to slave");
 
 var data = MongoRunner.dataDir + "/dumprestore3-other1/";
 resetDbpath(data);
-runMongoProgram( "mongodump", "--host", "127.0.0.1:"+port, "--out", data );
+runMongoProgram( "mongodump", "--host", "127.0.0.1:"+conn.port, "--out", data );
 
 var x = runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+replTest.ports[1], "--dir", data );
 assert.neq(x, 0, "mongorestore should exit w/ 1 on slave");
@@ -49,7 +48,7 @@ assert.neq(x, 0, "mongorestore should exit w/ 1 on slave");
 step("try mongoimport to slave");
 
 dataFile = MongoRunner.dataDir + "/dumprestore3-other2.json";
-runMongoProgram( "mongoexport", "--host", "127.0.0.1:"+port, "--out", dataFile, "--db", "foo", "--collection", "bar" );
+runMongoProgram( "mongoexport", "--host", "127.0.0.1:"+conn.port, "--out", dataFile, "--db", "foo", "--collection", "bar" );
 
 x = runMongoProgram( "mongoimport", "--host", "127.0.0.1:"+replTest.ports[1], "--file", dataFile );
 assert.neq(x, 0, "mongoreimport should exit w/ 1 on slave");

@@ -34,7 +34,7 @@ namespace mutablebson {
         return findNthChild(n);
     }
 
-    inline Element Element::operator[](const StringData& name) const {
+    inline Element Element::operator[](StringData name) const {
         return findFirstChildNamed(name);
     }
 
@@ -91,9 +91,9 @@ namespace mutablebson {
         return getValue()._numberInt();
     }
 
-    inline OpTime Element::getValueTimestamp() const {
-        dassert(hasValue() && isType(mongo::Timestamp));
-        return getValue()._opTime();
+    inline Timestamp Element::getValueTimestamp() const {
+        dassert(hasValue() && isType(mongo::bsonTimestamp));
+        return getValue().timestamp();
     }
 
     inline int64_t Element::getValueLong() const {

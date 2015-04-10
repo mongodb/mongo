@@ -53,8 +53,8 @@ namespace mongo {
     class MMAPV1DatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
         MMAPV1DatabaseCatalogEntry( OperationContext* txn,
-                                    const StringData& name,
-                                    const StringData& path,
+                                    StringData name,
+                                    StringData path,
                                     bool directoryperdb,
                                     bool transient );
 
@@ -83,15 +83,15 @@ namespace mongo {
                                        double scale ) const;
 
         Status createCollection( OperationContext* txn,
-                                 const StringData& ns,
+                                 StringData ns,
                                  const CollectionOptions& options,
                                  bool allocateDefaultSpace );
 
-        Status dropCollection( OperationContext* txn, const StringData& ns );
+        Status dropCollection( OperationContext* txn, StringData ns );
 
         Status renameCollection( OperationContext* txn,
-                                 const StringData& fromNS,
-                                 const StringData& toNS,
+                                 StringData fromNS,
+                                 StringData toNS,
                                  bool stayTemp );
 
         void getCollectionNamespaces( std::list<std::string>* tofill ) const;
@@ -99,9 +99,9 @@ namespace mongo {
         /**
          * will return NULL if ns does not exist
          */
-        CollectionCatalogEntry* getCollectionCatalogEntry( const StringData& ns ) const;
+        CollectionCatalogEntry* getCollectionCatalogEntry( StringData ns ) const;
 
-        RecordStore* getRecordStore( const StringData& ns ) const;
+        RecordStore* getRecordStore( StringData ns ) const;
 
         IndexAccessMethod* getIndex( OperationContext* txn,
                                      const CollectionCatalogEntry* collection,
@@ -111,13 +111,13 @@ namespace mongo {
         MmapV1ExtentManager* getExtentManager() { return &_extentManager; }
 
         CollectionOptions getCollectionOptions( OperationContext* txn,
-                                                const StringData& ns ) const;
+                                                StringData ns ) const;
 
         /**
          * Creates a CollectionCatalogEntry in the for an index rather than a collection. MMAPv1
          * puts both indexes and collections into CCEs. A namespace named 'name' must not exist.
          */
-        void createNamespaceForIndex(OperationContext* txn, const StringData& name);
+        void createNamespaceForIndex(OperationContext* txn, StringData name);
 
     private:
         class EntryInsertion;
@@ -145,33 +145,33 @@ namespace mongo {
 
         RecordStoreV1Base* _getIndexRecordStore();
         RecordStoreV1Base* _getNamespaceRecordStore() const;
-        RecordStoreV1Base* _getRecordStore(const StringData& ns) const;
+        RecordStoreV1Base* _getRecordStore(StringData ns) const;
 
         void _addNamespaceToNamespaceCollection(OperationContext* txn,
-                                                const StringData& ns,
+                                                StringData ns,
                                                 const BSONObj* options);
 
-        void _removeNamespaceFromNamespaceCollection(OperationContext* txn, const StringData& ns);
+        void _removeNamespaceFromNamespaceCollection(OperationContext* txn, StringData ns);
 
         Status _renameSingleNamespace( OperationContext* txn,
-                                       const StringData& fromNS,
-                                       const StringData& toNS,
+                                       StringData fromNS,
+                                       StringData toNS,
                                        bool stayTemp );
 
-        void _ensureSystemCollection(OperationContext* txn, const StringData& ns);
+        void _ensureSystemCollection(OperationContext* txn, StringData ns);
 
         void _init( OperationContext* txn );
 
         /**
          * Populate the _collections cache.
          */
-        void _insertInCache(OperationContext* opCtx, const StringData& ns, Entry* entry);
+        void _insertInCache(OperationContext* opCtx, StringData ns, Entry* entry);
 
         /**
          * Drop cached information for specified namespace. If a RecoveryUnit is specified,
          * use it to allow rollback. When ru is null, removal is unconditional.
          */
-        void _removeFromCache(RecoveryUnit* ru, const StringData& ns);
+        void _removeFromCache(RecoveryUnit* ru, StringData ns);
 
 
         const std::string _path;

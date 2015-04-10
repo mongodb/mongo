@@ -58,12 +58,12 @@ namespace mongo {
          * Calling on a non-created ident is invalid and may crash.
          */
         virtual RecordStore* getRecordStore( OperationContext* opCtx,
-                                             const StringData& ns,
-                                             const StringData& ident,
+                                             StringData ns,
+                                             StringData ident,
                                              const CollectionOptions& options ) = 0;
 
         virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             const StringData& ident,
+                                                             StringData ident,
                                                              const IndexDescriptor* desc ) = 0;
 
         //
@@ -75,22 +75,22 @@ namespace mongo {
         //
 
         virtual Status createRecordStore( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
+                                          StringData ns,
+                                          StringData ident,
                                           const CollectionOptions& options ) = 0;
 
         virtual Status createSortedDataInterface( OperationContext* opCtx,
-                                                  const StringData& ident,
+                                                  StringData ident,
                                                   const IndexDescriptor* desc ) = 0;
 
         virtual int64_t getIdentSize( OperationContext* opCtx,
-                                      const StringData& ident ) = 0;
+                                      StringData ident ) = 0;
 
         virtual Status repairIdent( OperationContext* opCtx,
-                                    const StringData& ident ) = 0;
+                                    StringData ident ) = 0;
 
         virtual Status dropIdent( OperationContext* opCtx,
-                                  const StringData& ident ) = 0;
+                                  StringData ident ) = 0;
 
         // optional
         virtual int flushAllFiles( bool sync ) { return 0; }
@@ -110,14 +110,14 @@ namespace mongo {
         virtual bool supportsDirectoryPerDB() const = 0;
 
         virtual Status okToRename( OperationContext* opCtx,
-                                   const StringData& fromNS,
-                                   const StringData& toNS,
-                                   const StringData& ident,
+                                   StringData fromNS,
+                                   StringData toNS,
+                                   StringData ident,
                                    const RecordStore* originalRecordStore ) const {
             return Status::OK();
         }
 
-        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const = 0;
+        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const = 0;
 
         virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const = 0;
 

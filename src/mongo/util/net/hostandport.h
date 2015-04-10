@@ -51,7 +51,7 @@ namespace mongo {
          * Parses "text" to produce a HostAndPort.  Returns either that or an error
          * status describing the parse failure.
          */
-        static StatusWith<HostAndPort> parse(const StringData& text);
+        static StatusWith<HostAndPort> parse(StringData text);
 
         /**
          * Construct an empty/invalid HostAndPort.
@@ -62,7 +62,7 @@ namespace mongo {
          * Constructs a HostAndPort by parsing "text" of the form hostname[:portnumber]
          * Throws an AssertionException if bad config std::string or bad port #.
          */
-        explicit HostAndPort(const StringData& text);
+        explicit HostAndPort(StringData text);
 
         /**
          * Constructs a HostAndPort with the hostname "h" and port "p".
@@ -77,7 +77,7 @@ namespace mongo {
          * after initialize() returns a non-OK status, though it is safe to
          * assign to it or re-initialize it.
          */
-        Status initialize(const StringData& s);
+        Status initialize(StringData s);
 
         bool operator<(const HostAndPort& r) const;
         bool operator==(const HostAndPort& r) const;

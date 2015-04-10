@@ -45,7 +45,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 
@@ -72,7 +71,7 @@ namespace mongo {
 
         virtual void help( stringstream &help ) const {
             help << "clone this database from an instance of the db on another host\n";
-            help << "{ clone : \"host13\" }";
+            help << "{clone: \"host13\"[, slaveOk: <bool>]}";
         }
 
         virtual Status checkAuthForCommand(ClientBasic* client,
@@ -103,6 +102,7 @@ namespace mongo {
             CloneOptions opts;
             opts.fromDB = dbname;
             opts.logForRepl = ! fromRepl;
+            opts.slaveOk = cmdObj["slaveOk"].trueValue();
 
             // See if there's any collections we should ignore
             if( cmdObj["collsToIgnore"].type() == Array ){

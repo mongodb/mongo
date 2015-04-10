@@ -833,7 +833,17 @@ populate_thread(void *arg)
 		if (cfg->random_value)
 			randomize_value(thread, value_buf);
 		cursor->set_value(cursor, value_buf);
-		if ((ret = cursor->insert(cursor)) != 0) {
+		if ((ret = cursor->insert(cursor)) == WT_ROLLBACK) {
+			lprintf(cfg, ret, 0, "insert retrying");
+			if ((ret = session->rollback_transaction(
+			    session, NULL)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Failed rollback_transaction");
+				goto err;
+			}
+			intxn = 0;
+			continue;
+		} else if (ret != 0) {
 			lprintf(cfg, ret, 0, "Failed inserting");
 			goto err;
 		}

@@ -47,9 +47,10 @@ namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
     class Client;
+    class CurOp;
     class Database;
-    class Timer;
     class OperationContext;
+    class Timer;
 
 namespace mutablebson {
     class Document;
@@ -242,10 +243,6 @@ namespace mutablebson {
         ServerStatusMetricField<Counter64> _commandsFailedMetric;
 
     public:
-        // Stops all index builds required to run this command and returns index builds killed.
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db, 
-                                                     const BSONObj& cmdObj);
 
         static const CommandMap* commandsByBestName() { return _commandsByBestName; }
         static const CommandMap* webCommands() { return _webCommands; }
@@ -258,7 +255,7 @@ namespace mutablebson {
                                          BSONObj& jsobj,
                                          BSONObjBuilder& anObjBuilder,
                                          int queryOptions = 0);
-        static Command* findCommand( const StringData& name );
+        static Command* findCommand( StringData name );
         // For mongod and webserver.
         static void execCommand(OperationContext* txn,
                                 Command* c,
@@ -315,6 +312,24 @@ namespace mutablebson {
                                                BSONArray firstBatch,
                                                BSONObjBuilder* builder);
 
+        /**
+         * Builds a getMore response object from the provided cursor identifiers and "nextBatch",
+         * and appends the response object to the provided builder under the field name "cursor".
+         *
+         * The response object has the following format:
+         *   { id: <NumberLong>, ns: <String>, nextBatch: <Array> }.
+         */
+        static void appendGetMoreResponseObject(long long cursorId,
+                                                StringData cursorNamespace,
+                                                BSONArray nextBatch,
+                                                BSONObjBuilder* builder);
+
+        /**
+         * Helper for setting a writeConcernError field in the command result object if
+         * a writeConcern error occurs.
+         */
+        static void appendCommandWCStatus(BSONObjBuilder& result, const Status& status);
+
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;
 
@@ -341,10 +356,18 @@ namespace mutablebson {
 
     bool _runCommands(OperationContext* txn,
                       const char* ns,
-                      BSONObj& jsobj,
+                      BSONObj& _cmdobj,
                       BufBuilder& b,
                       BSONObjBuilder& anObjBuilder,
-                      bool fromRepl,
-                      int queryOptions);
+                      bool fromRepl, int queryOptions);
+
+    bool runCommands(OperationContext* txn,
+                     const char* ns,
+                     BSONObj& jsobj,
+                     CurOp& curop,
+                     BufBuilder& b,
+                     BSONObjBuilder& anObjBuilder,
+                     bool fromRepl,
+                     int queryOptions);
 
 } // namespace mongo

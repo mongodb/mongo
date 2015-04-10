@@ -27,7 +27,6 @@
 
 #include <boost/scoped_array.hpp>
 
-#include "mongo/client/export_macros.h"
 #include "mongo/client/sasl_client_session.h"
 
 #include <sasl/sasl.h>
@@ -38,7 +37,7 @@ namespace mongo {
      * Implementation of the client side of a SASL authentication conversation.
      * using the Cyrus SASL library.
      */
-    class MONGO_CLIENT_API CyrusSaslClientSession : public SaslClientSession {
+    class CyrusSaslClientSession : public SaslClientSession {
         MONGO_DISALLOW_COPYING(CyrusSaslClientSession);
     public:
 
@@ -48,7 +47,7 @@ namespace mongo {
         /**
          * Overriding to store the password data in sasl_secret_t format
          */
-        virtual void setParameter(Parameter id, const StringData& value);
+        virtual void setParameter(Parameter id, StringData value);
 
         /**
          * Returns the value of the parameterPassword parameter in the form of a sasl_secret_t, used
@@ -60,7 +59,7 @@ namespace mongo {
 
         virtual Status initialize();
 
-        virtual Status step(const StringData& inputData, std::string* outputData);
+        virtual Status step(StringData inputData, std::string* outputData);
 
         virtual bool isDone() const { return _done; }
 

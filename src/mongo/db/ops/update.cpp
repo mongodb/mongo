@@ -36,16 +36,17 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/log.h"
@@ -77,24 +78,19 @@ namespace mongo {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 
-            if (!request.isFromReplication() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                nsString.db())) {
+            bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db());
+
+            if (userInitiatedWritesAndNotPrimary) {
                 uassertStatusOK(Status(ErrorCodes::NotMaster, str::stream()
                     << "Not primary while creating collection " << nsString.ns()
                     << " during upsert"));
             }
 
             WriteUnitOfWork wuow(txn);
-            collection = db->createCollection(txn, nsString.ns());
+            collection = db->createCollection(txn, nsString.ns(), CollectionOptions());
             invariant(collection);
 
-            if (!request.isFromReplication()) {
-                repl::logOp(txn,
-                            "c",
-                            (db->name() + ".$cmd").c_str(),
-                            BSON("create" << (nsString.coll())));
-            }
             wuow.commit();
         }
 

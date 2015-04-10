@@ -69,6 +69,13 @@ namespace mongo {
         static const long long kCollectionScanOnCreationThreshold;
 
         /**
+         * Parses collections options for wired tiger configuration string for table creation.
+         * The document 'options' is typically obtained from the 'wiredTiger' field of
+         * CollectionOptions::storageEngine.
+         */
+        static StatusWith<std::string> parseOptionsField(const BSONObj options);
+
+        /**
          * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
          * Configuration string is constructed from:
          *     built-in defaults
@@ -79,13 +86,13 @@ namespace mongo {
          * Note that even if this function returns an OK status, WT_SESSION:create() may still
          * fail with the constructed configuration string.
          */
-        static StatusWith<std::string> generateCreateString(const StringData& ns,
+        static StatusWith<std::string> generateCreateString(StringData ns,
                                                             const CollectionOptions &options,
-                                                            const StringData& extraStrings);
+                                                            StringData extraStrings);
 
         WiredTigerRecordStore(OperationContext* txn,
-                              const StringData& ns,
-                              const StringData& uri,
+                              StringData ns,
+                              StringData uri,
                               bool isCapped = false,
                               int64_t cappedMaxSize = -1,
                               int64_t cappedMaxDocs = -1,
@@ -167,10 +174,6 @@ namespace mongo {
                                         BSONObjBuilder* result,
                                         double scale ) const;
 
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL );
-
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
                                               RecordId end,
                                               bool inclusive);
@@ -179,7 +182,7 @@ namespace mongo {
                                                          const RecordId& startingPosition) const;
 
         virtual Status oplogDiskLocRegister( OperationContext* txn,
-                                             const OpTime& opTime );
+                                             const Timestamp& opTime );
 
         virtual void updateStatsAfterRepair(OperationContext* txn,
                                             long long numRecords,

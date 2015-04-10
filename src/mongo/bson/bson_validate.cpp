@@ -29,6 +29,7 @@
 
 #include <cstring>
 #include <deque>
+#include <limits>
 
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_validate.h"
@@ -89,6 +90,11 @@ namespace mongo {
                 int sz;
                 if ( !readNumber<int>( &sz ) )
                     return makeError("invalid bson", _idElem);
+
+                if ( sz <= 0 ) {
+                    // must have NULL at the very least
+                    return makeError("invalid bson", _idElem);
+                }
 
                 if ( out ) {
                     *out = StringData( _buffer + _position, sz );
@@ -214,7 +220,7 @@ namespace mongo {
 
             case NumberDouble:
             case NumberLong:
-            case Timestamp:
+            case bsonTimestamp:
             case Date:
                 if ( !buffer->skip( sizeof(int64_t) ) )
                     return makeError("invalid bson", idElem);
@@ -249,6 +255,8 @@ namespace mongo {
                 int sz;
                 if ( !buffer->readNumber<int>( &sz ) )
                     return makeError("invalid bson", idElem);
+                if ( sz < 0 || sz == std::numeric_limits<int>::max() )
+                    return makeError("invalid size in bson", idElem);
                 if ( !buffer->skip( 1 + sz ) )
                     return makeError("invalid bson", idElem);
                 return Status::OK();

@@ -40,10 +40,13 @@ assert(found, "found test.test in collection infos");
 
 // storageEngine in collection options must:
 // - be a document
-// - contain at least one field of document type with the name of a registered storage engine.
+// - all fields of the document:
+// -- must have names that are registered storage engines
+// -- must be objects
 db.getCollection('test').drop();
 var storageEngineName = db.serverStatus().storageEngine.name;
-assert.commandFailed(db.createCollection('test', {storageEngine: {}}));
+assert.commandFailed(db.createCollection('test', {storageEngine: 'not a document'}));
+assert.commandWorked(db.createCollection('test', {storageEngine: {}}));
 assert.commandFailed(db.createCollection('test', {storageEngine: {unknownStorageEngine: {}}}));
 var invalidStorageEngineOptions = {}
 invalidStorageEngineOptions[storageEngineName] = 12345;

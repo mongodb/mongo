@@ -37,7 +37,7 @@ namespace mongo {
     typedef StringData::Hasher StringMapDefaultHash;
 
     struct StringMapDefaultEqual {
-        bool operator()( const StringData& a, const StringData& b ) const {
+        bool operator()( StringData a, StringData b ) const {
             return a == b;
         }
     };
@@ -49,7 +49,7 @@ namespace mongo {
     };
 
     struct StringMapDefaultConvertorOther {
-        std::string operator()( const StringData& s ) const {
+        std::string operator()( StringData s ) const {
             return s.toString();
         }
     };

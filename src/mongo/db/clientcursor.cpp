@@ -44,10 +44,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/exit.h"
 
 namespace mongo {
@@ -68,6 +69,8 @@ namespace mongo {
                                                                          &cursorStatsOpenNoTimeout );
     static ServerStatusMetricField<Counter64> dCursorStatusTimedout( "cursor.timedOut",
                                                                      &cursorStatsTimedOut );
+
+    MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis, int, 10 * 60 * 1000 /* 10 minutes */);
 
     long long ClientCursor::totalOpen() {
         return cursorStatsOpen.get();
@@ -171,22 +174,22 @@ namespace mongo {
         if (_isNoTimeout || _isPinned) {
             return false;
         }
-        return _idleAgeMillis > 600000;
+        return _idleAgeMillis > cursorTimeoutMillis;
     }
 
     void ClientCursor::setIdleTime( int millis ) {
         _idleAgeMillis = millis;
     }
 
-    void ClientCursor::updateSlaveLocation(OperationContext* txn, CurOp& curop) {
+    void ClientCursor::updateSlaveLocation(OperationContext* txn) {
         if (_slaveReadTill.isNull())
             return;
 
         verify(str::startsWith(_ns.c_str(), "local.oplog."));
 
-        Client* c = curop.getClient();
+        Client* c = txn->getClient();
         verify(c);
-        OID rid = c->getRemoteID();
+        OID rid = repl::ReplClientInfo::forClient(c).getRemoteID();
         if (!rid.isSet())
             return;
 
@@ -323,7 +326,7 @@ namespace mongo {
     // TODO: remove this for 3.0
     class CmdCursorInfo : public Command {
     public:
-        CmdCursorInfo() : Command( "cursorInfo", true ) {}
+        CmdCursorInfo() : Command( "cursorInfo" ) {}
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }, deprecated";

@@ -90,13 +90,13 @@ namespace {
 
         builder->append(kOkFieldName, 1.0);
         if (_opTimeSet) {
-            builder->appendDate(kOpTimeFieldName, _opTime.asDate());
+            builder->appendDate(kOpTimeFieldName, _opTime.asULL());
         }
         if (_timeSet) {
             *builder << kTimeFieldName << _time.total_seconds();
         }
         if (_electionTimeSet) {
-            builder->appendDate(kElectionTimeFieldName, _electionTime.asDate());
+            builder->appendDate(kElectionTimeFieldName, _electionTime.asULL());
         }
         if (_configSet) {
             *builder << kConfigFieldName << _config.toBSON();
@@ -178,13 +178,13 @@ namespace {
         if (electionTimeElement.eoo()) {
             _electionTimeSet = false;
         }
-        else if (electionTimeElement.type() == Timestamp) {
+        else if (electionTimeElement.type() == bsonTimestamp) {
             _electionTimeSet = true;
-            _electionTime = electionTimeElement._opTime();
+            _electionTime = electionTimeElement.timestamp();
         }
         else if (electionTimeElement.type() == Date) {
             _electionTimeSet = true;
-            _electionTime = OpTime(electionTimeElement.date());
+            _electionTime = Timestamp(electionTimeElement.date());
         }
         else {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
@@ -212,13 +212,13 @@ namespace {
         if (opTimeElement.eoo()) {
             _opTimeSet = false;
         }
-        else if (opTimeElement.type() == Timestamp) {
+        else if (opTimeElement.type() == bsonTimestamp) {
             _opTimeSet = true;
-            _opTime = opTimeElement._opTime();
+            _opTime = opTimeElement.timestamp();
         }
         else if (opTimeElement.type() == Date) {
             _opTimeSet = true;
-            _opTime = OpTime(opTimeElement.date());
+            _opTime = Timestamp(opTimeElement.date());
         }
         else {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
@@ -329,7 +329,7 @@ namespace {
         return _state;
     }
 
-    OpTime ReplSetHeartbeatResponse::getElectionTime() const {
+    Timestamp ReplSetHeartbeatResponse::getElectionTime() const {
         invariant(_electionTimeSet);
         return _electionTime;
     }
@@ -344,7 +344,7 @@ namespace {
         return _time;
     }
 
-    OpTime ReplSetHeartbeatResponse::getOpTime() const {
+    Timestamp ReplSetHeartbeatResponse::getOpTime() const {
         invariant(_opTimeSet);
         return _opTime;
     }

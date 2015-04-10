@@ -22,9 +22,9 @@ assert( !s.admin.runCommand( { removeshard: "shard0001" } ).ok , "allowed removi
 assert.isnull( s.config.databases.findOne({_id: 'local'}), 'should have removed local db');
 
 // should create a shard0002 shard
-conn = startMongodTest( 29000 );
-assert( s.admin.runCommand( { addshard: "localhost:29000" } ).ok, "failed to add shard" );
+var conn = MongoRunner.runMongod({});
+assert( s.admin.runCommand( { addshard: conn.host } ).ok, "failed to add shard" );
 assert.eq( 2, s.config.shards.count(), "new server does not appear in count" );
 
-stopMongod( 29000 );
+MongoRunner.stopMongod(conn);
 s.stop();

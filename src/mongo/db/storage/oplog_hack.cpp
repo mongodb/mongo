@@ -34,7 +34,7 @@
 #include <limits>
 
 #include "mongo/bson/bson_validate.h"
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/debug_util.h"
@@ -42,7 +42,7 @@
 namespace mongo {
 namespace oploghack {
 
-    StatusWith<RecordId> keyForOptime(const OpTime& opTime) {
+    StatusWith<RecordId> keyForOptime(const Timestamp& opTime) {
         // Make sure secs and inc wouldn't be negative if treated as signed. This ensures that they
         // don't sort differently when put in a RecordId. It also avoids issues with Null/Invalid
         // RecordIds
@@ -71,10 +71,10 @@ namespace oploghack {
         const BSONElement elem = obj["ts"];
         if (elem.eoo())
             return StatusWith<RecordId>(ErrorCodes::BadValue, "no ts field");
-        if (elem.type() != Timestamp)
+        if (elem.type() != bsonTimestamp)
             return StatusWith<RecordId>(ErrorCodes::BadValue, "ts must be a Timestamp");
 
-        return keyForOptime(elem._opTime());
+        return keyForOptime(elem.timestamp());
     }
 
 }  // namespace oploghack

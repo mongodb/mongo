@@ -31,8 +31,8 @@
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
-#include "mongo/bson/bson_field.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/chunk_version.h"
 
@@ -64,7 +64,7 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setShardName(const StringData& shardName);
+        void setShardName(StringData shardName);
         void unsetShardName();
         bool isShardNameSet() const;
         const std::string& getShardName() const;

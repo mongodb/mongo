@@ -31,9 +31,11 @@
 
 #include "mongo/util/timer.h"
 
+#include "mongo/config.h"
+
 #include <ctime>
 #include <limits>
-#if defined(MONGO_HAVE_HEADER_UNISTD_H)
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -86,7 +88,7 @@ namespace mongo {
             _timerNow = &timerNowWindows;
         }
 
-#elif defined(MONGO_HAVE_POSIX_MONOTONIC_CLOCK)
+#elif defined(MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK)
 
         /**
          * Implementation for timer on systems that support the

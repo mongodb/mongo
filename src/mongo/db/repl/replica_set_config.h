@@ -52,12 +52,8 @@ namespace repl {
     public:
         typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
-        static const std::string kIdFieldName;
         static const std::string kVersionFieldName;
-        static const std::string kMembersFieldName;
-        static const std::string kSettingsFieldName;
         static const std::string kMajorityWriteConcernModeName;
-        static const std::string kStepDownCheckWriteConcernModeName;
 
         static const size_t kMaxMembers = 50;
         static const size_t kMaxVotingMembers = 7;
@@ -181,14 +177,14 @@ namespace repl {
          * Returns a ReplicaSetTag with the given "key" and "value", or an invalid
          * tag if the configuration describes no such tag.
          */
-        ReplicaSetTag findTag(const StringData& key, const StringData& value) const;
+        ReplicaSetTag findTag(StringData key, StringData value) const;
 
         /**
          * Returns the pattern corresponding to "patternName" in this configuration.
          * If "patternName" is not a valid pattern in this configuration, returns
          * ErrorCodes::NoSuchKey.
          */
-        StatusWith<ReplicaSetTagPattern> findCustomWriteMode(const StringData& patternName) const;
+        StatusWith<ReplicaSetTagPattern> findCustomWriteMode(StringData patternName) const;
 
         /**
          * Returns the "tags configuration" for this replicaset.
@@ -213,6 +209,14 @@ namespace repl {
          * in order to satisfy a write concern of {w: "majority"}.
          */
         int getWriteMajority() const { return _writeMajority; }
+
+        /**
+         * Gets the protocol version for this configuration.
+         *
+         * The protocol version number currently determines what election protocol is used by the
+         * cluster; 0 is the default and indicates the old 3.0 election protocol.
+         */
+        long long getProtocolVersion() const { return _protocolVersion; }
 
     private:
         /**
@@ -242,6 +246,7 @@ namespace repl {
         int _totalVotingMembers;
         ReplicaSetTagConfig _tagConfig;
         StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
+        long long _protocolVersion;
     };
 
 

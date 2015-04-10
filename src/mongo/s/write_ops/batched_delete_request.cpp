@@ -183,7 +183,7 @@ namespace mongo {
         return toBSON().toString();
     }
     
-    void BatchedDeleteRequest::setCollName(const StringData& collName) {
+    void BatchedDeleteRequest::setCollName(StringData collName) {
         _collName = NamespaceString(collName);
         _isCollNameSet = true;
     }

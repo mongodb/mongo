@@ -52,21 +52,16 @@ admin_s1.runCommand({replSetFreeze:999999});
 
 
 print("6. Bring up #3");
-var ports = allocatePorts( 3 );
-var basePath = MongoRunner.dataPath + basename;
 var hostname = getHostName();
 
-var slave2 = startMongodTest (ports[2],
-                              basename,
-                              false,
-                              Object.merge({replSet : basename, oplogSize : 2}, x509_options2));
+var slave2 = MongoRunner.runMongod(Object.merge({replSet: basename, oplogSize: 2}, x509_options2));
 
 var local_s2 = slave2.getDB("local");
 var admin_s2 = slave2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
 config.version = 2;
-config.members.push({_id:2, host:hostname+":"+ports[2]});
+config.members.push({_id:2, host:hostname+":"+slave2.port});
 try {
   admin.runCommand({replSetReconfig:config});
 }
@@ -130,5 +125,5 @@ assert.writeOK(bulk.execute());
 print("11. Everyone happy eventually");
 replTest.awaitReplication(300000);
 
-stopMongod(ports[2]);
+MongoRunner.stopMongod(slave2);
 replTest.stopSet();

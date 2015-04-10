@@ -32,7 +32,7 @@
 
 #include <string>
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
@@ -109,7 +109,7 @@ namespace {
     }
 
 
-    Lock::DBLock::DBLock(Locker* locker, const StringData& db, LockMode mode)
+    Lock::DBLock::DBLock(Locker* locker, StringData db, LockMode mode)
         : _id(RESOURCE_DATABASE, db),
           _locker(locker),
           _mode(mode),
@@ -158,7 +158,7 @@ namespace {
 
 
     Lock::CollectionLock::CollectionLock(Locker* lockState,
-                                         const StringData& ns,
+                                         StringData ns,
                                          LockMode mode)
         : _id(RESOURCE_COLLECTION, ns),
           _lockState(lockState) {

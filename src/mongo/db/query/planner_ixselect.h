@@ -46,7 +46,9 @@ namespace mongo {
          * The 'prefix' argument is a path prefix to be prepended to any fields mentioned in
          * predicates encountered.  Some array operators specify a path prefix.
          */
-        static void getFields(MatchExpression* node, std::string prefix, unordered_set<std::string>* out);
+        static void getFields(const MatchExpression* node,
+                              std::string prefix,
+                              unordered_set<std::string>* out);
 
         /**
          * Find all indices prefixed by fields we have predicates over.  Only these indices are

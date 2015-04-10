@@ -39,7 +39,6 @@
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -80,6 +79,10 @@ namespace mongo {
                     continue;
                 else
                     return r;
+            case 's':
+                // Single-line mode specified. This just changes the behavior of the '.'
+                // character to match every character instead of every character except '\n'.
+                continue;
             case 'x': // extended
                 extended = true;
                 break;

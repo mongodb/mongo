@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/util/time_support.h"
@@ -54,11 +54,11 @@ namespace repl {
         }
         const std::string& getLastHeartbeatMsg() const { return _lastResponse.getHbMsg(); }
         const std::string& getSyncSource() const { return _lastResponse.getSyncingTo(); }
-        OpTime getOpTime() const { return _lastResponse.getOpTime(); }
+        Timestamp getOpTime() const { return _lastResponse.getOpTime(); }
         int getConfigVersion() const { return _lastResponse.getVersion(); }
         bool hasAuthIssue() const { return _authIssue; }
 
-        OpTime getElectionTime() const { return _lastResponse.getElectionTime(); }
+        Timestamp getElectionTime() const { return _lastResponse.getElectionTime(); }
 
         // Returns true if the last heartbeat data explicilty stated that the node
         // is not electable.

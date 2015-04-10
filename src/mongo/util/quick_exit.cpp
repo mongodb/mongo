@@ -28,7 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
-#if defined(MONGO_HAVE_HEADER_UNISTD_H)
+#include "mongo/config.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -43,9 +45,16 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
+#ifdef MONGO_GCOV
+extern "C" void __gcov_flush();
+#endif
+
 namespace mongo {
 
     void quickExit(int code) {
+#ifdef MONGO_GCOV
+        __gcov_flush();
+#endif
 
 #if __has_feature(address_sanitizer)
         __lsan_do_leak_check();

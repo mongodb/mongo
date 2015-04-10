@@ -43,70 +43,6 @@ namespace mongo {
      */
     class LiteParsedQuery {
     public:
-
-        /**
-         * Encapsulates various options that can be passed in order to affect the behavior
-         * of a query beyond the basic query specification (filter, sort, projection, skip, limit,
-         * batchSize).
-         */
-        struct Options {
-
-            Options();
-
-            /**
-             * Fills in the LiteParsedQuery::Options* 'out' by parsing the BSON format,
-             * 'optionsObj'.
-             */
-            static Status parseFromBSON(const BSONObj& optionsObj, Options* out);
-
-            /**
-             * Restores all options to their default values.
-             */
-            void clear();
-
-            /**
-             * Several query options are passed as flags within an integer field in the legacy
-             * OP_QUERY message. Use this method to initialize this Options struct based on the
-             * legacy format.
-             */
-            void initFromInt(int options);
-
-            /**
-             * Converts those options which used to be contained in the integer 'flags' field of
-             * the OP_QUERY message to their legacy format.
-             *
-             * TODO: The bit vector format returned here is historical. All uses of it should
-             * be removed.
-             */
-            int toInt() const;
-
-            //
-            // Member fields
-            //
-
-            std::string comment;
-
-            int maxScan;
-            int maxTimeMS;
-
-            BSONObj min;
-            BSONObj max;
-
-            bool returnKey;
-            bool showDiskLoc;
-            bool snapshot;
-            bool hasReadPref;
-
-            // Options that can be specified in the OP_QUERY 'flags' header.
-            bool tailable;
-            bool slaveOk;
-            bool oplogReplay;
-            bool noCursorTimeout;
-            bool awaitData;
-            bool exhaust;
-            bool partial;
-        };
-
         /**
          * Parses a find command object, 'cmdObj'. Caller must indicate whether or not
          * this lite parsed query is an explained query or not via 'isExplain'.
@@ -141,10 +77,11 @@ namespace mongo {
         static bool isTextScoreMeta(BSONElement elt);
 
         /**
-         * Helper function to identify diskLoc projection
-         * Example: {a: {$meta: "diskloc"}}.
+         * Helper function to identify recordId projection.
+         *
+         * Example: {a: {$meta: "recordId"}}.
          */
-        static bool isDiskLocMeta(BSONElement elt);
+        static bool isRecordIdMeta(BSONElement elt);
 
         /**
          * Helper function to validate a sort object.
@@ -169,7 +106,7 @@ namespace mongo {
         static const std::string metaTextScore;
         static const std::string metaGeoNearDistance;
         static const std::string metaGeoNearPoint;
-        static const std::string metaDiskLoc;
+        static const std::string metaRecordId;
         static const std::string metaIndexKey;
 
         const std::string& ns() const { return _ns; }
@@ -185,19 +122,34 @@ namespace mongo {
         int getBatchSize() const { return _batchSize; }
         int getNumToReturn() const { return std::min(_limit, _batchSize); }
         bool wantMore() const { return _wantMore; }
-        bool hasReadPref() const { return _options.hasReadPref; }
 
         bool isExplain() const { return _explain; }
-        bool isSnapshot() const { return _options.snapshot; }
-        bool returnKey() const { return _options.returnKey; }
-        bool showDiskLoc() const { return _options.showDiskLoc; }
 
-        const BSONObj& getMin() const { return _options.min; }
-        const BSONObj& getMax() const { return _options.max; }
-        int getMaxScan() const { return _options.maxScan; }
-        int getMaxTimeMS() const { return _options.maxTimeMS; }
+        const std::string& getComment() const { return _comment; }
 
-        const Options& getOptions() const { return _options; }
+        int getMaxScan() const { return _maxScan; }
+        int getMaxTimeMS() const { return _maxTimeMS; }
+
+        const BSONObj& getMin() const { return _min; }
+        const BSONObj& getMax() const { return _max; }
+
+        bool returnKey() const { return _returnKey; }
+        bool showRecordId() const { return _showRecordId; }
+        bool isSnapshot() const { return _snapshot; }
+        bool hasReadPref() const { return _hasReadPref; }
+
+        bool isTailable() const { return _tailable; }
+        bool isSlaveOk() const { return _slaveOk; }
+        bool isOplogReplay() const { return _oplogReplay; }
+        bool isNoCursorTimeout() const { return _noCursorTimeout; }
+        bool isAwaitData() const { return _awaitData; }
+        bool isExhaust() const { return _exhaust; }
+        bool isPartial() const { return _partial; }
+
+        /**
+         * Return options as a bit vector.
+         */
+        int getOptions() const;
 
         //
         // Old parsing code: SOON TO BE DEPRECATED.
@@ -251,26 +203,55 @@ namespace mongo {
         void addReturnKeyMetaProj();
 
         /**
-         * Updates the projection object with a $meta projection for the showDiskLoc option.
+         * Updates the projection object with a $meta projection for the showRecordId option.
          */
-        void addShowDiskLocMetaProj();
+        void addShowRecordIdMetaProj();
+
+        /**
+         * Initializes options based on the value of the 'options' bit vector.
+         *
+         * This contains flags such as tailable, exhaust, and noCursorTimeout.
+         */
+        void initFromInt(int options);
 
         std::string _ns;
-        int _skip;
-        int _limit;
-        int _batchSize;
-        BSONObj _filter;
-        BSONObj _sort;
-        BSONObj _proj;
-        bool _wantMore;
-        bool _explain;
 
+        BSONObj _filter;
+        BSONObj _proj;
+        BSONObj _sort;
         // The hint provided, if any.  If the hint was by index key pattern, the value of '_hint' is
         // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
         // {$hint: <String>}, where <String> is the index name hinted.
         BSONObj _hint;
 
-        Options _options;
+        int _skip;
+        int _limit;
+        int _batchSize;
+        bool _wantMore;
+
+        bool _explain;
+
+        std::string _comment;
+
+        int _maxScan;
+        int _maxTimeMS;
+
+        BSONObj _min;
+        BSONObj _max;
+
+        bool _returnKey;
+        bool _showRecordId;
+        bool _snapshot;
+        bool _hasReadPref;
+
+        // Options that can be specified in the OP_QUERY 'flags' header.
+        bool _tailable;
+        bool _slaveOk;
+        bool _oplogReplay;
+        bool _noCursorTimeout;
+        bool _awaitData;
+        bool _exhaust;
+        bool _partial;
     };
 
 } // namespace mongo

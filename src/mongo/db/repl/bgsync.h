@@ -131,7 +131,7 @@ namespace repl {
         // _mutex protects all of the class variables except _syncSourceReader and _buffer
         mutable boost::mutex _mutex;
 
-        OpTime _lastOpTimeFetched;
+        Timestamp _lastOpTimeFetched;
 
         // lastAppliedHash is used to generate a new hash for the following op, when primary.
         long long _lastAppliedHash;

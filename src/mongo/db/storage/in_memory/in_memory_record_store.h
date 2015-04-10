@@ -48,7 +48,7 @@ namespace mongo {
      */
     class InMemoryRecordStore : public RecordStore {
     public:
-        explicit InMemoryRecordStore(const StringData& ns,
+        explicit InMemoryRecordStore(StringData ns,
                                      boost::shared_ptr<void>* dataInOut,
                                      bool isCapped = false,
                                      int64_t cappedMaxSize = -1,
@@ -110,10 +110,6 @@ namespace mongo {
                                         double scale ) const;
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
-
-        virtual Status setCustomOption( OperationContext* txn,
-                                        const BSONElement& option,
-                                        BSONObjBuilder* info = NULL );
 
         virtual void increaseStorageSize( OperationContext* txn,  int size, bool enforceQuota );
 

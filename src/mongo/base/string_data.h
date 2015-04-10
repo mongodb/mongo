@@ -89,14 +89,14 @@ namespace mongo {
          * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
          * lexicographical order.
          */
-        int compare(const StringData& other) const;
+        int compare(StringData other) const;
 
         /**
          * note: this uses tolower, and therefore does not handle
          *       come languages correctly.
          *       should be use sparingly
          */
-        bool equalCaseInsensitive( const StringData& other ) const;
+        bool equalCaseInsensitive( StringData other ) const;
 
         void copyTo( char* dest, bool includeEndingNull ) const;
 
@@ -107,18 +107,18 @@ namespace mongo {
         //
 
         size_t find( char c , size_t fromPos = 0 ) const;
-        size_t find( const StringData& needle ) const;
+        size_t find( StringData needle ) const;
         size_t rfind( char c, size_t fromPos = std::string::npos ) const;
 
         /**
          * Returns true if 'prefix' is a substring of this instance, anchored at position 0.
          */
-        bool startsWith( const StringData& prefix ) const;
+        bool startsWith( StringData prefix ) const;
 
         /**
          * Returns true if 'suffix' is a substring of this instance, anchored at the end.
          */
-        bool endsWith( const StringData& suffix ) const;
+        bool endsWith( StringData suffix ) const;
 
         //
         // accessors
@@ -142,7 +142,7 @@ namespace mongo {
          *          to be consistent across versions.
          */
         struct Hasher {
-            size_t operator() (const StringData& str) const;
+            size_t operator() (StringData str) const;
         };
 
         //
@@ -159,31 +159,31 @@ namespace mongo {
         size_t _size;     // 'size' does not include the null terminator
     };
 
-    inline bool operator==(const StringData& lhs, const StringData& rhs) {
+    inline bool operator==(StringData lhs, StringData rhs) {
         return (lhs.size() == rhs.size()) && (lhs.compare(rhs) == 0);
     }
 
-    inline bool operator!=(const StringData& lhs, const StringData& rhs) {
+    inline bool operator!=(StringData lhs, StringData rhs) {
         return !(lhs == rhs);
     }
 
-    inline bool operator<(const StringData& lhs, const StringData& rhs) {
+    inline bool operator<(StringData lhs, StringData rhs) {
         return lhs.compare(rhs) < 0 ;
     }
 
-    inline bool operator<=(const StringData& lhs, const StringData& rhs) {
+    inline bool operator<=(StringData lhs, StringData rhs) {
         return lhs.compare(rhs) <= 0;
     }
 
-    inline bool operator>(const StringData& lhs, const StringData& rhs) {
+    inline bool operator>(StringData lhs, StringData rhs) {
         return lhs.compare(rhs) > 0;
     }
 
-    inline bool operator>=(const StringData& lhs, const StringData& rhs) {
+    inline bool operator>=(StringData lhs, StringData rhs) {
         return lhs.compare(rhs) >= 0;
     }
 
-    std::ostream& operator<<(std::ostream& stream, const StringData& value);
+    std::ostream& operator<<(std::ostream& stream, StringData value);
 
 } // namespace mongo
 

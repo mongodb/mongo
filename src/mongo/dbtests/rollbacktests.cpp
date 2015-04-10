@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"
@@ -57,7 +58,7 @@ namespace {
             dropDatabase( txn, db );
         }
     }
-    bool collectionExists( Client::Context* ctx, const string& ns ) {
+    bool collectionExists( OldClientContext* ctx, const string& ns ) {
         const DatabaseCatalogEntry* dbEntry = ctx->db()->getDatabaseCatalogEntry();
         list<string> names;
         dbEntry->getCollectionNamespaces( &names );
@@ -66,11 +67,11 @@ namespace {
     void createCollection( OperationContext* txn, const NamespaceString& nss ) {
         ScopedTransaction transaction( txn, MODE_IX );
         Lock::DBLock dbXLock( txn->lockState(), nss.db(), MODE_X );
-        Client::Context ctx( txn, nss.ns() );
+        OldClientContext ctx( txn, nss.ns() );
         {
             WriteUnitOfWork uow( txn );
             ASSERT( !collectionExists( &ctx, nss.ns() ) );
-            ASSERT_OK( userCreateNS( txn, ctx.db(), nss.ns(), BSONObj(), false, false ) );
+            ASSERT_OK( userCreateNS( txn, ctx.db(), nss.ns(), BSONObj(), false ) );
             ASSERT( collectionExists( &ctx, nss.ns() ) );
             uow.commit();
         }
@@ -127,22 +128,16 @@ namespace {
         IndexDescriptor* desc = catalog->findIndexByName( txn, idxName, false );
 
         if ( desc ) {
-            CursorOptions cursorOptions;
-            cursorOptions.direction = CursorOptions::INCREASING;
+            auto cursor = catalog->getIndex(desc)->newCursor(txn);
 
-            IndexCursor *cursor;
-            ASSERT_OK( catalog->getIndex( desc )->newCursor( txn, cursorOptions, &cursor ) );
-            ASSERT_OK( cursor->seek( minKey ) );
-
-            while ( !cursor->isEOF() ) {
+            for (auto kv = cursor->seek(minKey, true); kv; kv = cursor->next()) {
                 numEntries++;
-                cursor->next();
             }
-            delete cursor;
         }
 
         return numEntries;
     }
+
     void dropIndex( OperationContext* txn, const NamespaceString& nss, const string& idxName ) {
         Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName( txn, idxName );
@@ -162,11 +157,11 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, ns );
+            OldClientContext ctx( &txn, ns );
             {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, ns ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), ns, BSONObj(), false, defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), ns, BSONObj(), defaultIndexes ) );
                 ASSERT( collectionExists( &ctx, ns ) );
                 if ( !rollback ) {
                     uow.commit();
@@ -192,11 +187,11 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, ns );
+            OldClientContext ctx( &txn, ns );
             {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, ns ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), ns, BSONObj(), false, defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), ns, BSONObj(), defaultIndexes ) );
                 uow.commit();
             }
             ASSERT( collectionExists( &ctx, ns ) );
@@ -234,14 +229,13 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite globalWriteLock( txn.lockState() );
-            Client::Context ctx( &txn, source );
+            OldClientContext ctx( &txn, source );
 
             {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, source ) );
                 ASSERT( !collectionExists( &ctx, target ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), source.ns(), BSONObj(), false,
-                                         defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), source.ns(), BSONObj(), defaultIndexes ) );
                 uow.commit();
             }
             ASSERT( collectionExists( &ctx, source ) );
@@ -282,7 +276,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite globalWriteLock( txn.lockState() );
-            Client::Context ctx( &txn, source );
+            OldClientContext ctx( &txn, source );
 
             BSONObj sourceDoc = BSON( "_id" << "source" );
             BSONObj targetDoc = BSON( "_id" << "target" );
@@ -291,10 +285,8 @@ namespace {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, source ) );
                 ASSERT( !collectionExists( &ctx, target ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), source.ns(), BSONObj(), false,
-                                         defaultIndexes ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), target.ns(), BSONObj(), false,
-                                         defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), source.ns(), BSONObj(), defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), target.ns(), BSONObj(), defaultIndexes ) );
 
                 insertRecord( &txn, source, sourceDoc );
                 insertRecord( &txn, target, targetDoc );
@@ -343,7 +335,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss );
+            OldClientContext ctx( &txn, nss );
 
             BSONObj oldDoc = BSON( "_id" << "old" );
             BSONObj newDoc = BSON( "_id" << "new" );
@@ -351,8 +343,7 @@ namespace {
             {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, nss ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), false,
-                                         defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes ) );
                 insertRecord( &txn, nss, oldDoc );
                 uow.commit();
             }
@@ -365,8 +356,7 @@ namespace {
                 WriteUnitOfWork uow( &txn );
                 ASSERT_OK( ctx.db()->dropCollection( &txn, nss.ns() ) );
                 ASSERT( !collectionExists( &ctx, nss ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), false,
-                                         defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes ) );
                 ASSERT( collectionExists( &ctx, nss ) );
                 insertRecord( &txn, nss, newDoc );
                 assertOnlyRecord( &txn, nss, newDoc );
@@ -394,7 +384,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss );
+            OldClientContext ctx( &txn, nss );
 
             BSONObj doc = BSON( "_id" << "example string" );
 
@@ -402,8 +392,7 @@ namespace {
             {
                 WriteUnitOfWork uow( &txn );
 
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), false,
-                                         defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes ) );
                 ASSERT( collectionExists( &ctx, nss ) );
                 insertRecord( &txn, nss, doc );
                 assertOnlyRecord( &txn, nss, doc );
@@ -429,7 +418,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss );
+            OldClientContext ctx( &txn, nss );
 
             BSONObj doc = BSON( "_id" << "foo" );
 
@@ -437,8 +426,7 @@ namespace {
             {
                 WriteUnitOfWork uow( &txn );
 
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), false,
-                                         defaultIndexes ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), defaultIndexes ) );
                 ASSERT( collectionExists( &ctx, nss ) );
                 insertRecord( &txn, nss, doc );
                 assertOnlyRecord( &txn, nss, doc );
@@ -680,7 +668,7 @@ namespace {
 
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
-            Client::Context ctx( &txn, nss.ns() );
+            OldClientContext ctx( &txn, nss.ns() );
 
             string idxNameA = "indexA";
             string idxNameB = "indexB";
@@ -694,7 +682,7 @@ namespace {
             {
                 WriteUnitOfWork uow( &txn );
                 ASSERT( !collectionExists( &ctx, nss.ns() ) );
-                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), false, false ) );
+                ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), false ) );
                 ASSERT( collectionExists( &ctx, nss.ns() ) );
                 Collection* coll = ctx.db()->getCollection( ns );
                 IndexCatalog* catalog = coll->getIndexCatalog();

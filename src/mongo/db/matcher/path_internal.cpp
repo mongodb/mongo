@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    bool isAllDigits( const StringData& str ) {
+    bool isAllDigits( StringData str ) {
         for ( unsigned i = 0; i < str.size(); i++ ) {
             if ( !isdigit( str[i] ) )
                 return false;

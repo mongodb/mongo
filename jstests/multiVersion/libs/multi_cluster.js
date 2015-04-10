@@ -60,7 +60,7 @@ ShardingTest.prototype.upgradeCluster = function( binVersion, options ){
                 // Upgrade replica set
                 var rst = this._rs[i].test
                 
-                rst.upgradeSet( binVersion )
+                rst.upgradeSet({ binVersion: binVersion });
             }
             else {
                 

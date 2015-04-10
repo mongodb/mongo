@@ -32,6 +32,11 @@
 
 namespace mongo {
 
+    /**
+     * Name of the server parameter used to report the auth schema version (via getParameter).
+     */
+    extern const std::string authSchemaVersionServerParameter;
+
     // Gets the singleton AuthorizationManager object for this server process.
     AuthorizationManager* getGlobalAuthorizationManager();
 

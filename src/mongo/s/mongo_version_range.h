@@ -57,12 +57,12 @@ namespace mongo {
 
         void toBSONElement(BSONArrayBuilder* barr) const;
 
-        bool isInRange(const StringData& version) const;
+        bool isInRange(StringData version) const;
 
         std::string minVersion;
         std::string maxVersion;
     };
 
-    bool isInMongoVersionRanges(const StringData& version,
+    bool isInMongoVersionRanges(StringData version,
                                 const std::vector<MongoVersionRange>& ranges);
 }

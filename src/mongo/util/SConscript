@@ -1,0 +1,46 @@
+# -*- mode: python -*-
+
+Import("env")
+Import("has_option")
+
+env.Library(
+    target='intrusive_counter',
+    source=[
+        'intrusive_counter.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/foundation',
+        ]
+    )
+
+debuggerEnv = env.Clone()
+if has_option("gdbserver"):
+    debuggerEnv.Append(CPPDEFINES=["USE_GDBSERVER"])
+
+debuggerEnv.Library(
+    target='debugger',
+    source=[
+        'debugger.cpp',
+        ],
+    LIBDEPS=[]
+    )
+
+env.Library(
+    target='decorable',
+    source=[
+        'decoration_container.cpp',
+        'decoration_registry.cpp',
+    ],
+    LIBDEPS=[]
+    )
+
+env.CppUnitTest(
+    target='decorable_test',
+    source=[
+        'decorable_test.cpp'
+        ],
+    LIBDEPS=[
+        'decorable',
+        ]
+    )
+

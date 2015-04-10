@@ -113,7 +113,7 @@ namespace {
     }
 
     static void _initializeUserRolesFromV0UserDocument(
-            User* user, const BSONObj& privDoc, const StringData& dbname) {
+            User* user, const BSONObj& privDoc, StringData dbname) {
         bool readOnly = privDoc["readOnly"].trueValue();
         if (dbname == "admin") {
             if (readOnly) {
@@ -132,7 +132,7 @@ namespace {
 
     Status _initializeUserRolesFromV1RolesArray(User* user,
                                                 const BSONElement& rolesElement,
-                                                const StringData& dbname) {
+                                                StringData dbname) {
         static const char privilegesTypeMismatchMessage[] =
                 "Roles in V1 user documents must be enumerated in an array of strings.";
 
@@ -150,7 +150,7 @@ namespace {
     }
 
     static Status _initializeUserRolesFromV1UserDocument(
-                User* user, const BSONObj& privDoc, const StringData& dbname) {
+                User* user, const BSONObj& privDoc, StringData dbname) {
 
         if (!privDoc[READONLY_FIELD_NAME].eoo()) {
             return Status(ErrorCodes::UnsupportedFormat,
@@ -199,7 +199,7 @@ namespace {
     }
 
     Status V1UserDocumentParser::initializeUserRolesFromUserDocument(
-            User* user, const BSONObj& privDoc, const StringData& dbname) const {
+            User* user, const BSONObj& privDoc, StringData dbname) const {
         if (!privDoc.hasField("roles")) {
             _initializeUserRolesFromV0UserDocument(user, privDoc, dbname);
         } else {

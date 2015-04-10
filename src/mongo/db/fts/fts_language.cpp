@@ -33,6 +33,8 @@
 #include <string>
  
 #include "mongo/base/init.h"
+#include "mongo/db/fts/fts_basic_tokenizer.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
@@ -49,7 +51,7 @@ namespace mongo {
              */
             struct LanguageStringCompare {
                 /** Returns true if lhs < rhs. */
-                bool operator()( const StringData& lhs, const StringData& rhs ) const {
+                bool operator()( StringData lhs, StringData rhs ) const {
                     size_t minSize = std::min( lhs.size(), rhs.size() );
 
                     for ( size_t x = 0; x < minSize; x++ ) {
@@ -77,6 +79,10 @@ namespace mongo {
             // Case-sensitive by lookup key.
             typedef std::map<StringData, const FTSLanguage*> LanguageMapV1;
             LanguageMapV1 languageMapV1;
+        }
+
+        std::unique_ptr<FTSTokenizer> BasicFTSLanguage::createTokenizer() const {
+            return stdx::make_unique<BasicFTSTokenizer>(this);
         }
 
         MONGO_INITIALIZER_GROUP( FTSAllLanguagesRegistered, MONGO_NO_PREREQUISITES,
@@ -185,7 +191,7 @@ namespace mongo {
         }
 
         // static
-        void FTSLanguage::registerLanguage( const StringData& languageName,
+        void FTSLanguage::registerLanguage( StringData languageName,
                                             TextIndexVersion textIndexVersion,
                                             FTSLanguage* language ) {
             verify( !languageName.empty() );
@@ -205,7 +211,7 @@ namespace mongo {
 
         // static
         void FTSLanguage::registerLanguageAlias( const FTSLanguage* language,
-                                                 const StringData& alias,
+                                                 StringData alias,
                                                  TextIndexVersion textIndexVersion ) {
             switch ( textIndexVersion ) {
             case TEXT_INDEX_VERSION_2:
@@ -229,7 +235,7 @@ namespace mongo {
         }
 
         // static
-        StatusWithFTSLanguage FTSLanguage::make( const StringData& langName,
+        StatusWithFTSLanguage FTSLanguage::make( StringData langName,
                                                  TextIndexVersion textIndexVersion ) {
             switch ( textIndexVersion ) {
                 case TEXT_INDEX_VERSION_2: {

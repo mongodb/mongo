@@ -40,9 +40,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
-
 
 namespace mongo {
 
@@ -106,6 +106,17 @@ namespace mongo {
                     // Any update to a path containing "language" as a component could change the
                     // language of a subdocument.  Add the override field as a path component.
                     _indexedPaths.addPathComponent(ftsSpec.languageOverrideField());
+                }
+            }
+
+            // handle filtered indexes
+            const IndexCatalogEntry* entry = i.catalogEntry(descriptor);
+            const MatchExpression* filter = entry->getFilterExpression();
+            if (filter) {
+                unordered_set<std::string> paths;
+                QueryPlannerIXSelect::getFields(filter, "", &paths);
+                for (auto it = paths.begin(); it != paths.end(); ++it) {
+                    _indexedPaths.addPath(*it);
                 }
             }
         }

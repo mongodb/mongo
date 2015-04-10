@@ -39,6 +39,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
@@ -136,7 +137,7 @@ namespace mongo {
             (although not assured) that it is journaled here once.
         */
         static void prepBasicWrites(AlignedBuilder& bb, const std::vector<WriteIntent>& intents) {
-            scoped_lock lk(privateViews._mutex());
+            boost::lock_guard<boost::mutex> lk(privateViews._mutex());
 
             // Each time write intents switch to a different database we journal a JDbContext.
             // Switches will be rare as we sort by memory location first and we batch commit.

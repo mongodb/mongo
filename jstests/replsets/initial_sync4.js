@@ -25,15 +25,13 @@ print("3. Make sure synced");
 replTest.awaitReplication();
 
 print("4. Bring up a new node");
-ports = allocatePorts( 3 );
-basePath = MongoRunner.dataPath + basename;
 hostname = getHostName();
 
-s = startMongodTest (ports[2], basename, false, {replSet : basename, oplogSize : 2} );
+s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
 
 var config = replTest.getReplSetConfig();
 config.version = 2;
-config.members.push({_id:2, host:hostname+":"+ports[2]});
+config.members.push({_id:2, host:hostname+":"+s.port});
 try {
     m.getDB("admin").runCommand({replSetReconfig:config});
 }

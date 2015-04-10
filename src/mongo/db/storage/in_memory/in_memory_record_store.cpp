@@ -113,7 +113,7 @@ namespace mongo {
     // RecordStore
     //
 
-    InMemoryRecordStore::InMemoryRecordStore(const StringData& ns,
+    InMemoryRecordStore::InMemoryRecordStore(StringData ns,
                                              boost::shared_ptr<void>* dataInOut,
                                              bool isCapped,
                                              int64_t cappedMaxSize,
@@ -329,7 +329,14 @@ namespace mongo {
     }
 
     bool InMemoryRecordStore::updateWithDamagesSupported() const {
-        return true;
+        // TODO: Currently the UpdateStage assumes that updateWithDamages will apply the
+        // damages directly to the unowned BSONObj containing the record to be modified.
+        // The implementation of updateWithDamages() below copies the old record to a
+        // a new one and then applies the damages.
+        //
+        // We should be able to enable updateWithDamages() here once this assumption is
+        // relaxed.
+        return false;
     }
 
     Status InMemoryRecordStore::updateWithDamages( OperationContext* txn,
@@ -450,20 +457,6 @@ namespace mongo {
             output->append("millis", 0);
         }
         return Status::OK();
-    }
-
-    Status InMemoryRecordStore::setCustomOption(
-                OperationContext* txn, const BSONElement& option, BSONObjBuilder* info) {
-        StringData name = option.fieldName();
-        if ( name == "usePowerOf2Sizes" ) {
-            // we ignore, so just say ok
-            return Status::OK();
-        }
-
-        return Status( ErrorCodes::InvalidOptions,
-                       mongoutils::str::stream()
-                       << "unknown custom option to InMemoryRecordStore: "
-                       << name );
     }
 
     void InMemoryRecordStore::increaseStorageSize(OperationContext* txn,

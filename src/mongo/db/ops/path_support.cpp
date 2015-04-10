@@ -43,7 +43,7 @@ namespace pathsupport {
 
     namespace {
 
-        bool isNumeric(const StringData& str, size_t* num) {
+        bool isNumeric(StringData str, size_t* num) {
             size_t res = 0;
             for (size_t i = 0; i < str.size(); ++i) {
                 if (str[i] < '0' || str[i] > '9') {

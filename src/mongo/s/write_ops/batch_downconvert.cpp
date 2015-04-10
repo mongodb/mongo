@@ -34,6 +34,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/client/multi_command_dispatch.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -222,7 +223,7 @@ namespace mongo {
 
     // Adds a wOpTime and a wElectionId field to a set of gle options
     static BSONObj buildGLECmdWithOpTime( const BSONObj& gleOptions,
-                                          const OpTime& opTime,
+                                          const Timestamp& opTime,
                                           const OID& electionId ) {
         BSONObjBuilder builder;
         BSONObjIterator it( gleOptions );
@@ -240,13 +241,13 @@ namespace mongo {
 
             builder.append( el );
         }
-        builder.appendTimestamp( "wOpTime", opTime.asDate() );
+        builder.append( "wOpTime", opTime );
         builder.appendOID( "wElectionId", const_cast<OID*>(&electionId) );
         return builder.obj();
     }
 
     Status enforceLegacyWriteConcern( MultiCommandDispatch* dispatcher,
-                                      const StringData& dbName,
+                                      StringData dbName,
                                       const BSONObj& options,
                                       const HostOpTimeMap& hostOpTimes,
                                       vector<LegacyWCResponse>* legacyWCResponses ) {
@@ -260,7 +261,7 @@ namespace mongo {
 
             const ConnectionString& shardEndpoint = it->first;
             const HostOpTime hot = it->second;
-            const OpTime& opTime = hot.opTime;
+            const Timestamp& opTime = hot.opTime;
             const OID& electionId = hot.electionId;
 
             LOG( 3 ) << "enforcing write concern " << options << " on " << shardEndpoint.toString()

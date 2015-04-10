@@ -44,7 +44,7 @@ namespace mongo {
     class IndexDescriptor;
     class NamespaceString;
     class OperationContext;
-    class OpTime;
+    class Timestamp;
     struct WriteConcernOptions;
 
 namespace repl {
@@ -53,6 +53,7 @@ namespace repl {
     class HandshakeArgs;
     class IsMasterResponse;
     class OplogReader;
+    class ReplicaSetConfig;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
     class UpdatePositionArgs;
@@ -171,7 +172,7 @@ namespace repl {
          * ErrorCodes::Interrupted if the operation was killed with killop()
          */
         virtual StatusAndDuration awaitReplication(const OperationContext* txn,
-                                                   const OpTime& ts,
+                                                   const Timestamp& ts,
                                                    const WriteConcernOptions& writeConcern) = 0;
 
         /**
@@ -214,7 +215,7 @@ namespace repl {
          * NOTE: This function can only be meaningfully called while the caller holds the global
          * lock in some mode other than MODE_NONE.
          */
-        virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
+        virtual bool canAcceptWritesForDatabase(StringData dbName) = 0;
 
         /**
          * Checks if the current replica set configuration can satisfy the given write concern.
@@ -245,7 +246,7 @@ namespace repl {
          * Updates our internal tracking of the last OpTime applied for the given slave
          * identified by "rid".  Only valid to call in master/slave mode
          */
-        virtual Status setLastOptimeForSlave(const OID& rid, const OpTime& ts) = 0;
+        virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts) = 0;
 
         /**
          * Updates our internal tracking of the last OpTime applied to this node.
@@ -255,7 +256,7 @@ namespace repl {
          * that after calls to resetLastOpTimeFromOplog(), the minimum acceptable value for "ts" is
          * reset based on the contents of the oplog, and may go backwards due to rollback.
          */
-        virtual void setMyLastOptime(const OpTime& ts) = 0;
+        virtual void setMyLastOptime(const Timestamp& ts) = 0;
 
         /**
          * Same as above, but used during places we need to zero our last optime.
@@ -270,7 +271,7 @@ namespace repl {
         /**
          * Returns the last optime recorded by setMyLastOptime.
          */
-        virtual OpTime getMyLastOptime() const = 0;
+        virtual Timestamp getMyLastOptime() const = 0;
 
         /**
          * Retrieves and returns the current election id, which is a unique id that is local to
@@ -338,15 +339,6 @@ namespace repl {
         virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
 
         /**
-         * For ourself and each secondary chaining off of us, adds a BSONObj to "handshakes"
-         * describing an invocation of the replSetUpdateCommand that can be sent to this node's
-         * sync source to handshake us and our chained secondaries, informing the sync source that
-         * we are replicating off of it.
-         */
-        virtual void prepareReplSetUpdatePositionCommandHandshakes(
-                std::vector<BSONObj>* handshakes) = 0;
-
-        /**
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
          */
         virtual Status processReplSetGetStatus(BSONObjBuilder* result) = 0;
@@ -362,6 +354,11 @@ namespace repl {
          * last known optimes.
          */
         virtual void appendSlaveInfoData(BSONObjBuilder* result) = 0;
+
+        /**
+         * Returns a copy of the current ReplicaSetConfig.
+         */
+        virtual ReplicaSetConfig getConfig() const = 0;
 
         /**
          * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.
@@ -446,7 +443,7 @@ namespace repl {
             HostAndPort who;  // host and port of the member that sent the replSetFresh command
             unsigned id;  // replSet id of the member that sent the replSetFresh command
             int cfgver;  // replSet config version that the member who sent the command thinks it has
-            OpTime opTime;  // last optime seen by the member who sent the replSetFresh command
+            Timestamp opTime;  // last optime seen by the member who sent the replSetFresh command
         };
 
         /*
@@ -477,24 +474,25 @@ namespace repl {
          * Handles an incoming replSetUpdatePosition command, updating each node's oplog progress.
          * Returns Status::OK() if all updates are processed correctly, NodeNotFound
          * if any updating node cannot be found in the config, InvalidReplicaSetConfig if the
-         * "cfgver" sent in any of the updates doesn't match our config version, or
+         * "configVersion" sent in any of the updates doesn't match our config version, or
          * NotMasterOrSecondaryCode if we are in state REMOVED or otherwise don't have a valid
          * replica set config.
          * If a non-OK status is returned, it is unspecified whether none or some of the updates
          * were applied.
+         * "configVersion" will be populated with our config version if and only if we return
+         * InvalidReplicaSetConfig.
          */
-        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates) = 0;
+        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
+                                                    long long* configVersion) = 0;
 
-        /**
-         * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
-         * Associates the node's 'remoteID' with its 'handshake' object. This association is used
-         * to update local.slaves and to forward the node's replication progress upstream when this
-         * node is being chained through.
+        /** 
+         * Handles an incoming Handshake command. Associates the node's 'remoteID' with its
+         * 'handshake' object. This association is used to update internal representation of 
+         * replication progress and to forward the node's replication progress upstream when this
+         * node is being chained through in master/slave replication.
          *
-         * Returns ErrorCodes::NodeNotFound if no replica set member exists with the given member ID
-         * and ErrorCodes::NotMasterOrSecondaryCode if we're in state REMOVED or otherwise don't
-         * have a valid config.
-         */
+         * Returns ErrorCodes::IllegalOperation if we're not running with master/slave replication.  
+         */  
         virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake) = 0;
 
         /**
@@ -505,7 +503,7 @@ namespace repl {
         /**
          * Returns a vector of members that have applied the operation with OpTime 'op'.
          */
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) = 0;
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op) = 0;
 
         /**
          * Returns a vector of the members other than ourself in the replica set, as specified in
@@ -550,6 +548,13 @@ namespace repl {
          * currentSource: the current sync source
          */
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) = 0;
+
+        /**
+         * Returns the OpTime of the latest replica set-committed op known to this server.
+         * Committed means a majority of the voting nodes of the config are known to have the
+         * operation in their oplogs.  This implies such ops will never be rolled back.
+         */
+        virtual Timestamp getLastCommittedOpTime() const = 0;
 
     protected:
 

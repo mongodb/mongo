@@ -41,14 +41,14 @@ for( f in files ) {
 assert( fileCount > 0, "Expected more than zero nondirectory files in the database directory" );
 
 check();
-stopMongod( port );
+MongoRunner.stopMongod( port );
 
 resetDbpath( repairpath );
 m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 assert.commandWorked( db.runCommand( {repairDatabase:1} ) );
 check();
-stopMongod( port );
+MongoRunner.stopMongod( port );
 
 //Test long database names
 resetDbpath( repairpath );
@@ -56,7 +56,7 @@ m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath",
 db = m.getDB( longDBName );
 assert.writeOK(db[ baseName ].save( {} ));
 assert.commandWorked( db.runCommand( {repairDatabase:1} ) );
-stopMongod( port );
+MongoRunner.stopMongod( port );
 
 //Test long repairPath
 resetDbpath( longRepairPath )
@@ -64,7 +64,7 @@ m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath",
 db = m.getDB( longDBName );
 assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles: true} ) );
 check();
-stopMongod( port );
+MongoRunner.stopMongod( port );
 
 //Test database name and repairPath with --repair
 resetDbpath( longRepairPath )
@@ -72,14 +72,14 @@ m = startMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port,
 m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( longDBName );
 check();
-stopMongod( port );
+MongoRunner.stopMongod( port );
 
 resetDbpath( repairpath );
 runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 check();
-stopMongod( port );
+MongoRunner.stopMongod( port );
 
 resetDbpath( repairpath );
 runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );

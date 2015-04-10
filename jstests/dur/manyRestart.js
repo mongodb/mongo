@@ -105,29 +105,29 @@ var path1 = MongoRunner.dataPath + testname+"nodur";
 var path2 = MongoRunner.dataPath + testname+"dur";
 
 // non-durable version
-log("starting 30000");
-conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles");
+log("starting first mongod");
+conn = MongoRunner.runMongod({dbpath: path1, nodur: "", smallfiles: ""});
 work();
-stopMongod(30000);
+MongoRunner.stopMongod(conn);
 
 // hail mary for windows
 // Sat Jun 11 14:07:57 Error: boost::filesystem::create_directory: Access is denied: "\data\db\manyRestartsdur" (anon):1
 sleep(1000);
 
-log("starting 30001");
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+log("starting second mongod");
+conn = MongoRunner.runMongod({dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
 work();
 // wait for group commit.
 printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
 
-stopMongod(30001);
+MongoRunner.stopMongod(conn);
 sleep(5000);
 
 for (var i = 0; i < 3; ++i) {
 
     // durable version
-    log("restarting 30001");
-    conn = startMongodNoReset("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+    log("restarting second mongod");
+    conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
 
     // wait for group commit.
     printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
@@ -136,7 +136,7 @@ for (var i = 0; i < 3; ++i) {
     
     // kill the process hard
     log("hard kill");
-    stopMongod(30001, /*signal*/9);
+    MongoRunner.stopMongod(conn, /*signal*/9);
     
     sleep(5000);
 }
@@ -145,11 +145,11 @@ for (var i = 0; i < 3; ++i) {
 
 // restart and recover
 log("restart");
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
 log("verify");
 verify();
 log("stop");
-stopMongod(30002);
+MongoRunner.stopMongod(conn);
 sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
@@ -170,8 +170,8 @@ var nrows = 0;
 for (var i = 0; i < 5; ++i) {
 
     // durable version
-    log("restarting 30001");
-    conn = startMongodNoReset("--port", 30001, "--dbpath", path2, "--dur", "--smallfiles", "--durOptions", 8);
+    log("restarting second mongod");
+    conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
     nrows += addRows();
     // wait for group commit.
     printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
@@ -180,7 +180,7 @@ for (var i = 0; i < 5; ++i) {
     
     // kill the process hard
     log("hard kill");
-    stopMongod(30001, /*signal*/9);
+    MongoRunner.stopMongod(conn, /*signal*/9);
     
     sleep(5000);
 }

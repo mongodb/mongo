@@ -87,7 +87,7 @@ namespace mongo {
         bool isErrInfoSet() const;
         const BSONObj& getErrInfo() const;
 
-        void setErrMessage(const StringData& errMessage);
+        void setErrMessage(StringData errMessage);
         void unsetErrMessage();
         bool isErrMessageSet() const;
         const std::string& getErrMessage() const;

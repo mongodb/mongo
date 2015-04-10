@@ -32,9 +32,10 @@
 
 #include "mongo/db/concurrency/lock_state.h"
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/background.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
@@ -53,26 +54,22 @@ namespace {
         PartitionedInstanceWideLockStats() { }
 
         void recordAcquisition(LockerId id, ResourceId resId, LockMode mode) {
-            LockStats& stats = _get(id);
-            stats.recordAcquisition(resId, mode);
+            _get(id).recordAcquisition(resId, mode);
         }
 
         void recordWait(LockerId id, ResourceId resId, LockMode mode) {
-            LockStats& stats = _get(id);
-            stats.recordWait(resId, mode);
+            _get(id).recordWait(resId, mode);
         }
 
         void recordWaitTime(LockerId id, ResourceId resId, LockMode mode, uint64_t waitMicros) {
-            LockStats& stats = _get(id);
-            stats.recordWaitTime(resId, mode, waitMicros);
+            _get(id).recordWaitTime(resId, mode, waitMicros);
         }
 
         void recordDeadlock(ResourceId resId, LockMode mode) {
-            LockStats& stats = _get(resId);
-            stats.recordDeadlock(resId, mode);
+            _get(resId).recordDeadlock(resId, mode);
         }
 
-        void report(LockStats* outStats) const {
+        void report(SingleThreadedLockStats* outStats) const {
             for (int i = 0; i < NumPartitions; i++) {
                 outStats->append(_partitions[i].stats);
             }
@@ -87,16 +84,15 @@ namespace {
     private:
 
         // This alignment is a best effort approach to ensure that each partition falls on a
-        // separate page/cache line in order to avoid false sharing. The 4096-byte alignment is
-        // in an effort to play nicely with NUMA.
-        struct MONGO_COMPILER_ALIGN_TYPE(4096) AlignedLockStats {
-            LockStats stats;
+        // separate page/cache line in order to avoid false sharing.
+        struct MONGO_COMPILER_ALIGN_TYPE(128) AlignedLockStats {
+            AtomicLockStats stats;
         };
 
         enum { NumPartitions = 8 };
 
 
-        LockStats& _get(LockerId id) {
+        AtomicLockStats& _get(LockerId id) {
             return _partitions[id % NumPartitions].stats;
         }
 
@@ -198,31 +194,26 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::assertEmpty() const {
+    void LockerImpl<IsForMMAPV1>::assertEmptyAndReset() {
         invariant(!inAWriteUnitOfWork());
         invariant(_resourcesToUnlockAtEndOfUnitOfWork.empty());
         invariant(_requests.empty());
+
+        // Reset the locking statistics so the object can be reused
+        _stats.reset();
     }
 
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::dump() const {
         StringBuilder ss;
-        ss << "lock status: ";
-
-        //  isLocked() must be called without holding _lock
-        if (!isLocked()) {
-            ss << "unlocked";
-        }
-        else {
-            // SERVER-14978: Dump lock stats information
-        }
-
-        ss << " requests:";
+        ss << "Locker id " << _id << " status: ";
 
         _lock.lock();
         LockRequestsMap::ConstIterator it = _requests.begin();
         while (!it.finished()) {
-            ss << " " << it.key().toString() << " held in " << modeName(it->mode);
+            ss << it.key().toString() << " "
+               << lockRequestStatusName(it->status) << " in "
+               << modeName(it->mode) << "; ";
             it.next();
         }
         _lock.unlock();
@@ -283,7 +274,7 @@ namespace {
         // Cannot delete the Locker while there are still outstanding requests, because the
         // LockManager may attempt to access deleted memory. Besides it is probably incorrect
         // to delete with unaccounted locks anyways.
-        assertEmpty();
+        assertEmptyAndReset();
     }
 
     template<bool IsForMMAPV1>
@@ -339,6 +330,11 @@ namespace {
         LockRequest* globalLockRequest = _requests.find(resourceIdGlobal).objAddr();
         invariant(globalLockRequest->mode == MODE_X);
         invariant(globalLockRequest->recursiveCount == 1);
+
+        // Making this call here will record lock downgrades as acquisitions, which is acceptable
+        globalStats.recordAcquisition(_id, resourceIdGlobal, MODE_S);
+        _stats.recordAcquisition(resourceIdGlobal, MODE_S);
+
         globalLockManager.downgrade(globalLockRequest, MODE_S);
 
         if (IsForMMAPV1) {
@@ -389,15 +385,7 @@ namespace {
         // For MMAP V1, we need to yield the flush lock so that the flush thread can run
         if (IsForMMAPV1) {
             invariant(unlock(resourceIdMMAPV1Flush));
-
-            while (true) {
-                LockResult result =
-                    lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), UINT_MAX, true);
-
-                if (result == LOCK_OK) break;
-
-                invariant(result == LOCK_DEADLOCK);
-            }
+            invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
         }
     }
 
@@ -447,7 +435,7 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName,
+    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(StringData dbName,
                                                     LockMode mode) const {
         invariant(nsIsDbOnly(dbName));
 
@@ -459,7 +447,7 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(const StringData& ns,
+    bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(StringData ns,
                                                             LockMode mode) const {
         invariant(nsIsFull(ns));
 
@@ -514,8 +502,6 @@ namespace {
         lockerInfo->locks.clear();
         lockerInfo->waitingResource = ResourceId();
         lockerInfo->stats.reset();
-
-        if (!isLocked()) return;
 
         _lock.lock();
         LockRequestsMap::ConstIterator it = _requests.begin();
@@ -611,7 +597,7 @@ namespace {
 
     template<bool IsForMMAPV1>
     LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
-        invariant(!getWaitingResource().isValid());
+        dassert(!getWaitingResource().isValid());
 
         LockRequest* request;
         bool isNew = true;
@@ -832,11 +818,38 @@ namespace {
         : _locker(locker),
           _released(false) {
 
-        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_S));
+        // The journal thread acquiring the journal lock in S-mode opens opportunity for deadlock
+        // involving operations which do not acquire and release the Oplog collection's X lock
+        // inside a WUOW (see SERVER-17416 for the sequence of events), therefore acquire it with
+        // check for deadlock and back-off if one is encountered.
+        // 
+        // This exposes theoretical chance that we might starve the journaling system, but given
+        // that these deadlocks happen extremely rarely and are usually due to incorrect locking
+        // policy, and we have the deadlock counters as part of the locking statistics, this is a
+        // reasonable handling.
+        //
+        // In the worst case, if we are to starve the journaling system, the server will shut down
+        // due to too much uncommitted in-memory journal, but won't have corruption.
+
+        while (true) {
+            LockResult result = _locker->lock(resourceIdMMAPV1Flush, MODE_S, UINT_MAX, true);
+            if (result == LOCK_OK) {
+                break;
+            }
+
+            invariant(result == LOCK_DEADLOCK);
+
+            warning() << "Delayed journaling in order to avoid deadlock during MMAP V1 journal " <<
+                         "lock acquisition. See the previous messages for information on the " <<
+                         "involved threads.";
+        }
     }
 
     void AutoAcquireFlushLockForMMAPV1Commit::upgradeFlushLockToExclusive() {
-        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X));
+        // This should not be able to deadlock, since we already hold the S journal lock, which
+        // means all writers are kicked out. Readers always yield the journal lock if they block
+        // waiting on any other lock.
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX, true));
 
         // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
         // complain.
@@ -855,6 +868,26 @@ namespace {
     }
 
 
+namespace {
+    /**
+     *  Periodically purges unused lock buckets. The first time the lock is used again after
+     *  cleanup it needs to be allocated, and similarly, every first use by a client for an intent
+     *  mode may need to create a partitioned lock head. Cleanup is done roughtly once a minute.
+     */
+    class UnusedLockCleaner : PeriodicTask {
+    public:
+        std::string taskName() const {
+            return "UnusedLockCleaner";
+        }
+
+        void taskDoWork() {
+            LOG(2) << "cleaning up unused lock buckets of the global lock manager";
+            getGlobalLockManager()->cleanupUnusedLocks();
+        }
+    } unusedLockCleaner;
+} // namespace
+
+
     //
     // Standalone functions
     //
@@ -863,7 +896,7 @@ namespace {
         return &globalLockManager;
     }
 
-    void reportGlobalLockingStats(LockStats* outStats) {
+    void reportGlobalLockingStats(SingleThreadedLockStats* outStats) {
         globalStats.report(outStats);
     }
 

@@ -56,7 +56,7 @@ namespace {
 
             // This returns the blocked lock states
             {
-                boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+                boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
 
                 // Count all clients
                 numTotal = Client::clients.size();
@@ -132,7 +132,7 @@ namespace {
                                         const BSONElement& configElement) const {
             BSONObjBuilder ret;
 
-            LockStats stats;
+            SingleThreadedLockStats stats;
             reportGlobalLockingStats(&stats);
 
             stats.report(&ret);

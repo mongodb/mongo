@@ -102,7 +102,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    std::string getTestFrameworkHelp(const StringData& name, const moe::OptionSection& options) {
+    std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options) {
         StringBuilder sb;
         sb << "usage: " << name << " [options] [suite]...\n"
             << options.helpString() << "suite: run the specified test suite(s) only\n";
@@ -203,7 +203,7 @@ namespace mongo {
             storageGlobalParams.dur = true;
         }
 
-        DEV log() << "_DEBUG build" << endl;
+        DEV log() << "DEBUG build" << endl;
         if( sizeof(void*)==4 )
             log() << "32bit" << endl;
         log() << "random seed: " << frameworkGlobalParams.seed << endl;
@@ -229,8 +229,8 @@ namespace mongo {
             frameworkGlobalParams.filter = params["filter"].as<string>();
         }
 
-        if (debug && storageGlobalParams.dur) {
-            log() << "_DEBUG: automatically enabling mmapv1GlobalOptions.journalOptions=8 "
+        if (kDebugBuild && storageGlobalParams.dur) {
+            log() << "Debug Build: automatically enabling mmapv1GlobalOptions.journalOptions=8 "
                   << "(JournalParanoid)" << endl;
             // this was commented out.  why too slow or something?
             mmapv1GlobalOptions.journalOptions |= MMAPV1Options::JournalParanoid;

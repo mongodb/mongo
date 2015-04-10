@@ -79,7 +79,7 @@ namespace {
         return NULL;
     }
 
-    User* UserSet::removeByDBName(const StringData& dbname) {
+    User* UserSet::removeByDBName(StringData dbname) {
         for (iterator it = begin(); it != end(); ++it) {
             User* current = *it;
             if (current->getName().getDB() == dbname) {
@@ -113,7 +113,7 @@ namespace {
         return NULL;
     }
 
-    User* UserSet::lookupByDBName(const StringData& dbname) const {
+    User* UserSet::lookupByDBName(StringData dbname) const {
         for (iterator it = begin(); it != end(); ++it) {
             User* current = *it;
             if (current->getName().getDB() == dbname) {

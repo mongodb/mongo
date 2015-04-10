@@ -94,10 +94,10 @@ function runFirstMongodAndFillDisk() {
     log();
     
     clear();
-    conn = startMongodNoReset("--port", 30001, "--dbpath", startPath, "--dur", "--smallfiles", "--durOptions", 8+64, "--noprealloc");
+    conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: startPath, dur: "", smallfiles: "", durOptions: 8+64, noprealloc: ""});
     
     assert.throws( work, null, "no exception thrown when exceeding disk capacity" );
-    stopMongod( 30001 );
+    MongoRunner.stopMongod(conn);
 
     sleep(5000);    
 }
@@ -105,11 +105,11 @@ function runFirstMongodAndFillDisk() {
 function runSecondMongdAndRecover() {
     // restart and recover
     log();
-    conn = startMongodNoReset("--port", 30003, "--dbpath", startPath, "--dur", "--smallfiles", "--durOptions", 8+64, "--noprealloc");
+    conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: startPath, dur: "", smallfiles: "", durOptions: 8+64, noprealloc: ""});
     verify();
     
     log("stop");
-    stopMongod(30003);
+    MongoRunner.stopMongod(conn);
     
     // stopMongod seems to be asynchronous (hmmm) so we sleep here.
     sleep(5000);

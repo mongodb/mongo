@@ -90,14 +90,14 @@ namespace {
             _noOpsInProg.wait(lk);
     }
 
-    void recordBeginAndInsert(BgInfoMap* bgiMap, const StringData& key) {
+    void recordBeginAndInsert(BgInfoMap* bgiMap, StringData key) {
         boost::shared_ptr<BgInfo>& bgInfo = bgiMap->get(key);
         if (!bgInfo)
             bgInfo.reset(new BgInfo);
         bgInfo->recordBegin();
     }
 
-    void recordEndAndRemove(BgInfoMap* bgiMap, const StringData& key) {
+    void recordEndAndRemove(BgInfoMap* bgiMap, StringData key) {
         BgInfoMapIterator iter = bgiMap->find(key);
         fassert(17431, iter != bgiMap->end());
         if (0 == iter->second->recordEnd()) {
@@ -108,7 +108,7 @@ namespace {
     void awaitNoBgOps(
             boost::unique_lock<boost::mutex>& lk,
             BgInfoMap* bgiMap,
-            const StringData& key) {
+            StringData key) {
 
         boost::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(
                 *bgiMap, key, boost::shared_ptr<BgInfo>());
@@ -118,54 +118,54 @@ namespace {
     }
 
 }  // namespace
-    bool BackgroundOperation::inProgForDb(const StringData& db) {
-        boost::mutex::scoped_lock lk(m);
+    bool BackgroundOperation::inProgForDb(StringData db) {
+        boost::lock_guard<boost::mutex> lk(m);
         return dbsInProg.find(db) != dbsInProg.end();
     }
 
-    bool BackgroundOperation::inProgForNs(const StringData& ns) {
-        boost::mutex::scoped_lock lk(m);
+    bool BackgroundOperation::inProgForNs(StringData ns) {
+        boost::lock_guard<boost::mutex> lk(m);
         return nsInProg.find(ns) != nsInProg.end();
     }
 
-    void BackgroundOperation::assertNoBgOpInProgForDb(const StringData& db) {
+    void BackgroundOperation::assertNoBgOpInProgForDb(StringData db) {
         uassert(ErrorCodes::BackgroundOperationInProgressForDatabase, mongoutils::str::stream() <<
                 "cannot perform operation: a background operation is currently running for "
                 "database " << db,
                 !inProgForDb(db));
     }
 
-    void BackgroundOperation::assertNoBgOpInProgForNs(const StringData& ns) {
+    void BackgroundOperation::assertNoBgOpInProgForNs(StringData ns) {
         uassert(ErrorCodes::BackgroundOperationInProgressForNamespace, mongoutils::str::stream() <<
                 "cannot perform operation: a background operation is currently running for "
                 "collection " << ns,
                 !inProgForNs(ns));
     }
 
-    void BackgroundOperation::awaitNoBgOpInProgForDb(const StringData& db) {
+    void BackgroundOperation::awaitNoBgOpInProgForDb(StringData db) {
         boost::unique_lock<boost::mutex> lk(m);
         awaitNoBgOps(lk, &dbsInProg, db);
     }
 
-    void BackgroundOperation::awaitNoBgOpInProgForNs(const StringData& ns) {
+    void BackgroundOperation::awaitNoBgOpInProgForNs(StringData ns) {
         boost::unique_lock<boost::mutex> lk(m);
         awaitNoBgOps(lk, &nsInProg, ns);
     }
 
-    BackgroundOperation::BackgroundOperation(const StringData& ns) : _ns(ns) {
-        boost::mutex::scoped_lock lk(m);
+    BackgroundOperation::BackgroundOperation(StringData ns) : _ns(ns) {
+        boost::lock_guard<boost::mutex> lk(m);
         recordBeginAndInsert(&dbsInProg, _ns.db());
         recordBeginAndInsert(&nsInProg, _ns.ns());
     }
 
     BackgroundOperation::~BackgroundOperation() {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         recordEndAndRemove(&dbsInProg, _ns.db());
         recordEndAndRemove(&nsInProg, _ns.ns());
     }
 
     void BackgroundOperation::dump(std::ostream& ss) {
-        boost::mutex::scoped_lock lk(m);
+        boost::lock_guard<boost::mutex> lk(m);
         if( nsInProg.size() ) {
             ss << "\n<b>Background Jobs in Progress</b>\n";
             for( BgInfoMapIterator i = nsInProg.begin(); i != nsInProg.end(); ++i )

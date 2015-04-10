@@ -49,8 +49,8 @@ namespace mongo {
     }
 
     void WriteConflictException::logAndBackoff(int attempt,
-                                               const StringData& operation,
-                                               const StringData& ns) {
+                                               StringData operation,
+                                               StringData ns) {
 
         LOG(1) << "Caught WriteConflictException doing " << operation
                << " on " << ns
@@ -77,7 +77,7 @@ namespace mongo {
         ExportedServerParameter<bool> TraceWCExceptionsSetting(ServerParameterSet::getGlobal(),
                                                                "traceWriteConflictExceptions",
                                                                &WriteConflictException::trace,
-                                                               false, // allowedToChangeAtStartup
+                                                               true, // allowedToChangeAtStartup
                                                                true); // allowedToChangeAtRuntime
     }
 

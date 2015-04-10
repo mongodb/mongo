@@ -45,8 +45,8 @@ namespace mongo {
      * does NOT to permission checking, that is elsewhere
      * for example, can't write to foo.system.bar
      */
-    Status userAllowedWriteNS( const StringData& db, const StringData& coll );
-    Status userAllowedWriteNS( const StringData& ns );
+    Status userAllowedWriteNS( StringData db, StringData coll );
+    Status userAllowedWriteNS( StringData ns );
     Status userAllowedWriteNS( const NamespaceString& ns );
 
 }

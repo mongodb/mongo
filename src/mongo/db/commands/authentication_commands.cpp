@@ -41,6 +41,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/config.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -206,7 +207,7 @@ namespace mongo {
         if (mechanism == "MONGODB-CR") {
             return _authenticateCR(txn, user, cmdObj);
         }
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         if (mechanism == "MONGODB-X509") {
             return _authenticateX509(txn, user, cmdObj);
         }
@@ -304,7 +305,7 @@ namespace mongo {
         return Status::OK();
     }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
     void canonicalizeClusterDN(std::vector<std::string>* dn) {
         // remove all RDNs we don't care about
         for (size_t i=0; i<dn->size(); i++) {

@@ -171,7 +171,8 @@ namespace {
         if (status.isOK()) {
             session->setParameter(SaslClientSession::parameterPassword, value);
         }
-        else if (status != ErrorCodes::NoSuchKey) {
+        else if (!(status == ErrorCodes::NoSuchKey && targetDatabase == "$external")) {
+            // $external users do not have passwords, hence NoSuchKey is expected
             return status;
         }
 

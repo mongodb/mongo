@@ -28,6 +28,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/jsobj.h"
@@ -45,7 +46,7 @@ namespace QueryStageSubplan {
             : _client(&_txn) { }
 
         virtual ~QueryStageSubplanBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -75,7 +76,7 @@ namespace QueryStageSubplan {
     class QueryStageSubplanGeo2dOr : public QueryStageSubplanBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             addIndex(BSON("a" << "2d" << "b" << 1));
             addIndex(BSON("a" << "2d"));
 
@@ -96,9 +97,9 @@ namespace QueryStageSubplan {
             boost::scoped_ptr<SubplanStage> subplan(new SubplanStage(&_txn, collection, &ws,
                                                                      plannerParams, cq.get()));
 
-            // NULL means that 'subplan' will not yield during plan selection. Plan selection
-            // should succeed due to falling back on regular planning.
-            ASSERT_OK(subplan->pickBestPlan(NULL));
+            // Plan selection should succeed due to falling back on regular planning.
+            PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
+            ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
         }
     };
 
@@ -108,7 +109,7 @@ namespace QueryStageSubplan {
     class QueryStageSubplanPlanFromCache : public QueryStageSubplanBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             addIndex(BSON("a" << 1 << "b" << 1));
             addIndex(BSON("a" << 1 << "c" << 1));
@@ -135,8 +136,8 @@ namespace QueryStageSubplan {
             boost::scoped_ptr<SubplanStage> subplan(new SubplanStage(&_txn, collection, &ws,
                                                                      plannerParams, cq.get()));
 
-            // NULL means that 'subplan' should not yield during plan selection.
-            ASSERT_OK(subplan->pickBestPlan(NULL));
+            PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
+            ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
             // Nothing is in the cache yet, so neither branch should have been planned from
             // the plan cache.
@@ -148,7 +149,7 @@ namespace QueryStageSubplan {
             ws.clear();
             subplan.reset(new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 
-            ASSERT_OK(subplan->pickBestPlan(NULL));
+            ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
             ASSERT_TRUE(subplan->branchPlannedFromCache(0));
             ASSERT_FALSE(subplan->branchPlannedFromCache(1));

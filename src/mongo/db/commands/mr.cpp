@@ -1,5 +1,3 @@
-// mr.cpp
-
 /**
  *    Copyright (C) 2012 10gen Inc.
  *
@@ -45,24 +43,27 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/instance.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/range_preserver.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/scripting/engine.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -370,7 +371,7 @@ namespace mongo {
             if (_useIncremental) {
                 // Create the inc collection and make sure we have index on "0" key.
                 // Intentionally not replicating the inc collection to secondaries.
-                Client::WriteContext incCtx(_txn, _config.incLong);
+                OldClientWriteContext incCtx(_txn, _config.incLong);
                 WriteUnitOfWork wuow(_txn);
                 Collection* incColl = incCtx.getCollection();
                 invariant(!incColl);
@@ -396,7 +397,7 @@ namespace mongo {
 
             {
                 // copy indexes into temporary storage
-                Client::WriteContext finalCtx(_txn, _config.outputOptions.finalNamespace);
+                OldClientWriteContext finalCtx(_txn, _config.outputOptions.finalNamespace);
                 Collection* const finalColl = finalCtx.getCollection();
                 if ( finalColl ) {
                     IndexCatalog::IndexIterator ii =
@@ -423,7 +424,7 @@ namespace mongo {
 
             {
                 // create temp collection and insert the indexes from temporary storage
-                Client::WriteContext tempCtx(_txn, _config.tempNamespace);
+                OldClientWriteContext tempCtx(_txn, _config.tempNamespace);
                 WriteUnitOfWork wuow(_txn);
                 uassert(ErrorCodes::NotMaster, "no longer master", 
                         repl::getGlobalReplicationCoordinator()->
@@ -434,13 +435,6 @@ namespace mongo {
                 CollectionOptions options;
                 options.temp = true;
                 tempColl = tempCtx.db()->createCollection(_txn, _config.tempNamespace, options);
-
-                // Log the createCollection operation.
-                BSONObjBuilder b;
-                b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
-                b.appendElements( options.toBSON() );
-                string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                repl::logOp(_txn, "c", logNs.c_str(), b.obj());
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
                         it != indexesToInsert.end(); ++it ) {
@@ -454,7 +448,7 @@ namespace mongo {
                     }
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
-                    repl::logOp(_txn, "i", logNs.c_str(), *it);
+                    getGlobalServiceContext()->getOpObserver()->onCreateIndex(_txn, logNs, *it);
                 }
                 wuow.commit();
             }
@@ -638,7 +632,7 @@ namespace mongo {
 
                     bool found;
                     {
-                        Client::Context tx(txn, _config.outputOptions.finalNamespace);
+                        OldClientContext tx(txn, _config.outputOptions.finalNamespace);
                         Collection* coll =
                             tx.db()->getCollection(_config.outputOptions.finalNamespace);
                         found = Helpers::findOne(_txn,
@@ -676,7 +670,7 @@ namespace mongo {
             verify( _onDisk );
 
 
-            Client::WriteContext ctx(_txn,  ns );
+            OldClientWriteContext ctx(_txn,  ns );
             WriteUnitOfWork wuow(_txn);
             uassert(ErrorCodes::NotMaster, "no longer master", 
                     repl::getGlobalReplicationCoordinator()->
@@ -691,7 +685,6 @@ namespace mongo {
             BSONObj bo = b.obj();
 
             uassertStatusOK( coll->insertDocument( _txn, bo, true ).getStatus() );
-            repl::logOp(_txn, "i", ns.c_str(), bo);
             wuow.commit();
         }
 
@@ -701,10 +694,13 @@ namespace mongo {
         void State::_insertToInc( BSONObj& o ) {
             verify( _onDisk );
 
-            Client::WriteContext ctx(_txn,  _config.incLong );
+            OldClientWriteContext ctx(_txn,  _config.incLong );
             WriteUnitOfWork wuow(_txn);
             Collection* coll = getCollectionOrUassert(ctx.db(), _config.incLong);
-            uassertStatusOK( coll->insertDocument( _txn, o, true ).getStatus() );
+            bool shouldReplicateWrites = _txn->writesAreReplicated();
+            _txn->setReplicatedWrites(false);
+            ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _txn, shouldReplicateWrites);
+            uassertStatusOK(coll->insertDocument(_txn, o, true, false).getStatus());
             wuow.commit();
         }
 
@@ -901,7 +897,7 @@ namespace mongo {
             _config.reducer->numReduces = _scope->getNumberInt("_redCt");
         }
 
-        Collection* State::getCollectionOrUassert(Database* db, const StringData& ns) {
+        Collection* State::getCollectionOrUassert(Database* db, StringData ns) {
             Collection* out = db ? db->getCollection(ns) : NULL;
             uassert(18697, "Collection unexpectedly disappeared: " + ns.toString(),
                     out);
@@ -981,7 +977,7 @@ namespace mongo {
             BSONObj sortKey = BSON( "0" << 1 );
 
             {
-                Client::WriteContext incCtx(_txn, _config.incLong );
+                OldClientWriteContext incCtx(_txn, _config.incLong );
                 WriteUnitOfWork wuow(_txn);
                 Collection* incColl = getCollectionOrUassert(incCtx.db(), _config.incLong );
 
@@ -1270,7 +1266,15 @@ namespace mongo {
             }
 
             bool run(OperationContext* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            invariant(!fromRepl == txn->writesAreReplicated());
                 Timer t;
+
+                if (txn->getClient()->isInDirectClient()) {
+                    return appendCommandStatus(result,
+                                               Status(ErrorCodes::IllegalOperation,
+                                                      "Cannot run mapReduce command from eval()"));
+                }
+
                 CurOp* op = txn->getCurOp();
 
                 Config config( dbname , cmd );
@@ -1577,7 +1581,6 @@ namespace mongo {
                     while ( i.more() ) {
                         BSONElement e = i.next();
                         string shard = e.fieldName();
-//                        BSONObj res = e.embeddedObjectUserCheck();
                         servers.insert( shard );
                     }
                 }

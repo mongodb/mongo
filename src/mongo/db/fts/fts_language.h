@@ -39,8 +39,10 @@ namespace mongo {
 
     namespace fts {
 
+        class FTSTokenizer;
+
         #define MONGO_FTS_LANGUAGE_DECLARE( language, name, version ) \
-            FTSLanguage language; \
+            BasicFTSLanguage language; \
             MONGO_INITIALIZER_GENERAL( language, MONGO_NO_PREREQUISITES, \
                                        ( "FTSAllLanguagesRegistered" ) ) \
                                      ( ::mongo::InitializerContext* context ) { \
@@ -70,6 +72,8 @@ namespace mongo {
             /** Create an uninitialized language. */
             FTSLanguage();
 
+            virtual ~FTSLanguage() {}
+
             /**
              * Returns the language as a std::string in canonical form (lowercased English name).  It is
              * an error to call str() on an uninitialized language.
@@ -77,12 +81,18 @@ namespace mongo {
             const std::string& str() const;
 
             /**
+             * Returns a new FTSTokenizer instance for this language.
+             * Lifetime is scoped to FTSLanguage (which are currently all process lifetime)
+             */
+            virtual std::unique_ptr<FTSTokenizer> createTokenizer() const = 0;
+
+            /**
              * Register std::string 'languageName' as a new language with text index version
              * 'textIndexVersion'.  Saves the resulting language to out-argument 'languageOut'.
              * Subsequent calls to FTSLanguage::make() will recognize the newly-registered language
              * string.
              */
-            static void registerLanguage( const StringData& languageName,
+            static void registerLanguage( StringData languageName,
                                           TextIndexVersion textIndexVersion,
                                           FTSLanguage *languageOut );
 
@@ -92,7 +102,7 @@ namespace mongo {
              * newly-registered alias. 
              */
             static void registerLanguageAlias( const FTSLanguage* language,
-                                               const StringData& alias,
+                                               StringData alias,
                                                TextIndexVersion textIndexVersion );
 
             /**
@@ -110,7 +120,7 @@ namespace mongo {
              * documents needs to be processed with the English stemmer and the empty stopword list
              * (since "en" is recognized by Snowball but not the stopword processing logic).
              */
-            static StatusWith<const FTSLanguage*> make( const StringData& langName,
+            static StatusWith<const FTSLanguage*> make( StringData langName,
                                                         TextIndexVersion textIndexVersion );
 
         private:
@@ -120,9 +130,15 @@ namespace mongo {
 
         typedef StatusWith<const FTSLanguage*> StatusWithFTSLanguage;
 
-        extern FTSLanguage languagePorterV1;
-        extern FTSLanguage languageEnglishV2;
-        extern FTSLanguage languageFrenchV2;
+
+        class BasicFTSLanguage : public FTSLanguage {
+        public:
+            std::unique_ptr<FTSTokenizer> createTokenizer() const override;
+        };
+
+        extern BasicFTSLanguage languagePorterV1;
+        extern BasicFTSLanguage languageEnglishV2;
+        extern BasicFTSLanguage languageFrenchV2;
 
     }
 }

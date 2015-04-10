@@ -12,7 +12,7 @@ var m = MongoRunner.runMongod({auth : "", port : port[4], dbpath : MongoRunner.d
 
 assert.eq(m.getDB("local").auth("__system", ""), 0);
 
-stopMongod(port[4]);
+MongoRunner.stopMongod(m);
 
 
 print("reset permissions");
@@ -26,7 +26,7 @@ m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--d
 
 print("should fail with wrong permissions");
 assert.eq(m, _isWindows()? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
-stopMongod(port[0]);
+MongoRunner.stopMongod(port[0]);
 
 
 print("change permissions on #1 & #2");
@@ -35,11 +35,11 @@ run("chmod", "600", path+"key2");
 
 
 print("add a user to server0: foo");
-m = startMongodTest( port[0], name+"-0", 0 );
+m = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-0"});
 m.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
 m.getDB("test").createUser({user: "bar", pwd: "baz", roles: jsTest.basicUserRoles});
 print("make sure user is written before shutting down");
-stopMongod(port[0]);
+MongoRunner.stopMongod(m);
 
 print("start up rs");
 var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
@@ -126,8 +126,11 @@ for (var i=0; i<1000; i++) {
 bulk.execute({ w:3, wtimeout:60000 });
 
 print("add member with wrong key");
-var conn = new MongodRunner(port[3], MongoRunner.dataPath+name+"-3", null, null, ["--replSet","rs_auth1","--rest","--oplogSize","2", "--keyFile", path+"key2"], {no_bind : true});
-conn.start();
+var conn = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-3",
+                                  port: port[3],
+                                  replSet: "rs_auth1",
+                                  oplogSize: 2,
+                                  keyFile: path + "key2"});
 
 
 master.getDB("admin").auth("foo", "bar");
@@ -155,12 +158,15 @@ for (var i = 0; i<10; i++) {
 
 
 print("stop member");
-stopMongod(port[3]);
+MongoRunner.stopMongod(conn);
 
 
 print("start back up with correct key");
-conn = new MongodRunner(port[3], MongoRunner.dataPath+name+"-3", null, null, ["--replSet","rs_auth1","--rest","--oplogSize","2", "--keyFile", path+"key1"], {no_bind : true});
-conn.start();
+var conn = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-3",
+                                  port: port[3],
+                                  replSet: "rs_auth1",
+                                  oplogSize: 2,
+                                  keyFile: path + "key1"});
 
 wait(function() {
     try {

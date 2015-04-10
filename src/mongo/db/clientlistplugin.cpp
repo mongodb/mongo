@@ -38,7 +38,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/currentop_command.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/dbwebserver.h"
@@ -86,7 +86,7 @@ namespace {
         static void _processAllClients(std::stringstream& ss) {
             using namespace html;
 
-            boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+            boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
 
             ClientSet::const_iterator it = Client::clients.begin();
             for (; it != Client::clients.end(); it++) {
@@ -198,7 +198,7 @@ namespace {
         static BSONArray _processAllClients(MatchExpression* matcher) {
             BSONArrayBuilder array;
 
-            boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+            boost::lock_guard<boost::mutex> scopedLock(Client::clientsMutex);
 
             ClientSet::const_iterator it = Client::clients.begin();
             for (; it != Client::clients.end(); it++) {

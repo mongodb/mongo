@@ -38,16 +38,18 @@
 #include <sstream>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/scoped_conn.h"
+#include "mongo/db/repl/network_interface_impl_downconvert_find_getmore.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -58,6 +60,9 @@ namespace {
 
     const size_t kMinThreads = 1;
     const size_t kMaxThreads = 51;  // Set to 1 + max repl set size, for heartbeat + wiggle room.
+    const unsigned long long kNeverTooStale = std::numeric_limits<unsigned long long>::max();
+    // 5 Minutes (Note: Must be larger than kMaxConnectionAge below)
+    const long long kCleanUpInterval = 5 * 60 * 1000;
     const Seconds kMaxIdleThreadAge(30);
     const Seconds kMaxConnectionAge(30);
 
@@ -75,6 +80,7 @@ namespace {
 
         typedef stdx::list<ConnectionInfo> ConnectionList;
         typedef unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
+        typedef std::map<HostAndPort, Date_t> HostLastUsedMap;
 
         /**
          * RAII class for connections from the pool.  To use the connection pool, instantiate one of
@@ -111,7 +117,7 @@ namespace {
 
             DBClientConnection& operator*();
             DBClientConnection* operator->();
-
+            operator DBClientConnection*();
         private:
             ConnectionPool* _pool;
             const ConnectionList::iterator _connInfo;
@@ -159,6 +165,11 @@ namespace {
         bool shouldKeepConnection(Date_t now, const ConnectionInfo& connInfo) const;
 
         /**
+         * Apply cleanup policy to any host(s) not active in the last kCleanupInterval milliseconds.
+         */
+        void cleanUpStaleHosts_inlock(Date_t now);
+
+        /**
          * Implementation of cleanUpOlderThan which assumes that _mutex is already held.
          */
         void cleanUpOlderThan_inlock(Date_t now);
@@ -183,6 +194,12 @@ namespace {
 
         // List of non-idle connections.
         ConnectionList _inUseConnections;
+
+        // Map of HostAndPorts to when they were last used.
+        HostLastUsedMap _lastUsedHosts;
+        
+        // Time representing when the connections were last cleaned.
+        Date_t _lastCleanUpTime;
     };
 
     /**
@@ -209,7 +226,11 @@ namespace {
         return _connInfo->conn;
     }
 
-    NetworkInterfaceImpl::ConnectionPool::ConnectionPool() {}
+    NetworkInterfaceImpl::ConnectionPool::ConnectionPtr::operator DBClientConnection*() {
+        return _connInfo->conn;
+    }
+
+    NetworkInterfaceImpl::ConnectionPool::ConnectionPool() : _lastCleanUpTime(0ULL) {}
 
     NetworkInterfaceImpl::ConnectionPool::~ConnectionPool() {
         cleanUpOlderThan(Date_t(~0ULL));
@@ -271,17 +292,40 @@ namespace {
         }
     }
 
+    void NetworkInterfaceImpl::ConnectionPool::cleanUpStaleHosts_inlock(Date_t now) {
+        if (now > _lastCleanUpTime + kCleanUpInterval) {
+            for (HostLastUsedMap::iterator itr = _lastUsedHosts.begin();
+                    itr != _lastUsedHosts.end();
+                    itr++) {
+                if (itr->second <= _lastCleanUpTime) {
+                    ConnectionList connList = _connections.find(itr->first)->second;
+                    cleanUpOlderThan_inlock(now, &connList);
+                    invariant(connList.empty());
+                    itr->second = Date_t(kNeverTooStale);
+                }
+            }
+            _lastCleanUpTime = now;
+        }
+    }
+
     NetworkInterfaceImpl::ConnectionPool::ConnectionList::iterator
     NetworkInterfaceImpl::ConnectionPool::acquireConnection(
             const HostAndPort& target,
             Date_t now,
             Milliseconds timeout) {
         boost::unique_lock<boost::mutex> lk(_mutex);
+
+        // Clean up connections on stale/unused hosts
+        cleanUpStaleHosts_inlock(now);
+
         for (HostConnectionMap::iterator hostConns;
              ((hostConns = _connections.find(target)) != _connections.end());) {
 
+            // Clean up the requested host to remove stale/unused connections
             cleanUpOlderThan_inlock(now, &hostConns->second);
             if (hostConns->second.empty()) {
+                // prevent host from causing unnecessary cleanups
+                _lastUsedHosts[hostConns->first] = Date_t(kNeverTooStale);
                 break;
             }
             _inUseConnections.splice(_inUseConnections.begin(),
@@ -319,7 +363,7 @@ namespace {
                 str::stream() << "Failed attempt to connect to " << target.toString() << "; " <<
                 errmsg,
                 conn->connect(target, errmsg));
-        conn->port().tag |= ScopedConn::keepOpen;
+        conn->port().tag |= ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen;
         if (getGlobalAuthorizationManager()->isAuthEnabled()) {
             uassert(ErrorCodes::AuthenticationFailed,
                     "Missing credentials for authenticating as internal user",
@@ -341,6 +385,7 @@ namespace {
         ConnectionList& hostConns = _connections[iter->conn->getServerHostAndPort()];
         cleanUpOlderThan_inlock(now, &hostConns);
         hostConns.splice(hostConns.begin(), _inUseConnections, iter);
+        _lastUsedHosts[iter->conn->getServerHostAndPort()] = now;
     }
 
     void NetworkInterfaceImpl::ConnectionPool::destroyConnection(ConnectionList::iterator iter) {
@@ -617,7 +662,33 @@ namespace {
                                                request.target,
                                                requestStartDate,
                                                Milliseconds(timeoutMillis.getValue()));
-            conn->runCommand(request.dbname, request.cmdObj, output);
+            bool ok = conn->runCommand(request.dbname, request.cmdObj, output);
+
+            // If remote server does not support either find or getMore commands, down convert
+            // to using DBClientInterface::query()/getMore().
+            // TODO: Perform down conversion based on wire protocol version.
+            //       Refer to the down conversion implementation in the shell.
+            if (!ok &&
+                getStatusFromCommandResult(output).code() == ErrorCodes::CommandNotFound) {
+
+                // 'commandName' will be an empty string if the command object is an empty BSON
+                // document.
+                StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
+                if (commandName == "find") {
+                    runDownconvertedFindCommand(
+                        conn,
+                        request.dbname,
+                        request.cmdObj,
+                        &output);
+                }
+                else if (commandName == "getMore") {
+                    runDownconvertedGetMoreCommand(
+                        conn,
+                        request.dbname,
+                        request.cmdObj,
+                        &output);
+                }
+            }
             const Date_t requestFinishDate = now();
             conn.done(requestFinishDate);
             return ResponseStatus(Response(output,

@@ -94,7 +94,7 @@ namespace mongo {
             case Symbol: return "Symbol";
             case CodeWScope: return "CodeWScope";
             case NumberInt: return "NumberInt32";
-            case Timestamp: return "Timestamp";
+            case bsonTimestamp: return "Timestamp";
             case NumberLong: return "NumberLong64";
             // JSTypeMax doesn't make sense to turn into a string; overlaps with highest-valued type
             case MaxKey: return "MaxKey";

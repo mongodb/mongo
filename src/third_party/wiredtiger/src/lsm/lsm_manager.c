@@ -11,7 +11,7 @@
 static int __lsm_manager_aggressive_update(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_manager_run_server(WT_SESSION_IMPL *);
 
-static void * __lsm_worker_manager(void *);
+static WT_THREAD_RET __lsm_worker_manager(void *);
 
 /*
  * __wt_lsm_manager_config --
@@ -500,7 +500,7 @@ err:	if (dhandle_locked) {
  *	A thread that manages all open LSM trees, and the shared LSM worker
  *	threads.
  */
-static void *
+static WT_THREAD_RET
 __lsm_worker_manager(void *arg)
 {
 	WT_DECL_RET;
@@ -518,7 +518,7 @@ __lsm_worker_manager(void *arg)
 err:		WT_PANIC_MSG(session, ret, "LSM worker manager thread error");
 	}
 	F_CLR(S2C(session), WT_CONN_SERVER_LSM);
-	return (NULL);
+	return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -657,6 +657,21 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	WT_LSM_WORK_UNIT *entry;
 
 	manager = &S2C(session)->lsm_manager;
+
+	/*
+	 * Don't add merges or bloom filter creates if merges
+	 * or bloom filters are disabled in the tree.
+	 */
+	switch (type) {
+	case WT_LSM_WORK_BLOOM:
+		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
+			return (0);
+		break;
+	case WT_LSM_WORK_MERGE:
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_MERGES))
+			return (0);
+		break;
+	}
 
 	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
 

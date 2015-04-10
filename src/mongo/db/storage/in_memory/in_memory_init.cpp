@@ -30,7 +30,7 @@
  */
 
 #include "mongo/base/init.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/in_memory/in_memory_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage_options.h"
@@ -54,15 +54,6 @@ namespace mongo {
                 return "inMemoryExperiment";
             }
 
-            virtual Status validateCollectionStorageOptions(const BSONObj& options) const
-            {
-                return Status::OK();
-            }
-
-            virtual Status validateIndexStorageOptions(const BSONObj& options) const {
-                return Status::OK();
-            }
-
             virtual Status validateMetadata(const StorageEngineMetadata& metadata,
                                             const StorageGlobalParams& params) const {
                 return Status::OK();
@@ -79,7 +70,7 @@ namespace mongo {
                                          ("SetGlobalEnvironment"))
                                          (InitializerContext* context) {
 
-        getGlobalEnvironment()->registerStorageEngine("inMemoryExperiment", new InMemoryFactory());
+        getGlobalServiceContext()->registerStorageEngine("inMemoryExperiment", new InMemoryFactory());
         return Status::OK();
     }
 

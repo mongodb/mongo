@@ -55,9 +55,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_WRITE_BARRIER();
 
-	/* Connect to a cache pool. */
-	WT_RET(__wt_cache_pool_config(session, cfg));
-
 	/* Create the cache. */
 	WT_RET(__wt_cache_create(session, cfg));
 
@@ -113,6 +110,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(session));
 	WT_TRET(__wt_lsm_manager_destroy(session));
+
+	F_SET(conn, WT_CONN_CLOSING);
+
 	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, 1));
 	WT_TRET(__wt_sweep_destroy(session));
@@ -143,14 +143,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * Complain if files weren't closed, ignoring the lock file, we'll
 	 * close it in a minute.
 	 */
-	TAILQ_FOREACH(fh, &conn->fhqh, q) {
+	SLIST_FOREACH(fh, &conn->fhlh, l) {
 		if (fh == conn->lock_fh)
 			continue;
 
 		__wt_errx(session,
 		    "Connection has open file handles: %s", fh->name);
-		WT_TRET(__wt_close(session, fh));
-		fh = TAILQ_FIRST(&conn->fhqh);
+		WT_TRET(__wt_close(session, &fh));
+		fh = SLIST_FIRST(&conn->fhlh);
 	}
 
 	/* Shut down the eviction server thread. */

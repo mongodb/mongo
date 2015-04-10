@@ -50,10 +50,12 @@
 // NOTE(schwerin): MSVC's _snprintf is not a drop-in replacement for C99's snprintf().  In
 // particular, when the target buffer is too small, behaviors differ.  Consult the documentation
 // from MSDN and form the BSD or Linux man pages before using.
+#if _MSC_VER < 1900
 #define snprintf _snprintf
 #endif
+#endif
 
-#ifdef __sunos__
+#ifdef __sun
 // Some versions of Solaris do not have timegm defined, so fall back to our implementation when
 // building on Solaris.  See SERVER-13446.
 extern "C" time_t
@@ -247,8 +249,8 @@ namespace {
     }
 
 namespace {
-    StringData getNextToken(const StringData& currentString,
-                            const StringData& terminalChars,
+    StringData getNextToken(StringData currentString,
+                            StringData terminalChars,
                             size_t startIndex,
                             size_t* endIndex) {
         size_t index = startIndex;
@@ -275,7 +277,7 @@ namespace {
     }
 
     // Check to make sure that the string only consists of digits
-    bool isOnlyDigits(const StringData& toCheck) {
+    bool isOnlyDigits(StringData toCheck) {
         StringData digits("0123456789");
         for (StringData::const_iterator iterator = toCheck.begin();
              iterator != toCheck.end(); iterator++) {
@@ -286,7 +288,7 @@ namespace {
         return true;
     }
 
-    Status parseTimeZoneFromToken(const StringData& tzStr, int* tzAdjSecs) {
+    Status parseTimeZoneFromToken(StringData tzStr, int* tzAdjSecs) {
 
         *tzAdjSecs = 0;
 
@@ -361,7 +363,7 @@ namespace {
     }
 
     Status parseMillisFromToken(
-            const StringData& millisStr,
+            StringData millisStr,
             int* resultMillis) {
 
         *resultMillis = 0;
@@ -401,12 +403,12 @@ namespace {
     }
 
     Status parseTmFromTokens(
-            const StringData& yearStr,
-            const StringData& monthStr,
-            const StringData& dayStr,
-            const StringData& hourStr,
-            const StringData& minStr,
-            const StringData& secStr,
+            StringData yearStr,
+            StringData monthStr,
+            StringData dayStr,
+            StringData hourStr,
+            StringData minStr,
+            StringData secStr,
             std::tm* resultTm) {
 
         memset(resultTm, 0, sizeof(*resultTm));
@@ -530,7 +532,7 @@ namespace {
         return Status::OK();
     }
 
-    Status parseTm(const StringData& dateString,
+    Status parseTm(StringData dateString,
                    std::tm* resultTm,
                    int* resultMillis,
                    int* tzAdjSecs) {
@@ -624,7 +626,7 @@ namespace {
 
 }  // namespace
 
-    StatusWith<Date_t> dateFromISOString(const StringData& dateString) {
+    StatusWith<Date_t> dateFromISOString(StringData dateString) {
         std::tm theTime;
         int millis = 0;
         int tzAdjSecs = 0;

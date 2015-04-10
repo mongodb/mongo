@@ -26,7 +26,10 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/client.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
@@ -55,7 +58,11 @@ namespace QueryStageIxscan {
             _ctx.db()->dropCollection(&_txn, ns());
             _coll = _ctx.db()->createCollection(&_txn, ns());
 
-            ASSERT_OK(dbtests::createIndex(&_txn, ns(), BSON("x" << 1)));
+            ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
+                        &_txn,
+                        BSON("ns" << ns()
+                          << "key" << BSON("x" << 1)
+                          << "name" << DBClientBase::genIndexName(BSON("x" << 1)))));
 
             wunit.commit();
         }
@@ -137,7 +144,7 @@ namespace QueryStageIxscan {
 
         ScopedTransaction _scopedXact;
         Lock::DBLock _dbLock;
-        Client::Context _ctx;
+        OldClientContext _ctx;
         Collection* _coll;
 
         WorkingSet _ws;
@@ -193,10 +200,13 @@ namespace QueryStageIxscan {
             insert(fromjson("{_id: 5, x: 11}"));
             ixscan->restoreState(&_txn);
 
-            // Expect EOF: we miss {'': 10} because it is inserted behind the cursor.
-            ASSERT(ixscan->isEOF());
+            member = getNext(ixscan.get());
+            ASSERT_EQ(WorkingSetMember::LOC_AND_IDX, member->state);
+            ASSERT_EQ(member->keyData[0].keyData, BSON("" << 10));
+
             WorkingSetID id;
             ASSERT_EQ(PlanStage::IS_EOF, ixscan->work(&id));
+            ASSERT(ixscan->isEOF());
         }
     };
 
@@ -225,11 +235,13 @@ namespace QueryStageIxscan {
             insert(fromjson("{_id: 4, x: 7}"));
             ixscan->restoreState(&_txn);
 
-            // Expect EOF: we miss {'': 7} because it is inserted behind the cursor, and
-            // {'': 10} is not in the range (5, 10)
-            ASSERT(ixscan->isEOF());
+            member = getNext(ixscan.get());
+            ASSERT_EQ(WorkingSetMember::LOC_AND_IDX, member->state);
+            ASSERT_EQ(member->keyData[0].keyData, BSON("" << 7));
+
             WorkingSetID id;
             ASSERT_EQ(PlanStage::IS_EOF, ixscan->work(&id));
+            ASSERT(ixscan->isEOF());
         }
     };
 
@@ -259,9 +271,9 @@ namespace QueryStageIxscan {
             ixscan->restoreState(&_txn);
 
             // Ensure that we're EOF and we don't erroneously return {'': 12}.
-            ASSERT(ixscan->isEOF());
             WorkingSetID id;
             ASSERT_EQ(PlanStage::IS_EOF, ixscan->work(&id));
+            ASSERT(ixscan->isEOF());
         }
     };
 
@@ -292,12 +304,17 @@ namespace QueryStageIxscan {
             // Save state and insert an indexed doc.
             ixscan->saveState();
             insert(fromjson("{_id: 4, x: 6}"));
+            insert(fromjson("{_id: 5, x: 9}"));
             ixscan->restoreState(&_txn);
 
-            // Ensure that we're EOF and we don't erroneously return {'': 6}.
-            ASSERT(ixscan->isEOF());
+            // Ensure that we don't erroneously return {'': 9} or {'':3}.
+            member = getNext(ixscan.get());
+            ASSERT_EQ(WorkingSetMember::LOC_AND_IDX, member->state);
+            ASSERT_EQ(member->keyData[0].keyData, BSON("" << 6));
+
             WorkingSetID id;
             ASSERT_EQ(PlanStage::IS_EOF, ixscan->work(&id));
+            ASSERT(ixscan->isEOF());
         }
     };
 

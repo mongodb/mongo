@@ -195,7 +195,7 @@ namespace mongo {
         return toBSON().toString();
     }
 
-    void BatchedUpdateRequest::setCollName(const StringData& collName) {
+    void BatchedUpdateRequest::setCollName(StringData collName) {
         _collName = NamespaceString(collName);
         _isCollNameSet = true;
     }

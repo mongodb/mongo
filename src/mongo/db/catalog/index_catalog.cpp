@@ -47,13 +47,14 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -80,7 +81,9 @@ namespace mongo {
     // -------------
 
     IndexCatalog::IndexCatalog( Collection* collection )
-        : _magic(INDEX_CATALOG_UNINIT), _collection( collection ) {
+        : _magic(INDEX_CATALOG_UNINIT),
+          _collection( collection ),
+          _maxNumIndexesAllowed(_collection->getCatalogEntry()->getMaxAllowedIndexes()) {
     }
 
     IndexCatalog::~IndexCatalog() {
@@ -447,6 +450,39 @@ namespace {
         entry->setIsReady( true );
     }
 
+    namespace {
+        // While technically recursive, only current possible with 2 levels.
+        Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) {
+            if (!expression)
+                return Status::OK();
+
+            switch(expression->matchType()) {
+            case MatchExpression::AND:
+                if (level > 0)
+                    return Status(ErrorCodes::CannotCreateIndex,
+                                  "$and only supported in filter at top level");
+                for (size_t i = 0; i < expression->numChildren(); i++) {
+                    Status status = _checkValidFilterExpressions(expression->getChild(i),
+                                                                 level + 1 );
+                    if (!status.isOK())
+                        return status;
+                }
+                return Status::OK();
+            case MatchExpression::EQ:
+            case MatchExpression::LT:
+            case MatchExpression::LTE:
+            case MatchExpression::GT:
+            case MatchExpression::GTE:
+            case MatchExpression::EXISTS:
+            case MatchExpression::TYPE_OPERATOR:
+                return Status::OK();
+            default:
+                return Status(ErrorCodes::CannotCreateIndex,
+                              str::stream() << "unsupported expression in filtered index: "
+                              << expression->toString());
+            }
+        }
+    }
 
     Status IndexCatalog::_isSpecOk( const BSONObj& spec ) const {
 
@@ -461,7 +497,7 @@ namespace {
             double v = vElt.Number();
 
             // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
-            if (v == 0 && !getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1()) {
+            if (v == 0 && !getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
                 return Status( ErrorCodes::CannotCreateIndex,
                                str::stream() << "use of v0 indexes is only allowed with the "
                                              << "mmapv1 storage engine");
@@ -508,6 +544,9 @@ namespace {
         if (name.find('\0') != std::string::npos)
             return Status(ErrorCodes::CannotCreateIndex, "index names cannot contain NUL bytes");
 
+        if (name.empty())
+            return Status(ErrorCodes::CannotCreateIndex, "index names cannot be empty");
+
         const std::string indexNamespace = IndexDescriptor::makeIndexNamespace( nss.ns(), name );
         if ( indexNamespace.length() > NamespaceString::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
@@ -537,16 +576,42 @@ namespace {
             }
         }
 
+        // Ensure if there is a filter, its valid.
+        BSONElement filterElement = spec.getField("filter");
+        if ( filterElement.type() ) {
+            if ( spec["sparse"].trueValue() ) {
+                return Status( ErrorCodes::CannotCreateIndex,
+                               "cannot mix \"filter\" and \"sparse\" options" );
+            }
+
+            if ( filterElement.type() != Object ) {
+                return Status(ErrorCodes::CannotCreateIndex,
+                              "'filter' for an index has to be a document");
+            }
+            StatusWithMatchExpression res = MatchExpressionParser::parse( filterElement.Obj() );
+            if ( !res.isOK() ) {
+                return res.getStatus();
+            }
+            const std::unique_ptr<MatchExpression> filterExpr( res.getValue() );
+
+            Status status = _checkValidFilterExpressions( filterExpr.get() );
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        // --- only storage engine checks allowed below this ----
+
         BSONElement storageEngineElement = spec.getField("storageEngine");
         if (storageEngineElement.eoo()) {
             return Status::OK();
         }
         if (storageEngineElement.type() != mongo::Object) {
-            return Status(ErrorCodes::BadValue, "'storageEngine' has to be a document.");
+            return Status(ErrorCodes::CannotCreateIndex, "'storageEngine' has to be a document.");
         }
         BSONObj storageEngineOptions = storageEngineElement.Obj();
         if (storageEngineOptions.isEmpty()) {
-            return Status(ErrorCodes::BadValue,
+            return Status(ErrorCodes::CannotCreateIndex,
                           "Empty 'storageEngine' options are invalid. "
                           "Please remove, or include valid options.");
 
@@ -615,8 +680,7 @@ namespace {
             }
         }
 
-        if ( _collection->getCatalogEntry()->getTotalIndexCount( txn ) >=
-             _collection->getCatalogEntry()->getMaxAllowedIndexes() ) {
+        if ( numIndexesTotal(txn) >= _maxNumIndexesAllowed ) {
             string s = str::stream() << "add index fails, too many indexes for "
                                      << _collection->ns().ns() << " key:" << key.toString();
             log() << s;
@@ -872,11 +936,20 @@ namespace {
     }
 
     int IndexCatalog::numIndexesTotal( OperationContext* txn ) const {
-        return _collection->getCatalogEntry()->getTotalIndexCount( txn );
+        int count = _entries.size() + _unfinishedIndexes.size();
+        dassert(_collection->getCatalogEntry()->getTotalIndexCount(txn) == count);
+        return count;
     }
 
     int IndexCatalog::numIndexesReady( OperationContext* txn ) const {
-        return _collection->getCatalogEntry()->getCompletedIndexCount( txn );
+        int count = 0;
+        IndexIterator ii = getIndexIterator(txn, /*includeUnfinished*/false);
+        while (ii.more()) {
+            ii.next();
+            count++;
+        }
+        dassert(_collection->getCatalogEntry()->getCompletedIndexCount(txn) == count);
+        return count;
     }
 
     bool IndexCatalog::haveIdIndex( OperationContext* txn ) const {
@@ -911,9 +984,14 @@ namespace {
         return _prev->descriptor();
     }
 
-    IndexAccessMethod* IndexCatalog::IndexIterator::accessMethod( IndexDescriptor* desc ) {
+    IndexAccessMethod* IndexCatalog::IndexIterator::accessMethod( const IndexDescriptor* desc ) {
         invariant( desc == _prev->descriptor() );
         return _prev->accessMethod();
+    }
+
+    IndexCatalogEntry* IndexCatalog::IndexIterator::catalogEntry( const IndexDescriptor* desc ) {
+        invariant( desc == _prev->descriptor() );
+        return _prev;
     }
 
     void IndexCatalog::IndexIterator::_advance() {
@@ -944,7 +1022,7 @@ namespace {
     }
 
     IndexDescriptor* IndexCatalog::findIndexByName( OperationContext* txn,
-                                                    const StringData& name,
+                                                    StringData name,
                                                     bool includeUnfinishedIndexes ) const {
         IndexIterator ii = getIndexIterator( txn, includeUnfinishedIndexes );
         while ( ii.more() ) {
@@ -1071,6 +1149,11 @@ namespace {
                                       IndexCatalogEntry* index,
                                       const BSONObj& obj,
                                       const RecordId &loc ) {
+        const MatchExpression* filter = index->getFilterExpression();
+        if ( filter && !filter->matchesBSON( obj ) ) {
+            return Status::OK();
+        }
+
         InsertDeleteOptions options;
         options.logIfError = false;
         options.dupsAllowed = isDupsAllowed( index->descriptor() );
@@ -1087,6 +1170,11 @@ namespace {
         InsertDeleteOptions options;
         options.logIfError = logIfError;
         options.dupsAllowed = isDupsAllowed( index->descriptor() );
+
+        // For unindex operations, dupsAllowed=false really means that it is safe to delete anything
+        // that matches the key, without checking the RecordID, since dups are impossible. We need
+        // to disable this behavior for in-progress indexes. See SERVER-17487 for more details.
+        options.dupsAllowed = options.dupsAllowed || !index->isReady(txn);
 
         int64_t removed;
         Status status = index->accessMethod()->remove(txn, obj, loc, options, &removed);
@@ -1218,7 +1306,7 @@ namespace {
             // immediately after it recovers from yield, such that no further work is done
             // on the index build. Thus this thread does not have to synchronize with the
             // bg index operation; we can just assume that it is safe to proceed.
-            getGlobalEnvironment()->killOperation(opNum);
+            getGlobalServiceContext()->killOperation(opNum);
         }
 
         if (indexes.size() > 0) {

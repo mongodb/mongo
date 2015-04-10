@@ -24,6 +24,10 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	chunk = NULL;			/* -Wconditional-uninitialized */
 
+	/* LSM trees inherit the merge setting from the connection. */
+	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
+		F_SET(lsm_tree, WT_LSM_TREE_MERGES);
+
 	WT_RET(__wt_metadata_search(session, lsm_tree->name, &lsmconfig));
 	WT_ERR(__wt_config_init(session, &cparser, lsmconfig));
 	while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
@@ -37,7 +41,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    cv.str, cv.len, &lsm_tree->value_format));
 		} else if (WT_STRING_MATCH("collator", ck.str, ck.len)) {
 			if (cv.len == 0 ||
-			    WT_STRING_CASE_MATCH("none", cv.str, cv.len))
+			    WT_STRING_MATCH("none", cv.str, cv.len))
 				continue;
 			/*
 			 * Extract the application-supplied metadata (if any)
@@ -74,7 +78,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			lsm_tree->bloom_bit_count = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("bloom_hash_count", ck.str, ck.len))
 			lsm_tree->bloom_hash_count = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH("chunk_max", ck.str, ck.len))
+		else if (WT_STRING_MATCH("chunk_count_limit", ck.str, ck.len)) {
+			lsm_tree->chunk_count_limit = (uint32_t)cv.val;
+			if (cv.val != 0)
+				F_CLR(lsm_tree, WT_LSM_TREE_MERGES);
+		} else if (WT_STRING_MATCH("chunk_max", ck.str, ck.len))
 			lsm_tree->chunk_max = (uint64_t)cv.val;
 		else if (WT_STRING_MATCH("chunk_size", ck.str, ck.len))
 			lsm_tree->chunk_size = (uint64_t)cv.val;
@@ -145,10 +153,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 			lsm_tree->nold_chunks = nchunks;
-		/* Values included for backward compatibility */
-		} else if (WT_STRING_MATCH("merge_threads", ck.str, ck.len)) {
-		} else
-			WT_ERR(__wt_illegal_value(session, "LSM metadata"));
+		}
+		/*
+		 * Ignore any other values: the metadata entry might have been
+		 * created by a future release, with unknown options.
+		 */
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -187,6 +196,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    session, buf, ",collator=%s", lsm_tree->collator_name));
 	WT_ERR(__wt_buf_catfmt(session, buf,
 	    ",last=%" PRIu32
+	    ",chunk_count_limit=%" PRIu32
 	    ",chunk_max=%" PRIu64
 	    ",chunk_size=%" PRIu64
 	    ",auto_throttle=%" PRIu32
@@ -195,7 +205,8 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    ",bloom=%" PRIu32
 	    ",bloom_bit_count=%" PRIu32
 	    ",bloom_hash_count=%" PRIu32,
-	    lsm_tree->last, lsm_tree->chunk_max, lsm_tree->chunk_size,
+	    lsm_tree->last, lsm_tree->chunk_count_limit,
+	    lsm_tree->chunk_max, lsm_tree->chunk_size,
 	    F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) ? 1 : 0,
 	    lsm_tree->merge_max, lsm_tree->merge_min, lsm_tree->bloom,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count));

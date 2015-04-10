@@ -42,6 +42,10 @@ namespace mongo {
         _canonicalQuery() { }
 
     Status ParsedUpdate::parseRequest() {
+        // It is invalid to request that the update plan stores a copy of the resulting document
+        // if it is a multi-update.
+        invariant(!(_request->shouldStoreResultDoc() && _request->isMulti()));
+
         // We parse the update portion before the query portion because the dispostion of the update
         // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
         // the update involves the positional-dollar operator, we must have a CanonicalQuery even if
@@ -90,12 +94,12 @@ namespace mongo {
         // Only user updates should be checked. Any system or replication stuff should pass through.
         // Config db docs shouldn't get checked for valid field names since the shard key can have
         // a dot (".") in it.
-        const bool shouldValidate = !(_request->isFromReplication() ||
+        const bool shouldValidate = !(!_txn->writesAreReplicated() ||
                                       ns.isConfigDB() ||
                                       _request->isFromMigration());
 
         _driver.setLogOp(true);
-        _driver.setModOptions(ModifierInterface::Options(_request->isFromReplication(),
+        _driver.setModOptions(ModifierInterface::Options(!_txn->writesAreReplicated(),
                                                          shouldValidate));
 
         return _driver.parse(_request->getUpdates(), _request->isMulti());
@@ -103,10 +107,14 @@ namespace mongo {
 
     bool ParsedUpdate::canYield() const {
         return !_request->isGod() &&
-            PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() && (
-            _canonicalQuery.get() ?
-            !QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC) :
-            !LiteParsedQuery::isQueryIsolated(_request->getQuery()));
+            PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
+            !isIsolated();
+    }
+
+    bool ParsedUpdate::isIsolated() const {
+        return _canonicalQuery.get()
+            ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
+            : LiteParsedQuery::isQueryIsolated(_request->getQuery());
     }
 
     bool ParsedUpdate::hasParsedQuery() const {

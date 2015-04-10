@@ -56,7 +56,7 @@ namespace mongo {
         case MaxKey:
         case jstOID:
         case Date:
-        case Timestamp:
+        case bsonTimestamp:
         case EOO:
         case jstNULL:
         case Undefined:
@@ -92,7 +92,7 @@ namespace mongo {
         }
     }
 
-    void ValueStorage::putString(const StringData& s) {
+    void ValueStorage::putString(StringData s) {
         // Note: this also stores data portion of BinData
         const size_t sizeNoNUL = s.size();
         if (sizeNoNUL <= sizeof(shortStrStorage)) {
@@ -199,9 +199,8 @@ namespace mongo {
             _storage.intValue = elem.numberInt();
             break;
 
-        case Timestamp:
-            // asDate is a poorly named function that returns a ReplTime
-            _storage.timestampValue = elem._opTime().asDate();
+        case bsonTimestamp:
+            _storage.timestampValue = elem.timestamp().asULL();
             break;
 
         case NumberLong:
@@ -290,7 +289,7 @@ namespace mongo {
         case String:       return builder << val.getStringData();
         case Bool:         return builder << val.getBool();
         case Date:         return builder << Date_t(val.getDate());
-        case Timestamp:    return builder << val.getTimestamp();
+        case bsonTimestamp:    return builder << val.getTimestamp();
         case Object:       return builder << val.getDocument();
         case Symbol:       return builder << BSONSymbol(val.getStringData());
         case Code:         return builder << BSONCode(val.getStringData());
@@ -348,7 +347,7 @@ namespace mongo {
         case Date:
         case RegEx:
         case Symbol:
-        case Timestamp:
+        case bsonTimestamp:
             return true;
 
         case EOO:
@@ -426,7 +425,7 @@ namespace mongo {
         case Date:
             return getDate();
 
-        case Timestamp:
+        case bsonTimestamp:
             return getTimestamp().getSecs() * 1000LL;
 
         default:
@@ -503,7 +502,7 @@ namespace mongo {
         case String:
             return getStringData().toString();
 
-        case Timestamp:
+        case bsonTimestamp:
             return getTimestamp().toStringPretty();
 
         case Date:
@@ -522,9 +521,9 @@ namespace mongo {
         } // switch(getType())
     }
 
-    OpTime Value::coerceToTimestamp() const {
+    Timestamp Value::coerceToTimestamp() const {
         switch(getType()) {
-        case Timestamp:
+        case bsonTimestamp:
             return getTimestamp();
 
         default:
@@ -579,7 +578,7 @@ namespace mongo {
         case Bool:
             return rL.getBool() - rR.getBool();
 
-        case Timestamp: // unsigned
+        case bsonTimestamp: // unsigned
             return cmp(rL._storage.timestampValue, rR._storage.timestampValue);
 
         case Date: // signed
@@ -706,7 +705,7 @@ namespace mongo {
             boost::hash_combine(seed, getBool());
             break;
 
-        case Timestamp:
+        case bsonTimestamp:
         case Date:
             BOOST_STATIC_ASSERT(sizeof(_storage.dateValue) == sizeof(_storage.timestampValue));
             boost::hash_combine(seed, _storage.dateValue);
@@ -865,7 +864,7 @@ namespace mongo {
         case Bool:
         case Date:
         case NumberInt:
-        case Timestamp:
+        case bsonTimestamp:
         case NumberLong:
         case jstNULL:
         case Undefined:
@@ -898,7 +897,7 @@ namespace mongo {
         case jstNULL: return out << "null";
         case Undefined: return out << "undefined";
         case Date: return out << tmToISODateString(val.coerceToTm());
-        case Timestamp: return out << val.getTimestamp().toString();
+        case bsonTimestamp: return out << val.getTimestamp().toString();
         case Object: return out << val.getDocument().toString();
         case Array: {
             out << "[";
@@ -949,7 +948,7 @@ namespace mongo {
         case NumberDouble: buf.appendNum(_storage.doubleValue); break;
         case Bool:         buf.appendChar(_storage.boolValue); break;
         case Date:         buf.appendNum(_storage.dateValue); break;
-        case Timestamp:    buf.appendStruct(getTimestamp()); break;
+        case bsonTimestamp:    buf.appendStruct(getTimestamp()); break;
 
         // types that are like strings
         case String:
@@ -1020,7 +1019,7 @@ namespace mongo {
         case NumberDouble: return Value(buf.read<double>());
         case Bool:         return Value(bool(buf.read<char>()));
         case Date:         return Value(Date_t(buf.read<long long>()));
-        case Timestamp:    return Value(buf.read<OpTime>());
+        case bsonTimestamp:  return Value(buf.read<Timestamp>());
 
         // types that are like strings
         case String:

@@ -15,10 +15,8 @@
  */
 
 
-var port = allocatePorts(1)[0];
 baseName = "jstests_restorewithauth";
-var conn = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface",
-                        "--nojournal", "--bind_ip", "127.0.0.1" );
+var conn = MongoRunner.runMongod({nojournal: "", bind_ip: "127.0.0.1"});
 
 // write to ns foo.bar
 var foo = conn.getDB( "foo" );
@@ -42,17 +40,16 @@ assert.eq(foo.baz.getIndexes().length, 1);
 // get data dump
 var dumpdir = MongoRunner.dataDir + "/restorewithauth-dump1/";
 resetDbpath( dumpdir );
-x = runMongoProgram("mongodump", "--db", "foo", "-h", "127.0.0.1:"+port, "--out", dumpdir);
+x = runMongoProgram("mongodump", "--db", "foo", "-h", "127.0.0.1:"+ conn.port, "--out", dumpdir);
 
 // now drop the db
 foo.dropDatabase();
 
 // stop mongod
-stopMongod( port );
+MongoRunner.stopMongod(conn);
 
 // start mongod with --auth
-conn = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface",
-                    "--nojournal", "--bind_ip", "127.0.0.1" );
+conn = MongoRunner.runMongod({auth: "", nojournal: "", bind_ip: "127.0.0.1"});
 
 // admin user
 var admin = conn.getDB( "admin" )
@@ -67,7 +64,7 @@ assert.eq(-1, collNames.indexOf("bar"), "bar collection already exists");
 assert.eq(-1, collNames.indexOf("baz"), "baz collection already exists");
 
 // now try to restore dump
-x = runMongoProgram( "mongorestore", "-h", "127.0.0.1:" + port,  "--dir" , dumpdir, "-vvvvv" );
+x = runMongoProgram( "mongorestore", "-h", "127.0.0.1:" + conn.port,  "--dir" , dumpdir, "-vvvvv" );
 
 // make sure that the collection isn't restored
 collNames = foo.getCollectionNames();
@@ -76,7 +73,7 @@ assert.eq(-1, collNames.indexOf("baz"), "baz collection was restored");
 
 // now try to restore dump with correct credentials
 x = runMongoProgram( "mongorestore",
-                     "-h", "127.0.0.1:" + port,
+                     "-h", "127.0.0.1:" + conn.port,
                      "-d", "foo",
                      "--authenticationDatabase=admin",
                      "-u", "admin",
@@ -99,7 +96,7 @@ foo.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
 
 // now try to restore dump with foo database credentials
 x = runMongoProgram("mongorestore",
-                    "-h", "127.0.0.1:" + port,
+                    "-h", "127.0.0.1:" + conn.port,
                     "-d", "foo",
                     "-u", "user",
                     "-p", "password",
@@ -114,4 +111,4 @@ assert.eq(foo.bar.count(), 4);
 assert.eq(foo.baz.count(), 4);
 assert.eq(foo.bar.getIndexes().length + foo.baz.getIndexes().length, 3); // _id on foo, _id on bar, x on foo
 
-stopMongod( port );
+MongoRunner.stopMongod(conn);

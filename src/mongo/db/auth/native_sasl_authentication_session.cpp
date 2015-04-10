@@ -47,7 +47,7 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_plain_server_conversation.h"
 #include "mongo/db/auth/sasl_scramsha1_server_conversation.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -78,7 +78,8 @@ namespace {
         (InitializerContext*) {
 
         AuthorizationManager authzManager(new AuthzManagerExternalStateMock());
-        AuthorizationSession authzSession(new AuthzSessionExternalStateMock(&authzManager));
+        std::unique_ptr<AuthorizationSession> authzSession =
+            authzManager.makeAuthorizationSession();
 
         for (size_t i = 0; i < saslGlobalParams.authenticationMechanisms.size(); ++i) {
             const std::string& mechanism = saslGlobalParams.authenticationMechanisms[i];
@@ -87,7 +88,7 @@ namespace {
                 continue;
             }
             scoped_ptr<SaslAuthenticationSession>
-                session(SaslAuthenticationSession::create(&authzSession, mechanism));
+                session(SaslAuthenticationSession::create(authzSession.get(), mechanism));
             Status status = session->start("test",
                                            mechanism,
                                            saslGlobalParams.serviceName,
@@ -110,10 +111,10 @@ namespace {
 
     NativeSaslAuthenticationSession::~NativeSaslAuthenticationSession() {}
 
-    Status NativeSaslAuthenticationSession::start(const StringData& authenticationDatabase,
-                                                  const StringData& mechanism,
-                                                  const StringData& serviceName,
-                                                  const StringData& serviceHostname,
+    Status NativeSaslAuthenticationSession::start(StringData authenticationDatabase,
+                                                  StringData mechanism,
+                                                  StringData serviceName,
+                                                  StringData serviceHostname,
                                                   int64_t conversationId,
                                                   bool autoAuthorize) {
         fassert(18626, conversationId > 0);
@@ -145,7 +146,7 @@ namespace {
         return Status::OK();
     }
 
-    Status NativeSaslAuthenticationSession::step(const StringData& inputData,
+    Status NativeSaslAuthenticationSession::step(StringData inputData,
                                                  std::string* outputData) {
         if (!_saslConversation) {
             return Status(ErrorCodes::BadValue,
@@ -156,6 +157,8 @@ namespace {
         StatusWith<bool> status = _saslConversation->step(inputData, outputData);
         if (status.isOK()) {
             _done = status.getValue();
+        } else {
+            _done = true;
         }
         return status.getStatus();
     }

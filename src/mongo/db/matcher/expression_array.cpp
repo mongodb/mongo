@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-    Status ArrayMatchingMatchExpression::initPath( const StringData& path ) {
+    Status ArrayMatchingMatchExpression::initPath( StringData path ) {
         _path = path;
         Status s = _elementPath.init( _path );
         _elementPath.setTraverseLeafArray( false );
@@ -92,7 +92,7 @@ namespace mongo {
 
     // -------
 
-    Status ElemMatchObjectMatchExpression::init( const StringData& path, MatchExpression* sub ) {
+    Status ElemMatchObjectMatchExpression::init( StringData path, MatchExpression* sub ) {
         _sub.reset( sub );
         return initPath( path );
     }
@@ -146,13 +146,13 @@ namespace mongo {
         _subs.clear();
     }
 
-    Status ElemMatchValueMatchExpression::init( const StringData& path, MatchExpression* sub ) {
+    Status ElemMatchValueMatchExpression::init( StringData path, MatchExpression* sub ) {
         init( path );
         add( sub );
         return Status::OK();
     }
 
-    Status ElemMatchValueMatchExpression::init( const StringData& path ) {
+    Status ElemMatchValueMatchExpression::init( StringData path ) {
         return initPath( path );
     }
 
@@ -216,7 +216,7 @@ namespace mongo {
 
     // ---------
 
-    Status SizeMatchExpression::init( const StringData& path, int size ) {
+    Status SizeMatchExpression::init( StringData path, int size ) {
         _size = size;
         return initPath( path );
     }

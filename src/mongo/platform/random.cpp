@@ -117,7 +117,7 @@ namespace mongo {
         return new WinSecureRandom();
     }
 
-#elif defined(__linux__) || defined(__sunos__) || defined(__APPLE__) || defined(__freebsd__)
+#elif defined(__linux__) || defined(__sun) || defined(__APPLE__) || defined(__FreeBSD__)
 
     class InputStreamSecureRandom : public SecureRandom {
     public:
@@ -150,7 +150,7 @@ namespace mongo {
         return new InputStreamSecureRandom( "/dev/urandom" );
     }
 
-#elif defined(__openbsd__)
+#elif defined(__OpenBSD__)
 
     class Arc4SecureRandom : public SecureRandom {
     public:

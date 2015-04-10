@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include "mongo/config.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
@@ -48,7 +49,7 @@
 #include "mongo/util/time_support.h"
 
 #ifndef _WIN32
-# ifndef __sunos__
+# ifndef __sun
 #  include <ifaddrs.h>
 # endif
 # include <sys/resource.h>
@@ -115,9 +116,9 @@ namespace mongo {
         std::set<MessagingPort*> ports;
         mongo::mutex m;
     public:
-        Ports() : ports(), m("Ports") {}
+        Ports() : ports() {}
         void closeAll(unsigned skip_mask) {
-            scoped_lock bl(m);
+            boost::lock_guard<boost::mutex> bl(m);
             for ( std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ ) {
                 if( (*i)->tag & skip_mask )
                     continue;
@@ -125,11 +126,11 @@ namespace mongo {
             }
         }
         void insert(MessagingPort* p) {
-            scoped_lock bl(m);
+            boost::lock_guard<boost::mutex> bl(m);
             ports.insert(p);
         }
         void erase(MessagingPort* p) {
-            scoped_lock bl(m);
+            boost::lock_guard<boost::mutex> bl(m);
             ports.erase(p);
         }
     };
@@ -201,7 +202,7 @@ again:
             }
             // If responseTo is not 0 or -1 for first packet assume SSL
             else if (psock->isAwaitingHandshake()) {
-#ifndef MONGO_SSL
+#ifndef MONGO_CONFIG_SSL
                 if (header.constView().getResponseTo() != 0
                  && header.constView().getResponseTo() != -1) {
                     uasserted(17133,
@@ -212,15 +213,15 @@ again:
                  && header.constView().getResponseTo() != -1) {
                     uassert(17132,
                             "SSL handshake received but server is started without SSL support",
-                            sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_disabled);
+                            sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
                     setX509SubjectName(psock->doSSLHandshake(
                                        reinterpret_cast<const char*>(&header), sizeof(header)));
                     psock->setHandshakeReceived();
                     goto again;
                 }
                 uassert(17189, "The server is configured to only allow SSL connections",
-                        sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_requireSSL);
-#endif // MONGO_SSL
+                        sslGlobalParams.sslMode.load() != SSLParams::SSLMode_requireSSL);
+#endif // MONGO_CONFIG_SSL
             }
             if ( static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
                  static_cast<size_t>(len) > MaxMessageSizeBytes ) {

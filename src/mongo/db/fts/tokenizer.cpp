@@ -38,9 +38,9 @@ namespace mongo {
 
     namespace fts {
 
-        Tokenizer::Tokenizer( const FTSLanguage& language, const StringData& str )
+        Tokenizer::Tokenizer( const FTSLanguage* language, StringData str )
             : _pos(0), _raw( str ) {
-            _english = ( language.str() == "english" );
+            _english = ( language->str() == "english" );
             _skipWhitespace();
             _previousWhiteSpace = true;
         }
@@ -55,7 +55,7 @@ namespace mongo {
 
             unsigned start = _pos++;
             Token::Type type = _type( _raw[start] );
-            if ( type == Token::WHITESPACE ) abort();
+            if ( type == Token::WHITESPACE ) invariant( false );
 
             if ( type == Token::TEXT )
                 while ( _pos < _raw.size() && _type( _raw[_pos] ) == type )

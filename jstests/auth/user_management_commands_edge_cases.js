@@ -62,6 +62,10 @@ function runTest(conn) {
                            db.createUser({user: 'user2', pwd: 'pwd', roles: [{role: '',
                                                                               db: 'test'}]});
                        });
+         // Regression test for SERVER-17125
+         assert.throws(function() {
+                           db.getSiblingDB('$external').createUser({user: '', roles: []});
+                       });
 
          assert.eq(1, db.getUsers().length);
      })();

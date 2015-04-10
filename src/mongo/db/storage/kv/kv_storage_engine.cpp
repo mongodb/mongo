@@ -50,7 +50,7 @@ namespace mongo {
 
     class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
     public:
-        RemoveDBChange(KVStorageEngine* engine, const StringData& db, KVDatabaseCatalogEntry* entry)
+        RemoveDBChange(KVStorageEngine* engine, StringData db, KVDatabaseCatalogEntry* entry)
             : _engine(engine)
             , _db(db.toString())
             , _entry(entry)
@@ -61,7 +61,7 @@ namespace mongo {
         }
 
         virtual void rollback() {
-            boost::mutex::scoped_lock lk(_engine->_dbsLock);
+            boost::lock_guard<boost::mutex> lk(_engine->_dbsLock);
             _engine->_dbs[_db] = _entry;
         }
 
@@ -196,7 +196,7 @@ namespace mongo {
     }
 
     void KVStorageEngine::listDatabases( std::vector<std::string>* out ) const {
-        boost::mutex::scoped_lock lk( _dbsLock );
+        boost::lock_guard<boost::mutex> lk( _dbsLock );
         for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
             if ( it->second->isEmpty() )
                 continue;
@@ -205,8 +205,8 @@ namespace mongo {
     }
 
     DatabaseCatalogEntry* KVStorageEngine::getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                                    const StringData& dbName ) {
-        boost::mutex::scoped_lock lk( _dbsLock );
+                                                                    StringData dbName ) {
+        boost::lock_guard<boost::mutex> lk( _dbsLock );
         KVDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db ) {
             // Not registering change since db creation is implicit and never rolled back.
@@ -215,16 +215,16 @@ namespace mongo {
         return db;
     }
 
-    Status KVStorageEngine::closeDatabase( OperationContext* txn, const StringData& db ) {
+    Status KVStorageEngine::closeDatabase( OperationContext* txn, StringData db ) {
         // This is ok to be a no-op as there is no database layer in kv.
         return Status::OK();
     }
 
-    Status KVStorageEngine::dropDatabase( OperationContext* txn, const StringData& db ) {
+    Status KVStorageEngine::dropDatabase( OperationContext* txn, StringData db ) {
 
         KVDatabaseCatalogEntry* entry;
         {
-            boost::mutex::scoped_lock lk( _dbsLock );
+            boost::lock_guard<boost::mutex> lk( _dbsLock );
             DBMap::const_iterator it = _dbs.find( db.toString() );
             if ( it == _dbs.end() )
                 return Status( ErrorCodes::NamespaceNotFound, "db not found to drop" );
@@ -250,7 +250,7 @@ namespace mongo {
         invariant( toDrop.empty() );
 
         {
-            boost::mutex::scoped_lock lk( _dbsLock );
+            boost::lock_guard<boost::mutex> lk( _dbsLock );
             txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
             _dbs.erase( db.toString() );
         }

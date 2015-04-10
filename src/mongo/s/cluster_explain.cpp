@@ -51,7 +51,7 @@ namespace mongo {
 
         bool appendIfRoom(BSONObjBuilder* bob,
                           const BSONObj& toAppend,
-                          const StringData& fieldName) {
+                          StringData fieldName) {
             if ((bob->len() + toAppend.objsize()) < BSONObjMaxUserSize) {
                 bob->append(fieldName, toAppend);
                 return true;

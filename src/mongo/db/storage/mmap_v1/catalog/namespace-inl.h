@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    inline Namespace& Namespace::operator=(const StringData& ns) {
+    inline Namespace& Namespace::operator=(StringData ns) {
         // we fill the remaining space with all zeroes here.  as the full Namespace struct is in
         // the datafiles (the .ns files specifically), that is helpful as then they are deterministic
         // in the bytes they have for a given sequence of operations.  that makes testing and debugging

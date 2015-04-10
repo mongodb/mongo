@@ -31,19 +31,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_session_external_state_s.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbhelpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request.h"
-#include "mongo/s/shard.h"
-#include "mongo/util/log.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/log.h"
 
 /*
   most a pile of hacks to make linking nicer
@@ -51,31 +48,23 @@
  */
 namespace mongo {
 
-    using std::endl;
     using std::string;
     using std::stringstream;
-
-    void* remapPrivateView(void *oldPrivateAddr) {
-        log() << "remapPrivateView called in mongos, aborting" << endl;
-        fassertFailed(16462);
-    }
 
     /** When this callback is run, we record a shard that we've used for useful work
      *  in an operation to be read later by getLastError()
     */
-    void usingAShardConnection( const string& addr ) {
-        ClientInfo::get()->addShardHost( addr );
+    void usingAShardConnection(const std::string& addr) {
+        ClusterLastErrorInfo::get(ClientInfo::get()).addShardHost(addr);
     }
 
     TSP_DEFINE(Client,currentClient)
 
-    Client::Client(const string& desc, AbstractMessagingPort *p) :
-        ClientBasic(p),
+    Client::Client(const string& desc, ServiceContext* serviceContext, AbstractMessagingPort *p) :
+        ClientBasic(serviceContext, p),
         _desc(desc),
         _connectionId(),
-        _god(0),
-        _lastOp(0),
-        _shutdown(false) {
+        _inDirectClient(false) {
     }
     Client::~Client() {}
     bool Client::shutdown() { return true; }
@@ -92,11 +81,10 @@ namespace mongo {
 
         setThreadName( fullDesc.c_str() );
 
-        Client *c = new Client( fullDesc, mp );
+        Client *c = new Client( fullDesc, getGlobalServiceContext(), mp );
         currentClient.reset(c);
         mongo::lastError.initThread();
-        c->setAuthorizationSession(new AuthorizationSession(new AuthzSessionExternalStateMongos(
-                getGlobalAuthorizationManager())));
+        c->setAuthorizationSession(getGlobalAuthorizationManager()->makeAuthorizationSession());
     }
 
     string Client::clientAddress(bool includePort) const {
@@ -151,17 +139,15 @@ namespace mongo {
         try {
             ok = c->run( txn, dbname , cmdObj, queryOptions, errmsg, result, false );
         }
-        catch (DBException& e) {
+        catch (const DBException& e) {
             ok = false;
             int code = e.getCode();
             if (code == RecvStaleConfigCode) { // code for StaleConfigException
                 throw;
             }
 
-            stringstream ss;
-            ss << "exception: " << e.what();
-            errmsg = ss.str();
-            result.append( "code" , code );
+            errmsg = e.what();
+            result.append("code", code);
         }
 
         if ( !ok ) {

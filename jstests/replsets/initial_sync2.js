@@ -50,11 +50,9 @@ admin_s1.runCommand({replSetFreeze:999999});
 
 
 print("6. Bring up #3");
-var ports = allocatePorts( 3 );
-var basePath = MongoRunner.dataPath + basename;
 var hostname = getHostName();
 
-var slave2 = startMongodTest (ports[2], basename, false, {replSet : basename, oplogSize : 2} )
+var slave2 = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
 
 var local_s2 = slave2.getDB("local");
 var admin_s2 = slave2.getDB("admin");
@@ -67,7 +65,7 @@ config.version = 2;
 db = admin;
 
 // If _id is not provided, rs.add() will generate _id for #3 based on existing members' _ids.
-assert.commandWorked(rs.add({host:hostname+":"+ports[2]}), "failed to add #3 to replica set");
+assert.commandWorked(rs.add({host:hostname+":"+slave2.port}), "failed to add #3 to replica set");
 
 reconnect(slave1);
 reconnect(slave2);

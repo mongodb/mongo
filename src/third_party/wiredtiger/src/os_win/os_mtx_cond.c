@@ -41,13 +41,14 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
  *	Wait on a mutex, optionally timing out.
  */
 int
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
+__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 {
+	DWORD milliseconds;
 	WT_DECL_RET;
+	uint64_t milliseconds64;
 	int locked;
-	int milliseconds;
+
 	locked = 0;
-	WT_ASSERT(session, usecs >= 0);
 
 	/* Fast path if already signalled. */
 	if (WT_ATOMIC_ADD4(cond->waiters, 1) == 0)
@@ -67,13 +68,23 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	locked = 1;
 
 	if (usecs > 0) {
-		milliseconds = usecs / 1000;
+		milliseconds64 = usecs / 1000;
+
+		/*
+		 * Check for 32-bit unsigned integer overflow
+		 * INFINITE is max unsigned int on Windows
+		 */
+		if (milliseconds64 >= INFINITE)
+			milliseconds64 = INFINITE - 1;
+		milliseconds = (DWORD)milliseconds64;
+
 		/*
 		 * 0 would mean the CV sleep becomes a TryCV which we do not
 		 * want
 		 */
 		if (milliseconds == 0)
 			milliseconds = 1;
+
 		ret = SleepConditionVariableCS(
 		    &cond->cond, &cond->mtx, milliseconds);
 	} else

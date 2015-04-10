@@ -58,13 +58,13 @@ namespace {
 
     class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
     public:
-        AddIdentChange(KVCatalog* catalog, const StringData& ident)
+        AddIdentChange(KVCatalog* catalog, StringData ident)
             :_catalog(catalog), _ident(ident.toString())
         {}
 
         virtual void commit() {}
         virtual void rollback() {
-            boost::mutex::scoped_lock lk(_catalog->_identsLock);
+            boost::lock_guard<boost::mutex> lk(_catalog->_identsLock);
             _catalog->_idents.erase(_ident);
         }
 
@@ -74,13 +74,13 @@ namespace {
 
     class KVCatalog::RemoveIdentChange : public RecoveryUnit::Change {
     public:
-        RemoveIdentChange(KVCatalog* catalog, const StringData& ident, const Entry& entry)
+        RemoveIdentChange(KVCatalog* catalog, StringData ident, const Entry& entry)
             :_catalog(catalog), _ident(ident.toString()), _entry(entry)
         {}
 
         virtual void commit() {}
         virtual void rollback() {
-            boost::mutex::scoped_lock lk(_catalog->_identsLock);
+            boost::lock_guard<boost::mutex> lk(_catalog->_identsLock);
             _catalog->_idents[_ident] = _entry;
         }
 
@@ -118,7 +118,7 @@ namespace {
         return false;
     }
 
-    std::string KVCatalog::_newUniqueIdent(const StringData& ns, const char* kind) {
+    std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
         // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
         StringBuilder buf;
         if ( _directoryPerDb ) {
@@ -152,14 +152,14 @@ namespace {
     }
 
     void KVCatalog::getAllCollections( std::vector<std::string>* out ) const {
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         for ( NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it ) {
             out->push_back( it->first );
         }
     }
 
     Status KVCatalog::newCollection( OperationContext* opCtx,
-                                     const StringData& ns,
+                                     StringData ns,
                                      const CollectionOptions& options ) {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
@@ -173,7 +173,7 @@ namespace {
 
         const string ident = _newUniqueIdent(ns, "collection");
 
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         Entry& old = _idents[ns.toString()];
         if ( !old.ident.empty() ) {
             return Status( ErrorCodes::NamespaceExists, "collection already exists" );
@@ -202,23 +202,23 @@ namespace {
         return Status::OK();
     }
 
-    std::string KVCatalog::getCollectionIdent( const StringData& ns ) const {
-        boost::mutex::scoped_lock lk( _identsLock );
+    std::string KVCatalog::getCollectionIdent( StringData ns ) const {
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
         invariant( it != _idents.end() );
         return it->second.ident;
     }
 
     std::string KVCatalog::getIndexIdent( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& idxName ) const {
+                                          StringData ns,
+                                          StringData idxName ) const {
         BSONObj obj = _findEntry( opCtx, ns );
         BSONObj idxIdent = obj["idxIdent"].Obj();
         return idxIdent[idxName].String();
     }
 
     BSONObj KVCatalog::_findEntry( OperationContext* opCtx,
-                                   const StringData& ns,
+                                   StringData ns,
                                    RecordId* out ) const {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -230,7 +230,7 @@ namespace {
 
         RecordId dl;
         {
-            boost::mutex::scoped_lock lk( _identsLock );
+            boost::lock_guard<boost::mutex> lk( _identsLock );
             NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
             invariant( it != _idents.end() );
             dl = it->second.storedLoc;
@@ -252,7 +252,7 @@ namespace {
     }
 
     const BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData( OperationContext* opCtx,
-                                                                       const StringData& ns ) {
+                                                                       StringData ns ) {
         BSONObj obj = _findEntry( opCtx, ns );
         LOG(3) << " fetched CCE metadata: " << obj;
         BSONCollectionCatalogEntry::MetaData md;
@@ -265,7 +265,7 @@ namespace {
     }
 
     void KVCatalog::putMetaData( OperationContext* opCtx,
-                                 const StringData& ns,
+                                 StringData ns,
                                  BSONCollectionCatalogEntry::MetaData& md ) {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -318,8 +318,8 @@ namespace {
     }
 
     Status KVCatalog::renameCollection( OperationContext* opCtx,
-                                        const StringData& fromNS,
-                                        const StringData& toNS,
+                                        StringData fromNS,
+                                        StringData toNS,
                                         bool stayTemp ) {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -356,7 +356,7 @@ namespace {
             invariant( status.getValue() == loc );
         }
 
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         const NSToIdentMap::iterator fromIt = _idents.find(fromNS.toString());
         invariant(fromIt != _idents.end());
 
@@ -370,7 +370,7 @@ namespace {
     }
 
     Status KVCatalog::dropCollection( OperationContext* opCtx,
-                                      const StringData& ns ) {
+                                      StringData ns ) {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
         boost::scoped_ptr<Lock::ResourceLock> rLk;
@@ -380,7 +380,7 @@ namespace {
                                              MODE_X));
         }
 
-        boost::mutex::scoped_lock lk( _identsLock );
+        boost::lock_guard<boost::mutex> lk( _identsLock );
         const NSToIdentMap::iterator it = _idents.find(ns.toString());
         if (it == _idents.end()) {
             return Status( ErrorCodes::NamespaceNotFound, "collection not found" );
@@ -395,11 +395,11 @@ namespace {
         return Status::OK();
     }
 
-    std::vector<std::string> KVCatalog::getAllIdentsForDB( const StringData& db ) const {
+    std::vector<std::string> KVCatalog::getAllIdentsForDB( StringData db ) const {
         std::vector<std::string> v;
 
         {
-            boost::mutex::scoped_lock lk( _identsLock );
+            boost::lock_guard<boost::mutex> lk( _identsLock );
             for ( NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it ) {
                 NamespaceString ns( it->first );
                 if ( ns.db() != db )
@@ -436,7 +436,7 @@ namespace {
         return v;
     }
 
-    bool KVCatalog::isUserDataIdent( const StringData& ident ) const {
+    bool KVCatalog::isUserDataIdent( StringData ident ) const {
         return
             ident.find( "index-" ) != std::string::npos ||
             ident.find( "index/" ) != std::string::npos ||

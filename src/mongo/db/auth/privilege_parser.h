@@ -32,7 +32,6 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bson_field.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/bson_serializable.h"
 
@@ -91,12 +90,12 @@ namespace mongo {
         bool isClusterSet() const;
         bool getCluster() const;
 
-        void setDb(const StringData& db);
+        void setDb(StringData db);
         void unsetDb();
         bool isDbSet() const;
         const std::string& getDb() const;
 
-        void setCollection(const StringData& collection);
+        void setCollection(StringData collection);
         void unsetCollection();
         bool isCollectionSet() const;
         const std::string& getCollection() const;

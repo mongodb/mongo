@@ -62,7 +62,7 @@ namespace mongo {
          * Gets the list of open cursors on a given namespace.
          */
         virtual void getCursorIds(OperationContext* txn,
-                                  const StringData& ns,
+                                  StringData ns,
                                   std::set<CursorId>* openCursors);
     };
 }

@@ -114,12 +114,12 @@ namespace mongo {
         int64_t _repr;
     };
 
-    inline bool operator==(RecordId rhs, RecordId lhs) { return rhs.repr() == lhs.repr(); }
-    inline bool operator!=(RecordId rhs, RecordId lhs) { return rhs.repr() != lhs.repr(); }
-    inline bool operator< (RecordId rhs, RecordId lhs) { return rhs.repr() <  lhs.repr(); }
-    inline bool operator<=(RecordId rhs, RecordId lhs) { return rhs.repr() <= lhs.repr(); }
-    inline bool operator> (RecordId rhs, RecordId lhs) { return rhs.repr() >  lhs.repr(); }
-    inline bool operator>=(RecordId rhs, RecordId lhs) { return rhs.repr() >= lhs.repr(); }
+    inline bool operator==(RecordId lhs, RecordId rhs) { return lhs.repr() == rhs.repr(); }
+    inline bool operator!=(RecordId lhs, RecordId rhs) { return lhs.repr() != rhs.repr(); }
+    inline bool operator< (RecordId lhs, RecordId rhs) { return lhs.repr() <  rhs.repr(); }
+    inline bool operator<=(RecordId lhs, RecordId rhs) { return lhs.repr() <= rhs.repr(); }
+    inline bool operator> (RecordId lhs, RecordId rhs) { return lhs.repr() >  rhs.repr(); }
+    inline bool operator>=(RecordId lhs, RecordId rhs) { return lhs.repr() >= rhs.repr(); }
 
     inline StringBuilder& operator<<( StringBuilder& stream, const RecordId& id ) {
         return stream << "RecordId(" << id.repr() << ')';

@@ -42,11 +42,11 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/range_arithmetic.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/range_arithmetic.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/util/log.h"
 

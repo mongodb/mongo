@@ -9,6 +9,8 @@ var coll = "collModTest";
 var t = db.getCollection( coll );
 t.drop();
 
+var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+
 db.createCollection( coll );
 
 function findTTL( key, expireAfterSeconds ) {
@@ -18,6 +20,16 @@ function findTTL( key, expireAfterSeconds ) {
             friendlyEqual( z.key, key ); } );
     return all.length == 1;
 }
+
+function findCollectionInfo() {
+    var all = db.getCollectionInfos();
+    all = all.filter( function(z) { return z.name == t.getName(); } );
+    assert.eq(all.length, 1);
+    return all[0];
+}
+
+// ensure we fail with gibberish options
+assert.commandFailed(t.runCommand('collmod', {NotARealOption:1}));
 
 // add a TTL index
 t.ensureIndex( {a : 1}, { "expireAfterSeconds": 50 } )
@@ -64,3 +76,24 @@ var res = db.runCommand( { "collMod" : coll ,
 debug( res );
 assert( findTTL( {a:1}, 100), "TTL index should be 100 now" );
 
+// Clear usePowerOf2Sizes and enable noPadding. Make sure collection options.flags is updated.
+var res = db.runCommand( { "collMod" : coll ,
+                           "usePowerOf2Sizes" : false,
+                           "noPadding" : true} )
+debug( res );
+assert.commandWorked(res);
+var info = findCollectionInfo();
+assert.eq(info.options.flags, 2, tojson(info)); // 2 is CollectionOptions::Flag_NoPadding
+
+// Clear noPadding and check results object and options.flags.
+var res = db.runCommand( { "collMod" : coll ,
+                           "noPadding" : false} )
+debug( res );
+assert.commandWorked(res);
+if (!isMongos) {
+    // don't check this for sharding passthrough since mongos has a different output format.
+    assert.eq(res.noPadding_old, true, tojson(res));
+    assert.eq(res.noPadding_new, false, tojson(res));
+}
+var info = findCollectionInfo();
+assert.eq(info.options.flags, 0, tojson(info));

@@ -34,61 +34,58 @@
 
 #include "mongo/s/request.h"
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/config.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/server.h"
+#include "mongo/s/strategy.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
     using std::endl;
     using std::string;
 
-    Request::Request( Message& m, AbstractMessagingPort* p ) :
-        _m(m) , _d( m ) , _p(p) , _didInit(false) {
+    Request::Request(Message& m, AbstractMessagingPort* p)
+        : _clientInfo(ClientInfo::get()),
+          _m(m),
+          _d(m),
+          _p(p),
+          _id(_m.header().getId()),
+          _didInit(false) {
 
-        _id = _m.header().getId();
-
-        _txn.reset(new OperationContextNoop());
-
-        _clientInfo = ClientInfo::get();
-        if ( p ) {
-            _clientInfo->newPeerRequest( p->remote() );
-        }
-        else {
-            _clientInfo->newRequest();
-        }
+        ClusterLastErrorInfo::get(_clientInfo).newRequest();
     }
 
     void Request::init() {
-        if ( _didInit )
-            return;
-        _didInit = true;
-        reset();
-        _clientInfo->getAuthorizationSession()->startRequest(_txn.get());
-    }
-
-    // Deprecated, will move to the strategy itself
-    void Request::reset() {
-        _m.header().setId(_id);
-        _clientInfo->clearRequestInfo();
-
-        if ( !_d.messageShouldHaveNs()) {
+        if (_didInit) {
             return;
         }
 
-        uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
+        _m.header().setId(_id);
+        ClusterLastErrorInfo::get(_clientInfo).clearRequestInfo();
 
-        grid.getDBConfig( getns() );
+        if (_d.messageShouldHaveNs()) {
+            const NamespaceString nss(getns());
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "can't use 'local' database through mongos",
+                    nss.db() != "local");
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid ns [" << nss.ns() << "]",
+                    nss.isValid());
+        }
+
+        _clientInfo->getAuthorizationSession()->startRequest(NULL);
+
+        grid.getDBConfig(getns());
+
+        _didInit = true;
     }
 
     void Request::process( int attempt ) {
@@ -96,7 +93,7 @@ namespace mongo {
         int op = _m.operation();
         verify( op > dbMsg );
 
-        int msgId = (int)(_m.header().getId());
+        const MSGID msgId = _m.header().getId();
 
         Timer t;
         LOG(3) << "Request::process begin ns: " << getns()

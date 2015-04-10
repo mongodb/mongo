@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/user_management_commands.h"
-
 #include <string>
 #include <vector>
 
@@ -41,6 +39,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/config.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -401,7 +400,7 @@ namespace mongo {
                                "\"createUser\" command requires a \"roles\" array"));
             }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             if (args.userName.getDB() == "$external" &&
                 getSSLManager() &&
                 getSSLManager()->getSSLConfiguration()
@@ -422,12 +421,6 @@ namespace mongo {
                                   args.userName.getUser());
             userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
                                   args.userName.getDB());
-            if (!args.hasHashedPassword) {
-                // Must be an external user
-                userObjBuilder.append("credentials", BSON("external" << true));
-            }
-
-            BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             int authzVersion;
@@ -436,15 +429,22 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            // Add SCRAM credentials for appropriate authSchemaVersions.
-            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                BSONObj scramCred = scram::generateCredentials(
-                        args.hashedPassword,
-                        saslGlobalParams.scramIterationCount);
-                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
+            BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
+            if (!args.hasHashedPassword) {
+                // Must be an external user
+                credentialsBuilder.append("external", true);
             }
-            else { // Otherwise default to MONGODB-CR.
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+            else {
+                // Add SCRAM credentials for appropriate authSchemaVersions.
+                if (authzVersion > AuthorizationManager::schemaVersion26Final) {
+                    BSONObj scramCred = scram::generateCredentials(
+                            args.hashedPassword,
+                            saslGlobalParams.scramIterationCount);
+                    credentialsBuilder.append("SCRAM-SHA-1", scramCred);
+                }
+                else { // Otherwise default to MONGODB-CR.
+                    credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+                }
             }
             credentialsBuilder.done();
 
@@ -2663,7 +2663,7 @@ namespace mongo {
          */
         static void addUser(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& db,
+                            StringData db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<UserName>* usersToDrop,
@@ -2708,7 +2708,7 @@ namespace mongo {
          */
         static void addRole(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& db,
+                            StringData db,
                             bool update,
                             const BSONObj& writeConcern,
                             unordered_set<RoleName>* rolesToDrop,
@@ -2747,8 +2747,8 @@ namespace mongo {
          */
         Status processUsers(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& usersCollName,
-                            const StringData& db,
+                            StringData usersCollName,
+                            StringData db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the users
@@ -2830,8 +2830,8 @@ namespace mongo {
          */
         Status processRoles(OperationContext* txn,
                             AuthorizationManager* authzManager,
-                            const StringData& rolesCollName,
-                            const StringData& db,
+                            StringData rolesCollName,
+                            StringData db,
                             bool drop,
                             const BSONObj& writeConcern) {
             // When the "drop" argument has been provided, we use this set to store the roles
@@ -2969,27 +2969,4 @@ namespace mongo {
 
     } cmdMergeAuthzCollections;
 
-    CmdAuthSchemaUpgrade::CmdAuthSchemaUpgrade() : Command("authSchemaUpgrade") {}
-    CmdAuthSchemaUpgrade::~CmdAuthSchemaUpgrade() {}
-
-    bool CmdAuthSchemaUpgrade::slaveOk() const { return false; }
-    bool CmdAuthSchemaUpgrade::adminOnly() const { return true; }
-    bool CmdAuthSchemaUpgrade::isWriteCommandForConfigServer() const { return false; }
-
-    void CmdAuthSchemaUpgrade::help(stringstream& ss) const {
-        ss << "Upgrades the auth data storage schema";
-    }
-
-    Status CmdAuthSchemaUpgrade::checkAuthForCommand(ClientBasic* client,
-                                                         const std::string& dbname,
-                                                         const BSONObj& cmdObj) {
-
-        AuthorizationSession* authzSession = client->getAuthorizationSession();
-        if (!authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade)) {
-            return Status(ErrorCodes::Unauthorized,
-                          "Not authorized to run authSchemaUpgrade command.");
-        }
-        return Status::OK();
-    }
-}
+} // namespace mongo

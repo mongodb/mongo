@@ -65,7 +65,7 @@ replTest.restart(masterId);
 
 print("9: check former master does not roll back");
 assert.soon(function(){
-    return rawMongoProgramOutput().match("replSet need to rollback, but in inconsistent state");
+    return rawMongoProgramOutput().match("need to rollback, but in inconsistent state");
 });
 
 replTest.stopSet(15);

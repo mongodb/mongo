@@ -574,7 +574,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 			__wt_page_evict_soon(page);
 		cbt->page_deleted_count = 0;
 
-		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
+		WT_ERR(__wt_tree_walk(session, &cbt->ref, NULL, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
 	}
 

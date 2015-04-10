@@ -241,8 +241,6 @@ namespace mongo {
          * for minimal user comprehension.
          */
         PlanCacheKey _cacheKey;
-
-        bool _isForWrite;
     };
 
 }  // namespace mongo

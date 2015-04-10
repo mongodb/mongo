@@ -1,6 +1,6 @@
 path = MongoRunner.dataDir + '/indexbg2_dur';
 
-m = startMongodEmpty( '--port', 30001, '--dbpath', path, '--journal', '--smallfiles' );
+var m = MongoRunner.runMongod({journal: "", smallfiles: ""});
 
 t = m.getDB( 'test' ).test;
 t.createIndex( {a:1} );

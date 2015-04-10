@@ -29,14 +29,22 @@
 *    it in the license file.
 */
 
+#pragma once
+
+#include <boost/shared_ptr.hpp>
 #include <string>
 #include <vector>
 
-#include "mongo/util/admin_access.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/util/net/miniwebserver.h"
 #include "mongo/util/net/sock.h"
-#include "mongo/db/operation_context.h"
 
 namespace mongo {
+
+    class AdminAccess;
+    class DbWebServer;
+    class OperationContext;
+
 
     class Prioritizable {
     public:
@@ -47,6 +55,7 @@ namespace mongo {
     };
 
     class DbWebHandler : public Prioritizable {
+        MONGO_DISALLOW_COPYING(DbWebHandler);
     public:
         DbWebHandler( const std::string& name , double priority , bool requiresREST );
         virtual ~DbWebHandler() {}
@@ -79,6 +88,7 @@ namespace mongo {
         static std::vector<DbWebHandler*> * _handlers;
     };
 
+
     class WebStatusPlugin : public Prioritizable {
     public:
         WebStatusPlugin( const std::string& secionName , double priority , const std::string& subheader = "" );
@@ -96,7 +106,34 @@ namespace mongo {
         static std::vector<WebStatusPlugin*> * _plugins;
 
     };
-    void webServerThread(const AdminAccess* admins);
+
+    class DbWebServer : public MiniWebServer {
+    public:
+        DbWebServer(const std::string& ip, int port, AdminAccess* webUsers);
+
+    private:
+        virtual void doRequest(const char *rq,
+                               std::string url,
+                               std::string& responseMsg,
+                               int& responseCode,
+                               std::vector<std::string>& headers,
+                               const SockAddr &from);
+
+        bool _allowed(OperationContext* txn,
+                      const char* rq,
+                      std::vector<std::string>& headers,
+                      const SockAddr& from);
+
+        void _rejectREST(std::string& responseMsg,
+                         int& responseCode,
+                         std::vector<std::string>& headers);
+
+
+        const boost::scoped_ptr<AdminAccess> _webUsers;
+    };
+
+    void webServerListenThread(boost::shared_ptr<DbWebServer> dbWebServer);
+
     std::string prettyHostName();
 
 };

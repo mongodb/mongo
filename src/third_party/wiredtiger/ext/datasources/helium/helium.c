@@ -1913,7 +1913,7 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		EMSG_ERR(wtext, session, ret,
 		    "helium_o_truncate configuration: %s",
-		    wtext->strerror(ret));
+		    wtext->strerror(wtext, session, ret));
 
 	if ((ret = ws_source_open_object(
 	    wtds, session, hs, uri, NULL, oflags, &ws->he)) != 0)
@@ -2041,7 +2041,8 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 		exclusive = a.val != 0;
 	else if (ret != WT_NOTFOUND)
 		ERET(wtext, session, ret,
-		    "exclusive configuration: %s", wtext->strerror(ret));
+		    "exclusive configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 
 	/* Get the key/value format strings. */
 	if ((ret = wtext->config_get(
@@ -2052,7 +2053,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 		} else
 			ERET(wtext, session, ret,
 			    "key_format configuration: %s",
-			    wtext->strerror(ret));
+			    wtext->strerror(wtext, session, ret));
 	}
 	if ((ret = wtext->config_get(
 	    wtext, session, config, "value_format", &b)) != 0) {
@@ -2062,7 +2063,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 		} else
 			ERET(wtext, session, ret,
 			    "value_format configuration: %s",
-			    wtext->strerror(ret));
+			    wtext->strerror(wtext, session, ret));
 	}
 
 	/* Get the compression configuration. */
@@ -2073,7 +2074,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 		else
 			ERET(wtext, session, ret,
 			    "helium_o_compress configuration: %s",
-			    wtext->strerror(ret));
+			    wtext->strerror(wtext, session, ret));
 	}
 
 	/*
@@ -2090,7 +2091,8 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 		return (0);
 	if (ret == WT_DUPLICATE_KEY)
 		return (exclusive ? EEXIST : 0);
-	ERET(wtext, session, ret, "%s: %s", uri, wtext->strerror(ret));
+	ERET(wtext,
+	    session, ret, "%s: %s", uri, wtext->strerror(wtext, session, ret));
 }
 
 /*
@@ -2129,19 +2131,22 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if ((ret = wtext->config_get(		/* Parse configuration */
 	    wtext, session, config, "append", &v)) != 0)
 		EMSG_ERR(wtext, session, ret,
-		    "append configuration: %s", wtext->strerror(ret));
+		    "append configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 	cursor->config_append = v.val != 0;
 
 	if ((ret = wtext->config_get(
 	    wtext, session, config, "overwrite", &v)) != 0)
 		EMSG_ERR(wtext, session, ret,
-		    "overwrite configuration: %s", wtext->strerror(ret));
+		    "overwrite configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 	cursor->config_overwrite = v.val != 0;
 
 	if ((ret = wtext->collator_config(
 	    wtext, session, uri, config, NULL, &own)) != 0)
 		EMSG_ERR(wtext, session, ret,
-		    "collator configuration: %s", wtext->strerror(ret));
+		    "collator configuration: %s",
+		    wtext->strerror(wtext, session, ret));
 
 	/* Finish initializing the cursor. */
 	cursor->wtcursor.close = helium_cursor_close;
@@ -2178,19 +2183,19 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		    session, value, strlen(value), &config_parser)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "Configuration string parser: %s",
-			    wtext->strerror(ret));
+			    wtext->strerror(wtext, session, ret));
 		if ((ret = config_parser->get(
 		    config_parser, "key_format", &v)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "key_format configuration: %s",
-			    wtext->strerror(ret));
+			    wtext->strerror(wtext, session, ret));
 		ws->config_recno = v.len == 1 && v.str[0] == 'r';
 
 		if ((ret = config_parser->get(
 		    config_parser, "value_format", &v)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "value_format configuration: %s",
-			    wtext->strerror(ret));
+			    wtext->strerror(wtext, session, ret));
 		ws->config_bitfield =
 		    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
@@ -2198,7 +2203,7 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		    config_parser, "helium_o_compress", &v)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "helium_o_compress configuration: %s",
-			    wtext->strerror(ret));
+			    wtext->strerror(wtext, session, ret));
 		ws->config_compress = v.val ? 1 : 0;
 
 		/*
@@ -2237,7 +2242,8 @@ err:		if (ws != NULL && locked)
 	if (config_parser != NULL &&
 	    (tret = config_parser->close(config_parser)) != 0)
 		EMSG(wtext, session, tret,
-		    "WT_CONFIG_PARSER.close: %s", wtext->strerror(tret));
+		    "WT_CONFIG_PARSER.close: %s",
+		    wtext->strerror(wtext, session, tret));
 
 	free((void *)value);
 	return (ret);
@@ -2913,7 +2919,7 @@ helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 	    wtext, NULL, config->str, config->len, &config_parser)) != 0)
 		ERET(wtext, NULL, ret,
 		    "WT_EXTENSION_API.config_parser_open: %s",
-		    wtext->strerror(ret));
+		    wtext->strerror(wtext, NULL, ret));
 	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
 		if (string_match("helium_devices", k.str, k.len)) {
 			if ((*devicep = calloc(1, v.len + 1)) == NULL)
@@ -2944,11 +2950,13 @@ helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 		ret = 0;
 	if (ret != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_CONFIG_PARSER.next: %s", wtext->strerror(ret));
+		    "WT_CONFIG_PARSER.next: %s",
+		    wtext->strerror(wtext, NULL, ret));
 
 err:	if ((tret = config_parser->close(config_parser)) != 0)
 		EMSG(wtext, NULL, tret,
-		    "WT_CONFIG_PARSER.close: %s", wtext->strerror(tret));
+		    "WT_CONFIG_PARSER.close: %s",
+		    wtext->strerror(wtext, NULL, tret));
 
 	return (ret);
 }
@@ -3373,14 +3381,14 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API.config_get: config: %s",
-		    wtext->strerror(ret));
+		    wtext->strerror(wtext, NULL, ret));
 
 	/* Step through the list of Helium sources, opening each one. */
 	if ((ret = wtext->config_parser_open(
 	    wtext, NULL, v.str, v.len, &config_parser)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API.config_parser_open: config: %s",
-		    wtext->strerror(ret));
+		    wtext->strerror(wtext, NULL, ret));
 	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
 		if (string_match("helium_verbose", k.str, k.len)) {
 			verbose = v.val == 0 ? 0 : 1;
@@ -3392,11 +3400,11 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	if (ret != WT_NOTFOUND)
 		EMSG_ERR(wtext, NULL, ret,
 		    "WT_CONFIG_PARSER.next: config: %s",
-		    wtext->strerror(ret));
+		    wtext->strerror(wtext, NULL, ret));
 	if ((ret = config_parser->close(config_parser)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
 		    "WT_CONFIG_PARSER.close: config: %s",
-		    wtext->strerror(ret));
+		    wtext->strerror(wtext, NULL, ret));
 	config_parser = NULL;
 
 	/* Find and open the database transaction store. */
@@ -3423,13 +3431,14 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 			EMSG_ERR(wtext, NULL, ret,
 			    "WT_CONNECTION.configure_method: session.create: "
 			    "%s: %s",
-			    *p, wtext->strerror(ret));
+			    *p, wtext->strerror(wtext, NULL, ret));
 
 	/* Add the data source */
 	if ((ret = connection->add_data_source(
 	    connection, "helium:", (WT_DATA_SOURCE *)ds, NULL)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_CONNECTION.add_data_source: %s", wtext->strerror(ret));
+		    "WT_CONNECTION.add_data_source: %s",
+		    wtext->strerror(wtext, NULL, ret));
 	return (0);
 
 err:	if (ds != NULL)

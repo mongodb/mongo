@@ -34,6 +34,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/delete.h"
@@ -52,7 +53,7 @@ namespace QueryStageDelete {
     class QueryStageDeleteBase {
     public:
         QueryStageDeleteBase() : _client(&_txn) {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             for (size_t i = 0; i < numObj(); ++i) {
                 BSONObjBuilder bob;
@@ -62,7 +63,7 @@ namespace QueryStageDelete {
         }
 
         virtual ~QueryStageDeleteBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -111,7 +112,7 @@ namespace QueryStageDelete {
     class QueryStageDeleteInvalidateUpcomingObject : public QueryStageDeleteBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            OldClientWriteContext ctx(&_txn, ns());
 
             Collection* coll = ctx.getCollection();
 

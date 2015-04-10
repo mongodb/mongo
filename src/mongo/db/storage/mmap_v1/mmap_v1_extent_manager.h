@@ -80,7 +80,7 @@ namespace mongo {
          *        while a bit odd, this is not a layer violation as extents
          *        are a peer to the .ns file, without any layering
          */
-        MmapV1ExtentManager(const StringData& dbname, const StringData& path,
+        MmapV1ExtentManager(StringData dbname, StringData path,
                             bool directoryPerDB);
 
         /**
@@ -208,7 +208,7 @@ namespace mongo {
          */
         class FilesArray {
         public:
-            FilesArray() : _writersMutex("MmapV1ExtentManager"), _size(0) { }
+            FilesArray() : _size(0) { }
             ~FilesArray();
 
             /**

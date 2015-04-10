@@ -126,6 +126,7 @@ Filesystems
 FindFirstFile
 Fk
 FlushFileBuffers
+Fprintf
 FreeBSD
 FreeBSD's
 FreeLibrary
@@ -197,10 +198,12 @@ LNO
 LOGREC
 LOGSCAN
 LRU
+LRVv
 LSB
 LSM
 LSN
 LSNs
+LZ
 LZO
 LeafGreen
 LevelDB
@@ -283,6 +286,7 @@ RNG
 ROCKSDB
 RPC
 RUNDIR
+RVv
 Radu
 Recno
 Recurse
@@ -358,6 +362,7 @@ VLDB
 VMSG
 Vanishingly
 Vc
+Vfprintf
 Vixie
 Vo
 Vv
@@ -418,6 +423,7 @@ autoheader
 bInheritHandle
 basecfg
 bdb
+beginthreadex
 bigram
 bitcnt
 bitfield
@@ -493,6 +499,7 @@ compat
 concat
 cond
 conf
+confchk
 config
 conn
 connectionp
@@ -536,6 +543,7 @@ decl
 decr
 decrement
 decrementing
+deflateCopy
 deflateEnd
 deflateInit
 defno
@@ -550,6 +558,7 @@ dest
 dev
 dhandle
 dhandles
+dir
 dirlist
 dl
 dlclose
@@ -911,6 +920,7 @@ qsort
 quartile
 qup
 rS
+rb
 rbrace
 rbracket
 rdlock
@@ -1073,6 +1083,7 @@ treplacement
 trk
 trk's
 troot
+trun
 trunc
 trylock
 trywrlock
@@ -1141,6 +1152,7 @@ variable's
 vcell
 verrx
 versa
+vfprintf
 vlcs
 vmsg
 vpack
@@ -1153,12 +1165,14 @@ vtype
 vunpack
 vupdate
 walk's
+wb
 wiredtiger
 workFactor
 wrapup
 writelock
 writeunlock
 wrlock
+wrlsn
 ws
 wti
 wtperf

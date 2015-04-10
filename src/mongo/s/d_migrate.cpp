@@ -57,28 +57,33 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/op_observer.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/range_deleter_service.h"
-#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logger/ramlog.h"
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/type_chunk.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/exit.h"
@@ -174,7 +179,11 @@ namespace mongo {
                 if ( !_cmdErrmsg->empty() ) {
                     _b.append( "errmsg" , *_cmdErrmsg );
                 }
-                configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
+
+                grid.catalogManager()->logChange(_txn,
+                                                 (string)"moveChunk." + _where,
+                                                 _ns,
+                                                 _b.obj());
             }
             catch ( const std::exception& e ) {
                 warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what() << migrateLog;
@@ -252,11 +261,9 @@ namespace mongo {
     class MigrateFromStatus {
     public:
         MigrateFromStatus():
-            _mutex("MigrateFromStatus"),
             _inCriticalSection(false),
             _memoryUsed(0),
-            _active(false),
-            _cloneLocsMutex("MigrateFromTrackerMutex") {
+            _active(false) {
         }
 
         /**
@@ -275,7 +282,7 @@ namespace mongo {
             // Get global shared to synchronize with logOp. Also see comments in the class
             // members declaration for more details.
             Lock::GlobalRead globalShared(txn->lockState());
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             if (_active) {
                 return false;
@@ -292,7 +299,7 @@ namespace mongo {
 
             _active = true;
 
-            scoped_lock tLock(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> tLock(_cloneLocsMutex);
             verify(_cloneLocs.size() == 0);
 
             return true;
@@ -305,7 +312,7 @@ namespace mongo {
             // Get global shared to synchronize with logOp. Also see comments in the class
             // members declaration for more details.
             Lock::GlobalRead globalShared(txn->lockState());
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             _active = false;
             _deleteNotifyExec.reset( NULL );
@@ -316,7 +323,7 @@ namespace mongo {
             _reload.clear();
             _memoryUsed = 0;
 
-            scoped_lock cloneLock(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> cloneLock(_cloneLocsMutex);
             _cloneLocs.clear();
         }
 
@@ -326,6 +333,18 @@ namespace mongo {
                    const BSONObj& obj,
                    BSONObj* patt,
                    bool notInActiveChunk) {
+            ensureShardVersionOKOrThrow(ns);
+
+            const char op = opstr[0];
+
+            if (notInActiveChunk) {
+                // Ignore writes that came from the migration process like cleanup so they
+                // won't be transferred to the recipient shard. Also ignore ops from
+                // _migrateClone and _transferMods since it is impossible to move a chunk
+                // to self.
+                return;
+            }
+
             dassert(txn->lockState()->isWriteLocked()); // Must have Global IX.
 
             if (!_active)
@@ -335,65 +354,47 @@ namespace mongo {
                 return;
 
             // no need to log if this is not an insertion, an update, or an actual deletion
-            // note: opstr 'db' isn't a deletion but a mention that a database exists (for replication
-            // machinery mostly)
-            char op = opstr[0];
-            if ( op == 'n' || op =='c' || ( op == 'd' && opstr[1] == 'b' ) )
+            // note: opstr 'db' isn't a deletion but a mention that a database exists
+            // (for replication machinery mostly).
+            if (op == 'n' || op == 'c' || (op == 'd' && opstr[1] == 'b'))
                 return;
 
             BSONElement ide;
-            if ( patt )
-                ide = patt->getField( "_id" );
+            if (patt)
+                ide = patt->getField("_id");
             else
                 ide = obj["_id"];
 
-            if ( ide.eoo() ) {
-                warning() << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << migrateLog;
+            if (ide.eoo()) {
+                warning() << "logOpForSharding got mod with no _id, ignoring  obj: "
+                          << obj << migrateLog;
                 return;
             }
 
-            BSONObj it;
-
-            switch ( opstr[0] ) {
-
-            case 'd': {
-
-                if (notInActiveChunk) {
-                    // we don't want to xfer things we're cleaning
-                    // as then they'll be deleted on TO
-                    // which is bad
-                    return;
-                }
-
-                scoped_lock sl(_mutex);
-                // can't filter deletes :(
-                _deleted.push_back( ide.wrap() );
-                _memoryUsed += ide.size() + 5;
+            if (op == 'i' && (!isInRange(obj, _min, _max, _shardKeyPattern))) {
                 return;
             }
 
-            case 'i':
-                it = obj;
-                break;
+            BSONObj idObj(ide.wrap());
 
-            case 'u':
-                Client::Context ctx(txn, _ns);
-                if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), ide.wrap(), it)) {
-                    warning() << "logOpForSharding couldn't find: " << ide
+            if (op == 'u') {
+                BSONObj fullDoc;
+                OldClientContext ctx(txn, _ns, false);
+                if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), idObj, fullDoc)) {
+                    warning() << "logOpForSharding couldn't find: " << idObj
                               << " even though should have" << migrateLog;
+                    dassert(false); // TODO: Abort the migration.
                     return;
                 }
-                break;
 
+                if (!isInRange(fullDoc, _min, _max, _shardKeyPattern)) {
+                    return;
+                }
             }
 
-            if (!isInRange(it, _min, _max, _shardKeyPattern)) {
-                return;
-            }
+            // Note: can't check if delete is in active chunk since the document is gone!
 
-            scoped_lock sl(_mutex);
-            _reload.push_back(ide.wrap());
-            _memoryUsed += ide.size() + 5;
+            txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, op));
         }
 
         /**
@@ -450,7 +451,7 @@ namespace mongo {
             {
                 AutoGetCollectionForRead ctx(txn, getNS());
 
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 if (!_active) {
                     errmsg = "no active migration!";
                     return false;
@@ -509,7 +510,7 @@ namespace mongo {
                 // It's alright not to lock _mutex all the way through based on the assumption
                 // that this is only called by the main thread that drives the migration and
                 // only it can start and stop the current migration.
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
 
                 invariant( _deleteNotifyExec.get() == NULL );
                 WorkingSet* ws = new WorkingSet();
@@ -559,7 +560,7 @@ namespace mongo {
             RecordId dl;
             while (PlanExecutor::ADVANCED == exec->getNext(NULL, &dl)) {
                 if ( ! isLargeChunk ) {
-                    scoped_lock lk(_cloneLocsMutex);
+                    boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
                     _cloneLocs.insert( dl );
                 }
 
@@ -572,7 +573,7 @@ namespace mongo {
             exec.reset();
 
             if ( isLargeChunk ) {
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 warning() << "cannot move chunk: the maximum number of documents for a chunk is "
                           << maxRecsWhenFull << " , the maximum chunk size is " << maxChunkSize
                           << " , average document size is " << avgRecSize
@@ -600,7 +601,7 @@ namespace mongo {
             {
                 AutoGetCollectionForRead ctx(txn, getNS());
 
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 if (!_active) {
                     errmsg = "not active";
                     return false;
@@ -623,7 +624,7 @@ namespace mongo {
             while (!isBufferFilled) {
                 AutoGetCollectionForRead ctx(txn, getNS());
 
-                scoped_lock sl(_mutex);
+                boost::lock_guard<boost::mutex> sl(_mutex);
                 if (!_active) {
                     errmsg = "not active";
                     return false;
@@ -638,7 +639,7 @@ namespace mongo {
                     return false;
                 }
 
-                scoped_lock lk(_cloneLocsMutex);
+                boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
                 set<RecordId>::iterator cloneLocsIter = _cloneLocs.begin();
                 for ( ; cloneLocsIter != _cloneLocs.end(); ++cloneLocsIter) {
                     if (tracker.intervalHasElapsed()) // should I yield?
@@ -681,33 +682,33 @@ namespace mongo {
             // that check only works for non-mmapv1 engines, and this is needed
             // for mmapv1.
 
-            scoped_lock lk(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
             _cloneLocs.erase( dl );
         }
 
         std::size_t cloneLocsRemaining() {
-            scoped_lock lk(_cloneLocsMutex);
+            boost::lock_guard<boost::mutex> lk(_cloneLocsMutex);
             return _cloneLocs.size();
         }
 
         long long mbUsed() const {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             return _memoryUsed / ( 1024 * 1024 );
         }
 
         bool getInCriticalSection() const {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             return _inCriticalSection;
         }
 
         void setInCriticalSection( bool b ) {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             _inCriticalSection = b;
             _inCriticalSectionCV.notify_all();
         }
 
         std::string getNS() const {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             return _ns;
         }
 
@@ -719,9 +720,9 @@ namespace mongo {
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += maxSecondsToWait;
 
-            scoped_lock lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             while (_inCriticalSection) {
-                if (!_inCriticalSectionCV.timed_wait(lk.boost(), xt))
+                if (!_inCriticalSectionCV.timed_wait(lk, xt))
                     return false;
             }
 
@@ -731,8 +732,58 @@ namespace mongo {
         bool isActive() const { return _getActive(); }
 
     private:
-        bool _getActive() const { scoped_lock lk(_mutex); return _active; }
-        void _setActive( bool b ) { scoped_lock lk(_mutex); _active = b; }
+        bool _getActive() const { boost::lock_guard<boost::mutex> lk(_mutex); return _active; }
+        void _setActive( bool b ) { boost::lock_guard<boost::mutex> lk(_mutex); _active = b; }
+
+        /**
+         * Used to commit work for LogOpForSharding. Used to keep track of changes in documents
+         * that are part of a chunk being migrated.
+         */
+        class LogOpForShardingHandler : public RecoveryUnit::Change {
+        public:
+            /**
+             * Invariant: idObj should belong to a document that is part of the active chunk
+             * being migrated.
+             */
+            LogOpForShardingHandler(MigrateFromStatus* migrateFromStatus,
+                                    const BSONObj& idObj,
+                                    const char op):
+                _migrateFromStatus(migrateFromStatus),
+                _idObj(idObj.getOwned()),
+                _op(op) {
+            }
+
+            virtual void commit() {
+                switch (_op) {
+                case 'd': {
+                    boost::lock_guard<boost::mutex> sl(_migrateFromStatus->_mutex);
+                    _migrateFromStatus->_deleted.push_back(_idObj);
+                    _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
+                    break;
+                }
+
+                case 'i':
+                case 'u':
+                {
+                    boost::lock_guard<boost::mutex> sl(_migrateFromStatus->_mutex);
+                    _migrateFromStatus->_reload.push_back(_idObj);
+                    _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
+                    break;
+                }
+
+                default:
+                    invariant(false);
+
+                }
+            }
+
+            virtual void rollback() { }
+
+        private:
+            MigrateFromStatus* _migrateFromStatus;
+            const BSONObj _idObj;
+            const char _op;
+        };
 
         /**
          * Used to receive invalidation notifications.
@@ -1142,7 +1193,8 @@ namespace mongo {
             BSONObj chunkInfo =
                 BSON("min" << min << "max" << max <<
                      "from" << fromShard.getName() << "to" << toShard.getName());
-            configServer.logChange("moveChunk.start", ns, chunkInfo);
+
+            grid.catalogManager()->logChange(txn, "moveChunk.start", ns, chunkInfo);
 
             // Always refresh our metadata remotely
             ChunkVersion origShardVersion;
@@ -1508,14 +1560,14 @@ namespace mongo {
 
                     // get another chunk on that shard
                     ChunkType bumpChunk;
-                    bool result = 
-                        bumpedCollMetadata->getNextChunk( bumpedCollMetadata->getMinKey(),
-                                                          &bumpChunk );
+                    bool chunkRes =
+                        bumpedCollMetadata->getNextChunk(bumpedCollMetadata->getMinKey(),
+                                                         &bumpChunk);
                     BSONObj bumpMin = bumpChunk.getMin();
                     BSONObj bumpMax = bumpChunk.getMax();
 
-                    (void)result; // for compile warning on non-debug
-                    dassert( result );
+                    (void)chunkRes; // for compile warning on non-debug
+                    dassert(chunkRes);
                     dassert( bumpMin.woCompare( min ) != 0 );
 
                     BSONObjBuilder op;
@@ -1678,9 +1730,11 @@ namespace mongo {
                 // 5.d
                 BSONObjBuilder commitInfo;
                 commitInfo.appendElements( chunkInfo );
-                if ( res["counts"].type() == Object )
-                    commitInfo.appendElements( res["counts"].Obj() );
-                configServer.logChange( "moveChunk.commit" , ns , commitInfo.obj() );
+                if (res["counts"].type() == Object) {
+                    commitInfo.appendElements(res["counts"].Obj());
+                }
+
+                grid.catalogManager()->logChange(txn, "moveChunk.commit", ns, commitInfo.obj());
             }
 
             migrateFromStatus.done(txn);
@@ -1775,7 +1829,6 @@ namespace mongo {
         };
 
         MigrateStatus():
-            _mutex("MigrateStatus"),
             _active(false),
             _numCloned(0),
             _clonedBytes(0),
@@ -1785,12 +1838,12 @@ namespace mongo {
         }
 
         void setState(State newState) {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             _state = newState;
         }
 
         State getState() const {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             return _state;
         }
 
@@ -1802,7 +1855,7 @@ namespace mongo {
                        const BSONObj& min,
                        const BSONObj& max,
                        const BSONObj& shardKeyPattern) {
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
 
             if (_active) {
                 return Status(ErrorCodes::ConflictingOperationInProgress,
@@ -1845,7 +1898,7 @@ namespace mongo {
             }
             catch ( std::exception& e ) {
                 {
-                    scoped_lock sl(_mutex);
+                    boost::lock_guard<boost::mutex> sl(_mutex);
                     _state = FAIL;
                     _errmsg = e.what();
                 }
@@ -1854,7 +1907,7 @@ namespace mongo {
             }
             catch ( ... ) {
                 {
-                    scoped_lock sl(_mutex);
+                    boost::lock_guard<boost::mutex> sl(_mutex);
                     _state = FAIL;
                     _errmsg = "UNKNOWN ERROR";
                 }
@@ -1902,9 +1955,19 @@ namespace mongo {
 
             {
                 // 0. copy system.namespaces entry if collection doesn't already exist
-                Client::WriteContext ctx(txn,  ns );
+                OldClientWriteContext ctx(txn,  ns );
+
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                    nsToDatabaseSubstring(ns))) {
+                    errmsg = str::stream() << "Not primary during migration: " << ns
+                                           << ": checking if collection exists";
+                    warning() << errmsg;
+                    setState(FAIL);
+                    return;
+                }
+
                 // Only copy if ns doesn't already exist
-                Database* db = ctx.ctx().db();
+                Database* db = ctx.db();
                 Collection* collection = db->getCollection( ns );
 
                 if ( !collection ) {
@@ -1921,7 +1984,7 @@ namespace mongo {
                     }
 
                     WriteUnitOfWork wuow(txn);
-                    Status status = userCreateNS( txn, db, ns, options, true, false );
+                    Status status = userCreateNS(txn, db, ns, options, false);
                     if ( !status.isOK() ) {
                         warning() << "failed to create collection [" << ns << "] "
                                   << " with options " << options << ": " << status;
@@ -1941,7 +2004,7 @@ namespace mongo {
 
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), MODE_X);
-                Client::Context ctx(txn,  ns);
+                OldClientContext ctx(txn,  ns);
                 if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
                     nsToDatabaseSubstring(ns))) {
                     errmsg = str::stream() << "Not primary during migration: " << ns;
@@ -1998,8 +2061,11 @@ namespace mongo {
 
                     for (size_t i = 0; i < indexSpecs.size(); i++) {
                         // make sure to create index on secondaries as well
-                        repl::logOp(txn, "i", db->getSystemIndexesName().c_str(), indexSpecs[i],
-                                       NULL, NULL, true /* fromMigrate */);
+                        getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                                txn,
+                                db->getSystemIndexesName(),
+                                indexSpecs[i],
+                                true /* fromMigrate */);
                     }
 
                     wunit.commit();
@@ -2098,7 +2164,7 @@ namespace mongo {
 
                         BSONObj docToClone = i.next().Obj();
                         {
-                            Client::WriteContext cx(txn, ns );
+                            OldClientWriteContext cx(txn, ns );
 
                             BSONObj localDoc;
                             if (willOverrideLocalId(txn,
@@ -2106,7 +2172,7 @@ namespace mongo {
                                                     min,
                                                     max,
                                                     shardKeyPattern,
-                                                    cx.ctx().db(),
+                                                    cx.db(),
                                                     docToClone,
                                                     &localDoc)) {
                                 string errMsg =
@@ -2126,16 +2192,17 @@ namespace mongo {
                         thisTime++;
 
                         {
-                            scoped_lock statsLock(_mutex);
+                            boost::lock_guard<boost::mutex> statsLock(_mutex);
                             _numCloned++;
                             _clonedBytes += docToClone.objsize();
                         }
 
-                        if (writeConcern.shouldWaitForOtherNodes() && thisTime > 0) {
+                        if (writeConcern.shouldWaitForOtherNodes()) {
                             repl::ReplicationCoordinator::StatusAndDuration replStatus =
                                     repl::getGlobalReplicationCoordinator()->awaitReplication(
                                             txn,
-                                            txn->getClient()->getLastOp(),
+                                            repl::ReplClientInfo::forClient(
+                                                    txn->getClient()).getLastOp(),
                                             writeConcern);
                             if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
                                 warning() << "secondaryThrottle on, but doc insert timed out; "
@@ -2156,7 +2223,8 @@ namespace mongo {
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
-            ReplTime lastOpApplied = txn->getClient()->getLastOp().asDate();
+
+            Timestamp lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
 
             {
                 // 4. do bulk of mods
@@ -2298,7 +2366,7 @@ namespace mongo {
         }
 
         void status(BSONObjBuilder& b) {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
 
             b.appendBool("active", _active);
 
@@ -2327,8 +2395,8 @@ namespace mongo {
                    BSONObj max,
                    BSONObj shardKeyPattern,
                    const BSONObj& xfer,
-                   ReplTime* lastOpApplied) {
-            ReplTime dummy;
+                   Timestamp* lastOpApplied) {
+            Timestamp dummy;
             if ( lastOpApplied == NULL ) {
                 lastOpApplied = &dummy;
             }
@@ -2343,7 +2411,7 @@ namespace mongo {
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {
                     Lock::CollectionLock clk(txn->lockState(), ns, MODE_X);
-                    Client::Context ctx(txn, ns);
+                    OldClientContext ctx(txn, ns);
 
                     BSONObj id = i.next().Obj();
 
@@ -2367,11 +2435,10 @@ namespace mongo {
                                   id,
                                   PlanExecutor::YIELD_MANUAL,
                                   true /* justOne */,
-                                  true /* logOp */,
                                   false /* god */,
                                   true /* fromMigrate */);
 
-                    *lastOpApplied = ctx.getClient()->getLastOp().asDate();
+                    *lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
                     didAnything = true;
                 }
             }
@@ -2379,7 +2446,7 @@ namespace mongo {
             if ( xfer["reload"].isABSONObj() ) {
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ) {
-                    Client::WriteContext cx(txn, ns);
+                    OldClientWriteContext cx(txn, ns);
 
                     BSONObj updatedDoc = i.next().Obj();
 
@@ -2389,7 +2456,7 @@ namespace mongo {
                                             min,
                                             max,
                                             shardKeyPattern,
-                                            cx.ctx().db(),
+                                            cx.db(),
                                             updatedDoc,
                                             &localDoc)) {
                         string errMsg =
@@ -2407,7 +2474,7 @@ namespace mongo {
                     // We are in write lock here, so sure we aren't killing
                     Helpers::upsert( txn, ns , updatedDoc , true );
 
-                    *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
+                    *lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
                     didAnything = true;
                 }
             }
@@ -2443,7 +2510,7 @@ namespace mongo {
          * writeConcern (if not empty) have applied till the specified lastOp.
          */
         bool opReplicatedEnough(const OperationContext* txn,
-                                const ReplTime& lastOpApplied,
+                                const Timestamp& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             WriteConcernOptions majorityWriteConcern;
             majorityWriteConcern.wTimeout = -1;
@@ -2470,10 +2537,10 @@ namespace mongo {
                                 const std::string& ns,
                                 BSONObj min,
                                 BSONObj max,
-                                const ReplTime& lastOpApplied,
+                                const Timestamp& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             if (!opReplicatedEnough(txn, lastOpApplied, writeConcern)) {
-                OpTime op( lastOpApplied );
+                Timestamp op( lastOpApplied );
                 OCCASIONALLY warning() << "migrate commit waiting for a majority of slaves for '"
                                        << ns << "' " << min << " -> " << max
                                        << " waiting for: " << op
@@ -2513,7 +2580,7 @@ namespace mongo {
         }
 
         bool startCommit() {
-            scoped_lock lock(_mutex);
+            boost::unique_lock<boost::mutex> lock(_mutex);
 
             if (_state != STEADY) {
                 return false;
@@ -2525,9 +2592,9 @@ namespace mongo {
 
             _state = COMMIT_START;
             while (_active) {
-                if ( ! isActiveCV.timed_wait( lock.boost(), xt ) ){
+                if ( ! isActiveCV.timed_wait( lock, xt ) ){
                     // TIMEOUT
-                    setState(FAIL);
+                    _state = FAIL;
                     log() << "startCommit never finished!" << migrateLog;
                     return false;
                 }
@@ -2542,14 +2609,14 @@ namespace mongo {
         }
 
         void abort() {
-            scoped_lock sl(_mutex);
+            boost::lock_guard<boost::mutex> sl(_mutex);
             _state = ABORT;
             _errmsg = "aborted";
         }
 
-        bool getActive() const { scoped_lock lk(_mutex); return _active; }
+        bool getActive() const { boost::lock_guard<boost::mutex> lk(_mutex); return _active; }
         void setActive( bool b ) { 
-            scoped_lock lk(_mutex);
+            boost::lock_guard<boost::mutex> lk(_mutex);
             _active = b;
             isActiveCV.notify_all(); 
         }

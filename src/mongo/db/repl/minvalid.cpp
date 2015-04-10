@@ -32,7 +32,7 @@
 
 #include "mongo/db/repl/minvalid.h"
 
-#include "mongo/bson/optime.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
@@ -49,22 +49,32 @@ namespace {
     const char* minvalidNS = "local.replset.minvalid";
 } // namespace
 
+    // Writes
     void clearInitialSyncFlag(OperationContext* txn) {
         ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+        // TODO: Investigate correctness of taking MODE_IX for DB/Collection locks
+        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
         Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
     }
 
     void setInitialSyncFlag(OperationContext* txn) {
         ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
         Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
     }
 
+    void setMinValid(OperationContext* ctx, Timestamp ts) {
+        ScopedTransaction transaction(ctx, MODE_IX);
+        Lock::DBLock dblk(ctx->lockState(), "local", MODE_X);
+        Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
+    }
+
+    // Reads
     bool getInitialSyncFlag() {
         OperationContextImpl txn;
-        ScopedTransaction transaction(&txn, MODE_IX);
-        Lock::DBLock lk(txn.lockState(), "local", MODE_X);
+        ScopedTransaction transaction(&txn, MODE_IS);
+        Lock::DBLock dblk(txn.lockState(), "local", MODE_IS);
+        Lock::CollectionLock lk(txn.lockState(), minvalidNS, MODE_IS);
         BSONObj mv;
         bool found = Helpers::getSingleton( &txn, minvalidNS, mv);
 
@@ -74,21 +84,16 @@ namespace {
         return false;
     }
 
-    void setMinValid(OperationContext* ctx, OpTime ts) {
-        ScopedTransaction transaction(ctx, MODE_IX);
-        Lock::DBLock lk(ctx->lockState(), "local", MODE_X);
-        Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
-    }
-
-    OpTime getMinValid(OperationContext* txn) {
+    Timestamp getMinValid(OperationContext* txn) {
         ScopedTransaction transaction(txn, MODE_IS);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_S);
+        Lock::DBLock dblk(txn->lockState(), "local", MODE_IS);
+        Lock::CollectionLock lk(txn->lockState(), minvalidNS, MODE_IS);
         BSONObj mv;
         bool found = Helpers::getSingleton(txn, minvalidNS, mv);
         if (found) {
-            return mv["ts"]._opTime();
+            return mv["ts"].timestamp();
         }
-        return OpTime();
+        return Timestamp();
     }
 
 }

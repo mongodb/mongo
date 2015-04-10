@@ -15,10 +15,6 @@ function aggregateNoOrder(coll, pipeline) {
     return coll.aggregate(pipeline).toArray();
 }
 
-/*
-> ShardingTest
-function (testName, numShards, verboseLevel, numMongos, otherParams) {
-*/
 var shardedAggTest = new ShardingTest({
     shards: 2,
     verbose: 2,

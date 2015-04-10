@@ -42,7 +42,6 @@ env.Library(
         'sorted_data_interface_test_cursor.cpp',
         'sorted_data_interface_test_cursor_advanceto.cpp',
         'sorted_data_interface_test_cursor_locate.cpp',
-        'sorted_data_interface_test_cursor_position.cpp',
         'sorted_data_interface_test_cursor_saverestore.cpp',
         'sorted_data_interface_test_dupkeycheck.cpp',
         'sorted_data_interface_test_fullvalidate.cpp',
@@ -53,14 +52,15 @@ env.Library(
         'sorted_data_interface_test_spaceused.cpp',
         'sorted_data_interface_test_touch.cpp',
         'sorted_data_interface_test_unindex.cpp',
-        ],
-    LIBDEPS=[]
-    )
+    ],
+    LIBDEPS=[
+        'index_entry_comparison',
+    ],
+)
 
 env.Library(
     target='record_store_test_harness',
     source=[
-        'record_store_test_customoption.cpp',
         'record_store_test_datafor.cpp',
         'record_store_test_datasize.cpp',
         'record_store_test_deleterecord.cpp',
@@ -83,7 +83,7 @@ env.Library(
 env.Library(
     target='storage_engine_lock_file',
     source=[
-        'storage_engine_lock_file_${OS_FAMILY}.cpp',
+        'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
         ]

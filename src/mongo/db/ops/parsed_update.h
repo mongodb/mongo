@@ -89,6 +89,11 @@ namespace mongo {
         bool canYield() const;
 
         /**
+         * Is this update supposed to be isolated?
+         */
+        bool isIsolated() const;
+
+        /**
          * As an optimization, we don't create a canonical query for updates with simple _id
          * queries. Use this method to determine whether or not we actually parsed the query.
          */

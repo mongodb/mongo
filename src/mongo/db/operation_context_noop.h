@@ -91,12 +91,8 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual bool isPrimaryFor( const StringData& ns ) {
+        virtual bool isPrimaryFor( StringData ns ) {
             return true;
-        }
-
-        virtual bool isGod() const {
-            return false;
         }
 
         virtual std::string getNS() const {
@@ -105,6 +101,12 @@ namespace mongo {
 
         virtual unsigned int getOpID() const {
             return 0;
+        }
+
+        void setReplicatedWrites(bool writesAreReplicated = true) {}
+
+        bool writesAreReplicated() const {
+            return false;
         }
 
     private:

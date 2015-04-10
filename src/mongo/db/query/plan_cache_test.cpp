@@ -39,7 +39,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
@@ -145,7 +144,7 @@ namespace {
         if (!status.isOK()) {
             mongoutils::str::stream ss;
             ss << "failed to parse query: " << obj.toString()
-               << ". Reason: " << status.toString();
+               << ". Reason: " << status.getStatus().toString();
             FAIL(ss);
         }
         MatchExpression* expr(status.getValue());

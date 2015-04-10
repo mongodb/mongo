@@ -99,11 +99,14 @@ namespace mongo {
         ConfigServerFixture();
 
         /**
-         * Returns a connection std::string to the virtual config server.
+         * Returns a uniform config server connection string to use throughout the tests.
          */
-        ConnectionString configSvr() const {
-            return ConnectionString(HostAndPort("$dummy:10000"));
-        }
+        static ConnectionString configSvr();
+
+        /**
+         * Returns a uniform shard name to use throughout the tests.
+         */
+        static std::string shardName();
 
         /**
          * Clears all data on the server
@@ -111,12 +114,6 @@ namespace mongo {
         void clearServer();
 
         void clearVersion();
-        void clearShards();
-        void clearDatabases();
-        void clearCollections();
-        void clearChunks();
-        void clearPings();
-        void clearChangelog();
 
         /**
          * Dumps the contents of the config server to the log.
@@ -124,15 +121,13 @@ namespace mongo {
         void dumpServer();
 
     protected:
-
-        virtual void setUp();
-
-        virtual void tearDown();
-
-
         OperationContextImpl _txn;
         CustomDirectClient _client;
         CustomConnectHook* _connectHook;
+
+    private:
+        virtual void setUp();
+        virtual void tearDown();
     };
 
 }

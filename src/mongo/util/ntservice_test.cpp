@@ -117,4 +117,7 @@ namespace mongo {
     void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
     }
     void removeControlCHandler() {}
+    void signalShutdown() {}
+    bool inShutdown() { return false; }
+    void exitCleanly(ExitCode code) { }
 }  // namespace mongo

@@ -99,7 +99,7 @@ namespace {
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(
                                               BSON("ok" << 1 <<
                                                    "fresher" << false <<
-                                                   "opTime" << Date_t(OpTime(0, 0).asDate()) <<
+                                                   "opTime" << Date_t(Timestamp(0, 0).asULL()) <<
                                                    "veto" << false)));
             }
             else {
@@ -135,7 +135,6 @@ namespace {
      */
     TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
         OperationContextReplMock txn;
-        startCapturingLogMessages();
         assertStartSuccess(
             BSON("_id" << "mySet" <<
                  "version" << 1 <<
@@ -150,7 +149,7 @@ namespace {
         ASSERT(getReplCoord()->getMemberState().secondary()) <<
                                                       getReplCoord()->getMemberState().toString();
 
-        getReplCoord()->setMyLastOptime(OpTime(10,0));
+        getReplCoord()->setMyLastOptime(Timestamp(10,0));
 
         NetworkInterfaceMock* net = getNet();
         net->enterNetwork();
@@ -211,7 +210,7 @@ namespace {
                                 ));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         OperationContextNoop txn;
-        getReplCoord()->setMyLastOptime(OpTime (100, 1));
+        getReplCoord()->setMyLastOptime(Timestamp (100, 1));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
         startCapturingLogMessages();
         simulateSuccessfulElection();
@@ -232,7 +231,7 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OpTime time1(100, 1);
+        Timestamp time1(100, 1);
         getReplCoord()->setMyLastOptime(time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -263,7 +262,7 @@ namespace {
         net->exitNetwork();
         stopCapturingLogMessages();
         ASSERT_EQUALS(1,
-                countLogLinesContaining("replSet couldn't elect self, only received -9999 votes"));
+                countLogLinesContaining("couldn't elect self, only received -9999 votes"));
     }
 
     TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
@@ -279,7 +278,7 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OpTime time1(100, 1);
+        Timestamp time1(100, 1);
         getReplCoord()->setMyLastOptime(time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -327,7 +326,7 @@ namespace {
                                          BSON("_id" << 5 << "host" << "node5:12345") )),
             HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(OpTime(100,0));
+        getReplCoord()->setMyLastOptime(Timestamp(100,0));
 
         // set hbreconfig to hang while in progress
         getExternalState()->setStoreLocalConfigDocumentToHang(true);

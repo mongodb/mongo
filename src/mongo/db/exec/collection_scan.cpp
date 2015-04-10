@@ -35,6 +35,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/fail_point_service.h"
@@ -65,7 +66,7 @@ namespace mongo {
         _specificStats.direction = params.direction;
 
         // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
-        // for anything other than passing up NEED_FETCH. We use the loc and owned obj state, but
+        // for anything other than passing up NEED_YIELD. We use the loc and owned obj state, but
         // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
         WorkingSetMember* member = _workingSet->get(_wsidForFetch);
         member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
@@ -86,25 +87,34 @@ namespace mongo {
                 return PlanStage::DEAD;
             }
 
-            if (_lastSeenLoc.isNull()) {
-                _iter.reset( _params.collection->getIterator( _txn,
-                                                              _params.start,
-                                                              _params.direction ) );
-            }
-            else {
-                invariant(_params.tailable);
-
-                _iter.reset( _params.collection->getIterator( _txn,
-                                                              _lastSeenLoc,
-                                                              _params.direction ) );
-
-                // Advance _iter past where we were last time. If it returns something else, mark us
-                // as dead since we want to signal an error rather than silently dropping data from
-                // the stream. This is related to the _lastSeenLock handling in invalidate.
-                if (_iter->getNext() != _lastSeenLoc) {
-                    _isDead = true;
-                    return PlanStage::DEAD;
+            try {
+                if (_lastSeenLoc.isNull()) {
+                    _iter.reset( _params.collection->getIterator( _txn,
+                                                                  _params.start,
+                                                                  _params.direction ) );
                 }
+                else {
+                    invariant(_params.tailable);
+
+                    _iter.reset( _params.collection->getIterator( _txn,
+                                                                  _lastSeenLoc,
+                                                                  _params.direction ) );
+
+                    // Advance _iter past where we were last time. If it returns something else,
+                    // mark us as dead since we want to signal an error rather than silently
+                    // dropping data from the stream. This is related to the _lastSeenLock handling
+                    // in invalidate.
+                    if (_iter->getNext() != _lastSeenLoc) {
+                        _isDead = true;
+                        return PlanStage::DEAD;
+                    }
+                }
+            }
+            catch (const WriteConflictException& wce) {
+                // Leave us in a state to try again next time.
+                _iter.reset();
+                *out = WorkingSet::INVALID_ID;
+                return PlanStage::NEED_YIELD;
             }
 
             ++_commonStats.needTime;
@@ -126,9 +136,8 @@ namespace mongo {
         _lastSeenLoc = curr;
 
         // See if the record we're about to access is in memory. If not, pass a fetch request up.
-        // Note that curr() does not touch the record (on MMAPv1 which is the only place we use
-        // NEED_FETCH) so we are able to yield before touching the record, as long as we do so
-        // before calling getNext().
+        // Note that curr() does not touch the record. This way, we are able to yield before
+        // fetching the record.
         {
             std::auto_ptr<RecordFetcher> fetcher(
                 _params.collection->documentNeedsFetch(_txn, curr));
@@ -138,20 +147,32 @@ namespace mongo {
                 // Pass the RecordFetcher off to the WSM.
                 member->setFetcher(fetcher.release());
                 *out = _wsidForFetch;
-                _commonStats.needFetch++;
-                return NEED_FETCH;
+                _commonStats.needYield++;
+                return NEED_YIELD;
             }
+        }
+
+        // Do this before advancing because it is more efficient while the iterator is still on this
+        // document.
+        const Snapshotted<BSONObj> obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
+                                                              _iter->dataFor(curr).releaseToBson());
+
+        // Advance the iterator.
+        try {
+            invariant(_iter->getNext() == curr);
+        }
+        catch (const WriteConflictException& wce) {
+            // If getNext thows, it leaves us on the original document.
+            invariant(_iter->curr() == curr);
+            *out = WorkingSet::INVALID_ID;
+            return PlanStage::NEED_YIELD;
         }
 
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
         member->loc = curr;
-        member->obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
-                                           _iter->dataFor(member->loc).releaseToBson());
+        member->obj = obj;
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-
-        // Advance the iterator.
-        invariant(_iter->getNext() == curr);
 
         return returnIfMatches(member, id, out);
     }

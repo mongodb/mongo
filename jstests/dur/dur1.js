@@ -94,13 +94,13 @@ var path2 = MongoRunner.dataPath + testname+"dur";
 
 // non-durable version
 log("run mongod without journaling");
-conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur", "--smallfiles");
+conn = MongoRunner.runMongod({dbpath: path1, nodur: "", smallfiles: ""});
 work();
-stopMongod(30000);
+MongoRunner.stopMongod(conn);
 
 // durable version
 log("run mongod with --journal");
-conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--journal", "--smallfiles", "--journalOptions", 8);
+conn = MongoRunner.runMongod({dbpath: path2, journal: "", smallfiles: "", journalOptions: 8});
 work();
 
 // wait for group commit.
@@ -108,17 +108,22 @@ printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
 
 // kill the process hard
 log("kill 9");
-stopMongod(30001, /*signal*/9);
+MongoRunner.stopMongod(conn.port, /*signal*/9);
 
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
 log("restart mongod --journal and recover");
-conn = startMongodNoReset("--port", 30002, "--dbpath", path2, "--journal", "--smallfiles", "--journalOptions", 8);
+conn = MongoRunner.runMongod({restart: true,
+                              cleanData: false,
+                              dbpath: path2,
+                              journal: "",
+                              smallfiles: "",
+                              journalOptions: 8});
 verify();
 
 log("stop mongod");
-stopMongod(30002);
+MongoRunner.stopMongod(conn);
 
 // stopMongod seems to be asynchronous (hmmm) so we sleep here.
 // sleep(5000);

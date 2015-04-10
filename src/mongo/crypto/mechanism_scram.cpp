@@ -89,7 +89,7 @@ namespace scram {
     }
 
     // Iterate the hash function to generate SaltedPassword
-    void generateSaltedPassword(const StringData& hashedPassword,
+    void generateSaltedPassword(StringData hashedPassword,
                                 const unsigned char* salt,
                                 const int saltLen,
                                 const int iterationCount,

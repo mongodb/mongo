@@ -42,7 +42,6 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/qlog.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
@@ -95,7 +94,7 @@ namespace mongo {
 
         // Compute score for each tree.  Record the best.
         for (size_t i = 0; i < statTrees.size(); ++i) {
-            QLOG() << "Scoring plan " << i << ":" << endl
+            LOG(5) << "Scoring plan " << i << ":" << endl
                    << candidates[i].solution->toString() << "Stats:\n"
                    << Explain::statsToBSON(*statTrees[i]).jsonString(Strict, true);
             LOG(2) << "Scoring query plan: "
@@ -103,9 +102,9 @@ namespace mongo {
                    << " planHitEOF=" << statTrees[i]->common.isEOF;
 
             double score = scoreTree(statTrees[i]);
-            QLOG() << "score = " << score << endl;
+            LOG(5) << "score = " << score << endl;
             if (statTrees[i]->common.isEOF) {
-                QLOG() << "Adding +" << eofBonus << " EOF bonus to score." << endl;
+                LOG(5) << "Adding +" << eofBonus << " EOF bonus to score." << endl;
                 score += 1;
             }
             scoresAndCandidateindices.push_back(std::make_pair(score, i));
@@ -207,9 +206,9 @@ namespace mongo {
         double productivity = static_cast<double>(stats->common.advanced)
                             / static_cast<double>(workUnits);
 
-        // Just enough to break a tie.
-        static const double epsilon = 1.0 /
-            static_cast<double>(internalQueryPlanEvaluationWorks);
+        // Just enough to break a tie. Must be small enough to ensure that a more productive
+        // plan doesn't lose to a less productive plan due to tie breaking.
+        static const double epsilon = std::min(1.0 / static_cast<double>(10 * workUnits), 1e-4);
 
         // We prefer covered projections.
         //
@@ -259,7 +258,6 @@ namespace mongo {
                                                       << " noIxisectBonus = "
                                                       << tieBreakers << ")";
         std::string scoreStr = ss;
-        QLOG() << scoreStr << endl;
         LOG(2) << scoreStr;
 
         if (internalQueryForceIntersectionPlans) {
@@ -267,7 +265,7 @@ namespace mongo {
                 // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
                 // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.
                 score += 3;
-                QLOG() << "Score boosted to " << score << " due to intersection forcing." << endl;
+                LOG(5) << "Score boosted to " << score << " due to intersection forcing." << endl;
             }
         }
 

@@ -137,6 +137,9 @@ namespace mongo {
         virtual RecoveryUnit* newRecoveryUnit() {
             return new WiredTigerRecoveryUnit( _sessionCache );
         }
+
+        WT_CONNECTION* conn() const { return _conn; }
+
     private:
         unittest::TempDir _dbpath;
         WT_CONNECTION* _conn;
@@ -147,22 +150,43 @@ namespace mongo {
         return new WiredTigerHarnessHelper();
     }
 
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyDocument) {
+        BSONObj spec = fromjson("{}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(result.getValue(), ""); // "," would also be valid.
+    }
+
     TEST(WiredTigerRecordStoreTest, GenerateCreateStringUnknownField) {
-        CollectionOptions options;
-        options.storageEngine = fromjson("{wiredTiger: {unknownField: 1}}");
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString("", options, "");
+        BSONObj spec = fromjson("{unknownField: 1}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status);
     }
 
     TEST(WiredTigerRecordStoreTest, GenerateCreateStringNonStringConfig) {
-        CollectionOptions options;
-        options.storageEngine = fromjson("{wiredTiger: {configString: 12345}}");
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString("", options, "");
+        BSONObj spec = fromjson("{configString: 12345}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
         const Status& status = result.getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status.code());
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyConfigString) {
+        BSONObj spec = fromjson("{configString: ''}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(result.getValue(), ","); // "" would also be valid.
+    }
+
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigFormat) {
+        // TODO eventually this should fail since "abc" is not a valid WT option.
+        BSONObj spec = fromjson("{configString: 'abc=def'}");
+        StatusWith<std::string> result = WiredTigerRecordStore::parseOptionsField(spec);
+        const Status& status = result.getStatus();
+        ASSERT_OK(status);
+        ASSERT_EQ(result.getValue(), "abc=def,");
     }
 
     TEST(WiredTigerRecordStoreTest, Isolation1 ) {
@@ -271,12 +295,13 @@ namespace mongo {
     }
 
     TEST(WiredTigerRecordStoreTest, SizeStorer1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         string uri = checked_cast<WiredTigerRecordStore*>( rs.get() )->getURI();
 
-        WiredTigerSizeStorer ss;
+        string indexUri = "table:myindex";
+        WiredTigerSizeStorer ss(harnessHelper->conn(), indexUri);
         checked_cast<WiredTigerRecordStore*>( rs.get() )->setSizeStorer( &ss );
 
         int N = 12;
@@ -303,7 +328,7 @@ namespace mongo {
         {
             long long numRecords;
             long long dataSize;
-            ss.load( uri, &numRecords, &dataSize );
+            ss.loadFromCache( uri, &numRecords, &dataSize );
             ASSERT_EQUALS( N, numRecords );
         }
 
@@ -318,7 +343,6 @@ namespace mongo {
             ASSERT_EQUALS( N, rs->numRecords( opCtx.get() ) );
         }
 
-        string indexUri = "table:myindex";
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             WiredTigerRecoveryUnit* ru =
@@ -331,22 +355,16 @@ namespace mongo {
                 uow.commit();
             }
 
-            {
-                WriteUnitOfWork uow( opCtx.get() );
-                ss.storeInto( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(opCtx.get()),
-                              indexUri );
-                uow.commit();
-            }
+            ss.syncCache(true);
         }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WiredTigerSizeStorer ss2;
-            ss2.loadFrom( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(opCtx.get()),
-                          indexUri );
+            WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri);
+            ss2.fillCache();
             long long numRecords;
             long long dataSize;
-            ss2.load( uri, &numRecords, &dataSize );
+            ss2.loadFromCache( uri, &numRecords, &dataSize );
             ASSERT_EQUALS( N, numRecords );
         }
 
@@ -375,7 +393,7 @@ namespace {
     private:
         virtual void setUp() {
             harnessHelper.reset(new WiredTigerHarnessHelper());
-            sizeStorer.reset(new WiredTigerSizeStorer());
+            sizeStorer.reset(new WiredTigerSizeStorer(harnessHelper->conn(), "table:sizeStorer"));
             rs.reset(harnessHelper->newNonCappedRecordStore());
             WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
             wtrs->setSizeStorer(sizeStorer.get());
@@ -393,7 +411,7 @@ namespace {
             }
             ASSERT_EQUALS(expectedNumRecords, rs->numRecords(NULL));
             ASSERT_EQUALS(expectedDataSize, rs->dataSize(NULL));
-            sizeStorer->store(uri, 0, 0);
+            sizeStorer->storeToCache(uri, 0, 0);
         }
         virtual void tearDown() {
             expectedNumRecords = 0;
@@ -409,14 +427,14 @@ namespace {
         long long getNumRecords() const {
             long long numRecords;
             long long unused;
-            sizeStorer->load(uri, &numRecords, &unused);
+            sizeStorer->loadFromCache(uri, &numRecords, &unused);
             return numRecords;
         }
 
         long long getDataSize() const {
             long long unused;
             long long dataSize;
-            sizeStorer->load(uri, &unused, &dataSize);
+            sizeStorer->loadFromCache(uri, &unused, &dataSize);
             return dataSize;
         }
 
@@ -472,7 +490,7 @@ namespace {
         rs.reset(NULL);
 
         scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-        sizeStorer->store(uri, expectedNumRecords*2, expectedDataSize*2);
+        sizeStorer->storeToCache(uri, expectedNumRecords*2, expectedDataSize*2);
         rs.reset(new WiredTigerRecordStore(opCtx.get(), "a.b", uri, false, -1, -1, NULL,
                                            sizeStorer.get()));
         ASSERT_EQUALS(expectedNumRecords*2, rs->numRecords(NULL));
@@ -497,7 +515,7 @@ namespace {
 
     StatusWith<RecordId> insertBSON(scoped_ptr<OperationContext>& opCtx,
                                    scoped_ptr<RecordStore>& rs,
-                                   const OpTime& opTime) {
+                                   const Timestamp& opTime) {
         BSONObj obj = BSON( "ts" << opTime );
         WriteUnitOfWork wuow(opCtx.get());
         WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
@@ -522,33 +540,33 @@ namespace {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
 
             // always illegal
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,-1)).getStatus(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2,-1)).getStatus(),
                   ErrorCodes::BadValue);
 
             {
-                BSONObj obj = BSON("not_ts" << OpTime(2,1));
+                BSONObj obj = BSON("not_ts" << Timestamp(2,1));
                 ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
                                            false ).getStatus(),
                           ErrorCodes::BadValue);
 
-                obj = BSON( "ts" << "not an OpTime" );
+                obj = BSON( "ts" << "not a Timestamp" );
                 ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
                                            false ).getStatus(),
                           ErrorCodes::BadValue);
             }
 
             // currently dasserts
-            // ASSERT_EQ(insertBSON(opCtx, rs, BSON("ts" << OpTime(-2,1))).getStatus(),
+            // ASSERT_EQ(insertBSON(opCtx, rs, BSON("ts" << Timestamp(-2,1))).getStatus(),
             // ErrorCodes::BadValue);
 
             // success cases
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,1)).getValue(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1,1)).getValue(),
                       RecordId(1,1));
 
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,2)).getValue(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1,2)).getValue(),
                       RecordId(1,2));
 
-            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,2)).getValue(),
+            ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2,2)).getValue(),
                       RecordId(2,2));
         }
 
@@ -610,7 +628,7 @@ namespace {
 
         scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
 
-        BSONObj obj = BSON( "ts" << OpTime(2,-1) );
+        BSONObj obj = BSON( "ts" << Timestamp(2,-1) );
         {
             WriteUnitOfWork wuow( opCtx.get() );
             ASSERT_OK(rs->insertRecord(opCtx.get(), obj.objdata(),
@@ -728,7 +746,7 @@ namespace {
     RecordId _oplogOrderInsertOplog( OperationContext* txn,
                                     scoped_ptr<RecordStore>& rs,
                                     int inc ) {
-        OpTime opTime = OpTime(5,inc);
+        Timestamp opTime = Timestamp(5,inc);
         WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         Status status = wrs->oplogDiskLocRegister( txn, opTime );
         ASSERT_OK( status );

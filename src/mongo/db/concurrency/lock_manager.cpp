@@ -28,12 +28,13 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include <vector>
-
 #include "mongo/platform/basic.h"
+
+#include <vector>
 
 #include "mongo/db/concurrency/lock_manager.h"
 
+#include "mongo/config.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -117,6 +118,22 @@ namespace {
     // Ensure we do not add new types without updating the names array
     BOOST_STATIC_ASSERT(
         (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
+
+
+    /**
+     * Maps the LockRequest status to a human-readable string.
+     */
+    static const char* LockRequestStatusNames[] = {
+        "new",
+        "granted",
+        "waiting",
+        "converting",
+    };
+
+    // Ensure we do not add new status types without updating the names array
+    BOOST_STATIC_ASSERT(
+        (sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0]))
+                                                                == LockRequest::StatusCount);
 
 } // namespace
 
@@ -661,6 +678,7 @@ namespace {
     }
 
     void LockManager::cleanupUnusedLocks() {
+        size_t deletedLockHeads = 0;
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
             SimpleMutex::scoped_lock scopedLock(bucket->mutex);
@@ -682,6 +700,7 @@ namespace {
                     invariant(lock->compatibleFirstCount == 0);
 
                     bucket->data.erase(it++);
+                    deletedLockHeads++;
                     delete lock;
                 }
                 else {
@@ -689,6 +708,7 @@ namespace {
                 }
             }
         }
+        LOG(2) << "deleted " << deletedLockHeads << " unused lock heads";
     }
 
     void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
@@ -1057,16 +1077,16 @@ namespace {
                 + (hashId & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits));
     }
 
-    ResourceId::ResourceId(ResourceType type, const StringData& ns)
+    ResourceId::ResourceId(ResourceType type, StringData ns)
         : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         _nsCopy = ns.toString();
 #endif
     }
 
     ResourceId::ResourceId(ResourceType type, const string& ns)
         : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         _nsCopy = ns;
 #endif
     }
@@ -1079,7 +1099,7 @@ namespace {
         ss << "{" << _fullHash << ": " << resourceTypeName(getType())
            << ", " << getHashId();
 
-#ifdef _DEBUG
+#ifdef MONGO_CONFIG_DEBUG_BUILD
         ss << ", " << _nsCopy;
 #endif
 
@@ -1130,6 +1150,10 @@ namespace {
 
     const char* resourceTypeName(ResourceType resourceType) {
         return ResourceTypeNames[resourceType];
+    }
+
+    const char* lockRequestStatusName(LockRequest::Status status) {
+        return LockRequestStatusNames[status];
     }
 
 } // namespace mongo

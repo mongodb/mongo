@@ -77,8 +77,8 @@ namespace repl {
         BSONObj findOne(const char *ns, const Query& q) {
             return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
         }
-        BSONObj getLastOp(const char *ns) {
-            return findOne(ns, Query().sort(reverseNaturalObj));
+        BSONObj getLastOp(const std::string& ns) {
+            return findOne(ns.c_str(), Query().sort(reverseNaturalObj));
         }
 
         /* SO_TIMEOUT (send/recv time out) for our DBClientConnections */
@@ -99,10 +99,10 @@ namespace repl {
 
         void tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields=0);
 
-        void tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields=0);
+        void tailingQueryGTE(const char *ns, Timestamp t, const BSONObj* fields=0);
 
         /* Do a tailing query, but only send the ts field back. */
-        void ghostQueryGTE(const char *ns, OpTime t) {
+        void ghostQueryGTE(const char *ns, Timestamp t) {
             const BSONObj fields = BSON("ts" << 1 << "_id" << 0);
             return tailingQueryGTE(ns, t, &fields);
         }
@@ -146,7 +146,7 @@ namespace repl {
          * This function may throw DB exceptions.
          */
         void connectToSyncSource(OperationContext* txn, 
-                                 OpTime lastOpTimeFetched,
+                                 Timestamp lastOpTimeFetched,
                                  ReplicationCoordinator* replCoord);
     };
 

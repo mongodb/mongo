@@ -69,7 +69,7 @@ namespace mongo {
          * noOp.
          */
         virtual Status prepare(mutablebson::Element root,
-                               const StringData& matchedField,
+                               StringData matchedField,
                                ExecInfo* execInfo);
 
         /**

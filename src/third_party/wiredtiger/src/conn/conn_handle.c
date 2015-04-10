@@ -20,13 +20,15 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	session = conn->default_session;
 
-	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
 		SLIST_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
+		SLIST_INIT(&conn->fhhash[i]);	/* File handle hash lists */
+	}
 
 	SLIST_INIT(&conn->dhlh);		/* Data handle list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->dsrcqh);		/* Data source list */
-	TAILQ_INIT(&conn->fhqh);		/* File list */
+	SLIST_INIT(&conn->fhlh);		/* File list */
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 	TAILQ_INIT(&conn->extractorqh);		/* Extractor list */
@@ -85,7 +87,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	 * more opaque, but for now this is simpler.
 	 */
 	WT_RET(__wt_spin_init(session, &conn->block_lock, "block manager"));
-	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+		SLIST_INIT(&conn->blockhash[i]);/* Block handle hash lists */
+	SLIST_INIT(&conn->blocklh);		/* Block manager list */
 
 	return (0);
 }
@@ -112,8 +116,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	 * underlying file-close code uses the mutex to guard lists of
 	 * open files.
 	 */
-	if (conn->lock_fh != NULL)
-		WT_TRET(__wt_close(session, conn->lock_fh));
+	WT_TRET(__wt_close(session, &conn->lock_fh));
 
 	/* Remove from the list of connections. */
 	__wt_spin_lock(session, &__wt_process.spinlock);

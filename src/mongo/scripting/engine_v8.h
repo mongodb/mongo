@@ -214,7 +214,7 @@ namespace mongo {
         virtual BSONObj getObject(const char* field);
 
         virtual void setNumber(const char* field, double val);
-        virtual void setString(const char* field, const StringData& val);
+        virtual void setString(const char* field, StringData val);
         virtual void setBoolean(const char* field, bool val);
         virtual void setElement(const char* field, const BSONElement& e);
         virtual void setObject(const char* field, const BSONObj& obj, bool readOnly);
@@ -228,7 +228,7 @@ namespace mongo {
                            int timeoutMs = 0, bool ignoreReturn = false,
                            bool readOnlyArgs = false, bool readOnlyRecv = false);
 
-        virtual bool exec(const StringData& code, const std::string& name, bool printResult,
+        virtual bool exec(StringData code, const std::string& name, bool printResult,
                           bool reportError, bool assertOnError, int timeoutMs);
 
         // functions to create v8 object and function templates
@@ -269,27 +269,27 @@ namespace mongo {
          */
         mongo::BSONObj v8ToMongo(v8::Handle<v8::Object> obj, int depth = 0);
         void v8ToMongoElement(BSONObjBuilder& b,
-                              const StringData& sname,
+                              StringData sname,
                               v8::Handle<v8::Value> value,
                               int depth = 0,
                               BSONObj* originalParent = 0);
         void v8ToMongoObject(BSONObjBuilder& b,
-                             const StringData& sname,
+                             StringData sname,
                              v8::Handle<v8::Value> value,
                              int depth,
                              BSONObj* originalParent);
         void v8ToMongoNumber(BSONObjBuilder& b,
-                             const StringData& elementName,
+                             StringData elementName,
                              v8::Handle<v8::Number> value,
                              BSONObj* originalParent);
         void v8ToMongoRegex(BSONObjBuilder& b,
-                            const StringData& elementName,
+                            StringData elementName,
                             v8::Handle<v8::RegExp> v8Regex);
         void v8ToMongoDBRef(BSONObjBuilder& b,
-                            const StringData& elementName,
+                            StringData elementName,
                             v8::Handle<v8::Object> obj);
         void v8ToMongoBinData(BSONObjBuilder& b,
-                              const StringData& elementName,
+                              StringData elementName,
                               v8::Handle<v8::Object> obj);
         OID v8ToMongoObjectID(v8::Handle<v8::Object> obj);
 
@@ -426,7 +426,7 @@ namespace mongo {
         /**
          * Create a new function; primarily used for BSON/V8 conversion.
          */
-        v8::Local<v8::Value> newFunction(const StringData& code);
+        v8::Local<v8::Value> newFunction(StringData code);
 
         template <typename _HandleType>
         bool checkV8ErrorState(const _HandleType& resultHandle,

@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/db.h"
@@ -82,7 +83,7 @@ namespace mongo {
         }
 #endif
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         moe::OptionSection ssl_options("SSL options");
 
         ret = addSSLServerOptions(&ssl_options);
@@ -418,7 +419,7 @@ namespace mongo {
         options->addSection(ms_options);
         options->addSection(rs_options);
         options->addSection(sharding_options);
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         options->addSection(ssl_options);
 #endif
         options->addSection(storage_options);
@@ -628,7 +629,7 @@ namespace mongo {
             return ret;
         }
 
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
         ret = canonicalizeSSLServerOptions(params);
         if (!ret.isOK()) {
             return ret;
@@ -1048,6 +1049,10 @@ namespace mongo {
             replSettings.slavedelay = params["slavedelay"].as<int>();
         }
         if (params.count("fastsync")) {
+            if (replSettings.slave != repl::SimpleSlave) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "--fastsync must only be used with --slave");
+            }
             replSettings.fastsync = params["fastsync"].as<bool>();
         }
         if (params.count("autoresync")) {
@@ -1137,12 +1142,6 @@ namespace mongo {
             params["sharding.clusterRole"].as<std::string>() == "configsvr") {
             serverGlobalParams.configsvr = true;
             mmapv1GlobalOptions.smallfiles = true; // config server implies small files
-            if (replSettings.usingReplSets()
-                    || replSettings.master
-                    || replSettings.slave) {
-                return Status(ErrorCodes::BadValue,
-                              "replication should not be enabled on a config server");
-            }
 
             // If we haven't explicitly specified a journal option, default journaling to true for
             // the config server role

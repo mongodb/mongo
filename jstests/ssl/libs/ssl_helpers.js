@@ -1,3 +1,5 @@
+load('jstests/multiVersion/libs/multi_rs.js');
+
 //=== Shared SSL testing library functions and constants ===
 
 var KEYFILE = "jstests/libs/key1";
@@ -100,87 +102,3 @@ function mixedShardTest(options1, options2, shouldSucceed) {
     }
 }
 
-//
-// Utility functions for upgrading replica sets
-//
-// Hacked from version upgrading functions in multiVersion folder.
-// TODO: merge this with that file and add to utils?
-//
-
-ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
-    options = options || {};
-
-    var primary = this.getPrimary();
-
-    // Upgrade secondaries first
-    var nodesToUpgrade = this.getSecondaries();
-
-    // Then upgrade primaries
-    nodesToUpgrade.push( primary );
-
-    // We can upgrade with no primary downtime if we have enough nodes
-    var noDowntimePossible = this.nodes.length > 2;
-
-    for( var i = 0; i < nodesToUpgrade.length; i++ ){
-        var node = nodesToUpgrade[ i ];
-        if( node == primary ){
-            node = this.stepdown( node );
-            primary = this.getPrimary();
-        }
-
-        var prevPrimaryId = this.getNodeId( primary );
-        //merge new options into node settings...
-        for(var nodeName in this.nodeOptions){
-            this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
-        }
-        printjson(this.nodeOptions);
-        this.upgradeNode( node, options, user, pwd );
-
-        if( noDowntimePossible )
-            assert.eq( this.getNodeId( primary ), prevPrimaryId );
-    }
-};
-
-ReplSetTest.prototype.upgradeNode = function( node, opts, user, pwd ){
-    if (user != undefined) {
-        assert.eq(1, node.getDB("admin").auth(user, pwd));
-    }
-    assert.commandWorked(node.adminCommand("replSetMaintenance"));
-    this.waitForState(node, ReplSetTest.State.RECOVERING);
-
-    var newNode = this.restart( node, opts );
-    if (user != undefined) {
-        newNode.getDB("admin").auth(user, pwd);
-    }
-    waitForStates = [ ReplSetTest.State.PRIMARY,
-                      ReplSetTest.State.SECONDARY,
-                      ReplSetTest.State.ARBITER ];
-    this.waitForState( newNode, waitForStates );
-
-    return newNode;
-};
-
-ReplSetTest.prototype.stepdown = function( nodeId ){
-    nodeId = this.getNodeId( nodeId );
-    assert.eq( this.getNodeId( this.getPrimary() ), nodeId );
-    var node = this.nodes[ nodeId ];
-    try {
-        node.getDB("admin").runCommand({ replSetStepDown: 50, force : true });
-        assert( false );
-    }
-    catch( e ){
-        printjson( e );
-    }
-    return this.reconnect( node );
-};
-
-ReplSetTest.prototype.reconnect = function( node ){
-    var nodeId = this.getNodeId( node );
-    this.nodes[ nodeId ] = new Mongo( node.host );
-    var except = {};
-    for( var i in node ){
-        if( typeof( node[i] ) == "function" ) continue;
-        this.nodes[ nodeId ][ i ] = node[ i ];
-    }
-    return this.nodes[ nodeId ];
-};

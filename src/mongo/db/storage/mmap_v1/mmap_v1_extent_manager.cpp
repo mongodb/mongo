@@ -37,7 +37,7 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/record.h"
@@ -107,14 +107,14 @@ namespace mongo {
         boost::scoped_ptr<LockMongoFilesShared> _filesLock;
     };
 
-    MmapV1ExtentManager::MmapV1ExtentManager(const StringData& dbname,
-                                             const StringData& path,
+    MmapV1ExtentManager::MmapV1ExtentManager(StringData dbname,
+                                             StringData path,
                                              bool directoryPerDB)
         : _dbname(dbname.toString()),
           _path(path.toString()),
           _directoryPerDB(directoryPerDB),
           _rid(RESOURCE_METADATA, dbname) {
-        StorageEngine* engine = getGlobalEnvironment()->getGlobalStorageEngine();
+        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
         invariant(engine->isMmapV1());
         MMAPV1Engine* mmapEngine = static_cast<MMAPV1Engine*>(engine);
         _recordAccessTracker = &mmapEngine->getRecordAccessTracker();
@@ -657,7 +657,7 @@ namespace mongo {
     }
 
     void MmapV1ExtentManager::FilesArray::push_back(DataFile* val) {
-        scoped_lock lk(_writersMutex);
+        boost::lock_guard<boost::mutex> lk(_writersMutex);
         const int n = _size.load();
         invariant(n < DiskLoc::MaxFiles);
         // Note ordering: _size update must come after updating the _files array

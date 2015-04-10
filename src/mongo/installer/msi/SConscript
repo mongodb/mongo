@@ -3,8 +3,6 @@
 import os
 
 Import("env")
-Import("windows")
-Import("mongoCodeVersion")
 Import("s3push")
 Import("has_option")
 
@@ -50,11 +48,11 @@ if 'enterprise' in env['MONGO_MODULES']:
   upgrade_code = 'E7FE8DF3-00F1-4434-97DF-2721E7F712FA'
 # Community
 else:
-  if 'MONGO_SSL' in env['CPPDEFINES']:
+  if has_option('ssl'):
     msi_edition = 'SSL'
   else:
     msi_edition = 'Standard'
-  if env['PROCESSOR_ARCHITECTURE'] == 'i386':
+  if env['TARGET_ARCH'] == 'i386':
     msi_platform = 'x86'
     msi_flavor = ''
     upgrade_code = 'B2E70C13-483E-4E16-B6AA-FCCA7983B767'
@@ -83,7 +81,7 @@ else:
 sources = ["wxs/" + file for file in sourcesList]
 objects = ["$BUILD_DIR/msi/" + file.replace(".wxs", ".wixobj") for file in sourcesList]
 
-full_version = mongoCodeVersion.partition('-')[0]
+full_version = env['MONGO_CODE_VERSION'].partition('-')[0]
 
 # major version is the x.y, not the x.y.z
 major_version = full_version

@@ -161,7 +161,7 @@ namespace mongo {
         return _errInfo;
     }
 
-    void WCErrorDetail::setErrMessage(const StringData& errMessage) {
+    void WCErrorDetail::setErrMessage(StringData errMessage) {
         _errMessage = errMessage.toString();
         _isErrMessageSet = true;
     }

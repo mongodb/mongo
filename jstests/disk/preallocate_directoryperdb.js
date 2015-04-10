@@ -7,7 +7,6 @@ var baseDir = "jstests_disk_preallocate_directoryperdb";
 var baseName = "preallocate_directoryperdb"
 var baseName2 = "preallocate_directoryperdb2"
 var baseName3 = "preallocate_directoryperdb3"
-port = allocatePorts( 1 )[ 0 ];
 dbpath = MongoRunner.dataPath + baseDir + "/";
 
 function checkDb2DirAbsent() {
@@ -19,7 +18,7 @@ function checkDb2DirAbsent() {
     }    
 }
 
-var m = startMongod( "--smallfiles", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+var m = MongoRunner.runMongod({smallfiles: "", directoryperdb: "", dbpath: dbpath, bind_ip: "127.0.0.1"});
 db = m.getDB( baseName );
 db2 = m.getDB( baseName2 );
 var bulk = db[ baseName ].initializeUnorderedBulkOp();

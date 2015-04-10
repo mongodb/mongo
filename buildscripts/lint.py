@@ -5,6 +5,20 @@ import codecs
 import cpplint
 import utils
 
+class CheckForConfigH:
+    def __init__(self):
+        self.found_configh = False
+
+    def __call__(self, filename, clean_lines, line_num, error):
+        if self.found_configh:
+            return
+
+        cur_line = clean_lines.elided[line_num]
+        self.found_configh = cur_line.startswith('#include "mongo/config.h"')
+
+        if not self.found_configh and "MONGO_CONFIG_" in cur_line:
+            error(filename, line_num, 'build/config_h_include', 5,
+                  'MONGO_CONFIG define used without prior inclusion of config.h.')
 
 def run_lint( paths, nudgeOn=False ):
     # errors are as of 10/14
@@ -82,10 +96,12 @@ def run_lint( paths, nudgeOn=False ):
                                            codecs.getreader('utf8'),
                                            codecs.getwriter('utf8'),
                                            'replace')
-    
     cpplint._cpplint_state.ResetErrorCounts()
     for filename in filenames:
-        cpplint.ProcessFile(filename, cpplint._cpplint_state.verbose_level)
+        config_h_check_obj = CheckForConfigH()
+        cpplint.ProcessFile(filename,
+            cpplint._cpplint_state.verbose_level,
+            extra_check_functions=[config_h_check_obj])
     cpplint._cpplint_state.PrintErrorCounts()
     
     return cpplint._cpplint_state.error_count == 0

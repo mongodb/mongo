@@ -264,7 +264,7 @@ namespace mongo {
             s << "\"" << escape(_asCode()) << "\"";
             break;
 
-        case Timestamp:
+        case bsonTimestamp:
             if ( format == TenGen ) {
                 s << "Timestamp( " << ( timestampTime() / 1000 ) << ", " << timestampInc() << " )";
             }
@@ -422,7 +422,7 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONObj BSONElement::wrap( const StringData& newName ) const {
+    BSONObj BSONElement::wrap( StringData newName ) const {
         BSONObjBuilder b(size() + 6 + newName.size());
         b.appendAs(*this,newName);
         return b.obj();
@@ -461,7 +461,7 @@ namespace mongo {
         case NumberInt:
             x = 4;
             break;
-        case Timestamp:
+        case bsonTimestamp:
         case mongo::Date:
         case NumberDouble:
         case NumberLong:
@@ -541,7 +541,7 @@ namespace mongo {
         case NumberInt:
             x = 4;
             break;
-        case Timestamp:
+        case bsonTimestamp:
         case mongo::Date:
         case NumberDouble:
         case NumberLong:
@@ -700,7 +700,7 @@ namespace mongo {
                 }
             }
             break;
-        case Timestamp:
+        case bsonTimestamp:
             s << "Timestamp " << timestampTime() << "|" << timestampInc();
             break;
         default:
@@ -743,6 +743,13 @@ namespace mongo {
         if ( !isNumber() )
             return false;
         *out = numberInt();
+        return true;
+    }
+
+    template<> bool BSONElement::coerce<long long>( long long* out ) const {
+        if ( !isNumber() )
+            return false;
+        *out = numberLong();
         return true;
     }
 
@@ -836,7 +843,7 @@ namespace mongo {
             return f==0 ? 0 : 1;
         case Bool:
             return *l.value() - *r.value();
-        case Timestamp:
+        case bsonTimestamp:
             // unsigned compare for timestamps - note they are not really dates but (ordinal + time_t)
             if ( l.date() < r.date() )
                 return -1;
@@ -956,8 +963,8 @@ namespace mongo {
             boost::hash_combine(hash, elem.boolean());
             break;
 
-        case mongo::Timestamp:
-            boost::hash_combine(hash, elem._opTime().asDate());
+        case mongo::bsonTimestamp:
+            boost::hash_combine(hash, elem.timestamp().asULL());
             break;
 
         case mongo::Date:

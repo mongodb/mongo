@@ -57,7 +57,7 @@ namespace mongo {
             return _buf;
         }
 
-        ThreadSafeString& operator=( const StringData& str ) {
+        ThreadSafeString& operator=( StringData str ) {
             size_t s = str.size();
             if ( s >= _size - 2 )
                 s = _size - 2;

@@ -58,7 +58,7 @@ namespace audit {
      * Logs the result of an authentication attempt.
      */
     void logAuthentication(ClientBasic* client,
-                           const StringData& mechanism,
+                           StringData mechanism,
                            const UserName& user,
                            ErrorCodes::Error result);
 
@@ -178,7 +178,7 @@ namespace audit {
      * Logs the result of a dropAllUsersFromDatabase command.
      */
     void logDropAllUsersFromDatabase(ClientBasic* client,
-                                     const StringData& dbname);
+                                     StringData dbname);
 
     /**
      * Logs the result of a updateUser command.
@@ -229,7 +229,7 @@ namespace audit {
      * Logs the result of a dropAllRolesForDatabase command.
      */
     void logDropAllRolesFromDatabase(ClientBasic* client,
-                                     const StringData& dbname);
+                                     StringData dbname);
 
     /**
      * Logs the result of a grantRolesToRole command.
@@ -270,7 +270,7 @@ namespace audit {
      * Logs the result of an ApplicationMessage command.
      */
     void logApplicationMessage(ClientBasic* client,
-                               const StringData& msg);
+                               StringData msg);
 
     /**
      * Logs the result of a shutdown command.
@@ -282,59 +282,59 @@ namespace audit {
      */
     void logCreateIndex(ClientBasic* client,
                         const BSONObj* indexSpec,
-                        const StringData& indexname,
-                        const StringData& nsname);
+                        StringData indexname,
+                        StringData nsname);
 
     /**
      * Logs the result of a createCollection command.
      */
     void logCreateCollection(ClientBasic* client,
-                             const StringData& nsname);
+                             StringData nsname);
 
     /**
      * Logs the result of a createDatabase command.
      */
     void logCreateDatabase(ClientBasic* client,
-                           const StringData& dbname);
+                           StringData dbname);
 
 
     /**
      * Logs the result of a dropIndex command.
      */
     void logDropIndex(ClientBasic* client,
-                      const StringData& indexname,
-                      const StringData& nsname);
+                      StringData indexname,
+                      StringData nsname);
 
     /**
      * Logs the result of a dropCollection command.
      */
     void logDropCollection(ClientBasic* client,
-                           const StringData& nsname);
+                           StringData nsname);
 
     /**
      * Logs the result of a dropDatabase command.
      */
     void logDropDatabase(ClientBasic* client,
-                         const StringData& dbname);
+                         StringData dbname);
 
     /**
      * Logs a collection rename event.
      */
     void logRenameCollection(ClientBasic* client,
-                             const StringData& source,
-                             const StringData& target);
+                             StringData source,
+                             StringData target);
 
     /**
      * Logs the result of a enableSharding command.
      */
     void logEnableSharding(ClientBasic* client,
-                           const StringData& dbname);
+                           StringData dbname);
 
     /**
      * Logs the result of a addShard command.
      */
     void logAddShard(ClientBasic* client,
-                     const StringData& name,
+                     StringData name,
                      const std::string& servers,
                      long long maxSize);
 
@@ -342,13 +342,13 @@ namespace audit {
      * Logs the result of a removeShard command.
      */
     void logRemoveShard(ClientBasic* client,
-                        const StringData& shardname);
+                        StringData shardname);
 
     /**
      * Logs the result of a shardCollection command.
      */
     void logShardCollection(ClientBasic* client,
-                            const StringData& ns,
+                            StringData ns,
                             const BSONObj& keyPattern,
                             bool unique);
 

@@ -57,7 +57,6 @@ namespace repl {
     void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
     void ReplicationCoordinatorExternalStateMock::initiateOplog(OperationContext* txn) {}
     void ReplicationCoordinatorExternalStateMock::shutdown() {}
-    void ReplicationCoordinatorExternalStateMock::forwardSlaveHandshake() {}
     void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
     OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
@@ -109,16 +108,16 @@ namespace repl {
         _localRsConfigDocument = localConfigDocument;
     }
 
-    void ReplicationCoordinatorExternalStateMock::setGlobalOpTime(const OpTime& newTime) {
+    void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(const Timestamp& newTime) {
     }
 
-    StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
+    StatusWith<Timestamp> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
         OperationContext* txn) {
         return _lastOpTime;
     }
 
     void ReplicationCoordinatorExternalStateMock::setLastOpTime(
-        const StatusWith<OpTime>& lastApplied) {
+        const StatusWith<Timestamp>& lastApplied) {
         _lastOpTime = lastApplied;
     }
 

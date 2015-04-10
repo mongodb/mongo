@@ -118,7 +118,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setNS(const StringData& ns) {
+        void setNS(StringData ns) {
             _ns = ns.toString();
             _isNsSet = true;
         }
@@ -133,7 +133,7 @@ namespace mongo {
             return _ns;
         }
 
-        void setTag(const StringData& tag) {
+        void setTag(StringData tag) {
             _tag = tag.toString();
             _isTagSet = true;
         }

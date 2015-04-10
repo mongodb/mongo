@@ -31,21 +31,21 @@
  * the DBClientReplicaSet talks to, so the tests only covers the client side logic.
  */
 
-#include "mongo/bson/bson_field.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/dbtests/mock/mock_replica_set.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-
 #include <boost/scoped_ptr.hpp>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
+#include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
     using boost::scoped_ptr;

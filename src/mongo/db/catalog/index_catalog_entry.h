@@ -43,12 +43,13 @@ namespace mongo {
     class HeadManager;
     class IndexAccessMethod;
     class IndexDescriptor;
+    class MatchExpression;
     class OperationContext;
 
     class IndexCatalogEntry {
         MONGO_DISALLOW_COPYING( IndexCatalogEntry );
     public:
-        IndexCatalogEntry( const StringData& ns,
+        IndexCatalogEntry( StringData ns,
                            CollectionCatalogEntry* collection, // not owned
                            IndexDescriptor* descriptor, // ownership passes to me
                            CollectionInfoCache* infoCache ); // not owned, optional
@@ -67,6 +68,8 @@ namespace mongo {
         const IndexAccessMethod* accessMethod() const { return _accessMethod; }
 
         const Ordering& ordering() const { return _ordering; }
+
+        const MatchExpression* getFilterExpression() const { return _filterExpression.get(); }
 
         /// ---------------------
 
@@ -110,6 +113,7 @@ namespace mongo {
 
         // Owned here.
         HeadManager* _headManager;
+        boost::scoped_ptr<MatchExpression> _filterExpression;
 
         // cached stuff
 

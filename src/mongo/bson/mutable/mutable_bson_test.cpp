@@ -553,8 +553,8 @@ namespace {
         t0.setValueLong(12345LL);
         ASSERT_EQUALS(mongo::NumberLong, t0.getType());
 
-        t0.setValueTimestamp(mongo::OpTime());
-        ASSERT_EQUALS(mongo::Timestamp, t0.getType());
+        t0.setValueTimestamp(mongo::Timestamp());
+        ASSERT_EQUALS(mongo::bsonTimestamp, t0.getType());
 
         t0.setValueDate(12345LL);
         ASSERT_EQUALS(mongo::Date, t0.getType());
@@ -609,42 +609,42 @@ namespace {
     TEST(TimestampType, createElement) {
         mmb::Document doc;
 
-        mmb::Element t0 = doc.makeElementTimestamp("t0", mongo::OpTime());
-        ASSERT(mongo::OpTime() == t0.getValueTimestamp());
+        mmb::Element t0 = doc.makeElementTimestamp("t0", mongo::Timestamp());
+        ASSERT(mongo::Timestamp() == t0.getValueTimestamp());
 
-        mmb::Element t1 = doc.makeElementTimestamp("t1", mongo::OpTime(123, 456));
-        ASSERT(mongo::OpTime(123, 456) == t1.getValueTimestamp());
+        mmb::Element t1 = doc.makeElementTimestamp("t1", mongo::Timestamp(123, 456));
+        ASSERT(mongo::Timestamp(123, 456) == t1.getValueTimestamp());
     }
 
     TEST(TimestampType, setElement) {
         mmb::Document doc;
 
-        mmb::Element t0 = doc.makeElementTimestamp("t0", mongo::OpTime());
-        t0.setValueTimestamp(mongo::OpTime(123, 456));
-        ASSERT(mongo::OpTime(123, 456) == t0.getValueTimestamp());
+        mmb::Element t0 = doc.makeElementTimestamp("t0", mongo::Timestamp());
+        t0.setValueTimestamp(mongo::Timestamp(123, 456));
+        ASSERT(mongo::Timestamp(123, 456) == t0.getValueTimestamp());
 
-        // Try setting to other types and back to OpTime
+        // Try setting to other types and back to Timestamp
         t0.setValueLong(1234567890);
         ASSERT_EQUALS(1234567890LL, t0.getValueLong());
-        t0.setValueTimestamp(mongo::OpTime(789, 321));
-        ASSERT(mongo::OpTime(789, 321) == t0.getValueTimestamp());
+        t0.setValueTimestamp(mongo::Timestamp(789, 321));
+        ASSERT(mongo::Timestamp(789, 321) == t0.getValueTimestamp());
 
         t0.setValueString("foo bar baz");
         ASSERT_EQUALS("foo bar baz", t0.getValueString());
-        t0.setValueTimestamp(mongo::OpTime(9876, 5432));
-        ASSERT(mongo::OpTime(9876, 5432) == t0.getValueTimestamp());
+        t0.setValueTimestamp(mongo::Timestamp(9876, 5432));
+        ASSERT(mongo::Timestamp(9876, 5432) == t0.getValueTimestamp());
     }
 
     TEST(TimestampType, appendElement) {
         mmb::Document doc;
 
         mmb::Element t0 = doc.makeElementObject("e0");
-        t0.appendTimestamp("a timestamp field", mongo::OpTime(1352151971, 471));
+        t0.appendTimestamp("a timestamp field", mongo::Timestamp(1352151971, 471));
 
         mmb::Element it =
             mmb::findFirstChildNamed(t0, "a timestamp field");
         ASSERT_TRUE(it.ok());
-        ASSERT(mongo::OpTime(1352151971, 471) == it.getValueTimestamp());
+        ASSERT(mongo::Timestamp(1352151971, 471) == it.getValueTimestamp());
     }
 
     TEST(SafeNumType, createElement) {
@@ -2264,11 +2264,11 @@ namespace {
     TEST(TypeSupport, EncodingEquivalenceTimestamp) {
         mongo::BSONObjBuilder builder;
         const char name[] = "thing";
-        const mongo::OpTime value1 = mongo::OpTime(mongo::jsTime());
+        const mongo::Timestamp value1 = mongo::Timestamp(mongo::jsTime());
         builder.append(name, value1);
         mongo::BSONObj source = builder.done();
         const mongo::BSONElement thing = source.firstElement();
-        ASSERT_TRUE(thing.type() == mongo::Timestamp);
+        ASSERT_TRUE(thing.type() == mongo::bsonTimestamp);
 
         mmb::Document doc;
 
@@ -2276,7 +2276,7 @@ namespace {
         ASSERT_OK(doc.root().appendTimestamp(name, value1));
         mmb::Element a = doc.root().rightChild();
         ASSERT_TRUE(a.ok());
-        ASSERT_EQUALS(a.getType(), mongo::Timestamp);
+        ASSERT_EQUALS(a.getType(), mongo::bsonTimestamp);
         ASSERT_TRUE(a.hasValue());
         ASSERT_TRUE(value1 == mmb::ConstElement(a).getValueTimestamp());
 
@@ -2284,7 +2284,7 @@ namespace {
         ASSERT_OK(doc.root().appendElement(thing));
         mmb::Element b = doc.root().rightChild();
         ASSERT_TRUE(b.ok());
-        ASSERT_EQUALS(b.getType(), mongo::Timestamp);
+        ASSERT_EQUALS(b.getType(), mongo::bsonTimestamp);
         ASSERT_TRUE(b.hasValue());
 
         // Construct via setValue call.
@@ -2292,7 +2292,7 @@ namespace {
         mmb::Element c = doc.root().rightChild();
         ASSERT_TRUE(c.ok());
         c.setValueTimestamp(value1);
-        ASSERT_EQUALS(c.getType(), mongo::Timestamp);
+        ASSERT_EQUALS(c.getType(), mongo::bsonTimestamp);
         ASSERT_TRUE(c.hasValue());
 
         // Ensure identity:
@@ -2788,7 +2788,7 @@ namespace {
     }
 
     TEST(DocumentInPlace, TimestampLifecycle) {
-        mongo::BSONObj obj(BSON("x" << mongo::OpTime(mongo::Date_t(1000))));
+        mongo::BSONObj obj(BSON("x" << mongo::Timestamp(mongo::Date_t(1000))));
         mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
         mmb::Element x = doc.root().leftChild();
@@ -2796,13 +2796,13 @@ namespace {
         mmb::DamageVector damages;
         const char* source = NULL;
 
-        x.setValueTimestamp(mongo::OpTime(mongo::Date_t(20000)));
+        x.setValueTimestamp(mongo::Timestamp(mongo::Date_t(20000)));
         ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
         ASSERT_EQUALS(1U, damages.size());
         apply(&obj, damages, source);
         ASSERT_TRUE(x.hasValue());
-        ASSERT_TRUE(x.isType(mongo::Timestamp));
-        ASSERT_TRUE(mongo::OpTime(mongo::Date_t(20000)) == x.getValueTimestamp());
+        ASSERT_TRUE(x.isType(mongo::bsonTimestamp));
+        ASSERT_TRUE(mongo::Timestamp(mongo::Date_t(20000)) == x.getValueTimestamp());
 
         // TODO: When in-place updates for leaf elements is implemented, add tests here.
     }

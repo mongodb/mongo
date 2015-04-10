@@ -37,9 +37,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/storage/storage_engine.h"
 
@@ -81,7 +84,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern( dbname, cmdObj ), actions));
         }
 
-        CmdListIndexes() : Command( "listIndexes", true ) {}
+        CmdListIndexes() : Command( "listIndexes" ) {}
 
         bool run(OperationContext* txn,
                  const string& dbname,
@@ -129,21 +132,26 @@ namespace mongo {
             invariant(cce);
 
             vector<string> indexNames;
-            cce->getAllIndexes( txn, &indexNames );
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                indexNames.clear();
+                cce->getAllIndexes( txn, &indexNames );
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
 
             std::auto_ptr<WorkingSet> ws(new WorkingSet());
             std::auto_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
 
             for ( size_t i = 0; i < indexNames.size(); i++ ) {
-                BSONObj indexSpec = cce->getIndexSpec( txn, indexNames[i] );
+                BSONObj indexSpec;
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    indexSpec = cce->getIndexSpec( txn, indexNames[i] );
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
 
-                WorkingSetID wsId = ws->allocate();
-                WorkingSetMember* member = ws->get(wsId);
-                member->state = WorkingSetMember::OWNED_OBJ;
-                member->keyData.clear();
-                member->loc = RecordId();
-                member->obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec);
-                root->pushBack(*member);
+                WorkingSetMember member;
+                member.state = WorkingSetMember::OWNED_OBJ;
+                member.keyData.clear();
+                member.loc = RecordId();
+                member.obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec.getOwned());
+                root->pushBack(member);
             }
 
             std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name << "."

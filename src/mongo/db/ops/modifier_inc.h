@@ -73,7 +73,7 @@ namespace mongo {
          *  effects, handling upcasting and overflow as necessary.
          */
         virtual Status prepare(mutablebson::Element root,
-                               const StringData& matchedField,
+                               StringData matchedField,
                                ExecInfo* execInfo);
 
         /** Updates the node passed in prepare with the results of the $inc */

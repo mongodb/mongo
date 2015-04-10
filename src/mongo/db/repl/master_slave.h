@@ -135,7 +135,7 @@ namespace repl {
         std::string only; // only a certain db. note that in the sources collection, this may not be changed once you start replicating.
 
         /* the last time point we have already synced up to (in the remote/master's oplog). */
-        OpTime syncedTo;
+        Timestamp syncedTo;
 
         int nClonedThisPass;
 
@@ -176,19 +176,19 @@ namespace repl {
 
     /**
      * Helper class used to set and query an ignore state for a named database.
-     * The ignore state will expire after a specified OpTime.
+     * The ignore state will expire after a specified Timestamp.
      */
     class DatabaseIgnorer {
     public:
         /** Indicate that operations for 'db' should be ignored until after 'futureOplogTime' */
-        void doIgnoreUntilAfter( const std::string &db, const OpTime &futureOplogTime );
+        void doIgnoreUntilAfter( const std::string &db, const Timestamp &futureOplogTime );
         /**
          * Query ignore state of 'db'; if 'currentOplogTime' is after the ignore
          * limit, the ignore state will be cleared.
          */
-        bool ignoreAt( const std::string &db, const OpTime &currentOplogTime );
+        bool ignoreAt( const std::string &db, const Timestamp &currentOplogTime );
     private:
-        std::map< std::string, OpTime > _ignores;
+        std::map< std::string, Timestamp > _ignores;
     };
 
 } // namespace repl

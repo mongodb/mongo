@@ -79,9 +79,9 @@ namespace mongo {
         if (!allowAddlFields && it.more()) { return BAD_VALUE("Point must only contain two numeric elements"); }
         out->x = x.number();
         out->y = y.number();
-        // Point coordinates must must be finite numbers, neither NaN or infinite.
+        // Point coordinates must be finite numbers, neither NaN or infinite.
         if (!std::isfinite(out->x) || !std::isfinite(out->y)) {
-            return BAD_VALUE("Point coordinates must must be finite numbers");
+            return BAD_VALUE("Point coordinates must be finite numbers");
         }
         return Status::OK();
     }
@@ -108,11 +108,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    static Status parseGeoJSONCoodinate(const BSONElement& elem, S2Point* out) {
+    static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
         if (Array != elem.type()) { return BAD_VALUE("GeoJSON coordinates must be an array"); }
         Point p;
-        // Check the object has and only has 2 numbers.
-        Status status = parseFlatPoint(elem, &p);
+        // GeoJSON allows extra elements, e.g. altitude.
+        Status status = parseFlatPoint(elem, &p, true);
         if (!status.isOK()) return status;
 
         status = coordToPoint(p.x, p.y, out);
@@ -120,13 +120,13 @@ namespace mongo {
     }
 
     // "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
-    static Status parseArrayOfCoodinates(const BSONElement& elem, vector<S2Point>* out) {
+    static Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* out) {
         if (Array != elem.type()) { return BAD_VALUE("GeoJSON coordinates must be an array of coordinates"); }
         BSONObjIterator it(elem.Obj());
         // Iterate all coordinates in array
         while (it.more()) {
             S2Point p;
-            Status status = parseGeoJSONCoodinate(it.next(), &p);
+            Status status = parseGeoJSONCoordinate(it.next(), &p);
             if (!status.isOK()) return status;
             out->push_back(p);
         }
@@ -144,9 +144,15 @@ namespace mongo {
     }
 
     static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopElt) {
-        if (loop.empty() || loop[0] != loop[loop.size() - 1])
-            return BAD_VALUE("Loop is not closed: " << loopElt.toString(false));
-        return Status::OK();
+      if (loop.empty()) {
+        return BAD_VALUE("Loop has no vertices: " << loopElt.toString(false));
+      }
+
+      if (loop[0] != loop[loop.size() - 1]) {
+        return BAD_VALUE("Loop is not closed: " << loopElt.toString(false));
+      }
+
+      return Status::OK();
     }
 
     static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem, S2Polygon *out) {
@@ -162,7 +168,7 @@ namespace mongo {
             // Parse the array of vertices of a loop.
             BSONElement coordinateElt = it.next();
             vector<S2Point> points;
-            status = parseArrayOfCoodinates(coordinateElt, &points);
+            status = parseArrayOfCoordinates(coordinateElt, &points);
             if (!status.isOK()) return status;
 
             // Check if the loop is closed.
@@ -172,6 +178,12 @@ namespace mongo {
             eraseDuplicatePoints(&points);
             // Drop the duplicated last point.
             points.resize(points.size() - 1);
+
+            // At least 3 vertices.
+            if (points.size() < 3) {
+                return BAD_VALUE("Loop must have at least 3 different vertices: " <<
+                                 coordinateElt.toString(false));
+            }
 
             S2Loop* loop = new S2Loop(points);
             loops.push_back(loop);
@@ -195,6 +207,10 @@ namespace mongo {
                     "secondary loops must be holes: " << coordinateElt.toString(false)
                     << " first loop: " << elem.Obj().firstElement().toString(false));
             }
+        }
+
+        if (loops.empty()) {
+            return BAD_VALUE("Polygon has no loops.");
         }
 
         // Check if the given loops form a valid polygon.
@@ -253,7 +269,7 @@ namespace mongo {
         Status status = Status::OK();
         string err;
 
-        status = parseArrayOfCoodinates(coordinates.front(), &exteriorVertices);
+        status = parseArrayOfCoordinates(coordinates.front(), &exteriorVertices);
         if (!status.isOK()) return status;
 
         status = isLoopClosed(exteriorVertices, coordinates.front());
@@ -264,6 +280,12 @@ namespace mongo {
         // The last point is duplicated.  We drop it, since S2Loop expects no
         // duplicate points
         exteriorVertices.resize(exteriorVertices.size() - 1);
+
+        // At least 3 vertices.
+        if (exteriorVertices.size() < 3) {
+            return BAD_VALUE("Loop must have at least 3 different vertices: " <<
+                             elem.toString(false));
+        }
 
         auto_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
         // Check whether this loop is valid.
@@ -324,7 +346,7 @@ namespace mongo {
     // Or a line in "coordinates" field of GeoJSON MultiLineString
     static Status parseGeoJSONLineCoordinates(const BSONElement& elem, S2Polyline* out) {
         vector<S2Point> vertices;
-        Status status = parseArrayOfCoodinates(elem, &vertices);
+        Status status = parseArrayOfCoordinates(elem, &vertices);
         if (!status.isOK()) return status;
 
         eraseDuplicatePoints(&vertices);
@@ -403,7 +425,7 @@ namespace mongo {
         if (!status.isOK()) return status;
 
         // "coordinates"
-        status = parseFlatPoint(obj[GEOJSON_COORDINATES], &out->oldPoint);
+        status = parseFlatPoint(obj[GEOJSON_COORDINATES], &out->oldPoint, true);
         if (!status.isOK()) return status;
 
         // Projection
@@ -456,7 +478,7 @@ namespace mongo {
 
         out->points.clear();
         BSONElement coordElt = obj.getFieldDotted(GEOJSON_COORDINATES);
-        status = parseArrayOfCoodinates(coordElt, &out->points);
+        status = parseArrayOfCoordinates(coordElt, &out->points);
         if (!status.isOK()) return status;
 
         if (0 == out->points.size())

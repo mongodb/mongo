@@ -59,20 +59,20 @@ namespace {
         }
     }
 
-    Notification::Notification() : _mutex ( "Notification" ) {
+    Notification::Notification() {
         lookFor = 1;
         cur = 0;
     }
 
     void Notification::waitToBeNotified() {
-        scoped_lock lock( _mutex );
+        boost::unique_lock<boost::mutex> lock( _mutex );
         while ( lookFor != cur )
-            _condition.wait( lock.boost() );
+            _condition.wait(lock);
         lookFor++;
     }
 
     void Notification::notifyOne() {
-        scoped_lock lock( _mutex );
+        boost::lock_guard<boost::mutex> lock( _mutex );
         verify( cur != lookFor );
         cur++;
         _condition.notify_one();
@@ -80,55 +80,55 @@ namespace {
 
     /* --- NotifyAll --- */
 
-    NotifyAll::NotifyAll() : _mutex("NotifyAll") { 
+    NotifyAll::NotifyAll() {
         _lastDone = 0;
         _lastReturned = 0;
         _nWaiting = 0;
     }
 
     NotifyAll::When NotifyAll::now() { 
-        scoped_lock lock( _mutex );
+        boost::lock_guard<boost::mutex> lock( _mutex );
         return ++_lastReturned;
     }
 
-    void NotifyAll::waitFor( When e ) {
-        scoped_lock lock( _mutex );
+    void NotifyAll::waitFor(When e) {
+        boost::unique_lock<boost::mutex> lock( _mutex );
         ++_nWaiting;
         while( _lastDone < e ) {
-            _condition.wait( lock.boost() );
+            _condition.wait(lock);
         }
     }
 
     bool NotifyAll::timedWaitFor( When e, int millis ) {
-        scoped_lock lock( _mutex );
+        boost::unique_lock<boost::mutex> lock( _mutex );
         ++_nWaiting;
         while( _lastDone < e ) {
-            if( ! _condition.timed_wait( lock.boost(), boost::posix_time::milliseconds( millis ) ) ) break;
+            if( ! _condition.timed_wait( lock, boost::posix_time::milliseconds( millis ) ) ) break;
         }
         return _lastDone >= e;
     }
 
     void NotifyAll::awaitBeyondNow() { 
-        scoped_lock lock( _mutex );
+        boost::unique_lock<boost::mutex> lock( _mutex );
         ++_nWaiting;
         When e = ++_lastReturned;
         while( _lastDone <= e ) {
-            _condition.wait( lock.boost() );
+            _condition.wait(lock);
         }
     }
 
     bool NotifyAll::timedAwaitBeyondNow( int millis ) {
-        scoped_lock lock( _mutex );
+        boost::unique_lock<boost::mutex> lock( _mutex );
         ++_nWaiting;
         When e = ++_lastReturned;
         while( _lastDone <= e ) {
-            if( ! _condition.timed_wait( lock.boost(), boost::posix_time::milliseconds( millis ) ) ) break;
+            if( ! _condition.timed_wait( lock, boost::posix_time::milliseconds( millis ) ) ) break;
         }
         return _lastDone > e;
     }
 
     void NotifyAll::notifyAll(When e) {
-        scoped_lock lock( _mutex );
+        boost::unique_lock<boost::mutex> lock( _mutex );
         _lastDone = e;
         _nWaiting = 0;
         _condition.notify_all();

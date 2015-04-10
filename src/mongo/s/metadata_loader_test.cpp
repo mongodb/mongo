@@ -36,9 +36,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/metadata_loader.h"
-#include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
@@ -174,7 +174,7 @@ namespace {
         ChunkType chunkInfo;
         chunkInfo.setNS( "test.foo" );
         chunkInfo.setVersion( ChunkVersion( 1, 0, collInfo.getEpoch() ) );
-        ASSERT( !chunkInfo.isValid( &errMsg ) );
+        ASSERT(!chunkInfo.validate().isOK());
 
         dummyConfig.insert( ChunkType::ConfigNS, chunkInfo.toBSON() );
 
@@ -265,7 +265,7 @@ namespace {
             chunkType.setMax( BSON( "a" << MAXKEY ) );
             chunkType.setVersion( ChunkVersion( 1, 0, epoch ) );
             chunkType.setName( OID::gen().toString() );
-            ASSERT( chunkType.isValid( &errMsg ) );
+            ASSERT(chunkType.validate().isOK());
 
             _dummyConfig->insert( ChunkType::ConfigNS, chunkType.toBSON() );
         }
@@ -317,8 +317,7 @@ namespace {
         ChunkType chunkInfo;
         chunkInfo.setNS( "test.foo" );
         chunkInfo.setVersion( ChunkVersion( 1, 0, OID() ) );
-        string errMsg;
-        ASSERT( !chunkInfo.isValid( &errMsg ) );
+        ASSERT(!chunkInfo.validate().isOK());
 
         // Replace the chunk with a bad chunk
         getDummyConfig()->remove( ChunkType::ConfigNS, BSONObj() );
@@ -516,7 +515,7 @@ namespace {
                     version.incMajor();
                 }
 
-                ASSERT( chunk.isValid( &errMsg ) );
+                ASSERT(chunk.validate().isOK());
 
                 _dummyConfig->insert( ChunkType::ConfigNS, chunk.toBSON() );
             }

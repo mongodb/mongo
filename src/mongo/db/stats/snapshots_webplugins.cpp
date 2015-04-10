@@ -38,25 +38,10 @@ namespace {
 
     using namespace html;
 
-    using std::auto_ptr;
     using std::fixed;
     using std::setprecision;
     using std::string;
     using std::stringstream;
-
-    class WriteLockStatus : public WebStatusPlugin {
-    public:
-        WriteLockStatus() : WebStatusPlugin( "write lock" , 51 , "% time in write lock, by 4 sec periods" ) {}
-        virtual void init() {}
-
-        virtual void run(OperationContext* txn, stringstream& ss) {
-            ss << "<a "
-               "href=\"http://dochub.mongodb.org/core/concurrency\" "
-               "title=\"snapshot: was the db in the write lock when this page was generated?\">";
-            ss << "write locked now:</a> " << (txn->lockState()->isW() ? "true" : "false") << "\n";
-        }
-
-    } writeLockStatus;
 
     class DBTopStatus : public WebStatusPlugin {
     public:
@@ -95,8 +80,9 @@ namespace {
         }
 
         void run(OperationContext* txn, stringstream& ss) {
-            auto_ptr<SnapshotDelta> delta = statsSnapshots.computeDelta();
-            if ( ! delta.get() )
+            StatusWith<SnapshotDiff> diff = statsSnapshots.computeDelta();
+
+            if ( ! diff.isOK() )
                 return;
 
             ss << "<table border=1 cellpadding=2 cellspacing=0>";
@@ -113,9 +99,10 @@ namespace {
                "<th colspan=2>Removes</th>";
             ss << "</tr>\n";
 
-            Top::UsageMap usage = delta->collectionUsageDiff();
+            const Top::UsageMap& usage = diff.getValue().usageDiff;
+            unsigned long long elapsed = diff.getValue().timeElapsed;
             for ( Top::UsageMap::const_iterator i=usage.begin(); i != usage.end(); ++i ) {
-                display( ss , (double) delta->elapsed() , i->first , i->second );
+                display( ss , (double) elapsed , i->first , i->second );
             }
 
             ss << "</table>";

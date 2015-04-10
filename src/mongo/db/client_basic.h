@@ -28,9 +28,11 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <memory>
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
 
@@ -39,6 +41,7 @@ namespace mongo {
     class AuthenticationInfo;
     class AuthenticationSession;
     class AuthorizationSession;
+    class ServiceContext;
 
     /**
      * this is the base class for Client and ClientInfo
@@ -47,7 +50,8 @@ namespace mongo {
      * They should converge slowly
      * The idea is this has the basic api so that not all code has to be duplicated
      */
-    class ClientBasic : boost::noncopyable {
+    class ClientBasic : public Decorable<ClientBasic> {
+        MONGO_DISALLOW_COPYING(ClientBasic);
     public:
         virtual ~ClientBasic();
         AuthenticationSession* getAuthenticationSession();
@@ -56,7 +60,7 @@ namespace mongo {
 
         bool hasAuthorizationSession() const;
         AuthorizationSession* getAuthorizationSession() const;
-        void setAuthorizationSession(AuthorizationSession* authorizationSession);
+        void setAuthorizationSession(std::unique_ptr<AuthorizationSession> authorizationSession);
 
         bool getIsLocalHostConnection() {
             if (!hasRemote()) {
@@ -70,16 +74,26 @@ namespace mongo {
             verify( _messagingPort );
             return _messagingPort->remote();
         }
+
+        /**
+         * Returns the ServiceContext that owns this client session context.
+         */
+        ServiceContext* getServiceContext() const { return _serviceContext; }
+
+        /**
+         * Returns the AbstractMessagePort to which this client session is bound, if any.
+         */
         AbstractMessagingPort * port() const { return _messagingPort; }
 
         static ClientBasic* getCurrent();
 
     protected:
-        ClientBasic(AbstractMessagingPort* messagingPort);
+        ClientBasic(ServiceContext* serviceContext, AbstractMessagingPort* messagingPort);
 
     private:
         boost::scoped_ptr<AuthenticationSession> _authenticationSession;
-        boost::scoped_ptr<AuthorizationSession> _authorizationSession;
+        std::unique_ptr<AuthorizationSession> _authorizationSession;
+        ServiceContext* const _serviceContext;
         AbstractMessagingPort* const _messagingPort;
     };
 }

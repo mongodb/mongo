@@ -4,11 +4,16 @@
 // ***************************************************************
 
 // Set up namespaces a and b.
-admin = db.getMongo().getDB( "admin" );
-db_a = db.getMongo().getDB( "db_a" );
-db_b = db.getMongo().getDB( "db_b" );
-a = db_a.rename7;
-b = db_b.rename7;
+var admin = db.getMongo().getDB( "admin" );
+var db_a = db.getMongo().getDB( "db_a" );
+var db_b = db.getMongo().getDB( "db_b" );
+
+var a = db_a.rename7;
+var b = db_b.rename7;
+
+// Ensure that the databases are created
+db_a.coll.insert({});
+db_b.coll.insert({});
 
 a.drop();
 b.drop();
@@ -49,7 +54,7 @@ a.save( {a: 1} );
 a.save( {a: 2} );
 a.save( {a: 3} );
 
-previousStorageSize = a.stats().storageSize
+previousMaxSize = a.stats().maxSize
 
 assert.commandWorked( admin.runCommand( {renameCollection: "db_a.rename7_capped",
                                          to: "db_b.rename7_capped"} ) );
@@ -61,7 +66,7 @@ assert.eq( 3, b.find().count() );
 assert( db_b.getCollectionNames().indexOf( "rename7_capped" ) >= 0 );
 printjson( db_b.rename7_capped.stats() );
 assert( db_b.rename7_capped.stats().capped );
-assert.eq( previousStorageSize, b.stats().storageSize );
+assert.eq( previousMaxSize, b.stats().maxSize );
 
 a.drop();
 b.drop();

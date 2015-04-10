@@ -31,7 +31,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/fts/fts_query.h"
+
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
@@ -47,24 +49,25 @@ namespace mongo {
         using std::stringstream;
         using std::vector;
 
-        Status FTSQuery::parse(const string& query, const StringData& language,
+        const bool FTSQuery::caseSensitiveDefault = false;
+
+        Status FTSQuery::parse(const string& query, StringData language, bool caseSensitive,
                                TextIndexVersion textIndexVersion) {
-            _search = query;
             StatusWithFTSLanguage swl = FTSLanguage::make( language, textIndexVersion );
             if ( !swl.getStatus().isOK() ) {
                 return swl.getStatus();
             }
             _language = swl.getValue();
+            _caseSensitive = caseSensitive;
 
-            const StopWords* stopWords = StopWords::getStopWords( *_language );
-            Stemmer stemmer( *_language );
+            std::unique_ptr<FTSTokenizer> tokenizer(_language->createTokenizer());
 
             bool inNegation = false;
             bool inPhrase = false;
 
             unsigned quoteOffset = 0;
 
-            Tokenizer i( *_language, query );
+            Tokenizer i( _language, query );
             while ( i.more() ) {
                 Token t = i.next();
 
@@ -75,7 +78,7 @@ namespace mongo {
                         // don't add term
                     }
                     else {
-                        _addTerm( stopWords, stemmer, s, inNegation );
+                        _addTerm( tokenizer.get(), s, inNegation );
                     }
 
                     if ( inNegation && !inPhrase )
@@ -98,9 +101,9 @@ namespace mongo {
                             StringData phrase = StringData( query ).substr( phraseStart,
                                                                             phraseLength );
                             if ( inNegation )
-                                _negatedPhrases.push_back( tolowerString( phrase ) );
+                                _negatedPhrases.push_back( normalizeString( phrase ) );
                             else
-                                _phrases.push_back( tolowerString( phrase ) );
+                                _positivePhrases.push_back( normalizeString( phrase ) );
                             inNegation = false;
                             inPhrase = false;
                         }
@@ -112,22 +115,61 @@ namespace mongo {
                     }
                 }
                 else {
-                    abort();
+                    invariant( false );
                 }
             }
 
             return Status::OK();
         }
 
-        void FTSQuery::_addTerm( const StopWords* sw, Stemmer& stemmer, const string& term, bool negated ) {
-            string word = tolowerString( term );
-            if ( sw->isStopWord( word ) )
+        void FTSQuery::_addTerm( FTSTokenizer* tokenizer,
+                                 const string& token,
+                                 bool negated ) {
+            tokenizer->reset(token.c_str(), FTSTokenizer::FilterStopWords);
+
+            auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
+
+            // First, get all the terms for indexing, ie, lower cased words
+            // If we are case-insensitive, we can also used this for positive, and negative terms
+            // Some terms may be expanded into multiple words in some non-English languages
+            while (tokenizer->moveNext()) {
+
+                string word = tokenizer->get().toString();
+
+                if (!negated) {
+                    _termsForBounds.insert(word);
+                }
+
+                // Compute the string corresponding to 'token' that will be used for the matcher.
+                // For case-insensitive queries, this is the same string as 'boundsTerm' computed
+                // above.
+                if (!_caseSensitive) {
+                    activeTerms.insert(word);
+                }
+            }
+
+            if (!_caseSensitive) {
                 return;
-            word = stemmer.stem( word );
-            if ( negated )
-                _negatedTerms.insert( word );
-            else
-                _terms.push_back( word );
+            }
+
+            tokenizer->reset(token.c_str(), static_cast<FTSTokenizer::Options>(
+                FTSTokenizer::FilterStopWords
+                | FTSTokenizer::GenerateCaseSensitiveTokens));
+
+            // If we want case-sensitivity, get the case-sensitive token
+            while (tokenizer->moveNext()) {
+
+                string word = tokenizer->get().toString();
+
+                activeTerms.insert(word);
+            }
+        }
+
+        string FTSQuery::normalizeString(StringData str) const {
+            if (_caseSensitive) {
+                return str.toString();
+            }
+            return tolowerString(str);
         }
 
         namespace {
@@ -154,7 +196,7 @@ namespace mongo {
             ss << "FTSQuery\n";
 
             ss << "  terms: ";
-            _debugHelp( ss, getTerms(), ", " );
+            _debugHelp( ss, getPositiveTerms(), ", " );
             ss << "\n";
 
             ss << "  negated terms: ";
@@ -162,7 +204,7 @@ namespace mongo {
             ss << "\n";
 
             ss << "  phrases: ";
-            _debugHelp( ss, getPhr(), ", " );
+            _debugHelp( ss, getPositivePhr(), ", " );
             ss << "\n";
 
             ss << "  negated phrases: ";
@@ -175,13 +217,13 @@ namespace mongo {
         string FTSQuery::debugString() const {
             stringstream ss;
 
-            _debugHelp( ss, getTerms(), "|" );
+            _debugHelp( ss, getPositiveTerms(), "|" );
             ss << "||";
 
             _debugHelp( ss, getNegatedTerms(), "|" );
             ss << "||";
 
-            _debugHelp( ss, getPhr(), "|" );
+            _debugHelp( ss, getPositivePhr(), "|" );
             ss << "||";
 
             _debugHelp( ss, getNegatedPhr(), "|" );
@@ -191,9 +233,9 @@ namespace mongo {
 
         BSONObj FTSQuery::toBSON() const {
             BSONObjBuilder bob;
-            bob.append( "terms", getTerms() );
+            bob.append( "terms", getPositiveTerms() );
             bob.append( "negatedTerms", getNegatedTerms() );
-            bob.append( "phrases", getPhr() );
+            bob.append( "phrases", getPositivePhr() );
             bob.append( "negatedPhrases", getNegatedPhr() );
             return bob.obj();
         }

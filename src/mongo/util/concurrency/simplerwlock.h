@@ -31,6 +31,7 @@
 #include <boost/noncopyable.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
@@ -44,14 +45,14 @@ namespace mongo {
 #else
         RWLockBase m;
 #endif
-#if defined(_WIN32) && defined(_DEBUG)
+#if defined(_WIN32) && defined(MONGO_CONFIG_DEBUG_BUILD)
         AtomicUInt32 shares;
         ThreadLocalValue<int> s;
         unsigned tid;
 #endif
     public:
         const std::string name;
-        SimpleRWLock(const StringData& name = "" );
+        SimpleRWLock(StringData name = "" );
         void lock();
         void unlock();
         void lock_shared();

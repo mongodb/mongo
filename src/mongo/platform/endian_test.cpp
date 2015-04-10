@@ -29,6 +29,7 @@
 
 #include <cstring>
 
+#include "mongo/config.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -79,7 +80,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -94,7 +95,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -109,7 +110,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -124,7 +125,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -139,7 +140,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -154,7 +155,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -169,7 +170,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -184,7 +185,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(be, nativeToBig(le));
 #else
         ASSERT_EQUALS(be, nativeToBig(be));
@@ -199,7 +200,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -214,7 +215,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -229,7 +230,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -244,7 +245,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -259,7 +260,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -274,7 +275,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -289,7 +290,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -304,7 +305,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, nativeToLittle(le));
 #else
         ASSERT_EQUALS(le, nativeToLittle(be));
@@ -319,7 +320,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -334,7 +335,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -349,7 +350,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -364,7 +365,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -379,7 +380,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -394,7 +395,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -409,7 +410,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -424,7 +425,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, littleToNative(le));
 #else
         ASSERT_EQUALS(be, littleToNative(le));
@@ -439,7 +440,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));
@@ -454,7 +455,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));
@@ -469,7 +470,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));
@@ -484,7 +485,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));
@@ -499,7 +500,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));
@@ -514,7 +515,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));
@@ -529,7 +530,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));
@@ -544,7 +545,7 @@ namespace mongo {
         std::memcpy(&le, le_buf, sizeof(le));
         std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_BYTE_ORDER == 1234
+#if MONGO_CONFIG_BYTE_ORDER == 1234
         ASSERT_EQUALS(le, bigToNative(be));
 #else
         ASSERT_EQUALS(be, bigToNative(be));

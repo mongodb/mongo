@@ -39,8 +39,10 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -67,7 +69,7 @@ namespace mongo {
         IndexCatalogEntry* _catalogEntry;
     };
 
-    IndexCatalogEntry::IndexCatalogEntry( const StringData& ns,
+    IndexCatalogEntry::IndexCatalogEntry( StringData ns,
                                           CollectionCatalogEntry* collection,
                                           IndexDescriptor* descriptor,
                                           CollectionInfoCache* infoCache )
@@ -99,6 +101,19 @@ namespace mongo {
         _isReady = _catalogIsReady( txn );
         _head = _catalogHead( txn );
         _isMultikey = _catalogIsMultikey( txn );
+
+        BSONElement filterElement = _descriptor->getInfoElement("filter");
+        if ( filterElement.type() ) {
+            invariant( filterElement.isABSONObj() );
+            BSONObj filter = filterElement.Obj();
+            StatusWithMatchExpression res = MatchExpressionParser::parse( filter );
+            // this should be checked in create, so can blow up here
+            invariantOK( res.getStatus() );
+            _filterExpression.reset( res.getValue() );
+            LOG(2) << "have filter expression for "
+                   << _ns << " " << _descriptor->indexName()
+                   << " " << filter;
+        }
     }
 
     const RecordId& IndexCatalogEntry::head( OperationContext* txn ) const {
@@ -195,7 +210,7 @@ namespace mongo {
         // setMultikey. The reason we need is to avoid artificial WriteConflicts, which happen
         // with snapshot isolation.
         {
-            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             RecoveryUnitSwap ruSwap(txn, storageEngine->newRecoveryUnit());
 
             WriteUnitOfWork wuow(txn);

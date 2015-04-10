@@ -62,7 +62,7 @@ namespace mongo {
 
     }
 
-    NamespaceDetails* NamespaceIndex::details(const StringData& ns) const {
+    NamespaceDetails* NamespaceIndex::details(StringData ns) const {
         const Namespace n(ns);
         return details(n);
     }
@@ -72,13 +72,13 @@ namespace mongo {
     }
 
     void NamespaceIndex::add_ns( OperationContext* txn,
-                                 const StringData& ns, const DiskLoc& loc, bool capped) {
+                                 StringData ns, const DiskLoc& loc, bool capped) {
         NamespaceDetails details( loc, capped );
         add_ns( txn, ns, &details );
     }
 
     void NamespaceIndex::add_ns( OperationContext* txn,
-                                 const StringData& ns,
+                                 StringData ns,
                                  const NamespaceDetails* details ) {
         Namespace n(ns);
         add_ns( txn, n, details );
@@ -95,7 +95,7 @@ namespace mongo {
         uassert(10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
     }
 
-    void NamespaceIndex::kill_ns( OperationContext* txn, const StringData& ns) {
+    void NamespaceIndex::kill_ns( OperationContext* txn, StringData ns) {
         const NamespaceString nss(ns.toString());
         invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 

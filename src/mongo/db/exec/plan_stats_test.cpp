@@ -48,7 +48,7 @@ namespace {
         ASSERT_EQUALS(stats.invalidates, static_cast<size_t>(0));
         ASSERT_EQUALS(stats.advanced, static_cast<size_t>(0));
         ASSERT_EQUALS(stats.needTime, static_cast<size_t>(0));
-        ASSERT_EQUALS(stats.needFetch, static_cast<size_t>(0));
+        ASSERT_EQUALS(stats.needYield, static_cast<size_t>(0));
         ASSERT_FALSE(stats.isEOF);
     }
 

@@ -65,39 +65,39 @@ namespace mongo {
          * @return error or ident for instance
          */
         Status newCollection( OperationContext* opCtx,
-                              const StringData& ns,
+                              StringData ns,
                               const CollectionOptions& options );
 
-        std::string getCollectionIdent( const StringData& ns ) const;
+        std::string getCollectionIdent( StringData ns ) const;
 
         std::string getIndexIdent( OperationContext* opCtx,
-                                   const StringData& ns,
-                                   const StringData& idName ) const;
+                                   StringData ns,
+                                   StringData idName ) const;
 
         const BSONCollectionCatalogEntry::MetaData getMetaData( OperationContext* opCtx,
-                                                                const StringData& ns );
+                                                                StringData ns );
         void putMetaData( OperationContext* opCtx,
-                          const StringData& ns,
+                          StringData ns,
                           BSONCollectionCatalogEntry::MetaData& md );
 
         Status renameCollection( OperationContext* opCtx,
-                                 const StringData& fromNS,
-                                 const StringData& toNS,
+                                 StringData fromNS,
+                                 StringData toNS,
                                  bool stayTemp );
 
         Status dropCollection( OperationContext* opCtx,
-                               const StringData& ns );
+                               StringData ns );
 
-        std::vector<std::string> getAllIdentsForDB( const StringData& db ) const;
+        std::vector<std::string> getAllIdentsForDB( StringData db ) const;
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
 
-        bool isUserDataIdent( const StringData& ident ) const;
+        bool isUserDataIdent( StringData ident ) const;
     private:
         class AddIdentChange;
         class RemoveIdentChange;
 
         BSONObj _findEntry( OperationContext* opCtx,
-                            const StringData& ns,
+                            StringData ns,
                             RecordId* out=NULL ) const;
 
         /**
@@ -105,7 +105,7 @@ namespace mongo {
          * @param ns - the containing ns
          * @param kind - what this "thing" is, likely collection or index
          */
-        std::string _newUniqueIdent(const StringData& ns, const char* kind);
+        std::string _newUniqueIdent(StringData ns, const char* kind);
 
         // Helpers only used by constructor and init(). Don't call from elsewhere.
         static std::string _newRand();

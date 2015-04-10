@@ -28,14 +28,18 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/d_state.h"
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
-#include "mongo/s/chunk.h"  // needed for genID
-#include "mongo/s/config.h" // needed for changelog write
+#include "mongo/s/d_state.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -311,7 +315,7 @@ namespace mongo {
                                                     shardVersion,
                                                     mergeVersion );
 
-        configServer.logChange( "merge", nss.ns(), mergeLogEntry );
+        grid.catalogManager()->logChange(txn, "merge", nss.ns(), mergeLogEntry);
 
         return true;
     }

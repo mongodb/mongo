@@ -78,10 +78,7 @@ namespace mongo {
 
     private:
 
-        /**
-         * @return if more data
-         */
-        RecordId _advance();
+        void _advance();
 
         OperationContext* _txn;
         Collection* _collection;

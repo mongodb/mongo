@@ -303,6 +303,9 @@ config_check(WT_SESSION_IMPL *session,
 			    "Invalid value for key '%.*s': expected a %s",
 			    (int)k.len, k.str, checks[i].type);
 
+		if (checks[i].checkf != NULL)
+			WT_RET(checks[i].checkf(session, &v));
+
 		if (checks[i].checks == NULL)
 			continue;
 

@@ -60,7 +60,7 @@ namespace {
      *
      * E.g., for "/foo/bar/my.txt", returns "my.txt".
      */
-    StringData getBaseName(const StringData& path) {
+    StringData getBaseName(StringData path) {
         size_t lastSlash = path.rfind('/');
         if (lastSlash == std::string::npos)
             return path;

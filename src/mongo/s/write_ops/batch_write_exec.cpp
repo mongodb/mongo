@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h" // ConnectionString (header-only)
+#include "mongo/s/client/multi_command_dispatch.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/util/log.h"
@@ -290,7 +291,7 @@ namespace mongo {
                         // or delete any documents, which preserves old behavior but is conservative
                         _stats->noteWriteAt( shardHost,
                                              response.isLastOpSet() ? 
-                                             response.getLastOp() : OpTime(),
+                                             response.getLastOp() : Timestamp(),
                                              response.isElectionIdSet() ?
                                              response.getElectionId() : OID());
                     }
@@ -385,7 +386,7 @@ namespace mongo {
     }
 
     void BatchWriteExecStats::noteWriteAt(const ConnectionString& host,
-                                          OpTime opTime,
+                                          Timestamp opTime,
                                           const OID& electionId) {
         _writeOpTimes[host] = HostOpTime(opTime, electionId);
     }

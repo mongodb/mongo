@@ -5,12 +5,17 @@
 //TODO(mathias) add --master or make another test
 //conn = startMongodEmpty("--port", 30200, "--dbpath", MongoRunner.dataDir + "/dur_passthrough", "--dur", "--smallfiles", "--durOptions", "24");
 
-conn = startMongodEmpty("--port", 30200, "--dbpath", MongoRunner.dataDir + "/dur_passthrough", "--dur", "--nopreallocj", "--smallfiles",
-"--durOptions", "8");
+var conn = MongoRunner.runMongod({dur: "", nopreallocj: "", smallfiles: "", durOptions: 8});
 db = conn.getDB("test");
 conn.forceWriteMode("commands");
 
 function doTest() {
+    "use strict"
+
+    // Some tests use "conn" and can override the "conn" defined above, so save a copy of it here
+    // in local scope.
+    var myConn = conn.port;
+
     var files = listFiles("jstests/core");
     files = files.sort(compareOn('name'));
 
@@ -38,7 +43,7 @@ function doTest() {
         }
     );
 
-    stopMongod(30200);
+    MongoRunner.stopMongod(myConn);
 
     var runnerEnd = new Date()
 

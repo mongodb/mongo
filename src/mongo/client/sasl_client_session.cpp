@@ -35,13 +35,13 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 
 namespace mongo {
-    SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create = NULL;
+    SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create;
 
     SaslClientSession::SaslClientSession() {}
 
     SaslClientSession::~SaslClientSession() {}
 
-    void SaslClientSession::setParameter(Parameter id, const StringData& value) {
+    void SaslClientSession::setParameter(Parameter id, StringData value) {
         fassert(16807, id >= 0 && id < numParameters);
         fassert(28583, value.size() < std::numeric_limits<std::size_t>::max());
 

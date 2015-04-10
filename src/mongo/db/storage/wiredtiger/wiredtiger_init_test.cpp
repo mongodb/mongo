@@ -30,7 +30,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/json.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -46,10 +46,10 @@ namespace {
     class WiredTigerFactoryTest : public mongo::unittest::Test {
     private:
         virtual void setUp() {
-            GlobalEnvironmentExperiment* globalEnv = getGlobalEnvironment();
+            ServiceContext* globalEnv = getGlobalServiceContext();
             ASSERT_TRUE(globalEnv);
-            ASSERT_TRUE(getGlobalEnvironment()->isRegisteredStorageEngine(kWiredTigerEngineName));
-            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalEnvironment()->
+            ASSERT_TRUE(getGlobalServiceContext()->isRegisteredStorageEngine(kWiredTigerEngineName));
+            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
                                                             makeStorageFactoriesIterator());
             ASSERT_TRUE(sfi);
             bool found = false;

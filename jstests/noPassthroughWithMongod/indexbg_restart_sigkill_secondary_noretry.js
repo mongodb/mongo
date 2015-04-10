@@ -1,6 +1,3 @@
-// SERVER-13922
-if (0) {
-
 // TODO: SERVER-13215 move test back to replSets suite.
 
 /**
@@ -113,5 +110,3 @@ if (0) {
     assert.neq(2, secondDB.jstests_bgsec.getIndexes().length );
     replTest.stopSet();
 }());
-
-}  // if(0)

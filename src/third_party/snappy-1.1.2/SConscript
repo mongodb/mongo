@@ -1,8 +1,8 @@
 # -*- mode: python -*-
 
-Import("env windows")
+Import("env")
 
-if not windows:
+if env.ToolchainIs('clang', 'GCC'):
     env = env.Clone()
     env.Append(CCFLAGS=['-Wno-sign-compare', '-Wno-unused-function'])
 

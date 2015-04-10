@@ -32,9 +32,7 @@
 
 #include <string>
 
-#include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {
 
@@ -47,53 +45,6 @@ namespace mongo {
             TEXT_INDEX_VERSION_1 = 1, // Legacy index format.  Deprecated.
             TEXT_INDEX_VERSION_2 = 2 // Current index format.
         };
-
-
-        /**
-         * destructive!
-         */
-        inline void makeLower( std::string* s ) {
-            std::string::size_type sz = s->size();
-            for ( std::string::size_type i = 0; i < sz; i++ )
-                (*s)[i] = (char)tolower( (int)(*s)[i] );
-        }
-
-        struct _be_hash {
-            size_t operator()( const BSONElement& e ) const {
-                return static_cast<size_t>( BSONElementHasher::hash64( e, 17 ) );
-            }
-        };
-
-        struct _be_equals {
-            bool operator()( const BSONElement& a, const BSONElement& b ) const {
-                return a == b;
-            }
-        };
-
-        struct _be_convert {
-            BSONElement operator()( const BSONObj& o ) const {
-                const BSONElement& x = o.firstElement();
-                BSONElement y( x.rawdata() );
-                return y;
-            }
-        };
-
-        struct _be_convert_other {
-            BSONObj operator()( const BSONElement& e ) const {
-                return e.wrap();
-            }
-        };
-
-        template< typename V >
-        class BSONElementMap : public UnorderedFastKeyTable<BSONElement,
-                                                            BSONObj,
-                                                            V,
-                                                            _be_hash,
-                                                            _be_equals,
-                                                            _be_convert,
-                                                            _be_convert_other > {
-        };
-
 
     }
 }

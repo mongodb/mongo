@@ -85,7 +85,7 @@ namespace mongo {
          * user.  It is the caller's responsibility to then release that user back to the
          * authorizationManger.  If no user exists for the given database, returns NULL;
          */
-        User* removeByDBName(const StringData& dbname);
+        User* removeByDBName(StringData dbname);
 
         // Returns the User with the given name, or NULL if not found.
         // Ownership of the returned User remains with the UserSet.  The pointer
@@ -95,7 +95,7 @@ namespace mongo {
 
         // Gets the user whose authentication credentials came from dbname, or NULL if none
         // exist.  There should be at most one such user.
-        User* lookupByDBName(const StringData& dbname) const;
+        User* lookupByDBName(StringData dbname) const;
 
         // Gets an iterator over the names of the users stored in the set.  The iterator is
         // valid until the next non-const method is called on the UserSet.

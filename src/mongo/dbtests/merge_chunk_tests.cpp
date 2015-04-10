@@ -26,15 +26,15 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/db/range_arithmetic.h"
 #include "mongo/dbtests/config_server_fixture.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h" // for genID
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/d_merge.h"
-#include "mongo/s/range_arithmetic.h"
 #include "mongo/s/type_collection.h"
-#include "mongo/s/type_chunk.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -130,20 +130,6 @@ namespace mongo {
             ASSERT(!client.findOne(ChunkType::ConfigNS, query).isEmpty());
         }
 
-        string shardName() { return "shard0000"; }
-
-    protected:
-
-        virtual void setUp() {
-            ConfigServerFixture::setUp();
-            shardingState.initialize( configSvr().toString() );
-            shardingState.gotShardName( shardName() );
-        }
-
-        virtual void tearDown() {
-            shardingState.resetShardingState();
-            ConfigServerFixture::tearDown();
-        }
     };
 
     //

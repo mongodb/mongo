@@ -79,7 +79,7 @@ namespace {
         return Status::OK();
     }
 
-    Status NativeSaslClientSession::step(const StringData& inputData, std::string* outputData) {
+    Status NativeSaslClientSession::step(StringData inputData, std::string* outputData) {
         if (!_saslConversation) {
             return Status(ErrorCodes::BadValue,
                 mongoutils::str::stream() <<

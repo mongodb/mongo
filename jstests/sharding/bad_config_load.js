@@ -26,7 +26,7 @@ st.printShardingStatus()
 var port = parseInt( st._configDB.replace( /^.*:/, "" ) )
 jsTestLog( "Stopping " + port + "..." )
 
-stopMongod( port )
+MongoRunner.stopMongod( port )
 
 jsTestLog( "Config flushed and config server down!" )
 
@@ -43,7 +43,9 @@ for( var i = 0; i < 2; i++ ){
         
         // Make sure we get a transport error, and not a no-primary error
         // Unfortunately e gets stringified so we have to test this way
-        assert( e.message.indexOf( "10276" ) >= 0 || e.message.indexOf( "socket" ) >= 0 )
+        assert(e.message.indexOf("10276") >= 0 ||       // Transport error
+               e.message.indexOf("13328") >= 0 ||       // Connect error
+               e.message.indexOf("socket") >= 0 )
     }
 }
 

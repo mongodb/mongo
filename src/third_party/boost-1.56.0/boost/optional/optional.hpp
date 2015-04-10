@@ -134,6 +134,13 @@ class aligned_storage
 
   public:
 
+#if defined(__GNUC__) && !defined(__clang__)
+    // MONGO
+    // Fix for -Wmaybe-uninitialized warnings from g++.
+    // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=47679
+    aligned_storage() : dummy_() {};
+#endif
+
 #if defined(BOOST_OPTIONAL_DETAIL_USE_ATTRIBUTE_MAY_ALIAS)
     void const* address() const { return &dummy_; }
     void      * address()       { return &dummy_; }

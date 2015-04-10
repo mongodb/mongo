@@ -116,7 +116,7 @@ namespace mongo {
         //
 
         // Mandatory Fields
-        void setProcess(const StringData& process) {
+        void setProcess(StringData process) {
             _process = process.toString();
             _isProcessSet = true;
         }

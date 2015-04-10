@@ -99,7 +99,7 @@ namespace repl {
                   !replAuthenticate(_conn.get())) ) {
 
                 resetConnection();
-                log() << "repl: " << errmsg << endl;
+                error() << errmsg << endl;
                 return false;
             }
             _host = host;
@@ -109,7 +109,7 @@ namespace repl {
 
     void OplogReader::tailCheck() {
         if( cursor.get() && cursor->isDead() ) {
-            log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
+            log() << "old cursor isDead, will initiate a new one" << std::endl;
             resetCursor();
         }
     }
@@ -126,13 +126,13 @@ namespace repl {
 
     void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
         verify( !haveCursor() );
-        LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
+        LOG(2) << ns << ".find(" << query.toString() << ')' << endl;
         cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
     }
 
-    void OplogReader::tailingQueryGTE(const char *ns, OpTime optime, const BSONObj* fields ) {
+    void OplogReader::tailingQueryGTE(const char *ns, Timestamp optime, const BSONObj* fields ) {
         BSONObjBuilder gte;
-        gte.appendTimestamp("$gte", optime.asDate());
+        gte.append("$gte", optime);
         BSONObjBuilder query;
         query.append("ts", gte.done());
         tailingQuery(ns, query.done(), fields);
@@ -143,10 +143,10 @@ namespace repl {
     }
 
     void OplogReader::connectToSyncSource(OperationContext* txn,
-                                          OpTime lastOpTimeFetched,
+                                          Timestamp lastOpTimeFetched,
                                           ReplicationCoordinator* replCoord) {
-        const OpTime sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
-        OpTime oldestOpTimeSeen = sentinel;
+        const Timestamp sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
+        Timestamp oldestOpTimeSeen = sentinel;
 
         invariant(conn() == NULL);
 
@@ -165,11 +165,10 @@ namespace repl {
 
                 // Connected to at least one member, but in all cases we were too stale to use them
                 // as a sync source.
-                log() << "replSet error RS102 too stale to catch up";
-                log() << "replSet our last optime : " << lastOpTimeFetched.toStringLong();
-                log() << "replSet oldest available is " << oldestOpTimeSeen.toStringLong();
-                log() << "replSet "
-                    "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
+                error() << "RS102 too stale to catch up";
+                log() << "our last optime : " << lastOpTimeFetched.toStringLong();
+                log() << "oldest available is " << oldestOpTimeSeen.toStringLong();
+                log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
                 setMinValid(txn, oldestOpTimeSeen);
                 bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
                 if (!worked) {
@@ -181,7 +180,7 @@ namespace repl {
             }
 
             if (!connect(candidate)) {
-                LOG(2) << "replSet can't connect to " << candidate.toString() << 
+                LOG(2) << "can't connect to " << candidate.toString() <<
                     " to read operations";
                 resetConnection();
                 replCoord->blacklistSyncSource(candidate, Date_t(curTimeMillis64() + 10*1000));
@@ -189,9 +188,9 @@ namespace repl {
             }
             // Read the first (oldest) op and confirm that it's not newer than our last
             // fetched op. Otherwise, we have fallen off the back of that source's oplog.
-            BSONObj remoteOldestOp(findOne(rsoplog, Query()));
+            BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));
             BSONElement tsElem(remoteOldestOp["ts"]);
-            if (tsElem.type() != Timestamp) {
+            if (tsElem.type() != bsonTimestamp) {
                 // This member's got a bad op in its oplog.
                 warning() << "oplog invalid format on node " << candidate.toString();
                 resetConnection();
@@ -199,7 +198,7 @@ namespace repl {
                                                Date_t(curTimeMillis64() + 600*1000));
                 continue;
             }
-            OpTime remoteOldOpTime = tsElem._opTime();
+            Timestamp remoteOldOpTime = tsElem.timestamp();
 
             if (lastOpTimeFetched < remoteOldOpTime) {
                 // We're too stale to use this sync source.

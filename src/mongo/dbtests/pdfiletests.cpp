@@ -31,11 +31,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/db.h"
-#include "mongo/db/json.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/db.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/json.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {
@@ -68,7 +69,7 @@ namespace PdfileTests {
             OperationContextImpl _txn;
             ScopedTransaction _scopedXact;
             Lock::GlobalWrite _lk;
-            Client::Context _context;
+            OldClientContext _context;
         };
 
         class InsertNoId : public Base {
@@ -105,9 +106,9 @@ namespace PdfileTests {
                 ASSERT( fixed.firstElement().number() == 1 );
 
                 BSONElement a = fixed["a"];
-                ASSERT( o["a"].type() == Timestamp );
+                ASSERT( o["a"].type() == bsonTimestamp );
                 ASSERT( o["a"].timestampValue() == 0 );
-                ASSERT( a.type() == Timestamp );
+                ASSERT( a.type() == bsonTimestamp );
                 ASSERT( a.timestampValue() > 0 );
             }
         };
@@ -130,15 +131,15 @@ namespace PdfileTests {
                 ASSERT( fixed.firstElement().number() == 1 );
 
                 BSONElement a = fixed["a"];
-                ASSERT( o["a"].type() == Timestamp );
+                ASSERT( o["a"].type() == bsonTimestamp );
                 ASSERT( o["a"].timestampValue() == 0 );
-                ASSERT( a.type() == Timestamp );
+                ASSERT( a.type() == bsonTimestamp );
                 ASSERT( a.timestampValue() > 0 );
 
                 BSONElement b = fixed["b"];
-                ASSERT( o["b"].type() == Timestamp );
+                ASSERT( o["b"].type() == bsonTimestamp );
                 ASSERT( o["b"].timestampValue() == 0 );
-                ASSERT( b.type() == Timestamp );
+                ASSERT( b.type() == bsonTimestamp );
                 ASSERT( b.timestampValue() > 0 );
             }
         };

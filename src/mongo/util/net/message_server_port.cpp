@@ -36,6 +36,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/config.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
@@ -129,7 +130,7 @@ namespace {
                 if (limits.rlim_cur > STACK_SIZE) {
                     size_t stackSizeToSet = STACK_SIZE;
 #if !__has_feature(address_sanitizer)
-                    if (DEBUG_BUILD)
+                    if (kDebugBuild)
                         stackSizeToSet /= 2;
 #endif
                     pthread_attr_setstacksize(&attrs, stackSizeToSet);
@@ -254,7 +255,7 @@ namespace {
             }
 
             // Normal disconnect path.
-#ifdef MONGO_SSL
+#ifdef MONGO_CONFIG_SSL
             SSLManagerInterface* manager = getSSLManager();
             if (manager)
                 manager->cleanupThreadLocals();

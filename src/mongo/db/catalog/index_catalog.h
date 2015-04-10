@@ -87,7 +87,7 @@ namespace mongo {
          * @return null if cannot find
          */
         IndexDescriptor* findIndexByName( OperationContext* txn,
-                                          const StringData& name,
+                                          StringData name,
                                           bool includeUnfinishedIndexes = false ) const;
 
         /**
@@ -143,7 +143,11 @@ namespace mongo {
             IndexDescriptor* next();
 
             // returns the access method for the last return IndexDescriptor
-            IndexAccessMethod* accessMethod( IndexDescriptor* desc );
+            IndexAccessMethod* accessMethod( const IndexDescriptor* desc );
+
+            // returns the IndexCatalogEntry for the last return IndexDescriptor
+            IndexCatalogEntry* catalogEntry( const IndexDescriptor* desc );
+
         private:
             IndexIterator( OperationContext* txn,
                            const IndexCatalog* cat,
@@ -153,7 +157,7 @@ namespace mongo {
 
             bool _includeUnfinishedIndexes;
 
-            OperationContext* _txn;
+            OperationContext* const _txn;
             const IndexCatalog* _catalog;
             IndexCatalogEntryContainer::const_iterator _iterator;
 
@@ -263,9 +267,9 @@ namespace mongo {
             IndexCatalogEntry* getEntry() { return _entry; }
 
         private:
-            Collection* _collection;
-            IndexCatalog* _catalog;
-            std::string _ns;
+            Collection* const _collection;
+            IndexCatalog* const _catalog;
+            const std::string _ns;
 
             BSONObj _spec;
 
@@ -358,7 +362,8 @@ namespace mongo {
         Status _doesSpecConflictWithExisting( OperationContext* txn, const BSONObj& spec ) const;
 
         int _magic;
-        Collection* _collection;
+        Collection* const _collection;
+        const int _maxNumIndexesAllowed;
 
         IndexCatalogEntryContainer _entries;
 

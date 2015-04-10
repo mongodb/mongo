@@ -61,7 +61,7 @@ function runTest(s) {
     printjson(s.getDB("config").settings.find().toArray());
 
     print("restart mongos");
-    stopMongoProgram(31000);
+    MongoRunner.stopMongos(31000);
     var opts = { port : 31000, v : 2, configdb : s._configDB, keyFile : "jstests/libs/key1", chunkSize : 1 };
     var conn = startMongos( opts );
     s.s = s._mongos[0] = s["s0"] = conn;
@@ -238,6 +238,9 @@ function runTest(s) {
     d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 );
     d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 );
 
+    authutil.asCluster(d1.nodes, "jstests/libs/key1", function() { d1.awaitReplication(60000); });
+    authutil.asCluster(d2.nodes, "jstests/libs/key1", function() { d2.awaitReplication(60000); });
+
     // add admin on shard itself, hack to prevent localhost auth bypass
     d1.getMaster().getDB(adminUser.db).createUser({user: adminUser.username,
                                                    pwd: adminUser.password,
@@ -294,11 +297,8 @@ function runTest(s) {
     assert.throws(function() {
         printjson(readOnlyDB.currentOp());
     });
-    assert.throws(function() {
-        printjson(readOnlyDB.killOp(123));
-    });
+    assert.commandFailed(readOnlyDB.killOp(123));
     // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
-
     /*
     broken because of SERVER-4156
     print( "   testing write command (should fail)" );
@@ -316,9 +316,7 @@ function runTest(s) {
     assert.throws(function() {
         printjson(readOnlyDB.currentOp());
     });
-    assert.throws(function() {
-        printjson(readOnlyDB.killOp(123));
-    });
+    assert.commandFailed(readOnlyDB.killOp(123));
     // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
 }
 

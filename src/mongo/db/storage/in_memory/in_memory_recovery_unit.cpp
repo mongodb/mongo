@@ -28,9 +28,12 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
 
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
     InMemoryRecoveryUnit::~InMemoryRecoveryUnit() {
@@ -45,10 +48,15 @@ namespace mongo {
         if ( _depth > 1 )
             return;
 
-        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit();
+        try {
+            for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+                (*it)->commit();
+            }
+            _changes.clear();
         }
-        _changes.clear();
+        catch (...) {
+            std::terminate();
+        }
     }
 
     void InMemoryRecoveryUnit::endUnitOfWork() {
@@ -56,10 +64,17 @@ namespace mongo {
          if (_depth > 0 )
              return;
 
-         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-                 it != end; ++it) {
-             (*it)->rollback();
-         }
-         _changes.clear();
+         try {
+             for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+                     it != end; ++it) {
+                 ChangePtr change = *it;
+                 LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
+                 change->rollback();
+             }
+             _changes.clear();
+        }
+        catch (...) {
+            std::terminate();
+        }
     }
 }

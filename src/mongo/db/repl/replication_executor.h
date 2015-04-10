@@ -275,7 +275,7 @@ namespace repl {
         /**
          * Blocks until the executor finishes running the callback referenced by "cbHandle".
          *
-         * Becaue callbacks all run during shutdown if they weren't run beforehand, there is no need
+         * Because callbacks all run during shutdown if they weren't run beforehand, there is no need
          * to indicate the reason for returning from wait(CallbackHandle).  It is always that the
          * callback ran.
          *
@@ -494,6 +494,10 @@ namespace repl {
     class ReplicationExecutor::NetworkInterface {
         MONGO_DISALLOW_COPYING(NetworkInterface);
     public:
+
+        // A flag to keep replication MessagingPorts open when all other sockets are disconnected.
+        static const unsigned int kMessagingPortKeepOpen = 1;
+
         typedef RemoteCommandResponse Response;
         typedef stdx::function<void (const ResponseStatus&)> RemoteCommandCompletionFn;
 

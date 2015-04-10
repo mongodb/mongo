@@ -43,6 +43,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
@@ -50,11 +51,12 @@
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/isself.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
@@ -146,15 +148,10 @@ namespace mongo {
                          << to_collection.ns() << "]",
                          !createdCollection );
                 WriteUnitOfWork wunit(txn);
-                collection = db->createCollection(txn, to_collection.ns());
+                invariant(logForRepl == txn->writesAreReplicated());
+                collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
                 verify(collection);
 
-                if (logForRepl) {
-                    repl::logOp(txn,
-                                "c",
-                                (_dbName + ".$cmd").c_str(),
-                                BSON("create" << to_collection.coll()));
-                }
                 wunit.commit();
             }
 
@@ -228,11 +225,9 @@ namespace mongo {
                 StatusWith<RecordId> loc = collection->insertDocument( txn, js, true );
                 if ( !loc.isOK() ) {
                     error() << "error: exception cloning object in " << from_collection
-                            << ' ' << loc.toString() << " obj:" << js;
+                            << ' ' << loc.getStatus() << " obj:" << js;
                 }
                 uassertStatusOK( loc.getStatus() );
-                if (logForRepl)
-                    repl::logOp(txn, "i", to_collection.ns().c_str(), js);
 
                 wunit.commit();
 
@@ -336,14 +331,9 @@ namespace mongo {
         Collection* collection = db->getCollection( to_collection );
         if ( !collection ) {
             WriteUnitOfWork wunit(txn);
-            collection = db->createCollection( txn, to_collection.ns() );
+            invariant(logForRepl == txn->writesAreReplicated());
+            collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
             invariant(collection);
-            if (logForRepl) {
-                repl::logOp(txn,
-                            "c",
-                            (toDBName + ".$cmd").c_str(),
-                            BSON("create" << to_collection.coll()));
-            }
             wunit.commit();
         }
 
@@ -366,9 +356,12 @@ namespace mongo {
         WriteUnitOfWork wunit(txn);
         indexer.commit();
         if (logForRepl) {
+            const string targetSystemIndexesCollectionName =
+                to_collection.getSystemIndexesCollection();
+            const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
             for (vector<BSONObj>::const_iterator it = indexesToBuild.begin();
                     it != indexesToBuild.end(); ++it) {
-                repl::logOp(txn, "i", to_collection.ns().c_str(), *it);
+                getGlobalServiceContext()->getOpObserver()->onCreateIndex(txn, createIndexNs, *it);
             }
         }
         wunit.commit();
@@ -404,7 +397,8 @@ namespace mongo {
             BSONObj col = collList.front();
             if (col["options"].isABSONObj()) {
                 WriteUnitOfWork wunit(txn);
-                Status status = userCreateNS(txn, db, ns, col["options"].Obj(), logForRepl, 0);
+                invariant(logForRepl == txn->writesAreReplicated());
+                Status status = userCreateNS(txn, db, ns, col["options"].Obj(), 0);
                 if ( !status.isOK() ) {
                     errmsg = status.toString();
                     return false;
@@ -585,12 +579,8 @@ namespace mongo {
 
                     // we defer building id index for performance - building it in batch is much
                     // faster
-                    Status createStatus = userCreateNS(txn,
-                                                       db,
-                                                       to_name.ns(),
-                                                       options,
-                                                       opts.logForRepl,
-                                                       false);
+                    invariant(opts.logForRepl == txn->writesAreReplicated());
+                    Status createStatus = userCreateNS(txn, db, to_name.ns(), options, false);
                     if ( !createStatus.isOK() ) {
                         errmsg = str::stream() << "failed to create collection \""
                                                << to_name.ns() << "\": "
@@ -639,13 +629,13 @@ namespace mongo {
                     uassertStatusOK(indexer.init(c->getIndexCatalog()->getDefaultIdIndexSpec()));
                     uassertStatusOK(indexer.insertAllDocumentsInCollection(&dups));
 
+                    // This must be done before we commit the indexer. See the comment about
+                    // dupsAllowed in IndexCatalog::_unindexRecord and SERVER-17487.
                     for (set<RecordId>::const_iterator it = dups.begin(); it != dups.end(); ++it) {
                         WriteUnitOfWork wunit(txn);
                         BSONObj id;
 
                         c->deleteDocument(txn, *it, true, true, opts.logForRepl ? &id : NULL);
-                        if (opts.logForRepl)
-                            repl::logOp(txn, "d", c->ns().ns().c_str(), id);
                         wunit.commit();
                     }
 
@@ -656,10 +646,10 @@ namespace mongo {
                     WriteUnitOfWork wunit(txn);
                     indexer.commit();
                     if (opts.logForRepl) {
-                        repl::logOp(txn,
-                                    "i",
-                                    c->ns().getSystemIndexesCollection().c_str(),
-                                    c->getIndexCatalog()->getDefaultIdIndexSpec());
+                        getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                                txn,
+                                c->ns().getSystemIndexesCollection().c_str(),
+                                c->getIndexCatalog()->getDefaultIdIndexSpec());
                     }
                     wunit.commit();
                 }

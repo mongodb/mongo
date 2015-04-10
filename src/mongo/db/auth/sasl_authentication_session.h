@@ -80,10 +80,10 @@ namespace mongo {
          *
          * Must be called only once on an instance.
          */
-        virtual Status start(const StringData& authenticationDatabase,
-                             const StringData& mechanism,
-                             const StringData& serviceName,
-                             const StringData& serviceHostname,
+        virtual Status start(StringData authenticationDatabase,
+                             StringData mechanism,
+                             StringData serviceName,
+                             StringData serviceHostname,
                              int64_t conversationId,
                              bool autoAuthorize) = 0;
 
@@ -96,7 +96,7 @@ namespace mongo {
          *
          * Must not be called before start().
          */
-        virtual Status step(const StringData& inputData, std::string* outputData) = 0;
+        virtual Status step(StringData inputData, std::string* outputData) = 0;
 
         /**
          * Returns the the operation context associated with the currently executing command.
