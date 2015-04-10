@@ -33,6 +33,7 @@
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 
 #include <iomanip>
+#include <map>
 #include <pcrecpp.h>
 #include <set>
 #include <vector>
@@ -50,6 +51,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -61,6 +63,7 @@
 
 namespace mongo {
 
+    using std::map;
     using std::pair;
     using std::set;
     using std::string;
@@ -691,6 +694,113 @@ namespace {
         }
 
         return DatabaseType::fromBSON(dbObj);
+    }
+
+    Status CatalogManagerLegacy::dropCollection(const std::string& collectionNs) {
+        logChange(NULL, "dropCollection.start", collectionNs, BSONObj());
+
+        // Lock the collection globally so that split/migrate cannot run
+        ScopedDistributedLock nsLock(_configServerConnectionString, collectionNs);
+        nsLock.setLockMessage("drop");
+
+        Status lockStatus = nsLock.tryAcquire();
+        if (!lockStatus.isOK()) {
+            return lockStatus;
+        }
+
+        LOG(1) << "dropCollection " << collectionNs << " started";
+
+        // This cleans up the collection on all shards
+        vector<ShardType> allShards;
+        Status status = getAllShards(&allShards);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        LOG(1) << "dropCollection " << collectionNs << " locked";
+
+        map<string, BSONObj> errors;
+
+        // Delete data from all mongods
+        for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
+            Shard shard = Shard::make(i->getHost());
+            ScopedDbConnection conn(shard.getConnString());
+
+            BSONObj info;
+            if (!conn->dropCollection(collectionNs, &info)) {
+                // Ignore the database not found errors
+                if (info["code"].isNumber() &&
+                        (info["code"].Int() == ErrorCodes::NamespaceNotFound)) {
+                    continue;
+                }
+                errors[shard.getConnString()] = info;
+            }
+
+            conn.done();
+        }
+
+        if (!errors.empty()) {
+            StringBuilder sb;
+            sb << "Dropping collection failed on the following hosts: ";
+
+            for (map<string, BSONObj>::const_iterator it = errors.begin();
+                 it != errors.end();
+                 ++it) {
+
+                if (it != errors.begin()) {
+                    sb << ", ";
+                }
+
+                sb << it->first << ": " << it->second;
+            }
+
+            return Status(ErrorCodes::OperationFailed, sb.str());
+        }
+
+        LOG(1) << "dropCollection " << collectionNs << " shard data deleted";
+
+        // remove chunk data
+        Status result = remove(ChunkType::ConfigNS,
+                               BSON(ChunkType::ns(collectionNs)),
+                               0,
+                               NULL);
+        if (!result.isOK()) {
+            return result;
+        }
+
+        LOG(1) << "dropCollection " << collectionNs << " chunk data deleted";
+
+        for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
+            Shard shard = Shard::make(i->getHost());
+            ScopedDbConnection conn(shard.getConnString());
+
+            BSONObj res;
+
+            // this is horrible
+            // we need a special command for dropping on the d side
+            // this hack works for the moment
+
+            if (!setShardVersion(conn.conn(),
+                                 collectionNs,
+                                 _configServerConnectionString.toString(),
+                                 ChunkVersion(0, 0, OID()),
+                                 NULL,
+                                 true,
+                                 res)) {
+
+                return Status(static_cast<ErrorCodes::Error>(8071),
+                              str::stream() << "cleaning up after drop failed: " << res);
+            }
+
+            conn->simpleCommand("admin", 0, "unsetSharding");
+            conn.done();
+        }
+
+        LOG(1) << "dropCollection " << collectionNs << " completed";
+
+        logChange(NULL, "dropCollection", collectionNs, BSONObj());
+
+        return Status::OK();
     }
 
     void CatalogManagerLegacy::logChange(OperationContext* opCtx,

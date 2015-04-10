@@ -623,7 +623,7 @@ namespace {
                     return passthrough( conf , cmdObj , result );
                 }
 
-                cm->drop();
+                uassertStatusOK(grid.catalogManager()->dropCollection(fullns));
 
                 if( ! conf->removeSharding( fullns ) ){
                     warning() << "collection " << fullns

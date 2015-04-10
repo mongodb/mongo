@@ -740,7 +740,8 @@ namespace mongo {
             LOG(1) << "\t dropping sharded collection: " << i->first << endl;
 
             i->second.getCM()->getAllShards( allServers );
-            i->second.getCM()->drop();
+
+            uassertStatusOK(grid.catalogManager()->dropCollection(i->first));
 
             // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
             // unsharded in the meantime

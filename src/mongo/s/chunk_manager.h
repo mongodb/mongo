@@ -205,8 +205,6 @@ namespace mongo {
 
         void getInfo( BSONObjBuilder& b ) const;
 
-        void drop() const;
-
         void _printChunks() const;
 
         int getCurrentDesiredChunkSize() const;
