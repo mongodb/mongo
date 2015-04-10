@@ -678,6 +678,7 @@ namespace {
     }
 
     void LockManager::cleanupUnusedLocks() {
+        size_t deletedLockHeads = 0;
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
             SimpleMutex::scoped_lock scopedLock(bucket->mutex);
@@ -699,6 +700,7 @@ namespace {
                     invariant(lock->compatibleFirstCount == 0);
 
                     bucket->data.erase(it++);
+                    deletedLockHeads++;
                     delete lock;
                 }
                 else {
@@ -706,6 +708,7 @@ namespace {
                 }
             }
         }
+        LOG(2) << "deleted " << deletedLockHeads << " unused lock heads";
     }
 
     void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
