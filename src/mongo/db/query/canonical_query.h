@@ -194,7 +194,7 @@ namespace mongo {
 
         /**
          * Traverses expression tree post-order.
-         * Sorts children at each non-leaf node by (MatchType, path(), cacheKey)
+         * Sorts children at each non-leaf node by (MatchType, path(), children, number of children)
          */
         static void sortTree(MatchExpression* tree);
 

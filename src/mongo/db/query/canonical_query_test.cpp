@@ -37,6 +37,7 @@ namespace {
 
     using std::auto_ptr;
     using std::string;
+    using std::unique_ptr;
 
     static const char* ns = "somebogusns";
 
@@ -45,12 +46,53 @@ namespace {
      * tree.  Returns the resulting tree, or an error Status.
      */
     StatusWithMatchExpression parseNormalize(const std::string& queryStr) {
+        // TODO Parsing a MatchExpression from a temporary BSONObj is invalid.  SERVER-18086.
         StatusWithMatchExpression swme = MatchExpressionParser::parse(fromjson(queryStr));
         if (!swme.getStatus().isOK()) {
             return swme;
         }
         return StatusWithMatchExpression(CanonicalQuery::normalizeTree(swme.getValue()));
     }
+
+    MatchExpression* parseMatchExpression(const BSONObj& obj) {
+        StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+        if (!status.isOK()) {
+            mongoutils::str::stream ss;
+            ss << "failed to parse query: " << obj.toString()
+               << ". Reason: " << status.getStatus().toString();
+            FAIL(ss);
+        }
+        return status.getValue();
+    }
+
+    void assertEquivalent(const char* queryStr,
+                          const MatchExpression* expected,
+                          const MatchExpression* actual) {
+        if (actual->equivalent(expected)) {
+            return;
+        }
+        mongoutils::str::stream ss;
+        ss << "Match expressions are not equivalent."
+           << "\nOriginal query: " << queryStr
+           << "\nExpected: " << expected->toString()
+           << "\nActual: " << actual->toString();
+        FAIL(ss);
+    }
+
+    void assertNotEquivalent(const char* queryStr,
+                             const MatchExpression* expected,
+                             const MatchExpression* actual) {
+        if (!actual->equivalent(expected)) {
+            return;
+        }
+        mongoutils::str::stream ss;
+        ss << "Match expressions are equivalent."
+           << "\nOriginal query: " << queryStr
+           << "\nExpected: " << expected->toString()
+           << "\nActual: " << actual->toString();
+        FAIL(ss);
+    }
+
 
     TEST(CanonicalQueryTest, IsValidText) {
         // Passes in default values for LiteParsedQuery.
@@ -416,6 +458,66 @@ namespace {
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
     }
 
+    //
+    // Tests for CanonicalQuery::sortTree
+    //
+
+    /**
+     * Helper function for testing CanonicalQuery::sortTree().
+     *
+     * Verifies that sorting the expression 'unsortedQueryStr' yields an expression equivalent to
+     * the expression 'sortedQueryStr'.
+     */
+    void testSortTree(const char* unsortedQueryStr, const char* sortedQueryStr) {
+        BSONObj unsortedQueryObj = fromjson(unsortedQueryStr);
+        unique_ptr<MatchExpression> unsortedQueryExpr(parseMatchExpression(unsortedQueryObj));
+
+        BSONObj sortedQueryObj = fromjson(sortedQueryStr);
+        unique_ptr<MatchExpression> sortedQueryExpr(parseMatchExpression(sortedQueryObj));
+
+        // Sanity check that the unsorted expression is not equivalent to the sorted expression.
+        assertNotEquivalent(unsortedQueryStr, unsortedQueryExpr.get(), sortedQueryExpr.get());
+
+        // Sanity check that sorting the sorted expression is a no-op.
+        {
+            unique_ptr<MatchExpression> sortedQueryExprClone(parseMatchExpression(sortedQueryObj));
+            CanonicalQuery::sortTree(sortedQueryExprClone.get());
+            assertEquivalent(unsortedQueryStr, sortedQueryExpr.get(), sortedQueryExprClone.get());
+        }
+
+        // Test that sorting the unsorted expression yields the sorted expression.
+        CanonicalQuery::sortTree(unsortedQueryExpr.get());
+        assertEquivalent(unsortedQueryStr, unsortedQueryExpr.get(), sortedQueryExpr.get());
+    }
+
+    // Test that an EQ expression sorts before a GT expression.
+    TEST(CanonicalQueryTest, SortTreeMatchTypeComparison) {
+        testSortTree("{a: {$gt: 1}, a: 1}", "{a: 1, a: {$gt: 1}}");
+    }
+
+    // Test that an EQ expression on path "a" sorts before an EQ expression on path "b".
+    TEST(CanonicalQueryTest, SortTreePathComparison) {
+        testSortTree("{b: 1, a: 1}", "{a: 1, b: 1}");
+        testSortTree("{'a.b': 1, a: 1}", "{a: 1, 'a.b': 1}");
+        testSortTree("{'a.c': 1, 'a.b': 1}", "{'a.b': 1, 'a.c': 1}");
+    }
+
+    // Test that AND expressions sort according to their first differing child.
+    TEST(CanonicalQueryTest, SortTreeChildComparison) {
+        testSortTree("{$or: [{a: 1, c: 1}, {a: 1, b: 1}]}", "{$or: [{a: 1, b: 1}, {a: 1, c: 1}]}");
+    }
+
+    // Test that an AND with 2 children sorts before an AND with 3 children, if the first 2 children
+    // are equivalent in both.
+    TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
+        testSortTree("{$or: [{a: 1, b: 1, c: 1}, {a: 1, b: 1}]}",
+                     "{$or: [{a: 1, b: 1}, {a: 1, b: 1, c: 1}]}");
+    }
+
+    //
+    // Tests for CanonicalQuery::logicalRewrite
+    //
+
     /**
      * Utility function to create a CanonicalQuery
      */
@@ -439,39 +541,6 @@ namespace {
         ASSERT_OK(result);
         return cq;
     }
-
-   /**
-    * Utility function to create MatchExpression
-    */
-    MatchExpression* parseMatchExpression(const BSONObj& obj) {
-        StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
-        if (!status.isOK()) {
-            mongoutils::str::stream ss;
-            ss << "failed to parse query: " << obj.toString()
-               << ". Reason: " << status.getStatus().toString();
-            FAIL(ss);
-        }
-        MatchExpression* expr(status.getValue());
-        return expr;
-    }
-
-    void assertEquivalent(const char* queryStr,
-                          const MatchExpression* expected,
-                          const MatchExpression* actual) {
-        if (actual->equivalent(expected)) {
-            return;
-        }
-        mongoutils::str::stream ss;
-        ss << "Match expressions are not equivalent."
-           << "\nOriginal query: " << queryStr
-           << "\nExpected: " << expected->toString()
-           << "\nActual: " << actual->toString();
-        FAIL(ss);
-    }
-
-    //
-    // Tests for CanonicalQuery::logicalRewrite
-    //
 
     // Don't do anything with a double OR.
     TEST(CanonicalQueryTest, RewriteNoDoubleOr) {

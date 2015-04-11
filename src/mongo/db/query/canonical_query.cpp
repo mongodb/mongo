@@ -76,42 +76,57 @@ namespace {
     void encodePlanCacheKeyTree(const MatchExpression* tree, mongoutils::str::stream* os);
 
     /**
-     * Comparator for MatchExpression nodes. nodes by:
+     * Comparator for MatchExpression nodes.  Returns an integer less than, equal to, or greater
+     * than zero if 'lhs' is less than, equal to, or greater than 'rhs', respectively.
+     *
+     * Sorts by:
      * 1) operator type (MatchExpression::MatchType)
      * 2) path name (MatchExpression::path())
-     * 3) cache key of the subtree
+     * 3) sort order of children
+     * 4) number of children (MatchExpression::numChildren())
      *
-     * The third item is needed to break ties, thus ensuring that
-     * match expression trees which should have the same cache key
-     * always sort the same way. If you're wondering when the tuple
-     * (operator type, path name) could ever be equal, consider this
-     * query:
+     * The third item is needed to ensure that match expression trees which should have the same
+     * cache key always sort the same way. If you're wondering when the tuple (operator type, path
+     * name) could ever be equal, consider this query:
      *
-     * {$and:[{$or:[{a:1},{a:2}]},{$or:[{b:1},{b:2}]}]}
+     * {$and:[{$or:[{a:1},{a:2}]},{$or:[{a:1},{b:2}]}]}
      *
-     * The two OR nodes would compare as equal in this case were it
-     * not for tuple item #3 (cache key of the subtree).
+     * The two OR nodes would compare as equal in this case were it not for tuple item #3 (sort
+     * order of children).
      */
-    bool OperatorAndFieldNameComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
-        // First compare by MatchType
+    int matchExpressionComparator(const MatchExpression* lhs, const MatchExpression* rhs) {
         MatchExpression::MatchType lhsMatchType = lhs->matchType();
         MatchExpression::MatchType rhsMatchType = rhs->matchType();
         if (lhsMatchType != rhsMatchType) {
-            return lhsMatchType < rhsMatchType;
+            return lhsMatchType < rhsMatchType ? -1 : 1;
         }
-        // Second, path.
+
         StringData lhsPath = lhs->path();
         StringData rhsPath = rhs->path();
-        if (lhsPath != rhsPath) {
-            return lhsPath < rhsPath;
+        int pathsCompare = lhsPath.compare(rhsPath);
+        if (pathsCompare != 0) {
+            return pathsCompare;
         }
-        // Third, cache key.
-        mongoutils::str::stream ssLeft, ssRight;
-        encodePlanCacheKeyTree(lhs, &ssLeft);
-        encodePlanCacheKeyTree(rhs, &ssRight);
-        string strLeft(ssLeft);
-        string strRight(ssRight);
-        return strLeft < strRight;
+
+        const size_t numChildren = std::min(lhs->numChildren(), rhs->numChildren());
+        for (size_t childIdx = 0; childIdx < numChildren; ++childIdx) {
+            int childCompare = matchExpressionComparator(lhs->getChild(childIdx),
+                                                         rhs->getChild(childIdx));
+            if (childCompare != 0) {
+                return childCompare;
+            }
+        }
+
+        if (lhs->numChildren() != rhs->numChildren()) {
+            return lhs->numChildren() < rhs->numChildren() ? -1 : 1;
+        }
+
+        // They're equal!
+        return 0;
+    }
+
+    bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* rhs) {
+        return matchExpressionComparator(lhs, rhs) < 0;
     }
 
     /**
@@ -686,7 +701,7 @@ namespace mongo {
         }
         std::vector<MatchExpression*>* children = tree->getChildVector();
         if (NULL != children) {
-            std::sort(children->begin(), children->end(), OperatorAndFieldNameComparison);
+            std::sort(children->begin(), children->end(), matchExpressionLessThan);
         }
     }
 
