@@ -45,6 +45,7 @@ env.Library(
         "stage_builder.cpp",
     ],
     LIBDEPS=[
+        "internal_plans",
         "query_planner",
         "query_planner_test_lib",
         "$BUILD_DIR/mongo/expression_algo",
@@ -113,6 +114,15 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "getmore_request",
+    ],
+)
+
+env.Library(
+    target="internal_plans",
+    source=[
+        "internal_plans.cpp"
+    ],
+    LIBDEPS=[
     ],
 )
 

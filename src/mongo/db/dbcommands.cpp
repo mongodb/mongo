@@ -36,7 +36,6 @@
 #include <time.h>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/audit.h"
@@ -50,6 +49,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
@@ -66,6 +66,8 @@
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/index_builder.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"

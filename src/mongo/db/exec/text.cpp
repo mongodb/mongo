@@ -31,6 +31,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
