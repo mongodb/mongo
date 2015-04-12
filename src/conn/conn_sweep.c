@@ -62,7 +62,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
  * __sweep_able --
  *	Return if we can/should sweep this file.
  */
-static int inline
+static inline int
 __sweep_able(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 {
 	WT_BTREE *btree;
