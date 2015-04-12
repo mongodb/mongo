@@ -25,7 +25,7 @@ __wt_block_manager_truncate(
 	WT_RET(__wt_open(session, filename, 0, 0, WT_FILE_TYPE_DATA, &fh));
 
 	/* Truncate the file. */
-	WT_ERR(__wt_ftruncate(session, fh, (wt_off_t)0));
+	WT_ERR(__wt_block_truncate(session, fh, (wt_off_t)0));
 
 	/* Write out the file's meta-data. */
 	WT_ERR(__wt_desc_init(session, fh, allocsize));

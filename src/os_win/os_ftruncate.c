@@ -26,10 +26,8 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 		    fh->name);
 
 	ret = SetEndOfFile(fh->filehandle_secondary);
-	if (ret != FALSE) {
-		fh->size = fh->extend_size = len;
+	if (ret != FALSE)
 		return (0);
-	}
 
 	if (GetLastError() == ERROR_USER_MAPPED_FILE)
 		return (EBUSY);
