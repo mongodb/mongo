@@ -137,7 +137,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size));
 		WT_ERR_BUSY_OK(
-		    __wt_ftruncate(session, block->fh, ci->file_size));
+		    __wt_block_truncate(session, block->fh, ci->file_size));
 	}
 
 	if (0) {
@@ -185,7 +185,7 @@ __wt_block_checkpoint_unload(
 		 * an open checkpoint on the file), that's OK.
 		 */
 		WT_TRET_BUSY_OK(
-		    __wt_ftruncate(session, block->fh, block->fh->size));
+		    __wt_block_truncate(session, block->fh, block->fh->size));
 
 		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);

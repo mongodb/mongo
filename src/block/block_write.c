@@ -21,6 +21,30 @@ __wt_block_header(WT_BLOCK *block)
 }
 
 /*
+ * __wt_block_extend --
+ *	Extend the file.
+ */
+int
+__wt_block_extend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+{
+	return (__wt_ftruncate(session, fh, len));
+}
+
+/*
+ * __wt_block_truncate --
+ *	Truncate the file.
+ */
+int
+__wt_block_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+{
+	WT_RET(__wt_ftruncate(session, fh, len));
+
+	fh->size = fh->extend_size = len;
+
+	return (0);
+}
+
+/*
  * __wt_block_write_size --
  *	Return the buffer size required to write a block.
  */
@@ -208,7 +232,7 @@ extend_truncate:	/*
 			 * (if there's an open checkpoint on the file), that's
 			 * OK.
 			 */
-			if ((ret = __wt_ftruncate(
+			if ((ret = __wt_block_extend(
 			    session, fh, offset + fh->extend_len * 2)) == EBUSY)
 				ret = 0;
 		}
