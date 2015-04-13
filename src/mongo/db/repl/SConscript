@@ -329,3 +329,22 @@ env.CppUnitTest(
         'base_cloner_test_fixture',
     ],
 )
+
+env.Library(
+    target='database_cloner',
+    source=[
+        'database_cloner.cpp',
+    ],
+    LIBDEPS=[
+        'collection_cloner',
+    ],
+)
+
+env.CppUnitTest(
+    target='database_cloner_test',
+    source='database_cloner_test.cpp',
+    LIBDEPS=[
+        'database_cloner',
+        'base_cloner_test_fixture',
+    ],
+)
