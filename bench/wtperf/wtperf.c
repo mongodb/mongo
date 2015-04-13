@@ -2293,11 +2293,11 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 static int
 drop_all_tables(CONFIG *cfg)
 {
-	WT_SESSION *session;
-	int ret, t_ret;
 	struct timespec start, stop;
+	WT_SESSION *session;
 	size_t i;
 	uint64_t msecs;
+	int ret, t_ret;
 
 	/* Drop any tables. */
 	if ((ret = cfg->conn->open_session(
@@ -2306,7 +2306,7 @@ drop_all_tables(CONFIG *cfg)
 		    "Error opening a session on %s", cfg->home);
 		return (ret);
 	}
-	__wt_epoch(NULL, &start);
+	(void)__wt_epoch(NULL, &start);
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->drop(
 		    session, cfg->uris[i], NULL)) != 0) {
@@ -2315,7 +2315,7 @@ drop_all_tables(CONFIG *cfg)
 			goto err;
 		}
 	}
-	__wt_epoch(NULL, &stop);
+	(void)__wt_epoch(NULL, &stop);
 	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
 	lprintf(cfg, 0, 1,
 	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",
