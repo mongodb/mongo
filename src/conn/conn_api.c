@@ -1793,9 +1793,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
+	const char *new_cfg;
 
 	/* Leave space for optional additional configuration. */
-	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
+	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 
 	*wt_connp = NULL;
 
@@ -1852,6 +1853,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * 3. the config passed in by the application.
 	 * 4. user configuration file (optional)
 	 * 5. environment variable settings (optional)
+	 * 6. optional clearing of sensitive settings (optional)
 	 *
 	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
@@ -1974,9 +1976,26 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.secretkey",
 	    &secretval));
-	if (secretval.len != 0)
+	if (secretval.len != 0) {
+		/*
+		 * After saving the secret key, we want to "remove" it from
+		 * the stored configuration so that it will not appear in the
+		 * base configuration file.  Add an empty entry in the stack.
+		 */
 		WT_ERR(__wt_strndup(session, secretval.str, secretval.len,
 		    &conn->encrypt_secret_key));
+		__conn_config_append(cfg, "encryption=(secretkey=)");
+		/*
+		 * We now merge all non-default settings and set that new
+		 * string as the next config.  This is necessary because writing
+		 * out the base config file writes everything it gets one
+		 * config string at a time.  We don't want the secretkey
+		 * real appearance in the file so we have to merge it.
+		 */
+		WT_ERR(__wt_config_merge(session, &cfg[1], &new_cfg));
+		cfg[1] = new_cfg;
+		cfg[2] = NULL;
+	}
 	WT_ERR(__wt_encryptor_config(session, &cval, &keyid, &conn->encryptor));
 
 	/*

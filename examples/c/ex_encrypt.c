@@ -486,6 +486,10 @@ main(void)
 	 * by reading the data from disk, forcing decryption.
 	 */
 	printf("REOPEN and VERIFY encrypted data\n");
+
+	/*
+	 * Confirm we detect a bad password.
+	 */
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
@@ -493,6 +497,29 @@ main(void)
 	    "keyid=" SYS_KEYID ",secretkey=" SYS_BADPW ")", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect bad password\n");
+		exit (1);
+	}
+	/*
+	 * Confirm we detect no password.
+	 */
+	ret = wiredtiger_open(home, NULL,
+	    "create,cache_size=100MB,"
+	    "extensions=[" EXTENSION_NAME "],"
+	    "log=(enabled=true),encryption=(name=rotn,"
+	    "keyid=" SYS_KEYID ")", &conn);
+	if (ret != EPERM) {
+		fprintf(stderr, "Did not detect missing password\n");
+		exit (1);
+	}
+	/*
+	 * Confirm we detect not using encryption at all.
+	 */
+	ret = wiredtiger_open(home, NULL,
+	    "create,cache_size=100MB,"
+	    "extensions=[" EXTENSION_NAME "],"
+	    "log=(enabled=true)", &conn);
+	if (ret != EPERM) {
+		fprintf(stderr, "Did not detect no encryption\n");
 		exit (1);
 	}
 
