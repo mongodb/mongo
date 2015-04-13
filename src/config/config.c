@@ -621,21 +621,31 @@ __config_getraw(
  */
 int
 __wt_config_get(WT_SESSION_IMPL *session,
-    const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+    const char **cfg_arg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG cparser;
 	WT_DECL_RET;
-	int found;
+	const char **cfg;
 
-	for (found = 0; *cfg != NULL; cfg++) {
+	if (cfg_arg[0] == NULL)
+		return (WT_NOTFOUND);
+
+	/*
+	 * Search the strings in reverse order, that way the first hit wins
+	 * and we don't search the base set until there's no other choice.
+	 */
+	for (cfg = cfg_arg; *cfg != NULL; ++cfg)
+		;
+	do {
+		--cfg;
+
 		WT_RET(__wt_config_init(session, &cparser, *cfg));
 		if ((ret = __config_getraw(&cparser, key, value, 1)) == 0)
-			found = 1;
-		else if (ret != WT_NOTFOUND)
-			return (ret);
-	}
+			return (0);
+		WT_RET_NOTFOUND_OK(ret);
+	} while (cfg != cfg_arg);
 
-	return (found ? 0 : WT_NOTFOUND);
+	return (WT_NOTFOUND);
 }
 
 /*
