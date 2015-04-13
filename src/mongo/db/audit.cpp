@@ -54,19 +54,10 @@ namespace audit {
             const BSONObj& pattern,
             ErrorCodes::Error result) MONGO_AUDIT_STUB
 
-    void logFsyncUnlockAuthzCheck(
-            ClientBasic* client,
-            ErrorCodes::Error result) MONGO_AUDIT_STUB
-
     void logGetMoreAuthzCheck(
             ClientBasic* client,
             const NamespaceString& ns,
             long long cursorId,
-            ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logInProgAuthzCheck(
-            ClientBasic* client,
-            const BSONObj& filter,
             ErrorCodes::Error result) MONGO_AUDIT_STUB
 
     void logInsertAuthzCheck(
@@ -79,11 +70,6 @@ namespace audit {
             ClientBasic* client,
             const NamespaceString& ns,
             long long cursorId,
-            ErrorCodes::Error result) MONGO_AUDIT_STUB
-
-    void logKillOpAuthzCheck(
-            ClientBasic* client,
-            const BSONObj& filter,
             ErrorCodes::Error result) MONGO_AUDIT_STUB
 
     void logQueryAuthzCheck(
