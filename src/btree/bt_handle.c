@@ -319,8 +319,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		    session, cfg, "encrypt.keyid", &metadata));
 		WT_RET(__wt_encryptor_config(session, &cval, &metadata,
 		    &btree->encryptor));
-		__wt_errx(session, "btree_conf: %s: btree->enc 0x%lx",
-		    btree->dhandle->name,btree->encryptor);
 	}
 
 	/* Initialize locks. */

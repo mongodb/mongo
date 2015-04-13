@@ -271,7 +271,6 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * here that maps the id onto a secret key.
 	 */
 	if (strcmp(keyidstr, "system") == 0) {
-		    my_crypto->password == NULL ? "NULL" : my_crypto->password);
 		if (my_crypto->password == NULL ||
 		    strcmp(my_crypto->password, SYS_PW) != 0)
 			goto err;
