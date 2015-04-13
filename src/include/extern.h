@@ -71,6 +71,7 @@ extern int __wt_verify_ckpt_load( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_
 extern int __wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_verify_addr(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size);
 extern u_int __wt_block_header(WT_BLOCK *block);
+extern int __wt_block_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len);
 extern int __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep);
 extern int __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum);
 extern int __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int data_cksum, int caller_locked);
@@ -181,7 +182,7 @@ extern int __wt_config_initn( WT_SESSION_IMPL *session, WT_CONFIG *conf, const c
 extern int __wt_config_init(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str);
 extern int __wt_config_subinit( WT_SESSION_IMPL *session, WT_CONFIG *conf, WT_CONFIG_ITEM *item);
 extern int __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
-extern int __wt_config_get(WT_SESSION_IMPL *session, const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
+extern int __wt_config_get(WT_SESSION_IMPL *session, const char **cfg_arg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_gets(WT_SESSION_IMPL *session, const char **cfg, const char *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_gets_none(WT_SESSION_IMPL *session, const char **cfg, const char *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_getone(WT_SESSION_IMPL *session, const char *config, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
@@ -629,10 +630,6 @@ extern void __wt_huffman_close(WT_SESSION_IMPL *session, void *huffman_arg);
 extern int __wt_print_huffman_code(void *huffman_arg, uint16_t symbol);
 extern int __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg, const uint8_t *from_arg, size_t from_len, WT_ITEM *to_buf);
 extern int __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg, const uint8_t *from_arg, size_t from_len, WT_ITEM *to_buf);
-extern int __wt_spin_lock_register_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
-extern void __wt_spin_lock_unregister_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
-extern int __wt_spin_lock_register_caller(WT_SESSION_IMPL *session, const char *name, const char *file, int line, int *idp);
-extern int __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag);
 extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern uint32_t __wt_log2_int(uint32_t n);

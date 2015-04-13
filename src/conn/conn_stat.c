@@ -45,6 +45,8 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
 	__wt_async_stats_update(session);
 	__wt_cache_stats_update(session);
 	__wt_txn_stats_update(session);
+
+	WT_CONN_STAT(session, file_open) = S2C(session)->open_file_count;
 }
 
 /*
@@ -315,11 +317,6 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 
 	/* Dump the connection statistics. */
 	WT_RET(__statlog_dump(session, conn->home, 1));
-
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	/* Dump the spinlock statistics. */
-	WT_RET(__wt_statlog_dump_spinlock(conn, conn->home));
-#endif
 
 	/*
 	 * Lock the schema and walk the list of open handles, dumping
