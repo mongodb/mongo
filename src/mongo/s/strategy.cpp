@@ -52,7 +52,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client/dbclient_multi_command.h"
-#include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"

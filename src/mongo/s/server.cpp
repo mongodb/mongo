@@ -63,7 +63,6 @@
 #include "mongo/s/catalog/legacy/config_upgrade.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
@@ -139,8 +138,8 @@ namespace mongo {
     public:
         virtual ~ShardedMessageHandler() {}
 
-        virtual void connected( AbstractMessagingPort* p ) {
-            ClientInfo::create(getGlobalServiceContext(), p);
+        virtual void connected(AbstractMessagingPort* p) {
+            Client::initThread("conn", getGlobalServiceContext(), p);
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {

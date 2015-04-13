@@ -28,8 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/client_info.h"
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
@@ -66,7 +66,7 @@ namespace {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            result << "you" << ClientInfo::get()->getRemote().toString();
+            result << "you" << cc().getRemote().toString();
             return true;
         }
 

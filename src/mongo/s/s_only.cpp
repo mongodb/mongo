@@ -37,7 +37,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/client_info.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
@@ -55,7 +54,7 @@ namespace mongo {
      *  in an operation to be read later by getLastError()
     */
     void usingAShardConnection(const std::string& addr) {
-        ClusterLastErrorInfo::get(ClientInfo::get()).addShardHost(addr);
+        ClusterLastErrorInfo::get(cc()).addShardHost(addr);
     }
 
     TSP_DEFINE(Client,currentClient)
@@ -70,10 +69,14 @@ namespace mongo {
     void Client::shutdown() {}
 
     void Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-        // mp is non-null only for client connections, and mongos uses ClientInfo for those
-        massert(16478, "Client being used for incoming connection thread in mongos", mp == NULL);
+        initThread(desc, getGlobalServiceContext(), mp);
+    }
 
-        verify( currentClient.get() == 0 );
+    void Client::initThread(const char* desc,
+                            ServiceContext* serviceContext,
+                            AbstractMessagingPort *mp) {
+
+        verify(currentClient.get() == 0);
 
         string fullDesc = desc;
         if ( str::equals( "conn" , desc ) && mp != NULL )
@@ -81,17 +84,24 @@ namespace mongo {
 
         setThreadName( fullDesc.c_str() );
 
-        Client *c = new Client( fullDesc, getGlobalServiceContext(), mp );
+        Client *c = new Client(fullDesc, serviceContext, mp);
         currentClient.reset(c);
         mongo::lastError.initThread();
         AuthorizationSession::set(c, getGlobalAuthorizationManager()->makeAuthorizationSession());
     }
 
+    ClientBasic* ClientBasic::getCurrent() {
+        return currentClient.get();
+    }
+
     string Client::clientAddress(bool includePort) const {
-        ClientInfo * ci = ClientInfo::get();
-        if ( ci )
-            return ci->getRemote().toString();
-        return "";
+        if (!hasRemote()) {
+            return "";
+        }
+        if (includePort) {
+            return getRemote().toString();
+        }
+        return getRemote().host();
     }
 
     // Need a version that takes a Client to match the mongod interface so the web server can call

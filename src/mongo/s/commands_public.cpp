@@ -57,7 +57,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/client_info.h"
 #include "mongo/s/cluster_explain.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_commands_common.h"
@@ -993,9 +992,7 @@ namespace {
 
                 if (ok) {
                     // check whether split is necessary (using update object for size heuristic)
-                    ClientInfo *client = ClientInfo::get();
-
-                    if (client != NULL && ClusterLastErrorInfo::get(client).autoSplitOk()) {
+                    if (haveClient() && ClusterLastErrorInfo::get(cc()).autoSplitOk()) {
                         chunk->splitIfShould(cmdObj.getObjectField("update").objsize());
                     }
                 }
@@ -2577,10 +2574,9 @@ namespace {
             Command::unknownCommands.increment();
             return;
         }
-        ClientInfo *client = ClientInfo::get();
 
         OperationContext* noTxn = NULL; // mongos doesn't use transactions SERVER-13931
-        execCommandClientBasic(noTxn, c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
+        execCommandClientBasic(noTxn, c, cc(), queryOptions, ns, jsobj, anObjBuilder, false);
     }
 
 } // namespace mongo

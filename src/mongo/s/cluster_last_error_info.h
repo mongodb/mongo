@@ -104,8 +104,9 @@ namespace mongo {
     };
 
     /**
-     * Looks for $gleStats in a command response, and fills in ClientInfo with the data,
-     * if found.
+     * Looks for $gleStats in a command response, and fills in the ClusterLastErrorInfo for this
+     * thread's associated Client with the data, if found.
+     *
      * This data will be used by subsequent GLE calls, to ensure we look for the correct
      * write on the correct PRIMARY.
      * result: the result from calling runCommand

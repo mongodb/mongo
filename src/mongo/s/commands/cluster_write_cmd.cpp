@@ -29,19 +29,19 @@
 #include "mongo/platform/basic.h"
  
 #include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/client_info.h"
-#include "mongo/s/cluster_last_error_info.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/cluster_explain.h"
+#include "mongo/s/cluster_last_error_info.h"
+#include "mongo/s/cluster_write.h"
+#include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/batch_upconvert.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -212,9 +212,8 @@ namespace {
             }
 
             // Save the last opTimes written on each shard for this client, to allow GLE to work
-            if (ClientInfo::exists() && writer.getStats().hasShardStats()) {
-                ClientInfo* clientInfo = ClientInfo::get();
-                ClusterLastErrorInfo::get(clientInfo).addHostOpTimes(
+            if (haveClient() && writer.getStats().hasShardStats()) {
+                ClusterLastErrorInfo::get(cc()).addHostOpTimes(
                         writer.getStats().getShardStats().getWriteOpTimes());
             }
 

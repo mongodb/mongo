@@ -891,7 +891,6 @@ env.Library('coreshard',
 env.Library('mongoscore',
             [
                 's/balance.cpp',
-                's/client_info.cpp',
                 's/cluster_last_error_info.cpp',
                 's/commands_public.cpp',
                 's/cursors.cpp',

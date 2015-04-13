@@ -48,7 +48,6 @@
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"

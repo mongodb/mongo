@@ -34,7 +34,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/client_info.h"
 
 namespace mongo {
 namespace {

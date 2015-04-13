@@ -31,7 +31,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"

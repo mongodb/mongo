@@ -34,10 +34,10 @@
 
 #include <utility>
 
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/s/client_info.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -75,12 +75,8 @@ namespace mongo {
     static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime",
                                                                  &gleWtimeStats);
 
-    // Look for $gleStats in a command response, and fill in ClientInfo with the data,
-    // if found.
-    // This data will be used by subsequent GLE calls, to ensure we look for the correct
-    // write on the correct PRIMARY.
     void saveGLEStats(const BSONObj& result, const std::string& hostString) {
-        if (!ClientInfo::exists()) {
+        if (!haveClient()) {
             return;
         }
         if (result[kGLEStatsFieldName].type() != Object) {
@@ -92,7 +88,7 @@ namespace mongo {
         BSONElement subobj = result[kGLEStatsFieldName];
         Timestamp lastOpTime = subobj[kGLEStatsLastOpTimeFieldName].timestamp();
         OID electionId = subobj[kGLEStatsElectionIdFieldName].OID();
-        ClientInfo* clientInfo = ClientInfo::get();
+        auto& clientInfo = cc();
         LOG(4) << "saveGLEStats lastOpTime:" << lastOpTime 
                << " electionId:" << electionId;
 

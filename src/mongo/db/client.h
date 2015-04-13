@@ -71,6 +71,9 @@ namespace mongo {
          *  call this when your thread starts.
         */
         static void initThread(const char *desc, AbstractMessagingPort *mp = 0);
+        static void initThread(const char* desc,
+                               ServiceContext* serviceContext,
+                               AbstractMessagingPort* mp);
 
         /**
          * Inits a thread if that thread has not already been init'd, setting the thread name to
