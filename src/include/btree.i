@@ -967,10 +967,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	if (mod == NULL)
 		return (1);
 
-	/* Skip pages that are already being evicted. */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
-		return (0);
-
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
 	 * internal pages not be evicted until all threads are known to have
