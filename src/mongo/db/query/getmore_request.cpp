@@ -38,13 +38,13 @@
 
 namespace mongo {
 
-    const int GetMoreRequest::kDefaultBatchSize = 101;
-
     GetMoreRequest::GetMoreRequest()
         : cursorid(0),
           batchSize(0) { }
 
-    GetMoreRequest::GetMoreRequest(const std::string& fullns, CursorId id, int sizeOfBatch)
+    GetMoreRequest::GetMoreRequest(const std::string& fullns,
+                                   CursorId id,
+                                   boost::optional<int> sizeOfBatch)
         : nss(fullns),
           cursorid(id),
           batchSize(sizeOfBatch) { }
@@ -59,10 +59,10 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "Cursor id for getMore must be non-zero");
         }
 
-        if (batchSize < 0) {
+        if (batchSize && *batchSize <= 0) {
             return Status(ErrorCodes::BadValue, str::stream()
-                << "Batch size for getMore must be non-negative, "
-                << "but received: " << batchSize);
+                << "Batch size for getMore must be positive, "
+                << "but received: " << *batchSize);
         }
 
         return Status::OK();
@@ -84,8 +84,8 @@ namespace mongo {
         boost::optional<CursorId> cursorid;
         boost::optional<std::string> fullns;
 
-        // Optional field, set to its default.
-        int batchSize = kDefaultBatchSize;
+        // Optional field.
+        boost::optional<int> batchSize;
 
         for (BSONElement el : cmdObj) {
             const char* fieldName = el.fieldName();

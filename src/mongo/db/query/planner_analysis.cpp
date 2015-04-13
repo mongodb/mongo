@@ -403,7 +403,8 @@ namespace mongo {
                                                          bool* blockingSortOut) {
         *blockingSortOut = false;
 
-        const BSONObj& sortObj = query.getParsed().getSort();
+        const LiteParsedQuery& lpq = query.getParsed();
+        const BSONObj& sortObj = lpq.getSort();
 
         if (sortObj.isEmpty()) {
             return solnRoot;
@@ -464,18 +465,25 @@ namespace mongo {
         // And build the full sort stage.
         SortNode* sort = new SortNode();
         sort->pattern = sortObj;
-        sort->query = query.getParsed().getFilter();
+        sort->query = lpq.getFilter();
         sort->children.push_back(solnRoot);
         solnRoot = sort;
         // When setting the limit on the sort, we need to consider both
         // the limit N and skip count M. The sort should return an ordered list
         // N + M items so that the skip stage can discard the first M results.
-        if (0 != query.getParsed().getNumToReturn()) {
+        if (lpq.getLimit()) {
+            // We have a true limit. The limit can be combined with the SORT stage.
+            sort->limit = static_cast<size_t>(*lpq.getLimit()) + static_cast<size_t>(lpq.getSkip());
+        }
+        else if (!lpq.fromFindCommand() && lpq.getBatchSize()) {
+            // We have an ntoreturn specified by an OP_QUERY style find. This is used
+            // by clients to mean both batchSize and limit.
+            //
             // Overflow here would be bad and could cause a nonsense limit. Cast
             // skip and limit values to unsigned ints to make sure that the
             // sum is never stored as signed. (See SERVER-13537).
-            sort->limit = size_t(query.getParsed().getNumToReturn()) +
-                          size_t(query.getParsed().getSkip());
+            sort->limit = static_cast<size_t>(*lpq.getBatchSize()) +
+                          static_cast<size_t>(lpq.getSkip());
 
             // This is a SORT with a limit. The wire protocol has a single quantity
             // called "numToReturn" which could mean either limit or batchSize.
@@ -497,7 +505,7 @@ namespace mongo {
             // with the topK first. If the client wants a limit, they'll get the efficiency
             // of topK. If they want a batchSize, the other OR branch will deliver the missing
             // results. The OR stage handles deduping.
-            if (query.getParsed().wantMore()
+            if (lpq.wantMore()
                 && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO)
@@ -579,6 +587,8 @@ namespace mongo {
         bool hasAndHashStage = hasNode(solnRoot, STAGE_AND_HASH);
         soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
+        const LiteParsedQuery& lpq = query.getParsed();
+
         // If we can (and should), add the keep mutations stage.
 
         // We cannot keep mutated documents if:
@@ -598,7 +608,7 @@ namespace mongo {
         bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT)
                               || hasNode(solnRoot, STAGE_GEO_NEAR_2D)
                               || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE)
-                              || (!query.getParsed().getSort().isEmpty() && !hasSortStage);
+                              || (!lpq.getSort().isEmpty() && !hasSortStage);
 
         // Only these stages can produce flagged results.  A stage has to hold state past one call
         // to work(...) in order to possibly flag a result.
@@ -710,7 +720,7 @@ namespace mongo {
             ProjectionNode* projNode = new ProjectionNode();
             projNode->children.push_back(solnRoot);
             projNode->fullExpression = query.root();
-            projNode->projection = query.getParsed().getProj();
+            projNode->projection = lpq.getProj();
             projNode->projType = projType;
             projNode->coveredKeyObj = coveredKeyObj;
             solnRoot = projNode;
@@ -724,9 +734,9 @@ namespace mongo {
             }
         }
 
-        if (0 != query.getParsed().getSkip()) {
+        if (0 != lpq.getSkip()) {
             SkipNode* skip = new SkipNode();
-            skip->skip = query.getParsed().getSkip();
+            skip->skip = lpq.getSkip();
             skip->children.push_back(solnRoot);
             solnRoot = skip;
         }
@@ -735,14 +745,23 @@ namespace mongo {
         // be enforced by the blocking sort.
         // Otherwise, we need to limit the results in the case of a hard limit
         // (ie. limit in raw query is negative)
-        if (0 != query.getParsed().getNumToReturn() &&
-            !hasSortStage &&
-            !query.getParsed().wantMore()) {
-
-            LimitNode* limit = new LimitNode();
-            limit->limit = query.getParsed().getNumToReturn();
-            limit->children.push_back(solnRoot);
-            solnRoot = limit;
+        if (!hasSortStage) {
+            // We don't have a sort stage. This means that, if there is a limit, we will have
+            // to enforce it ourselves since it's not handled inside SORT.
+            if (lpq.getLimit()) {
+                LimitNode* limit = new LimitNode();
+                limit->limit = *lpq.getLimit();
+                limit->children.push_back(solnRoot);
+                solnRoot = limit;
+            }
+            else if (!lpq.fromFindCommand() && lpq.getBatchSize() && !lpq.wantMore()) {
+                // We have a "legacy limit", i.e. a negative ntoreturn value from an OP_QUERY style
+                // find.
+                LimitNode* limit = new LimitNode();
+                limit->limit = *lpq.getBatchSize();
+                limit->children.push_back(solnRoot);
+                solnRoot = limit;
+            }
         }
 
         soln->root.reset(solnRoot);

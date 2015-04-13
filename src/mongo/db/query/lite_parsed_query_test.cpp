@@ -32,6 +32,8 @@
 
 #include "mongo/db/query/lite_parsed_query.h"
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional_io.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/json.h"
@@ -87,7 +89,7 @@ namespace {
                                               false, // explain
                                               &lpq);
         ASSERT_OK(result);
-        ASSERT_EQUALS(6, lpq->getNumToReturn());
+        ASSERT_EQUALS(6, lpq->getBatchSize());
         ASSERT(lpq->wantMore());
         delete lpq;
 
@@ -99,7 +101,7 @@ namespace {
                                        false, // explain
                                        &lpq);
         ASSERT_OK(result);
-        ASSERT_EQUALS(6, lpq->getNumToReturn());
+        ASSERT_EQUALS(6, lpq->getBatchSize());
         ASSERT(!lpq->wantMore());
         delete lpq;
     }
@@ -687,6 +689,34 @@ namespace {
         ASSERT_NOT_OK(status);
     }
 
+    TEST(LiteParsedQueryTest, ParseFromCommandBatchSizeZero) {
+        BSONObj cmdObj = fromjson("{find: 'testns', batchSize: 0}");
+
+        LiteParsedQuery* rawLpq;
+        const bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
+        ASSERT_OK(status);
+        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        ASSERT(lpq->getBatchSize());
+        ASSERT_EQ(0, lpq->getBatchSize());
+
+        ASSERT(!lpq->getLimit());
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandDefaultBatchSize) {
+        BSONObj cmdObj = fromjson("{find: 'testns'}");
+
+        LiteParsedQuery* rawLpq;
+        const bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
+        ASSERT_OK(status);
+        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        ASSERT(!lpq->getBatchSize());
+        ASSERT(!lpq->getLimit());
+    }
+
     //
     // Errors checked in LiteParsedQuery::validate().
     //
@@ -770,6 +800,32 @@ namespace {
         const bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseCommandIsFromFindCommand) {
+        BSONObj cmdObj = fromjson("{find: 'testns'}");
+
+        LiteParsedQuery* rawLpq;
+        const bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
+        ASSERT_OK(status);
+
+        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        ASSERT(lpq->fromFindCommand());
+    }
+
+    TEST(LiteParsedQueryTest, ParseCommandNotFromFindCommand) {
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", 5, 6, 9, BSON( "x" << 5 ), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              BSONObj(), BSONObj(),
+                                              false, // snapshot
+                                              false, // explain
+                                              &rawLpq);
+        ASSERT_OK(status);
+
+        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        ASSERT(!lpq->fromFindCommand());
     }
 
     TEST(LiteParsedQueryTest, ParseCommandAwaitDataButNotTailable) {

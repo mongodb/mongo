@@ -119,11 +119,11 @@ namespace {
         if (!lpq->getMax().isEmpty()) { query.minKey(lpq->getMax()); }
         if (lpq->isExplain()) { query.explain(); }
         if (lpq->isSnapshot()) { query.snapshot(); }
-        int nToReturn = lpq->wantMore() ? lpq->getLimit() : -lpq->getLimit();
+        int nToReturn = lpq->getLimit().value_or(0) * -1;
         int nToSkip = lpq->getSkip();
         const BSONObj* fieldsToReturn = &lpq->getProj();
         int queryOptions = lpq->getOptions();
-        int batchSize = lpq->getBatchSize();
+        int batchSize = lpq->getBatchSize().value_or(0);
 
         std::unique_ptr<DBClientCursor> cursor =
             conn->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
@@ -166,7 +166,8 @@ namespace {
         const GetMoreRequest& req = parseResult.getValue();
         const std::string& ns = req.nss.ns();
 
-        std::unique_ptr<DBClientCursor> cursor = conn->getMore(ns, req.cursorid, req.batchSize);
+        std::unique_ptr<DBClientCursor> cursor = conn->getMore(ns, req.cursorid,
+                                                               req.batchSize.value_or(0));
         cursor->decouple();
 
         Status status = getStatusFromCursorResult(*cursor);

@@ -43,18 +43,9 @@ namespace mongo {
     const char* QueryPlannerTest::ns = "somebogusns";
 
     void QueryPlannerTest::setUp() {
-        cq = NULL;
         internalQueryPlannerEnableHashIntersection = true;
         params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
         addIndex(BSON("_id" << 1));
-    }
-
-    void QueryPlannerTest::tearDown() {
-        delete cq;
-
-        for (std::vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
-            delete *it;
-        }
     }
 
     void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey) {
@@ -162,22 +153,19 @@ namespace mongo {
                                         const BSONObj& maxObj,
                                         bool snapshot) {
         // Clean up any previous state from a call to runQueryFull
-        delete cq;
-        cq = NULL;
+        solns.clear();
 
-        for (std::vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
-            delete *it;
+        {
+            CanonicalQuery* rawCq;
+            Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
+                                                    minObj, maxObj, snapshot,
+                                                    false, // explain
+                                                    &rawCq);
+            ASSERT_OK(s);
+            cq.reset(rawCq);
         }
 
-        solns.clear();
-        Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                                minObj, maxObj, snapshot,
-                                                false, // explain
-                                                &cq);
-        if (!s.isOK()) { cq = NULL; }
-        ASSERT_OK(s);
-        s = QueryPlanner::plan(*cq, params, &solns);
-        ASSERT_OK(s);
+        ASSERT_OK(QueryPlanner::plan(*cq, params, &solns.mutableVector()));
     }
 
     void QueryPlannerTest::runInvalidQuery(const BSONObj& query) {
@@ -227,22 +215,42 @@ namespace mongo {
                                                const BSONObj& minObj,
                                                const BSONObj& maxObj,
                                                bool snapshot) {
-        delete cq;
-        cq = NULL;
+        solns.clear();
 
-        for (std::vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
-            delete *it;
+        {
+            CanonicalQuery* rawCq;
+            Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
+                                                    minObj, maxObj, snapshot,
+                                                    false, // explain
+                                                    &rawCq);
+            ASSERT_OK(s);
+            cq.reset(rawCq);
         }
 
-        solns.clear();
-        Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                                minObj, maxObj, snapshot,
-                                                false, // explain
-                                                &cq);
-        if (!s.isOK()) { cq = NULL; }
-        ASSERT_OK(s);
-        s = QueryPlanner::plan(*cq, params, &solns);
+        Status s = QueryPlanner::plan(*cq, params, &solns.mutableVector());
         ASSERT_NOT_OK(s);
+    }
+
+    void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
+        solns.clear();
+
+        std::unique_ptr<LiteParsedQuery> lpq;
+        {
+            LiteParsedQuery* rawLpq;
+            const bool isExplain = false;
+            Status lpqStatus = LiteParsedQuery::make(ns, cmdObj, isExplain, &rawLpq);
+            ASSERT_OK(lpqStatus);
+            lpq.reset(rawLpq);
+
+            CanonicalQuery* rawCq;
+            WhereCallbackNoop whereCallback;
+            Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
+            ASSERT_OK(canonStatus);
+            cq.reset(rawCq);
+        }
+
+        Status s = QueryPlanner::plan(*cq, params, &solns.mutableVector());
+        ASSERT_OK(s);
     }
 
     size_t QueryPlannerTest::getNumSolutions() const {
@@ -256,10 +264,8 @@ namespace mongo {
     }
 
     void QueryPlannerTest::dumpSolutions(mongoutils::str::stream& ost) const {
-        for (std::vector<QuerySolution*>::const_iterator it = solns.begin();
-                it != solns.end();
-                ++it) {
-            ost << (*it)->toString() << '\n';
+        for (auto&& soln : solns) {
+            ost << soln->toString() << '\n';
         }
     }
 
@@ -277,10 +283,8 @@ namespace mongo {
     size_t QueryPlannerTest::numSolutionMatches(const std::string& solnJson) const {
         BSONObj testSoln = fromjson(solnJson);
         size_t matches = 0;
-        for (std::vector<QuerySolution*>::const_iterator it = solns.begin();
-                it != solns.end();
-                ++it) {
-            QuerySolutionNode* root = (*it)->root.get();
+        for (auto&& soln : solns) {
+            QuerySolutionNode* root = soln->root.get();
             if (QueryPlannerTestLib::solutionMatches(testSoln, root)) {
                 ++matches;
             }

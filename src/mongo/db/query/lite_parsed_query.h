@@ -29,6 +29,7 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/optional.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
@@ -117,12 +118,14 @@ namespace mongo {
         const BSONObj& getSort() const { return _sort; }
         const BSONObj& getHint() const { return _hint; }
 
+        static const int kDefaultBatchSize;
+
         int getSkip() const { return _skip; }
-        int getLimit() const { return _limit; }
-        int getBatchSize() const { return _batchSize; }
-        int getNumToReturn() const { return std::min(_limit, _batchSize); }
+        boost::optional<int> getLimit() const { return _limit; }
+        boost::optional<int> getBatchSize() const { return _batchSize; }
         bool wantMore() const { return _wantMore; }
 
+        bool fromFindCommand() const { return _fromCommand; }
         bool isExplain() const { return _explain; }
 
         const std::string& getComment() const { return _comment; }
@@ -225,10 +228,12 @@ namespace mongo {
         BSONObj _hint;
 
         int _skip;
-        int _limit;
-        int _batchSize;
         bool _wantMore;
 
+        boost::optional<int> _limit;
+        boost::optional<int> _batchSize;
+
+        bool _fromCommand;
         bool _explain;
 
         std::string _comment;

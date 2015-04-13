@@ -47,6 +47,7 @@ selector:
     - jstests/core/dbcase2.js  # SERVER-11735
     # TODO: SERVER-17284 remove once find cmd is implemented in mongos
     - jstests/core/read_after_optime.js
+    - jstests/core/find_getmore_cmd.js
 
 executor:
   js_test:

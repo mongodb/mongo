@@ -206,17 +206,16 @@ namespace mongo {
 
     // static
     size_t MultiPlanStage::getTrialPeriodNumToReturn(const CanonicalQuery& query) {
-        // We treat ntoreturn as though it is a limit during plan ranking.
-        // This means that ranking might not be great for sort + batchSize.
-        // But it also means that we don't buffer too much data for sort + limit.
-        // See SERVER-14174 for details.
-        size_t numToReturn = query.getParsed().getNumToReturn();
-
         // Determine the number of results which we will produce during the plan
         // ranking phase before stopping.
         size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults);
-        if (numToReturn > 0) {
-            numResults = std::min(numToReturn, numResults);
+        if (query.getParsed().getLimit()) {
+            numResults = std::min(static_cast<size_t>(*query.getParsed().getLimit()),
+                                  numResults);
+        }
+        else if (!query.getParsed().fromFindCommand() && query.getParsed().getBatchSize()) {
+            numResults = std::min(static_cast<size_t>(*query.getParsed().getBatchSize()),
+                                  numResults);
         }
 
         return numResults;

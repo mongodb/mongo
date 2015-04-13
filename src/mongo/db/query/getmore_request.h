@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -53,15 +54,16 @@ namespace mongo {
 
         const NamespaceString nss;
         const CursorId cursorid;
-        const int batchSize;
 
-        static const int kDefaultBatchSize;
+        // The batch size is optional. If not provided, we will put as many documents into the batch
+        // as fit within the byte limit.
+        const boost::optional<int> batchSize;
 
     private:
         /**
          * Construct from parsed BSON
          */
-        GetMoreRequest(const std::string& fullns, CursorId id, int batch);
+        GetMoreRequest(const std::string& fullns, CursorId id, boost::optional<int> batch);
 
         /**
          * Returns a non-OK status if there are semantic errors in the parsed request

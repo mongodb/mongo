@@ -346,7 +346,8 @@ namespace mongo {
                     nextBatch->append(obj);
                     (*numResults)++;
 
-                    if (enoughForGetMore(request.batchSize, *numResults, nextBatch->len())) {
+                    if (enoughForGetMore(request.batchSize.value_or(0),
+                                         *numResults, nextBatch->len())) {
                         break;
                     }
                 }

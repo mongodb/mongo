@@ -615,8 +615,18 @@ namespace {
 
     std::string CanonicalQuery::toString() const {
         str::stream ss;
-        ss << "ns=" << _pq->ns() << " limit=" << _pq->getNumToReturn()
-           << " skip=" << _pq->getSkip() << '\n';
+        ss << "ns=" << _pq->ns();
+
+        if (_pq->getBatchSize()) {
+            ss << " batchSize=" << *_pq->getBatchSize();
+        }
+
+        if (_pq->getLimit()) {
+            ss << " limit=" << *_pq->getLimit();
+        }
+
+        ss << " skip=" << _pq->getSkip() << "\n";
+
         // The expression tree puts an endl on for us.
         ss << "Tree: " << _root->toString();
         ss << "Sort: " << _pq->getSort().toString() << '\n';
@@ -629,8 +639,16 @@ namespace {
         ss << "query: " << _pq->getFilter().toString()
            << " sort: " << _pq->getSort().toString()
            << " projection: " << _pq->getProj().toString()
-           << " skip: " << _pq->getSkip()
-           << " limit: " << _pq->getNumToReturn();
+           << " skip: " << _pq->getSkip();
+
+        if (_pq->getBatchSize()) {
+            ss << " batchSize: " << *_pq->getBatchSize();
+        }
+
+        if (_pq->getLimit()) {
+            ss << " limit: " << *_pq->getLimit();
+        }
+
         return ss;
     }
 

@@ -116,10 +116,10 @@ namespace mongo {
      * results, or when the result set exceeds 4 MB.
      */
     bool enoughForFirstBatch(const LiteParsedQuery& pq, int numDocs, int bytesBuffered) {
-        if (0 == pq.getNumToReturn()) {
-            return (bytesBuffered > 1024 * 1024) || numDocs >= 101;
+        if (!pq.getBatchSize()) {
+            return (bytesBuffered > 1024 * 1024) || numDocs >= LiteParsedQuery::kDefaultBatchSize;
         }
-        return numDocs >= pq.getNumToReturn() || bytesBuffered > MaxBytesToReturnToClientAtOnce;
+        return numDocs >= *pq.getBatchSize() || bytesBuffered > MaxBytesToReturnToClientAtOnce;
     }
 
     bool enoughForGetMore(int ntoreturn, int numDocs, int bytesBuffered) {
@@ -148,7 +148,7 @@ namespace mongo {
             return false;
         }
 
-        if (pq.getNumToReturn() == 1) {
+        if (!pq.fromFindCommand() && pq.getBatchSize() && *pq.getBatchSize() == 1) {
             return false;
         }
 
@@ -655,7 +655,7 @@ namespace mongo {
 
             if (enoughForFirstBatch(pq, numResults, bb.len())) {
                 LOG(5) << "Enough for first batch, wantMore=" << pq.wantMore()
-                       << " numToReturn=" << pq.getNumToReturn()
+                       << " batchSize=" << pq.getBatchSize().value_or(0)
                        << " numResults=" << numResults
                        << endl;
                 break;

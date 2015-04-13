@@ -274,12 +274,9 @@ namespace QueryTests {
                 // Check internal server handoff to getmore.
                 OldClientWriteContext ctx(&_txn,  ns);
                 ClientCursorPin clientCursor( ctx.getCollection()->getCursorManager(), cursorId );
-                // pq doesn't exist if it's a runner inside of the clientcursor.
-                // ASSERT( clientCursor.c()->pq );
-                // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
                 ASSERT_EQUALS( 2, clientCursor.c()->pos() );
             }
-            
+
             cursor = _client.getMore( ns, cursorId );
             ASSERT( cursor->more() );
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );

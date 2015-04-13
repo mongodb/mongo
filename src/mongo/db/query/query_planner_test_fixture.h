@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/query_solution.h"
@@ -42,8 +44,6 @@ namespace mongo {
     class QueryPlannerTest : public mongo::unittest::Test {
     protected:
         void setUp();
-
-        void tearDown();
 
         //
         // Build up test.
@@ -141,6 +141,12 @@ namespace mongo {
                                  const BSONObj& maxObj,
                                  bool snapshot);
 
+        /**
+         * The other runQuery* methods run the query as through it is an OP_QUERY style find. This
+         * version goes through find command parsing, and will be planned like a find command.
+         */
+        void runQueryAsCommand(const BSONObj& cmdObj);
+
         //
         // Introspect solutions.
         //
@@ -181,9 +187,9 @@ namespace mongo {
         static const char* ns;
 
         BSONObj queryObj;
-        CanonicalQuery* cq;
+        std::unique_ptr<CanonicalQuery> cq;
         QueryPlannerParams params;
-        std::vector<QuerySolution*> solns;
+        OwnedPointerVector<QuerySolution> solns;
     };
 
 } // namespace mongo

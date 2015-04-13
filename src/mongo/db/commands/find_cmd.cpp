@@ -210,7 +210,8 @@ namespace mongo {
             }
 
             // Fill out curop information.
-            beginQueryOp(nss, cmdObj, lpq->getNumToReturn(), lpq->getSkip(), CurOp::get(txn));
+            int ntoreturn = lpq->getBatchSize().value_or(0);
+            beginQueryOp(nss, cmdObj, ntoreturn, lpq->getSkip(), CurOp::get(txn));
 
             // 1b) Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
             std::unique_ptr<CanonicalQuery> cq;
@@ -309,14 +310,11 @@ namespace mongo {
             BSONObj obj;
             PlanExecutor::ExecState state;
             int numResults = 0;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+            while (!enoughForFirstBatch(pq, numResults, firstBatch.len())
+                    && PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 // Add result to output buffer.
                 firstBatch.append(obj);
                 numResults++;
-
-                if (enoughForFirstBatch(pq, numResults, firstBatch.len())) {
-                    break;
-                }
             }
 
             // Throw an assertion if query execution fails for any reason.
