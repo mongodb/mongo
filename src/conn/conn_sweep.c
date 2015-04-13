@@ -59,38 +59,13 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 }
 
 /*
- * __sweep_able --
- *	Return if we can/should sweep this file.
- */
-static inline int
-__sweep_able(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
-{
-	WT_BTREE *btree;
-
-	btree = dhandle->handle;
-
-	/* Skip modified trees. */
-	if (btree->modified)
-		return (0);
-
-	/*
-	 * The close would require I/O if an update cannot be written (updates
-	 * in a no-longer-referenced file might not yet be globally visible if
-	 * sessions have disjoint sets of files open).  In that case, skip it:
-	 * we'll retry the close the next time, after the transaction state has
-	 * progressed.
-	 */
-	__wt_txn_update_oldest(session);
-	return (__wt_txn_visible_all(session, btree->rec_max_txn));
-}
-
-/*
  * __sweep --
  *	Close unused dhandles on the connection dhandle list.
  */
 static int
 __sweep(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -123,30 +98,21 @@ __sweep(WT_SESSION_IMPL *session)
 		}
 
 		/*
-		 * Ignore open files once the open file count reaches the
+		 * Ignore in-use files once the open file count reaches the
 		 * minimum number of handles.
 		 */
 		if (conn->open_file_count < conn->sweep_handles_min)
 			continue;
 
-		/* Check if a candidate for sweeping. */
-		if (!__sweep_able(session, dhandle))
-			continue;
-
-		/*
-		 * It can take a long time to push a big file out of cache, even
-		 * if all of the pages are clean, because we walk pages freeing
-		 * allocated memory. If the handle is open, evict the pages.
-		 */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			WT_WITH_DHANDLE(session, dhandle, ret =
-			    __wt_cache_op(session, NULL, WT_SYNC_CLOSE_SWEEP));
-			WT_RET_BUSY_OK(ret);
-		}
-
 		/*
 		 * We have a candidate for closing; if it's open, acquire an
 		 * exclusive lock on the handle and close it.
+		 *
+		 * The close would require I/O if an update cannot be written
+		 * (updates in a no-longer-referenced file might not yet be
+		 * globally visible if sessions have disjoint sets of files
+		 * open).  In that case, skip it: we'll retry the close the
+		 * next time, after the transaction state has progressed.
 		 *
 		 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want
 		 * opens to block on us rather than returning an EBUSY error to
@@ -157,11 +123,10 @@ __sweep(WT_SESSION_IMPL *session)
 			continue;
 		WT_RET(ret);
 
-		/*
-		 * We have exclusive access: confirm this file is a candidate
-		 * for sweeping.
-		 */
-		if (!__sweep_able(session, dhandle))
+		/* Only sweep clean trees where all updates are visible. */
+		btree = dhandle->handle;
+		if (btree->modified ||
+		    !__wt_txn_visible_all(session, btree->rec_max_txn))
 			goto unlock;
 
 		/* If the handle is open, try to close it. */
