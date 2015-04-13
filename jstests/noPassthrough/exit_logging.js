@@ -90,7 +90,7 @@
         });
         var mongosLauncher = {
             start: function (opts) {
-                var actualOpts = { configdb: st._configNames[0] }
+                var actualOpts = { configdb: st._configDB }
                 Object.extend(actualOpts, opts);
                 return MongoRunner.runMongos(actualOpts);
             },

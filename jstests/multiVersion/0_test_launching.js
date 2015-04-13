@@ -11,18 +11,25 @@ var versionsToCheck = [ "oldest-supported",
 for( var i = 0; i < versionsToCheck.length; i++ ){
 
     var version = versionsToCheck[ i ]
-    
-    var mongod = MongoRunner.runMongod({ binVersion : version })
-    var mongos = MongoRunner.runMongos({ binVersion : version, configdb : mongod })
+
+    var mongod1 = MongoRunner.runMongod({ binVersion : version });
+    var mongod2 = MongoRunner.runMongod({ binVersion : version });
+    var mongod3 = MongoRunner.runMongod({ binVersion : version });
+    var configdbStr = mongod1.host + "," + mongod2.host + "," + mongod3.host;
+    var mongos = MongoRunner.runMongos({ binVersion : version, configdb : configdbStr });
 
     // Make sure the started versions are actually the correct versions
-    assert.binVersion( mongod, version );
+    assert.binVersion( mongod1, version );
+    assert.binVersion( mongod2, version );
+    assert.binVersion( mongod3, version );
     assert.binVersion( mongos, version );
 
-    MongoRunner.stopMongos( mongos )
-    MongoRunner.stopMongod( mongod )
+    MongoRunner.stopMongos( mongos );
+    MongoRunner.stopMongod( mongod1 );
+    MongoRunner.stopMongod( mongod2 );
+    MongoRunner.stopMongod( mongod3 );
 }
-    
+
 jsTest.log( "Done!" )
 
 //

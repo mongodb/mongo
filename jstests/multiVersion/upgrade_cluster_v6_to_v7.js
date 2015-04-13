@@ -7,13 +7,11 @@ load( './jstests/multiVersion/libs/multi_cluster.js' )
 
 /**
  * @param isRSCluster {bool} use replica set shards.
- * @param isSyncCluster {bool} use 3 config servers.
  */
-var runTest = function(isRSCluster, isSyncCluster) {
+var runTest = function(isRSCluster) {
 "use strict";
 
-jsTest.log( "Starting" + ( isRSCluster ? " (replica set)" : "" ) + " cluster" + 
-                         ( isSyncCluster ? " (sync)" : "" ) + "..." );
+jsTest.log( "Starting" + ( isRSCluster ? " (replica set)" : "" ) + " cluster" + "..." );
 
 jsTest.log( "Starting 2.6 cluster..." );
 
@@ -25,7 +23,7 @@ var options = {
     
     rsOptions : { binVersion : "2.6" /*, oplogSize : 100, smallfiles : null */ },
 
-    sync : isSyncCluster,
+    sync: true, // Old clusters can't use replsets for config servers
     rs : isRSCluster
 }
 
@@ -143,7 +141,5 @@ st.stop();
 
 };
 
-runTest(false, false);
-runTest(false, true);
-runTest(true, false);
-runTest(true, true);
+runTest(false);
+runTest(true);

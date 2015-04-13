@@ -1,4 +1,4 @@
-s = new ShardingTest( "add_shard1", 1 );
+s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false });
 
 assert.eq( 1, s.config.shards.count(), "initial server count wrong" );
 

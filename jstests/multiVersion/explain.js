@@ -36,6 +36,7 @@ MongoRunner.stopMongod(mongod26.port);
 //
 
 options = {
+    sync: true, // Old clusters can't use replsets for config servers
     mongosOptions: {binVersion: "2.6"},
     configOptions: {binVersion: "2.6"},
     shardOptions: {binVersion: "2.6"}
@@ -79,6 +80,7 @@ st.stop();
 //
 
 options = {
+    sync: true, // Mixed version clusters can't use replsets for config servers
     mongosOptions: {binVersion: "2.8"},
     configOptions: {binVersion: "2.8"},
     shardOptions: {binVersion: "2.6"}
@@ -122,6 +124,7 @@ st.stop();
 //
 
 options = {
+    sync: true, // Mixed version clusters can't use replsets for config servers
     mongosOptions: {binVersion: "2.8"},
     configOptions: {binVersion: "2.8"},
     shardOptions: {binVersion: ["2.6", "2.8"]}

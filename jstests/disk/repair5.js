@@ -11,8 +11,7 @@ resetDbpath( repairpath );
 m = MongoRunner.runMongod({dbpath: dbpath,
                            repairpath: repairpath,
                            restart:true,
-                           cleanData: false, // Don't clean data so repair dir doesn't get removed
-                           bind_ip: "127.0.0.1"});
+                           cleanData: false}); // Don't clean data so repair dir doesn't get removed
 
 db = m.getDB( baseName );
 

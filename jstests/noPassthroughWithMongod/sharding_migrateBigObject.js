@@ -1,13 +1,7 @@
-var shardA = MongoRunner.runMongod({shardsvr: "", nopreallocj: ""});
-var shardB = MongoRunner.runMongod({shardsvr: "", nopreallocj: ""});
-var config = MongoRunner.runMongod({configsvr: "", nopreallocj: ""});
-var mongos = MongoRunner.runMongos({configdb : "localhost:" + config.port });
+var st = new ShardingTest({numShards: 2, nopreallocj: "", enableBalancer: true});
+var mongos = st.s;
 
 var admin = mongos.getDB("admin");
-
-admin.runCommand({ addshard : "localhost:" + shardA.port });
-admin.runCommand({ addshard : "localhost:" + shardB.port });
-
 db = mongos.getDB("test");
 var coll = db.getCollection("stuff")
 
@@ -45,8 +39,8 @@ assert.soon(
         // kill the server.  Do an explicit check for this. SERVER-8781
         // TODO: Remove once we can better specify what systems to run what tests on.
         try {
-            assert.commandWorked(shardA.getDB("admin").runCommand({ ping: 1 }));
-            assert.commandWorked(shardB.getDB("admin").runCommand({ ping: 1 }));
+            assert.commandWorked(st.shard0.getDB("admin").runCommand({ ping: 1 }));
+            assert.commandWorked(st.shard1.getDB("admin").runCommand({ ping: 1 }));
         }
         catch(e) {
             print("An error occurred contacting a shard during balancing," +
@@ -65,9 +59,4 @@ assert.soon(
     } , 
     "never migrated" , 10 * 60 * 1000 , 1000 );
 
-MongoRunner.stopMongos(mongos);
-MongoRunner.stopMongod(config);
-MongoRunner.stopMongod(shardA);
-MongoRunner.stopMongod(shardB);
-
-
+st.stop();

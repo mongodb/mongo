@@ -7,7 +7,11 @@ function setupTest() {
     port = allocatePorts( 1 )[ 0 ];
     baseName = "jstests_auth_auth1";
 
-    m = MongoRunner.runMongod({auth: "", port: port, nohttpinterface: "", bind_ip: "127.0.0.1"});
+    m = MongoRunner.runMongod({auth: "",
+                               port: port,
+                               nohttpinterface: "",
+                               bind_ip: "127.0.0.1",
+                               useHostname: false});
     return m;
 }
 

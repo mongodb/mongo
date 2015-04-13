@@ -266,11 +266,11 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({ auth: '' });
+var conn = MongoRunner.runMongod({ auth: '', useHostname: false });
 runTest(conn);
 MongoRunner.stopMongod(conn.port);
 
 jsTest.log('Test sharding');
-var st = new ShardingTest({ shards: 2, config: 3, keyFile: 'jstests/libs/key1' });
+var st = new ShardingTest({ shards: 2, config: 3, keyFile: 'jstests/libs/key1', useHostname: false });
 runTest(st.s);
 st.stop();

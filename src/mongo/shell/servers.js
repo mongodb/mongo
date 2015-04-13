@@ -493,7 +493,7 @@ MongoRunner.mongosOptions = function( opts ){
     }
     
     opts.pathOpts = Object.merge( opts.pathOpts, 
-                                { configdb : opts.configdb.replace( /:|,/g, "-" ) } )
+                                { configdb : opts.configdb.replace( /:|\/|,/g, "-" ) } )
     
     if( ! opts.logFile && opts.useLogFiles ){
         opts.logFile = MongoRunner.toRealFile( "$dataDir/mongos-$configdb-$port.log",
@@ -538,7 +538,7 @@ MongoRunner.mongosOptions = function( opts ){
 MongoRunner.runMongod = function( opts ){
     
     opts = opts || {}
-    var useHostName = false;
+    var useHostName = true;
     var runId = null;
     var waitForConnect = true;
     var fullOptions = opts;
@@ -547,8 +547,16 @@ MongoRunner.runMongod = function( opts ){
         
         opts = MongoRunner.mongodOptions( opts );
         fullOptions = opts;
-        
-        useHostName = opts.useHostName || opts.useHostname;
+
+        if (opts.useHostName != undefined) {
+            useHostName = opts.useHostName;
+        }
+        else if (opts.useHostname != undefined) {
+            useHostName = opts.useHostname;
+        }
+        else {
+            useHostName = true; // Default to true
+        }
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
         

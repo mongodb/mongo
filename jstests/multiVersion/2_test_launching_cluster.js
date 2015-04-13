@@ -20,6 +20,7 @@ for( var i = 0; i < versionsToCheck.length; i++ ){
     
     var st = new ShardingTest({ shards : 2, 
                                 mongos : 2,
+                                sync: true, // Old clusters can't use replsets for config servers
                                 other : { 
                                     mongosOptions : { binVersion : version },
                                     configOptions : { binVersion : version },

@@ -143,29 +143,33 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     // Get the options object returned by "getCmdLineOpts" when we spawn a mongos using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
-    function getBaseOptsObject() {
-
+    function getCmdLineOptsFromMongos(mongosOptions) {
         // Start mongod with no options
-        var baseMongod = MongoRunner.runMongod();
+        var baseMongod1 = MongoRunner.runMongod();
+        var baseMongod2 = MongoRunner.runMongod();
+        var baseMongod3 = MongoRunner.runMongod();
+        var configdbStr = baseMongod1.host + "," + baseMongod2.host + "," + baseMongod3.host;
 
-        // Start mongos with only the configdb option
-        var baseMongos = MongoRunner.runMongos({ configdb : baseMongod.host });
+        var options = Object.merge(mongosOptions, {configdb: configdbStr});
+        var baseMongos = MongoRunner.runMongos(options);
 
         // Get base command line opts.  Needed because the framework adds its own options
-        var getCmdLineOptsBaseMongos = baseMongos.adminCommand("getCmdLineOpts");
+        var getCmdLineOptsResult = baseMongos.adminCommand("getCmdLineOpts");
 
         // Remove the configdb option
-        delete getCmdLineOptsBaseMongos.parsed.sharding.configDB;
+        delete getCmdLineOptsResult.parsed.sharding.configDB;
 
         // Stop the mongod and mongos we used to get the options
-        MongoRunner.stopMongos(baseMongos.port);
-        MongoRunner.stopMongod(baseMongod.port);
+        MongoRunner.stopMongos(baseMongos);
+        MongoRunner.stopMongod(baseMongod1);
+        MongoRunner.stopMongod(baseMongod2);
+        MongoRunner.stopMongod(baseMongod3);
 
-        return getCmdLineOptsBaseMongos;
+        return getCmdLineOptsResult;
     }
 
     if (typeof getCmdLineOptsBaseMongos === "undefined") {
-        getCmdLineOptsBaseMongos = getBaseOptsObject();
+        getCmdLineOptsBaseMongos = getCmdLineOptsFromMongos({});
     }
 
     // Get base command line opts.  Needed because the framework adds its own options
@@ -182,17 +186,8 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     // Merge with the result that we expect
     expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
 
-    // Start mongod with no options
-    var mongod = MongoRunner.runMongod();
-
-    // Add configdb option
-    mongoRunnerConfig['configdb'] = mongod.host;
-
-    // Start mongos connected to mongod
-    var mongos = MongoRunner.runMongos(mongoRunnerConfig);
-
     // Get the parsed options
-    var getCmdLineOptsResult = mongos.adminCommand("getCmdLineOpts");
+    var getCmdLineOptsResult = getCmdLineOptsFromMongos(mongoRunnerConfig);
 
     // Delete port if we are not explicitly setting it, since it will change on multiple runs of the
     // test framework and cause false failures.
@@ -202,13 +197,6 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
         delete getCmdLineOptsResult.parsed.net.port;
     }
 
-    // Remove the configdb option
-    delete getCmdLineOptsResult.parsed.sharding.configDB;
-
     // Make sure the options are equal to what we expect
     assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
-
-    // Cleanup
-    MongoRunner.stopMongos(mongos.port);
-    MongoRunner.stopMongod(mongod.port);
 }
