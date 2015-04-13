@@ -48,9 +48,9 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	/*
 	 * The locking in this function is messy: the live system is locked when
 	 * we're called, by definition, but that lock may have been acquired by
-	 * our our caller or our caller's caller. If it's our caller's lock and
-	 * we can unlock it before returning (either before extending the file
-	 * or afterward, depending on the call used), then release_lock is set.
+	 * our caller or our caller's caller. If it's our caller's lock and we
+	 * can unlock it before returning (either before extending the file or
+	 * afterward, depending on the call used), then release_lock is set.
 	 *
 	 * If we unlock, but then find out we need a lock after all, re-acquire
 	 * the lock (and set release_lock so our caller knows to release it).
