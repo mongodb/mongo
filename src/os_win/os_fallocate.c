@@ -36,9 +36,21 @@ __wt_fallocate(
 {
 	WT_DECL_RET;
 	LARGE_INTEGER largeint;
+	wt_off_t size;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
+
+	WT_RET(__wt_filesize(session, fh, &size));
+
+	/*
+	 * If the new size is smaller then the current size,
+	 * then there is nothing to do since fallocate ignores
+	 * truncation requests.
+	 */
+	if ((offset + len) <= size) {
+		return (0);
+	}
 
 	largeint.QuadPart = offset + len;
 
@@ -47,10 +59,8 @@ __wt_fallocate(
 		WT_RET_MSG(session,
 		    __wt_errno(), "%s SetFilePointerEx error", fh->name);
 
-	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE) {
-		fh->size = fh->extend_size = len;
+	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE)
 		return (0);
-	}
 
 	WT_RET_MSG(session, __wt_errno(), "%s SetEndOfFile error", fh->name);
 }

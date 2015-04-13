@@ -28,8 +28,8 @@ BOOL CALLBACK _wt_init_once_callback(
 }
 
 /*
- * __wt_library_init --
- *	Some things to do, before we do anything else.
+ * __wt_once --
+ *	One-time initialization per process.
  */
 int
 __wt_once(void(*init_routine)(void))

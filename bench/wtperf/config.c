@@ -589,9 +589,10 @@ config_sanity(CONFIG *cfg)
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (EINVAL);
 	}
-	if (cfg->table_count < 1 || cfg->table_count > 99) {
+	/* The maximum is here to keep file name construction simple. */
+	if (cfg->table_count < 1 || cfg->table_count > 99999) {
 		fprintf(stderr,
-		    "invalid table count, less than 1 or greater than 99\n");
+		    "invalid table count, less than 1 or greater than 99999\n");
 		return (EINVAL);
 	}
 	if (cfg->database_count < 1 || cfg->database_count > 99) {

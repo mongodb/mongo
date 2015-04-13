@@ -152,9 +152,6 @@ main(int argc, char *argv[])
 	if (g.replay && SINGLETHREADED)
 		g.c_runs = 1;
 
-	/* Use line buffering on stdout so status updates aren't buffered. */
-	(void)setvbuf(stdout, NULL, _IOLBF, 32);
-
 	/*
 	 * Initialize locks to single-thread named checkpoints and backups, and
 	 * to single-thread last-record updates.
@@ -292,23 +289,13 @@ startup(void)
 	if (mkdir(g.home_kvs, 0777) != 0)
 		die(errno, "mkdir: %s", g.home_kvs);
 
-	/*
-	 * Open/truncate the logging file; line buffer so we see up-to-date
-	 * information on error.
-	 */
-	if (g.logging != 0) {
-		if ((g.logfp = fopen(g.home_log, "w")) == NULL)
-			die(errno, "fopen: %s", g.home_log);
-		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
-	}
+	/* Open/truncate the logging file. */
+	if (g.logging != 0 && (g.logfp = fopen(g.home_log, "w")) == NULL)
+		die(errno, "fopen: %s", g.home_log);
 
-	/*
-	 * Open/truncate the random number logging file; line buffer so we see
-	 * up-to-date information on error.
-	 */
+	/* Open/truncate the random number logging file. */
 	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
 		die(errno, "%s", g.home_rand);
-	(void)setvbuf(g.rand_log, NULL, _IOLBF, 32);
 }
 
 /*
