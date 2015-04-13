@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/fetcher.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
@@ -46,7 +47,7 @@
 namespace mongo {
 namespace repl {
 
-    class CollectionCloner {
+    class CollectionCloner : public BaseCloner {
         MONGO_DISALLOW_COPYING(CollectionCloner);
     public:
 
@@ -58,20 +59,14 @@ namespace repl {
         class StorageInterface;
 
         /**
-         * Fetcher callback function to report final status of collection cloning.
-         */
-        typedef stdx::function<void (const Status&)> CallbackFn;
-
-        /**
          * Type of function to schedule database work with the executor.
          *
          * Must be consistent with ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock().
          *
          * Used for testing only.
          */
-        typedef stdx::function<
-            StatusWith<ReplicationExecutor::CallbackHandle> (
-                const ReplicationExecutor::CallbackFn&)> ScheduleDbWorkFn;
+        using ScheduleDbWorkFn = stdx::function<StatusWith<ReplicationExecutor::CallbackHandle> (
+            const ReplicationExecutor::CallbackFn&)>;
 
         /**
          * Creates CollectionCloner task in inactive state. Use start() to activate cloner.
@@ -89,45 +84,23 @@ namespace repl {
                          const CallbackFn& work,
                          StorageInterface* storageInterface);
 
-        virtual ~CollectionCloner();
+        virtual ~CollectionCloner() = default;
 
-        /**
-         * Returns diagnostic information.
-         */
-        std::string getDiagnosticString() const;
+        const NamespaceString& getSourceNamespace() const;
 
-        /**
-         * Returns true if the cloner has been started (but has not completed).
-         */
-        bool isActive() const;
+        std::string getDiagnosticString() const override;
 
-        /**
-         * Starts collection cloning by scheduling initial command to be run by the executor.
-         */
-        Status start();
+        bool isActive() const override;
 
-        /**
-         * Cancels current remote command request.
-         * Returns immediately if collection cloner is not active.
-         *
-         * If the cloner is canceled after start() has been called, '_work' will be invoked
-         * with a ErrorCodes::CallbackCanceled status.
-         */
-        void cancel();
+        Status start() override;
+
+        void cancel() override;
 
         //
         // Testing only functions below.
         //
 
-        /**
-         * Waits for active remote commands and database worker to complete.
-         * Returns immediately if collection cloner is not active.
-         *
-         * TODO: Internal state not sufficiently protected for production use.
-         *
-         * For testing only.
-         */
-        void wait();
+        void wait() override;
 
         /**
          * Waits for database worker to complete.
@@ -142,7 +115,7 @@ namespace repl {
          *
          * For testing only.
          */
-        void setScheduleDbWorkFn(ScheduleDbWorkFn scheduleDbWorkFn);
+        void setScheduleDbWorkFn(const ScheduleDbWorkFn& scheduleDbWorkFn);
 
     private:
 
@@ -193,7 +166,7 @@ namespace repl {
         // Owned by us.
         std::unique_ptr<StorageInterface> _storageInterface;
 
-        // Protects member data of this Fetcher.
+        // Protects member data of this collection cloner.
         mutable boost::mutex _mutex;
 
         // _active is true when Collection Cloner is started.
@@ -232,7 +205,7 @@ namespace repl {
         /**
          * When the storage interface is destroyed, it will commit the index builder.
          */
-        virtual ~StorageInterface();
+        virtual ~StorageInterface() = default;
 
         /**
          * Creates a collection with the provided indexes.

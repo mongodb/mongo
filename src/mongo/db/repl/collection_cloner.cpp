@@ -83,11 +83,14 @@ namespace repl {
         uassert(ErrorCodes::BadValue, "null replication executor", executor);
         uassert(ErrorCodes::BadValue, "invalid collection namespace: " + sourceNss.ns(),
                 sourceNss.isValid());
-        uassert(ErrorCodes::BadValue, "null storage interface", storageInterface);
         uassertStatusOK(options.validate());
+        uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
+        uassert(ErrorCodes::BadValue, "null storage interface", storageInterface);
     }
 
-    CollectionCloner::~CollectionCloner() { }
+    const NamespaceString& CollectionCloner::getSourceNamespace() const {
+        return _sourceNss;
+    }
 
     std::string CollectionCloner::getDiagnosticString() const {
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -172,7 +175,7 @@ namespace repl {
         }
     }
 
-    void CollectionCloner::setScheduleDbWorkFn(ScheduleDbWorkFn scheduleDbWorkFn) {
+    void CollectionCloner::setScheduleDbWorkFn(const ScheduleDbWorkFn& scheduleDbWorkFn) {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         _scheduleDbWorkFn = scheduleDbWorkFn;
@@ -292,8 +295,6 @@ namespace repl {
 
         _work(Status::OK());
     }
-
-    CollectionCloner::StorageInterface::~StorageInterface() { }
 
 } // namespace repl
 } // namespace mongo

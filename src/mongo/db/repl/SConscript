@@ -326,6 +326,6 @@ env.CppUnitTest(
     source='collection_cloner_test.cpp',
     LIBDEPS=[
         'collection_cloner',
-        'replication_executor_test_fixture',
+        'base_cloner_test_fixture',
     ],
 )
