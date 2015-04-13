@@ -25,9 +25,9 @@ function runTest(test) {
 
     // Setup
     // Enable sharding, set primary shard and shard collection
-    db.adminCommand({enableSharding: dbName});
+    assert.commandWorked(db.adminCommand({enableSharding: dbName}));
     db.adminCommand({movePrimary: dbName, to: 'shard0000'});
-    db.adminCommand({shardCollection: coll + "", key: {x: 1}});
+    assert.commandWorked(db.adminCommand({shardCollection: coll + "", key: {x: 1}}));
 
     // Pre-split, move chunks & create tags
     for (var i = 0; i < test.shards.length; i++) {

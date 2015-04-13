@@ -72,6 +72,13 @@ namespace mongo {
 
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName);
 
+        virtual Status updateCollection(const std::string& collNs, const CollectionType& coll);
+
+        virtual StatusWith<CollectionType> getCollection(const std::string& collNs);
+
+        virtual Status getCollections(const std::string* dbName,
+                                      std::vector<CollectionType>* collections);
+
         virtual Status dropCollection(const std::string& collectionNs);
 
         virtual void getDatabasesForShard(const std::string& shardName,

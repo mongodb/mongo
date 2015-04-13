@@ -39,7 +39,6 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/type_collection.h"
 
 namespace mongo {
 

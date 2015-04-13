@@ -39,12 +39,12 @@
 #include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
-#include "mongo/s/type_collection.h"
 #include "mongo/util/log.h"
 
 namespace ShardingTests {
@@ -259,17 +259,15 @@ namespace ShardingTests {
                                                           ChunkType::DEPRECATED_lastmod());
 
             // Make manager load existing chunks
-            BSONObjBuilder collDocBuilder;
-            collDocBuilder << CollectionType::ns(collName());
-            collDocBuilder << CollectionType::keyPattern(BSON( "_id" << 1 ));
-            collDocBuilder << CollectionType::unique(false);
-            collDocBuilder << CollectionType::dropped(false);
-            collDocBuilder << CollectionType::DEPRECATED_lastmod(jsTime());
-            collDocBuilder << CollectionType::DEPRECATED_lastmodEpoch(version.epoch());
+            CollectionType collType;
+            collType.setNs(collName());
+            collType.setEpoch(version.epoch());
+            collType.setUpdatedAt(jsTime());
+            collType.setKeyPattern(BSON("_id" << 1));
+            collType.setUnique(false);
+            collType.setDropped(false);
 
-            BSONObj collDoc(collDocBuilder.done());
-
-            ChunkManager manager(collDoc);
+            ChunkManager manager(collType);
             manager.loadExistingRanges(shard().getConnString(), NULL);
 
             ASSERT(manager.getVersion().epoch() == version.epoch());

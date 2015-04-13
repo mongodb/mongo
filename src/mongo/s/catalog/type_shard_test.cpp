@@ -40,19 +40,19 @@ namespace {
 
     using std::string;
 
-    TEST(Validity, MissingName) {
+    TEST(ShardType, MissingName) {
         BSONObj obj = BSON(ShardType::host("localhost:27017"));
         StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
         ASSERT_FALSE(shardRes.isOK());
     }
 
-    TEST(Validity, MissingHost) {
+    TEST(ShardType, MissingHost) {
         BSONObj obj = BSON(ShardType::name("shard0000"));
         StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
         ASSERT_FALSE(shardRes.isOK());
     }
 
-    TEST(Validity, OnlyMandatory) {
+    TEST(ShardType, OnlyMandatory) {
         BSONObj obj = BSON(ShardType::name("shard0000") <<
                            ShardType::host("localhost:27017"));
         StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
@@ -61,7 +61,7 @@ namespace {
         ASSERT(shard.validate().isOK());
     }
 
-    TEST(Validity, AllOptionalsPresent) {
+    TEST(ShardType, AllOptionalsPresent) {
         BSONObj obj = BSON(ShardType::name("shard0000") <<
                            ShardType::host("localhost:27017") <<
                            ShardType::draining(true) <<
@@ -72,7 +72,7 @@ namespace {
         ASSERT(shard.validate().isOK());
     }
 
-    TEST(Validity, MaxSizeAsFloat) {
+    TEST(ShardType, MaxSizeAsFloat) {
         BSONObj obj = BSON(ShardType::name("shard0000") <<
                            ShardType::host("localhost:27017") <<
                            ShardType::maxSize() << 100.0);
@@ -82,7 +82,7 @@ namespace {
         ASSERT(shard.validate().isOK());
     }
 
-    TEST(Validity, BadType) {
+    TEST(ShardType, BadType) {
         BSONObj obj = BSON(ShardType::name() << 0);
         StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
         ASSERT_FALSE(shardRes.isOK());

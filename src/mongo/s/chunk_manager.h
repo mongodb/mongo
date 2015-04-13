@@ -40,6 +40,7 @@ namespace mongo {
 
     class CanonicalQuery;
     class ChunkManager;
+    class CollectionType;
     struct QuerySolutionNode;
 
     typedef boost::shared_ptr<ChunkManager> ChunkManagerPtr;
@@ -114,7 +115,7 @@ namespace mongo {
         typedef std::map<std::string, ChunkVersion> ShardVersionMap;
 
         // Loads a new chunk manager from a collection document
-        ChunkManager( const BSONObj& collDoc );
+        explicit ChunkManager(const CollectionType& coll);
 
         // Creates an empty chunk manager for the namespace
         ChunkManager( const std::string& ns, const ShardKeyPattern& pattern, bool unique );
@@ -202,8 +203,6 @@ namespace mongo {
 
         ChunkVersion getVersion(const std::string& shardName) const;
         ChunkVersion getVersion() const;
-
-        void getInfo( BSONObjBuilder& b ) const;
 
         void _printChunks() const;
 

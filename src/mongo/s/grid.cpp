@@ -38,7 +38,6 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config.h"
-#include "mongo/s/type_collection.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -147,25 +146,6 @@ namespace mongo {
         }
 
         return shouldBalance(balSettings);
-    }
-
-    bool Grid::getCollShouldBalance(const std::string& ns) const {
-        BSONObj collDoc;
-        ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-
-        try {
-            collDoc = conn->findOne(CollectionType::ConfigNS, BSON(CollectionType::ns(ns)));
-            conn.done();
-        }
-        catch (const DBException& e){
-            conn.kill();
-            warning() << "could not determine whether balancer should be running, error getting"
-                      << "config data from " << conn.getHost() << causedBy(e) << endl;
-            // if anything goes wrong, we shouldn't try balancing
-            return false;
-        }
-
-        return !collDoc[CollectionType::noBalance()].trueValue();
     }
 
     bool Grid::_inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now ) {

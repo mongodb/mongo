@@ -33,7 +33,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/type_mongos.h"
-#include "mongo/s/type_collection.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/unittest/unittest.h"

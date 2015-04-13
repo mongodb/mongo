@@ -38,6 +38,7 @@
 namespace mongo {
 
     class ChunkManager;
+    class CollectionType;
     class ConfigServer;
     class DatabaseType;
     class DBConfig;
@@ -46,13 +47,15 @@ namespace mongo {
 
     extern ConfigServer& configServer;
 
+
     struct CollectionInfo {
+
         CollectionInfo() {
             _dirty = false;
             _dropped = false;
         }
 
-        CollectionInfo(const BSONObj& in);
+        CollectionInfo(const CollectionType& in);
         ~CollectionInfo();
 
         bool isSharded() const {

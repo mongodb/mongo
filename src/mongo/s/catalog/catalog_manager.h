@@ -42,6 +42,7 @@ namespace mongo {
     struct BSONArray;
     class BSONObj;
     class ChunkType;
+    class CollectionType;
     class ConnectionString;
     class DatabaseType;
     class OperationContext;
@@ -92,7 +93,7 @@ namespace mongo {
          * @param fieldsAndOrder: shardKey pattern
          * @param unique: if true, ensure underlying index enforces a unique constraint.
          * @param initPoints: create chunks based on a set of specified split points.
-         * @param initShards: if NULL, use primary shard as lone shard for DB.
+         * @param initShards: if nullptr, use primary shard as lone shard for DB.
          *
          * WARNING: It's not completely safe to place initial chunks onto non-primary
          *          shards using this method because a conflict may result if multiple map-reduce
@@ -103,7 +104,7 @@ namespace mongo {
                                        const ShardKeyPattern& fieldsAndOrder,
                                        bool unique,
                                        std::vector<BSONObj>* initPoints,
-                                       std::vector<Shard>* initShards = NULL) = 0;
+                                       std::vector<Shard>* initShards = nullptr) = 0;
 
         /**
          *
@@ -137,8 +138,8 @@ namespace mongo {
          * metadata and sets the specified shard as primary.
          *
          * @param dbName name of the database (case sensitive)
-         * @param shard Optional shard to use as primary. If NULL is specified, one will be picked
-         *      by the system.
+         * @param shard Optional shard to use as primary. If nullptr is specified, one will be
+         *      picked by the system.
          *
          * Returns Status::OK on success or any error code indicating the failure. These are some
          * of the known failures:
@@ -149,8 +150,7 @@ namespace mongo {
         virtual Status createDatabase(const std::string& dbName, const Shard* shard) = 0;
 
         /**
-         * Updates the metadata for a given database. Currently, if the specified DB entry does
-         * not exist, it will be created.
+         * Updates or creates the metadata for a given database.
          */
         virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db) = 0;
 
@@ -166,6 +166,34 @@ namespace mongo {
         virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName) = 0;
 
         /**
+         * Updates or creates the metadata for a given collection.
+         */
+        virtual Status updateCollection(const std::string& collNs, const CollectionType& coll) = 0;
+
+        /**
+         * Retrieves the metadata for a given collection, if it exists.
+         *
+         * @param collectionNs fully qualified name of the collection (case sensitive)
+         *
+         * Returns Status::OK along with the collection information or any error code indicating
+         * the failure. These are some of the known failures:
+         *  - NamespaceNotFound - collection does not exist
+         */
+        virtual StatusWith<CollectionType> getCollection(const std::string& collNs) = 0;
+
+        /**
+         * Retrieves all collections undera specified database (or in the system).
+         *
+         * @param dbName an optional database name. Must be nullptr or non-empty. If nullptr is
+         *      specified, all collections on the system are returned.
+         * @param collections variable to receive the set of collections.
+         *
+         * Returns a !OK status if an error occurs.
+         */
+        virtual Status getCollections(const std::string* dbName,
+                                      std::vector<CollectionType>* collections) = 0;
+
+        /**
          * Drops the specified collection from the collection metadata store.
          *
          * Returns Status::OK if successful or any error code indicating the failure. These are
@@ -176,6 +204,7 @@ namespace mongo {
 
         /**
          * Retrieves all databases for a shard.
+         *
          * Returns a !OK status if an error occurs.
          */
         virtual void getDatabasesForShard(const std::string& shardName,
@@ -245,7 +274,7 @@ namespace mongo {
          *       class and externally for writes to the admin/config namespaces.
          *
          * @param request Request to be sent to the config server.
-         * @param response Out parameter to receive the response. Can be NULL.
+         * @param response Out parameter to receive the response. Can be nullptr.
          */
         virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
                                              BatchedCommandResponse* response) = 0;

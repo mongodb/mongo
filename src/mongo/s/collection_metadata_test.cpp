@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
@@ -33,35 +35,20 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/metadata_loader.h"
-#include "mongo/s/type_collection.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace {
 
+    using namespace mongo;
+
     using boost::scoped_ptr;
-    using mongo::BSONObj;
-    using mongo::BSONArray;
-    using mongo::ChunkType;
-    using mongo::ConnectionString;
-    using mongo::CollectionMetadata;
-    using mongo::CollectionType;
-    using mongo::Date_t;
-    using mongo::HostAndPort;
-    using mongo::KeyRange;
-    using mongo::MAXKEY;
-    using mongo::MetadataLoader;
-    using mongo::MINKEY;
-    using mongo::OID;
-    using mongo::ChunkVersion;
-    using mongo::MockConnRegistry;
-    using mongo::MockRemoteDBServer;
-    using mongo::RangeVector;
-    using mongo::Status;
     using std::auto_ptr;
     using std::make_pair;
     using std::string;
@@ -79,13 +66,12 @@ namespace {
             OID epoch = OID::gen();
 
             CollectionType collType;
-            collType.setNS( "test.foo" );
+            collType.setNs( "test.foo" );
             collType.setKeyPattern( BSON("a" << 1) );
             collType.setUnique( false );
             collType.setUpdatedAt( 1ULL );
             collType.setEpoch( epoch );
-            string errMsg;
-            ASSERT( collType.isValid( &errMsg ) );
+            ASSERT_OK(collType.validate());
 
             _dummyConfig->insert( CollectionType::ConfigNS, collType.toBSON() );
 
@@ -98,18 +84,22 @@ namespace {
             chunkType.setMax( BSON( "a" << MAXKEY ) );
             chunkType.setVersion( ChunkVersion( 1, 0, epoch ) );
             chunkType.setName( OID::gen().toString() );
-            ASSERT(chunkType.validate().isOK());
+            ASSERT_OK(collType.validate());
 
             _dummyConfig->insert( ChunkType::ConfigNS, chunkType.toBSON() );
 
-            ConnectionString configLoc = ConnectionString( HostAndPort(CONFIG_HOST_PORT) );
-            MetadataLoader loader( configLoc );
+            ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
+            ASSERT(configLoc.isValid());
+            CatalogManagerLegacy catalogManager;
+            catalogManager.init(configLoc);
 
-            Status status = loader.makeCollectionMetadata( "test.foo",
-                                                           "shard0000",
-                                                           NULL,
-                                                           &_metadata );
-            ASSERT( status.isOK() );
+            MetadataLoader loader(configLoc);
+            Status status = loader.makeCollectionMetadata(&catalogManager,
+                                                          "test.foo",
+                                                          "shard0000",
+                                                          NULL,
+                                                          &_metadata);
+            ASSERT_OK(status);
             ASSERT_EQUALS( 0u, _metadata.getNumChunks() );
         }
 
@@ -483,12 +473,13 @@ namespace {
             OID epoch = OID::gen();
             ChunkVersion chunkVersion = ChunkVersion( 1, 0, epoch );
 
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                    CollectionType::keyPattern(BSON("a" << 1)) <<
-                    CollectionType::unique(false) <<
-                    CollectionType::updatedAt(1ULL) <<
-                    CollectionType::epoch(epoch));
-            _dummyConfig->insert( CollectionType::ConfigNS, collFoo );
+            CollectionType collType;
+            collType.setNs("test.foo");
+            collType.setKeyPattern(BSON("a" << 1));
+            collType.setUnique(false);
+            collType.setUpdatedAt(1ULL);
+            collType.setEpoch(epoch);
+            _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
             BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_10") <<
                     ChunkType::ns("test.foo") <<
@@ -499,14 +490,18 @@ namespace {
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
 
-            ConnectionString configLoc( (HostAndPort(CONFIG_HOST_PORT)) );
-            MetadataLoader loader( configLoc );
+            ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
+            ASSERT(configLoc.isValid());
+            CatalogManagerLegacy catalogManager;
+            catalogManager.init(configLoc);
 
-            Status status = loader.makeCollectionMetadata( "test.foo",
-                                                           "shard0000",
-                                                           NULL,
-                                                           &_metadata );
-            ASSERT( status.isOK() );
+            MetadataLoader loader(configLoc);
+            Status status = loader.makeCollectionMetadata(&catalogManager,
+                                                          "test.foo",
+                                                          "shard0000",
+                                                          NULL,
+                                                          &_metadata);
+            ASSERT_OK(status);
         }
 
         void tearDown() {
@@ -826,12 +821,13 @@ namespace {
             OID epoch = OID::gen();
             ChunkVersion chunkVersion = ChunkVersion( 1, 0, epoch );
 
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                    CollectionType::keyPattern(BSON("a" << 1)) <<
-                    CollectionType::unique(false) <<
-                    CollectionType::updatedAt(1ULL) <<
-                    CollectionType::epoch(epoch));
-            _dummyConfig->insert( CollectionType::ConfigNS, collFoo );
+            CollectionType collType;
+            collType.setNs("test.foo");
+            collType.setKeyPattern(BSON("a" << 1));
+            collType.setUnique(false);
+            collType.setUpdatedAt(1ULL);
+            collType.setEpoch(epoch);
+            _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
             BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
                     ChunkType::ns("test.foo") <<
@@ -842,14 +838,18 @@ namespace {
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
 
-            ConnectionString configLoc((HostAndPort(CONFIG_HOST_PORT)));
-            MetadataLoader loader( configLoc );
+            ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
+            ASSERT(configLoc.isValid());
+            CatalogManagerLegacy catalogManager;
+            catalogManager.init(configLoc);
 
-            Status status = loader.makeCollectionMetadata( "test.foo",
-                                                           "shard0000",
-                                                           NULL,
-                                                           &_metadata );
-            ASSERT( status.isOK() );
+            MetadataLoader loader(configLoc);
+            Status status = loader.makeCollectionMetadata(&catalogManager,
+                                                          "test.foo",
+                                                          "shard0000",
+                                                          NULL,
+                                                          &_metadata);
+            ASSERT_OK(status);
         }
 
         void tearDown() {
@@ -889,12 +889,13 @@ namespace {
             OID epoch = OID::gen();
             ChunkVersion chunkVersion = ChunkVersion( 1, 0, epoch );
 
-            BSONObj collFoo = BSON(CollectionType::ns("test.foo") <<
-                    CollectionType::keyPattern(BSON("a" << 1)) <<
-                    CollectionType::unique(false) <<
-                    CollectionType::updatedAt(1ULL) <<
-                    CollectionType::epoch(epoch));
-            _dummyConfig->insert( CollectionType::ConfigNS, collFoo );
+            CollectionType collType;
+            collType.setNs("test.foo");
+            collType.setKeyPattern(BSON("a" << 1));
+            collType.setUnique(false);
+            collType.setUpdatedAt(1ULL);
+            collType.setEpoch(epoch);
+            _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
             _dummyConfig->insert( ChunkType::ConfigNS, BSON(ChunkType::name("test.foo-a_10") <<
                     ChunkType::ns("test.foo") <<
@@ -912,14 +913,18 @@ namespace {
                     ChunkType::DEPRECATED_epoch(epoch) <<
                     ChunkType::shard("shard0000")) );
 
-            ConnectionString configLoc((HostAndPort(CONFIG_HOST_PORT)));
-            MetadataLoader loader( configLoc );
+            ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
+            ASSERT(configLoc.isValid());
+            CatalogManagerLegacy catalogManager;
+            catalogManager.init(configLoc);
 
-            Status status = loader.makeCollectionMetadata( "test.foo",
-                                                           "shard0000",
-                                                           NULL,
-                                                           &_metadata );
-            ASSERT( status.isOK() );
+            MetadataLoader loader(configLoc);
+            Status status = loader.makeCollectionMetadata(&catalogManager,
+                                                          "test.foo",
+                                                          "shard0000",
+                                                          NULL,
+                                                          &_metadata);
+            ASSERT_OK(status);
         }
 
         void tearDown() {
@@ -1153,14 +1158,17 @@ namespace {
             mongo::ConnectionString::setConnectionHook( MockConnRegistry::get()->getConnStrHook() );
             MockConnRegistry::get()->addServer( _dummyConfig.get() );
 
-            OID epoch( OID::gen() );
+            OID epoch(OID::gen());
 
-            _dummyConfig->insert( CollectionType::ConfigNS, BSON(CollectionType::ns("x.y") <<
-                    CollectionType::dropped(false) <<
-                    CollectionType::keyPattern(BSON("a" << 1)) <<
-                    CollectionType::unique(false) <<
-                    CollectionType::updatedAt(1ULL) <<
-                    CollectionType::epoch(epoch)) );
+            {
+                CollectionType collType;
+                collType.setNs("x.y");
+                collType.setKeyPattern(BSON("a" << 1));
+                collType.setUnique(false);
+                collType.setUpdatedAt(1ULL);
+                collType.setEpoch(epoch);
+                _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
+            }
 
             {
                 ChunkVersion version( 1, 1, epoch );
@@ -1195,14 +1203,18 @@ namespace {
                         ChunkType::shard("shard0000")) );
             }
 
-            ConnectionString configLoc((HostAndPort(CONFIG_HOST_PORT)));
-            MetadataLoader loader( configLoc );
+            ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
+            ASSERT(configLoc.isValid());
+            CatalogManagerLegacy catalogManager;
+            catalogManager.init(configLoc);
 
-            Status status = loader.makeCollectionMetadata( "test.foo",
-                                                           "shard0000",
-                                                           NULL,
-                                                           &_metadata );
-            ASSERT( status.isOK() );
+            MetadataLoader loader(configLoc);
+            Status status = loader.makeCollectionMetadata(&catalogManager,
+                                                          "test.foo",
+                                                          "shard0000",
+                                                          NULL,
+                                                          &_metadata);
+            ASSERT_OK(status);
         }
 
         void tearDown() {

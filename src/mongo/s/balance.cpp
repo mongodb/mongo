@@ -45,6 +45,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
@@ -52,7 +53,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/type_collection.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_tags.h"
@@ -292,55 +292,29 @@ namespace mongo {
         }        
     }
 
-    void Balancer::_doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks ) {
-        verify( candidateChunks );
+    void Balancer::_doBalanceRound(DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks) {
+        invariant(candidateChunks);
 
-        //
-        // 1. Check whether there is any sharded collection to be balanced by querying
-        // the ShardsNS::collections collection
-        //
-
-        auto_ptr<DBClientCursor> cursor = conn.query(CollectionType::ConfigNS, BSONObj());
-
-        if ( NULL == cursor.get() ) {
-            warning() << "could not query " << CollectionType::ConfigNS
-                      << " while trying to balance" << endl;
+        vector<CollectionType> collections;
+        Status collsStatus = grid.catalogManager()->getCollections(nullptr, &collections);
+        if (!collsStatus.isOK()) {
+            warning() << "Failed to retrieve the set of collections during balancing round "
+                      << collsStatus;
             return;
         }
 
-        vector< string > collections;
-        while ( cursor->more() ) {
-            BSONObj col = cursor->nextSafe();
-
-            // sharded collections will have a shard "key".
-            if ( ! col[CollectionType::keyPattern()].eoo() &&
-                 ! col[CollectionType::noBalance()].trueValue() ){
-                collections.push_back( col[CollectionType::ns()].String() );
-            }
-            else if( col[CollectionType::noBalance()].trueValue() ){
-                LOG(1) << "not balancing collection " << col[CollectionType::ns()].String()
-                       << ", explicitly disabled" << endl;
-            }
-
-        }
-        cursor.reset();
-
-        if ( collections.empty() ) {
-            LOG(1) << "no collections to balance" << endl;
+        if (collections.empty()) {
+            LOG(1) << "no collections to balance";
             return;
         }
 
-        //
-        // 2. Get a list of all the shards that are participating in this balance round
-        // along with any maximum allowed quotas and current utilization. We get the
-        // latter by issuing db.serverStatus() (mem.mapped) to all shards.
+        // Get a list of all the shards that are participating in this balance round along with any
+        // maximum allowed quotas and current utilization. We get the latter by issuing
+        // db.serverStatus() (mem.mapped) to all shards.
         //
         // TODO: skip unresponsive shards and mark information as stale.
-        //
-
         ShardInfoMap shardInfo;
         Status loadStatus = DistributionStatus::populateShardInfoMap(&shardInfo);
-
         if (!loadStatus.isOK()) {
             warning() << "failed to load shard metadata" << causedBy(loadStatus);
             return;
@@ -353,16 +327,20 @@ namespace mongo {
         
         OCCASIONALLY warnOnMultiVersion( shardInfo );
 
-        //
-        // 3. For each collection, check if the balancing policy recommends moving anything around.
-        //
+        // For each collection, check if the balancing policy recommends moving anything around.
+        for (const auto& coll : collections) {
+            // Skip collections for which balancing is disabled
+            const string& ns = coll.getNs();
 
-        for (vector<string>::const_iterator it = collections.begin(); it != collections.end(); ++it ) {
-            const string& ns = *it;
+            if (!coll.getAllowBalance()) {
+                LOG(1) << "Not balancing collection " << ns << "; explicitly disabled.";
+                continue;
+            }
 
             OwnedPointerMap<string, OwnedPointerVector<ChunkType> > shardToChunksMap;
-            cursor = conn.query(ChunkType::ConfigNS,
-                                QUERY(ChunkType::ns(ns)).sort(ChunkType::min()));
+            auto_ptr<DBClientCursor> cursor =
+                                    conn.query(ChunkType::ConfigNS,
+                                               QUERY(ChunkType::ns(ns)).sort(ChunkType::min()));
 
             set<BSONObj> allChunkMinimums;
 
@@ -375,6 +353,7 @@ namespace mongo {
                             << ": " << chunkRes.getStatus().reason();
                     return;
                 }
+
                 auto_ptr<ChunkType> chunk(new ChunkType());
                 chunkRes.getValue().cloneTo(chunk.get());
 
@@ -473,13 +452,15 @@ namespace mongo {
                 break;
             }
 
-            if ( didAnySplits ) {
+            if (didAnySplits) {
                 // state change, just wait till next round
                 continue;
             }
 
-            CandidateChunk* p = _policy->balance( ns, status, _balancedLastTime );
-            if ( p ) candidateChunks->push_back( CandidateChunkPtr( p ) );
+            CandidateChunk* p = _policy->balance(ns, status, _balancedLastTime);
+            if (p) {
+                candidateChunks->push_back(CandidateChunkPtr(p));
+            }
         }
     }
 

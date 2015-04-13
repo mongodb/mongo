@@ -36,6 +36,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"

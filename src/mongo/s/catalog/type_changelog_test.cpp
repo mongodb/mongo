@@ -39,7 +39,7 @@ namespace {
     using mongo::BSONObj;
     using mongo::Date_t;
 
-    TEST(Validity, Empty) {
+    TEST(ChangelogType, Empty) {
         ChangelogType logEntry;
         BSONObj emptyObj = BSONObj();
         string errMsg;
@@ -48,7 +48,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, Valid) {
+    TEST(ChangelogType, Valid) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
@@ -70,7 +70,7 @@ namespace {
         ASSERT_EQUALS(logEntry.getDetails(), BSON("dummy" << "info"));
     }
 
-    TEST(Validity, MissingChangeID) {
+    TEST(ChangelogType, MissingChangeID) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::server("host.local") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
@@ -84,7 +84,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, MissingServer) {
+    TEST(ChangelogType, MissingServer) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
@@ -98,7 +98,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, MissingClientAddr) {
+    TEST(ChangelogType, MissingClientAddr) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
@@ -112,7 +112,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, MissingTime) {
+    TEST(ChangelogType, MissingTime) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
@@ -126,7 +126,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, MissingWhat) {
+    TEST(ChangelogType, MissingWhat) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
@@ -140,7 +140,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, MissingNS) {
+    TEST(ChangelogType, MissingNS) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
@@ -154,7 +154,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, MissingDetails) {
+    TEST(ChangelogType, MissingDetails) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
@@ -168,7 +168,7 @@ namespace {
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
-    TEST(Validity, BadType) {
+    TEST(ChangelogType, BadType) {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID() << 0);
         string errMsg;

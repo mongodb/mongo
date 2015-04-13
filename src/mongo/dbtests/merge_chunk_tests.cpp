@@ -29,12 +29,12 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk.h" // for genID
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/d_merge.h"
-#include "mongo/s/type_collection.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -64,17 +64,16 @@ namespace mongo {
             ASSERT_GREATER_THAN( ranges.size(), 0u );
 
             CollectionType coll;
-            coll.setNS( nss.ns() );
+            coll.setNs( nss.ns() );
             coll.setKeyPattern( ranges.begin()->keyPattern );
             coll.setEpoch( startVersion.epoch() );
             coll.setUpdatedAt( 1ULL );
-            string errMsg;
-            ASSERT( coll.isValid( &errMsg ) );
+            ASSERT_OK(coll.validate());
 
             DBDirectClient client(&_txn);
 
             client.update( CollectionType::ConfigNS,
-                           BSON( CollectionType::ns( coll.getNS() ) ),
+                           BSON( CollectionType::fullNs( coll.getNs() ) ),
                            coll.toBSON(), true, false );
 
             ChunkVersion nextVersion = startVersion;

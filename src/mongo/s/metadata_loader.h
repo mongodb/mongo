@@ -36,6 +36,7 @@
 
 namespace mongo {
 
+    class CatalogManager;
     class CollectionMetadata;
     class CollectionType;
     class DBClientCursor;
@@ -94,10 +95,11 @@ namespace mongo {
          * @return HostUnreachable if there was an error contacting the config servers
          * @return RemoteChangeDetected if the data loaded was modified by another operation
          */
-        Status makeCollectionMetadata( const std::string& ns,
-                                       const std::string& shard,
-                                       const CollectionMetadata* oldMetadata,
-                                       CollectionMetadata* metadata ) const;
+        Status makeCollectionMetadata(CatalogManager* catalogManager,
+                                      const std::string& ns,
+                                      const std::string& shard,
+                                      const CollectionMetadata* oldMetadata,
+                                      CollectionMetadata* metadata) const;
 
         /**
          * Replaces the pending chunks of the remote metadata with the more up-to-date pending
@@ -137,9 +139,10 @@ namespace mongo {
          * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
          *
          */
-        Status initCollection( const std::string& ns,
+        Status _initCollection(CatalogManager* catalogManager,
+                               const std::string& ns,
                                const std::string& shard,
-                               CollectionMetadata* metadata ) const;
+                               CollectionMetadata* metadata) const;
 
         /**
          * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the

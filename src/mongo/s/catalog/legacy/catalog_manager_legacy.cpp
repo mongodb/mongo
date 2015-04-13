@@ -49,6 +49,7 @@
 #include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/dbclient_multi_command.h"
@@ -67,6 +68,7 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
     using std::map;
     using std::pair;
     using std::set;
@@ -758,8 +760,8 @@ namespace {
                                &response);
         if (!status.isOK()) {
             return Status(status.code(),
-                            str::stream() << "database metadata write failed: "
-                                          << response.toBSON());
+                          str::stream() << "database metadata write failed: "
+                                        << response.toBSON() << "; status: " << status.toString());
         }
 
         return Status::OK();
@@ -787,7 +789,73 @@ namespace {
                           stream() <<  "database " << dbName << " not found");
         }
 
+        conn.done();
         return DatabaseType::fromBSON(dbObj);
+    }
+
+    Status CatalogManagerLegacy::updateCollection(const std::string& collNs,
+                                                  const CollectionType& coll) {
+        fassert(28634, coll.validate());
+
+        BatchedCommandResponse response;
+        Status status = update(CollectionType::ConfigNS,
+                               BSON(CollectionType::fullNs(collNs)),
+                               coll.toBSON(),
+                               true,    // upsert
+                               false,   // multi
+                               NULL);
+        if (!status.isOK()) {
+            return Status(status.code(),
+                          str::stream() << "collection metadata write failed: "
+                                        << response.toBSON() << "; status: " << status.toString());
+        }
+
+        return Status::OK();
+    }
+
+    StatusWith<CollectionType> CatalogManagerLegacy::getCollection(const std::string& collNs) {
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+
+        BSONObj collObj = conn->findOne(CollectionType::ConfigNS,
+                                        BSON(CollectionType::fullNs(collNs)));
+        if (collObj.isEmpty()) {
+            conn.done();
+            return Status(ErrorCodes::NamespaceNotFound,
+                          stream() << "collection " << collNs << " not found");
+        }
+
+        conn.done();
+        return CollectionType::fromBSON(collObj);
+    }
+
+    Status CatalogManagerLegacy::getCollections(const std::string* dbName,
+                                                std::vector<CollectionType>* collections) {
+        collections->empty();
+
+        BSONObjBuilder b;
+        if (dbName) {
+            invariant(!dbName->empty());
+            b.appendRegex(CollectionType::fullNs(),
+                          (string)"^" + pcrecpp::RE::QuoteMeta(*dbName) + "\\.");
+        }
+
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+
+        auto_ptr<DBClientCursor> cursor = conn->query(CollectionType::ConfigNS, b.obj());
+        while (cursor->more()) {
+            const BSONObj collObj = cursor->next();
+
+            auto status = CollectionType::fromBSON(collObj);
+            if (!status.isOK()) {
+                conn.done();
+                return status.getStatus();
+            }
+
+            collections->push_back(status.getValue());
+        }
+
+        conn.done();
+        return Status::OK();
     }
 
     Status CatalogManagerLegacy::dropCollection(const std::string& collectionNs) {
@@ -1024,6 +1092,7 @@ namespace {
 
             StatusWith<ShardType> shardRes = ShardType::fromBSON(shardObj);
             if (!shardRes.isOK()) {
+                conn.done();
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "Failed to parse chunk BSONObj: "
                                             << shardRes.getStatus().reason());
@@ -1058,6 +1127,7 @@ namespace {
         catch (const DBException& ex) {
             return ex.toStatus();
         }
+
         if (!ok) {
             string errMsg(str::stream() << "Unable to save chunk ops. Command: "
                                         << cmd << ". Result: " << cmdResult);

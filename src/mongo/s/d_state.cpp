@@ -582,10 +582,11 @@ namespace mongo {
 
         Timer refreshTimer;
         Status status =
-                mdLoader.makeCollectionMetadata( ns,
-                                                 getShardName(),
-                                                 ( fullReload ? NULL : beforeMetadata.get() ),
-                                                 remoteMetadataRaw );
+                mdLoader.makeCollectionMetadata(grid.catalogManager(),
+                                                ns,
+                                                getShardName(),
+                                                fullReload ? NULL : beforeMetadata.get(),
+                                                remoteMetadataRaw);
         long long refreshMillis = refreshTimer.millis();
 
         if ( status.code() == ErrorCodes::NamespaceNotFound ) {

@@ -93,7 +93,7 @@ namespace mongo {
          * @param conn is the connection with the config server(s)
          * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could possibly be moved
          */
-        void _doBalanceRound( DBClientBase& conn, std::vector<CandidateChunkPtr>* candidateChunks );
+        void _doBalanceRound(DBClientBase& conn, std::vector<CandidateChunkPtr>* candidateChunks);
 
         /**
          * Issues chunk migration request, one at a time.

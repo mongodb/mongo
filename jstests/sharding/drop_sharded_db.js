@@ -1,15 +1,14 @@
 // Tests the dropping of a sharded database SERVER-3471 SERVER-1726
-
 var st = new ShardingTest({ name : jsTestName() })
 st.stopBalancer()
 
 var mongos = st.s0
 var config = mongos.getDB( "config" )
 
-var dbName = "buy"
-var dbA = mongos.getDB( dbName )
-var dbB = mongos.getDB( dbName + "_201107" )
-var dbC = mongos.getDB( dbName + "_201108" )
+var dbA = mongos.getDB( "DropSharded_A" );
+var dbB = mongos.getDB( "DropSharded_B" );
+var dbC = mongos.getDB( "DropSharded_C" );
+
 
 print( "1: insert some data and colls into all dbs" )
 
@@ -21,10 +20,10 @@ for( var i = 0; i < numDocs; i++ ){
     dbC.getCollection( "data" + (i % numColls) ).insert({ _id : i })
 }
 
+
 print( "2: shard the colls ")
 
 for( var i = 0; i < numColls; i++ ){
-    
     var key = { _id : 1 }
     st.shardColl( dbA.getCollection( "data" + i ), key )
     st.shardColl( dbB.getCollection( "data" + i ), key )
@@ -48,16 +47,17 @@ assert.eq( 0, config.databases.find({ _id : "" + dbA }).toArray().length )
 assert.eq( 1, config.databases.find({ _id : "" + dbB }).toArray().length )
 assert.eq( 1, config.databases.find({ _id : "" + dbC }).toArray().length )
 
+// 10 dropped collections
 assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbA + "\\..*" ), dropped : true }).toArray().length )
-assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbB + "\\..*" ), dropped : false }).toArray().length )
-assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbC + "\\..*" ), dropped : false }).toArray().length )
 
-for( var i = 0; i < numColls; i++ ){
-    
-    assert.eq( numDocs / numColls, dbB.getCollection( "data" + (i % numColls) ).find().itcount() )
-    assert.eq( numDocs / numColls, dbC.getCollection( "data" + (i % numColls) ).find().itcount() ) 
-    
+// 20 active (dropped is missing)
+assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbB + "\\..*" ) }).toArray().length )
+assert.eq( numColls, config.collections.find({ _id : RegExp( "^" + dbC + "\\..*" ) }).toArray().length )
+
+for( var i = 0; i < numColls; i++ ) {
+    assert.eq( numDocs / numColls, dbB.getCollection( "data" + (i % numColls) ).find().itcount() );
+    assert.eq( numDocs / numColls, dbC.getCollection( "data" + (i % numColls) ).find().itcount() );
 }
 
 // Finish
-st.stop()
+st.stop();

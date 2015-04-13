@@ -35,11 +35,12 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientmockcursor.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
-#include "mongo/s/type_collection.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -102,112 +103,43 @@ namespace mongo {
     MetadataLoader::~MetadataLoader() {
     }
 
-    Status MetadataLoader::makeCollectionMetadata( const string& ns,
-                                                   const string& shard,
-                                                   const CollectionMetadata* oldMetadata,
-                                                   CollectionMetadata* metadata ) const
+    Status MetadataLoader::makeCollectionMetadata(CatalogManager* catalogManager,
+                                                  const string& ns,
+                                                  const string& shard,
+                                                  const CollectionMetadata* oldMetadata,
+                                                  CollectionMetadata* metadata) const
     {
-        Status status = initCollection( ns, shard, metadata );
-        if ( !status.isOK() || metadata->getKeyPattern().isEmpty() ) return status;
+        Status status = _initCollection(catalogManager, ns, shard, metadata);
+        if (!status.isOK() || metadata->getKeyPattern().isEmpty()) {
+            return status;
+        }
+
         return initChunks( ns, shard, oldMetadata, metadata );
     }
 
-    Status MetadataLoader::initCollection( const string& ns,
+    Status MetadataLoader::_initCollection(CatalogManager* catalogManager,
+                                           const string& ns,
                                            const string& shard,
-                                           CollectionMetadata* metadata ) const
-    {
-        //
-        // Bring collection entry from the config server.
-        //
+                                           CollectionMetadata* metadata) const {
 
-        BSONObj collDoc;
-        {
-            try {
-                ScopedDbConnection conn( _configLoc.toString(), 30 );
-                collDoc = conn->findOne( CollectionType::ConfigNS, QUERY(CollectionType::ns()<<ns));
-                conn.done();
-            }
-            catch ( const DBException& e ) {
-                string errMsg = str::stream() << "could not query collection metadata"
-                                              << causedBy( e );
-
-                // We deliberately do not return conn to the pool, since it was involved
-                // with the error here.
-
-                return Status( ErrorCodes::HostUnreachable, errMsg );
-            }
+        auto coll = catalogManager->getCollection(ns);
+        if (!coll.isOK()) {
+            return coll.getStatus();
         }
 
-        string errMsg;
-        if ( collDoc.isEmpty() ) {
-
-            errMsg = str::stream() << "could not load metadata, collection " << ns << " not found";
-            warning() << errMsg << endl;
-
-            return Status( ErrorCodes::NamespaceNotFound, errMsg );
+        CollectionType collInfo = coll.getValue();
+        if (collInfo.getDropped()) {
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "could not load metadata, collection "
+                                        << ns << " was dropped");
         }
 
-        CollectionType collInfo;
-        if ( !collInfo.parseBSON( collDoc, &errMsg ) || !collInfo.isValid( &errMsg ) ) {
+        metadata->_keyPattern = collInfo.getKeyPattern();
+        metadata->fillKeyPatternFields();
+        metadata->_shardVersion = ChunkVersion(0, 0, collInfo.getEpoch());
+        metadata->_collVersion = ChunkVersion(0, 0, collInfo.getEpoch());
 
-            errMsg = str::stream() << "could not parse metadata for collection " << ns
-                                   << causedBy( errMsg );
-            warning() << errMsg << endl;
-
-            return Status( ErrorCodes::FailedToParse, errMsg );
-        }
-
-        if ( collInfo.isDroppedSet() && collInfo.getDropped() ) {
-
-            errMsg = str::stream() << "could not load metadata, collection " << ns
-                                   << " was dropped";
-            warning() << errMsg << endl;
-
-            return Status( ErrorCodes::NamespaceNotFound, errMsg );
-        }
-
-        if ( collInfo.isKeyPatternSet() && !collInfo.getKeyPattern().isEmpty() ) {
-
-            // Sharded collection, need to load chunks
-
-            metadata->_keyPattern = collInfo.getKeyPattern();
-            metadata->fillKeyPatternFields();
-            metadata->_shardVersion = ChunkVersion( 0, 0, collInfo.getEpoch() );
-            metadata->_collVersion = ChunkVersion( 0, 0, collInfo.getEpoch() );
-
-            return Status::OK();
-        }
-        else if ( collInfo.isPrimarySet() && collInfo.getPrimary() == shard ) {
-
-            // A collection with a non-default primary
-
-            // Empty primary field not allowed if set
-            dassert( collInfo.getPrimary() != "" );
-
-            metadata->_keyPattern = BSONObj();
-            metadata->fillKeyPatternFields();
-            metadata->_shardVersion = ChunkVersion( 1, 0, collInfo.getEpoch() );
-            metadata->_collVersion = metadata->_shardVersion;
-
-            return Status::OK();
-        }
-        else {
-
-            // A collection with a primary that doesn't match this shard or is empty, the primary
-            // may have changed before we loaded.
-
-            errMsg = // br
-                    str::stream() << "collection " << ns << " does not have a shard key "
-                                  << "and primary "
-                                  << ( collInfo.isPrimarySet() ? collInfo.getPrimary() : "" )
-                                  << " does not match this shard " << shard;
-
-            warning() << errMsg << endl;
-
-            metadata->_collVersion = ChunkVersion( 0, 0, OID() );
-
-            return Status( ErrorCodes::RemoteChangeDetected, errMsg );
-        }
+        return Status::OK();
     }
 
     Status MetadataLoader::initChunks( const string& ns,

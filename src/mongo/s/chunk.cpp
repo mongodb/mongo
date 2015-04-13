@@ -45,6 +45,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
@@ -584,8 +585,17 @@ namespace {
                 _dataWritten = 0;
             }
 
-            const bool shouldBalance = grid.getConfigShouldBalance() &&
-                    grid.getCollShouldBalance(_manager->getns());
+            bool shouldBalance = grid.getConfigShouldBalance();
+            if (shouldBalance) {
+                auto status = grid.catalogManager()->getCollection(_manager->getns());
+                if (!status.isOK()) {
+                    log() << "Auto-split for " << _manager->getns()
+                          << " failed to load collection metadata due to " << status.getStatus();
+                    return false;
+                }
+
+                shouldBalance = status.getValue().getAllowBalance();
+            }
 
             log() << "autosplitted " << _manager->getns()
                   << " shard: " << toString()

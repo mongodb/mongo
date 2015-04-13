@@ -34,7 +34,7 @@ function doMapReduce(connection, outputDb) {
 function assertSuccess(configDb, outputDb) {
     adminDb.printShardingStatus();
     assert.eq(outputDb.numbers_out.count(), 50, "map/reduce failed");
-    assert.eq(configDb.collections.findOne().dropped, false, "no sharded collections");
+    assert.eq(configDb.collections.findOne().dropped, undefined, "no sharded collections");
 }
 
 function assertFailure(configDb, outputDb) {
@@ -50,7 +50,7 @@ var st = new ShardingTest( testName = "mrShardedOutputAuth",
                            { extraOptions : {"keyFile" : "jstests/libs/key1"} }
                          );
 
-// setup the users to the input, output and admin databases
+// Setup the users to the input, output and admin databases
 var mongos = st.s;
 var adminDb = mongos.getDB("admin");
 adminDb.createUser({user: "user", pwd: "pass", roles: jsTest.adminUserRoles});
@@ -67,14 +67,14 @@ inputDb.createUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
 var outputDb = authenticatedConn.getDB("output");
 outputDb.createUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
 
-// setup the input db
+// Setup the input db
 inputDb.numbers.drop();
 for (var i = 0; i < 50; i++) {
     inputDb.numbers.insert({ num : i }); 
 }
 assert.eq(inputDb.numbers.count(), 50);
 
-// setup a connection authenticated to both input and output db
+// Setup a connection authenticated to both input and output db
 var inputOutputAuthConn = new Mongo(mongos.host);
 inputOutputAuthConn.getDB('input').auth("user", "pass");
 inputOutputAuthConn.getDB('output').auth("user", "pass");

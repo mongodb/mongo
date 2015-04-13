@@ -82,7 +82,11 @@ assert.writeOK(bulk.execute());
 printjson( lastMigration )
 printjson( sh._lastMigration( collB ) )
 
-if( lastMigration == null ) assert.eq( null, sh._lastMigration( collB ) )
-else assert.eq( lastMigration.time, sh._lastMigration( collB ).time )
+if(lastMigration == null) {
+    assert.eq(null, sh._lastMigration(collB));
+}
+else {
+    assert.eq(lastMigration.time, sh._lastMigration(collB).time);
+}
 
-st.stop()
+st.stop();

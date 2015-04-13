@@ -93,12 +93,6 @@ namespace mongo {
          */
         bool getConfigShouldBalance() const;
 
-        /**
-         * Returns true if the given collection can be balanced based on the config.collections
-         * document.
-         */
-        bool getCollShouldBalance(const std::string& ns) const;
-
         CatalogManager* catalogManager() const { return _catalogManager.get(); }
         CatalogCache* catalogCache() const { return _catalogCache.get(); }
 
