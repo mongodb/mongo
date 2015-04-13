@@ -315,7 +315,8 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	 * from the root.
 	 */
 	valid = 0;
-	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
+	if (F_ISSET(cbt, WT_CBT_ACTIVE) &&
+	    cbt->ref->page->read_gen != WT_READGEN_OLDEST) {
 		__wt_txn_cursor_op(session);
 
 		WT_ERR(btree->type == BTREE_ROW ?
@@ -390,7 +391,9 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	 * existing record.
 	 */
 	valid = 0;
-	if (btree->type == BTREE_ROW && F_ISSET(cbt, WT_CBT_ACTIVE)) {
+	if (btree->type == BTREE_ROW &&
+	    F_ISSET(cbt, WT_CBT_ACTIVE) &&
+	    cbt->ref->page->read_gen != WT_READGEN_OLDEST) {
 		__wt_txn_cursor_op(session);
 
 		WT_ERR(__cursor_row_search(session, cbt, cbt->ref, 1));
