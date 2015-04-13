@@ -114,7 +114,8 @@ namespace repl {
 
         if (response.isOK()) {
             BSONObj res = response.getValue().data;
-            LOG(1) << "elect res: " << res.toString();
+            log() << "received " << res["vote"] << " votes from " << request.target;
+            LOG(1) << "full elect res: " << res.toString();
             BSONElement vote(res["vote"]); 
             if (vote.type() != mongo::NumberInt) {
                 error() << "wrong type for vote argument in replSetElect command: " << 
