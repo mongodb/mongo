@@ -37,9 +37,9 @@
 #include <iostream>
 
 #include "mongo/base/owned_pointer_map.h"
-#include "mongo/config.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/config.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/write_concern.h"
@@ -553,14 +553,6 @@ namespace {
                 return false;
             }
             TicketHolderReleaser releaser( &(getManager()->_splitHeuristics._splitTickets) );
-
-            if (!configServer.allUp(true)) {
-                LOG(1) << "not performing auto-split because not all config servers are up";
-
-                // Back off indirectly by resetting _dataWritten.
-                _dataWritten = 0;
-                return false;
-            }
 
             // this is a bit ugly
             // we need it so that mongos blocks for the writes to actually be committed

@@ -692,8 +692,6 @@ namespace {
                                            << causedBy(lockStatus));
         }
 
-        uassert(10174, "config servers not all up", configServer.allUp(false));
-
         set<Shard> seen;
 
         LOG(1) << "ChunkManager::drop : " << _ns ;

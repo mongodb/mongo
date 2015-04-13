@@ -105,10 +105,6 @@ namespace {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            if (!configServer.allUp(false, errmsg)) {
-                return false;
-            }
-
             ShardConnection::sync();
 
             const NamespaceString nss(parseNs(dbname, cmdObj));

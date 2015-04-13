@@ -48,7 +48,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -170,10 +169,6 @@ namespace {
 
             if (ns.find(".system.") != string::npos) {
                 errmsg = "can't shard system namespaces";
-                return false;
-            }
-
-            if (!configServer.allUp(false, errmsg)) {
                 return false;
             }
 

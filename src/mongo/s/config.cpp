@@ -226,9 +226,6 @@ namespace mongo {
                                                 vector<Shard>* initShards) {
 
         uassert(8042, "db doesn't have sharding enabled", _shardingEnabled);
-        uassert(13648,
-                str::stream() << "can't shard collection because not all config servers are up",
-                configServer.allUp(false));
 
         ChunkManagerPtr manager;
         
@@ -650,23 +647,16 @@ namespace mongo {
 
     bool DBConfig::dropDatabase(string& errmsg) {
         /**
-         * 1) make sure everything is up
-         * 2) update config server
-         * 3) drop and reset sharded collections
-         * 4) drop and reset primary
-         * 5) drop everywhere to clean up loose ends
+         * 1) update config server
+         * 2) drop and reset sharded collections
+         * 3) drop and reset primary
+         * 4) drop everywhere to clean up loose ends
          */
 
         log() << "DBConfig::dropDatabase: " << _name << endl;
         grid.catalogManager()->logChange(NULL, "dropDatabase.start", _name, BSONObj());
 
         // 1
-        if (!configServer.allUp(false, errmsg)) {
-            LOG(1) << "\t DBConfig::dropDatabase not all up" << endl;
-            return 0;
-        }
-
-        // 2
         grid.catalogCache()->invalidate(_name);
 
         Status result = grid.catalogManager()->remove(DatabaseType::ConfigNS,
@@ -679,16 +669,11 @@ namespace mongo {
             return false;
         }
 
-        if (!configServer.allUp(false, errmsg)) {
-            log() << "error removing from config server even after checking!" << endl;
-            return 0;
-        }
-
         LOG(1) << "\t removed entry from config server for: " << _name << endl;
 
         set<Shard> allServers;
 
-        // 3
+        // 2
         while ( true ) {
             int num = 0;
             if (!_dropShardedCollections(num, allServers, errmsg)) {
@@ -703,7 +688,7 @@ namespace mongo {
             }
         }
 
-        // 4
+        // 3
         {
             ScopedDbConnection conn(_primary.getConnString(), 30.0);
             BSONObj res;
@@ -714,7 +699,7 @@ namespace mongo {
             conn.done();
         }
 
-        // 5
+        // 4
         for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ) {
             ScopedDbConnection conn(i->getConnString(), 30.0);
             BSONObj res;
@@ -1014,44 +999,6 @@ namespace mongo {
         }
 
         return true;
-    }
-
-    bool ConfigServer::allUp(bool localCheckOnly) {
-        string errmsg;
-        return allUp(localCheckOnly, errmsg);
-    }
-
-    bool ConfigServer::allUp(bool localCheckOnly, string& errmsg) {
-        try {
-            ScopedDbConnection conn(_primary.getConnString(), 30.0);
-
-            // Note: SyncClusterConnection is different from normal connection types in
-            // that it can be instantiated even if all the config servers are down.
-            if (!conn->isStillConnected()) {
-                errmsg = str::stream() << "Not all config servers "
-                                       << _primary.toString() << " are reachable";
-                LOG(1) << errmsg;
-                return false;
-            }
-
-            if (localCheckOnly) {
-                conn.done();
-                return true;
-            }
-
-            // Note: For SyncClusterConnection, gle will only be sent to the first
-            // node, and it is not even guaranteed to be invoked.
-            conn->getLastError();
-            conn.done();
-            return true;
-        }
-        catch (const DBException& excep) {
-            errmsg = str::stream() << "Not all config servers "
-                                   << _primary.toString() << " are reachable"
-                                   << causedBy(excep);
-            return false;
-        }
-
     }
 
     int ConfigServer::dbConfigVersion() {

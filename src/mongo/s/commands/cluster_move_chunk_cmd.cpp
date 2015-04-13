@@ -107,10 +107,6 @@ namespace {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            if (!configServer.allUp(false, errmsg)) {
-                return false;
-            }
-
             ShardConnection::sync();
 
             Timer t;
