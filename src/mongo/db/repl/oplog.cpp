@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog.h"
 
 #include <deque>
+#include <set>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -449,91 +450,137 @@ namespace {
     // -------------------------------------
 
 namespace {
-    NamespaceString parseNs(const string& dbname, const BSONObj& cmdObj) {
+    NamespaceString parseNs(const string& ns, const BSONObj& cmdObj) {
         BSONElement first = cmdObj.firstElement();
         uassert(28631,
                 "no collection name specified",
                 first.canonicalType() == canonicalizeBSONType(mongo::String)
                 && first.valuestrsize() > 0);
         std::string coll = first.valuestr();
-        return NamespaceString(NamespaceString(dbname).db().toString(), coll);
+        return NamespaceString(NamespaceString(ns).db().toString(), coll);
     }
 
-    using opApplyFn = stdx::function<Status (OperationContext*, const char*, BSONObj&)>;
+    using OpApplyFn = stdx::function<Status (OperationContext*, const char*, BSONObj&)>;
 
-    std::map<std::string, opApplyFn> opsMap = {
+    struct ApplyOpMetadata {
+        OpApplyFn applyFunc;
+        std::set<ErrorCodes::Error> acceptableErrors;
+
+        ApplyOpMetadata(OpApplyFn fun) {
+            applyFunc = fun;
+        }
+
+        ApplyOpMetadata(OpApplyFn fun, std::set<ErrorCodes::Error> theAcceptableErrors) {
+            applyFunc = fun;
+            acceptableErrors = theAcceptableErrors;
+        }
+    };
+
+    std::map<std::string, ApplyOpMetadata> opsMap = {
         {"create",
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                return createCollection(txn, NamespaceString(dbName).db().toString(), cmd);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    return createCollection(txn, NamespaceString(ns).db().toString(), cmd);
+                },
+                {ErrorCodes::NamespaceExists}
             }
         },
         {"collMod",
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                BSONObjBuilder resultWeDontCareAbout;
-                return collMod(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    BSONObjBuilder resultWeDontCareAbout;
+                    return collMod(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+                }
             }
         },
         {"dropDatabase", 
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                return dropDatabase(txn, NamespaceString(dbName).db().toString());
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    return dropDatabase(txn, NamespaceString(ns).db().toString());
+                }
             }
         },
         {"drop", 
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                BSONObjBuilder resultWeDontCareAbout;
-                return dropCollection(txn, parseNs(dbName, cmd), resultWeDontCareAbout);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    BSONObjBuilder resultWeDontCareAbout;
+                    return dropCollection(txn, parseNs(ns, cmd), resultWeDontCareAbout);
+                },
+                {ErrorCodes::NamespaceNotFound}
             }
         },
         // deleteIndex(es) is deprecated but still works as of April 10, 2015
         {"deleteIndex", 
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                BSONObjBuilder resultWeDontCareAbout;
-                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    BSONObjBuilder resultWeDontCareAbout;
+                    return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+                },
+                {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}
             }
         },
         {"deleteIndexes", 
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                BSONObjBuilder resultWeDontCareAbout;
-                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    BSONObjBuilder resultWeDontCareAbout;
+                    return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+                },
+                {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}
             }
         },
         {"dropIndex",
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                BSONObjBuilder resultWeDontCareAbout;
-                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    BSONObjBuilder resultWeDontCareAbout;
+                    return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+                },
+                {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}
             }
         },
         {"dropIndexes", 
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                BSONObjBuilder resultWeDontCareAbout;
-                return dropIndexes(txn, parseNs(dbName, cmd), cmd, &resultWeDontCareAbout);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    BSONObjBuilder resultWeDontCareAbout;
+                    return dropIndexes(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+                },
+                {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}
             }
         },
         {"renameCollection",
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                return renameCollection(txn,
-                                        NamespaceString(cmd.firstElement().valuestrsafe()),
-                                        NamespaceString(cmd["to"].valuestrsafe()),
-                                        cmd["stayTemp"].trueValue(),
-                                        cmd["dropTarget"].trueValue());
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    return renameCollection(txn,
+                                            NamespaceString(cmd.firstElement().valuestrsafe()),
+                                            NamespaceString(cmd["to"].valuestrsafe()),
+                                            cmd["stayTemp"].trueValue(),
+                                            cmd["dropTarget"].trueValue());
+                },
+                {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}
             }
         },
         {"applyOps",
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                BSONObjBuilder resultWeDontCareAbout;
-                return applyOps(txn, dbName, cmd, &resultWeDontCareAbout);
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    BSONObjBuilder resultWeDontCareAbout;
+                    return applyOps(txn, ns, cmd, &resultWeDontCareAbout);
+                },
+                {ErrorCodes::UnknownError}
             }
         },
         {"convertToCapped",
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                return convertToCapped(txn,
-                                       parseNs(dbName, cmd),
-                                       cmd["size"].number());
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    return convertToCapped(txn,
+                                           parseNs(ns, cmd),
+                                           cmd["size"].number());
+                }
             }
         },
         {"emptycapped",
-            [](OperationContext* txn, const char* dbName, BSONObj& cmd) -> Status {
-                return emptyCapped(txn, parseNs(dbName, cmd));
+            {
+                [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+                    return emptyCapped(txn, parseNs(ns, cmd));
+                }
             }
         },
     };
@@ -723,7 +770,14 @@ namespace {
             bool done = false;
 
             while (!done) {
-                Status status = opsMap.find(o.firstElementFieldName())->second(txn, ns, o);
+                ApplyOpMetadata curOpToApply = opsMap.find(o.firstElementFieldName())->second;
+                Status status = Status::OK();
+                try {
+                    status = curOpToApply.applyFunc(txn, ns, o);
+                }
+                catch (...) {
+                    status = exceptionToStatus();
+                }
                 switch (status.code()) {
                 case ErrorCodes::WriteConflict: {
                     // Need to throw this up to a higher level where it will be caught and the
@@ -745,9 +799,16 @@ namespace {
                     break;
                 }
                 default:
-                    warning() << "Failed command " << o << " on " <<
-                        nsToDatabaseSubstring(ns) << " with status " << status <<
-                        " during oplog application";
+                    if (_oplogCollectionName == masterSlaveOplogName) {
+                        error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
+                                << " with status " << status << " during oplog application";
+                    }
+                    else if (curOpToApply.acceptableErrors.find(status.code())
+                            == curOpToApply.acceptableErrors.end()) {
+                        error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
+                                << " with status " << status << " during oplog application";
+                        return status;
+                    }
                     // fallthrough
                 case ErrorCodes::OK:
                     done = true;
