@@ -121,12 +121,12 @@ rw_start(u_int readers, u_int writers)
 				run_info[offset].nops =
 				    WT_MAX(1000, max_nops >> name_index);
 		} else
-			run_info[i].name = run_info[0].name;
+			run_info[offset].name = run_info[0].name;
 
 		/* Setup op count if not varying ops. */
-		if (run_info[i].nops == 0)
-			run_info[i].nops = max_nops;
-		total_nops += run_info[i].nops;
+		if (run_info[offset].nops == 0)
+			run_info[offset].nops = max_nops;
+		total_nops += run_info[offset].nops;
 	}
 
 	(void)gettimeofday(&start, NULL);
