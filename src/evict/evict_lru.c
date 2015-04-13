@@ -903,7 +903,6 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_DECL_RET;
 	u_int max_entries, prev_slot, retries, slot, start_slot, spins;
 	int incr, dhandle_locked;
-	WT_DECL_SPINLOCK_ID(id);
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
@@ -948,7 +947,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		 */
 		if (!dhandle_locked) {
 			for (spins = 0; (ret = __wt_spin_trylock(
-			    session, &conn->dhandle_lock, &id)) == EBUSY &&
+			    session, &conn->dhandle_lock)) == EBUSY &&
 			    !F_ISSET(cache, WT_CACHE_CLEAR_WALKS);
 			    spins++) {
 				if (spins < 1000)
@@ -1288,7 +1287,6 @@ __evict_get_ref(
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
 	uint32_t candidates;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
@@ -1304,7 +1302,7 @@ __evict_get_ref(
 	for (;;) {
 		if (cache->evict_current == NULL)
 			return (WT_NOTFOUND);
-		if (__wt_spin_trylock(session, &cache->evict_lock, &id) == 0)
+		if (__wt_spin_trylock(session, &cache->evict_lock) == 0)
 			break;
 		__wt_yield();
 	}

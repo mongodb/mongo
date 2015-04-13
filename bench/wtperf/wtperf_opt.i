@@ -104,6 +104,9 @@ DEF_OPT_AS_UINT32(database_count, 1,
     "number of WiredTiger databases to use. Each database will execute the"
     " workload using a separate home directory and complete set of worker"
     " threads")
+DEF_OPT_AS_UINT32(drop_tables, 0,
+    "Whether to drop all tables at the end of the run, and report time taken"
+    " to do the drop.")
 DEF_OPT_AS_UINT32(icount, 5000,
     "number of records to initially populate. If multiple tables are "
     "configured the count is spread evenly across all tables.")

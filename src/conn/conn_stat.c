@@ -318,11 +318,6 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	/* Dump the connection statistics. */
 	WT_RET(__statlog_dump(session, conn->home, 1));
 
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	/* Dump the spinlock statistics. */
-	WT_RET(__wt_statlog_dump_spinlock(conn, conn->home));
-#endif
-
 	/*
 	 * Lock the schema and walk the list of open handles, dumping
 	 * any that match the list of object sources.
