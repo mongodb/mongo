@@ -49,11 +49,12 @@ static const char *home = NULL;
 #define	BUFSIZE		16
 #define	MAX_TENANTS	3
 
-#define	SYS_KEYID       "system"
-#define	SYS_BADPW       "bad_password"
-#define	SYS_PW          "system_password"
-#define	USER1_KEYID     "user1"
-#define	USER2_KEYID     "user2"
+#define	SYS_KEYID	"system"
+#define	SYS_BADPW	"bad_password"
+#define	SYS_PW		"system_password"
+#define	USER1_KEYID	"user1"
+#define	USER2_KEYID	"user2"
+#define	USERBAD_KEYID	"userbad"
 
 /*! [encryption example callback implementation] */
 typedef struct {
@@ -275,9 +276,9 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		    strcmp(my_crypto->password, SYS_PW) != 0)
 			goto err;
 		my_crypto->rot_N = 13;
-	} else if (strcmp(keyidstr, "user1") == 0)
+	} else if (strcmp(keyidstr, USER1_KEYID) == 0)
 		my_crypto->rot_N = 4;
-	else if (strcmp(keyidstr, "user2") == 0)
+	else if (strcmp(keyidstr, USER2_KEYID) == 0)
 		my_crypto->rot_N = 19;
 	else
 		return (EINVAL);
@@ -424,13 +425,21 @@ main(void)
 	 * Create and open some encrypted and not encrypted tables.
 	 */
 	ret = session->create(session, "table:crypto1",
-	    "encrypt=(name=rotn,keyid=user1),"
+	    "encrypt=(name=rotn,keyid=" USER1_KEYID"),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:crypto2",
-	    "encrypt=(name=rotn,keyid=user2),"
+	    "encrypt=(name=rotn,keyid=" USER2_KEYID"),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:nocrypto",
 	    "key_format=S,value_format=S");
+
+	ret = session->create(session, "table:cryptobad",
+	    "encrypt=(name=rotn,keyid=" USERBAD_KEYID"),"
+	    "key_format=S,value_format=S");
+	if (ret == 0) {
+		fprintf(stderr, "Did not detect bad/unknown keyid error\n");
+		exit (1);
+	}
 
 	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
 	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
