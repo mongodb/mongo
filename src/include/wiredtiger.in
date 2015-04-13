@@ -1027,8 +1027,8 @@ struct __wt_session {
 	 * the Btree row-store leaf page value dictionary; see @ref
 	 * file_formats_compression for more information., an integer greater
 	 * than or equal to 0; default \c 0.}
-	 * @config{encryption = (, configure an encryptor for file blocks., a
-	 * set of related configuration options defined below.}
+	 * @config{encrypt = (, configure an encryptor for file blocks., a set
+	 * of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier that identifies
 	 * a unique instance of the encryptor.  It is stored in clear text\, and
 	 * thus is available when the wiredtiger database is reopened.  On the

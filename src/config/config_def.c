@@ -140,7 +140,7 @@ static const WT_CONFIG_CHECK confchk_cursor_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
-static const WT_CONFIG_CHECK confchk_encryption_subconfigs[] = {
+static const WT_CONFIG_CHECK confchk_encrypt_subconfigs[] = {
 	{ "keyid", "string", NULL, NULL, NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
@@ -166,9 +166,9 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "collator", "string", __wt_collator_confchk, NULL, NULL, 0 },
 	{ "columns", "list", NULL, NULL, NULL, 0 },
 	{ "dictionary", "int", NULL, "min=0", NULL, 0 },
-	{ "encryption", "category",
+	{ "encrypt", "category",
 	    NULL, NULL,
-	    confchk_encryption_subconfigs, 2 },
+	    confchk_encrypt_subconfigs, 2 },
 	{ "format", "string", NULL, "choices=[\"btree\"]", NULL, 0 },
 	{ "huffman_key", "string",
 	    __wt_huffman_confchk, NULL,
@@ -284,9 +284,9 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "collator", "string", __wt_collator_confchk, NULL, NULL, 0 },
 	{ "columns", "list", NULL, NULL, NULL, 0 },
 	{ "dictionary", "int", NULL, "min=0", NULL, 0 },
-	{ "encryption", "category",
+	{ "encrypt", "category",
 	    NULL, NULL,
-	    confchk_encryption_subconfigs, 2 },
+	    confchk_encrypt_subconfigs, 2 },
 	{ "exclusive", "boolean", NULL, NULL, NULL, 0 },
 	{ "extractor", "string",
 	    __wt_extractor_confchk, NULL,
@@ -388,6 +388,13 @@ static const WT_CONFIG_CHECK confchk_table_meta[] = {
 	{ "value_format", "format",
 	    __wt_struct_confchk, NULL,
 	    NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK confchk_encryption_subconfigs[] = {
+	{ "keyid", "string", NULL, NULL, NULL, 0 },
+	{ "name", "string", NULL, NULL, NULL, 0 },
+	{ "secretkey", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -750,8 +757,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
 	  "block_compressor=,cache_resident=0,checkpoint=,checkpoint_lsn=,"
 	  "checksum=uncompressed,collator=,columns=,dictionary=0,"
-	  "encryption=(keyid=,name=),format=btree,huffman_key=,"
-	  "huffman_value=,id=,internal_item_max=0,internal_key_max=0,"
+	  "encrypt=(keyid=,name=),format=btree,huffman_key=,huffman_value=,"
+	  "id=,internal_item_max=0,internal_key_max=0,"
 	  "internal_key_truncate=,internal_page_max=4KB,key_format=u,"
 	  "key_gap=10,leaf_item_max=0,leaf_key_max=0,leaf_page_max=32KB,"
 	  "leaf_value_max=0,memory_page_max=5MB,os_cache_dirty_max=0,"
@@ -788,7 +795,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "session.create",
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
 	  "block_compressor=,cache_resident=0,checksum=uncompressed,"
-	  "colgroups=,collator=,columns=,dictionary=0,encryption=(keyid=,"
+	  "colgroups=,collator=,columns=,dictionary=0,encrypt=(keyid=,"
 	  "name=),exclusive=0,extractor=,format=btree,huffman_key=,"
 	  "huffman_value=,immutable=0,internal_item_max=0,"
 	  "internal_key_max=0,internal_key_truncate=,internal_page_max=4KB,"

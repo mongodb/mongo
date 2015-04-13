@@ -654,7 +654,7 @@ err:	if (kenc != NULL) {
 		__wt_free(session, kenc->keyid);
 		__wt_free(session, kenc);
 	}
-	return (0);
+	return (ret);
 }
 
 /*

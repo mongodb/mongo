@@ -49,6 +49,12 @@ static const char *home = NULL;
 #define	BUFSIZE		16
 #define	MAX_TENANTS	3
 
+#define	SYS_KEYID       "system"
+#define	SYS_BADPW       "bad_password"
+#define	SYS_PW          "system_password"
+#define	USER1_KEYID     "user1"
+#define	USER2_KEYID     "user2"
+
 /*! [encryption example callback implementation] */
 typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
@@ -241,11 +247,13 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;				/* Unused parameters */
 
 	orig_crypto = (const MY_CRYPTO *)encryptor;
-	if ((my_crypto = malloc(sizeof(MY_CRYPTO))) == NULL)
+	if ((my_crypto = calloc(1, sizeof(MY_CRYPTO))) == NULL)
 		return (errno);
 	*my_crypto = *orig_crypto;
+	my_crypto->keyid = my_crypto->password = NULL;
 
-	/* Stash the keyid and the (optional) secret key
+	/*
+	 * Stash the keyid and the (optional) secret key
 	 * from the configuration string.
 	 */
 	if ((keyidstr = malloc(keyid->len + 1)) == NULL)
@@ -258,16 +266,20 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 			return (errno);
 		strncpy(my_crypto->password, secret, strlen(secret) + 1);
 	}
-
-	/* Presumably we'd have some sophisticated key management
+	/*
+	 * Presumably we'd have some sophisticated key management
 	 * here that maps the id onto a secret key.
 	 */
-	if (strcmp(keyidstr, "system") == 0)
+	if (strcmp(keyidstr, "system") == 0) {
+		    my_crypto->password == NULL ? "NULL" : my_crypto->password);
+		if (my_crypto->password == NULL ||
+		    strcmp(my_crypto->password, SYS_PW) != 0)
+			goto err;
 		my_crypto->rot_N = 13;
-	else if (strcmp(keyidstr, "user0") == 0)
-		my_crypto->rot_N = 14;
-	else if (strcmp(keyidstr, "user1") == 0)
-		my_crypto->rot_N = 15;
+	} else if (strcmp(keyidstr, "user1") == 0)
+		my_crypto->rot_N = 4;
+	else if (strcmp(keyidstr, "user2") == 0)
+		my_crypto->rot_N = 19;
 	else
 		return (EINVAL);
 
@@ -275,6 +287,13 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	*customp = &my_crypto->encryptor;
 	return (0);
+err:
+	if (my_crypto->keyid != NULL)
+		free(my_crypto->keyid);
+	if (my_crypto->password != NULL)
+		free(my_crypto->password);
+	free(my_crypto);
+	return (EPERM);
 }
 
 /*
@@ -328,7 +347,6 @@ add_my_encryptors(WT_CONNECTION *connection)
 	wt->customize = rotate_customize;
 	wt->terminate = rotate_terminate;
 	m->num_calls = 0;
-	fprintf(stderr, "Add encryptor: rotn\n");
 	if ((ret = connection->add_encryptor(
 	    connection, "rotn", (WT_ENCRYPTOR *)m, NULL)) != 0)
 		return (ret);
@@ -399,7 +417,7 @@ main(void)
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true),encryption=(name=rotn,"
-	    "keyid=system)", &conn);
+	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
@@ -407,10 +425,10 @@ main(void)
 	 * Create and open some encrypted and not encrypted tables.
 	 */
 	ret = session->create(session, "table:crypto1",
-	    "encryption=(name=rotn,keyid=user1),"
+	    "encrypt=(name=rotn,keyid=user1),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:crypto2",
-	    "encryption=(name=rotn,keyid=user2),"
+	    "encrypt=(name=rotn,keyid=user2),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:nocrypto",
 	    "key_format=S,value_format=S");
@@ -464,7 +482,17 @@ main(void)
 	    "create,cache_size=100MB,"
 	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true),encryption=(name=rotn,"
-	    "keyid=system)", &conn);
+	    "keyid=" SYS_KEYID ",secretkey=" SYS_BADPW ")", &conn);
+	if (ret != EPERM) {
+		fprintf(stderr, "Did not detect bad password\n");
+		exit (1);
+	}
+
+	ret = wiredtiger_open(home, NULL,
+	    "create,cache_size=100MB,"
+	    "extensions=[" EXTENSION_NAME "],"
+	    "log=(enabled=true),encryption=(name=rotn,"
+	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	/*
