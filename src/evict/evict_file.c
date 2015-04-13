@@ -15,10 +15,13 @@
 int
 __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 {
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
 	int evict_reset;
+
+	dhandle = session->dhandle;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
@@ -74,9 +77,33 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		switch (syncop) {
 		case WT_SYNC_CLOSE:
 			/*
-			 * Evict the page.
+			 * We have exclusive access and we're closing the file,
+			 * evict the page.
 			 */
 			WT_ERR(__wt_evict(session, ref, 1));
+			break;
+		case WT_SYNC_CLOSE_SWEEP:
+			/*
+			 * The sweep server found a clean, idle file and it's
+			 * trying to close it. There's no exclusive lock on
+			 * anything as this can take a long time; if the file
+			 * becomes active, we abort the close process.
+			 *
+			 * Skip the root, we're not closing the file yet.
+			 */
+			if (__wt_ref_is_root(ref))
+				break;
+
+			/*
+			 * If re-opened and/or modified or we can't evict the
+			 * page for any reason, abort the close process.
+			 */
+			if (dhandle->session_inuse ||
+			    __wt_page_is_modified(page) ||
+			    !WT_ATOMIC_CAS4(
+			    ref->state, WT_REF_MEM, WT_REF_LOCKED))
+				WT_ERR(EBUSY);
+			WT_ERR(__wt_evict(session, ref, 0));
 			break;
 		case WT_SYNC_DISCARD:
 			WT_ASSERT(session,
@@ -104,12 +131,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		}
 	}
 
-	if (0) {
-err:		/* On error, clear any left-over tree walk. */
-		if (next_ref != NULL)
-			WT_TRET(__wt_page_release(
-			    session, next_ref, WT_READ_NO_EVICT));
-	}
+err:	/* Clear any left-over tree walk. */
+	if (next_ref != NULL)
+		WT_TRET(__wt_page_release(session, next_ref, WT_READ_NO_EVICT));
 
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
