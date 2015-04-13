@@ -52,7 +52,8 @@ extern __ftype ftype;
 extern int   log_print;				/* Log print per operation */
 extern int   multiple_files;			/* File per thread */
 extern u_int nkeys;				/* Keys to load */
-extern u_int nops;				/* Operations per thread */
+extern u_int max_nops;				/* Operations per thread */
+extern int   vary_nops;				/* Operations per thread */
 extern int   session_per_op;			/* New session per operation */
 
 void load(const char *);

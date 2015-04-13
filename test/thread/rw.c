@@ -34,6 +34,7 @@ static void *writer(void *);
 
 typedef struct {
 	char *name;				/* object name */
+	u_int nops;				/* Thread op count */
 
 	int remove;				/* cursor.remove */
 	int update;				/* cursor.update */
@@ -73,10 +74,11 @@ rw_start(u_int readers, u_int writers)
 	struct timeval start, stop;
 	double seconds;
 	pthread_t *tids;
-	u_int i;
+	u_int i, name_index, offset, total_nops;
 	int ret;
 	void *thread_ret;
 
+	total_nops = 0;
 	/* Create per-thread structures. */
 	if ((run_info = calloc(
 	    (size_t)(readers + writers), sizeof(*run_info))) == NULL ||
@@ -84,14 +86,48 @@ rw_start(u_int readers, u_int writers)
 		die("calloc", errno);
 
 	/* Create the files and load the initial records. */
-	for (i = 0; i < readers + writers; ++i)
+	for (i = 0; i < writers; ++i) {
 		if (i == 0 || multiple_files) {
 			if ((run_info[i].name = malloc(64)) == NULL)
 				die("malloc", errno);
 			snprintf(run_info[i].name, 64, FNAME, i);
+
+			/* Vary by orders of magnitude */
+			if (vary_nops)
+				run_info[i].nops = WT_MAX(1000, max_nops >> i);
 			load(run_info[i].name);
 		} else
 			run_info[i].name = run_info[0].name;
+
+		/* Setup op count if not varying ops. */
+		if (run_info[i].nops == 0)
+			run_info[i].nops = max_nops;
+		total_nops += run_info[i].nops;
+	}
+
+	/* Setup the reader configurations */
+	for (i = 0; i < readers; ++i) {
+		offset = i + writers;
+		if (multiple_files) {
+			if ((run_info[offset].name = malloc(64)) == NULL)
+				die("malloc", errno);
+			/* Have readers read from tables with writes. */
+			name_index = i % writers;
+			snprintf(
+			    run_info[offset].name, 64, FNAME, name_index);
+
+			/* Vary by orders of magnitude */
+			if (vary_nops)
+				run_info[offset].nops =
+				    WT_MAX(1000, max_nops >> name_index);
+		} else
+			run_info[i].name = run_info[0].name;
+
+		/* Setup op count if not varying ops. */
+		if (run_info[i].nops == 0)
+			run_info[i].nops = max_nops;
+		total_nops += run_info[i].nops;
+	}
 
 	(void)gettimeofday(&start, NULL);
 
@@ -114,7 +150,7 @@ rw_start(u_int readers, u_int writers)
 	seconds = (stop.tv_sec - start.tv_sec) +
 	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
-	    seconds, (int)(((readers + writers) * nops) / seconds));
+	    seconds, (int)(((readers + writers) * total_nops) / seconds));
 
 	/* Verify the files. */
 	for (i = 0; i < readers + writers; ++i) {
@@ -192,7 +228,7 @@ reader(void *arg)
 	s = &run_info[id];
 
 	if (session_per_op) {
-		for (i = 0; i < nops; ++i, ++s->reads, sched_yield()) {
+		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield()) {
 			if ((ret = conn->open_session(
 			    conn, NULL, NULL, &session)) != 0)
 				die("conn.open_session", ret);
@@ -210,7 +246,7 @@ reader(void *arg)
 		if ((ret = session->open_cursor(
 		    session, s->name, NULL, NULL, &cursor)) != 0)
 			die("session.open_cursor", ret);
-		for (i = 0; i < nops; ++i, ++s->reads, sched_yield())
+		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield())
 			reader_op(session, cursor);
 		if ((ret = session->close(session, NULL)) != 0)
 			die("session.close", ret);
@@ -289,7 +325,7 @@ writer(void *arg)
 	s = &run_info[id];
 
 	if (session_per_op) {
-		for (i = 0; i < nops; ++i, sched_yield()) {
+		for (i = 0; i < s->nops; ++i, sched_yield()) {
 			if ((ret = conn->open_session(
 			    conn, NULL, NULL, &session)) != 0)
 				die("conn.open_session", ret);
@@ -307,7 +343,7 @@ writer(void *arg)
 		if ((ret = session->open_cursor(
 		    session, s->name, NULL, NULL, &cursor)) != 0)
 			die("session.open_cursor", ret);
-		for (i = 0; i < nops; ++i, sched_yield())
+		for (i = 0; i < s->nops; ++i, sched_yield())
 			writer_op(session, cursor, s);
 		if ((ret = session->close(session, NULL)) != 0)
 			die("session.close", ret);

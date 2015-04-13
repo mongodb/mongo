@@ -104,6 +104,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			    ref->state, WT_REF_MEM, WT_REF_LOCKED))
 				WT_ERR(EBUSY);
 			WT_ERR(__wt_evict(session, ref, 0));
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_sweep);
 			break;
 		case WT_SYNC_DISCARD:
 			WT_ASSERT(session,

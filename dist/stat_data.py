@@ -190,6 +190,7 @@ connection_stats = [
         'eviction server evicting pages'),
     CacheStat('cache_eviction_server_not_evicting',
         'eviction server populating queue, but not evicting pages'),
+    CacheStat('cache_eviction_sweep', 'pages evicted by sweep server'),
     CacheStat('cache_eviction_slow',
         'eviction server unable to reach eviction goal'),
     CacheStat('cache_eviction_split', 'pages split during eviction'),
