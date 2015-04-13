@@ -300,12 +300,12 @@ namespace repl {
             return Timestamp();
         }
 
-        if (mustAwaitCommit) {
+        if (supportsAwaitingCommit() && mustAwaitCommit) {
             txn->recoveryUnit()->goingToAwaitCommit();
         }
         Timestamp lastOpTime = writeOpsToOplog(txn, ops);
         // Wait for journal before setting last op time if any op in batch had j:true
-        if (mustAwaitCommit) {
+        if (supportsAwaitingCommit() && mustAwaitCommit) {
             txn->recoveryUnit()->awaitCommit();
         }
         ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOpTime);

@@ -98,6 +98,10 @@ namespace repl {
         static const int replBatchLimitSeconds = 1;
         static const unsigned int replBatchLimitOperations = 5000;
 
+        // SyncTail base class always supports awaiting commit if any op has j:true flag
+        // that indicates awaiting commit before updating last OpTime.
+        virtual bool supportsAwaitingCommit() { return true; }
+
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.
         // Returns the last OpTime applied.
