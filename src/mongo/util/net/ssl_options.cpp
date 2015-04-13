@@ -19,6 +19,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/text.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
@@ -56,6 +57,10 @@ namespace mongo {
                 "OpenSSL cipher configuration string")
                                    .hidden();
 
+        options->addOptionChaining("net.ssl.disabledProtocols", "sslDisabledProtocols", moe::String,
+                "Comma separated list of disabled protocols")
+                                    .hidden();
+
         options->addOptionChaining("net.ssl.weakCertificateValidation",
                 "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
                 "presenting a certificate");
@@ -91,6 +96,11 @@ namespace mongo {
                 "Certificate Revocation List file for SSL")
                                   .requires("ssl")
                                   .requires("ssl.CAFile");
+
+        options->addOptionChaining("net.ssl.disabledProtocols", "sslDisabledProtocols", moe::String,
+                "Comma separated list of disabled protocols")
+                                  .requires("ssl")
+                                  .hidden();
 
         options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
                     moe::Switch, "allow connections to servers with non-matching hostnames")
@@ -178,6 +188,26 @@ namespace mongo {
             sslGlobalParams.sslCipherConfig = params["net.ssl.sslCipherConfig"].as<string>();
         }
 
+        if (params.count("net.ssl.disabledProtocols")) {
+            std::vector<std::string> tokens = StringSplitter::split(
+                    params["net.ssl.disabledProtocols"].as<string>(), ",");
+
+            std::map<std::string, SSLGlobalParams::Protocols> validConfigs;
+            validConfigs["noTLS1_0"] = SSLGlobalParams::TLS1_0;
+            validConfigs["noTLS1_1"] = SSLGlobalParams::TLS1_1;
+            validConfigs["noTLS1_2"] = SSLGlobalParams::TLS1_2;
+            for (std::vector<std::string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
+                std::map<std::string, SSLGlobalParams::Protocols>::iterator mappedToken =
+                    validConfigs.find(*it);
+                if (mappedToken != validConfigs.end()) {
+                    sslGlobalParams.sslDisabledProtocols.push_back(mappedToken->second);
+                } else {
+                    return Status(ErrorCodes::BadValue,
+                                  "Unrecognized disabledProtocols '" + *it +"'");
+                }
+            }
+        }
+
         if (params.count("net.ssl.weakCertificateValidation")) {
             sslGlobalParams.sslWeakCertificateValidation = true;
         }
@@ -218,6 +248,7 @@ namespace mongo {
                  sslGlobalParams.sslCAFile.size() ||
                  sslGlobalParams.sslCRLFile.size() ||
                  sslGlobalParams.sslCipherConfig.size() ||
+                 sslGlobalParams.sslDisabledProtocols.size() ||
                  sslGlobalParams.sslWeakCertificateValidation ||
                  sslGlobalParams.sslFIPSMode) {
             return Status(ErrorCodes::BadValue,
