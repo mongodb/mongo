@@ -175,8 +175,10 @@ main(int argc, char *argv[])
 		start = time(NULL);
 		track("starting up", 0ULL, NULL);
 
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
+#endif
 		wts_open(g.home, 1, &g.wts_conn);
 		wts_create();
 
@@ -214,8 +216,10 @@ main(int argc, char *argv[])
 			}
 
 		track("shutting down", 0ULL, NULL);
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_close();
+#endif
 		wts_close();
 
 		/*
