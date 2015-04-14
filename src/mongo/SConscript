@@ -48,6 +48,7 @@ env.SConscript(['base/SConscript',
                 'installer/msi/SConscript',
                 'logger/SConscript',
                 'platform/SConscript',
+                'rpc/SConscript',
                 's/catalog/legacy/SConscript',
                 's/catalog/SConscript',
                 's/client/SConscript',
@@ -59,7 +60,6 @@ env.SConscript(['base/SConscript',
                 'util/options_parser/SConscript',
                 'util/cmdline_utils/SConscript',
                 'util/mongoutils/SConscript',
-                'util/net/SConscript',
             ]
 )
 

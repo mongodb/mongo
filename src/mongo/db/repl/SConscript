@@ -107,9 +107,9 @@ env.Library('repl_coordinator_impl',
                      '$BUILD_DIR/mongo/db/index/index_descriptor',
                      '$BUILD_DIR/mongo/fail_point',
                      '$BUILD_DIR/mongo/global_timestamp',
+                     '$BUILD_DIR/mongo/rpc/command_status',
                      '$BUILD_DIR/mongo/server_options_core',
                      '$BUILD_DIR/mongo/service_context',
-                     '$BUILD_DIR/mongo/util/net/command_status',
                      'repl_coordinator_interface',
                      'replica_set_messages',
                      'replication_executor',
@@ -265,7 +265,7 @@ env.Library(
         'replication_executor',
         '$BUILD_DIR/mongo/logger/logger',
         '$BUILD_DIR/mongo/namespace_string',
-        '$BUILD_DIR/mongo/util/net/command_status',
+        '$BUILD_DIR/mongo/rpc/command_status',
     ],
 )
 
@@ -278,7 +278,7 @@ env.Library(
         'replication_executor',
         '$BUILD_DIR/mongo/logger/logger',
         '$BUILD_DIR/mongo/namespace_string',
-        '$BUILD_DIR/mongo/util/net/command_status',
+        '$BUILD_DIR/mongo/rpc/command_status',
     ],
 )
 

@@ -35,9 +35,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/get_status_from_command_result.h"
 
 namespace mongo {
 namespace repl {

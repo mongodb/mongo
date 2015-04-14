@@ -45,11 +45,11 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/network_interface_impl_downconvert_find_getmore.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

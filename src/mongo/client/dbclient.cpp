@@ -42,12 +42,12 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"

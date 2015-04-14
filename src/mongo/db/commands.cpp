@@ -50,9 +50,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/get_status_from_command_result.h"
 
 namespace mongo {
 

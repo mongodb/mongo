@@ -38,8 +38,8 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/get_status_from_command_result.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 

@@ -1,0 +1,69 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target=[
+        'command_status',
+    ],
+    source=[
+        'get_status_from_command_result.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/foundation'
+    ],
+)
+
+env.Library(
+    target=[
+        'document_range',
+    ],
+    source=[
+        'document_range.cpp'
+    ],
+)
+
+env.Library(
+    target=[
+        'request',
+    ],
+    source=[
+        'request.cpp',
+        'request_builder.cpp',
+    ],
+    LIBDEPS=[
+        'document_range',
+        '$BUILD_DIR/mongo/network',
+    ],
+)
+
+env.Library(
+    target=[
+        'reply',
+    ],
+    source=[
+        'reply.cpp',
+        'reply_builder.cpp'
+    ],
+    LIBDEPS=[
+        'document_range',
+        '$BUILD_DIR/mongo/network',
+    ],
+)
+
+env.CppUnitTest(
+    target=[
+        'rpc_test',
+    ],
+    source=[
+        'reply_builder_test.cpp',
+        'reply_test.cpp',
+        'request_builder_test.cpp',
+        'request_test.cpp',
+    ],
+    LIBDEPS=[
+        'request',
+        'reply',
+    ],
+)
