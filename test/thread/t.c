@@ -190,7 +190,7 @@ wt_connect(char *config_open)
 #define	CMD "rm -rf WT_TEST && mkdir WT_TEST"
 #endif
 	if ((ret = system(CMD)) != 0)
-		die("directory cleanup call failed", ret);
+		die(ret, "directory cleanup call %s failed", CMD);
 
 	print_count = (size_t)snprintf(config, sizeof(config),
 	    "create,statistics=(all),error_prefix=\"%s\",%s%s",
@@ -199,11 +199,11 @@ wt_connect(char *config_open)
 	    config_open == NULL ? "" : config_open);
 
 	if (print_count >= sizeof(config))
-		die("Config string too long", EINVAL);
+		die(EINVAL, "Config string too long");
 
 	if ((ret = wiredtiger_open(
 	    "WT_TEST", &event_handler, config, &conn)) != 0)
-		die("wiredtiger_open", ret);
+		die(ret, "wiredtiger_open");
 }
 
 /*
@@ -217,13 +217,13 @@ wt_shutdown(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret = session->checkpoint(session, NULL)) != 0)
-		die("session.checkpoint", ret);
+		die(ret, "session.checkpoint");
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die("conn.close", ret);
+		die(ret, "conn.close");
 }
 
 /*
@@ -242,7 +242,7 @@ shutdown(void)
 #define	CMD "rm -rf WT_TEST"
 #endif
 	if ((ret = system(CMD)) != 0)
-		die("directory cleanup call failed", ret);
+		die(ret, "directory cleanup call %s failed", CMD);
 }
 
 static int
@@ -289,9 +289,17 @@ onint(int signo)
  *	Report an error and quit.
  */
 void
-die(const char *m, int e)
+die(int e, const char *fmt, ...)
 {
-	fprintf(stderr, "%s: %s: %s\n", progname, m, wiredtiger_strerror(e));
+	va_list ap;
+
+	fprintf(stderr, "%s: ", progname);
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	if (e != 0)
+		fprintf(stderr, ": %s", wiredtiger_strerror(e));
+	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
 

@@ -61,7 +61,7 @@ int  rw_start(u_int, u_int);
 void stats(void);
 void verify(const char *);
 
-void die(const char *, int)
+void die(int, const char *, ...)
 #if defined(__GNUC__)
 __attribute__((noreturn))
 #endif
