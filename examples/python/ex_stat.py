@@ -32,94 +32,85 @@ from wiredtiger import wiredtiger_open,WIREDTIGER_VERSION_STRING
 from _wiredtiger import WT_STAT_DSRC_BLOCK_SIZE,WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE,WT_STAT_DSRC_CURSOR_INSERT_BYTES,WT_STAT_DSRC_CURSOR_REMOVE_BYTES,WT_STAT_DSRC_CURSOR_UPDATE_BYTES,WT_STAT_DSRC_CACHE_BYTES_WRITE,WT_STAT_DSRC_BTREE_OVERFLOW
 
 def main():
-	# Create a clean test directory for this run of the test program
-	# if it does not already exist
-	if not os.path.exists('WT_TEST'):
-		os.makedirs('WT_TEST')
-	# Connect to the database and open a session
-	conn = wiredtiger_open('WT_TEST', 'create,statistics=(all)')
-	session = conn.open_session()
-	
-	# Create a simple table
-	session.create('table:access', 'key_format=S,value_format=S')
-	
-	# Open a cursor and insert a record
-	cursor = session.open_cursor('table:access', None)
-	
-	cursor.set_key('key')
-	cursor.set_value('value')
-	cursor.insert()
-	cursor.close()
-	
-	session.checkpoint()
-	print WIREDTIGER_VERSION_STRING
-	print_database_stats(session)
-	print_file_stats(session)
-	print_overflow_pages(session)
-	print_derived_stats(session)
-	conn.close()
+    # Create a clean test directory for this run of the test program
+    os.system('rm -rf WT_HOME')
+    os.makedirs('WT_HOME')
+    # Connect to the database and open a session
+    conn = wiredtiger_open('WT_HOME', 'create,statistics=(all)')
+    session = conn.open_session()
+    
+    # Create a simple table
+    session.create('table:access', 'key_format=S,value_format=S')
+    
+    # Open a cursor and insert a record
+    cursor = session.open_cursor('table:access', None)
+
+    cursor['key'] = 'value'    
+    cursor.insert()
+    cursor.close()
+    
+    session.checkpoint()
+    print WIREDTIGER_VERSION_STRING
+    print_database_stats(session)
+    print_file_stats(session)
+    print_overflow_pages(session)
+    print_derived_stats(session)
+    conn.close()
 
 def print_database_stats(session):
-	try:
-		statcursor = session.open_cursor("statistics:")
-	except:
-		return
-	print_cursor(statcursor)
-	statcursor.close()
+    try:
+        statcursor = session.open_cursor("statistics:")
+    except:
+        return
+    print_cursor(statcursor)
+    statcursor.close()
 
 def print_file_stats(session):
-	try:
-		fstatcursor = session.open_cursor("statistics:table:access")
-	except:
-		return
-	print_cursor(fstatcursor)
-	fstatcursor.close()
+    try:
+        fstatcursor = session.open_cursor("statistics:table:access")
+    except:
+        return
+    print_cursor(fstatcursor)
+    fstatcursor.close()
 
 def print_overflow_pages(session):
-	try:
-		ostatcursor = session.open_cursor("statistics:table:access")
-	except:
-		return
-	ostatcursor.set_key(WT_STAT_DSRC_BTREE_OVERFLOW)
-	ostatcursor.search()
-	val = ostatcursor.get_value()
-	if val != 0 :
-		print str(val[0]) + '=' + str(val[1])
-	ostatcursor.close()
+    try:
+        ostatcursor = session.open_cursor("statistics:table:access")
+    except:
+        return
+    val = ostatcursor[WT_STAT_DSRC_BTREE_OVERFLOW]
+    if val != 0 :
+        print str(val[0]) + '=' + str(val[1])
+    ostatcursor.close()
 
 def print_derived_stats(session):
-	try:
-		dstatcursor = session.open_cursor("statistics:table:access")
-	except:
-		return
-	ckpt_size = get_stat(dstatcursor, WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE)
-	file_size = get_stat(dstatcursor, WT_STAT_DSRC_BLOCK_SIZE)
-	percent = 0
-	if file_size != 0 :
-		percent = 100 * ((float(file_size) - float(ckpt_size)) / float(file_size))
-	print "Table is %" + str(percent) + " fragmented"
+    try:
+        dstatcursor = session.open_cursor("statistics:table:access")
+    except:
+        return
+    ckpt_size = dstatcursor[WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE][1]
+    file_size = dstatcursor[WT_STAT_DSRC_BLOCK_SIZE][1]
+    percent = 0
+    if file_size != 0 :
+        percent = 100 * ((float(file_size) - float(ckpt_size)) / float(file_size))
+    print "Table is %" + str(percent) + " fragmented"
 
-	app_insert = int(get_stat(dstatcursor, WT_STAT_DSRC_CURSOR_INSERT_BYTES))
-	app_remove = int(get_stat(dstatcursor, WT_STAT_DSRC_CURSOR_REMOVE_BYTES))
-	app_update = int(get_stat(dstatcursor, WT_STAT_DSRC_CURSOR_UPDATE_BYTES))
-	fs_writes  = int(get_stat(dstatcursor, WT_STAT_DSRC_CACHE_BYTES_WRITE))
+    app_insert = int(dstatcursor[WT_STAT_DSRC_CURSOR_INSERT_BYTES][1])
+    app_remove = int(dstatcursor[WT_STAT_DSRC_CURSOR_REMOVE_BYTES][1])
+    app_update = int(dstatcursor[WT_STAT_DSRC_CURSOR_UPDATE_BYTES][1])
+    fs_writes  = int(dstatcursor[WT_STAT_DSRC_CACHE_BYTES_WRITE][1])
 
-	if(app_insert + app_remove + app_update != 0):
-		print "Write amplification is " + '{:.2f}'.format(fs_writes / (app_insert + app_remove + app_update))
-	dstatcursor.close()
+    if(app_insert + app_remove + app_update != 0):
+        print "Write amplification is " + '{:.2f}'.format(fs_writes / (app_insert + app_remove + app_update))
+    dstatcursor.close()
 
 
 def print_cursor(mycursor):
-	while mycursor.next() == 0:
-		val = mycursor.get_value()
-		if val != 0 and val[1] != '0' :
-			print str(val[0]) + '=' + str(val[1])
-
-def get_stat(scursor, stat_intval):
-	scursor.set_key(stat_intval)
-	scursor.search()
-	return scursor.get_value()[1]
+    while mycursor.next() == 0:
+        val = mycursor.get_value()
+        if val[1] != '0' :
+            print str(val[0]) + '=' + str(val[1])
 
 if __name__ == "__main__":
-	main()
+    main()
 

@@ -31,10 +31,11 @@ import os
 from wiredtiger import wiredtiger_open
 
 # Connect to the database and open a session
-if not os.path.exists('WT_TEST'):
-    os.makedirs('WT_TEST')
+os.system('rm -rf WT_HOME')
+if not os.path.exists('WT_HOME'):
+    os.makedirs('WT_HOME')
 
-conn = wiredtiger_open('WT_TEST', 'create')
+conn = wiredtiger_open('WT_HOME', 'create')
 session = conn.open_session()
 
 # Create a simple table
