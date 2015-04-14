@@ -96,6 +96,7 @@ env.Library(
         "copydb.cpp",
         "copydb_start_commands.cpp",
         "count_cmd.cpp",
+        "cpuload.cpp",
         "create_indexes.cpp",
         "current_op.cpp",
         "dbcommands.cpp",

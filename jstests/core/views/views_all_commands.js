@@ -123,6 +123,7 @@
         copydbgetnonce: {skip: isUnrelated},
         copydbsaslstart: {skip: isUnrelated},
         count: {command: {count: "view"}},
+        cpuload: {skip: isAnInternalCommand},
         create: {skip: "tested in views/views_creation.js"},
         createIndexes: {
             command: {createIndexes: "view", indexes: [{key: {x: 1}, name: "x_1"}]},
