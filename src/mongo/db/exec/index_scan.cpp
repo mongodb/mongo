@@ -308,11 +308,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* IndexScan::getCommonStats() {
+    const CommonStats* IndexScan::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* IndexScan::getSpecificStats() {
+    const SpecificStats* IndexScan::getSpecificStats() const {
         return &_specificStats;
     }
 

@@ -103,11 +103,11 @@ namespace {
             return new PlanStageStats(_stats, STAGE_UNKNOWN);
         }
 
-        virtual const CommonStats* getCommonStats() {
+        virtual const CommonStats* getCommonStats() const {
             return &_stats;
         }
 
-        virtual const SpecificStats* getSpecificStats() {
+        virtual const SpecificStats* getSpecificStats() const {
             return NULL;
         }
 

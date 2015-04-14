@@ -546,11 +546,11 @@ namespace mongo {
         return NULL != _branchResults[i]->cachedSolution.get();
     }
 
-    const CommonStats* SubplanStage::getCommonStats() {
+    const CommonStats* SubplanStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* SubplanStage::getSpecificStats() {
+    const SpecificStats* SubplanStage::getSpecificStats() const {
         return NULL;
     }
 

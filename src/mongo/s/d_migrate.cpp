@@ -815,11 +815,11 @@ namespace mongo {
                 invariant( false );
                 return NULL;
             }
-            virtual CommonStats* getCommonStats() {
+            virtual CommonStats* getCommonStats() const {
                 invariant( false );
                 return NULL;
             }
-            virtual SpecificStats* getSpecificStats() {
+            virtual SpecificStats* getSpecificStats() const {
                 invariant( false );
                 return NULL;
             }

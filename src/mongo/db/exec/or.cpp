@@ -201,11 +201,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* OrStage::getCommonStats() {
+    const CommonStats* OrStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* OrStage::getSpecificStats() {
+    const SpecificStats* OrStage::getSpecificStats() const {
         return &_specificStats;
     }
 

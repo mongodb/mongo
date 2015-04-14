@@ -278,11 +278,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* MergeSortStage::getCommonStats() {
+    const CommonStats* MergeSortStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* MergeSortStage::getSpecificStats() {
+    const SpecificStats* MergeSortStage::getSpecificStats() const {
         return &_specificStats;
     }
 

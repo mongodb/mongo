@@ -168,11 +168,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* CountScan::getCommonStats() {
+    const CommonStats* CountScan::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* CountScan::getSpecificStats() {
+    const SpecificStats* CountScan::getSpecificStats() const {
         return &_specificStats;
     }
 

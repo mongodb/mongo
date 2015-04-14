@@ -121,8 +121,8 @@ namespace mongo {
         /**
          * Returns a short plan summary std::string describing the leaves of the query plan.
          */
-        static std::string getPlanSummary(PlanExecutor* exec);
-        static std::string getPlanSummary(PlanStage* root);
+        static std::string getPlanSummary(const PlanExecutor* exec);
+        static std::string getPlanSummary(const PlanStage* root);
 
         /**
          * Fills out 'statsOut' with summary stats using the execution tree contained
@@ -137,7 +137,7 @@ namespace mongo {
          *
          * Does not take ownership of its arguments.
          */
-        static void getSummaryStats(PlanExecutor* exec, PlanSummaryStats* statsOut);
+        static void getSummaryStats(const PlanExecutor* exec, PlanSummaryStats* statsOut);
 
     private:
         /**

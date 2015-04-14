@@ -270,11 +270,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* CollectionScan::getCommonStats() {
+    const CommonStats* CollectionScan::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* CollectionScan::getSpecificStats() {
+    const SpecificStats* CollectionScan::getSpecificStats() const {
         return &_specificStats;
     }
 

@@ -154,11 +154,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* DistinctScan::getCommonStats() {
+    const CommonStats* DistinctScan::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* DistinctScan::getSpecificStats() {
+    const SpecificStats* DistinctScan::getSpecificStats() const {
         return &_specificStats;
     }
 

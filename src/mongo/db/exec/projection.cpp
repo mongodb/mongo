@@ -285,11 +285,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* ProjectionStage::getCommonStats() {
+    const CommonStats* ProjectionStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* ProjectionStage::getSpecificStats() {
+    const SpecificStats* ProjectionStage::getSpecificStats() const {
         return &_specificStats;
     }
 

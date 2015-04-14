@@ -296,11 +296,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* DeleteStage::getCommonStats() {
+    const CommonStats* DeleteStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* DeleteStage::getSpecificStats() {
+    const SpecificStats* DeleteStage::getSpecificStats() const {
         return &_specificStats;
     }
 

@@ -271,7 +271,7 @@ namespace mongo {
          * It must not exist past the stage. If you need the stats to outlive the stage,
          * use the getStats(...) method above.
          */
-        virtual const CommonStats* getCommonStats() = 0;
+        virtual const CommonStats* getCommonStats() const = 0;
 
         /**
          * Get stats specific to this stage. Some stages may not have specific stats, in which
@@ -281,7 +281,7 @@ namespace mongo {
          * It must not exist past the stage. If you need the stats to outlive the stage,
          * use the getStats(...) method above.
          */
-        virtual const SpecificStats* getSpecificStats() = 0;
+        virtual const SpecificStats* getSpecificStats() const = 0;
 
     };
 

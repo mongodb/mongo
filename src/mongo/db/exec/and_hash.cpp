@@ -543,11 +543,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* AndHashStage::getCommonStats() {
+    const CommonStats* AndHashStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* AndHashStage::getSpecificStats() {
+    const SpecificStats* AndHashStage::getSpecificStats() const {
         return &_specificStats;
     }
 

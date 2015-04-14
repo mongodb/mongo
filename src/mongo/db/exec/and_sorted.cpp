@@ -339,11 +339,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* AndSortedStage::getCommonStats() {
+    const CommonStats* AndSortedStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* AndSortedStage::getSpecificStats() {
+    const SpecificStats* AndSortedStage::getSpecificStats() const {
         return &_specificStats;
     }
 

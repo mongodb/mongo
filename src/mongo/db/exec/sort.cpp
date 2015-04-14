@@ -483,11 +483,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* SortStage::getCommonStats() {
+    const CommonStats* SortStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* SortStage::getSpecificStats() {
+    const SpecificStats* SortStage::getSpecificStats() const {
         return &_specificStats;
     }
 

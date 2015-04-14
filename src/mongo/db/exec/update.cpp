@@ -1064,11 +1064,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* UpdateStage::getCommonStats() {
+    const CommonStats* UpdateStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* UpdateStage::getSpecificStats() {
+    const SpecificStats* UpdateStage::getSpecificStats() const {
         return &_specificStats;
     }
 

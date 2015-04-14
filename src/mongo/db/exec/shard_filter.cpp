@@ -156,11 +156,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* ShardFilterStage::getCommonStats() {
+    const CommonStats* ShardFilterStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* ShardFilterStage::getSpecificStats() {
+    const SpecificStats* ShardFilterStage::getSpecificStats() const {
         return &_specificStats;
     }
 

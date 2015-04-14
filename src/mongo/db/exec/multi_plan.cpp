@@ -508,11 +508,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* MultiPlanStage::getCommonStats() {
+    const CommonStats* MultiPlanStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* MultiPlanStage::getSpecificStats() {
+    const SpecificStats* MultiPlanStage::getSpecificStats() const {
         return &_specificStats;
     }
 

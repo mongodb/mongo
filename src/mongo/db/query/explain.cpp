@@ -56,7 +56,7 @@ namespace {
     /**
      * Traverse the tree rooted at 'root', and add all tree nodes into the list 'flattened'.
      */
-    void flattenStatsTree(PlanStageStats* root, vector<PlanStageStats*>* flattened) {
+    void flattenStatsTree(const PlanStageStats* root, vector<const PlanStageStats*>* flattened) {
         flattened->push_back(root);
         for (size_t i = 0; i < root->children.size(); ++i) {
             flattenStatsTree(root->children[i], flattened);
@@ -66,7 +66,7 @@ namespace {
     /**
      * Traverse the tree rooted at 'root', and add all nodes into the list 'flattened'.
      */
-    void flattenExecTree(PlanStage* root, vector<PlanStage*>* flattened) {
+    void flattenExecTree(const PlanStage* root, vector<const PlanStage*>* flattened) {
         flattened->push_back(root);
         vector<PlanStage*> children = root->getChildren();
         for (size_t i = 0; i < children.size(); ++i) {
@@ -162,7 +162,7 @@ namespace {
     /**
      * Adds to the plan summary string being built by 'ss' for the execution stage 'stage'.
      */
-    void addStageSummaryStr(PlanStage* stage, mongoutils::str::stream& ss) {
+    void addStageSummaryStr(const PlanStage* stage, mongoutils::str::stream& ss) {
         // First add the stage type string.
         const CommonStats* common = stage->getCommonStats();
         ss << common->stageTypeStr;
@@ -552,7 +552,7 @@ namespace mongo {
         }
 
         // Flatten the stats tree into a list.
-        vector<PlanStageStats*> statsNodes;
+        vector<const PlanStageStats*> statsNodes;
         flattenStatsTree(stats, &statsNodes);
 
         // Iterate over all stages in the tree and get the total number of keys/docs examined.
@@ -676,13 +676,13 @@ namespace mongo {
     }
 
     // static
-    string Explain::getPlanSummary(PlanExecutor* exec) {
+    std::string Explain::getPlanSummary(const PlanExecutor* exec) {
          return getPlanSummary(exec->getRootStage());
     }
 
     // static
-    string Explain::getPlanSummary(PlanStage* root) {
-        vector<PlanStage*> stages;
+    std::string Explain::getPlanSummary(const PlanStage* root) {
+        std::vector<const PlanStage*> stages;
         flattenExecTree(root, &stages);
 
         // Use this stream to build the plan summary string.
@@ -707,7 +707,7 @@ namespace mongo {
     }
 
     // static
-    void Explain::getSummaryStats(PlanExecutor* exec, PlanSummaryStats* statsOut) {
+    void Explain::getSummaryStats(const PlanExecutor* exec, PlanSummaryStats* statsOut) {
         invariant(NULL != statsOut);
 
         PlanStage* root = exec->getRootStage();
@@ -720,7 +720,7 @@ namespace mongo {
 
         // The other fields are aggregations over the stages in the plan tree. We flatten
         // the tree into a list and then compute these aggregations.
-        vector<PlanStage*> stages;
+        std::vector<const PlanStage*> stages;
         flattenExecTree(root, &stages);
 
         for (size_t i = 0; i < stages.size(); i++) {

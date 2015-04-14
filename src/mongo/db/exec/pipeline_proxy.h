@@ -79,8 +79,8 @@ namespace mongo {
         //
 
         virtual PlanStageStats* getStats() { return NULL; }
-        virtual CommonStats* getCommonStats() { return NULL; }
-        virtual SpecificStats* getSpecificStats() { return NULL; }
+        virtual CommonStats* getCommonStats() const { return NULL; }
+        virtual SpecificStats* getSpecificStats() const { return NULL; }
 
         // Not used.
         virtual std::vector<PlanStage*> getChildren() const;

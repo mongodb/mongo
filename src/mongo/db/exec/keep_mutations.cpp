@@ -148,11 +148,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* KeepMutationsStage::getCommonStats() {
+    const CommonStats* KeepMutationsStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* KeepMutationsStage::getSpecificStats() {
+    const SpecificStats* KeepMutationsStage::getSpecificStats() const {
         return NULL;
     }
 

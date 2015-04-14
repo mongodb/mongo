@@ -292,11 +292,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* GroupStage::getCommonStats() {
+    const CommonStats* GroupStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* GroupStage::getSpecificStats() {
+    const SpecificStats* GroupStage::getSpecificStats() const {
         return &_specificStats;
     }
 

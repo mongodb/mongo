@@ -185,11 +185,11 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* TextStage::getCommonStats() {
+    const CommonStats* TextStage::getCommonStats() const {
         return &_commonStats;
     }
 
-    const SpecificStats* TextStage::getSpecificStats() {
+    const SpecificStats* TextStage::getSpecificStats() const {
         return &_specificStats;
     }
 

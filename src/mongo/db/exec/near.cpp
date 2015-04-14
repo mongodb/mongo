@@ -386,11 +386,11 @@ namespace mongo {
         return _stats->stageType;
     }
 
-    const CommonStats* NearStage::getCommonStats() {
+    const CommonStats* NearStage::getCommonStats() const {
         return &_stats->common;
     }
 
-    const SpecificStats* NearStage::getSpecificStats() {
+    const SpecificStats* NearStage::getSpecificStats() const {
         return _stats->specific.get();
     }
 

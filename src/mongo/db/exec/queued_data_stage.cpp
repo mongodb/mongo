@@ -89,9 +89,9 @@ namespace mongo {
         return ret.release();
     }
 
-    const CommonStats* QueuedDataStage::getCommonStats() { return &_commonStats; }
+    const CommonStats* QueuedDataStage::getCommonStats() const { return &_commonStats; }
 
-    const SpecificStats* QueuedDataStage::getSpecificStats() { return &_specificStats; }
+    const SpecificStats* QueuedDataStage::getSpecificStats() const { return &_specificStats; }
 
     void QueuedDataStage::pushBack(const PlanStage::StageState state) {
         invariant(PlanStage::ADVANCED != state);

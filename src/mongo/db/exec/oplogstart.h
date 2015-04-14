@@ -83,9 +83,9 @@ namespace mongo {
 
         virtual PlanStageStats* getStats() { return NULL; }
 
-        virtual const CommonStats* getCommonStats() { return NULL; }
+        virtual const CommonStats* getCommonStats() const { return NULL; }
 
-        virtual const SpecificStats* getSpecificStats() { return NULL; }
+        virtual const SpecificStats* getSpecificStats() const { return NULL; }
 
         virtual StageType stageType() const { return STAGE_OPLOG_START; }
 
