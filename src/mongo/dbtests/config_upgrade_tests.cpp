@@ -27,11 +27,11 @@
  */
 
 #include "mongo/dbtests/config_server_fixture.h"
+#include "mongo/s/catalog/legacy/cluster_client_internal.h"
+#include "mongo/s/catalog/legacy/config_upgrade.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/cluster_client_internal.h"
-#include "mongo/s/config_upgrade.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_settings.h"

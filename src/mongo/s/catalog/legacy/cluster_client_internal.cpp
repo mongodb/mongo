@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/cluster_client_internal.h"
+#include "mongo/s/catalog/legacy/cluster_client_internal.h"
 
 #include <boost/scoped_ptr.hpp>
 #include <string>

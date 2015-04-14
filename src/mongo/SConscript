@@ -935,7 +935,6 @@ env.Library('mongoscore',
                 's/cluster_ops',
                 's/cluster_write_op_conversion',
                 's/commands/cluster_commands',
-                's/upgrade',
             ])
 
 env.CppUnitTest("mongoscore_test",
@@ -1237,7 +1236,6 @@ env.Install(
             "coreshard",
             "ntservice",
             "mongodandmongos",
-            "s/upgrade",
             '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         ]))
 
@@ -1276,7 +1274,6 @@ test = env.Install(
                        "coredb",
                        "testframework",
                        "signal_handlers_synchronous",
-                       "s/upgrade",
                        "s/cluster_ops",
                        "s/cluster_ops_impl",
                        "mocklib",

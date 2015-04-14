@@ -28,15 +28,15 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
-#include "mongo/s/config_upgrade.h"
+#include "mongo/s/catalog/legacy/config_upgrade.h"
 
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/cluster_client_internal.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongo_version_range.h"

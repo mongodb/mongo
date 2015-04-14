@@ -61,21 +61,6 @@ env.CppUnitTest('type_tags_test', 'type_tags_test.cpp',
                          '$BUILD_DIR/mongo/db/common'])
 
 #
-# Upgrade library for config database
-# Built only on 'mongocommon' because clientandshell pulls in 'defaultversion'
-#
-
-env.Library('upgrade', ['cluster_client_internal.cpp',
-                        'config_upgrade.cpp',
-                        'config_upgrade_helpers.cpp',
-                        'config_upgrade_v0_to_v7.cpp',
-                        'config_upgrade_v6_to_v7.cpp'],
-            LIBDEPS=['base',
-                     '$BUILD_DIR/mongo/mongocommon'])
-
-# TODO: config upgrade tests are currently in dbtests
-
-#
 # Support for maintaining persistent sharding state and data.
 #
 

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/config_upgrade.h"
+#include "mongo/s/catalog/legacy/config_upgrade.h"
 
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/grid.h"
