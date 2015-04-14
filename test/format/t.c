@@ -240,6 +240,7 @@ main(int argc, char *argv[])
 		printf("%4d: %s, %s (%.0f seconds)\n",
 		    g.run_cnt, g.c_data_source,
 		    g.c_file_type, difftime(time(NULL), start));
+		fflush(stdout);
 	}
 
 	/* Flush/close any logging information. */
