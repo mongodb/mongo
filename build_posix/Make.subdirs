@@ -23,7 +23,7 @@ lang/python PYTHON
 test/bloom
 test/checkpoint
 test/fops
-test/format HAVE_BERKELEY_DB
+test/format
 test/huge
 test/packing
 test/salvage

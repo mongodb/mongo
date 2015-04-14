@@ -116,11 +116,10 @@ wts_load(void)
 		if ((ret = cursor->insert(cursor)) != 0)
 			die(ret, "cursor.insert");
 
-		if (!SINGLETHREADED)
-			continue;
-
-		/* Insert the item into BDB. */
-		bdb_insert(key.data, key.size, value.data, value.size);
+#ifdef HAVE_BERKELEY_DB
+		if (SINGLETHREADED)
+			bdb_insert(key.data, key.size, value.data, value.size);
+#endif
 	}
 
 	if ((ret = cursor->close(cursor)) != 0)

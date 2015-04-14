@@ -422,6 +422,7 @@ wts_close(void)
 void
 wts_dump(const char *tag, int dump_bdb)
 {
+#ifdef HAVE_BERKELEY_DB
 	size_t len;
 	int ret;
 	char *cmd;
@@ -430,7 +431,6 @@ wts_dump(const char *tag, int dump_bdb)
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
-#ifndef _WIN32
 	track("dump files and compare", 0ULL, NULL);
 
 	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
@@ -448,6 +448,9 @@ wts_dump(const char *tag, int dump_bdb)
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
 	free(cmd);
+#else
+	(void)tag;				/* [-Wunused-variable] */
+	(void)dump_bdb;				/* [-Wunused-variable] */
 #endif
 }
 

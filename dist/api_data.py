@@ -1,9 +1,8 @@
 # This file is a python script that describes the WiredTiger API.
 
 class Method:
-    def __init__(self, config, **flags):
+    def __init__(self, config):
         self.config = config
-        self.flags = flags
 
 class Config:
     def __init__(self, name, default, desc, subconfig=None, **flags):

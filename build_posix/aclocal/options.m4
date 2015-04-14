@@ -215,8 +215,6 @@ pthread|pthreads)
 	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_PTHREAD_MUTEX);;
 pthread_adaptive|pthreads_adaptive)
 	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_PTHREAD_MUTEX_ADAPTIVE);;
-pthread_logging|pthreads_logging)
-	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_PTHREAD_MUTEX_LOGGING);;
 *)	AC_MSG_ERROR([Unknown spinlock type "$with_spinlock"]);;
 esac
 AC_MSG_RESULT($with_spinlock)

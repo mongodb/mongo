@@ -68,6 +68,7 @@ static const char * const debug_tconfig = "";
 static void	*checkpoint_worker(void *);
 static int	 create_tables(CONFIG *);
 static int	 create_uris(CONFIG *);
+static int	drop_all_tables(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
@@ -1528,6 +1529,10 @@ err:	cfg->stop = 1;
 	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
 		ret = t_ret;
 
+	/* Drop tables if configured to and this isn't an error path */
+	if (ret == 0 && cfg->drop_tables && (ret = drop_all_tables(cfg)) != 0)
+		lprintf(cfg, ret, 0, "Drop tables failed.");
+
 	/* Report if any worker threads didn't finish. */
 	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
@@ -2283,6 +2288,42 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 
 	*ops = 0;
 	*interval = now;
+}
+
+static int
+drop_all_tables(CONFIG *cfg)
+{
+	struct timespec start, stop;
+	WT_SESSION *session;
+	size_t i;
+	uint64_t msecs;
+	int ret, t_ret;
+
+	/* Drop any tables. */
+	if ((ret = cfg->conn->open_session(
+	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
+		lprintf(cfg, ret, 0,
+		    "Error opening a session on %s", cfg->home);
+		return (ret);
+	}
+	(void)__wt_epoch(NULL, &start);
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->drop(
+		    session, cfg->uris[i], NULL)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error dropping table %s", cfg->uris[i]);
+			goto err;
+		}
+	}
+	(void)__wt_epoch(NULL, &stop);
+	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
+	lprintf(cfg, 0, 1,
+	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",
+	    cfg->table_count, msecs / cfg->table_count);
+
+err:	if ((t_ret = session->close(session, NULL)) != 0 && ret == 0)
+		ret = t_ret;
+	return (ret);
 }
 
 static uint64_t
