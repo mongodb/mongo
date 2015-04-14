@@ -36,7 +36,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	if (block->fh->size > allocsize) {
 		len = (block->fh->size / allocsize) * allocsize;
 		if (len != block->fh->size)
-			WT_RET(__wt_ftruncate(session, block->fh, len));
+			WT_RET(__wt_block_truncate(session, block->fh, len));
 	} else
 		len = allocsize;
 	block->live.file_size = len;

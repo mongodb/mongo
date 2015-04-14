@@ -21,6 +21,127 @@ __wt_block_header(WT_BLOCK *block)
 }
 
 /*
+ * __wt_block_truncate --
+ *	Truncate the file.
+ */
+int
+__wt_block_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
+{
+	WT_RET(__wt_ftruncate(session, fh, len));
+
+	fh->size = fh->extend_size = len;
+
+	return (0);
+}
+
+/*
+ * __wt_block_extend --
+ *	Extend the file.
+ */
+static inline int
+__wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_FH *fh, wt_off_t offset, size_t align_size, int *release_lockp)
+{
+	WT_DECL_RET;
+	int locked;
+
+	/*
+	 * The locking in this function is messy: by definition, the live system
+	 * is locked when we're called, but that lock may have been acquired by
+	 * our caller or our caller's caller. If our caller's lock, release_lock
+	 * comes in set, indicating this function can unlock it before returning
+	 * (either before extending the file or afterward, depending on the call
+	 * used). If it is our caller's caller, then release_lock comes in not
+	 * set, indicating it cannot be released here.
+	 *
+	 * If we unlock here, we clear release_lock. But if we then find out we
+	 * need a lock after all, we re-acquire the lock and set release_lock so
+	 * our caller knows to release it.
+	 */
+	locked = 1;
+
+	/* If not configured to extend the file, we're done. */
+	if (fh->extend_len == 0)
+		return (0);
+
+	/*
+	 * Extend the file in chunks.  We want to limit the number of threads
+	 * extending the file at the same time, so choose the one thread that's
+	 * crossing the extended boundary.  We don't extend newly created files,
+	 * and it's theoretically possible we might wait so long our extension
+	 * of the file is passed by another thread writing single blocks, that's
+	 * why there's a check in case the extended file size becomes too small:
+	 * if the file size catches up, every thread tries to extend it.
+	 */
+	if (fh->extend_size > fh->size &&
+	    (offset > fh->extend_size ||
+	    offset + fh->extend_len + (wt_off_t)align_size < fh->extend_size))
+		return (0);
+
+	/*
+	 * File extension may require locking: some variants of the system call
+	 * used to extend the file initialize the extended space. If a writing
+	 * thread races with the extending thread, the extending thread might
+	 * overwrite already written data, and that would be very, very bad.
+	 *
+	 * Some variants of the system call to extend the file fail at run-time
+	 * based on the filesystem type, fall back to ftruncate in that case,
+	 * and remember that ftruncate requires locking.
+	 */
+	if (fh->fallocate_available != WT_FALLOCATE_NOT_AVAILABLE) {
+		/*
+		 * Release any locally acquired lock if not needed to extend the
+		 * file, extending the file may require updating on-disk file's
+		 * metadata, which can be slow. (It may be a bad idea to
+		 * configure for file extension on systems that require locking
+		 * over the extend call.)
+		 */
+		if (!fh->fallocate_requires_locking && *release_lockp) {
+			*release_lockp = locked = 0;
+			__wt_spin_unlock(session, &block->live_lock);
+		}
+
+		/*
+		 * Extend the file: there's a race between setting the value of
+		 * extend_size and doing the extension, but it should err on the
+		 * side of extend_size being smaller than the actual file size,
+		 * and that's OK, we simply may do another extension sooner than
+		 * otherwise.
+		 */
+		fh->extend_size = fh->size + fh->extend_len * 2;
+		if ((ret = __wt_fallocate(
+		    session, fh, fh->size, fh->extend_len * 2)) == 0)
+			return (0);
+		if (ret != ENOTSUP)
+			return (ret);
+	}
+
+	/*
+	 * We may have a caller lock or a locally acquired lock, but we need a
+	 * lock to call ftruncate.
+	 */
+	if (!locked) {
+		__wt_spin_lock(session, &block->live_lock);
+		*release_lockp = 1;
+	}
+
+	/*
+	 * The underlying truncate call initializes allocated space, reset the
+	 * extend length after locking so we don't overwrite already-written
+	 * blocks.
+	 */
+	fh->extend_size = fh->size + fh->extend_len * 2;
+
+	/*
+	 * The truncate might fail if there's a mapped file (in other words, if
+	 * there's an open checkpoint on the file), that's OK.
+	 */
+	if ((ret = __wt_ftruncate(session, fh, fh->extend_size)) == EBUSY)
+		ret = 0;
+	return (ret);
+}
+
+/*
  * __wt_block_write_size --
  *	Return the buffer size required to write a block.
  */
@@ -86,7 +207,6 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;
-	local_locked = 0;
 
 	/* Buffers should be aligned for writing. */
 	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
@@ -143,81 +263,26 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	blk->cksum = __wt_cksum(
 	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
 
+	/* Pre-allocate some number of extension structures. */
+	WT_RET(__wt_block_ext_prealloc(session, 5));
+
+	/*
+	 * Acquire a lock, if we don't already hold one.
+	 * Allocate space for the write, and optionally extend the file (note
+	 * the block-extend function may release the lock).
+	 * Release any locally acquired lock.
+	 */
+	local_locked = 0;
 	if (!caller_locked) {
-		WT_RET(__wt_block_ext_prealloc(session, 5));
 		__wt_spin_lock(session, &block->live_lock);
 		local_locked = 1;
 	}
 	ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
-
-	/*
-	 * Extend the file in chunks.  We want to limit the number of threads
-	 * extending the file at the same time, so choose the one thread that's
-	 * crossing the extended boundary.  We don't extend newly created files,
-	 * and it's theoretically possible we might wait so long our extension
-	 * of the file is passed by another thread writing single blocks, that's
-	 * why there's a check in case the extended file size becomes too small:
-	 * if the file size catches up, every thread tries to extend it.
-	 *
-	 * File extension may require locking: some variants of the system call
-	 * used to extend the file initialize the extended space. If a writing
-	 * thread races with the extending thread, the extending thread might
-	 * overwrite already written data, and that would be very, very bad.
-	 *
-	 * Some variants of the system call to extend the file fail at run-time
-	 * based on the filesystem type, fall back to ftruncate in that case,
-	 * and remember that ftruncate requires locking.
-	 */
-	if (ret == 0 &&
-	    fh->extend_len != 0 &&
-	    (fh->extend_size <= fh->size ||
-	    (offset + fh->extend_len <= fh->extend_size &&
-	    offset +
-	    fh->extend_len + (wt_off_t)align_size >= fh->extend_size))) {
-		fh->extend_size = offset + fh->extend_len * 2;
-		if (fh->fallocate_available != WT_FALLOCATE_NOT_AVAILABLE) {
-			/*
-			 * Release any locally acquired lock if it's not needed
-			 * to extend the file, extending the file might require
-			 * updating file metadata, which can be slow. (It may be
-			 * a bad idea to configure for file extension on systems
-			 * that require locking over the extend call.)
-			 */
-			if (!fh->fallocate_requires_locking && local_locked) {
-				__wt_spin_unlock(session, &block->live_lock);
-				local_locked = 0;
-			}
-
-			/* Extend the file. */
-			if ((ret = __wt_fallocate(session,
-			    fh, offset, fh->extend_len * 2)) == ENOTSUP) {
-				ret = 0;
-				goto extend_truncate;
-			}
-		} else {
-extend_truncate:	/*
-			 * We may have a caller lock or a locally acquired lock,
-			 * but we need a lock to call ftruncate.
-			 */
-			if (!caller_locked && local_locked == 0) {
-				__wt_spin_lock(session, &block->live_lock);
-				local_locked = 1;
-			}
-			/*
-			 * The truncate might fail if there's a file mapping
-			 * (if there's an open checkpoint on the file), that's
-			 * OK.
-			 */
-			if ((ret = __wt_ftruncate(
-			    session, fh, offset + fh->extend_len * 2)) == EBUSY)
-				ret = 0;
-		}
-	}
-	/* Release any locally acquired lock. */
-	if (local_locked) {
+	if (ret == 0)
+		ret = __wt_block_extend(
+		    session, block, fh, offset, align_size, &local_locked);
+	if (local_locked)
 		__wt_spin_unlock(session, &block->live_lock);
-		local_locked = 0;
-	}
 	WT_RET(ret);
 
 	/* Write the block. */

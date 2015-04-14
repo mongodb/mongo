@@ -1342,7 +1342,7 @@ __wt_block_extlist_truncate(
 	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
 	    (intmax_t)orig, (intmax_t)size));
-	WT_RET_BUSY_OK(__wt_ftruncate(session, block->fh, size));
+	WT_RET_BUSY_OK(__wt_block_truncate(session, block->fh, size));
 
 	return (0);
 }
