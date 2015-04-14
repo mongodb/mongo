@@ -371,12 +371,12 @@ connection_runtime_config = [
     Config('file_manager', '', r'''
         control how file handles are managed''',
         type='category', subconfig=[
+        Config('close_handle_minimum', '250', r'''
+            number of handles open before the file manager will look for handles
+            to close''', min=0),
         Config('close_idle_time', '30', r'''
             amount of time in seconds a file handle needs to be idle
             before attempting to close it''', min=1, max=100000),
-        Config('close_handle_minimum', '250', r'''
-            number of handles open before the file manager will look for handles
-            to close'''),
         Config('close_scan_interval', '10', r'''
             interval in seconds at which to check for files that are
             inactive and close them''', min=1, max=100000),
