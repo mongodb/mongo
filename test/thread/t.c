@@ -30,7 +30,8 @@
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
 __ftype ftype;					/* File type */
-u_int nkeys, nops;				/* Keys, Operations */
+u_int nkeys, max_nops;				/* Keys, Operations */
+int vary_nops;					/* Vary operations by thread */
 int log_print;					/* Log print per operation */
 int multiple_files;				/* File per thread */
 int session_per_op;				/* New session per operation */
@@ -66,14 +67,15 @@ main(int argc, char *argv[])
 	log_print = 0;
 	multiple_files = 0;
 	nkeys = 1000;
-	nops = 10000;
+	max_nops = 10000;
 	readers = 10;
 	runs = 1;
 	session_per_op = 0;
+	vary_nops = 0;
 	writers = 10;
 
 	while ((ch = __wt_getopt(
-	    progname, argc, argv, "C:Fk:Ll:n:R:r:St:W:")) != EOF)
+	    progname, argc, argv, "C:Fk:Ll:n:R:r:St:vW:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			config_open = __wt_optarg;
@@ -95,7 +97,7 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'n':			/* operations */
-			nops = (u_int)atoi(__wt_optarg);
+			max_nops = (u_int)atoi(__wt_optarg);
 			break;
 		case 'R':
 			readers = (u_int)atoi(__wt_optarg);
@@ -121,6 +123,9 @@ main(int argc, char *argv[])
 				return (usage());
 			}
 			break;
+		case 'v':			/* vary operation count */
+			vary_nops = 1;
+			break;
 		case 'W':
 			writers = (u_int)atoi(__wt_optarg);
 			break;
@@ -132,6 +137,12 @@ main(int argc, char *argv[])
 	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
+
+	if (vary_nops && !multiple_files) {
+		fprintf(stderr,
+		    "Variable op counts only supported with multiple tables\n");
+		return (usage());
+	}
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -169,16 +180,30 @@ wt_connect(char *config_open)
 		NULL	/* Close handler. */
 	};
 	int ret;
-	char config[128];
+	char config[512];
+	size_t print_count;
 
-	snprintf(config, sizeof(config),
+#undef	CMD
+#ifdef _WIN32
+#define	CMD "rd /s /q WT_TEST & mkdir WT_TEST"
+#else
+#define	CMD "rm -rf WT_TEST && mkdir WT_TEST"
+#endif
+	if ((ret = system(CMD)) != 0)
+		die(ret, "directory cleanup call %s failed", CMD);
+
+	print_count = (size_t)snprintf(config, sizeof(config),
 	    "create,statistics=(all),error_prefix=\"%s\",%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)
-		die("wiredtiger_open", ret);
+	if (print_count >= sizeof(config))
+		die(EINVAL, "Config string too long");
+
+	if ((ret = wiredtiger_open(
+	    "WT_TEST", &event_handler, config, &conn)) != 0)
+		die(ret, "wiredtiger_open");
 }
 
 /*
@@ -192,13 +217,13 @@ wt_shutdown(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret = session->checkpoint(session, NULL)) != 0)
-		die("session.checkpoint", ret);
+		die(ret, "session.checkpoint");
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die("conn.close", ret);
+		die(ret, "conn.close");
 }
 
 /*
@@ -210,8 +235,14 @@ shutdown(void)
 {
 	int ret;
 
-	if ((ret = system("rm -f WiredTiger* wt.*")) != 0)
-		die("system cleanup call failed", ret);
+#undef	CMD
+#ifdef _WIN32
+#define	CMD "rd /s /q WT_TEST"
+#else
+#define	CMD "rm -rf WT_TEST"
+#endif
+	if ((ret = system(CMD)) != 0)
+		die(ret, "directory cleanup call %s failed", CMD);
 }
 
 static int
@@ -258,9 +289,17 @@ onint(int signo)
  *	Report an error and quit.
  */
 void
-die(const char *m, int e)
+die(int e, const char *fmt, ...)
 {
-	fprintf(stderr, "%s: %s: %s\n", progname, m, wiredtiger_strerror(e));
+	va_list ap;
+
+	fprintf(stderr, "%s: ", progname);
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	if (e != 0)
+		fprintf(stderr, ": %s", wiredtiger_strerror(e));
+	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -273,7 +312,7 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-FLS] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
+	    "[-FLSv] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
 	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
 	    progname);
 	fprintf(stderr, "%s",
@@ -287,6 +326,7 @@ usage(void)
 	    "\t-r set number of runs (0 for continuous)\n"
 	    "\t-S open/close a session on every operation\n"
 	    "\t-t set a file type (fix | row | var)\n"
+	    "\t-v do a different number of operations on different tables\n"
 	    "\t-W set number of writing threads\n");
 	return (EXIT_FAILURE);
 }
