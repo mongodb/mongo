@@ -32,8 +32,7 @@ from wiredtiger import wiredtiger_open
 
 # Connect to the database and open a session
 os.system('rm -rf WT_HOME')
-if not os.path.exists('WT_HOME'):
-    os.makedirs('WT_HOME')
+os.makedirs('WT_HOME')
 
 conn = wiredtiger_open('WT_HOME', 'create')
 session = conn.open_session()
