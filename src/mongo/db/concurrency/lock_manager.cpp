@@ -708,7 +708,6 @@ namespace {
                 }
             }
         }
-        LOG(2) << "deleted " << deletedLockHeads << " unused lock heads";
     }
 
     void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
