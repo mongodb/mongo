@@ -183,6 +183,16 @@ wt_connect(char *config_open)
 	char config[512];
 	size_t print_count;
 
+#undef	CMD
+#ifdef _WIN32
+#define	CMD "rd /s /q WT_TEST & mkdir WT_TEST"
+#else
+#define	CMD "rm -rf WT_TEST && mkdir WT_TEST"
+#endif
+
+	if ((ret = system(CMD)) != 0)
+		die("directory cleanup call failed", ret);
+
 	print_count = (size_t)snprintf(config, sizeof(config),
 	    "create,statistics=(all),error_prefix=\"%s\",%s%s",
 	    progname,
@@ -192,7 +202,8 @@ wt_connect(char *config_open)
 	if (print_count >= sizeof(config))
 		die("Config string too long", EINVAL);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(
+	    "WT_TEST", &event_handler, config, &conn)) != 0)
 		die("wiredtiger_open", ret);
 }
 

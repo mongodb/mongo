@@ -219,13 +219,13 @@ reader(void *arg)
 	char tid[128];
 
 	id = (int)(uintptr_t)arg;
-
+	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
-	printf(" read thread %2d starting: tid: %s\n", id, tid);
+
+	printf(" read thread %2d starting: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	sched_yield();		/* Get all the threads created. */
-
-	s = &run_info[id];
 
 	if (session_per_op) {
 		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield()) {
@@ -251,6 +251,9 @@ reader(void *arg)
 		if ((ret = session->close(session, NULL)) != 0)
 			die("session.close", ret);
 	}
+
+	printf(" read thread %2d stopping: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	return (NULL);
 }
@@ -316,13 +319,13 @@ writer(void *arg)
 	char tid[128];
 
 	id = (int)(uintptr_t)arg;
-
+	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
-	printf("write thread %2d starting: tid: %s\n", id, tid);
+
+	printf("write thread %2d starting: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	sched_yield();		/* Get all the threads created. */
-
-	s = &run_info[id];
 
 	if (session_per_op) {
 		for (i = 0; i < s->nops; ++i, sched_yield()) {
@@ -348,6 +351,9 @@ writer(void *arg)
 		if ((ret = session->close(session, NULL)) != 0)
 			die("session.close", ret);
 	}
+
+	printf("write thread %2d stopping: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	return (NULL);
 }
