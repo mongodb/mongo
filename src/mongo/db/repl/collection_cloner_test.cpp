@@ -373,7 +373,9 @@ namespace {
         // immediately after scheduling.
         auto&& executor = getExecutor();
         collectionCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
-            auto scheduleResult = executor.scheduleWorkWithGlobalExclusiveLock(workFn);
+            // Schedule as non-exclusive task to allow us to cancel it before the executor is able
+            // to invoke the callback.
+            auto scheduleResult = executor.scheduleWork(workFn);
             ASSERT_OK(scheduleResult.getStatus());
             executor.cancel(scheduleResult.getValue());
             return scheduleResult;
@@ -570,7 +572,9 @@ namespace {
         // immediately after scheduling.
         auto&& executor = getExecutor();
         collectionCloner->setScheduleDbWorkFn([&](const ReplicationExecutor::CallbackFn& workFn) {
-            auto scheduleResult = executor.scheduleWorkWithGlobalExclusiveLock(workFn);
+            // Schedule as non-exclusive task to allow us to cancel it before the executor is able
+            // to invoke the callback.
+            auto scheduleResult = executor.scheduleWork(workFn);
             ASSERT_OK(scheduleResult.getStatus());
             executor.cancel(scheduleResult.getValue());
             return scheduleResult;
