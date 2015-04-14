@@ -189,7 +189,6 @@ wt_connect(char *config_open)
 #else
 #define	CMD "rm -rf WT_TEST && mkdir WT_TEST"
 #endif
-
 	if ((ret = system(CMD)) != 0)
 		die("directory cleanup call failed", ret);
 
@@ -236,8 +235,14 @@ shutdown(void)
 {
 	int ret;
 
-	if ((ret = system("rm -f WiredTiger* wt.*")) != 0)
-		die("system cleanup call failed", ret);
+#undef	CMD
+#ifdef _WIN32
+#define	CMD "rd /s /q WT_TEST"
+#else
+#define	CMD "rm -rf WT_TEST"
+#endif
+	if ((ret = system(CMD)) != 0)
+		die("directory cleanup call failed", ret);
 }
 
 static int
