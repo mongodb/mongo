@@ -218,7 +218,7 @@ def add_subconfig(c, cname):
 };
 ''' % {
     'name' : '\n    '.join(ws.wrap(\
-	'static const WT_CONFIG_CHECK confchk_' + cname + '_subconfigs')),
+        'static const WT_CONFIG_CHECK confchk_' + cname + '_subconfigs')),
     'check' : '\n\t'.join(getconfcheck(subc) for subc in sorted(c.subconfig)),
 })
 
