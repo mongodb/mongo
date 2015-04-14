@@ -124,4 +124,56 @@ namespace mongo {
 
     };
 
+    struct DataRangeTypeHelper {
+        static Status makeStoreStatus(size_t t_length, size_t length, std::ptrdiff_t debug_offset);
+    };
+
+    // Enable for classes derived from ConstDataRange
+    template <typename T>
+    struct DataType::Handler<T,
+        typename std::enable_if<std::is_base_of<ConstDataRange, T>::value>::type> {
+
+        static Status load(T* t, const char* ptr, size_t length, size_t* advanced,
+                           std::ptrdiff_t debug_offset)
+        {
+            if (t) {
+                // Assuming you know what you're doing at the read above this
+                // is fine.  Either you're reading into a readable buffer, so
+                // ptr started off non-const, or the const_cast will feed back
+                // to const char* taking Const variants.  So it'll get tossed
+                // out again.
+                *t = T(const_cast<char*>(ptr), const_cast<char*>(ptr) + length);
+            }
+
+            if (advanced) {
+                *advanced = length;
+            }
+
+            return Status::OK();
+        }
+
+        static Status store(const T& t, char* ptr, size_t length, size_t* advanced,
+                            std::ptrdiff_t debug_offset)
+        {
+            if (t.length() > length) {
+                return DataRangeTypeHelper::makeStoreStatus(t.length(), length, debug_offset);
+            }
+
+            if (ptr) {
+                std::memcpy(ptr, t.data(), t.length());
+            }
+
+            if (advanced) {
+                *advanced = t.length();
+            }
+
+            return Status::OK();
+        }
+
+        static T defaultConstruct()
+        {
+            return T(nullptr, nullptr);
+        }
+    };
+
 } // namespace mongo

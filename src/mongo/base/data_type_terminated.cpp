@@ -25,25 +25,33 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_terminated.h"
 
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    Status ConstDataRange::makeOffsetStatus(size_t offset) const {
+    Status TerminatedHelper::makeLoadNoTerminalStatus(char c, size_t length,
+                                                      std::ptrdiff_t debug_offset) {
         str::stream ss;
-        ss << "Invalid offset(" << offset << ") past end of buffer[" << length()
-           << "] at offset: " << _debug_offset;
+        ss << "couldn't locate terminal char (" << c << ") in buffer[" << length
+           << "] at offset: " << debug_offset;
+        return Status(ErrorCodes::Overflow, ss);
+    }
+
+    Status TerminatedHelper::makeLoadShortReadStatus(char c, size_t read, size_t length,
+                                                     std::ptrdiff_t debug_offset) {
+        str::stream ss;
+        ss << "only read (" << read << ") bytes. (" << length << ") bytes to terminal char (" << c
+           << ") at offset: " << debug_offset;
 
         return Status(ErrorCodes::Overflow, ss);
     }
 
-    Status DataRangeTypeHelper::makeStoreStatus(size_t t_length, size_t length,
-                                                std::ptrdiff_t debug_offset) {
+    Status TerminatedHelper::makeStoreStatus(char c, size_t length, std::ptrdiff_t debug_offset) {
         str::stream ss;
-        ss << "buffer size too small to write (" << t_length << ") bytes into buffer["
-           << length << "] at offset: " << debug_offset;
+        ss << "couldn't write terminal char (" << c << ") in buffer[" << length
+           << "] at offset: " << debug_offset;
         return Status(ErrorCodes::Overflow, ss);
     }
 

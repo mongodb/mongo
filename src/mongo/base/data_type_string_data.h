@@ -25,26 +25,54 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_range.h"
+#pragma once
 
-#include "mongo/util/mongoutils/str.h"
+#include <cstring>
+
+#include "mongo/base/data_type.h"
 
 namespace mongo {
 
-    Status ConstDataRange::makeOffsetStatus(size_t offset) const {
-        str::stream ss;
-        ss << "Invalid offset(" << offset << ") past end of buffer[" << length()
-           << "] at offset: " << _debug_offset;
+    template <>
+    struct DataType::Handler<StringData> {
+        static Status load(StringData* sdata, const char* ptr, size_t length, size_t* advanced,
+                           std::ptrdiff_t debug_offset) {
+            if (sdata) {
+                *sdata = StringData(ptr, length);
+            }
 
-        return Status(ErrorCodes::Overflow, ss);
-    }
+            if (advanced) {
+                *advanced = length;
+            }
 
-    Status DataRangeTypeHelper::makeStoreStatus(size_t t_length, size_t length,
-                                                std::ptrdiff_t debug_offset) {
-        str::stream ss;
-        ss << "buffer size too small to write (" << t_length << ") bytes into buffer["
-           << length << "] at offset: " << debug_offset;
-        return Status(ErrorCodes::Overflow, ss);
-    }
+            return Status::OK();
+        }
 
-}  // namespace mongo
+        static Status store(const StringData& sdata, char* ptr, size_t length, size_t* advanced,
+                            std::ptrdiff_t debug_offset) {
+            if (sdata.size() > length) {
+                return makeStoreStatus(sdata, length, debug_offset);
+            }
+
+            if (ptr) {
+                std::memcpy(ptr, sdata.rawData(), sdata.size());
+            }
+
+            if (advanced) {
+                *advanced = sdata.size();
+            }
+
+            return Status::OK();
+        }
+
+        static StringData defaultConstruct() {
+            return StringData();
+        }
+
+    private:
+        static Status makeStoreStatus(const StringData& sdata, size_t length,
+                                      std::ptrdiff_t debug_offset);
+
+    };
+
+} // namespace mongo

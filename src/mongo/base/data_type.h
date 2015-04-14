@@ -40,7 +40,21 @@ namespace mongo {
 
     struct DataType {
 
-        template <typename T>
+        // Second template parameter allows templatized SFINAE specialization.
+        //
+        // Something like:
+        //   template <typename T, typename std::enable_if<std::is_CONDITION<T>::value>::type>
+        //   struct Handler { ... };
+        //
+        // That would allow you to constrain your specialization to all T's
+        // that std::is_CONDITION<T>
+        //
+        // Again, note that you probably don't ever want to use this second
+        // parameter for anything.  If you're not interested in template meta
+        // programming to duck type in a specialization, you can pretend that
+        // this just says template <typename T>.
+
+        template <typename T, typename = void>
         struct Handler {
 
             static void unsafeLoad(T* t, const char* ptr, size_t* advanced)

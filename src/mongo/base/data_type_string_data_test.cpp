@@ -1,4 +1,5 @@
-/*    Copyright 2015 MongoDB Inc.
+/**
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,26 +26,45 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_string_data.h"
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/base/data_type_terminated.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    Status ConstDataRange::makeOffsetStatus(size_t offset) const {
-        str::stream ss;
-        ss << "Invalid offset(" << offset << ") past end of buffer[" << length()
-           << "] at offset: " << _debug_offset;
+    TEST(DataTypeStringData, Basic) {
+        char buf[100];
+        StringData a("a");
+        StringData b("bb");
+        StringData c("ccc");
 
-        return Status(ErrorCodes::Overflow, ss);
+        {
+            DataRangeCursor drc(buf, buf + sizeof(buf));
+
+            ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', StringData>(a)));
+            ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', StringData>(b)));
+            ASSERT_OK(drc.writeAndAdvance(Terminated<'\0', StringData>(c)));
+
+            ASSERT_EQUALS(1 + 2 + 3 + 3, drc.data() - buf);
+        }
+
+        {
+            ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
+
+            Terminated<'\0', StringData> tsd;
+
+            ASSERT_OK(cdrc.readAndAdvance(&tsd));
+            ASSERT_EQUALS(a, tsd.value);
+
+            ASSERT_OK(cdrc.readAndAdvance(&tsd));
+            ASSERT_EQUALS(b, tsd.value);
+
+            ASSERT_OK(cdrc.readAndAdvance(&tsd));
+            ASSERT_EQUALS(c, tsd.value);
+        }
     }
 
-    Status DataRangeTypeHelper::makeStoreStatus(size_t t_length, size_t length,
-                                                std::ptrdiff_t debug_offset) {
-        str::stream ss;
-        ss << "buffer size too small to write (" << t_length << ") bytes into buffer["
-           << length << "] at offset: " << debug_offset;
-        return Status(ErrorCodes::Overflow, ss);
-    }
-
-}  // namespace mongo
+} // namespace mongo

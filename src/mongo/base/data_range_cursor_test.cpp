@@ -58,6 +58,19 @@ namespace mongo {
         ASSERT_EQUALS(false, cdrc.readAndAdvance<char>().isOK());
     }
 
+    TEST(DataRangeCursor, ConstDataRangeCursorType) {
+        char buf[] = "foo";
+
+        ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
+
+        ConstDataRangeCursor out(nullptr, nullptr);
+
+        auto inner = cdrc.read(&out);
+
+        ASSERT_OK(inner);
+        ASSERT_EQUALS(buf, out.data());
+    }
+
     TEST(DataRangeCursor, DataRangeCursor) {
         char buf[100] = { 0 };
 
@@ -78,4 +91,23 @@ namespace mongo {
         ASSERT_EQUALS(static_cast<char>(0), cdrc.readAndAdvance<char>().getValue());
     }
 
+    TEST(DataRangeCursor, DataRangeCursorType) {
+        char buf[] = "foo";
+        char buf2[] = "barZ";
+
+        DataRangeCursor drc(buf, buf + sizeof(buf) + -1);
+
+        DataRangeCursor out(nullptr, nullptr);
+
+        Status status = drc.read(&out);
+
+        ASSERT_OK(status);
+        ASSERT_EQUALS(buf, out.data());
+
+        drc = DataRangeCursor(buf2, buf2 + sizeof(buf2) + -1);
+        status = drc.write(out);
+
+        ASSERT_OK(status);
+        ASSERT_EQUALS(std::string("fooZ"), buf2);
+    }
 } // namespace mongo

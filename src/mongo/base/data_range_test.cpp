@@ -57,6 +57,19 @@ namespace mongo {
         ASSERT_EQUALS(ErrorCodes::Overflow, result.getStatus().code());
     }
 
+    TEST(DataRange, ConstDataRangeType) {
+        char buf[] = "foo";
+
+        ConstDataRange cdr(buf, buf + sizeof(buf));
+
+        ConstDataRange out(nullptr, nullptr);
+
+        auto inner = cdr.read(&out);
+
+        ASSERT_OK(inner);
+        ASSERT_EQUALS(buf, out.data());
+    }
+
     TEST(DataRange, DataRange) {
         char buf[sizeof(uint32_t) * 3];
         uint32_t native = 1234;
@@ -76,6 +89,26 @@ namespace mongo {
         ASSERT_EQUALS(native, dv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2).getValue());
 
         ASSERT_EQUALS(false, dv.read<uint32_t>(sizeof(uint32_t) * 3).isOK());
+    }
+
+    TEST(DataRange, DataRangeType) {
+        char buf[] = "foo";
+        char buf2[] = "barZ";
+
+        DataRange dr(buf, buf + sizeof(buf) + -1);
+
+        DataRange out(nullptr, nullptr);
+
+        Status status = dr.read(&out);
+
+        ASSERT_OK(status);
+        ASSERT_EQUALS(buf, out.data());
+
+        dr = DataRange(buf2, buf2 + sizeof(buf2) + -1);
+        status = dr.write(out);
+
+        ASSERT_OK(status);
+        ASSERT_EQUALS(std::string("fooZ"), buf2);
     }
 
 } // namespace mongo
