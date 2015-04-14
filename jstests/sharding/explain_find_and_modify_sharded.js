@@ -23,7 +23,8 @@
     // Enable sharding on the database and shard the collection.
     // Use "shard0000" as the primary shard.
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-    assert.commandWorked(testDB.adminCommand({movePrimary: testDB.getName(), to: 'shard0000'}));
+    var res = testDB.adminCommand({movePrimary: testDB.getName(), to: 'shard0000'});
+    assert(res.ok || res.errmsg == "it is already the primary");
     assert.commandWorked(testDB.adminCommand({
         shardCollection: shardedColl.getFullName(),
         key: shardKey
