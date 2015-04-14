@@ -48,6 +48,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -2378,6 +2379,11 @@ namespace {
     Timestamp ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
         boost::unique_lock<boost::mutex> lk(_mutex);
         return _lastCommittedOpTime;
+    }
+
+    Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
+        const ReplSetRequestVotesArgs& args, ReplSetRequestVotesResponse* response) {
+        return {ErrorCodes::CommandNotFound, "not implemented"};
     }
 
 } // namespace repl

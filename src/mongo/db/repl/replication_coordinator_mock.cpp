@@ -299,5 +299,12 @@ namespace repl {
         return Timestamp();
     }
 
+    Status ReplicationCoordinatorMock::processReplSetRequestVotes(
+        const ReplSetRequestVotesArgs& args,
+        ReplSetRequestVotesResponse* response) {
+        return Status::OK();
+    }
+
+
 } // namespace repl
 } // namespace mongo

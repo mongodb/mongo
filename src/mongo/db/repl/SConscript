@@ -240,6 +240,19 @@ env.CppUnitTest('isself_test',
                 NO_CRUTCH = True)
 
 env.Library(
+    target='replset_commands',
+    source=[
+        'replset_commands.cpp',
+        'repl_set_command.cpp',
+        'repl_set_request_votes.cpp',
+        'repl_set_request_votes_args.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/logger/logger',
+    ],
+)
+
+env.Library(
     target='fetcher',
     source=[
         'fetcher.cpp',

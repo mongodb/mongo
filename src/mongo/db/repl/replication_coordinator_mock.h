@@ -181,6 +181,10 @@ namespace repl {
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
         virtual Timestamp getLastCommittedOpTime() const;
+
+        virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+                                                  ReplSetRequestVotesResponse* response);
+
     private:
 
         const ReplSettings _settings;

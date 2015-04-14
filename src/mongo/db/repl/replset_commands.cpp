@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/repl/repl_set_command.h"
+
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -58,28 +60,6 @@ namespace repl {
 
     using std::string;
     using std::stringstream;
-
-    /**
-     * Base class for repl set commands.
-     */
-    class ReplSetCommand : public Command {
-    protected:
-        ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual Status checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
-            ActionSet actions;
-            actions.addAction(ActionType::internal);
-            if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), actions)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            return Status::OK();
-        }    
-    };
 
     // Testing only, enabled via command-line.
     class CmdReplSetTest : public ReplSetCommand {
@@ -768,7 +748,7 @@ namespace {
 
             ReplicationCoordinator::ReplSetFreshArgs parsedArgs;
             parsedArgs.id = cmdObj["id"].Int();
-            parsedArgs.setName = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.setName = cmdObj["set"].String();
             parsedArgs.who = HostAndPort(cmdObj["who"].String());
             BSONElement cfgverElement = cmdObj["cfgver"];
             uassert(28525,
@@ -801,7 +781,7 @@ namespace {
                 return appendCommandStatus(result, status);
 
             ReplicationCoordinator::ReplSetElectArgs parsedArgs;
-            parsedArgs.set = cmdObj["set"].checkAndGetStringData();
+            parsedArgs.set = cmdObj["set"].String();
             parsedArgs.whoid = cmdObj["whoid"].Int();
             BSONElement cfgverElement = cmdObj["cfgver"];
             uassert(28526,

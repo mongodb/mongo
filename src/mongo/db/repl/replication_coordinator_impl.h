@@ -60,6 +60,7 @@ namespace repl {
     class HandshakeArgs;
     class HeartbeatResponseAction;
     class OplogReader;
+    class ReplSetRequestVotesArgs;
     class ReplicaSetConfig;
     class SyncSourceFeedback;
     class TopologyCoordinator;
@@ -228,6 +229,8 @@ namespace repl {
 
         virtual Timestamp getLastCommittedOpTime() const;
 
+        virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+                                                  ReplSetRequestVotesResponse* response);
 
         // ================== Test support API ===================
 

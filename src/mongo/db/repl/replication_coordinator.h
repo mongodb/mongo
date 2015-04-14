@@ -53,9 +53,11 @@ namespace repl {
     class HandshakeArgs;
     class IsMasterResponse;
     class OplogReader;
-    class ReplicaSetConfig;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
+    class ReplSetRequestVotesArgs;
+    class ReplSetRequestVotesResponse;
+    class ReplicaSetConfig;
     class UpdatePositionArgs;
 
     /**
@@ -439,7 +441,7 @@ namespace repl {
          * Arguments to the replSetFresh command.
          */
         struct ReplSetFreshArgs {
-            StringData setName;  // Name of the replset
+            std::string setName;  // Name of the replset
             HostAndPort who;  // host and port of the member that sent the replSetFresh command
             unsigned id;  // replSet id of the member that sent the replSetFresh command
             int cfgver;  // replSet config version that the member who sent the command thinks it has
@@ -457,7 +459,7 @@ namespace repl {
          * Arguments to the replSetElect command.
          */
         struct ReplSetElectArgs {
-            StringData set;  // Name of the replset
+            std::string set;  // Name of the replset
             int whoid;  // replSet id of the member that sent the replSetFresh command
             int cfgver;  // replSet config version that the member who sent the command thinks it has
             OID round;  // unique ID for this election
@@ -555,6 +557,13 @@ namespace repl {
          * operation in their oplogs.  This implies such ops will never be rolled back.
          */
         virtual Timestamp getLastCommittedOpTime() const = 0;
+
+        /*
+        * Handles an incoming replSetRequestVotes command.
+        * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+        */
+        virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+                                                  ReplSetRequestVotesResponse* response) = 0;
 
     protected:
 

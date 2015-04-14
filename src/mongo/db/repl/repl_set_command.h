@@ -28,61 +28,34 @@
 
 #pragma once
 
-#include <tuple>
-#include <utility>
+#include <string>
 
-#include "mongo/bson/timestamp.h"
+#include "mongo/db/commands.h"
 
 namespace mongo {
+
+    class Status;
+    class ClientBasic;
+    class BSONObj;
+
 namespace repl {
 
     /**
-     * OpTime encompasses a Timestamp (which itself is composed of two 32-bit integers, which can
-     * represent a time_t and a counter), and a 64-bit Term number.  OpTime can be used to
-     * label every op in an oplog with a unique identifier.
+     * Base class for repl set commands.
      */
+    class ReplSetCommand : public Command {
+    protected:
+        ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
 
-    class OpTime {
-    public:
-        OpTime() = default;
-        OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
+        bool slaveOk() const override { return true; }
 
-        Timestamp getTimestamp() const {
-            return _timestamp;
-        }
+        bool adminOnly() const override { return true; }
 
-        long long getTerm() const {
-            return _term;
-        }
+        bool isWriteCommandForConfigServer() const override { return false; }
 
-        inline bool operator==(const OpTime& rhs) {
-            return std::tie(_term, _timestamp) == std::tie(rhs._term, rhs._timestamp);
-        }
-
-        inline bool operator<(const OpTime& rhs) {
-            // Compare term first, then the opTimes.
-            return std::tie(_term, _timestamp) < std::tie(rhs._term, rhs._timestamp);
-        }
-
-        inline bool operator!=(const OpTime& rhs) {
-            return !(*this == rhs);
-        }
-
-        inline bool operator<=(const OpTime& rhs) {
-            return *this < rhs || *this == rhs;
-        }
-
-        inline bool operator>(const OpTime& rhs) {
-            return !(*this <= rhs);
-        }
-
-        inline bool operator>=(const OpTime& rhs) {
-            return !(*this < rhs);
-        }
-
-    private:
-        Timestamp _timestamp;
-        long long _term = -1;
+        Status checkAuthForCommand(ClientBasic* client,
+                                   const std::string& dbname,
+                                   const BSONObj& cmdObj) override;
     };
 
 } // namespace repl
