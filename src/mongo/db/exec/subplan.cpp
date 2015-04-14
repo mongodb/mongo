@@ -63,7 +63,9 @@ namespace mongo {
           _plannerParams(params),
           _query(cq),
           _child(NULL),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        invariant(_collection);
+    }
 
     // static
     bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {

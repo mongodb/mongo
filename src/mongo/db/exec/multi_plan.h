@@ -173,8 +173,10 @@ namespace mongo {
 
         static const int kNoSuchPlan = -1;
 
-        // not owned here
+        // Not owned here.
         OperationContext* _txn;
+
+        // Not owned here. Must be non-null.
         const Collection* _collection;
 
         // Whether or not we should try to cache the winning plan in the plan cache.

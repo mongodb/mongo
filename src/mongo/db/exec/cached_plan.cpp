@@ -66,7 +66,9 @@ namespace mongo {
           _plannerParams(params),
           _decisionWorks(decisionWorks),
           _root(root),
-          _commonStats(kStageType) {}
+          _commonStats(kStageType) {
+        invariant(_collection);
+    }
 
     Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of

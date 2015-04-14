@@ -72,7 +72,9 @@ namespace mongo {
           _failure(false),
           _failureCount(0),
           _statusMemberId(WorkingSet::INVALID_ID),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        invariant(_collection);
+    }
 
     MultiPlanStage::~MultiPlanStage() {
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {

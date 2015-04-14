@@ -121,7 +121,7 @@ namespace mongo {
         // Not owned.
         OperationContext* _txn;
 
-        // Not owned.
+        // Not owned. Must be non-null.
         Collection* _collection;
 
         // Not owned.

@@ -167,6 +167,7 @@ namespace mongo {
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
 
+        // Not owned here. Must be non-null.
         Collection* _collection;
 
         // Not owned here.
