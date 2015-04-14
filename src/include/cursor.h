@@ -112,12 +112,14 @@ struct __wt_cursor_btree {
 	int	compare;
 
 	/*
-	 * The key value from a binary search of a row-store files; we keep a
-	 * copy of the last key we retrieved in the search, it avoids having
-	 * doing the additional work of getting the key again for return to
-	 * the application.
+	 * A key from a binary search of a row-store leaf page; if we find an
+	 * exact match on a row-store leaf page, keep a copy of key we built
+	 * during the search to avoid doing the additional work of getting the
+	 * key again for return to the application. Note, this only applies to
+	 * exact matches when searching disk-image structures, so it's not, for
+	 * example, a key from an insert list.
 	 */
-	WT_ITEM search_key;
+	WT_ITEM *search_key, _search_key;
 
 	/*
 	 * It's relatively expensive to calculate the last record on a variable-
@@ -163,9 +165,16 @@ struct __wt_cursor_btree {
 	WT_ROW *rip_saved;		/* Last-returned key reference */
 
 	/*
-	 * A temporary buffer for caching RLE values for column-store files.
+	 * A temporary buffer for caching RLE values for column-store files (if
+	 * RLE is non-zero, then we don't unpack the value every time we move
+	 * to the next cursor position, we re-use the unpacked value we stored
+	 * here the first time we hit the value).
+	 *
+	 * A temporary buffer for building overflow and prefix-compressed keys
+	 * when stepping a cursor through row-store files, and building on-page
+	 * keys when searching row-store files.
 	 */
-	WT_ITEM tmp;
+	WT_ITEM *tmp, _tmp;
 
 	/*
 	 * The update structure allocated by the row- and column-store modify

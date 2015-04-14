@@ -432,8 +432,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->internal_uri = btree->dhandle->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
-
 	cbt->btree = btree;
+
 	if (bulk) {
 		F_SET(cursor, WT_CURSTD_BULK);
 
@@ -456,6 +456,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		cursor->next = __curfile_next_random;
 		cursor->reset = __curfile_reset;
 	}
+
+	/* Underlying btree initialization. */
+	__wt_btcur_open(cbt);
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(
