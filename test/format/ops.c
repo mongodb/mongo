@@ -584,9 +584,10 @@ wts_read_scan(void)
 static int
 read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
+	static int sn = 0;
 	WT_ITEM value;
 	WT_SESSION *session;
-	int ret;
+	int exact, ret;
 	uint8_t bitfield;
 
 	session = cursor->session;
@@ -608,7 +609,16 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		break;
 	}
 
-	if ((ret = cursor->search(cursor)) == 0) {
+	if (sn) {
+		ret = cursor->search_near(cursor, &exact);
+		if (ret == 0 && exact != 0)
+			ret = WT_NOTFOUND;
+		sn = 0;
+	} else {
+		ret = cursor->search(cursor);
+		sn = 1;
+	}
+	if (ret == 0) {
 		if (g.type == FIX) {
 			ret = cursor->get_value(cursor, &bitfield);
 			value.data = &bitfield;
@@ -653,7 +663,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
 		fprintf(stderr,
-		    "read_row: read row value mismatch %" PRIu64 ":\n", keyno);
+		    "read_row: value mismatch %" PRIu64 ":\n", keyno);
 		print_item("bdb", &bdb_value);
 		print_item(" wt", &value);
 		die(0, NULL);
