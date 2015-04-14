@@ -158,7 +158,7 @@ file_config = format_meta + [
         row-store leaf page value dictionary; see
         @ref file_formats_compression for more information''',
         min='0'),
-    Config('encrypt', '', r'''
+    Config('encryption', '', r'''
         configure an encryptor for file blocks''',
         type='category', subconfig=[
         Config('name', 'none', r'''

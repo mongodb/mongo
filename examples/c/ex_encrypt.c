@@ -433,16 +433,16 @@ main(void)
 	 * Create and open some encrypted and not encrypted tables.
 	 */
 	ret = session->create(session, "table:crypto1",
-	    "encrypt=(name=rotn,keyid=" USER1_KEYID"),"
+	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:crypto2",
-	    "encrypt=(name=rotn,keyid=" USER2_KEYID"),"
+	    "encryption=(name=rotn,keyid=" USER2_KEYID"),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:nocrypto",
 	    "key_format=S,value_format=S");
 
 	ret = session->create(session, "table:cryptobad",
-	    "encrypt=(name=rotn,keyid=" USERBAD_KEYID"),"
+	    "encryption=(name=rotn,keyid=" USERBAD_KEYID"),"
 	    "key_format=S,value_format=S");
 	if (ret == 0) {
 		fprintf(stderr, "Did not detect bad/unknown keyid error\n");

@@ -316,10 +316,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		btree->encryptor = conn->encryptor;
 	else {
 		WT_RET(__wt_config_gets_none(
-		    session, cfg, "encrypt.name", &cval));
+		    session, cfg, "encryption.name", &cval));
 		WT_RET(__wt_config_gets_none(
-		    session, cfg, "encrypt.keyid", &metadata));
-		WT_RET(__wt_config_gets(session, cfg, "encrypt", &enc));
+		    session, cfg, "encryption.keyid", &metadata));
+		WT_RET(__wt_config_gets(session, cfg, "encryption", &enc));
 		if (enc.len != 0)
 			WT_RET(__wt_strndup(session, enc.str, enc.len,
 			    &enc_cfg[0]));
