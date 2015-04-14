@@ -244,7 +244,7 @@ rotate_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
  */
 static int
 rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    WT_CONFIG_ARG *app_config, WT_ENCRYPTOR **customp)
+    WT_CONFIG_ARG *encrypt_config, WT_ENCRYPTOR **customp)
 {
 	int ret;
 	const MY_CRYPTO *orig_crypto;
@@ -264,7 +264,7 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Stash the keyid and the (optional) secret key
 	 * from the configuration string.
 	 */
-	if ((ret = extapi->config_get(extapi, session, app_config,
+	if ((ret = extapi->config_get(extapi, session, encrypt_config,
 	    "keyid", &keyid)) == 0 && keyid.len != 0) {
 		if ((my_crypto->keyid = malloc(keyid.len + 1)) == NULL)
 			return (errno);
@@ -272,7 +272,7 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		my_crypto->keyid[keyid.len] = '\0';
 	}
 
-	if ((ret = extapi->config_get(extapi, session, app_config,
+	if ((ret = extapi->config_get(extapi, session, encrypt_config,
 	    "secretkey", &secret)) == 0 && secret.len != 0) {
 		if ((my_crypto->password = malloc(secret.len + 1)) == NULL)
 			return (errno);
