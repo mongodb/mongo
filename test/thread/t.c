@@ -299,8 +299,8 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-FLS] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
-	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-v] [-W writers]\n",
+	    "[-FLSv] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
+	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"
