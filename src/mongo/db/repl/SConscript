@@ -299,6 +299,16 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='base_cloner_test_fixture',
+    source=[
+        'base_cloner_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'replication_executor_test_fixture',
+    ],
+)
+
+env.Library(
     target='collection_cloner',
     source=[
         'collection_cloner.cpp',
