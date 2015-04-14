@@ -162,9 +162,12 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_config.py. */
 #include "wt_internal.h"
 ''')
 
-# Make a TextWrapper that can wrap at commas.
+# Make a TextWrapper that wraps at commas.
 w = textwrap.TextWrapper(width=64, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
+
+# TextWrapper that wraps at whitespace.
+ws = textwrap.TextWrapper(width=64, break_on_hyphens=False)
 
 def checkstr(c):
     '''Generate the function reference and JSON string used by __wt_config_check
@@ -209,12 +212,13 @@ def add_subconfig(c, cname):
         return
     created_subconfigs.add(cname)
     tfile.write('''
-static const WT_CONFIG_CHECK confchk_%(name)s_subconfigs[] = {
+%(name)s[] = {
 \t%(check)s
 \t{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 ''' % {
-    'name' : cname,
+    'name' : '\n    '.join(ws.wrap(\
+	'static const WT_CONFIG_CHECK confchk_' + cname + '_subconfigs')),
     'check' : '\n\t'.join(getconfcheck(subc) for subc in sorted(c.subconfig)),
 })
 
