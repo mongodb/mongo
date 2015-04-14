@@ -434,7 +434,11 @@ main(void)
 	 */
 	ret = session->create(session, "table:crypto1",
 	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
+	    "columns=(key0,value0),"
 	    "key_format=S,value_format=S");
+	ret = session->create(session, "index:crypto1:byvalue",
+	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
+	    "columns=(value0,key0)");
 	ret = session->create(session, "table:crypto2",
 	    "encryption=(name=rotn,keyid=" USER2_KEYID"),"
 	    "key_format=S,value_format=S");
