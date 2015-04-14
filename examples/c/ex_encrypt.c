@@ -41,6 +41,7 @@
 #endif
 
 #include <wiredtiger.h>
+#include <wiredtiger_ext.h>
 
 int add_my_encryptors(WT_CONNECTION *connection);
 
@@ -239,11 +240,14 @@ rotate_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
  */
 static int
 rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    WT_CONFIG_ITEM *keyid, const char *secret, WT_ENCRYPTOR **customp)
+    WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *app_config, WT_ENCRYPTOR **customp)
 {
+	char *keyidstr;
+	int ret;
 	const MY_CRYPTO *orig_crypto;
 	MY_CRYPTO *my_crypto;
-	char *keyidstr;
+	WT_CONFIG_ITEM secret;
+	WT_EXTENSION_API *extapi;
 
 	(void)session;				/* Unused parameters */
 
@@ -262,10 +266,14 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	strncpy(keyidstr, keyid->str, keyid->len + 1);
 	keyidstr[keyid->len] = '\0';
 	my_crypto->keyid = keyidstr;
-	if (secret != NULL) {
-		if ((my_crypto->password = malloc(strlen(secret) + 1)) == NULL)
+
+	extapi = session->connection->get_extension_api(session->connection);
+	if ((ret = extapi->config_get(extapi, session, app_config,
+	    "secretkey", &secret)) == 0 && secret.len != 0) {
+		if ((my_crypto->password = malloc(secret.len + 1)) == NULL)
 			return (errno);
-		strncpy(my_crypto->password, secret, strlen(secret) + 1);
+		strncpy(my_crypto->password, secret.str, secret.len + 1);
+		my_crypto->password[secret.len] = '\0';
 	}
 	/*
 	 * Presumably we'd have some sophisticated key management

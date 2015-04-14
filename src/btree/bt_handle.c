@@ -185,12 +185,14 @@ static int
 __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval, metadata;
+	WT_CONFIG_ITEM cval, enc, metadata;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
 	const char **cfg;
+	const char *enc_cfg[] = { NULL, NULL };
 
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
@@ -317,8 +319,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		    session, cfg, "encrypt.name", &cval));
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "encrypt.keyid", &metadata));
-		WT_RET(__wt_encryptor_config(session, &cval, &metadata,
-		    &btree->encryptor));
+		WT_RET(__wt_config_gets(session, cfg, "encrypt", &enc));
+		if (enc.len != 0)
+			WT_RET(__wt_strndup(session, enc.str, enc.len,
+			    &enc_cfg[0]));
+		ret = __wt_encryptor_config(session, &cval, &metadata,
+		    (WT_CONFIG_ARG *)enc_cfg, &btree->encryptor);
+		__wt_free(session, enc_cfg[0]);
+		WT_RET(ret);
 	}
 
 	/* Initialize locks. */

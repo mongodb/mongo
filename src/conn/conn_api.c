@@ -604,7 +604,7 @@ __wt_encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
  */
 int
 __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
-    WT_CONFIG_ITEM *keyid, WT_ENCRYPTOR **encryptorp)
+    WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *cfg_arg, WT_ENCRYPTOR **encryptorp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -635,7 +635,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	encryptor = nenc->encryptor;
 	if (encryptor->customize != NULL) {
 		WT_ERR(encryptor->customize(encryptor, &session->iface,
-		    keyid, S2C(session)->encrypt_secret_key, &encryptor));
+		    keyid, cfg_arg, &encryptor));
 		if (encryptor == NULL)
 			encryptor = nenc->encryptor;
 		else
@@ -749,7 +749,6 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 		__wt_free(session, nenc->name);
 		__wt_free(session, nenc);
 	}
-	__wt_free(session, conn->encrypt_secret_key);
 	return (ret);
 }
 
@@ -1785,7 +1784,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ NULL, 0 }
 	};
 
-	WT_CONFIG_ITEM cval, sval, secretval, keyid;
+	WT_CONFIG_ITEM cval, enc, keyid, secretval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(i1);
 	WT_DECL_ITEM(i2);
@@ -1794,6 +1793,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 	const char *new_cfg;
+	const char *enc_cfg[] = { NULL, NULL };
 
 	/* Leave space for optional additional configuration. */
 	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL };
@@ -1976,14 +1976,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.secretkey",
 	    &secretval));
+	WT_ERR(__wt_config_gets(session, cfg, "encryption", &enc));
+	if (enc.len != 0)
+		WT_ERR(__wt_strndup(session, enc.str, enc.len, &enc_cfg[0]));
+	WT_ERR(__wt_encryptor_config(session, &cval, &keyid,
+	    (WT_CONFIG_ARG *)enc_cfg, &conn->encryptor));
 	if (secretval.len != 0) {
 		/*
-		 * After saving the secret key, we want to "remove" it from
-		 * the stored configuration so that it will not appear in the
-		 * base configuration file.  Add an empty entry in the stack.
+		 * After making the secret key available to the encryptor,
+		 * we want to "remove" it from the stored configuration so
+		 * that it will not appear in the base configuration file.
+		 * Add an empty entry in the stack.
 		 */
-		WT_ERR(__wt_strndup(session, secretval.str, secretval.len,
-		    &conn->encrypt_secret_key));
 		__conn_config_append(cfg, "encryption=(secretkey=)");
 		/*
 		 * We now merge all non-default settings and set that new
@@ -1996,7 +2000,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		cfg[1] = new_cfg;
 		cfg[2] = NULL;
 	}
-	WT_ERR(__wt_encryptor_config(session, &cval, &keyid, &conn->encryptor));
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
@@ -2024,7 +2027,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-err:	/* Discard the scratch buffers. */
+err:	__wt_free(session, enc_cfg[0]);
+	/* Discard the scratch buffers. */
 	__wt_scr_free(session, &i1);
 	__wt_scr_free(session, &i2);
 	__wt_scr_free(session, &i3);

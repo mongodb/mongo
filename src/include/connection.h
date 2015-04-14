@@ -289,7 +289,6 @@ struct __wt_connection_impl {
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
 	WT_ENCRYPTOR	*encryptor;     /* Encryptor for metadata and log */
-	char		*encrypt_secret_key;/* Encrypt secret key */
 
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */

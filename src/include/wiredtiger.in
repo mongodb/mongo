@@ -3283,13 +3283,14 @@ struct __wt_encryptor {
 	 * is used instead of this one for any callbacks.
 	 * @param[in] keyid configuration value of "keyid" in the
 	 * wiredtiger_open or WT_SESSION::create call.
-	 * @param[in] the configuration value of "secretkey" from the
-	 * connection's wiredtiger_open call.
+	 * @param[in] app_config the "encryption" portion of the
+         *            configuration from the wiredtiger_open or
+         *            WT_SESSION::create call
 	 * @param[out] customp the new modified encryptor, or NULL.
 	 * @returns zero for success, non-zero to indicate an error.
 	 */
 	int (*customize)(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-	    WT_CONFIG_ITEM *keyid, const char *secretkey,
+	    WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *app_config,
 	    WT_ENCRYPTOR **customp);
 
 	/*!
