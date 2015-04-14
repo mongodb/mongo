@@ -162,6 +162,7 @@ namespace {
             setupServerConfigActionSet.addAction(ActionType::getCmdLineOpts);
             setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
             setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
+            setupServerConfigActionSet.addAction(ActionType::serverStatus);
             Privilege setupServerConfigPrivilege =
                 Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
 
