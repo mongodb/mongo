@@ -1,0 +1,11 @@
+Makefile
+Makefile.in
+.deps
+*.a
+*.o
+*.obj
+*.lib
+*.pdb
+*.log
+*.trs
+*.dirstamp
