@@ -44,6 +44,7 @@ namespace mongo {
     class DatabaseType;
     class OperationContext;
     class Shard;
+    class ShardKeyPattern;
     class ShardType;
     class Status;
     template<typename T> class StatusWith;
@@ -81,6 +82,26 @@ namespace mongo {
          *  - ShardNotFound - could not find a shard to place the DB on
          */
         virtual Status enableSharding(const std::string& dbName) = 0;
+
+        /**
+         * Shards a collection. Assumes that the database is enabled for sharding.
+         *
+         * @param ns: namespace of collection to shard
+         * @param fieldsAndOrder: shardKey pattern
+         * @param unique: if true, ensure underlying index enforces a unique constraint.
+         * @param initPoints: create chunks based on a set of specified split points.
+         * @param initShards: if NULL, use primary shard as lone shard for DB.
+         *
+         * WARNING: It's not completely safe to place initial chunks onto non-primary
+         *          shards using this method because a conflict may result if multiple map-reduce
+         *          operations are writing to the same output collection, for instance.
+         *
+         */
+        virtual Status shardCollection(const std::string& ns,
+                                       const ShardKeyPattern& fieldsAndOrder,
+                                       bool unique,
+                                       std::vector<BSONObj>* initPoints,
+                                       std::vector<Shard>* initShards = NULL) = 0;
 
         /**
          *

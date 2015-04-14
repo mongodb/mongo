@@ -46,6 +46,46 @@ namespace mongo {
 
     extern ConfigServer& configServer;
 
+    struct CollectionInfo {
+        CollectionInfo() {
+            _dirty = false;
+            _dropped = false;
+        }
+
+        CollectionInfo(const BSONObj& in);
+        ~CollectionInfo();
+
+        bool isSharded() const {
+            return _cm.get();
+        }
+
+        boost::shared_ptr<ChunkManager> getCM() const {
+            return _cm;
+        }
+
+        void resetCM(ChunkManager * cm);
+
+        void shard(ChunkManager* cm);
+        void unshard();
+
+        bool isDirty() const { return _dirty; }
+        bool wasDropped() const { return _dropped; }
+
+        void save(const std::string& ns);
+
+        void useChunkManager(boost::shared_ptr<ChunkManager> manager);
+
+        bool unique() const { return _unique; }
+        BSONObj key() const { return _key; }
+
+    private:
+        BSONObj _key;
+        bool _unique;
+        boost::shared_ptr<ChunkManager> _cm;
+        bool _dirty;
+        bool _dropped;
+    };
+
     /**
      * top level configuration for a database
      */
@@ -69,20 +109,6 @@ namespace mongo {
         const Shard& getPrimary() const { return _primary; }
 
         void enableSharding( bool save = true );
-
-        /* Makes all the configuration changes necessary to shard a new collection.
-         * Optionally, chunks will be created based on a set of specified initial split points, and
-         * distributed in a round-robin fashion onto a set of initial shards.  If no initial shards
-         * are specified, only the primary will be used.
-         *
-         * WARNING: It's not safe to place initial chunks onto non-primary shards using this method.
-         * The initShards parameter allows legacy behavior expected by map-reduce.
-         */
-        boost::shared_ptr<ChunkManager> shardCollection(const std::string& ns,
-                                                        const ShardKeyPattern& fieldsAndOrder,
-                                                        bool unique,
-                                                        std::vector<BSONObj>* initPoints,
-                                                        std::vector<Shard>* initShards = NULL);
 
         /**
            @return true if there was sharding info to remove
@@ -119,45 +145,6 @@ namespace mongo {
         void getAllShardedCollections(std::set<std::string>& namespaces);
 
     protected:
-        struct CollectionInfo {
-            CollectionInfo() {
-                _dirty = false;
-                _dropped = false;
-            }
-
-            CollectionInfo(const BSONObj& in);
-            ~CollectionInfo();
-
-            bool isSharded() const {
-                return _cm.get();
-            }
-
-            boost::shared_ptr<ChunkManager> getCM() const {
-                return _cm;
-            }
-
-            void resetCM(ChunkManager * cm);
-
-            void shard(ChunkManager* cm);
-            void unshard();
-
-            bool isDirty() const { return _dirty; }
-            bool wasDropped() const { return _dropped; }
-
-            void save(const std::string& ns);
-
-            bool unique() const { return _unqiue; }
-            BSONObj key() const { return _key; }
-
-
-        private:
-            BSONObj _key;
-            bool _unqiue;
-            boost::shared_ptr<ChunkManager> _cm;
-            bool _dirty;
-            bool _dropped;
-        };
-
         typedef std::map<std::string, CollectionInfo> CollectionInfoMap;
 
 

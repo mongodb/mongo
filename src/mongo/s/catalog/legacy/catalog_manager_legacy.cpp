@@ -49,10 +49,13 @@
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/config.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -403,6 +406,94 @@ namespace {
         return updateDatabase(dbName, db);
     }
 
+    Status CatalogManagerLegacy::shardCollection(const string& ns,
+                                                 const ShardKeyPattern& fieldsAndOrder,
+                                                 bool unique,
+                                                 vector<BSONObj>* initPoints,
+                                                 vector<Shard>* initShards) {
+
+        StatusWith<DatabaseType> status = getDatabase(nsToDatabase(ns));
+        if (!status.isOK()) {
+            return status.getStatus();
+        }
+        DatabaseType dbt = status.getValue();
+        Shard dbPrimary = Shard::make(dbt.getPrimary());
+
+        log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder;
+
+        // Record start in changelog
+        BSONObjBuilder collectionDetail;
+        collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
+        collectionDetail.append("collection", ns);
+        collectionDetail.append("primary", dbPrimary.toString());
+
+        BSONArray initialShards;
+        if (initShards == NULL)
+            initialShards = BSONArray();
+        else {
+            BSONArrayBuilder b;
+            for (unsigned i = 0; i < initShards->size(); i++) {
+                b.append((*initShards)[i].getName());
+            }
+            initialShards = b.arr();
+        }
+
+        collectionDetail.append("initShards", initialShards);
+        collectionDetail.append("numChunks", static_cast<int>(initPoints->size() + 1));
+
+        logChange(NULL, "shardCollection.start", ns, collectionDetail.obj());
+
+        ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
+        manager->createFirstChunks(_configServerConnectionString.toString(),
+                                   dbPrimary,
+                                   initPoints,
+                                   initShards);
+        manager->loadExistingRanges(_configServerConnectionString.toString(), NULL);
+
+        CollectionInfo collInfo;
+        collInfo.useChunkManager(manager);
+        collInfo.save(ns);
+        manager->reload(true);
+
+        // Tell the primary mongod to refresh its data
+        // TODO:  Think the real fix here is for mongos to just
+        //        assume that all collections are sharded, when we get there
+        for (int i = 0;i < 4;i++) {
+            if (i == 3) {
+                warning() << "too many tries updating initial version of " << ns
+                          << " on shard primary " << dbPrimary
+                          << ", other mongoses may not see the collection as sharded immediately";
+                break;
+            }
+            try {
+                ShardConnection conn(dbPrimary, ns);
+                bool isVersionSet = conn.setVersion();
+                conn.done();
+                if (!isVersionSet) {
+                    warning() << "could not update initial version of "
+                              << ns << " on shard primary " << dbPrimary;
+                } else {
+                    break;
+                }
+            }
+            catch (const DBException& e) {
+                warning() << "could not update initial version of " << ns
+                          << " on shard primary " << dbPrimary
+                          << causedBy(e);
+            }
+            sleepsecs(i);
+        }
+
+        // Record finish in changelog
+        BSONObjBuilder finishDetail;
+
+        finishDetail.append("version", manager->getVersion().toString());
+
+        logChange(NULL, "shardCollection", ns, finishDetail.obj());
+
+        return Status::OK();
+    }
+
     Status CatalogManagerLegacy::createDatabase(const std::string& dbName, const Shard* shard) {
         invariant(nsIsDbOnly(dbName));
 
@@ -559,7 +650,7 @@ namespace {
     }
 
     StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationContext* txn,
-                                                                 const std::string& name) {
+                                                                      const std::string& name) {
         ScopedDbConnection conn(_configServerConnectionString, 30);
 
         if (conn->count(ShardType::ConfigNS,

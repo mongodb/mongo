@@ -53,6 +53,12 @@ namespace mongo {
 
         virtual Status enableSharding(const std::string& dbName);
 
+        virtual Status shardCollection(const std::string& ns,
+                                       const ShardKeyPattern& fieldsAndOrder,
+                                       bool unique,
+                                       std::vector<BSONObj>* initPoints,
+                                       std::vector<Shard>* initShards);
+
         virtual StatusWith<std::string> addShard(const std::string& name,
                                                  const ConnectionString& shardConnectionString,
                                                  const long long maxSize);

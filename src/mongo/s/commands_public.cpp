@@ -1857,11 +1857,14 @@ namespace {
                         vector<Shard> outShards( shardSet.begin() , shardSet.end() );
 
                         ShardKeyPattern sortKeyPattern(sortKey);
-                        confOut->shardCollection(finalColLong,
-                                                 sortKeyPattern,
-                                                 true,
-                                                 &sortedSplitPts,
-                                                 &outShards);
+                        Status status = grid.catalogManager()->shardCollection(finalColLong,
+                                                                               sortKeyPattern,
+                                                                               true,
+                                                                               &sortedSplitPts,
+                                                                               &outShards);
+                        if (!status.isOK()) {
+                            return appendCommandStatus(result, status);
+                        }
 
                     }
 

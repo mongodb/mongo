@@ -76,7 +76,7 @@ namespace mongo {
     Shard Shard::EMPTY;
 
 
-    DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
+    CollectionInfo::CollectionInfo(const BSONObj& in) {
         _dirty = false;
         _dropped = in[CollectionType::dropped()].trueValue();
 
@@ -87,18 +87,18 @@ namespace mongo {
         _dirty = false;
     }
 
-    DBConfig::CollectionInfo::~CollectionInfo() {
+    CollectionInfo::~CollectionInfo() {
 
     }
 
-    void DBConfig::CollectionInfo::resetCM(ChunkManager* cm) {
+    void CollectionInfo::resetCM(ChunkManager* cm) {
         invariant(cm);
         invariant(_cm);
 
         _cm.reset(cm);
     }
     
-    void DBConfig::CollectionInfo::shard(ChunkManager* manager){
+    void CollectionInfo::shard(ChunkManager* manager) {
         // Do this *first* so we're invisible to everyone else
         manager->loadExistingRanges(configServer.getPrimary().getConnString(), NULL);
 
@@ -107,12 +107,8 @@ namespace mongo {
         // This helps prevent errors when dropping in a different process
         //
 
-        if (manager->numChunks() != 0){
-            _cm = ChunkManagerPtr(manager);
-            _key = manager->getShardKeyPattern().toBSON().getOwned();
-            _unqiue = manager->isUnique();
-            _dirty = true;
-            _dropped = false;
+        if (manager->numChunks() != 0) {
+            useChunkManager(ChunkManagerPtr(manager));
         }
         else{
             warning() << "no chunks found for collection " << manager->getns()
@@ -121,14 +117,22 @@ namespace mongo {
         }
     }
 
-    void DBConfig::CollectionInfo::unshard() {
+    void CollectionInfo::unshard() {
         _cm.reset();
         _dropped = true;
         _dirty = true;
         _key = BSONObj();
     }
 
-    void DBConfig::CollectionInfo::save( const string& ns ) {
+    void CollectionInfo::useChunkManager(ChunkManagerPtr manager) {
+        _cm = manager;
+        _key = manager->getShardKeyPattern().toBSON().getOwned();
+        _unique = manager->isUnique();
+        _dirty = true;
+        _dropped = false;
+    }
+
+    void CollectionInfo::save(const string& ns) {
         BSONObj key = BSON( "_id" << ns );
 
         BSONObjBuilder val;
@@ -216,97 +220,6 @@ namespace mongo {
         boost::lock_guard<boost::mutex> lk( _lock );
         _shardingEnabled = true;
         if( save ) _save();
-    }
-
-    boost::shared_ptr<ChunkManager> DBConfig::shardCollection(
-                                                const string& ns,
-                                                const ShardKeyPattern& fieldsAndOrder,
-                                                bool unique,
-                                                vector<BSONObj>* initPoints,
-                                                vector<Shard>* initShards) {
-
-        uassert(8042, "db doesn't have sharding enabled", _shardingEnabled);
-
-        ChunkManagerPtr manager;
-        
-        {
-            boost::lock_guard<boost::mutex> lk( _lock );
-
-            CollectionInfo& ci = _collections[ns];
-            uassert( 8043 , "collection already sharded" , ! ci.isSharded() );
-
-            log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
-
-            // Record start in changelog
-            BSONObjBuilder collectionDetail;
-            collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
-            collectionDetail.append("collection", ns);
-            collectionDetail.append("primary", getPrimary().toString());
-
-            BSONArray initialShards;
-            if (initShards == NULL)
-                initialShards = BSONArray();
-            else {
-                BSONArrayBuilder b;
-                for (unsigned i = 0; i < initShards->size(); i++) {
-                    b.append((*initShards)[i].getName());
-                }
-                initialShards = b.arr();
-            }
-
-            collectionDetail.append("initShards", initialShards);
-            collectionDetail.append("numChunks", (int)(initPoints->size() + 1));
-
-            grid.catalogManager()->logChange(NULL,
-                                             "shardCollection.start",
-                                             ns,
-                                             collectionDetail.obj());
-
-            ChunkManager* cm = new ChunkManager( ns, fieldsAndOrder, unique );
-            cm->createFirstChunks(configServer.getPrimary().getConnString(),
-                                  getPrimary(),
-                                  initPoints,
-                                  initShards);
-            ci.shard(cm);
-
-            _save();
-
-            // Save the initial chunk manager for later, no need to reload if we're in this lock
-            manager = ci.getCM();
-            verify( manager.get() );
-        }
-
-        // Tell the primary mongod to refresh it's data
-        // TODO:  Think the real fix here is for mongos to just assume all collections sharded, when we get there
-        for( int i = 0; i < 4; i++ ){
-            if( i == 3 ){
-                warning() << "too many tries updating initial version of " << ns << " on shard primary " << getPrimary() <<
-                             ", other mongoses may not see the collection as sharded immediately" << endl;
-                break;
-            }
-            try {
-                ShardConnection conn( getPrimary(), ns );
-                if (!conn.setVersion()) {
-                    warning() << "could not update initial version of "
-                              << ns << " on shard primary " << getPrimary();
-                }
-                conn.done();
-                break;
-            }
-            catch( DBException& e ){
-                warning() << "could not update initial version of " << ns << " on shard primary " << getPrimary() <<
-                             causedBy( e ) << endl;
-            }
-            sleepsecs( i );
-        }
-
-        // Record finish in changelog
-        BSONObjBuilder finishDetail;
-        finishDetail.append("version", manager->getVersion().toString());
-
-        grid.catalogManager()->logChange(NULL, "shardCollection", ns, finishDetail.obj());
-
-        return manager;
     }
 
     bool DBConfig::removeSharding( const string& ns ) {

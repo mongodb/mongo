@@ -46,6 +46,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
@@ -406,7 +407,13 @@ namespace {
                                       proposedKey,
                                       careAboutUnique);
 
-            config->shardCollection(ns, proposedShardKey, careAboutUnique, &initSplits);
+            Status status = grid.catalogManager()->shardCollection(ns,
+                                                                   proposedShardKey,
+                                                                   careAboutUnique,
+                                                                   &initSplits);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
 
             result << "collectionsharded" << ns;
 
