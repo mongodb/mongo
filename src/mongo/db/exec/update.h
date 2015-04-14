@@ -71,8 +71,10 @@ namespace mongo {
     };
 
     /**
-     * Execution stage responsible for updates to documents and upserts. NEED_TIME is returned
-     * after performing an update or an insert.
+     * Execution stage responsible for updates to documents and upserts. If the prior or
+     * newly-updated version of the document was requested to be returned, then ADVANCED is
+     * returned after updating or inserting a document. Otherwise, NEED_TIME is returned after
+     * updating or inserting a document.
      *
      * Callers of work() must be holding a write lock.
      */
@@ -145,9 +147,10 @@ namespace mongo {
     private:
         /**
          * Computes the result of applying mods to the document 'oldObj' at RecordId 'loc' in
-         * memory, then commits these changes to the database.
+         * memory, then commits these changes to the database. Returns a possibly unowned copy
+         * of the newly-updated version of the document.
          */
-        void transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& loc);
+        BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& loc);
 
         /**
          * Computes the document to insert and inserts it into the collection. Used if the
@@ -186,8 +189,11 @@ namespace mongo {
         // Owned by us.
         boost::scoped_ptr<PlanStage> _child;
 
-        // If not Null, we use this rather than asking our child what to do next.
+        // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
         WorkingSetID _idRetrying;
+
+        // If not WorkingSet::INVALID_ID, we return this member to our caller.
+        WorkingSetID _idReturning;
 
         // Stats
         CommonStats _commonStats;

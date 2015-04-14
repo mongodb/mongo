@@ -62,6 +62,7 @@ namespace mongo {
           _collection(collection),
           _child(child),
           _idRetrying(WorkingSet::INVALID_ID),
+          _idReturning(WorkingSet::INVALID_ID),
           _commonStats(kStageType) { }
 
     DeleteStage::~DeleteStage() {}
@@ -73,7 +74,9 @@ namespace mongo {
         if (!_params.isMulti && _specificStats.docsDeleted > 0) {
             return true;
         }
-        return _idRetrying == WorkingSet::INVALID_ID && _child->isEOF();
+        return _idRetrying == WorkingSet::INVALID_ID
+            && _idReturning == WorkingSet::INVALID_ID
+            && _child->isEOF();
     }
 
     PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
@@ -84,6 +87,21 @@ namespace mongo {
 
         if (isEOF()) { return PlanStage::IS_EOF; }
         invariant(_collection); // If isEOF() returns false, we must have a collection.
+
+        // It is possible that after a delete was executed, a WriteConflictException occurred
+        // and prevented us from returning ADVANCED with the old version of the document.
+        if (_idReturning != WorkingSet::INVALID_ID) {
+            // We should only get here if we were trying to return something before.
+            invariant(_params.returnDeleted);
+
+            WorkingSetMember* member = _ws->get(_idReturning);
+            invariant(member->state == WorkingSetMember::OWNED_OBJ);
+
+            *out = _idReturning;
+            _idReturning = WorkingSet::INVALID_ID;
+            ++_commonStats.advanced;
+            return PlanStage::ADVANCED;
+         }
 
         // Either retry the last WSM we worked on or get a new one from our child.
         WorkingSetID id;
@@ -106,12 +124,14 @@ namespace mongo {
             if (!member->hasLoc()) {
                 // We expect to be here because of an invalidation causing a force-fetch, and
                 // doc-locking storage engines do not issue invalidations.
-                dassert(!supportsDocLocking());
                 ++_specificStats.nInvalidateSkips;
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             RecordId rloc = member->loc;
+            // Deletes can't have projections. This means that covering analysis will always add
+            // a fetch. We should always get fetched data, and never just key data.
+            invariant(member->hasObj());
 
             try {
                 // If the snapshot changed, then we have to make sure we have the latest copy of the
@@ -147,16 +167,24 @@ namespace mongo {
                     std::terminate();
                 }
 
+                if (_params.returnDeleted) {
+                    // Save a copy of the document that is about to get deleted.
+                    BSONObj deletedDoc = member->obj.value();
+                    member->obj.setValue(deletedDoc.getOwned());
+                    member->loc = RecordId();
+                    member->state = WorkingSetMember::OWNED_OBJ;
+                }
+
                 // Do the write, unless this is an explain.
                 if (!_params.isExplain) {
                     WriteUnitOfWork wunit(_txn);
 
                     const bool deleteCappedOK = false;
                     const bool deleteNoWarn = false;
-                    BSONObj deletedDoc;
+                    BSONObj deletedId;
 
                     _collection->deleteDocument(_txn, rloc, deleteCappedOK, deleteNoWarn,
-                                                _params.shouldCallLogOp ? &deletedDoc : NULL);
+                                                _params.shouldCallLogOp ? &deletedId : NULL);
 
                     wunit.commit();
                 }
@@ -179,10 +207,29 @@ namespace mongo {
             }
             catch ( const WriteConflictException& wce ) {
                 // Note we don't need to retry anything in this case since the delete already
-                // was committed.
+                // was committed. However, we still need to return the deleted document
+                // (if it was requested).
+                if (_params.returnDeleted) {
+                    // member->obj should refer to the deleted document.
+                    invariant(member->state == WorkingSetMember::OWNED_OBJ);
+
+                    _idReturning = id;
+                    // Keep this member around so that we can return it on the next work() call.
+                    memberFreer.Dismiss();
+                }
                 *out = WorkingSet::INVALID_ID;
                 _commonStats.needYield++;
                 return NEED_YIELD;
+            }
+
+            if (_params.returnDeleted) {
+                // member->obj should refer to the deleted document.
+                invariant(member->state == WorkingSetMember::OWNED_OBJ);
+
+                memberFreer.Dismiss();  // Keep this member around so we can return it.
+                *out = id;
+                ++_commonStats.advanced;
+                return PlanStage::ADVANCED;
             }
 
             ++_commonStats.needTime;

@@ -39,7 +39,6 @@ namespace mongo {
     class Database;
     class OperationContext;
 
-    // If justOne is true, deletedId is set to the id of the deleted object.
     long long deleteObjects(OperationContext* txn,
                             Database* db,
                             StringData ns,

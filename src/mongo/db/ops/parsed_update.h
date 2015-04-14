@@ -43,6 +43,10 @@ namespace mongo {
      * via the parseRequest() method. A ParsedUpdate can then be used to retrieve a PlanExecutor
      * capable of executing the update.
      *
+     * It is invalid to request that the UpdateStage return the prior or newly-updated version of a
+     * document during a multi-update. It is also invalid to request that a ProjectionStage be
+     * applied to the UpdateStage if the UpdateStage would not return any document.
+     *
      * No locks need to be held during parsing.
      *
      * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed

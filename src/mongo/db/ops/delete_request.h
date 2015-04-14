@@ -45,21 +45,28 @@ namespace mongo {
             _god(false),
             _fromMigrate(false),
             _isExplain(false),
+            _returnDeleted(false),
             _yieldPolicy(PlanExecutor::YIELD_MANUAL) {}
 
         void setQuery(const BSONObj& query) { _query = query; }
+        void setProj(const BSONObj& proj) { _proj = proj; }
+        void setSort(const BSONObj& sort) { _sort = sort; }
         void setMulti(bool multi = true) { _multi = multi; }
         void setGod(bool god = true) { _god = god; }
         void setFromMigrate(bool fromMigrate = true) { _fromMigrate = fromMigrate; }
         void setExplain(bool isExplain = true) { _isExplain = isExplain; }
+        void setReturnDeleted(bool returnDeleted = true) { _returnDeleted = returnDeleted; }
         void setYieldPolicy(PlanExecutor::YieldPolicy yieldPolicy) { _yieldPolicy = yieldPolicy; }
 
         const NamespaceString& getNamespaceString() const { return _nsString; }
         const BSONObj& getQuery() const { return _query; }
+        const BSONObj& getProj() const { return _proj; }
+        const BSONObj& getSort() const { return _sort; }
         bool isMulti() const { return _multi; }
         bool isGod() const { return _god; }
         bool isFromMigrate() const { return _fromMigrate; }
         bool isExplain() const { return _isExplain; }
+        bool shouldReturnDeleted() const { return _returnDeleted; }
         PlanExecutor::YieldPolicy getYieldPolicy() const { return _yieldPolicy; }
 
         std::string toString() const;
@@ -67,10 +74,13 @@ namespace mongo {
     private:
         const NamespaceString& _nsString;
         BSONObj _query;
+        BSONObj _proj;
+        BSONObj _sort;
         bool _multi;
         bool _god;
         bool _fromMigrate;
         bool _isExplain;
+        bool _returnDeleted;
         PlanExecutor::YieldPolicy _yieldPolicy;
     };
 

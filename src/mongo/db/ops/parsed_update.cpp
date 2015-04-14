@@ -42,9 +42,13 @@ namespace mongo {
         _canonicalQuery() { }
 
     Status ParsedUpdate::parseRequest() {
-        // It is invalid to request that the update plan stores a copy of the resulting document
-        // if it is a multi-update.
-        invariant(!(_request->shouldStoreResultDoc() && _request->isMulti()));
+        // It is invalid to request that the UpdateStage return the prior or newly-updated version
+        // of a document during a multi-update.
+        invariant(!(_request->shouldReturnAnyDocs() && _request->isMulti()));
+
+        // It is invalid to request that a ProjectionStage be applied to the UpdateStage if the
+        // UpdateStage would not return any document.
+        invariant(_request->getProj().isEmpty() || _request->shouldReturnAnyDocs());
 
         // We parse the update portion before the query portion because the dispostion of the update
         // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
@@ -75,8 +79,27 @@ namespace mongo {
         CanonicalQuery* cqRaw;
         const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
 
+        // Limit should only used for the findAndModify command when a sort is specified. If a sort
+        // is requested, we want to use a top-k sort for efficiency reasons, so should pass the
+        // limit through. Generally, a update stage expects to be able to skip documents that were
+        // deleted/modified under it, but a limit could inhibit that and give an EOF when the update
+        // has not actually updated a document. This behavior is fine for findAndModify, but should
+        // not apply to update in general.
+        long long limit = (!_request->isMulti() && !_request->getSort().isEmpty()) ? -1 : 0;
+
+        // The projection needs to be applied after the update operation, so we specify an empty
+        // BSONObj as the projection during canonicalization.
+        const BSONObj emptyObj;
         Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
                                                      _request->getQuery(),
+                                                     _request->getSort(),
+                                                     emptyObj, // projection
+                                                     0, // skip
+                                                     limit,
+                                                     emptyObj, // hint
+                                                     emptyObj, // min
+                                                     emptyObj, // max
+                                                     false, // snapshot
                                                      _request->isExplain(),
                                                      &cqRaw,
                                                      whereCallback);

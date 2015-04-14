@@ -899,6 +899,65 @@ namespace {
                 find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
             }
 
+            Status explain(OperationContext* txn,
+                           const std::string& dbName,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+                const string ns = parseNsCollectionRequired(dbName, cmdObj);
+
+                auto status = grid.catalogCache()->getDatabase(dbName);
+                uassertStatusOK(status);
+                DBConfigPtr conf = status.getValue();
+
+                Shard shard;
+                if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
+                    shard = conf->getPrimary();
+                }
+                else {
+                    ChunkManagerPtr chunkMgr = getChunkManager(conf, ns);
+
+                    const BSONObj query = cmdObj.getObjectField("query");
+                    StatusWith<BSONObj> status = getShardKey(chunkMgr, ns, query);
+                    if (!status.isOK()) {
+                        return status.getStatus();
+                    }
+
+                    BSONObj shardKey = status.getValue();
+                    ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
+                    shard = chunk->getShard();
+                }
+
+                BSONObjBuilder explainCmd;
+                ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmd);
+
+                // Time how long it takes to run the explain command on the shard.
+                Timer timer;
+
+                BSONObjBuilder result;
+                bool ok = runCommand(conf, shard, ns, explainCmd.obj(), result);
+                long long millisElapsed = timer.millis();
+
+                if (!ok) {
+                    BSONObj res = result.obj();
+                    return Status(ErrorCodes::OperationFailed, str::stream()
+                        << "Explain for findAndModify command failed: " << res);
+                }
+
+                Strategy::CommandResult cmdResult;
+                cmdResult.shardTarget = shard;
+                cmdResult.target = shard.getAddress();
+                cmdResult.result = result.obj();
+
+                vector<Strategy::CommandResult> shardResults;
+                shardResults.push_back(cmdResult);
+
+                return ClusterExplain::buildExplainResult(shardResults,
+                                                          ClusterExplain::kSingleShard,
+                                                          millisElapsed,
+                                                          out);
+            }
+
             bool run(OperationContext* txn,
                      const string& dbName,
                      BSONObj& cmdObj,
@@ -907,49 +966,80 @@ namespace {
                      BSONObjBuilder& result,
                      bool fromRepl) {
 
-                const string fullns = parseNs(dbName, cmdObj);
+                const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
                 // findAndModify should only be creating database if upsert is true, but this
                 // would require that the parsing be pulled into this function.
                 auto conf = uassertStatusOK(grid.implicitCreateDb(dbName));
-                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-                    return passthrough( conf , cmdObj , result);
+                if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
+                    Shard shard = conf->getPrimary();
+                    return runCommand(conf, shard, ns, cmdObj, result);
                 }
 
-                ChunkManagerPtr cm = conf->getChunkManager( fullns );
-                massert( 13002 ,  "shard internal error chunk manager should never be null" , cm );
+                ChunkManagerPtr chunkMgr = getChunkManager(conf, ns);
 
-                BSONObj filter = cmdObj.getObjectField("query");
-
-                StatusWith<BSONObj> status =
-                    cm->getShardKeyPattern().extractShardKeyFromQuery(filter);
-
+                const BSONObj query = cmdObj.getObjectField("query");
+                StatusWith<BSONObj> status = getShardKey(chunkMgr, ns, query);
                 // Bad query
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status.getStatus());
                 }
 
                 BSONObj shardKey = status.getValue();
-                uassert(13343, "query for sharded findAndModify must have shardkey",
-                        !shardKey.isEmpty());
+                ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
+                Shard shard = chunk->getShard();
 
-                ChunkPtr chunk = cm->findIntersectingChunk(shardKey);
-                ShardConnection conn( chunk->getShard() , fullns );
-                BSONObj res;
-                bool ok = conn->runCommand( conf->name() , cmdObj , res );
-                conn.done();
-
-                if (!ok && res.getIntField("code") == RecvStaleConfigCode) { // code for RecvStaleConfigException
-                    throw RecvStaleConfigException( "FindAndModify", res ); // Command code traps this and re-runs
-                }
+                bool ok = runCommand(conf, shard, ns, cmdObj, result);
 
                 if (ok) {
                     // check whether split is necessary (using update object for size heuristic)
                     ClientInfo *client = ClientInfo::get();
 
                     if (client != NULL && ClusterLastErrorInfo::get(client).autoSplitOk()) {
-                      chunk->splitIfShould( cmdObj.getObjectField("update").objsize() ); 
+                        chunk->splitIfShould(cmdObj.getObjectField("update").objsize());
                     }
+                }
+
+                return ok;
+            }
+
+        private:
+            ChunkManagerPtr getChunkManager(DBConfigPtr conf, const string& ns) const {
+                ChunkManagerPtr chunkMgr = conf->getChunkManager(ns);
+                massert(13002, "shard internal error chunk manager should never be null", chunkMgr);
+                return chunkMgr;
+            }
+
+            StatusWith<BSONObj> getShardKey(ChunkManagerPtr chunkMgr,
+                                            const string& ns,
+                                            const BSONObj& query) const {
+                // Verify that the query has an equality predicate using the shard key.
+                StatusWith<BSONObj> status =
+                    chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(query);
+
+                if (status.isOK()) {
+                    BSONObj shardKey = status.getValue();
+                    uassert(13343, "query for sharded findAndModify must have shardkey",
+                            !shardKey.isEmpty());
+                }
+                return status;
+            }
+
+            bool runCommand(DBConfigPtr conf,
+                            const Shard& shard,
+                            const string& ns,
+                            const BSONObj& cmdObj,
+                            BSONObjBuilder& result) const {
+                BSONObj res;
+
+                ShardConnection conn(shard, ns);
+                bool ok = conn->runCommand(conf->name(), cmdObj, res);
+                conn.done();
+
+                // RecvStaleConfigCode is the code for RecvStaleConfigException.
+                if (!ok && res.getIntField("code") == RecvStaleConfigCode) {
+                    // Command code traps this exception and re-runs
+                    throw RecvStaleConfigException("FindAndModify", res);
                 }
 
                 result.appendElements(res);

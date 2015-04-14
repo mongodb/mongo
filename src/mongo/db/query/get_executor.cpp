@@ -75,6 +75,7 @@
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -636,6 +637,47 @@ namespace {
         return getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, out, options);
     }
 
+namespace {
+
+    /**
+     * Wrap the specified 'root' plan stage in a ProjectionStage. Does not take ownership of any
+     * arguments other than root.
+     *
+     * If the projection was valid, then return Status::OK() with a pointer to the newly created
+     * ProjectionStage. Otherwise, return a status indicating the error reason.
+     */
+    StatusWith<std::unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
+                                                           Collection* collection,
+                                                           CanonicalQuery* cq,
+                                                           const BSONObj& proj,
+                                                           bool allowPositional,
+                                                           WorkingSet* ws,
+                                                           std::unique_ptr<PlanStage> root) {
+        invariant(!proj.isEmpty());
+
+        ParsedProjection* rawParsedProj;
+        Status ppStatus = ParsedProjection::make(proj.getOwned(), cq->root(), &rawParsedProj);
+        if (!ppStatus.isOK()) {
+            return ppStatus;
+        }
+        std::unique_ptr<ParsedProjection> pp(rawParsedProj);
+
+        // ProjectionExec requires the MatchDetails from the query expression when the projection
+        // uses the positional operator. Since the query may no longer match the newly-updated
+        // document, we forbid this case.
+        if (!allowPositional && pp->requiresMatchDetails()) {
+            return {ErrorCodes::BadValue,
+                    "cannot use a positional projection and return the new document"};
+        }
+
+        ProjectionStageParams params(WhereCallbackReal(txn, collection->ns().db()));
+        params.projObj = proj;
+        params.fullExpression = cq->root();
+        return {stdx::make_unique<ProjectionStage>(params, ws, root.release())};
+    }
+
+}  // namespace
+
     //
     // Delete
     //
@@ -676,6 +718,7 @@ namespace {
         deleteStageParams.isMulti = request->isMulti();
         deleteStageParams.fromMigrate = request->isFromMigrate();
         deleteStageParams.isExplain = request->isExplain();
+        deleteStageParams.returnDeleted = request->shouldReturnDeleted();
 
         auto_ptr<WorkingSet> ws(new WorkingSet());
         PlanExecutor::YieldPolicy policy = parsedDelete->canYield() ? PlanExecutor::YIELD_AUTO :
@@ -699,8 +742,9 @@ namespace {
 
             }
 
-            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-                collection->getIndexCatalog()->findIdIndex(txn)) {
+            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery)
+                    && collection->getIndexCatalog()->findIdIndex(txn)
+                    && request->getProj().isEmpty()) {
                 LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
                 PlanStage* idHackStage = new IDHackStage(txn,
@@ -723,22 +767,48 @@ namespace {
         // This is the regular path for when we have a CanonicalQuery.
         std::auto_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
 
-        PlanStage* root;
-        QuerySolution* querySolution;
+        PlanStage* rawRoot;
+        QuerySolution* rawQuerySolution;
         const size_t defaultPlannerOptions = 0;
         Status status = prepareExecution(txn, collection, ws.get(), cq.get(),
-                                         defaultPlannerOptions, &root, &querySolution);
+                                         defaultPlannerOptions, &rawRoot, &rawQuerySolution);
         if (!status.isOK()) {
             return status;
         }
-        invariant(root);
+        invariant(rawRoot);
+        std::unique_ptr<QuerySolution> querySolution(rawQuerySolution);
         deleteStageParams.canonicalQuery = cq.get();
 
-        root = new DeleteStage(txn, deleteStageParams, ws.get(), collection, root);
+        rawRoot = new DeleteStage(txn, deleteStageParams, ws.get(), collection, rawRoot);
+        std::unique_ptr<PlanStage> root(rawRoot);
+
+        if (!request->getProj().isEmpty()) {
+            invariant(request->shouldReturnDeleted());
+
+            const bool allowPositional = true;
+            StatusWith<std::unique_ptr<PlanStage>> projStatus = applyProjection(txn,
+                                                                                collection,
+                                                                                cq.get(),
+                                                                                request->getProj(),
+                                                                                allowPositional,
+                                                                                ws.get(),
+                                                                                std::move(root));
+            if (!projStatus.isOK()) {
+                return projStatus.getStatus();
+            }
+            root = std::move(projStatus.getValue());
+        }
+
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null.
-        return PlanExecutor::make(txn, ws.release(), root, querySolution, cq.release(),
-                                  collection, policy, execOut);
+        return PlanExecutor::make(txn,
+                                  ws.release(),
+                                  root.release(),
+                                  querySolution.release(),
+                                  cq.release(),
+                                  collection,
+                                  policy,
+                                  execOut);
     }
 
     //
@@ -828,8 +898,9 @@ namespace {
                                           policy, execOut);
             }
 
-            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-                collection->getIndexCatalog()->findIdIndex(txn)) {
+            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery)
+                    && collection->getIndexCatalog()->findIdIndex(txn)
+                    && request->getProj().isEmpty()) {
 
                 LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
@@ -853,24 +924,47 @@ namespace {
         // This is the regular path for when we have a CanonicalQuery.
         std::auto_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
 
-        PlanStage* root;
-        QuerySolution* querySolution;
+        PlanStage* rawRoot;
+        QuerySolution* rawQuerySolution;
         const size_t defaultPlannerOptions = 0;
         Status status = prepareExecution(txn, collection, ws.get(), cq.get(),
-                                         defaultPlannerOptions, &root, &querySolution);
+                                         defaultPlannerOptions, &rawRoot, &rawQuerySolution);
         if (!status.isOK()) {
             return status;
         }
-        invariant(root);
+        invariant(rawRoot);
+        std::unique_ptr<QuerySolution> querySolution(rawQuerySolution);
         updateStageParams.canonicalQuery = cq.get();
 
-        root = new UpdateStage(txn, updateStageParams, ws.get(), collection, root);
+        rawRoot = new UpdateStage(txn, updateStageParams, ws.get(), collection, rawRoot);
+        std::unique_ptr<PlanStage> root(rawRoot);
+
+        if (!request->getProj().isEmpty()) {
+            invariant(request->shouldReturnAnyDocs());
+
+            // If the plan stage is to return the newly-updated version of the documents, then it
+            // is invalid to use a positional projection because the query expression need not
+            // match the array element after the update has been applied.
+            const bool allowPositional = request->shouldReturnOldDocs();
+            StatusWith<std::unique_ptr<PlanStage>> projStatus = applyProjection(txn,
+                                                                                collection,
+                                                                                cq.get(),
+                                                                                request->getProj(),
+                                                                                allowPositional,
+                                                                                ws.get(),
+                                                                                std::move(root));
+            if (!projStatus.isOK()) {
+                return projStatus.getStatus();
+            }
+            root = std::move(projStatus.getValue());
+        }
+
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null. Takes ownership of all args other than 'collection' and 'txn'
         return PlanExecutor::make(txn,
                                   ws.release(),
-                                  root,
-                                  querySolution,
+                                  root.release(),
+                                  querySolution.release(),
                                   cq.release(),
                                   collection,
                                   policy,

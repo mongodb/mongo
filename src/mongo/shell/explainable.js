@@ -68,6 +68,7 @@ var Explainable = (function() {
             print("\t.aggregate(...) - explain an aggregation operation");
             print("\t.count(...) - explain a count operation");
             print("\t.find(...) - get an explainable query");
+            print("\t.findAndModify(...) - explain a findAndModify operation");
             print("\t.group(...) - explain a group operation");
             print("\t.remove(...) - explain a remove operation");
             print("\t.update(...) - explain an update operation");
@@ -125,6 +126,13 @@ var Explainable = (function() {
             var cursor = this._collection.find.apply(this._collection, arguments);
             return new DBExplainQuery(cursor, this._verbosity);
         }
+
+        this.findAndModify = function(params) {
+            var famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
+            var explainCmd = {"explain": famCmd, "verbosity": this._verbosity};
+            var explainResult = this._collection.runCommand(explainCmd);
+            return throwOrReturn(explainResult);
+        };
 
         this.group = function(params) {
             params.ns = this._collection.getName();

@@ -44,6 +44,10 @@ namespace mongo {
      * via the parseRequest() method. A ParsedDelete can then be used to retrieve a PlanExecutor
      * capable of executing the delete.
      *
+     * It is invalid to request that the DeleteStage return the deleted document during a
+     * multi-remove. It is also invalid to request that a ProjectionStage be applied to the
+     * DeleteStage if the DeleteStage would not return the deleted document.
+     *
      * A delete request is parsed to a CanonicalQuery, so this class is a thin, delete-specific
      * wrapper around canonicalization.
      *

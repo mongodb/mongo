@@ -635,13 +635,6 @@ namespace mongo {
         // The object that was inserted. This is an empty document if no insert was performed.
         BSONObj objInserted;
 
-        // The document resulting from the update (or the document inserted for an upsert). This is
-        // an empty document if no existing doc was modified and no insert happened, or if this is
-        // a multi-update.
-        //
-        // Only set if requested via UpdateRequest::setStoreResultDoc().
-        BSONObj newObj;
-
         // Invalidated documents can be force-fetched, causing the now invalid RecordId to
         // be thrown out. The update stage skips over any results which do not have the
         // RecordId to update.

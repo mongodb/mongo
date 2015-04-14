@@ -56,6 +56,12 @@ namespace mongo {
                                         MatchExpressionParser::WhereCallback());
 
         /**
+         * Returns true if the projection requires match details from the query,
+         * and false otherwise.
+         */
+        bool requiresMatchDetails() const { return _requiresMatchDetails; }
+
+        /**
          * Is the full document required to compute this projection?
          */
         bool requiresDocument() const { return _requiresDocument; }
@@ -94,7 +100,12 @@ namespace mongo {
         /**
          * Must go through ::make
          */
-        ParsedProjection() : _requiresDocument(true) { }
+        ParsedProjection()
+            : _requiresMatchDetails(false),
+              _requiresDocument(true),
+              _wantGeoNearDistance(false),
+              _wantGeoNearPoint(false),
+              _returnKey(false) { }
 
         /**
          * Returns true if field name refers to a positional projection.
@@ -115,6 +126,8 @@ namespace mongo {
 
         // TODO: stringdata?
         std::vector<std::string> _requiredFields;
+
+        bool _requiresMatchDetails;
 
         bool _requiresDocument;
 

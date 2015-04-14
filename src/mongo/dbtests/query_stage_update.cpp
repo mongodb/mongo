@@ -39,6 +39,7 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -47,7 +48,9 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 
 namespace QueryStageUpdate {
 
@@ -354,6 +357,238 @@ namespace QueryStageUpdate {
         }
     };
 
+    /**
+     * Test that the update stage returns an owned copy of the original document if
+     * ReturnDocOption::RETURN_OLD is specified.
+     */
+    class QueryStageUpdateReturnOldDoc : public QueryStageUpdateBase {
+    public:
+        void run() {
+            // Populate the collection.
+            for (int i = 0; i < 10; ++i) {
+                insert(BSON("_id" << i << "foo" << i));
+            }
+            ASSERT_EQUALS(10U, count(BSONObj()));
+
+            // Various variables we'll need.
+            OldClientWriteContext ctx(&_txn, ns());
+            OpDebug* opDebug = &_txn.getCurOp()->debug();
+            Collection* coll = ctx.getCollection();
+            UpdateLifecycleImpl updateLifecycle(false, nsString());
+            UpdateRequest request(nsString());
+            UpdateDriver driver( (UpdateDriver::Options()) );
+            const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
+            const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
+            const std::unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+            const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
+
+            // Get the RecordIds that would be returned by an in-order scan.
+            vector<RecordId> locs;
+            getLocs(coll, CollectionScanParams::FORWARD, &locs);
+
+            // Populate the request.
+            request.setQuery(query);
+            request.setUpdates(fromjson("{$set: {x: 0}}"));
+            request.setSort(BSONObj());
+            request.setMulti(false);
+            request.setReturnDocs(UpdateRequest::RETURN_OLD);
+            request.setLifecycle(&updateLifecycle);
+
+            ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+
+            // Configure a QueuedDataStage to pass the first object in the collection back in a
+            // LOC_AND_UNOWNED_OBJ state.
+            std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+            WorkingSetMember member;
+            member.loc = locs[targetDocIndex];
+            member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+            const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
+            member.obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
+            qds->pushBack(member);
+
+            // Configure the update.
+            UpdateStageParams updateParams(&request, &driver, opDebug);
+            updateParams.canonicalQuery = cq.get();
+
+            const std::unique_ptr<UpdateStage> updateStage(
+                stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
+
+            // Should return advanced.
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = updateStage->work(&id);
+            ASSERT_EQUALS(PlanStage::ADVANCED, state);
+
+            // Make sure the returned value is what we expect it to be.
+
+            // Should give us back a valid id.
+            ASSERT_TRUE(WorkingSet::INVALID_ID != id);
+            WorkingSetMember* resultMember = ws->get(id);
+            // With an owned copy of the object, with no RecordId.
+            ASSERT_TRUE(resultMember->hasOwnedObj());
+            ASSERT_FALSE(resultMember->hasLoc());
+            ASSERT_EQUALS(resultMember->state, WorkingSetMember::OWNED_OBJ);
+            ASSERT_TRUE(resultMember->obj.value().isOwned());
+
+            // Should be the old value.
+            ASSERT_EQUALS(resultMember->obj.value(), oldDoc);
+
+            // Should have done the update.
+            BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
+            vector<BSONObj> objs;
+            getCollContents(coll, &objs);
+            ASSERT_EQUALS(objs[targetDocIndex], newDoc);
+
+            // That should be it.
+            id = WorkingSet::INVALID_ID;
+            ASSERT_EQUALS(PlanStage::IS_EOF, updateStage->work(&id));
+        }
+    };
+
+    /**
+     * Test that the update stage returns an owned copy of the updated document if
+     * ReturnDocOption::RETURN_NEW is specified.
+     */
+    class QueryStageUpdateReturnNewDoc : public QueryStageUpdateBase {
+    public:
+        void run() {
+            // Populate the collection.
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("_id" << i << "foo" << i));
+            }
+            ASSERT_EQUALS(50U, count(BSONObj()));
+
+            // Various variables we'll need.
+            OldClientWriteContext ctx(&_txn, ns());
+            OpDebug* opDebug = &_txn.getCurOp()->debug();
+            Collection* coll = ctx.getCollection();
+            UpdateLifecycleImpl updateLifecycle(false, nsString());
+            UpdateRequest request(nsString());
+            UpdateDriver driver( (UpdateDriver::Options()) );
+            const int targetDocIndex = 10;
+            const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
+            const std::unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+            const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
+
+            // Get the RecordIds that would be returned by an in-order scan.
+            vector<RecordId> locs;
+            getLocs(coll, CollectionScanParams::FORWARD, &locs);
+
+            // Populate the request.
+            request.setQuery(query);
+            request.setUpdates(fromjson("{$set: {x: 0}}"));
+            request.setSort(BSONObj());
+            request.setMulti(false);
+            request.setReturnDocs(UpdateRequest::RETURN_NEW);
+            request.setLifecycle(&updateLifecycle);
+
+            ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+
+            // Configure a QueuedDataStage to pass the first object in the collection back in a
+            // LOC_AND_UNOWNED_OBJ state.
+            std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+            WorkingSetMember member;
+            member.loc = locs[targetDocIndex];
+            member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+            const BSONObj oldDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex);
+            member.obj = Snapshotted<BSONObj>(SnapshotId(), oldDoc);
+            qds->pushBack(member);
+
+            // Configure the update.
+            UpdateStageParams updateParams(&request, &driver, opDebug);
+            updateParams.canonicalQuery = cq.get();
+
+            std::unique_ptr<UpdateStage> updateStage(
+                stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
+
+            // Should return advanced.
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = updateStage->work(&id);
+            ASSERT_EQUALS(PlanStage::ADVANCED, state);
+
+            // Make sure the returned value is what we expect it to be.
+
+            // Should give us back a valid id.
+            ASSERT_TRUE(WorkingSet::INVALID_ID != id);
+            WorkingSetMember* resultMember = ws->get(id);
+            // With an owned copy of the object, with no RecordId.
+            ASSERT_TRUE(resultMember->hasOwnedObj());
+            ASSERT_FALSE(resultMember->hasLoc());
+            ASSERT_EQUALS(resultMember->state, WorkingSetMember::OWNED_OBJ);
+            ASSERT_TRUE(resultMember->obj.value().isOwned());
+
+            // Should be the new value.
+            BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
+            ASSERT_EQUALS(resultMember->obj.value(), newDoc);
+
+            // Should have done the update.
+            vector<BSONObj> objs;
+            getCollContents(coll, &objs);
+            ASSERT_EQUALS(objs[targetDocIndex], newDoc);
+
+            // That should be it.
+            id = WorkingSet::INVALID_ID;
+            ASSERT_EQUALS(PlanStage::IS_EOF, updateStage->work(&id));
+        }
+    };
+
+    /**
+     * Test that the update stage does not update or return WorkingSetMembers that it gets back from
+     * a child in the OWNED_OBJ state.
+     */
+    class QueryStageUpdateSkipOwnedObjects : public QueryStageUpdateBase {
+    public:
+        void run() {
+            // Various variables we'll need.
+            OldClientWriteContext ctx(&_txn, ns());
+            OpDebug* opDebug = &_txn.getCurOp()->debug();
+            Collection* coll = ctx.getCollection();
+            UpdateLifecycleImpl updateLifecycle(false, nsString());
+            UpdateRequest request(nsString());
+            UpdateDriver driver( (UpdateDriver::Options()) );
+            const BSONObj query = BSONObj();
+            const std::unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+            const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
+
+            // Populate the request.
+            request.setQuery(query);
+            request.setUpdates(fromjson("{$set: {x: 0}}"));
+            request.setSort(BSONObj());
+            request.setMulti(false);
+            request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+            request.setLifecycle(&updateLifecycle);
+
+            ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
+
+            // Configure a QueuedDataStage to pass an OWNED_OBJ to the update stage.
+            std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+            WorkingSetMember member;
+            member.state = WorkingSetMember::OWNED_OBJ;
+            member.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{x: 1}"));
+            qds->pushBack(member);
+
+            // Configure the update.
+            UpdateStageParams updateParams(&request, &driver, opDebug);
+            updateParams.canonicalQuery = cq.get();
+
+            const std::unique_ptr<UpdateStage> updateStage(
+                stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
+            const UpdateStats* stats =
+                static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+
+            // Call work, passing the set up member to the update stage.
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = updateStage->work(&id);
+
+            // Should return NEED_TIME, not modifying anything.
+            ASSERT_EQUALS(PlanStage::NEED_TIME, state);
+            ASSERT_EQUALS(stats->nModified, 0U);
+
+            id = WorkingSet::INVALID_ID;
+            state = updateStage->work(&id);
+            ASSERT_EQUALS(PlanStage::IS_EOF, state);
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite("query_stage_update") {}
@@ -362,6 +597,9 @@ namespace QueryStageUpdate {
             // Stage-specific tests below.
             add<QueryStageUpdateUpsertEmptyColl>();
             add<QueryStageUpdateSkipInvalidatedDoc>();
+            add<QueryStageUpdateReturnOldDoc>();
+            add<QueryStageUpdateReturnNewDoc>();
+            add<QueryStageUpdateSkipOwnedObjects>();
         }
     };
 

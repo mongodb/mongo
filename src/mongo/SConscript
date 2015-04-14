@@ -594,7 +594,6 @@ coredbEnv.Library("coredb", [
         "db/pipeline/document_source_sort.cpp",
         "db/pipeline/document_source_unwind.cpp",
         "db/pipeline/expression.cpp",
-        "db/projection.cpp",
         "db/stats/timer_stats.cpp",
         ],
                   LIBDEPS=['db/auth/serverauth',
