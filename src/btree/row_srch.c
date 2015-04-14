@@ -523,7 +523,7 @@ restart:
 		    __wt_random(session->rnd) % page->pg_row_entries : 0;
 
 		return (__wt_row_leaf_key(session,
-		    page, page->pg_row_d + cbt->slot, cbt->search_key, 0));
+		    page, page->pg_row_d + cbt->slot, cbt->tmp, 0));
 	}
 
 	/*
