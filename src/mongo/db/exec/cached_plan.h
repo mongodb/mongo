@@ -28,14 +28,21 @@
 
 #pragma once
 
+#include <list>
+#include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
+
+    class PlanYieldPolicy;
 
     /**
      * This stage outputs its mainChild, and possibly its backup child
@@ -46,17 +53,13 @@ namespace mongo {
      */
     class CachedPlanStage : public PlanStage {
     public:
-        /**
-         * Takes ownership of 'mainChild', 'mainQs', 'backupChild', and 'backupQs'.
-         */
-        CachedPlanStage(const Collection* collection,
+        CachedPlanStage(OperationContext* txn,
+                        Collection* collection,
+                        WorkingSet* ws,
                         CanonicalQuery* cq,
-                        PlanStage* mainChild,
-                        QuerySolution* mainQs,
-                        PlanStage* backupChild = NULL,
-                        QuerySolution* backupQs = NULL);
-
-        virtual ~CachedPlanStage();
+                        const QueryPlannerParams& params,
+                        size_t decisionWorks,
+                        PlanStage* root);
 
         virtual bool isEOF();
 
@@ -78,40 +81,75 @@ namespace mongo {
 
         static const char* kStageType;
 
-        void kill();
+        /**
+         * Runs the cached plan for a trial period, yielding during the trial period according to
+         * 'yieldPolicy'.
+         *
+         * Feedback from the trial period is passed to the plan cache. If the performance is lower
+         * than expected, the old plan is evicted and a new plan is selected from scratch (again
+         * yielding according to 'yieldPolicy'). Otherwise, the cached plan is run.
+         */
+        Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
     private:
-        PlanStage* getActiveChild() const;
-        void updateCache();
+        /**
+         * Passes stats from the trial period run of the cached plan to the plan cache.
+         *
+         * If the plan cache entry is deleted before we get a chance to update it, then this
+         * is a no-op.
+         */
+        void updatePlanCache();
 
-        // not owned
-        const Collection* _collection;
+        /**
+         * Uses the QueryPlanner and the MultiPlanStage to re-generate candidate plans for this
+         * query and select a new winner.
+         *
+         * We fallback to a new plan if updatePlanCache() tells us that the performance was worse
+         * than anticipated during the trial period.
+         *
+         * We only write the result of re-planning to the plan cache if 'shouldCache' is true.
+         */
+        Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache);
 
-        // not owned
+        /**
+         * May yield during the cached plan stage's trial period or replanning phases.
+         *
+         * Returns a non-OK status if the plan was killed during a yield.
+         */
+        Status tryYield(PlanYieldPolicy* yieldPolicy);
+
+        // Not owned.
+        OperationContext* _txn;
+
+        // Not owned.
+        Collection* _collection;
+
+        // Not owned.
+        WorkingSet* _ws;
+
+        // Not owned.
         CanonicalQuery* _canonicalQuery;
 
-        // Owned by us. Must be deleted after the corresponding PlanStage trees, as
-        // those trees point into the query solutions.
-        boost::scoped_ptr<QuerySolution> _mainQs;
-        boost::scoped_ptr<QuerySolution> _backupQs;
+        QueryPlannerParams _plannerParams;
 
-        // Owned by us. Must be deleted before the QuerySolutions above, as these
-        // can point into the QuerySolutions.
-        boost::scoped_ptr<PlanStage> _mainChildPlan;
-        boost::scoped_ptr<PlanStage> _backupChildPlan;
+        // The number of work cycles taken to decide on a winning plan when the plan was first
+        // cached.
+        size_t _decisionWorks;
 
-        // True if the main plan errors before producing results
-        // and if a backup plan is available (can happen with blocking sorts)
-        bool _usingBackupChild;
+        // If we fall back to re-planning the query, and there is just one resulting query solution,
+        // that solution is owned here.
+        std::unique_ptr<QuerySolution> _replannedQs;
 
-        // True if the childPlan has produced results yet.
-        bool _alreadyProduced;
+        std::unique_ptr<PlanStage> _root;
 
-        // Have we updated the cache with our plan stats yet?
-        bool _updatedCache;
+        // Any results produced during trial period execution are kept here.
+        std::list<WorkingSetID> _results;
 
-        // Has this query been killed?
-        bool _killed;
+        // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
+        // to use to pull the record into memory. We take ownership of the RecordFetcher here,
+        // deleting it after we've had a chance to do the fetch. For timing-based yields, we
+        // just pass a NULL fetcher.
+        std::unique_ptr<RecordFetcher> _fetcher;
 
         // Stats
         CommonStats _commonStats;

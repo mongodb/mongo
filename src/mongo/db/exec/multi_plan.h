@@ -52,8 +52,16 @@ namespace mongo {
      */
     class MultiPlanStage : public PlanStage {
     public:
-        /** Takes no ownership */
-        MultiPlanStage(OperationContext* txn, const Collection* collection, CanonicalQuery* cq);
+        /**
+         * Takes no ownership.
+         *
+         * If 'shouldCache' is true, writes a cache entry for the winning plan to the plan cache
+         * when possible. If 'shouldCache' is false, the plan cache will never be written.
+         */
+        MultiPlanStage(OperationContext* txn,
+                       const Collection* collection,
+                       CanonicalQuery* cq,
+                       bool shouldCache = true);
 
         virtual ~MultiPlanStage();
 
@@ -93,6 +101,19 @@ namespace mongo {
          * Returns a non-OK status if the plan was killed during yield.
          */
         Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+
+        /**
+         * Returns the number of times that we are willing to work a plan during a trial period.
+         *
+         * Calculated based on a fixed query knob and the size of the collection.
+         */
+        static size_t getTrialPeriodWorks(OperationContext* txn, const Collection* collection);
+
+        /**
+         * Returns the max number of documents which we should allow any plan to return during the
+         * trial period. As soon as any plan hits this number of documents, the trial period ends.
+         */
+        static size_t getTrialPeriodNumToReturn(const CanonicalQuery& query);
 
         /** Return true if a best plan has been chosen  */
         bool bestPlanChosen() const;
@@ -155,6 +176,9 @@ namespace mongo {
         // not owned here
         OperationContext* _txn;
         const Collection* _collection;
+
+        // Whether or not we should try to cache the winning plan in the plan cache.
+        const bool _shouldCache;
 
         // The query that we're trying to figure out the best solution to.
         // not owned here

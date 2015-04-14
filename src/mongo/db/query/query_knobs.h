@@ -65,9 +65,9 @@ namespace mongo {
     // performance?
     extern int internalQueryCacheFeedbacksStored;
 
-    // How many stddevs must a feedback be from the 'reference' performance for us to evict the
-    // entry from the cache?
-    extern double internalQueryCacheStdDeviations;
+    // How many times more works must we perform in order to justify plan cache eviction
+    // and replanning?
+    extern double internalQueryCacheEvictionRatio;
 
     // How many write ops should we allow in a collection before tossing all cache entries?
     extern int internalQueryCacheWriteOpsBetweenFlush;

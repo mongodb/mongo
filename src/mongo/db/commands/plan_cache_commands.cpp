@@ -420,14 +420,10 @@ namespace mongo {
             statsBob.doneFast();
             reasonBob.doneFast();
 
-            // BSON object for 'feedback' field is created from query executions
-            // and shows number of executions since this cached solution was
-            // created as well as score data (average and standard deviation).
+            // BSON object for 'feedback' field shows scores from historical executions of the plan.
             BSONObjBuilder feedbackBob(planBob.subobjStart("feedback"));
             if (i == 0U) {
                 feedbackBob.append("nfeedback", int(entry->feedback.size()));
-                feedbackBob.append("averageScore", entry->averageScore.get_value_or(0));
-                feedbackBob.append("stdDevScore",entry->stddevScore.get_value_or(0));
                 BSONArrayBuilder scoresBob(feedbackBob.subarrayStart("scores"));
                 for (size_t i = 0; i < entry->feedback.size(); ++i) {
                     BSONObjBuilder scoreBob(scoresBob.subobjStart());

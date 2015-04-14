@@ -314,13 +314,11 @@ namespace mongo {
                 collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
                 // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
                 boost::scoped_ptr<CachedSolution> cs(rawCS);
-                QuerySolution *qs, *backupQs;
+                QuerySolution *qs;
                 Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
-                                                            &qs, &backupQs);
+                                                            &qs);
 
                 if (status.isOK()) {
-                    PlanStage *backupRoot = NULL;
-                    // The working set is shared by the root and backupRoot plans.
                     verify(StageBuilder::build(opCtx, collection, *qs, ws, rootOut));
                     if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
                         && turnIxscanIntoCount(qs)) {
@@ -328,15 +326,20 @@ namespace mongo {
                         LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
                                << ", planSummary: " << Explain::getPlanSummary(*rootOut);
                     }
-                    else if (NULL != backupQs) {
-                        verify(StageBuilder::build(opCtx, collection, *backupQs, ws, &backupRoot));
-                    }
 
-                    // Add a CachedPlanStage on top of the previous root. Takes ownership of
-                    // '*rootOut', 'backupRoot', 'qs', and 'backupQs'.
-                    *rootOut = new CachedPlanStage(collection, canonicalQuery,
-                                                   *rootOut, qs,
-                                                   backupRoot, backupQs);
+                    // Add a CachedPlanStage on top of the previous root.
+                    //
+                    // 'decisionWorks' is used to determine whether the existing cache entry should
+                    // be evicted, and the query replanned.
+                    //
+                    // Takes ownership of '*rootOut'.
+                    *rootOut = new CachedPlanStage(opCtx,
+                                                   collection,
+                                                   ws,
+                                                   canonicalQuery,
+                                                   plannerParams,
+                                                   cs->decisionWorks,
+                                                   *rootOut);
                     return Status::OK();
                 }
             }

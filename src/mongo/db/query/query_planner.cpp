@@ -338,14 +338,23 @@ namespace mongo {
     // static
     Status QueryPlanner::planFromCache(const CanonicalQuery& query,
                                        const QueryPlannerParams& params,
-                                       const SolutionCacheData& cacheData,
+                                       const CachedSolution& cachedSoln,
                                        QuerySolution** out) {
-        if (SolutionCacheData::WHOLE_IXSCAN_SOLN == cacheData.solnType) {
+        invariant(!cachedSoln.plannerData.empty());
+        invariant(out);
+
+        // A query not suitable for caching should not have made its way into the cache.
+        invariant(PlanCache::shouldCacheQuery(query));
+
+        // Look up winning solution in cached solution's array.
+        const SolutionCacheData& winnerCacheData = *cachedSoln.plannerData[0];
+
+        if (SolutionCacheData::WHOLE_IXSCAN_SOLN == winnerCacheData.solnType) {
             // The solution can be constructed by a scan over the entire index.
-            QuerySolution* soln = buildWholeIXSoln(*cacheData.tree->entry,
+            QuerySolution* soln = buildWholeIXSoln(*winnerCacheData.tree->entry,
                                                    query,
                                                    params,
-                                                   cacheData.wholeIXSolnDir);
+                                                   winnerCacheData.wholeIXSolnDir);
             if (soln == NULL) {
                 return Status(ErrorCodes::BadValue,
                               "plan cache error: soln that uses index to provide sort");
@@ -355,7 +364,7 @@ namespace mongo {
                 return Status::OK();
             }
         }
-        else if (SolutionCacheData::COLLSCAN_SOLN == cacheData.solnType) {
+        else if (SolutionCacheData::COLLSCAN_SOLN == winnerCacheData.solnType) {
             // The cached solution is a collection scan. We don't cache collscans
             // with tailable==true, hence the false below.
             QuerySolution* soln = buildCollscanSoln(query, false, params);
@@ -377,7 +386,7 @@ namespace mongo {
 
         LOG(5) << "Tagging the match expression according to cache data: " << endl
                << "Filter:" << endl << clone->toString()
-               << "Cache data:" << endl << cacheData.toString();
+               << "Cache data:" << endl << winnerCacheData.toString();
 
         // Map from index name to index number.
         // TODO: can we assume that the index numbering has the same lifetime
@@ -389,7 +398,7 @@ namespace mongo {
             LOG(5) << "Index " << i << ": " << ie.keyPattern.toString() << endl;
         }
 
-        Status s = tagAccordingToCache(clone, cacheData.tree.get(), indexMap);
+        Status s = tagAccordingToCache(clone, winnerCacheData.tree.get(), indexMap);
         if (!s.isOK()) {
             return s;
         }
@@ -403,55 +412,22 @@ namespace mongo {
         QuerySolutionNode* solnRoot =
             QueryPlannerAccess::buildIndexedDataAccess(query, clone, false, params.indices, params);
 
-        if (NULL != solnRoot) {
-            // Takes ownership of 'solnRoot'.
-            QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query,
-                                                                          params,
-                                                                          solnRoot);
-            if (NULL != soln) {
-                LOG(5) << "Planner: solution constructed from the cache:\n" << soln->toString() << endl;
-                *out = soln;
-                return Status::OK();
-            }
+        if (!solnRoot) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Failed to create data access plan from cache. Query: "
+                                        << query.toStringShort());
         }
 
-        return Status(ErrorCodes::BadValue, "couldn't plan from cache");
-    }
-
-    // static
-    Status QueryPlanner::planFromCache(const CanonicalQuery& query,
-                                       const QueryPlannerParams& params,
-                                       const CachedSolution& cachedSoln,
-                                       QuerySolution** out,
-                                       QuerySolution** backupOut) {
-        verify(!cachedSoln.plannerData.empty());
-        verify(out);
-        verify(backupOut);
-        verify(PlanCache::shouldCacheQuery(query));
-
-        // If there is no backup solution, then return NULL through
-        // the 'backupOut' out-parameter.
-        *backupOut = NULL;
-
-        // Queries not suitable for caching are filtered
-        // in multi plan runner using PlanCache::shouldCacheQuery().
-
-        // Look up winning solution in cached solution's array.
-        SolutionCacheData* winnerCacheData = cachedSoln.plannerData[0];
-        Status s = planFromCache(query, params, *winnerCacheData, out);
-        if (!s.isOK()) {
-            return s;
+        // Takes ownership of 'solnRoot'.
+        QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+        if (!soln) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Failed to analyze plan from cache. Query: "
+                                        << query.toStringShort());
         }
 
-        if (cachedSoln.backupSoln) {
-            SolutionCacheData* backupCacheData = cachedSoln.plannerData[*cachedSoln.backupSoln];
-            Status backupStatus = planFromCache(query, params,
-                                                *backupCacheData, backupOut);
-            if (!backupStatus.isOK()) {
-                return backupStatus;
-            }
-        }
-
+        LOG(5) << "Planner: solution constructed from the cache:\n" << soln->toString();
+        *out = soln;
         return Status::OK();
     }
 

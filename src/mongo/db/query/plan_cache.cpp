@@ -109,11 +109,11 @@ namespace mongo {
 
     CachedSolution::CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry)
         : plannerData(entry.plannerData.size()),
-          backupSoln(entry.backupSoln),
           key(key),
           query(entry.query.getOwned()),
           sort(entry.sort.getOwned()),
-          projection(entry.projection.getOwned()) {
+          projection(entry.projection.getOwned()),
+          decisionWorks(entry.decision->stats[0]->common.works) {
         // CachedSolution should not having any references into
         // cache entry. All relevant data should be cloned/copied.
         for (size_t i = 0; i < entry.plannerData.size(); ++i) {
@@ -169,8 +169,6 @@ namespace mongo {
         }
         PlanCacheEntry* entry = new PlanCacheEntry(solutions.vector(), decision->clone());
 
-        entry->backupSoln = backupSoln;
-
         // Copy query shape.
         entry->query = query.getOwned();
         entry->sort = sort.getOwned();
@@ -183,8 +181,6 @@ namespace mongo {
             fb->score = feedback[i]->score;
             entry->feedback.push_back(fb);
         }
-        entry->averageScore = averageScore;
-        entry->stddevScore = stddevScore;
         return entry;
     }
 
@@ -203,10 +199,6 @@ namespace mongo {
         ss << "key: " << key << '\n';
         return ss;
     }
-
-
-    // static
-    const double PlanCacheEntry::kMinDeviation = 0.0001;
 
     //
     // PlanCacheIndexTree
@@ -331,17 +323,6 @@ namespace mongo {
         entry->sort = pq.getSort().getOwned();
         entry->projection = pq.getProj().getOwned();
 
-        // If the winning solution uses a blocking stage, then try and
-        // find a fallback solution that has no blocking stage.
-        if (solns[0]->hasBlockingStage) {
-            for (size_t i = 1; i < solns.size(); ++i) {
-                if (!solns[i]->hasBlockingStage) {
-                    entry->backupSoln.reset(i);
-                    break;
-                }
-            }
-        }
-
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
         std::auto_ptr<PlanCacheEntry> evictedEntry = _cache.add(query.getPlanCacheKey(), entry);
 
@@ -371,57 +352,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    // TODO: Figure out what the right policy is here for determining if the cached solution is bad.
-    // This is a solution but may not be the right one, if there even is a right one...
-    static bool hasCachedPlanPerformanceDegraded(PlanCacheEntry* entry,
-                                                 PlanCacheEntryFeedback* latestFeedback) {
-
-        if (!entry->averageScore) {
-            // We haven't computed baseline performance stats for this cached plan yet.
-            // Let's do that now.
-
-            // Compute mean score.
-            double sum = 0;
-            for (size_t i = 0; i < entry->feedback.size(); ++i) {
-                sum += entry->feedback[i]->score;
-            }
-            double mean = sum / entry->feedback.size();
-
-            // Compute std deviation of scores.
-            double sum_of_squares = 0;
-            for (size_t i = 0; i < entry->feedback.size(); ++i) {
-                double iscore = entry->feedback[i]->score;
-                sum_of_squares += (iscore - mean) * (iscore - mean);
-            }
-            double stddev = sqrt(sum_of_squares / (entry->feedback.size() - 1));
-
-            entry->averageScore.reset(mean);
-            entry->stddevScore.reset(stddev);
-        }
-
-        // If the latest use of this plan cache entry is too far from the expected
-        // performance, then we should uncache the entry. Only uncache if the deviation
-        // also exceeds a minimum value.
-        double deviation = *entry->averageScore - latestFeedback->score;
-
-        if (deviation < PlanCacheEntry::kMinDeviation) {
-            // The plan performed better then the average or is only worse by
-            // epsilon. Keep the cache entry, regardless of the std dev.
-            return false;
-        }
-
-        if (deviation > (internalQueryCacheStdDeviations * (*entry->stddevScore))) {
-            // This run of the plan was much worse than average.
-            // Kick it out of the plan cache.
-            return true;
-        }
-
-        // If we're here, the performance deviated from the average, but
-        // not by enough to warrant uncaching.
-
-        return false;
-    }
-
     Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback) {
         if (NULL == feedback) {
             return Status(ErrorCodes::BadValue, "feedback is NULL");
@@ -437,17 +367,8 @@ namespace mongo {
         }
         invariant(entry);
 
-        if (entry->feedback.size() >= size_t(internalQueryCacheFeedbacksStored)) {
-            // If we have enough feedback, then use it to determine whether
-            // we should get rid of the cached solution.
-            if (hasCachedPlanPerformanceDegraded(entry, autoFeedback.get())) {
-                LOG(1) << _ns << ": removing plan cache entry " << entry->toString()
-                       << " - detected degradation in performance of cached solution.";
-                _cache.remove(ck);
-            }
-        }
-        else {
-            // We don't have enough feedback yet---just store it and move on.
+        // We store up to a constant number of feedback entries.
+        if (entry->feedback.size() < size_t(internalQueryCacheFeedbacksStored)) {
             entry->feedback.push_back(autoFeedback.release());
         }
 

@@ -111,16 +111,18 @@ namespace QueryStageSubplan {
         void run() {
             OldClientWriteContext ctx(&_txn, ns());
 
+            addIndex(BSON("a" << 1));
             addIndex(BSON("a" << 1 << "b" << 1));
-            addIndex(BSON("a" << 1 << "c" << 1));
+            addIndex(BSON("c" << 1));
 
             for (int i = 0; i < 10; i++) {
                 insert(BSON("a" << 1 << "b" << i << "c" << i));
             }
 
-            // This query should result in a plan cache entry for the first branch. The second
-            // branch should tie, meaning that nothing is inserted into the plan cache.
-            BSONObj query = fromjson("{$or: [{a: 1, b: 3}, {a: 1}]}");
+            // This query should result in a plan cache entry for the first $or branch, because
+            // there are two competing indices. The second branch has only one relevant index, so
+            // its winning plan should not be cached.
+            BSONObj query = fromjson("{$or: [{a: 1, b: 3}, {c: 1}]}");
 
             Collection* collection = ctx.getCollection();
 
@@ -144,8 +146,8 @@ namespace QueryStageSubplan {
             ASSERT_FALSE(subplan->branchPlannedFromCache(0));
             ASSERT_FALSE(subplan->branchPlannedFromCache(1));
 
-            // If we repeat the same query, then the first branch should come from the cache,
-            // but the second is re-planned due to tying on the first run.
+            // If we repeat the same query, the plan for the first branch should have come from
+            // the cache.
             ws.clear();
             subplan.reset(new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
 

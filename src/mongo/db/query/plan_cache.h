@@ -180,10 +180,6 @@ namespace mongo {
         // Owned here.
         std::vector<SolutionCacheData*> plannerData;
 
-        // An index into plannerData indicating the SolutionCacheData which should be
-        // used to produce a backup solution in the case of a blocking sort.
-        boost::optional<size_t> backupSoln;
-
         // Key used to provide feedback on the entry.
         PlanCacheKey key;
 
@@ -196,6 +192,10 @@ namespace mongo {
         BSONObj query;
         BSONObj sort;
         BSONObj projection;
+
+        // The number of work cycles taken to decide on a winning plan when the plan was first
+        // cached.
+        size_t decisionWorks;
     };
 
     /**
@@ -233,10 +233,6 @@ namespace mongo {
         // it from the cache a deep copy is made and returned inside CachedSolution.
         std::vector<SolutionCacheData*> plannerData;
 
-        // An index into plannerData indicating the SolutionCacheData which should be
-        // used to produce a backup solution in the case of a blocking sort.
-        boost::optional<size_t> backupSoln;
-
         // TODO: Do we really want to just hold a copy of the CanonicalQuery?  For now we just
         // extract the data we need.
         //
@@ -257,16 +253,6 @@ namespace mongo {
         // Annotations from cached runs.  The CachedPlanStage provides these stats about its
         // runs when they complete.
         std::vector<PlanCacheEntryFeedback*> feedback;
-
-        // The average score of all stored feedback.
-        boost::optional<double> averageScore;
-
-        // The standard deviation of the scores from stored as feedback.
-        boost::optional<double> stddevScore;
-
-        // In order to justify eviction, the deviation from the mean must exceed a
-        // minimum threshold.
-        static const double kMinDeviation;
     };
 
     /**
@@ -323,8 +309,8 @@ namespace mongo {
 
         /**
          * When the CachedPlanStage runs a plan out of the cache, we want to record data about the
-         * plan's performance.  The CachedPlanStage calls feedback(...) at the end of query
-         * execution in order to do this.
+         * plan's performance.  The CachedPlanStage calls feedback(...) after executing the cached
+         * plan for a trial period in order to do this.
          *
          * Cache takes ownership of 'feedback'.
          *
@@ -333,9 +319,6 @@ namespace mongo {
          *
          * If the entry corresponding to 'cq' still exists, 'feedback' is added to the run
          * statistics about the plan.  Status::OK() is returned.
-         *
-         * May cause the cache entry to be removed if it is determined that the cached plan
-         * is badly performing.
          */
         Status feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback);
 
@@ -388,7 +371,6 @@ namespace mongo {
         void notifyOfWriteOp();
 
     private:
-
         /**
          * Releases resources associated with each cache entry
          * and clears map.

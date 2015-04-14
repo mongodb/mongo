@@ -87,7 +87,7 @@ namespace mongo {
      */
     struct PlanRankingDecision {
 
-        PlanRankingDecision() : tieForBest(false) { }
+        PlanRankingDecision() { }
 
         /**
          * Make a deep copy.
@@ -101,7 +101,6 @@ namespace mongo {
             }
             decision->scores = scores;
             decision->candidateOrder = candidateOrder;
-            decision->tieForBest = tieForBest;
             return decision;
         }
 
@@ -120,13 +119,6 @@ namespace mongo {
         // candidates[candidateOrder[1]] followed by
         // candidates[candidateOrder[2]], ...
         std::vector<size_t> candidateOrder;
-
-        // Did two plans tie for best?
-        //
-        // NOTE: Reading this is the only reliable way to determine if there was a tie,
-        // because the scores kept inside the PlanRankingDecision do not incorporate
-        // the EOF bonus.
-        bool tieForBest;
     };
 
 }  // namespace mongo

@@ -186,11 +186,19 @@ namespace mongo {
         }
 
         // If we didn't have to do subplanning, we might still have to do regular
-        // multi plan selection.
+        // multi plan selection...
         foundStage = getStageByType(_root.get(), STAGE_MULTI_PLAN);
         if (foundStage) {
             MultiPlanStage* mps = static_cast<MultiPlanStage*>(foundStage);
             return mps->pickBestPlan(_yieldPolicy.get());
+        }
+
+        // ...or, we might have to run a plan from the cache for a trial period, falling back on
+        // regular planning if the cached plan performs poorly.
+        foundStage = getStageByType(_root.get(), STAGE_CACHED_PLAN);
+        if (foundStage) {
+            CachedPlanStage* cachedPlan = static_cast<CachedPlanStage*>(foundStage);
+            return cachedPlan->pickBestPlan(_yieldPolicy.get());
         }
 
         // Either we chose a plan, or no plan selection was required. In both cases,
@@ -467,12 +475,6 @@ namespace mongo {
                 if (childExec) {
                     childExec->kill();
                 }
-            }
-
-            foundStage = getStageByType(_root.get(), STAGE_CACHED_PLAN);
-            if (foundStage) {
-                CachedPlanStage* cacheStage = static_cast<CachedPlanStage*>(foundStage);
-                cacheStage->kill();
             }
         }
     }

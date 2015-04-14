@@ -57,20 +57,6 @@ namespace mongo {
                            std::vector<QuerySolution*>* out);
 
         /**
-         * Helper that does most of the heavy lifting for the planFromCache
-         * method which this overloads. Whereas the overloaded version plans
-         * from cache twice (once for the winning solution and once from the
-         * backup solution), this version plans from cache once.
-         *
-         * It requires a single SolutionCacheData, rather than a CachedSolution, which
-         * owns a vector of SolutionCacheData instances.
-         */
-        static Status planFromCache(const CanonicalQuery& query,
-                                    const QueryPlannerParams& params,
-                                    const SolutionCacheData& cacheData,
-                                    QuerySolution** out);
-
-        /**
          * Attempt to generate a query solution, given data retrieved
          * from the plan cache.
          *
@@ -79,15 +65,13 @@ namespace mongo {
          * @param cachedSoln -- the CachedSolution retrieved from the plan cache.
          * @param out -- an out-parameter which will be filled in with the solution
          *   generated from the cache data
-         * @param backupOut -- if 'out' contains a blocking sort, then backoutOut may
-         *  contain an alternative solution with no blocking sort; otherwise it will
-         *  contain NULL on return.
+         *
+         * On success, the caller is responsible for deleting *out.
          */
         static Status planFromCache(const CanonicalQuery& query,
                                     const QueryPlannerParams& params,
                                     const CachedSolution& cachedSoln,
-                                    QuerySolution** out,
-                                    QuerySolution** backupOut);
+                                    QuerySolution** out);
 
         /**
          * Used to generated the index tag tree that will be inserted

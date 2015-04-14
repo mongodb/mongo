@@ -42,7 +42,7 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheStdDeviations, double, 2.0);
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheEvictionRatio, double, 10.0);
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
 

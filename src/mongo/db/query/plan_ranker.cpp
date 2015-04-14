@@ -114,14 +114,6 @@ namespace mongo {
         std::stable_sort(scoresAndCandidateindices.begin(), scoresAndCandidateindices.end(),
                          scoreComparator);
 
-        // Determine whether plans tied for the win.
-        if (scoresAndCandidateindices.size() > 1) {
-            double bestScore = scoresAndCandidateindices[0].first;
-            double runnerUpScore = scoresAndCandidateindices[1].first;
-            static const double epsilon = 1e-10;
-            why->tieForBest = fabs(bestScore - runnerUpScore) < epsilon;
-        }
-
         // Update results in 'why'
         // Stats and scores in 'why' are sorted in descending order by score.
         why->stats.clear();
