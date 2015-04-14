@@ -175,8 +175,10 @@ main(int argc, char *argv[])
 		start = time(NULL);
 		track("starting up", 0ULL, NULL);
 
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
+#endif
 		wts_open(g.home, 1, &g.wts_conn);
 		wts_create();
 
@@ -214,8 +216,10 @@ main(int argc, char *argv[])
 			}
 
 		track("shutting down", 0ULL, NULL);
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_close();
+#endif
 		wts_close();
 
 		/*
@@ -236,6 +240,7 @@ main(int argc, char *argv[])
 		printf("%4d: %s, %s (%.0f seconds)\n",
 		    g.run_cnt, g.c_data_source,
 		    g.c_file_type, difftime(time(NULL), start));
+		fflush(stdout);
 	}
 
 	/* Flush/close any logging information. */

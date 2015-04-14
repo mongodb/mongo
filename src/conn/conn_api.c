@@ -1045,38 +1045,44 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	const char *p, *config_cfg[] = { NULL, NULL, NULL };
+	const char *p;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
-	WT_UNUSED(cfg);
 
 	/* Serialize reconfiguration. */
 	__wt_spin_lock(session, &conn->reconfig_lock);
 
 	/*
-	 * The configuration argument has been checked for validity, replace the
+	 * The configuration argument has been checked for validity, update the
 	 * previous connection configuration.
 	 *
 	 * DO NOT merge the configuration before the reconfigure calls.  Some
 	 * of the underlying reconfiguration functions do explicit checks with
 	 * the second element of the configuration array, knowing the defaults
 	 * are in slot #1 and the application's modifications are in slot #2.
+	 *
+	 * First, replace the base configuration set up by CONNECTION_API_CALL
+	 * with the current connection configuration, otherwise reconfiguration
+	 * functions will find the base value instead of previously configured
+	 * value.
 	 */
-	config_cfg[0] = conn->cfg;
-	config_cfg[1] = config;
+	cfg[0] = conn->cfg;
+	cfg[1] = config;
 
-	WT_ERR(__conn_statistics_config(session, config_cfg));
-	WT_ERR(__wt_async_reconfig(session, config_cfg));
-	WT_ERR(__wt_cache_config(session, 1, config_cfg));
-	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
-	WT_ERR(__wt_lsm_manager_reconfig(session, config_cfg));
-	WT_ERR(__wt_statlog_create(session, config_cfg));
+	/* Second, reconfigure the system. */
+	WT_ERR(__conn_statistics_config(session, cfg));
+	WT_ERR(__wt_async_reconfig(session, cfg));
+	WT_ERR(__wt_cache_config(session, 1, cfg));
+	WT_ERR(__wt_checkpoint_server_create(session, cfg));
+	WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
+	WT_ERR(__wt_statlog_create(session, cfg));
 	WT_ERR(__wt_sweep_config(session, cfg));
-	WT_ERR(__wt_verbose_config(session, config_cfg));
+	WT_ERR(__wt_verbose_config(session, cfg));
 
-	WT_ERR(__wt_config_merge(session, config_cfg, &p));
+	/* Third, merge everything together, creating a new connection state. */
+	WT_ERR(__wt_config_merge(session, cfg, &p));
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 

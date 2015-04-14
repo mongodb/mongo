@@ -2679,8 +2679,8 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		/* Finalize the header information and write the page. */
 		dsk->recno = bnd->recno;
 		dsk->u.entries = bnd->entries;
-		dsk->mem_size =
-		    tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
+		tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
+		dsk->mem_size = WT_STORE_SIZE(tmp->size);
 		WT_ERR(__rec_split_write(session, r, bnd, tmp, 0));
 	}
 

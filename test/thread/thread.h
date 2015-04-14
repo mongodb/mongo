@@ -52,7 +52,8 @@ extern __ftype ftype;
 extern int   log_print;				/* Log print per operation */
 extern int   multiple_files;			/* File per thread */
 extern u_int nkeys;				/* Keys to load */
-extern u_int nops;				/* Operations per thread */
+extern u_int max_nops;				/* Operations per thread */
+extern int   vary_nops;				/* Operations per thread */
 extern int   session_per_op;			/* New session per operation */
 
 void load(const char *);
@@ -60,7 +61,7 @@ int  rw_start(u_int, u_int);
 void stats(void);
 void verify(const char *);
 
-void die(const char *, int)
+void die(int, const char *, ...)
 #if defined(__GNUC__)
 __attribute__((noreturn))
 #endif

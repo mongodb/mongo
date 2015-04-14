@@ -32,14 +32,17 @@ static int   col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
 static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static int   col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   nextprev(WT_CURSOR *, int, int *);
-static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
-static void  print_item(const char *, WT_ITEM *);
 static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
 static int   row_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  table_append_init(void);
+
+#ifdef HAVE_BERKELEY_DB
+static int   notfound_chk(const char *, int, int, uint64_t);
+static void  print_item(const char *, WT_ITEM *);
+#endif
 
 /*
  * wts_ops --
@@ -581,9 +584,10 @@ wts_read_scan(void)
 static int
 read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
-	WT_ITEM bdb_value, value;
+	static int sn = 0;
+	WT_ITEM value;
 	WT_SESSION *session;
-	int notfound, ret;
+	int exact, ret;
 	uint8_t bitfield;
 
 	session = cursor->session;
@@ -605,7 +609,16 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		break;
 	}
 
-	if ((ret = cursor->search(cursor)) == 0) {
+	if (sn) {
+		ret = cursor->search_near(cursor, &exact);
+		if (ret == 0 && exact != 0)
+			ret = WT_NOTFOUND;
+		sn = 0;
+	} else {
+		ret = cursor->search(cursor);
+		sn = 1;
+	}
+	if (ret == 0) {
 		if (g.type == FIX) {
 			ret = cursor->get_value(cursor, &bitfield);
 			value.data = &bitfield;
@@ -618,6 +631,11 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "read_row: read row %" PRIu64, keyno);
+
+#ifdef HAVE_BERKELEY_DB
+	if (!SINGLETHREADED)
+		return (0);
+
 	/*
 	 * In fixed length stores, zero values at the end of the key space are
 	 * returned as not found.  Treat this the same as a zero value in the
@@ -630,10 +648,11 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		ret = 0;
 	}
 
-	if (!SINGLETHREADED)
-		return (0);
-
 	/* Retrieve the BDB value. */
+	{
+	WT_ITEM bdb_value;
+	int notfound;
+
 	bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound);
 
 	/* Check for not-found status. */
@@ -644,11 +663,13 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
 		fprintf(stderr,
-		    "read_row: read row value mismatch %" PRIu64 ":\n", keyno);
+		    "read_row: value mismatch %" PRIu64 ":\n", keyno);
 		print_item("bdb", &bdb_value);
 		print_item(" wt", &value);
 		die(0, NULL);
 	}
+	}
+#endif
 	return (0);
 }
 
@@ -659,15 +680,12 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 static int
 nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 {
-	WT_ITEM key, value, bdb_key, bdb_value;
-	WT_SESSION *session;
+	WT_ITEM key, value;
 	uint64_t keyno;
-	int notfound, ret;
+	int ret;
 	uint8_t bitfield;
 	const char *which;
-	char *p;
 
-	session = cursor->session;
 	which = next ? "next" : "prev";
 
 	keyno = 0;
@@ -696,8 +714,17 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		die(ret, "%s", which);
 	*notfoundp = (ret == WT_NOTFOUND);
 
+#ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
+
+	{
+	WT_ITEM bdb_key, bdb_value;
+	WT_SESSION *session;
+	int notfound;
+	char *p;
+
+	session = cursor->session;
 
 	/* Retrieve the BDB value. */
 	bdb_np(next, &bdb_key.data, &bdb_key.size,
@@ -753,6 +780,8 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 			    keyno, (int)value.size, (char *)value.data);
 			break;
 		}
+	}
+#endif
 	return (0);
 }
 
@@ -765,7 +794,7 @@ row_update(
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
-	int notfound, ret;
+	int ret;
 
 	session = cursor->session;
 
@@ -787,11 +816,17 @@ row_update(
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_update: update row %" PRIu64 " by key", keyno);
 
+#ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
 
+	{
+	int notfound;
+
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("row_update", ret, notfound, keyno);
+	}
+#endif
 	return (0);
 }
 
@@ -803,7 +838,7 @@ static int
 col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
-	int notfound, ret;
+	int ret;
 
 	session = cursor->session;
 
@@ -834,12 +869,20 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_update: %" PRIu64, keyno);
 
+#ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
+
+	{
+	int notfound;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("col_update", ret, notfound, keyno);
+	}
+#else
+	(void)key;				/* [-Wunused-variable] */
+#endif
 	return (0);
 }
 
@@ -957,7 +1000,7 @@ row_insert(
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
-	int notfound, ret;
+	int ret;
 
 	session = cursor->session;
 
@@ -979,11 +1022,17 @@ row_insert(
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_insert: insert row %" PRIu64 " by key", keyno);
 
+#ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
 
+	{
+	int notfound;
+
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("row_insert", ret, notfound, keyno);
+	}
+#endif
 	return (0);
 }
 
@@ -996,7 +1045,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 {
 	WT_SESSION *session;
 	uint64_t keyno;
-	int notfound, ret;
+	int ret;
 
 	session = cursor->session;
 
@@ -1030,11 +1079,19 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 			    (int)value->size, (char *)value->data);
 	}
 
+#ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
 
+	{
+	int notfound;
+
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	}
+#else
+	(void)key;				/* [-Wunused-variable] */
+#endif
 	return (0);
 }
 
@@ -1046,7 +1103,7 @@ static int
 row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
-	int notfound, ret;
+	int ret;
 
 	session = cursor->session;
 
@@ -1067,11 +1124,19 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
 
+#ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
 
+	{
+	int notfound;
+
 	bdb_remove(keyno, &notfound);
 	(void)notfound_chk("row_remove", ret, notfound, keyno);
+	}
+#else
+	(void)key;				/* [-Wunused-variable] */
+#endif
 	return (0);
 }
 
@@ -1083,7 +1148,7 @@ static int
 col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
-	int notfound, ret;
+	int ret;
 
 	session = cursor->session;
 
@@ -1102,8 +1167,12 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
 
+#ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
 		return (0);
+
+	{
+	int notfound;
 
 	/*
 	 * Deleting a fixed-length item is the same as setting the bits to 0;
@@ -1115,9 +1184,14 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	} else
 		bdb_remove(keyno, &notfound);
 	(void)notfound_chk("col_remove", ret, notfound, keyno);
+	}
+#else
+	(void)key;				/* [-Wunused-variable] */
+#endif
 	return (0);
 }
 
+#ifdef HAVE_BERKELEY_DB
 /*
  * notfound_chk --
  *	Compare notfound returns for consistency.
@@ -1178,3 +1252,4 @@ print_item(const char *tag, WT_ITEM *item)
 		}
 	fprintf(stderr, "}\n");
 }
+#endif

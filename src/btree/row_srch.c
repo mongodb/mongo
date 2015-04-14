@@ -178,10 +178,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	append_check = insert && cbt->append_tree;
 	descend_right = 1;
 
-	/*
-	 * In the service of eviction splits, we're only searching a single leaf
-	 * page, not a full tree.
-	 */
+	/* We may only be searching a single leaf page, not the full tree. */
 	if (leaf != NULL) {
 		current = leaf;
 		goto leaf_only;

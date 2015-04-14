@@ -550,8 +550,8 @@ static inline int
 __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
 	struct {
-		uint64_t len;
-		uint32_t v;
+		uint32_t len;
+		uint64_t v;
 	} copy;
 	uint64_t v;
 	const uint8_t *p;
