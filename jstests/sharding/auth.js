@@ -238,8 +238,8 @@ function runTest(s) {
     d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 );
     d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 );
 
-    authutil.asCluster(d1.nodes, "jstests/libs/key1", function() { d1.awaitReplication(60000); });
-    authutil.asCluster(d2.nodes, "jstests/libs/key1", function() { d2.awaitReplication(60000); });
+    authutil.asCluster(d1.nodes, "jstests/libs/key1", function() { d1.awaitReplication(120000); });
+    authutil.asCluster(d2.nodes, "jstests/libs/key1", function() { d2.awaitReplication(120000); });
 
     // add admin on shard itself, hack to prevent localhost auth bypass
     d1.getMaster().getDB(adminUser.db).createUser({user: adminUser.username,
