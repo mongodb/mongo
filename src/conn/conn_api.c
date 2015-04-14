@@ -635,7 +635,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	encryptor = nenc->encryptor;
 	if (encryptor->customize != NULL) {
 		WT_ERR(encryptor->customize(encryptor, &session->iface,
-		    keyid, cfg_arg, &encryptor));
+		    cfg_arg, &encryptor));
 		if (encryptor == NULL)
 			encryptor = nenc->encryptor;
 		else

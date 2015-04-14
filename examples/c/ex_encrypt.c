@@ -57,6 +57,10 @@ static const char *home = NULL;
 #define	USER2_KEYID	"user2"
 #define	USERBAD_KEYID	"userbad"
 
+#define ITEM_MATCHES(config_item, s) \
+	(strlen(s) == (config_item).len && \
+	 strncmp((config_item).str, s, (config_item).len) == 0)
+
 /*! [encryption example callback implementation] */
 typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
@@ -240,16 +244,15 @@ rotate_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
  */
 static int
 rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
-    WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *app_config, WT_ENCRYPTOR **customp)
+    WT_CONFIG_ARG *app_config, WT_ENCRYPTOR **customp)
 {
-	char *keyidstr;
 	int ret;
 	const MY_CRYPTO *orig_crypto;
 	MY_CRYPTO *my_crypto;
-	WT_CONFIG_ITEM secret;
+	WT_CONFIG_ITEM keyid, secret;
 	WT_EXTENSION_API *extapi;
 
-	(void)session;				/* Unused parameters */
+	extapi = session->connection->get_extension_api(session->connection);
 
 	orig_crypto = (const MY_CRYPTO *)encryptor;
 	if ((my_crypto = calloc(1, sizeof(MY_CRYPTO))) == NULL)
@@ -261,13 +264,14 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Stash the keyid and the (optional) secret key
 	 * from the configuration string.
 	 */
-	if ((keyidstr = malloc(keyid->len + 1)) == NULL)
-		return (errno);
-	strncpy(keyidstr, keyid->str, keyid->len + 1);
-	keyidstr[keyid->len] = '\0';
-	my_crypto->keyid = keyidstr;
+	if ((ret = extapi->config_get(extapi, session, app_config,
+	    "keyid", &keyid)) == 0 && keyid.len != 0) {
+		if ((my_crypto->keyid = malloc(keyid.len + 1)) == NULL)
+			return (errno);
+		strncpy(my_crypto->keyid, keyid.str, keyid.len + 1);
+		my_crypto->keyid[keyid.len] = '\0';
+	}
 
-	extapi = session->connection->get_extension_api(session->connection);
 	if ((ret = extapi->config_get(extapi, session, app_config,
 	    "secretkey", &secret)) == 0 && secret.len != 0) {
 		if ((my_crypto->password = malloc(secret.len + 1)) == NULL)
@@ -279,14 +283,14 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Presumably we'd have some sophisticated key management
 	 * here that maps the id onto a secret key.
 	 */
-	if (strcmp(keyidstr, "system") == 0) {
+	if (ITEM_MATCHES(keyid, "system")) {
 		if (my_crypto->password == NULL ||
 		    strcmp(my_crypto->password, SYS_PW) != 0)
 			goto err;
 		my_crypto->rot_N = 13;
-	} else if (strcmp(keyidstr, USER1_KEYID) == 0)
+	} else if (ITEM_MATCHES(keyid, USER1_KEYID))
 		my_crypto->rot_N = 4;
-	else if (strcmp(keyidstr, USER2_KEYID) == 0)
+	else if (ITEM_MATCHES(keyid, USER2_KEYID))
 		my_crypto->rot_N = 19;
 	else
 		return (EINVAL);
