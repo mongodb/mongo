@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/touch_pages.h"
 
@@ -62,6 +63,10 @@ public:
         return false;
     }
     virtual bool slaveOk() const {
+        return true;
+    }
+
+    bool supportsReadMajority() const final {
         return true;
     }
 
@@ -147,6 +152,19 @@ public:
                 // lifetime).
                 ClientCursor* cc =
                     new ClientCursor(collection->getCursorManager(), execs.releaseAt(i), ns.ns());
+
+                if (cmdObj["$readMajorityTemporaryName"].trueValue()) {
+                    // Need to make RecoveryUnits for each cursor so that the getMores know to
+                    // use readMajority. This will need to be replaced with a setting on the
+                    // client cursor once we resolve SERVER-17364.
+                    StorageEngine* storageEngine =
+                        getGlobalServiceContext()->getGlobalStorageEngine();
+                    std::unique_ptr<RecoveryUnit> newRu(storageEngine->newRecoveryUnit());
+                    // Wouldn't have entered run() if not supported.
+                    invariantOK(newRu->setReadFromMajorityCommittedSnapshot());
+
+                    cc->setOwnedRecoveryUnit(newRu.release());
+                }
 
                 BSONObjBuilder threadResult;
                 appendCursorResponseObject(cc->cursorid(), ns.ns(), BSONArray(), &threadResult);

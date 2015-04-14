@@ -37,8 +37,9 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <wiredtiger.h>
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
@@ -132,9 +133,17 @@ public:
         return _conn;
     }
 
+    WiredTigerSnapshotManager& snapshotManager() {
+        return _snapshotManager;
+    }
+    const WiredTigerSnapshotManager& snapshotManager() const {
+        return _snapshotManager;
+    }
+
 private:
     WiredTigerKVEngine* _engine;  // not owned, might be NULL
     WT_CONNECTION* _conn;         // not owned
+    WiredTigerSnapshotManager _snapshotManager;
 
     // Regular operations take it in shared mode. Shutdown sets the _shuttingDown flag and
     // then takes it in exclusive mode. This ensures that all threads, which would return

@@ -61,6 +61,10 @@ private:
         return true;
     }
 
+    bool supportsReadMajority() const final {
+        return true;
+    }
+
     virtual void help(std::stringstream& help) const {
         help << "http://dochub.mongodb.org/core/aggregation";
     }

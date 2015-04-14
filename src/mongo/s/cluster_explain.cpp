@@ -109,6 +109,11 @@ void ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
     if (cmdObj.hasField("$readPreference")) {
         out->append("$queryOptions", cmdObj["$readPreference"].wrap());
     }
+
+    // Propagate $readMajorityTemporaryName
+    if (auto readMajority = cmdObj["$readMajorityTemporaryName"]) {
+        out->append(readMajority);
+    }
 }
 
 // static

@@ -41,7 +41,7 @@
  */
 namespace mongo {
 
-class SnapshotThread;
+class StatsSnapshotThread;
 
 /**
  * stores a point in time snapshot
@@ -53,7 +53,7 @@ class SnapshotData {
     unsigned long long _created;
     Top::UsageMap _usage;
 
-    friend class SnapshotThread;
+    friend class StatsSnapshotThread;
     friend class SnapshotDelta;
     friend class Snapshots;
 };
@@ -103,14 +103,14 @@ private:
     int _stored;
 };
 
-class SnapshotThread : public BackgroundJob {
+class StatsSnapshotThread : public BackgroundJob {
 public:
     virtual std::string name() const {
-        return "snapshot";
+        return "statsSnapshot";
     }
     void run();
 };
 
 extern Snapshots statsSnapshots;
-extern SnapshotThread snapshotThread;
+extern StatsSnapshotThread statsSnapshotThread;
 }

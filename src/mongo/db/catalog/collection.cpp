@@ -153,7 +153,8 @@ Collection::Collection(OperationContext* txn,
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
       _cursorManager(fullNS),
-      _cappedNotifier(_recordStore->isCapped() ? new CappedInsertNotifier() : nullptr) {
+      _cappedNotifier(_recordStore->isCapped() ? new CappedInsertNotifier() : nullptr),
+      _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()) {
     _magic = 1357924;
     _indexCatalog.init(txn);
     if (isCapped())
@@ -272,6 +273,9 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(!_indexCatalog.haveAnyIndexes());  // eventually can implement, just not done
 
+    if (_mustTakeCappedLockOnInsert)
+        synchronizeOnCappedInFlightResource(txn->lockState());
+
     StatusWith<RecordId> loc = _recordStore->insertRecord(txn, doc, _enforceQuota(enforceQuota));
     if (!loc.isOK())
         return loc;
@@ -303,6 +307,9 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
         }
     }
 
+    if (_mustTakeCappedLockOnInsert)
+        synchronizeOnCappedInFlightResource(txn->lockState());
+
     StatusWith<RecordId> res = _insertDocument(txn, docToInsert, enforceQuota);
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
     if (res.isOK()) {
@@ -330,6 +337,9 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
     }
 
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
+
+    if (_mustTakeCappedLockOnInsert)
+        synchronizeOnCappedInFlightResource(txn->lockState());
 
     StatusWith<RecordId> loc =
         _recordStore->insertRecord(txn, doc.objdata(), doc.objsize(), _enforceQuota(enforceQuota));

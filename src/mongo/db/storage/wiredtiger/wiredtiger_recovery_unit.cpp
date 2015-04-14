@@ -105,6 +105,16 @@ void WiredTigerRecoveryUnit::reportState(BSONObjBuilder* b) const {
         b->append("wt_millisSinceCommit", _timer.millis());
 }
 
+void WiredTigerRecoveryUnit::prepareForCreateSnapshot(OperationContext* opCtx) {
+    invariant(!_active);  // Can't already be in a WT transaction.
+    invariant(!_inUnitOfWork);
+    invariant(!_readFromMajorityCommittedSnapshot);
+
+    // Starts the WT transaction that will be the basis for creating a named snapshot.
+    getSession(opCtx);
+    _areWriteUnitOfWorksBanned = true;
+}
+
 void WiredTigerRecoveryUnit::_commit() {
     try {
         if (_session && _active) {
@@ -144,6 +154,7 @@ void WiredTigerRecoveryUnit::_abort() {
 }
 
 void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
+    invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
     invariant(!_currentlySquirreled);
     _inUnitOfWork = true;
@@ -212,6 +223,7 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
         // Can't be in a WriteUnitOfWork, so safe to rollback
         _txnClose(false);
     }
+    _areWriteUnitOfWorksBanned = false;
 }
 
 void WiredTigerRecoveryUnit::setOplogReadTill(const RecordId& loc) {
@@ -308,6 +320,16 @@ SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
     return SnapshotId(_myTransactionCount);
 }
 
+Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
+    if (!_sessionCache->snapshotManager().haveCommittedSnapshot()) {
+        return {ErrorCodes::XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable,
+                "XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable message"};
+    }
+
+    _readFromMajorityCommittedSnapshot = true;
+    return Status::OK();
+}
+
 void WiredTigerRecoveryUnit::markNoTicketRequired() {
     invariant(!_ticket.hasTicket());
     _noTicketNeeded = true;
@@ -344,7 +366,13 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
 
     WT_SESSION* s = _session->getSession();
     _syncing = _syncing || waitUntilDurableData.numWaitingForSync.load() > 0;
-    invariantWTOK(s->begin_transaction(s, _syncing ? "sync=true" : NULL));
+
+    if (_readFromMajorityCommittedSnapshot) {
+        _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(s, _syncing);
+    } else {
+        invariantWTOK(s->begin_transaction(s, _syncing ? "sync=true" : NULL));
+    }
+
     LOG(2) << "WT begin_transaction";
     _timer.reset();
     _active = true;

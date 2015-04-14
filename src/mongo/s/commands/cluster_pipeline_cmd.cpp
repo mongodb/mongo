@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <initializer_list>
 #include <string>
 #include <utility>
 #include <vector>
@@ -150,13 +151,11 @@ public:
             commandBuilder.setField("cursor", Value(cmdObj["cursor"]));
         }
 
-        if (cmdObj.hasField("$queryOptions")) {
-            commandBuilder.setField("$queryOptions", Value(cmdObj["$queryOptions"]));
-        }
-
-        if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
-            commandBuilder.setField(LiteParsedQuery::cmdOptionMaxTimeMS,
-                                    Value(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+        const std::initializer_list<StringData> fieldsToPropagateToShards = {
+            "$queryOptions", "$readMajorityTemporaryName", LiteParsedQuery::cmdOptionMaxTimeMS,
+        };
+        for (auto&& field : fieldsToPropagateToShards) {
+            commandBuilder[field] = Value(cmdObj[field]);
         }
 
         BSONObj shardedCommand = commandBuilder.freeze().toBson();
@@ -211,6 +210,8 @@ public:
             mergeCmd[LiteParsedQuery::cmdOptionMaxTimeMS] =
                 Value(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
         }
+
+        // Not propagating $readMajorityTemporaryName to merger since it doesn't do local reads.
 
         string outputNsOrEmpty;
         if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pipeline->output())) {

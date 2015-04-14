@@ -184,5 +184,12 @@ OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContex
 
 void ReplicationCoordinatorExternalStateMock::dropAllTempCollections(OperationContext* txn) {}
 
+boost::optional<Timestamp> ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(
+    OpTime newCommitPoint) {
+    return {};
+}
+
+void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
+
 }  // namespace repl
 }  // namespace mongo

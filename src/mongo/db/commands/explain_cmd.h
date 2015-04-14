@@ -71,6 +71,10 @@ public:
         return false;
     }
 
+    bool supportsReadMajority() const final {
+        return true;
+    }
+
     virtual void help(std::stringstream& help) const {
         help << "explain database reads and writes";
     }

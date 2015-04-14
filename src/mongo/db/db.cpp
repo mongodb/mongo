@@ -515,7 +515,7 @@ static void _initAndListen(int listenPort) {
     // The snapshot thread provides historical collection level and lock statistics for use
     // by the web interface. Only needed when HTTP is enabled.
     if (serverGlobalParams.isHttpInterfaceEnabled) {
-        snapshotThread.go();
+        statsSnapshotThread.go();
 
         invariant(dbWebServer);
         stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));

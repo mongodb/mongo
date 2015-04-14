@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/db/storage/snapshot.h"
 
 namespace mongo {
@@ -87,6 +88,26 @@ public:
      * fail if it is.
      */
     virtual void abandonSnapshot() = 0;
+
+    /**
+     * Informs this RecoveryUnit that all future reads through it should be from a snapshot
+     * marked as Majority Committed. Snapshots should still be separately acquired and newer
+     * committed snapshots should be used if available whenever implementations would normally
+     * change snapshots.
+     *
+     * If no snapshot has yet been marked as Majority Committed, returns a status with error
+     * code XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable. After this returns successfully,
+     * at any point where implementations attempt to acquire committed snapshot, if there are
+     * none available due to a call to SnapshotManager::dropAllSnapshots(), a UserException with
+     * the same code should be thrown.
+     *
+     * StorageEngines that don't support a SnapshotManager should use the default
+     * implementation.
+     */
+    virtual Status setReadFromMajorityCommittedSnapshot() {
+        return {ErrorCodes::CommandNotSupported,
+                "Current storage engine does not support $readMajorityTemporaryName"};
+    }
 
     virtual SnapshotId getSnapshotId() const = 0;
 

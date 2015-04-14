@@ -184,7 +184,8 @@ public:
         SINGLETON_INVALID = 0,
         SINGLETON_PARALLEL_BATCH_WRITER_MODE,
         SINGLETON_GLOBAL,
-        SINGLETON_MMAPV1_FLUSH
+        SINGLETON_MMAPV1_FLUSH,
+        SINGLETON_CAPPED_IN_FLIGHT,
     };
 
     ResourceId() : _fullHash(0) {}
@@ -259,6 +260,14 @@ extern const ResourceId resourceIdAdminDB;
 // lock.
 // TODO: Merge this with resourceIdGlobal
 extern const ResourceId resourceIdParallelBatchWriterMode;
+
+// Everywhere that starts in-flight capped inserts which allocate capped collection RecordIds in
+// a way that could trigger hiding of newer records takes this lock in MODE_IX and holds it
+// until the end of their WriteUnitOfWork.
+//
+// Threads that need a consistent view of the world can lock this in MODE_X to prevent
+// concurrent in-flight capped inserts.
+extern const ResourceId resourceCappedInFlight;
 
 /**
  * Interface on which granted lock requests will be notified. See the contract for the notify

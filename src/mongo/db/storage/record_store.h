@@ -512,6 +512,9 @@ public:
      * When we write to an oplog, we call this so that if the storage engine
      * supports doc locking, it can manage the visibility of oplog entries to ensure
      * they are ordered.
+     *
+     * Since this is called inside of a WriteUnitOfWork while holding a std::mutex, it is
+     * illegal to acquire any LockManager locks inside of this function.
      */
     virtual Status oplogDiskLocRegister(OperationContext* txn, const Timestamp& opTime) {
         return Status::OK();

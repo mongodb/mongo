@@ -514,6 +514,7 @@ serverOnlyFiles = [
     "commands/plan_cache_commands.cpp",
     "commands/rename_collection.cpp",
     "commands/repair_cursor.cpp",
+    "commands/snapshot_management.cpp",
     "commands/test_commands.cpp",
     "commands/top_command.cpp",
     "commands/touch.cpp",

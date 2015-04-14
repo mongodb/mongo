@@ -70,6 +70,9 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
+    bool supportsReadMajority() const final {
+        return true;
+    }
     virtual void help(stringstream& help) const {
         help << "count objects in collection";
     }

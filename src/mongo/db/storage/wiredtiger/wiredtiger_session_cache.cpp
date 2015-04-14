@@ -35,6 +35,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 
@@ -122,12 +123,18 @@ uint64_t WiredTigerSession::genCursorId() {
 WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
     : _engine(engine),
       _conn(engine->getConnection()),
+      _snapshotManager(_conn),
       _shuttingDown(0),
       _sessionsOut(0),
       _highWaterMark(1) {}
 
 WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn)
-    : _engine(NULL), _conn(conn), _shuttingDown(0), _sessionsOut(0), _highWaterMark(1) {}
+    : _engine(NULL),
+      _conn(conn),
+      _snapshotManager(_conn),
+      _shuttingDown(0),
+      _sessionsOut(0),
+      _highWaterMark(1) {}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();
@@ -146,6 +153,7 @@ void WiredTigerSessionCache::shuttingDown() {
     }
 
     closeAll();
+    _snapshotManager.shutdown();
 }
 
 void WiredTigerSessionCache::closeAll() {

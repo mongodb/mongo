@@ -1173,6 +1173,26 @@ void Command::execCommand(OperationContext* txn,
             return;
         }
 
+        if (request.getCommandArgs()["$readMajorityTemporaryName"].trueValue()) {
+            if (!command->supportsReadMajority()) {
+                replyBuilder->setMetadata(rpc::makeEmptyMetadata())
+                    .setCommandReply({ErrorCodes::InvalidOptions,
+                                      str::stream()
+                                          << "Command " << command->name
+                                          << " does not support $readMajorityTemporaryName"});
+                return;
+            }
+
+            // TODO SERVER-19210 we should only do this if running in a replica set.
+            Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+            if (!status.isOK()) {
+                // TODO SERVER-19207 if code is XXX_TEMP_NAME_ReadCommittedCurrentlyUnavailable,
+                // block until a committed snapshot is available.
+                replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
+                return;
+            }
+        }
+
         ImpersonationSessionGuard guard(txn);
 
         uassertStatusOK(

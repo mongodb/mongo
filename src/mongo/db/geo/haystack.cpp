@@ -70,6 +70,9 @@ public:
     bool slaveOverrideOk() const {
         return true;
     }
+    bool supportsReadMajority() const final {
+        return true;
+    }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

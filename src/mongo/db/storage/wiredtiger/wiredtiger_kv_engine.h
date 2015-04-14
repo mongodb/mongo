@@ -47,7 +47,7 @@ namespace mongo {
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
-class WiredTigerKVEngine : public KVEngine {
+class WiredTigerKVEngine final : public KVEngine {
 public:
     WiredTigerKVEngine(const std::string& path,
                        const std::string& extraOpenOptions = "",
@@ -105,6 +105,10 @@ public:
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
 
     virtual void cleanShutdown();
+
+    SnapshotManager* getSnapshotManager() const final {
+        return &_sessionCache->snapshotManager();
+    }
 
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION

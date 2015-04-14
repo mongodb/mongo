@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
@@ -179,6 +180,21 @@ public:
      * for "txn".
      */
     virtual void dropAllTempCollections(OperationContext* txn) = 0;
+
+    /**
+     * Updates the committed snapshot to the newest possible view before or on newCommitPoint.
+     *
+     * If this changes the snapshot, returns the Timestamp for the new snapshot.
+     */
+    virtual boost::optional<Timestamp> updateCommittedSnapshot(OpTime newCommitPoint) = 0;
+
+    /**
+     * Signals the SnapshotThread, if running, to take a forced snapshot even if the global
+     * timestamp hasn't changed.
+     *
+     * Does not wait for the timestamp to be taken.
+     */
+    virtual void forceSnapshotCreation() = 0;
 };
 
 }  // namespace repl

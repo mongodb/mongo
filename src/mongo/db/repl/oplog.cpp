@@ -74,11 +74,13 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -134,6 +136,8 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
                                            const char* ns,
                                            ReplicationCoordinator* replCoord,
                                            const char* opstr) {
+    synchronizeOnCappedInFlightResource(txn->lockState());
+
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
     Timestamp ts = getNextGlobalTimestamp();
     newTimestampNotifier.notify_all();
@@ -856,6 +860,104 @@ void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
 
     _localDB = nullptr;
     _localOplogCollection = nullptr;
+}
+
+SnapshotThread::SnapshotThread(SnapshotManager* manager, Callback&& onSnapshotCreate)
+    : _manager(manager),
+      _onSnapshotCreate(std::move(onSnapshotCreate)),
+      _thread([this] { run(); }) {}
+
+void SnapshotThread::run() {
+    Client::initThread("SnapshotThread");
+    auto& client = cc();
+    auto serviceContext = client.getServiceContext();
+
+    Timestamp lastTimestamp = {};
+    while (true) {
+        {
+            stdx::unique_lock<stdx::mutex> lock(newOpMutex);
+            while (true) {
+                if (_inShutdown)
+                    return;
+
+                if (_forcedSnapshotPending || lastTimestamp != getLastSetTimestamp()) {
+                    _forcedSnapshotPending = false;
+                    lastTimestamp = getLastSetTimestamp();
+                    break;
+                }
+
+                newTimestampNotifier.wait(lock);
+            }
+        }
+
+        try {
+            auto txn = client.makeOperationContext();
+            Lock::GlobalLock globalLock(txn->lockState(), MODE_IS, UINT_MAX);
+
+            if (!ReplicationCoordinator::get(serviceContext)->getMemberState().readable()) {
+                // If our MemberState isn't readable, we may not be in a consistent state so don't
+                // take snapshots. When we transition into a readable state from a non-readable
+                // state, a snapshot is forced to ensure we don't miss the latest write. This must
+                // be checked each time we acquire the global IS lock since that prevents the node
+                // from transitioning to a !readable() state from a readable() one.
+                continue;
+            }
+
+            {
+                // Make sure there are no in-flight capped inserts while we create our snapshot.
+                Lock::ResourceLock cappedInsertLock(
+                    txn->lockState(), resourceCappedInFlight, MODE_X);
+                _manager->prepareForCreateSnapshot(txn.get());
+            }
+
+            Timestamp thisSnapshot = {};
+            {
+                AutoGetCollectionForRead oplog(txn.get(), rsOplogName);
+                invariant(oplog.getCollection());
+                // Read the latest op from the oplog.
+                auto record =
+                    oplog.getCollection()->getCursor(txn.get(), /*forward*/ false)->next();
+                if (!record)
+                    continue;  // oplog is completely empty.
+
+                const auto op = record->data.releaseToBson();
+                thisSnapshot = op["ts"].timestamp();
+                invariant(!thisSnapshot.isNull());
+            }
+
+            _manager->createSnapshot(txn.get(), SnapshotName(thisSnapshot));
+            _onSnapshotCreate(SnapshotName(thisSnapshot));
+        } catch (const WriteConflictException& wce) {
+            log() << "skipping storage snapshot pass due to write conflict";
+            continue;
+        }
+    }
+}
+
+void SnapshotThread::shutdown() {
+    invariant(_thread.joinable());
+    {
+        stdx::lock_guard<stdx::mutex> lock(newOpMutex);
+        invariant(!_inShutdown);
+        _inShutdown = true;
+        newTimestampNotifier.notify_all();
+    }
+    _thread.join();
+}
+
+void SnapshotThread::forceSnapshot() {
+    stdx::lock_guard<stdx::mutex> lock(newOpMutex);
+    _forcedSnapshotPending = true;
+    newTimestampNotifier.notify_all();
+}
+
+std::unique_ptr<SnapshotThread> SnapshotThread::start(ServiceContext* service,
+                                                      Callback onSnapshotCreate) {
+    auto manager = service->getGlobalStorageEngine()->getSnapshotManager();
+    if (!manager)
+        return {};
+    return std::unique_ptr<SnapshotThread>(
+        new SnapshotThread(manager, std::move(onSnapshotCreate)));
 }
 
 }  // namespace repl

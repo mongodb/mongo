@@ -72,6 +72,8 @@ public:
     virtual void signalApplierToChooseNewSyncSource();
     virtual OperationContext* createOperationContext(const std::string& threadName);
     virtual void dropAllTempCollections(OperationContext* txn);
+    virtual boost::optional<Timestamp> updateCommittedSnapshot(OpTime newCommitPoint);
+    virtual void forceSnapshotCreation();
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

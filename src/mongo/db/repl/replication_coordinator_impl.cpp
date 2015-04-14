@@ -2047,6 +2047,13 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         result = kActionWinElection;
     }
 
+    if (newState.readable() && !_memberState.readable()) {
+        // When we transition to a readable state from a non-readable one, force the SnapshotThread
+        // to take a snapshot, if it is running. This is because it never takes snapshots when not
+        // in readable states.
+        _externalState->forceSnapshotCreation();
+    }
+
     _memberState = newState;
     log() << "transition to " << newState.toString() << rsLog;
     return result;
@@ -2477,7 +2484,19 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     std::sort(votingNodesOpTimes.begin(), votingNodesOpTimes.end());
 
     // Use the index of the minimum quorum in the vector of nodes.
-    _lastCommittedOpTime = votingNodesOpTimes[(votingNodesOpTimes.size() - 1) / 2];
+    auto newCommittedOpTime = votingNodesOpTimes[(votingNodesOpTimes.size() - 1) / 2];
+    if (newCommittedOpTime != _lastCommittedOpTime) {
+        _lastCommittedOpTime = newCommittedOpTime;
+        // TODO SERVER-19208 Also need to updateCommittedSnapshot on secondaries.
+        if (auto newSnapshotTs = _externalState->updateCommittedSnapshot(newCommittedOpTime)) {
+            // TODO use this Timestamp for the following things:
+            // * SERVER-19206 make w:majority writes block until they are in the committed snapshot.
+            // * SERVER-19211 make readCommitted + afterOptime block until the optime is in the
+            //   committed view.
+            // * SERVER-19212 make new indexes not be used for any queries until the index is in the
+            //   committed view.
+        }
+    }
 }
 
 void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committedOpTime) {

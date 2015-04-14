@@ -28,7 +28,13 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -47,7 +53,9 @@ public:
     }
 
     virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
-        return BSON("name" << storageGlobalParams.engine);
+        auto engine = txn->getClient()->getServiceContext()->getGlobalStorageEngine();
+        return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
+                           << bool(engine->getSnapshotManager()));
     }
 
 } storageSSS;

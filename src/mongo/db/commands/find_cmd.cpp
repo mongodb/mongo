@@ -84,6 +84,10 @@ public:
         return false;
     }
 
+    bool supportsReadMajority() const final {
+        return true;
+    }
+
     void help(std::stringstream& help) const override {
         help << "query for documents";
     }

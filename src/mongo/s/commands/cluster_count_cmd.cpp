@@ -141,16 +141,16 @@ public:
             countCmdBuilder.append("limit", limit);
         }
 
-        if (cmdObj.hasField("hint")) {
-            countCmdBuilder.append(cmdObj["hint"]);
-        }
-
-        if (cmdObj.hasField("$queryOptions")) {
-            countCmdBuilder.append(cmdObj["$queryOptions"]);
-        }
-
-        if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
-            countCmdBuilder.append(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+        const std::initializer_list<StringData> passthroughFields = {
+            "hint",
+            "$queryOptions",
+            "$readMajorityTemporaryName",
+            LiteParsedQuery::cmdOptionMaxTimeMS,
+        };
+        for (auto name : passthroughFields) {
+            if (auto field = cmdObj[name]) {
+                countCmdBuilder.append(field);
+            }
         }
 
         vector<Strategy::CommandResult> countResult;

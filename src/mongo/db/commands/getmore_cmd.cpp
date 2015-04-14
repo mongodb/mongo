@@ -91,6 +91,11 @@ public:
         return false;
     }
 
+    bool supportsReadMajority() const final {
+        // Uses the $readMajorityTemporaryName setting from whatever created the cursor.
+        return false;
+    }
+
     void help(std::stringstream& help) const override {
         help << "retrieve more results from an existing cursor";
     }

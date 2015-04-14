@@ -28,14 +28,20 @@
 
 #pragma once
 
+#include <deque>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_feedback.h"
+#include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
 namespace repl {
+
+class SnapshotThread;
 
 class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExternalState {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
@@ -63,10 +69,14 @@ public:
     virtual void signalApplierToChooseNewSyncSource();
     virtual OperationContext* createOperationContext(const std::string& threadName);
     virtual void dropAllTempCollections(OperationContext* txn);
+    boost::optional<Timestamp> updateCommittedSnapshot(OpTime newCommitPoint) final;
+    void forceSnapshotCreation() final;
 
     std::string getNextOpContextThreadName();
 
 private:
+    void startSnapshotThread();
+
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;
 
@@ -91,6 +101,11 @@ private:
     stdx::mutex _nextThreadIdMutex;
     // Number used to uniquely name threads.
     long long _nextThreadId;
+
+    std::unique_ptr<SnapshotThread> _snapshotThread;
+
+    stdx::mutex _snapshotsMutex;          // guards _snapshots.
+    std::deque<SnapshotName> _snapshots;  // kept in sorted order.
 };
 
 }  // namespace repl

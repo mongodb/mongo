@@ -912,5 +912,7 @@ const ResourceId resourceIdOplog = ResourceId(RESOURCE_COLLECTION, StringData("l
 const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
 const ResourceId resourceIdParallelBatchWriterMode =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_PARALLEL_BATCH_WRITER_MODE);
+const ResourceId resourceCappedInFlight =
+    ResourceId(RESOURCE_METADATA, ResourceId::SINGLETON_CAPPED_IN_FLIGHT);
 
 }  // namespace mongo

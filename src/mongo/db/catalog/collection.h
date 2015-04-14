@@ -405,6 +405,8 @@ private:
     // This is non-null if and only if the collection is a capped collection.
     std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
+    const bool _mustTakeCappedLockOnInsert;
+
     friend class Database;
     friend class IndexCatalog;
     friend class NamespaceDetails;

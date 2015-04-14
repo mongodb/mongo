@@ -53,6 +53,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/snapshot_thread.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/network_interface.h"
@@ -77,6 +79,12 @@ const char lastVoteDatabaseName[] = "local";
 const char meCollectionName[] = "local.me";
 const char meDatabaseName[] = "local";
 const char tsFieldName[] = "ts";
+
+// Set this to false to disable the background creation of snapshots. This can be used for A-B
+// benchmarking to find how much overhead repl::SnapshotThread introduces.
+// TODO SERVER-19213 Make this the default once secondaries can advance their commit
+//                   points (SERVER-19208) and we've validated the performance impact.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
 }  // namespace
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl()
@@ -94,6 +102,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
     _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync)));
     _syncSourceFeedbackThread.reset(
         new stdx::thread(stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback)));
+    startSnapshotThread();
     _startedThreads = true;
 }
 
@@ -111,6 +120,9 @@ void ReplicationCoordinatorExternalStateImpl::shutdown() {
         BackgroundSync* bgsync = BackgroundSync::get();
         bgsync->shutdown();
         _producerThread->join();
+
+        if (_snapshotThread)
+            _snapshotThread->shutdown();
     }
 }
 
@@ -238,6 +250,35 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 }
 
 void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
+    // This is called to force-change the global timestamp following rollback. When this happens
+    // we need to drop all snapshots since we may need to create out-of-order snapshots. This
+    // would be necessary even if we used SnapshotName(term, timestamp) and RAFT because of the
+    // following situation:
+    //
+    //  |--------|-------------|-------------|
+    //  | OpTime | HasSnapshot | Committed   |
+    //  |--------|-------------|-------------|
+    //  | (0, 1) | *           | *           |
+    //  | (0, 2) | *           | ROLLED BACK |
+    //  | (1, 2) |             | *           |
+    //  |--------|-------------|-------------|
+    //
+    // When we try to make (1,2) the commit point, we'd find (0,2) as the newest snapshot
+    // before the commit point, but it would be invalid to mark it as the committed snapshot
+    // since it was never committed.
+    //
+    // TODO SERVER-19209 We also need to clear snapshots after resync.
+
+    {
+        stdx::lock_guard<stdx::mutex> lock(_snapshotsMutex);
+        _snapshots.clear();
+    }
+
+    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    if (auto snapshotManager = storageEngine->getSnapshotManager()) {
+        snapshotManager->dropAllSnapshots();
+    }
+
     setNewTimestamp(newTime);
 }
 
@@ -321,5 +362,56 @@ void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationCo
     }
 }
 
+void ReplicationCoordinatorExternalStateImpl::startSnapshotThread() {
+    if (!enableReplSnapshotThread)
+        return;
+
+    auto onSnapshotCreate = [this](SnapshotName name) {
+        stdx::lock_guard<stdx::mutex> lock(_snapshotsMutex);
+        if (!_snapshots.empty()) {
+            if (name == _snapshots.back()) {
+                // This is already in the set. Don't want to double add.
+                return;
+            }
+            invariant(name > _snapshots.back());
+        }
+        _snapshots.push_back(name);
+    };
+
+    _snapshotThread = SnapshotThread::start(getGlobalServiceContext(), std::move(onSnapshotCreate));
+}
+
+boost::optional<Timestamp> ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
+    OpTime newCommitPoint) {
+    if (newCommitPoint.isNull())
+        return {};
+
+    stdx::lock_guard<stdx::mutex> lock(_snapshotsMutex);
+
+    if (_snapshots.empty())
+        return {};
+
+    // Seek to the first entry > the commit point and go back one to land <=.
+    auto it = std::upper_bound(
+        _snapshots.begin(), _snapshots.end(), SnapshotName(newCommitPoint.getTimestamp()));
+    if (it == _snapshots.begin())
+        return {};  // Nothing available is <=.
+    --it;
+    auto newSnapshot = *it;
+
+    auto manager = getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
+    invariant(manager);  // If there is no manager, _snapshots would be empty.
+    manager->setCommittedSnapshot(newSnapshot);
+
+    // Forget about all snapshots <= the new commit point.
+    _snapshots.erase(_snapshots.begin(), ++it);
+
+    return {newSnapshot.timestamp()};
+}
+
+void ReplicationCoordinatorExternalStateImpl::forceSnapshotCreation() {
+    if (_snapshotThread)
+        _snapshotThread->forceSnapshot();
+}
 }  // namespace repl
 }  // namespace mongo

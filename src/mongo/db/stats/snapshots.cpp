@@ -103,8 +103,8 @@ StatusWith<SnapshotDiff> Snapshots::computeDelta() {
     return SnapshotDiff(delta.collectionUsageDiff(), delta.elapsed());
 }
 
-void SnapshotThread::run() {
-    Client::initThread("snapshot");
+void StatsSnapshotThread::run() {
+    Client::initThread("statsSnapshot");
     while (!inShutdown()) {
         try {
             statsSnapshots.takeSnapshot();
@@ -117,5 +117,5 @@ void SnapshotThread::run() {
 }
 
 Snapshots statsSnapshots;
-SnapshotThread snapshotThread;
+StatsSnapshotThread statsSnapshotThread;
 }

@@ -42,6 +42,7 @@ namespace mongo {
 class DatabaseCatalogEntry;
 class OperationContext;
 class RecoveryUnit;
+class SnapshotManager;
 struct StorageGlobalParams;
 class StorageEngineLockFile;
 class StorageEngineMetadata;
@@ -210,6 +211,15 @@ public:
      * There is intentionally no uncleanShutdown().
      */
     virtual void cleanShutdown() = 0;
+
+    /**
+     * Returns the SnapshotManager for this StorageEngine or NULL if not supported.
+     *
+     * Pointer remains owned by the StorageEngine, not the caller.
+     */
+    virtual SnapshotManager* getSnapshotManager() const {
+        return nullptr;
+    }
 
 protected:
     /**

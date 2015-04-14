@@ -206,4 +206,9 @@ void Lock::ResourceLock::unlock() {
     }
 }
 
+void synchronizeOnCappedInFlightResource(Locker* lockState) {
+    dassert(lockState->inAWriteUnitOfWork());
+    Lock::ResourceLock{lockState, resourceCappedInFlight, MODE_IX};  // held until end of WUOW.
+}
+
 }  // namespace mongo

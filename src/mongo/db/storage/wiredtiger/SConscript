@@ -17,6 +17,7 @@ if wiredtiger:
             'wiredtiger_record_store.cpp',
             'wiredtiger_recovery_unit.cpp',
             'wiredtiger_session_cache.cpp',
+            'wiredtiger_snapshot_manager.cpp',
             'wiredtiger_size_storer.cpp',
             'wiredtiger_util.cpp',
             ],
