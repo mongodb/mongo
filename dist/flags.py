@@ -44,6 +44,11 @@ flags = {
         'READ_TRUNCATE',
         'READ_WONT_NEED',
     ],
+    'page_eviction' : [
+        'CHECK_SPLITS',
+        'EXCLUSIVE',
+        'FORCE_SPLIT'
+    ],
     'rec_write' : [
         'EVICTING',
         'SKIP_UPDATE_ERR',
