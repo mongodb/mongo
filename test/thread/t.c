@@ -180,13 +180,17 @@ wt_connect(char *config_open)
 		NULL	/* Close handler. */
 	};
 	int ret;
-	char config[128];
+	char config[512];
+	size_t print_count;
 
-	snprintf(config, sizeof(config),
+	print_count = (size_t)snprintf(config, sizeof(config),
 	    "create,statistics=(all),error_prefix=\"%s\",%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
+
+	if (print_count >= sizeof(config))
+		die("Config string too long", EINVAL);
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)
 		die("wiredtiger_open", ret);
