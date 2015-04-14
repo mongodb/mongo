@@ -644,7 +644,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	kenc->encryptor = encryptor;
 
 	TAILQ_INSERT_TAIL(&nenc->keyedqh, kenc, q);
-	WT_RET(encryptor->sizing(encryptor, &session->iface,
+	WT_ERR(encryptor->sizing(encryptor, &session->iface,
 	    &encryptor->size_const));
 
 	*encryptorp = encryptor;
@@ -684,7 +684,7 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 
 	/*
 	 * Verify that terminate is set if customize is set.
-	 * We could relax this restriction and return an error
+	 * We could relax this restriction and give an error
 	 * if customize returns an encryptor and terminate
 	 * is not set. That seems more prone to mistakes.
 	 */
