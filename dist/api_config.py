@@ -306,8 +306,7 @@ __wt_conn_config_init(WT_SESSION_IMPL *session)
 \tconn = S2C(session);
 
 \t/* Build a list of pointers to the configuration information. */
-\tWT_RET(__wt_calloc_def(session,
-\t    sizeof(config_entries) / sizeof(config_entries[0]), &epp));
+\tWT_RET(__wt_calloc_def(session, WT_ELEMENTS(config_entries), &epp));
 \tconn->config_entries = epp;
 
 \t/* Fill in the list to reference the default information. */
