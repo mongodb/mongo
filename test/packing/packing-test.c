@@ -56,7 +56,7 @@ check(const char *fmt, ...)
 }
 
 int
-main()
+main(void)
 {
 	check("iii", 0, 101, -99);
 	check("3i", 0, 101, -99);

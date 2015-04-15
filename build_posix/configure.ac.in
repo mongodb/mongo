@@ -107,7 +107,7 @@ AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 
 AC_SUBST(AM_CFLAGS)
 
-# test/format requires an installed Oracle Berkeley DB release tree.
+# test/format optionally uses a Oracle Berkeley DB release for verification.
 AC_MSG_CHECKING([if --with-berkeleydb=DIR option specified])
 AC_ARG_WITH(berkeleydb,
     [AS_HELP_STRING([--with-berkeleydb=DIR],

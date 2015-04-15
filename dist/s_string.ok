@@ -89,7 +89,7 @@ Eron
 FALLTHROUGH
 FH
 FLD
-FLS
+FLSv
 FNV
 FORALL
 FOREACH
@@ -289,6 +289,7 @@ WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
 Wuninitialized
+Wunused
 XP
 abcdef
 abcdefghijklmnopqrstuvwxyz
@@ -874,6 +875,7 @@ usr
 utf
 util
 uu
+vW
 va
 valuep
 valuev

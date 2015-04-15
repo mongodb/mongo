@@ -1,8 +1,24 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_253 Upgrading to Version 2.5.3
-
+@section version_254 Upgrading to Version 2.5.4
 <dl>
+<dt>File handle closing</dt>
+<dd>
+In WiredTiger, a separate thread of control periodically reviews open
+objects, closing ones which have been idle for some period of time and
+discarding them from the cache.  In previous WiredTiger releases, this
+review was independent of the number of open file handles. In this
+release, WiredTiger only reviews the file handles if at least 250 file
+handles are open. How often file handles are reviewed (the default is
+30 seconds), and how many file handles must be opened before review is
+triggered, can be configured using the \c file_manager configuration
+values to the ::wiredtiger_open call.
+</dd>
+
+</dl><hr>
+@section version_253 Upgrading to Version 2.5.3
+<dl>
+
 <dt>Configuration string case-sensitivity</dt>
 <dd>
 In previous WiredTiger releases, there were several cases where configuration
@@ -28,15 +44,15 @@ In previous releases of WiredTiger, all buffers used for I/O were aligned
 to 4KB boundaries by default.  In the WiredTiger 2.5.2 release, alignment
 is only enforced when direct I/O is configured.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_252 Upgrading to Version 2.5.2
 
 There are no special upgrade steps required.
 
 @section version_251 Upgrading to Version 2.5.1
-
 <dl>
+
 <dt>Statistics cursors on data sources</dt>
 <dd>
 Opening a statistics cursor on a data source without a \c checkpoint name
@@ -50,11 +66,11 @@ opened cursors on checkpoints and relied on their statistics being
 aggregated into a single statistics cursor will need to open statistics
 cursors on each checkpoint.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_250 Upgrading to Version 2.5.0
-
 <dl>
+
 <dt>WT_STAT_CONN_LOG_BYTES_USER	renamed WT_STAT_CONN_LOG_BYTES_PAYLOAD</dt>
 <dd>
 The statistic for the number of bytes written to the log minus the overhead of
@@ -77,11 +93,11 @@ configuration strings are now deprecated in favor of the
 \c internal_key_max, \c leaf_key_max, and \c leaf_value_max
 configuration strings. See @ref tune_page_sizes for more information.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_241 Upgrading to Version 2.4.1
-
 <dl>
+
 <dt>WT_DEADLOCK renamed</dt>
 <dd>
 The \c WT_DEADLOCK error return has been deprecated in favor of ::WT_ROLLBACK
@@ -94,11 +110,11 @@ The names of WiredTiger statistics have been updated to be more consistently
 named, and simpler to categorize. Any application that was parsing the
 strings output by statistics will need to be updated.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_240 Upgrading to Version 2.4.0
-
 <dl>
+
 <dt>Default configuration file changes</dt>
 <dd>
 WiredTiger creates a configuration file when a database is first created. This
@@ -156,11 +172,11 @@ replaced by the W::wiredtiger_open \c lsm_manager=(worker_thread_max) option.
 The new version specifies a set of LSM threads that are shared across all
 LSM trees in a database, the older configuration was per LSM table.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_231 Upgrading to Version 2.3.1
-
 <dl>
+
 <dt>::wiredtiger_open eviction_workers configuration changed</dt>
 <dd>
 The \c eviction_workers configuration setting has been replaced by
@@ -170,15 +186,15 @@ There is also a semantic change because \c eviction_workers used to
 configure additional threads whereas the new settings configure the total
 number of threads involved with eviction.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_230 Upgrading to Version 2.3.0
 
 There are no special upgrade steps required.
 
 @section version_221 Upgrading to Version 2.2.1
-
 <dl>
+
 <dt>::wiredtiger_open configuration parsing order changed</dt>
 <dd>
 In the 2.2.1 release, the order that configuration strings are
@@ -220,8 +236,8 @@ every transaction commit by default.  Applications can enable or disable sync
 for a specific transaction with the \c sync setting to
 WT_SESSION::begin_transaction.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_220 Upgrading to Version 2.2.0
 <dl>
 
@@ -237,8 +253,8 @@ that benefit from prefix compression will need to explicitly set
 In the 2.2.0 release it is now necessary to include \c --enable-verbose
 in the configure command to be able to use verbose messages.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_212 Upgrading to Version 2.1.2
 <dl>
 
@@ -251,8 +267,8 @@ the pool being shared.
 We are now also enforcing that only one of \c cache_size and \c shared_cache
 are specified in the ::wiredtiger_open configuration string.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_211 Upgrading to Version 2.1.1
 <dl>
 
@@ -267,8 +283,8 @@ WT_EXTENSION_API::config_parser_open method, which can be used to parse
 configuration strings. See the WT_CONFIG_PARSER documentation for
 examples on how to use the updated API.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_21 Upgrading to Version 2.1
 <dl>
 
@@ -298,8 +314,8 @@ explicit "fsync" calls than by enabling "dsync" on a file handle.
 Applications that don't execute concurrent transactions may see better
 throughput with transaction_sync set to "dsync".
 </dd>
-</dl>
 
+</dl><hr>
 @section version_20 Upgrading to Version 2.0
 <dl>
 
@@ -319,8 +335,8 @@ details of the updated syntax: lsm_auto_throttle, lsm_bloom, lsm_bloom_config,
 lsm_bloom_bit_count, lsm_bloom_hash_count, lsm_bloom_oldest, lsm_chunk_max,
 lsm_chunk_size, lsm_merge_max and lsm_merge_threads.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_166 Upgrading to Version 1.6.6
 <dl>
 
@@ -401,8 +417,8 @@ Additionally add a WT_SESSION parameter into the existing
 WT_EVENT_HANDLER::handle_error, WT_EVENT_HANDLER::handle_message and
 WT_EVENT_HANDLER::handle_progress callback functions.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_165 Upgrading to Version 1.6.5
 <dl>
 
@@ -428,8 +444,8 @@ correct behavior.
 <dd>
 The \c sync configuration key to ::wiredtiger_open has been renamed \c checkpoint_sync.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_164 Upgrading to Version 1.6.4
 <dl>
 
@@ -450,8 +466,8 @@ add the \c -n option to their command line configuration; applications
 previously using the \c -o option on their command line configurations
 should remove it.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_163 Upgrading to Version 1.6.3
 <dl>
 
@@ -488,11 +504,11 @@ The \c transactional configuration key has been removed from
 ::wiredtiger_open.  Any application setting it should simply remove it,
 no change in application behavior is needed.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_162 Upgrading to Version 1.6.2
-
 <dl>
+
 <dt>Table of WiredTiger extension methods</dt>
 <dd>
 New functionality was added to the list of WiredTiger extension methods;
@@ -514,11 +530,11 @@ checksum, by default.  Applications using compression insufficient for
 the purposes of corrupted block identification should change their file
 checksum configuration to \c on.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_161 Upgrading to Version 1.6.1
-
 <dl>
+
 <dt>Default page sizes</dt>
 <dd>
 In the 1.6.1 release, the default for the WT_SESSION::create configuration
@@ -542,21 +558,21 @@ In the 1.6.1 release, the \c split_pct argument to the
 WT_COMPRESSOR::compress_raw function changed type from \c u_int to \c int,
 applications may require modification to avoid compiler warnings.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_160 Upgrading to Version 1.6.0
-
 <dl>
+
 <dt>File format changes</dt>
 <dd>
 The underlying file formats changed in the 1.6.0 release; tables and files
 should be dumped and re-loaded into a new database.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_153 Upgrading to Version 1.5.3
-
 <dl>
+
 <dt>Configuration strings</dt>
 <dd>
 An undocumented feature where configuration string case was ignored has
@@ -622,22 +638,22 @@ The \c exclusive argument to the WT_DATA_SOURCE::create method has been
 removed; applications may require modifications to resolve compile errors.
 </ul>
 </dd>
-</dl>
 
+</dl><hr>
 @section version_143 Upgrading to Version 1.4.3
-
 <dl>
+
 <dt>Statistics</dt>
 <dd>
 WiredTiger statistics are no longer maintained by default; to configure
 statistics, use the \c statistics configuration string to the
 ::wiredtiger_open function.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_139 Upgrading to Version 1.3.9
-
 <dl>
+
 <dt>Compression</dt>
 <dd>
 A new member, WT_COMPRESSOR::compress_raw, was added to the WT_COMPRESSOR
@@ -659,22 +675,22 @@ string \c uncompressed.
 The underlying file formats changed in the 1.3.9 release; tables and files
 should be dumped and re-loaded into a new database.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_138 Upgrading to Version 1.3.8
-
 <dl>
+
 <dt>Statistics keys</dt>
 <dd>
 The @ref statistics_keys "statistics key constants" have been renamed to use
 all capitals, and use consistent prefixes to distinguish between connection
 statistics and statistics for data sources.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_136 Upgrading to Version 1.3.6
-
 <dl>
+
 <dt>Installed library names</dt>
 <dd>
 The installed WiredTiger extension library names changed to limit
@@ -708,21 +724,21 @@ The built-in compression name arguments to the WT_SESSION:create
 @row{Snappy compression, "snappy_compress", "snappy"}
 </table>
 </dd>
-</dl>
 
+</dl><hr>
 @section version_135 Upgrading to Version 1.3.5
-
 <dl>
+
 <dt>File format changes</dt>
 <dd>
 The underlying file formats changed in the 1.3.5 release; tables and files
 should be dumped and re-loaded into a new database.
 </dd>
-</dl>
 
+</dl><hr>
 @section version_13 Upgrading to Version 1.3
-
 <dl>
+
 <dt>Checkpoint and Snapshot</dt>
 <dd>
 The checkpoint functionality supported by WT_SESSION::checkpoint and the
@@ -813,6 +829,6 @@ returns a cursor comparison status (less than 0, equal to 0, or greater than
 The underlying file formats changed in the 1.3 release; tables and files
 should be dumped and re-loaded into a new database.
 </dd>
-</dl>
 
+</dl>
 */

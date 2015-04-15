@@ -332,7 +332,6 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 {
 	WT_COMPRESSOR *compressor;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_LOG_RECORD *logrec;
 	size_t result_len, skip;
 	uint32_t uncompressed_size;
@@ -342,14 +341,14 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	skip = WT_LOG_COMPRESS_SKIP;
 	compressor = conn->log_compressor;
 	if (compressor == NULL || compressor->decompress == NULL)
-		WT_ERR_MSG(session, WT_ERROR,
+		WT_RET_MSG(session, WT_ERROR,
 		    "log_read: Compressed record with "
 		    "no configured compressor");
 	uncompressed_size = logrec->mem_len;
-	WT_ERR(__wt_scr_alloc(session, 0, out));
-	WT_ERR(__wt_buf_initsize(session, *out, uncompressed_size));
+	WT_RET(__wt_scr_alloc(session, 0, out));
+	WT_RET(__wt_buf_initsize(session, *out, uncompressed_size));
 	memcpy((*out)->mem, in->mem, skip);
-	WT_ERR(compressor->decompress(compressor, &session->iface,
+	WT_RET(compressor->decompress(compressor, &session->iface,
 	    (uint8_t *)in->mem + skip, in->size - skip,
 	    (uint8_t *)(*out)->mem + skip,
 	    uncompressed_size - skip, &result_len));
@@ -360,9 +359,10 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * here after corruption happens.  If we're salvaging the file,
 	 * it's OK, otherwise it's really, really bad.
 	 */
-	if (ret != 0 || result_len != uncompressed_size - WT_LOG_COMPRESS_SKIP)
-		WT_ERR(WT_ERROR);
-err:	return (ret);
+	if (result_len != uncompressed_size - WT_LOG_COMPRESS_SKIP)
+		return (WT_ERROR);
+
+	return (0);
 }
 
 /*
@@ -922,7 +922,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	WT_LSN sync_lsn;
 	size_t write_size;
 	int locked, yield_count;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	conn = S2C(session);
 	log = conn->log;
@@ -989,7 +988,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		 * beginning of our file.
 		 */
 		if (log->sync_lsn.file < slot->slot_end_lsn.file ||
-		    __wt_spin_trylock(session, &log->log_sync_lock, &id) != 0) {
+		    __wt_spin_trylock(session, &log->log_sync_lock) != 0) {
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_sync_cond, 10000));
 			continue;
@@ -1505,7 +1504,6 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOGSLOT tmp;
 	WT_MYSLOT myslot;
 	int dummy, locked;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	log = S2C(session)->log;
 	myslot.slot = &tmp;
@@ -1514,7 +1512,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_CLEAR(tmp);
 
 	/* Fast path the contended case. */
-	if (__wt_spin_trylock(session, &log->log_slot_lock, &id) != 0)
+	if (__wt_spin_trylock(session, &log->log_slot_lock) != 0)
 		return (EAGAIN);
 	locked = 1;
 

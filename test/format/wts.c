@@ -32,14 +32,20 @@ static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
+	int out;
+
 	(void)(handler);
 	(void)(session);
 
-	if (g.logfp != NULL)
-		return (fprintf(
-		    g.logfp, "%p:%s\n", session, message) < 0 ? -1 : 0);
-
-	return (printf("%p:%s\n", session, message) < 0 ? -1 : 0);
+	/* Write and flush the message so we're up-to-date on error. */
+	if (g.logfp == NULL) {
+		out = printf("%p:%s\n", session, message);
+		(void)fflush(stdout);
+	} else {
+		out = fprintf(g.logfp, "%p:%s\n", session, message);
+		(void)fflush(g.logfp);
+	}
+	return (out < 0 ? EIO : 0);
 }
 
 /*
@@ -416,6 +422,7 @@ wts_close(void)
 void
 wts_dump(const char *tag, int dump_bdb)
 {
+#ifdef HAVE_BERKELEY_DB
 	size_t len;
 	int ret;
 	char *cmd;
@@ -441,6 +448,10 @@ wts_dump(const char *tag, int dump_bdb)
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
 	free(cmd);
+#else
+	(void)tag;				/* [-Wunused-variable] */
+	(void)dump_bdb;				/* [-Wunused-variable] */
+#endif
 }
 
 void

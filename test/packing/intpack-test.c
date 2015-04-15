@@ -31,7 +31,7 @@
 #include "wt_internal.h"
 
 int
-main()
+main(void)
 {
 	const uint8_t *cp;
 	uint8_t buf[10], *p;

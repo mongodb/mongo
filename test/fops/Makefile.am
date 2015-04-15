@@ -8,4 +8,4 @@ t_LDFLAGS = -static
 TESTS = $(noinst_PROGRAMS)
 
 clean-local:
-	rm -rf WT_TEST
+	rm -rf WT_TEST *.core

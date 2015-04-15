@@ -202,6 +202,7 @@ struct __wt_connection_impl {
 
 	u_int open_btree_count;		/* Locked: open writable btree count */
 	uint32_t next_file_id;		/* Locked: file ID counter */
+	uint32_t open_file_count;	/* Atomic: open file handle count */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous sessions (threads of
@@ -254,29 +255,6 @@ struct __wt_connection_impl {
 	uint32_t stat_flags;
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
-
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	/*
-	 * Spinlock registration, so we can track which spinlocks are heavily
-	 * used, which are blocking and where.
-	 *
-	 * There's an array of spinlocks, and an array of blocking IDs.
-	 */
-#define	WT_SPINLOCK_MAX			1024
-#define	WT_SPINLOCK_MAX_LOCATION_ID	60
-	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
-
-					/* Spinlock blocking matrix */
-	struct __wt_connection_stats_spinlock {
-		const char *name;	/* Mutex name */
-
-		const char *file;	/* Caller's file/line, ID location */
-		int line;
-
-		u_int total;		/* Count of total, blocked calls */
-		u_int blocked[WT_SPINLOCK_MAX_LOCATION_ID];
-	} spinlock_block[WT_SPINLOCK_MAX_LOCATION_ID];
-#endif
 
 	WT_ASYNC	*async;		/* Async structure */
 	int		 async_cfg;	/* Global async configuration */
@@ -337,6 +315,7 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
 	time_t		 sweep_idle_time;/* Handle sweep idle time */
 	time_t		 sweep_interval;/* Handle sweep interval */
+	u_int		 sweep_handles_min;/* Handle sweep minimum open */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
