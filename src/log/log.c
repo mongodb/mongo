@@ -46,7 +46,10 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *c;
 	WT_DECL_RET;
+	WT_ITEM dummy_key, dummy_value;
 	WT_LOG *log;
+	uint64_t dummy_txnid;
+	uint32_t dummy_fileid, dummy_optype, rectype;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -59,21 +62,38 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 	if (log == NULL)
 		return (0);
 
+	/*
+	 * The LSN is the last written log record before the checkpoint.
+	 * See if the next record after that is a checkpoint and it is
+	 * the last record.  That is the only case where we can skip.
+	 */
 	WT_RET(__wt_curlog_open(session, "log:", NULL, &c));
 	c->set_key(c, ckp_lsn->file, ckp_lsn->offset, 0);
 	if ((ret = c->search(c)) == 0) {
-		/*
-		 * If the checkpoint LSN we're given is the last record,
-		 * then recovery is not needed.
-		 */
-		if ((ret = c->next(c)) == WT_NOTFOUND) {
-			*rec = 0;
+		if ((ret = c->next(c)) == 0) {
+			/*
+			 * The only thing we care about is the rectype.
+			 */
+			WT_ERR(c->get_value(c, &dummy_txnid, &rectype,
+			    &dummy_optype, &dummy_fileid,
+			    &dummy_key, &dummy_value));
+			/*
+			 * Only if the record is a checkpoint and it is the
+			 * last record can we skip.
+			 */
+			if (rectype == WT_LOGREC_CHECKPOINT &&
+			    (ret = c->next(c)) == WT_NOTFOUND) {
+				*rec = 0;
+				ret = 0;
+			}
+		} else if (ret == WT_NOTFOUND)
 			ret = 0;
-		}
 	} else if (ret == WT_NOTFOUND)
 		/*
-		 * If we didn't find that LSN, we need to run recovery,
-		 * but not return any error.
+		 * We should always find the checkpoint LSN as it now points
+		 * to the beginning of a written log record.  But if we're
+		 * running recovery on an earlier database we may not.  In
+		 * that case, we need to run recovery, don't return an error.
 		 */
 		ret = 0;
 	else
@@ -967,6 +987,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_write_cond, 200));
 	}
+	log->write_start_lsn = slot->slot_start_lsn;
 	log->write_lsn = slot->slot_end_lsn;
 	WT_ERR(__wt_cond_signal(session, log->log_write_cond));
 
@@ -1122,6 +1143,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 		WT_RET(__wt_fsync(session, log->log_fh));
 		log->sync_lsn = end_lsn;
 		log->write_lsn = end_lsn;
+		log->write_start_lsn = end_lsn;
 	}
 	if (created != NULL)
 		*created = create_log;
