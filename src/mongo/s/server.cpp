@@ -61,6 +61,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/catalog/legacy/config_upgrade.h"
+#include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"

@@ -140,22 +140,6 @@ namespace mongo {
     };
 
 
-    class ShardingConnectionHook : public DBConnectionHook {
-    public:
-
-        ShardingConnectionHook( bool shardedConnections )
-            : _shardedConnections( shardedConnections ) {
-
-        }
-
-        virtual void onCreate( DBClientBase * conn );
-        virtual void onDestroy( DBClientBase * conn );
-        virtual void onRelease(DBClientBase* conn);
-
-        bool _shardedConnections;
-    };
-
-
     /**
      * Sends the setShardVersion command on the specified connection.
      */

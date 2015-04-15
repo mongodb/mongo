@@ -28,7 +28,9 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
-#include "mongo/s/scc_fast_query_handler.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/client/scc_fast_query_handler.h"
 
 #include <vector>
 

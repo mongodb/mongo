@@ -26,11 +26,10 @@
  *    it in the license file.
  */
 
-#include "mongo/s/multi_host_query.h"
-
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/s/client/multi_host_query.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/synchronization.h"
 

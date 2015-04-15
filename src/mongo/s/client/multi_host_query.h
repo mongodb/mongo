@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/stdx/functional.h"
 

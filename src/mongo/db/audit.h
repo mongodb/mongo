@@ -48,10 +48,6 @@ namespace mongo {
     class StringData;
     class UserName;
 
-namespace mutablebson {
-    class Document;
-}  // namespace mutablebson
-
 namespace audit {
 
     /**

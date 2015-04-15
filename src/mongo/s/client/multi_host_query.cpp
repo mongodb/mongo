@@ -28,9 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/multi_host_query.h"
-
-#include <boost/shared_ptr.hpp>
+#include "mongo/s/client/multi_host_query.h"
 
 #include "mongo/bson/util/builder.h"
 

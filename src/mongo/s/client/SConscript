@@ -14,9 +14,23 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='sharding_connection_hook',
+    source=[
+        'multi_host_query.cpp',
+        'scc_fast_query_handler.cpp',
+        'sharding_connection_hook.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/clientdriver',
+    ]
+)
+
+
 env.CppUnitTest(
     target='sharding_client_test',
     source=[
+        'multi_host_query_test.cpp',
         'shard_connection_test.cpp'
     ],
     LIBDEPS=[

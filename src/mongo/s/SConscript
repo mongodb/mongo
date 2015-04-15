@@ -149,7 +149,6 @@ env.Library(
         'write_ops/write_op.cpp',
         'write_ops/batch_write_op.cpp',
         'write_ops/batch_write_exec.cpp',
-        'multi_host_query.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
@@ -171,19 +170,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/range_arithmetic',
     ]
-)
-
-env.CppUnitTest(
-    target='multi_host_query_test',
-    source=[
-        'multi_host_query_test.cpp',
-    ],
-    LIBDEPS=[
-        'base',
-        'cluster_ops',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/clientdriver',
-    ],
 )
 
 # Upconvert/Downconvert write functionality for mongos
@@ -228,7 +214,6 @@ env.Library(
         'cluster_explain.cpp',
         'cluster_write.cpp',
         'dbclient_shard_resolver.cpp',
-        'scc_fast_query_handler.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',

@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/client/syncclusterconnection.h"
-#include "mongo/s/multi_host_query.h"
+#include "mongo/s/client/multi_host_query.h"
 
 namespace mongo {
 

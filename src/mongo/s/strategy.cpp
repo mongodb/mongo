@@ -68,8 +68,6 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
-// error codes 8010-8040
-
 namespace mongo {
 
     using boost::scoped_ptr;
