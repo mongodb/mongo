@@ -32,7 +32,7 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/s/config.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 

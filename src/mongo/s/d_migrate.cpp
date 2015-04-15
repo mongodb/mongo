@@ -83,7 +83,7 @@
 #include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/exit.h"

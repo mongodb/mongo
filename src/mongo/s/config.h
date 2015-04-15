@@ -31,7 +31,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclient_rs.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/mutex.h"
 

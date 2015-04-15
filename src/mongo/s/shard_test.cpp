@@ -28,7 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

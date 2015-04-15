@@ -28,8 +28,7 @@
 *    then also delete it in the license file.
 */
 
-#ifndef S_BALANCER_POLICY_HEADER
-#define S_BALANCER_POLICY_HEADER
+#pragma once
 
 #include <boost/noncopyable.hpp>
 
@@ -37,7 +36,6 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/shard.h"
 
 namespace mongo {
 
@@ -236,5 +234,3 @@ namespace mongo {
 
 
 }  // namespace mongo
-
-#endif  // S_BALANCER_POLICY_HEADER

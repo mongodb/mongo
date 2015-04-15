@@ -551,7 +551,7 @@ namespace mongo {
     void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
         PCStatePtr state,
         const Shard& shard,
-        ShardPtr primary,
+        boost::shared_ptr<Shard> primary,
         const NamespaceString& ns,
         const string& vinfo,
         ChunkManagerPtr manager ) {
@@ -1158,8 +1158,8 @@ namespace mongo {
         return _cursorMap.size();
     }
 
-    ShardPtr ParallelSortClusteredCursor::getQueryShard() {
-        return ShardPtr(new Shard(_cursorMap.begin()->first));
+    boost::shared_ptr<Shard> ParallelSortClusteredCursor::getQueryShard() {
+        return boost::shared_ptr<Shard>(new Shard(_cursorMap.begin()->first));
     }
 
     void ParallelSortClusteredCursor::getQueryShards(set<Shard>& shards) {
@@ -1169,9 +1169,9 @@ namespace mongo {
         }
     }
 
-    ShardPtr ParallelSortClusteredCursor::getPrimary() {
+    boost::shared_ptr<Shard> ParallelSortClusteredCursor::getPrimary() {
         if (isSharded())
-            return ShardPtr();
+            return boost::shared_ptr<Shard>();
         return _cursorMap.begin()->second.pcState->primary;
     }
 

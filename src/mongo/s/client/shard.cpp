@@ -1,7 +1,5 @@
-// shard.cpp
-
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2008-2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 
 #include <boost/make_shared.hpp>
 #include <set>
@@ -57,7 +55,6 @@
 #include "mongo/s/scc_fast_query_handler.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 

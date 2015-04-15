@@ -37,10 +37,10 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/shard.h"
 
 namespace mongo {
 
+    class Shard;
     class StaleConfigException;
 
     /**
@@ -114,7 +114,7 @@ namespace mongo {
 
         // Version information
         ChunkManagerPtr manager;
-        ShardPtr primary;
+        boost::shared_ptr<Shard> primary;
 
         // Cursor status information
         long long count;
@@ -225,13 +225,13 @@ namespace mongo {
          * Returns the single shard with an open cursor.
          * It is an error to call this if getNumQueryShards() > 1
          */
-        ShardPtr getQueryShard();
+        boost::shared_ptr<Shard> getQueryShard();
 
         /**
          * Returns primary shard with an open cursor.
          * It is an error to call this if the collection is sharded.
          */
-        ShardPtr getPrimary();
+        boost::shared_ptr<Shard> getPrimary();
 
         ChunkManagerPtr getChunkManager( const Shard& shard );
         DBClientCursorPtr getShardCursor( const Shard& shard );
@@ -277,7 +277,7 @@ namespace mongo {
          */
         void setupVersionAndHandleSlaveOk( PCStatePtr state /* in & out */,
                            const Shard& shard,
-                           ShardPtr primary /* in */,
+                           boost::shared_ptr<Shard> primary /* in */,
                            const NamespaceString& ns,
                            const std::string& vinfo,
                            ChunkManagerPtr manager /* in */ );

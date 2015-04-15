@@ -39,7 +39,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/client/parallel.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 namespace {

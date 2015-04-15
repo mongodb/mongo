@@ -35,7 +35,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"

@@ -50,7 +50,7 @@
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
-#include "mongo/s/shard.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/type_actionlog.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_mongos.h"

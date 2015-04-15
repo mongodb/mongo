@@ -47,12 +47,12 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/sorter/sorter.h"
-#include "mongo/s/shard.h"
 #include "mongo/s/strategy.h"
 #include "mongo/util/intrusive_counter.h"
 
 
 namespace mongo {
+
     class Accumulator;
     class Document;
     class Expression;

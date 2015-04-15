@@ -31,10 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/balancer_policy.h"
+
 #include <algorithm>
 
 #include "mongo/client/connpool.h"
-#include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_manager.h"

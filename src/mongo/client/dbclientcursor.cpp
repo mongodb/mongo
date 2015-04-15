@@ -36,8 +36,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/shard.h"
-#include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"

@@ -905,7 +905,6 @@ env.Library('coreshard',
                 's/chunk.cpp',
                 's/chunk_manager.cpp',
                 's/config_server_checker_service.cpp',
-                's/shard.cpp',
                 's/shard_key_pattern.cpp'
             ],
             LIBDEPS=[
