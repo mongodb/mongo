@@ -871,21 +871,7 @@ namespace {
                                                                   &_entries, entry));
         entry = NULL;
 
-        try {
-
-            // ****   this is the first disk change ****
-            _deleteIndexFromDisk( txn,
-                                  indexName,
-                                  indexNamespace );
-        }
-        catch ( std::exception& ) {
-            // this is bad, and we don't really know state
-            // going to leak to make sure things are safe
-
-            log() << "error dropping index: " << indexNamespace
-                  << " going to leak some memory to be safe";
-            throw;
-        }
+        _deleteIndexFromDisk(txn, indexName, indexNamespace);
 
         _checkMagic();
 
