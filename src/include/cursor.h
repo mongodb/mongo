@@ -112,14 +112,16 @@ struct __wt_cursor_btree {
 	int	compare;
 
 	/*
-	 * A key from a binary search of a row-store leaf page; if we find an
-	 * exact match on a row-store leaf page, keep a copy of key we built
-	 * during the search to avoid doing the additional work of getting the
-	 * key again for return to the application. Note, this only applies to
-	 * exact matches when searching disk-image structures, so it's not, for
-	 * example, a key from an insert list.
+	 * A key returned from a binary search or cursor movement on a row-store
+	 * page; if we find an exact match on a row-store leaf page in a search
+	 * operation, keep a copy of key we built during the search to avoid
+	 * doing the additional work of getting the key again for return to the
+	 * application. Note, this only applies to exact matches when searching
+	 * disk-image structures, so it's not, for example, a key from an insert
+	 * list. Additionally, this structure is used to build keys when moving
+	 * a cursor through a row-store leaf page.
 	 */
-	WT_ITEM *search_key, _search_key;
+	WT_ITEM *row_key, _row_key;
 
 	/*
 	 * It's relatively expensive to calculate the last record on a variable-
@@ -170,9 +172,8 @@ struct __wt_cursor_btree {
 	 * to the next cursor position, we re-use the unpacked value we stored
 	 * here the first time we hit the value).
 	 *
-	 * A temporary buffer for building overflow and prefix-compressed keys
-	 * when stepping a cursor through row-store files, and building on-page
-	 * keys when searching row-store files.
+	 * A temporary buffer for building on-page keys when searching row-store
+	 * files.
 	 */
 	WT_ITEM *tmp, _tmp;
 

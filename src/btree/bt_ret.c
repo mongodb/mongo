@@ -91,12 +91,12 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 			 * the search key during any subsequent search that used
 			 * the temporary buffer.
 			 */
-			tmp = cbt->search_key;
-			cbt->search_key = cbt->tmp;
+			tmp = cbt->row_key;
+			cbt->row_key = cbt->tmp;
 			cbt->tmp = tmp;
 
-			cursor->key.data = cbt->search_key->data;
-			cursor->key.size = cbt->search_key->size;
+			cursor->key.data = cbt->row_key->data;
+			cursor->key.size = cbt->row_key->size;
 		} else
 			WT_RET(__wt_row_leaf_key(
 			    session, page, rip, &cursor->key, 0));

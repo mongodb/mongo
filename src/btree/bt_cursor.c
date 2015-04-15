@@ -1135,7 +1135,7 @@ err:	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 void
 __wt_btcur_open(WT_CURSOR_BTREE *cbt)
 {
-	cbt->search_key = &cbt->_search_key;
+	cbt->row_key = &cbt->_row_key;
 	cbt->tmp = &cbt->_tmp;
 }
 
@@ -1152,7 +1152,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	ret = __curfile_leave(cbt);
-	__wt_buf_free(session, &cbt->_search_key);
+	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);
 
 	return (ret);
