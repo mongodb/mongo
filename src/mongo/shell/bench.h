@@ -241,12 +241,14 @@ namespace mongo {
 
         bool error;
         unsigned long long errCount;
+        unsigned long long opCount;
 
         BenchRunEventCounter findOneCounter;
         BenchRunEventCounter updateCounter;
         BenchRunEventCounter insertCounter;
         BenchRunEventCounter deleteCounter;
         BenchRunEventCounter queryCounter;
+        BenchRunEventCounter commandCounter;
 
         std::map<std::string, long long> opcounters;
         std::vector<BSONObj> trappedErrors;
@@ -282,6 +284,11 @@ namespace mongo {
          */
         void tellWorkersToFinish();
 
+        /**
+         * Notify the worker threads to collect statistics.  Does not block.
+         */
+        void tellWorkersToCollectStats();
+
         /// Check that the current state is BRS_FINISHED.
         void assertFinished();
 
@@ -294,6 +301,12 @@ namespace mongo {
          * to tellWorkersToFinish()).
          */
         bool shouldWorkerFinish();
+
+         /**
+         * Predicate that workers call to see if they should start collecting stats (as a result
+         * of a call to tellWorkersToCollectStats()).
+         */
+        bool shouldWorkerCollectStats();
 
         /**
          * Called by each BenchRunWorker from within its thread context, immediately before it
@@ -313,6 +326,7 @@ namespace mongo {
         unsigned _numUnstartedWorkers;
         unsigned _numActiveWorkers;
         AtomicUInt32 _isShuttingDown;
+        AtomicUInt32 _isCollectingStats;
     };
 
     /**
@@ -357,11 +371,15 @@ namespace mongo {
 
         /// Predicate, used to decide whether or not it's time to terminate the worker.
         bool shouldStop() const;
+        /// Predicate, used to decide whether or not it's time to collect statistics
+        bool shouldCollectStats() const;
 
         size_t _id;
         const BenchRunConfig *_config;
         BenchRunState *_brState;
         BenchRunStats _stats;
+        /// Dummy stats to use before observation period.
+        BenchRunStats _statsBlackHole;
         int64_t _randomSeed;
     };
 
@@ -440,9 +458,6 @@ namespace mongo {
         unsigned long long _microsElapsed;
         std::unique_ptr<BenchRunConfig> _config;
         std::vector<BenchRunWorker *> _workers;
-
-        BSONObj before;
-        BSONObj after;
     };
 
 }  // namespace mongo
