@@ -192,9 +192,7 @@ namespace mongo {
         /**
            call at startup, this will initiate connection to the grid db
         */
-        bool init( std::vector<std::string> configHosts );
-
-        bool init( const std::string& s );
+        bool init( const ConnectionString& configCS );
 
         /**
          * Check hosts are unique. Returns true if all configHosts

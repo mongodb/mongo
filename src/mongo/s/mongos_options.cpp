@@ -255,15 +255,29 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "error: no args for --configdb");
         }
 
-        splitStringDelim(params["sharding.configDB"].as<std::string>(),
-                         &mongosGlobalParams.configdbs, ',');
-        if (mongosGlobalParams.configdbs.size() != 1 && mongosGlobalParams.configdbs.size() != 3) {
+        std::string configdbString = params["sharding.configDB"].as<std::string>();
+        try {
+            std::string errmsg;
+            mongosGlobalParams.configdbs = ConnectionString::parse(configdbString, errmsg);
+
+            if (!mongosGlobalParams.configdbs.isValid()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "Invalid configdb connection string: " << errmsg);
+            }
+        } catch (const DBException& e) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Invalid configdb connection string: " << e.what());
+        }
+
+        std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
+
+        if (configServers.size() != 1 && configServers.size() != 3) {
             return Status(ErrorCodes::BadValue, "need either 1 or 3 configdbs");
         }
 
-        if (mongosGlobalParams.configdbs.size() == 1) {
+        if (configServers.size() == 1) {
             warning() << "running with 1 config server should be done only for testing purposes "
-                      << "and is not recommended for production" << endl;
+                    << "and is not recommended for production" << endl;
         }
 
         if (params.count("upgrade")) {

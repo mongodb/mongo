@@ -347,26 +347,20 @@ static int _main() {
     startSignalProcessingThread();
 
     // we either have a setting where all processes are in localhost or none are
-    for (std::vector<std::string>::const_iterator it = mongosGlobalParams.configdbs.begin();
-         it != mongosGlobalParams.configdbs.end(); ++it) {
-        try {
+    std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
+    for (std::vector<HostAndPort>::const_iterator it = configServers.begin();
+            it != configServers.end(); ++it) {
 
-            HostAndPort configAddr( *it );  // will throw if address format is invalid
+        const HostAndPort& configAddr = *it;
 
-            if (it == mongosGlobalParams.configdbs.begin()) {
-                grid.setAllowLocalHost( configAddr.isLocalHost() );
-            }
-
-            if ( configAddr.isLocalHost() != grid.allowLocalHost() ) {
-                mongo::log(LogComponent::kDefault)
-                    << "cannot mix localhost and ip addresses in configdbs" << endl;
-                return 10;
-            }
-
+        if (it == configServers.begin()) {
+            grid.setAllowLocalHost( configAddr.isLocalHost() );
         }
-        catch ( DBException& e) {
-            mongo::log(LogComponent::kDefault) << "configdb: " << e.what() << endl;
-            return 9;
+
+        if ( configAddr.isLocalHost() != grid.allowLocalHost() ) {
+            mongo::log(LogComponent::kDefault)
+                << "cannot mix localhost and ip addresses in configdbs" << endl;
+            return 10;
         }
     }
 

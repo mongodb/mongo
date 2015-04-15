@@ -60,9 +60,9 @@ namespace mongo {
 
     }
 
-    bool Grid::initCatalogManager(const std::vector<std::string>& configHosts) {
+    bool Grid::initCatalogManager(const ConnectionString& configDBString) {
         std::auto_ptr<CatalogManagerLegacy> cm(new CatalogManagerLegacy());
-        Status status = cm->init(configHosts);
+        Status status = cm->init(configDBString);
         if (!status.isOK()) {
             severe() << "Catalog manager failed to initialize " << status;
             return false;

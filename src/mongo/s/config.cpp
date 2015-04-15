@@ -703,20 +703,18 @@ namespace mongo {
         return ConnectionString(_primary.getConnString(), ConnectionString::SYNC);
     }
 
-    bool ConfigServer::init( const std::string& s ) {
-        vector<string> configdbs;
-        splitStringDelim( s, &configdbs, ',' );
-        return init( configdbs );
-    }
+    bool ConfigServer::init( const ConnectionString& configCS ) {
+        invariant(configCS.isValid());
 
-    bool ConfigServer::init( vector<string> configHosts ) {
-        uassert( 10187 ,  "need configdbs" , configHosts.size() );
+        std::vector<HostAndPort> configHostAndPorts = configCS.getServers();
+        uassert( 10187 ,  "need configdbs" , configHostAndPorts.size() );
 
+        std::vector<std::string> configHosts;
         set<string> hosts;
-        for ( size_t i=0; i<configHosts.size(); i++ ) {
-            string host = configHosts[i];
+        for ( size_t i=0; i<configHostAndPorts.size(); i++ ) {
+            string host = configHostAndPorts[i].toString();
             hosts.insert( getHost( host , false ) );
-            configHosts[i] = getHost( host , true );
+            configHosts.push_back(getHost( host , true ));
         }
 
         for ( set<string>::iterator i=hosts.begin(); i!=hosts.end(); i++ ) {

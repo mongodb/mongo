@@ -61,7 +61,7 @@ namespace mongo {
          * Returns whether the catalog manager has been initialized successfully. Must be called
          * only once.
          */
-        bool initCatalogManager(const std::vector<std::string>& configHosts);
+        bool initCatalogManager(const ConnectionString& configDBString);
 
         /**
          * Implicitly creates the specified database as non-sharded.

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -43,7 +44,7 @@ namespace mongo {
     namespace moe = mongo::optionenvironment;
 
     struct MongosGlobalParams {
-        std::vector<std::string> configdbs;
+        ConnectionString configdbs;
         bool upgrade;
 
         MongosGlobalParams() :

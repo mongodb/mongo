@@ -49,7 +49,7 @@ namespace mongo {
          * Initializes the catalog manager with the hosts, which will be used as a configuration
          * server. Can only be called once for the lifetime.
          */
-        Status init(const std::vector<std::string>& configHosts);
+        Status init(const ConnectionString& configCS);
 
         virtual Status enableSharding(const std::string& dbName);
 

@@ -260,33 +260,25 @@ namespace {
 } // namespace
 
 
-    Status CatalogManagerLegacy::init(const vector<string>& configHosts) {
+    Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
         // Initialization should not happen more than once
         invariant(!_configServerConnectionString.isValid());
         invariant(_configServers.empty());
-
-        if (configHosts.empty()) {
-            return Status(ErrorCodes::InvalidOptions, "No config server hosts specified");
-        }
+        invariant(configDBCS.isValid());
         
         // Extract the hosts in HOST:PORT format
-        set<HostAndPort> configHostsAndPorts;
+        set<HostAndPort> configHostsAndPortsSet;
         set<string> configHostsOnly;
-        for (size_t i = 0; i < configHosts.size(); i++) {
-            // Parse the config host string
-            StatusWith<HostAndPort> status = HostAndPort::parse(configHosts[i]);
-            if (!status.isOK()) {
-                return status.getStatus();
-            }
-
+        std::vector<HostAndPort> configHostAndPorts = configDBCS.getServers();
+        for (size_t i = 0; i < configHostAndPorts.size(); i++) {
             // Append the default port, if not specified
-            HostAndPort configHost = status.getValue();
+            HostAndPort configHost = configHostAndPorts[i];
             if (!configHost.hasPort()) {
                 configHost = HostAndPort(configHost.host(), ServerGlobalParams::ConfigServerPort);
             }
 
             // Make sure there are no duplicates
-            if (!configHostsAndPorts.insert(configHost).second) {
+            if (!configHostsAndPortsSet.insert(configHost).second) {
                 StringBuilder sb;
                 sb << "Host " << configHost.toString()
                    << " exists twice in the config servers listing.";
@@ -329,15 +321,12 @@ namespace {
             }
         }
 
-        string fullString;
-        joinStringDelim(configHosts, &fullString, ',');
-
-        LOG(1) << " config string : " << fullString;
+        LOG(1) << " config string : " << configDBCS.toString();
 
         // Now that the config hosts are verified, initialize the catalog manager. The code below
         // should never fail.
 
-        _configServerConnectionString = ConnectionString(fullString, ConnectionString::SYNC);
+        _configServerConnectionString = configDBCS;
 
         if (_configServerConnectionString.type() == ConnectionString::MASTER) {
             _configServers.push_back(_configServerConnectionString);

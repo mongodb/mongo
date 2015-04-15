@@ -477,13 +477,16 @@ namespace mongo {
 
         ShardedConnectionInfo::addHook();
 
-        vector<string> configdbs;
-        splitStringDelim(server, &configdbs, ',');
+        std::string errmsg;
+        ConnectionString configServerCS = ConnectionString::parse(server, errmsg);
+        uassert(28631,
+                str::stream() << "Invalid config server connection string: " << errmsg,
+                configServerCS.isValid());
 
-        configServer.init(configdbs);
+        configServer.init(configServerCS);
         uassert(28627,
                 "failed to initialize catalog manager",
-                grid.initCatalogManager(configdbs));
+                grid.initCatalogManager(configServerCS));
         _enabled = true;
     }
 
