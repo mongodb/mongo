@@ -10,7 +10,7 @@ env.Library(
         'shard_connection.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver',
     ]
 )
 

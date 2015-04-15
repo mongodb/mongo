@@ -37,7 +37,6 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/client/syncclusterconnection.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/jsobj.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/get_status_from_command_result.h"
@@ -65,203 +65,6 @@ namespace mongo {
     AtomicInt64 DBClientBase::ConnectionIdSequence;
 
     const char* const saslCommandUserSourceFieldName = "userSource";
-
-    void ConnectionString::_fillServers( string s ) {
-        
-        //
-        // Custom-handled servers/replica sets start with '$'
-        // According to RFC-1123/952, this will not overlap with valid hostnames
-        // (also disallows $replicaSetName hosts)
-        //
-
-        if( s.find( '$' ) == 0 ) _type = CUSTOM;
-
-        {
-            string::size_type idx = s.find( '/' );
-            if ( idx != string::npos ) {
-                _setName = s.substr( 0 , idx );
-                s = s.substr( idx + 1 );
-                if( _type != CUSTOM ) _type = SET;
-            }
-        }
-
-        string::size_type idx;
-        while ( ( idx = s.find( ',' ) ) != string::npos ) {
-            _servers.push_back(HostAndPort(s.substr(0, idx)));
-            s = s.substr( idx + 1 );
-        }
-        _servers.push_back(HostAndPort(s));
-
-    }
-    
-    void ConnectionString::_finishInit() {
-
-        // Needed here as well b/c the parsing logic isn't used in all constructors
-        // TODO: Refactor so that the parsing logic *is* used in all constructors
-        if ( _type == MASTER && _servers.size() > 0 ){
-            if( _servers[0].host().find( '$' ) == 0 ){
-                _type = CUSTOM;
-            }
-        }
-
-        stringstream ss;
-        if ( _type == SET )
-            ss << _setName << "/";
-        for ( unsigned i=0; i<_servers.size(); i++ ) {
-            if ( i > 0 )
-                ss << ",";
-            ss << _servers[i].toString();
-        }
-        _string = ss.str();
-    }
-
-    mutex ConnectionString::_connectHookMutex;
-    ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
-
-    DBClientBase* ConnectionString::connect( string& errmsg, double socketTimeout ) const {
-
-        switch ( _type ) {
-        case MASTER: {
-            DBClientConnection * c = new DBClientConnection(true);
-            c->setSoTimeout( socketTimeout );
-            LOG(1) << "creating new connection to:" << _servers[0] << endl;
-            if ( ! c->connect( _servers[0] , errmsg ) ) {
-                delete c;
-                return 0;
-            }
-            LOG(1) << "connected connection!" << endl;
-            return c;
-        }
-
-        case PAIR:
-        case SET: {
-            DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
-            if( ! set->connect() ) {
-                delete set;
-                errmsg = "connect failed to replica set ";
-                errmsg += toString();
-                return 0;
-            }
-            return set;
-        }
-
-        case SYNC: {
-            // TODO , don't copy
-            list<HostAndPort> l;
-            for ( unsigned i=0; i<_servers.size(); i++ )
-                l.push_back( _servers[i] );
-            SyncClusterConnection* c = new SyncClusterConnection( l, socketTimeout );
-            return c;
-        }
-
-        case CUSTOM: {
-
-            // Lock in case other things are modifying this at the same time
-            boost::lock_guard<boost::mutex> lk( _connectHookMutex );
-
-            // Allow the replacement of connections with other connections - useful for testing.
-
-            uassert( 16335, "custom connection to " + this->toString() +
-                        " specified with no connection hook", _connectHook );
-
-            // Double-checked lock, since this will never be active during normal operation
-            DBClientBase* replacementConn = _connectHook->connect( *this, errmsg, socketTimeout );
-
-            log() << "replacing connection to " << this->toString() << " with "
-                  << ( replacementConn ? replacementConn->getServerAddress() : "(empty)" ) << endl;
-
-            return replacementConn;
-        }
-
-        case INVALID:
-            throw UserException( 13421 , "trying to connect to invalid ConnectionString" );
-            break;
-        }
-
-        verify( 0 );
-        return 0;
-    }
-
-    bool ConnectionString::sameLogicalEndpoint( const ConnectionString& other ) const {
-        if ( _type != other._type )
-            return false;
-
-        switch ( _type ) {
-        case INVALID:
-            return true;
-        case MASTER:
-            return _servers[0] == other._servers[0];
-        case PAIR:
-            if ( _servers[0] == other._servers[0] )
-                return _servers[1] == other._servers[1];
-            return
-                ( _servers[0] == other._servers[1] ) &&
-                ( _servers[1] == other._servers[0] );
-        case SET:
-            return _setName == other._setName;
-        case SYNC:
-            // The servers all have to be the same in each, but not in the same order.
-            if ( _servers.size() != other._servers.size() )
-                return false;
-            for ( unsigned i = 0; i < _servers.size(); i++ ) {
-                bool found = false;
-                for ( unsigned j = 0; j < other._servers.size(); j++ ) {
-                    if ( _servers[i] == other._servers[j] ) {
-                        found = true;
-                        break;
-                    }
-                }
-                if ( ! found )
-                    return false;
-            }
-            return true;
-        case CUSTOM:
-            return _string == other._string;
-        }
-        verify( false );
-    }
-
-    ConnectionString ConnectionString::parse( const string& host , string& errmsg ) {
-
-        string::size_type i = host.find( '/' );
-        if ( i != string::npos && i != 0) {
-            // replica set
-            return ConnectionString( SET , host.substr( i + 1 ) , host.substr( 0 , i ) );
-        }
-
-        int numCommas = str::count( host , ',' );
-
-        if( numCommas == 0 )
-            return ConnectionString( HostAndPort( host ) );
-
-        if ( numCommas == 1 )
-            return ConnectionString( PAIR , host );
-
-        if ( numCommas == 2 )
-            return ConnectionString( SYNC , host );
-
-        errmsg = (string)"invalid hostname [" + host + "]";
-        return ConnectionString(); // INVALID
-    }
-
-    string ConnectionString::typeToString( ConnectionType type ) {
-        switch ( type ) {
-        case INVALID:
-            return "invalid";
-        case MASTER:
-            return "master";
-        case PAIR:
-            return "pair";
-        case SET:
-            return "set";
-        case SYNC:
-            return "sync";
-        case CUSTOM:
-            return "custom";
-        }
-        verify(0);
-        return "";
-    }
 
     const BSONField<BSONObj> Query::ReadPrefField("$readPreference");
     const BSONField<string> Query::ReadPrefModeField("mode");

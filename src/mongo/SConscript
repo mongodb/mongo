@@ -22,6 +22,7 @@ env.InjectThirdPartyIncludePaths(libraries=['boost', 's2', 'pcre'])
 env.InjectMongoIncludePaths()
 
 env.SConscript(['base/SConscript',
+                'client/SConscript',
                 'crypto/SConscript',
                 'crypto/tom/SConscript',
                 'db/auth/SConscript',
@@ -331,32 +332,6 @@ env.Library(
         'index_names',
     ])
 
-env.Library('clientdriver', [
-            "client/connpool.cpp",
-            "client/dbclient.cpp",
-            "client/dbclient_rs.cpp",
-            "client/dbclientcursor.cpp",
-            'client/native_sasl_client_session.cpp',
-            "client/replica_set_monitor.cpp",
-            'client/sasl_client_authenticate.cpp',
-            "client/sasl_client_authenticate_impl.cpp",
-            'client/sasl_client_conversation.cpp',
-            'client/sasl_client_session.cpp',
-            'client/sasl_plain_client_conversation.cpp',
-            'client/sasl_scramsha1_client_conversation.cpp',
-            "client/syncclusterconnection.cpp",
-            "db/dbmessage.cpp"
-            ],
-            LIBDEPS=['$BUILD_DIR/mongo/db/auth/authcommon',
-                     '$BUILD_DIR/mongo/crypto/scramauth',
-                     '$BUILD_DIR/mongo/util/net/command_status',
-                     'network'
-            ])
-
-env.CppUnitTest("replica_set_monitor_test",
-                ["client/replica_set_monitor_test.cpp"],
-                LIBDEPS=["clientdriver"])
-
 env.Library('lasterror', [
             "db/lasterror.cpp",
             ],
@@ -451,7 +426,7 @@ if env['MONGO_BUILD_SASL_CLIENT']:
                 ['client/cyrus_sasl_client_session.cpp',
                  'client/sasl_sspi.cpp'],
                 LIBDEPS = [
-                    'clientdriver',
+                    '$BUILD_DIR/mongo/client/clientdriver',
                     'foundation',
                     'signal_handlers_synchronous',
                 ],
@@ -485,7 +460,7 @@ env.Library("fail_point",
 env.Library('mongocommon', commonFiles,
             LIBDEPS=['bson',
                      'background_job',
-                     'clientdriver',
+                     '$BUILD_DIR/mongo/client/clientdriver',
                      'fail_point',
                      'foundation',
                      'service_context',
@@ -617,7 +592,7 @@ coredbEnv.Library("coredb", [
                            'server_options',
                            '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
                            '$BUILD_DIR/mongo/logger/parse_log_component_settings',
-                           'clientdriver',
+                           '$BUILD_DIR/mongo/client/clientdriver',
                            ])
 
 env.Library('ntservice', ['util/ntservice.cpp'],
@@ -949,7 +924,7 @@ env.CppUnitTest("mongoscore_test",
                          "coredb"])
 
 env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
-                 LIBDEPS=['clientdriver', 'mocklib'])
+                 LIBDEPS=['$BUILD_DIR/mongo/client/clientdriver', 'mocklib'])
 
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
@@ -1257,7 +1232,7 @@ env.Library('mocklib', [
         'dbtests/mock/mock_remote_db_server.cpp',
         'dbtests/mock/mock_replica_set.cpp'
     ],
-    LIBDEPS=['clientdriver',
+    LIBDEPS=['$BUILD_DIR/mongo/client/clientdriver',
              '$BUILD_DIR/mongo/db/repl/replica_set_messages'])
 
 test = env.Install(

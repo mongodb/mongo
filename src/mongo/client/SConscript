@@ -1,0 +1,38 @@
+# -*- mode: python -*-
+
+Import("env")
+
+# Contains only the core ConnectionString functionality, *not* the ability to call connect()
+# and return a DBClientBase* back.  For that you need to link against the 'clientdriver' library.
+env.Library('connectionstring',
+            ["connection_string.cpp"],
+            LIBDEPS=[])
+
+
+env.Library('clientdriver', [
+            "connection_string_connect.cpp",
+            "connpool.cpp",
+            "dbclient.cpp",
+            "dbclient_rs.cpp",
+            "dbclientcursor.cpp",
+            'native_sasl_client_session.cpp',
+            "replica_set_monitor.cpp",
+            'sasl_client_authenticate.cpp',
+            "sasl_client_authenticate_impl.cpp",
+            'sasl_client_conversation.cpp',
+            'sasl_client_session.cpp',
+            'sasl_plain_client_conversation.cpp',
+            'sasl_scramsha1_client_conversation.cpp',
+            "syncclusterconnection.cpp",
+            "$BUILD_DIR/mongo/db/dbmessage.cpp"
+            ],
+            LIBDEPS=['connectionstring',
+                     '$BUILD_DIR/mongo/db/auth/authcommon',
+                     '$BUILD_DIR/mongo/crypto/scramauth',
+                     '$BUILD_DIR/mongo/util/net/command_status',
+                     '$BUILD_DIR/mongo/network'
+            ])
+
+env.CppUnitTest("replica_set_monitor_test",
+                ["replica_set_monitor_test.cpp"],
+                LIBDEPS=["clientdriver"])

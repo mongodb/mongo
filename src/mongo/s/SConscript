@@ -73,7 +73,7 @@ env.Library('metadata',
                 'base',
                 '$BUILD_DIR/mongo/bson',
                 '$BUILD_DIR/mongo/base/base',
-                '$BUILD_DIR/mongo/clientdriver',
+                '$BUILD_DIR/mongo/client/clientdriver',
                 '$BUILD_DIR/mongo/range_arithmetic',
                 '$BUILD_DIR/mongo/s/catalog/catalog_types'
             ])
@@ -152,7 +152,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver',
         'batch_write_types',
         '$BUILD_DIR/mongo/synchronization'
     ],
@@ -197,7 +197,7 @@ env.CppUnitTest(
         'cluster_write_op_conversion',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
-        "$BUILD_DIR/mongo/clientdriver",
+        "$BUILD_DIR/mongo/client/clientdriver",
     ]
 )
 

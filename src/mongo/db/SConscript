@@ -74,7 +74,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "common",
-        "$BUILD_DIR/mongo/clientdriver",
+        "$BUILD_DIR/mongo/client/clientdriver",
     ],
 )
 env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])

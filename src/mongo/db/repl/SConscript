@@ -24,7 +24,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/coredb',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/getmore_request',
