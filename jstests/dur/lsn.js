@@ -75,12 +75,12 @@ if( debugging ) {
 var path2 = MongoRunner.dataPath + testname+"dur";
 
 // run mongod with a short --syncdelay to make LSN writing sooner
-log("run mongod --dur and a short --syncdelay");
+log("run mongod --journal and a short --syncdelay");
 conn = MongoRunner.runMongod({dbpath: path2,
                               syncdelay: 2,
-                              dur: "",
+                              journal: "",
                               smallfiles: "",
-                              durOptions: 8 /*DurParanoid*/,
+                              journalOptions: 8 /*DurParanoid*/,
                               master: "",
                               oplogSize: 64});
 work();
@@ -112,9 +112,9 @@ log("restart mongod, recover, verify");
 conn = MongoRunner.runMongod({restart:true,
                               cleanData: false,
                               dbpath: path2,
-                              dur: "",
+                              journal: "",
                               smallfiles: "",
-                              durOptions: 24,
+                              journalOptions: 24,
                               master: "",
                               oplogSize: 64});
 verify();

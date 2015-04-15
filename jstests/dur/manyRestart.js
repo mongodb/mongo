@@ -106,7 +106,7 @@ var path2 = MongoRunner.dataPath + testname+"dur";
 
 // non-durable version
 log("starting first mongod");
-conn = MongoRunner.runMongod({dbpath: path1, nodur: "", smallfiles: ""});
+conn = MongoRunner.runMongod({dbpath: path1, nojournal: "", smallfiles: ""});
 work();
 MongoRunner.stopMongod(conn);
 
@@ -115,7 +115,7 @@ MongoRunner.stopMongod(conn);
 sleep(1000);
 
 log("starting second mongod");
-conn = MongoRunner.runMongod({dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
+conn = MongoRunner.runMongod({dbpath: path2, journal: "", smallfiles: "", journalOptions: 8});
 work();
 // wait for group commit.
 printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
@@ -127,7 +127,12 @@ for (var i = 0; i < 3; ++i) {
 
     // durable version
     log("restarting second mongod");
-    conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
+    conn = MongoRunner.runMongod({restart: true,
+                                  cleanData: false,
+                                  dbpath: path2,
+                                  journal: "",
+                                  smallfiles: "",
+                                  journalOptions: 8});
 
     // wait for group commit.
     printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));
@@ -145,7 +150,12 @@ for (var i = 0; i < 3; ++i) {
 
 // restart and recover
 log("restart");
-conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
+conn = MongoRunner.runMongod({restart: true,
+                              cleanData: false,
+                              dbpath: path2,
+                              journal: "",
+                              smallfiles: "",
+                              journalOptions: 8});
 log("verify");
 verify();
 log("stop");
@@ -171,7 +181,12 @@ for (var i = 0; i < 5; ++i) {
 
     // durable version
     log("restarting second mongod");
-    conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
+    conn = MongoRunner.runMongod({restart: true,
+                                  cleanData: false,
+                                  dbpath: path2,
+                                  journal: "",
+                                  smallfiles: "",
+                                  journalOptions: 8});
     nrows += addRows();
     // wait for group commit.
     printjson(conn.getDB('admin').runCommand({getlasterror:1, fsync:1}));

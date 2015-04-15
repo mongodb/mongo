@@ -69,9 +69,9 @@ var path = MongoRunner.dataPath + testname+"dur";
 
 log("run mongod with --dur");
 conn = MongoRunner.runMongod({dbpath: path,
-                              dur: "",
+                              journal: "",
                               smallfiles: "",
-                              durOptions: 8 /*DurParanoid*/,
+                              journalOptions: 8 /*DurParanoid*/,
                               master: "",
                               oplogSize: 64});
 work();
@@ -87,9 +87,9 @@ log("restart mongod and recover");
 conn = MongoRunner.runMongod({restart: true,
                               cleanData: false,
                               dbpath: path,
-                              dur: "",
+                              journal: "",
                               smallfiles: "",
-                              durOptions: 8,
+                              journalOptions: 8,
                               master: "",
                               oplogSize: 64});
 verify();

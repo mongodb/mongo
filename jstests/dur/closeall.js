@@ -6,18 +6,18 @@ function f(variant, quickCommits, paranoid) {
 
     print("closeall.js start mongod variant:" + variant + "." + quickCommits + "." + paranoid);
     var options = (paranoid==1 ? 8 : 0); // 8 is DurParanoid
-    print("closeall.js --durOptions " + options);
+    print("closeall.js --journalOptions " + options);
     var N = 1000;
     if (options) 
         N = 300;
 
     // use replication to exercise that code too with a close, and also to test local.sources with a close
-    var conn = MongoRunner.runMongod({dur: "",
-                                      durOptions: options + "",
+    var conn = MongoRunner.runMongod({journal: "",
+                                      journalOptions: options + "",
                                       master: "",
                                       oplogSize: 64});
-    var connSlave = MongoRunner.runMongod({dur: "",
-                                           durOptions: options + "",
+    var connSlave = MongoRunner.runMongod({journal: "",
+                                           journalOptions: options + "",
                                            slave: "",
                                            source: "localhost:" + conn.port});
 

@@ -110,14 +110,14 @@ var path2 = MongoRunner.dataPath + testname + "dur";
 
 // non-durable version
 log("mongod nodur");
-conn = MongoRunner.runMongod({dbpath: path1, nodur: "", smallfiles: ""});
+conn = MongoRunner.runMongod({dbpath: path1, nojournal: "", smallfiles: ""});
 work();
 verify();
 MongoRunner.stopMongod(conn);
 
 // durable version
 log("mongod dur");
-conn = MongoRunner.runMongod({dbpath: path2, dur: "", smallfiles: "", durOptions: 8});
+conn = MongoRunner.runMongod({dbpath: path2, journal: "", smallfiles: "", journalOptions: 8});
 work();
 verify();
 
@@ -133,7 +133,12 @@ removeFile(path2 + "/test.0");
 removeFile(path2 + "/lsn");
 
 log("restart and recover");
-conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: path2, dur: "", smallfiles: "", durOptions: 9});
+conn = MongoRunner.runMongod({restart: true,
+                              cleanData: false,
+                              dbpath: path2,
+                              journal: "",
+                              smallfiles: "",
+                              journalOptions: 9});
 
 log("verify after recovery");
 verify();

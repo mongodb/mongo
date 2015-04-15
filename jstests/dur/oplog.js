@@ -103,16 +103,16 @@ var path2 = MongoRunner.dataPath + testname+"dur";
 
 // non-durable version
 log();
-conn = MongoRunner.runMongod({dbpath: path1, nodur: "", smallfiles: "", master: "", oplogSize: 64});
+conn = MongoRunner.runMongod({dbpath: path1, nojournal: "", smallfiles: "", master: "", oplogSize: 64});
 work();
 MongoRunner.stopMongod(conn);
 
 // durable version
 log();
 conn = MongoRunner.runMongod({dbpath: path2,
-                              dur: "",
+                              journal: "",
                               smallfiles: "",
-                              durOptions: 8 /*DurParanoid*/,
+                              journalOptions: 8 /*DurParanoid*/,
                               master: "",
                               oplogSize: 64});
 work();
@@ -130,9 +130,9 @@ log();
 conn = MongoRunner.runMongod({restart: true,
                               cleanData: false,
                               dbpath: path2,
-                              dur: "",
+                              journal: "",
                               smallfiles: "",
-                              durOptions: 8,
+                              journalOptions: 8,
                               master: "",
                               oplogSize: 64});
 verify();

@@ -5,7 +5,7 @@
 //TODO(mathias) add --master or make another test
 //conn = startMongodEmpty("--port", 30200, "--dbpath", MongoRunner.dataDir + "/dur_passthrough", "--dur", "--smallfiles", "--durOptions", "24");
 
-var conn = MongoRunner.runMongod({dur: "", nopreallocj: "", smallfiles: "", durOptions: 8});
+var conn = MongoRunner.runMongod({journal: "", nopreallocj: "", smallfiles: "", journalOptions: 8});
 db = conn.getDB("test");
 conn.forceWriteMode("commands");
 

@@ -6,7 +6,7 @@ var path = MongoRunner.dataPath + testname;
 if (0) {
     // This is used to create the prototype journal file.
     jsTest.log("Just creating prototype journal, not testing anything");
-    var conn = MongoRunner.runMongod({dbpath: path, dur: ""});
+    var conn = MongoRunner.runMongod({dbpath: path, journal: ""});
     var db = conn.getDB("test");
 
     // each insert is in it's own commit.
@@ -28,9 +28,9 @@ function startMongodWithJournal() {
     return MongoRunner.runMongod({restart: true,
                                   cleanData: false,
                                   dbpath: path,
-                                  dur: "",
+                                  journal: "",
                                   smallfiles: "",
-                                  durOptions: 1 /*DurDumpJournal*/});
+                                  journalOptions: 1 /*DurDumpJournal*/});
 }
 
 
@@ -77,10 +77,10 @@ copyFile("jstests/libs/dur_checksum_good.journal", path + "/journal/j._1");
 exitCode = runMongoProgram("mongod",
                            "--port", 30001,
                            "--dbpath", path,
-                           "--dur",
+                           "--journal",
                            "--smallfiles",
-                           "--durOptions", 1 /*DurDumpJournal*/
-                                         + 2 /*DurScanOnly*/);
+                           "--journalOptions", 1 /*DurDumpJournal*/
+                                             + 2 /*DurScanOnly*/);
 
 assert.eq(exitCode, 100 /*EXIT_UNCAUGHT*/);
 
