@@ -30,7 +30,7 @@ namespace asio {
 namespace detail {
 
 dev_poll_reactor::dev_poll_reactor(asio::execution_context& ctx)
-  : asio::detail::service_base<dev_poll_reactor>(ctx),
+  : asio::detail::execution_context_service_base<dev_poll_reactor>(ctx),
     scheduler_(use_service<scheduler>(ctx)),
     mutex_(),
     dev_poll_fd_(do_dev_poll_create()),
@@ -67,29 +67,7 @@ void dev_poll_reactor::shutdown_service()
   scheduler_.abandon_operations(ops);
 } 
 
-// Helper class to re-register all descriptors with /dev/poll.
-class dev_poll_reactor::fork_helper
-{
-public:
-  fork_helper(dev_poll_reactor* reactor, short events)
-    : reactor_(reactor), events_(events)
-  {
-  }
-
-  bool set(int descriptor)
-  {
-    ::pollfd& ev = reactor_->add_pending_event_change(descriptor);
-    ev.events = events_;
-    return true;
-  }
-
-private:
-  dev_poll_reactor* reactor_;
-  short events_;
-};
-
-void dev_poll_reactor::fork_service(
-    asio::execution_context::fork_event fork_ev)
+void dev_poll_reactor::fork_service(asio::io_service::fork_event fork_ev)
 {
   if (fork_ev == asio::execution_context::fork_child)
   {
@@ -111,18 +89,24 @@ void dev_poll_reactor::fork_service(
 
     // Re-register all descriptors with /dev/poll. The changes will be written
     // to the /dev/poll descriptor the next time the reactor is run.
-    op_queue<operation> ops;
-    fork_helper read_op_helper(this, POLLERR | POLLHUP | POLLIN);
-    op_queue_[read_op].get_descriptors(read_op_helper, ops);
-    fork_helper write_op_helper(this, POLLERR | POLLHUP | POLLOUT);
-    op_queue_[write_op].get_descriptors(write_op_helper, ops);
-    fork_helper except_op_helper(this, POLLERR | POLLHUP | POLLPRI);
-    op_queue_[except_op].get_descriptors(except_op_helper, ops);
+    for (int i = 0; i < max_ops; ++i)
+    {
+      reactor_op_queue<socket_type>::iterator iter = op_queue_[i].begin();
+      reactor_op_queue<socket_type>::iterator end = op_queue_[i].end();
+      for (; iter != end; ++iter)
+      {
+        ::pollfd& pending_ev = add_pending_event_change(iter->first);
+        pending_ev.events |= POLLERR | POLLHUP;
+        switch (i)
+        {
+        case read_op: pending_ev.events |= POLLIN; break;
+        case write_op: pending_ev.events |= POLLOUT; break;
+        case except_op: pending_ev.events |= POLLPRI; break;
+        default: break;
+        }
+      }
+    }
     interrupter_.interrupt();
-
-    // The ops op_queue will always be empty because the fork_helper's set()
-    // member function never returns false.
-    ASIO_ASSERT(ops.empty());
   }
 }
 
