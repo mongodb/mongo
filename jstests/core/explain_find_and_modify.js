@@ -25,7 +25,7 @@
     var newDB = db.getSiblingDB(cName);
 
     // Explain the command, ensuring the database is not created.
-    var err_msg = "Explaining findAndModify on a non-existant database should return an error.";
+    var err_msg = "Explaining findAndModify on a non-existent database should return an error.";
     assert.commandFailed(newDB.runCommand(explainRemove), err_msg);
     assertDBDoesNotExist(newDB, "Explaining a remove should not create a database.");
 
@@ -44,6 +44,9 @@
     assertCollDoesNotExist(cName, "explaining a remove should not create a new collection.");
 
     assert.commandWorked(db.runCommand(explainUpsert));
+    assertCollDoesNotExist(cName, "explaining an upsert should not create a new collection.");
+
+    assert.commandWorked(db.runCommand(Object.merge(explainUpsert, {fields: {x: 1}})));
     assertCollDoesNotExist(cName, "explaining an upsert should not create a new collection.");
 
     // 3. Explaining findAndModify should not work with an invalid findAndModify command object.

@@ -647,7 +647,7 @@ namespace {
      * ProjectionStage. Otherwise, return a status indicating the error reason.
      */
     StatusWith<std::unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
-                                                           Collection* collection,
+                                                           const NamespaceString& nsString,
                                                            CanonicalQuery* cq,
                                                            const BSONObj& proj,
                                                            bool allowPositional,
@@ -670,7 +670,7 @@ namespace {
                     "cannot use a positional projection and return the new document"};
         }
 
-        ProjectionStageParams params(WhereCallbackReal(txn, collection->ns().db()));
+        ProjectionStageParams params(WhereCallbackReal(txn, nsString.db()));
         params.projObj = proj;
         params.fullExpression = cq->root();
         return {stdx::make_unique<ProjectionStage>(params, ws, root.release())};
@@ -787,7 +787,7 @@ namespace {
 
             const bool allowPositional = true;
             StatusWith<std::unique_ptr<PlanStage>> projStatus = applyProjection(txn,
-                                                                                collection,
+                                                                                nss,
                                                                                 cq.get(),
                                                                                 request->getProj(),
                                                                                 allowPositional,
@@ -947,7 +947,7 @@ namespace {
             // match the array element after the update has been applied.
             const bool allowPositional = request->shouldReturnOldDocs();
             StatusWith<std::unique_ptr<PlanStage>> projStatus = applyProjection(txn,
-                                                                                collection,
+                                                                                nsString,
                                                                                 cq.get(),
                                                                                 request->getProj(),
                                                                                 allowPositional,
