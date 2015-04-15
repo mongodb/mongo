@@ -893,8 +893,17 @@ connection_ops(WT_CONNECTION *conn)
 	/*! [Check if the database is newly created] */
 
 	/*! [Validate a configuration string] */
+	/*
+	 * Validate a configuration string for a WiredTiger function or method.
+	 *
+	 * Functions are specified by name (for example, "wiredtiger_open").
+	 *
+	 * Methods are specified using the handle name, a period and the method
+	 * name (for example, session create would be "WT_SESSION.create" and
+	 * cursor close would be WT_CURSOR.close").
+	 */
 	ret = wiredtiger_config_validate(
-	    NULL, "session.create", "allocation_size=32KB");
+	    NULL, "WT_SESSION.create", "allocation_size=32KB");
 	/*! [Validate a configuration string] */
 
 	{

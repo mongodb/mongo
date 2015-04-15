@@ -2484,14 +2484,14 @@ struct __wt_config_item {
  * ::wiredtiger_open.
  * @param session the session handle to be used for error reporting (if NULL,
  * error messages will be written to stderr).
- * @param method the WiredTiger function or method to check.
+ * @param name the WiredTiger function or method to validate.
  * @param config the configuration string being parsed.
  * @returns zero for success, non-zero to indicate an error.
  *
  * @snippet ex_all.c Validate a configuration string
  */
 int wiredtiger_config_validate(
-    WT_SESSION *session, const char *method, const char *config);
+    WT_SESSION *session, const char *name, const char *config);
 
 /*!
  * Create a handle that can be used to parse or create configuration strings
