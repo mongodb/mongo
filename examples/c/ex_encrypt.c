@@ -57,7 +57,7 @@ static const char *home = NULL;
 #define	USER2_KEYID	"user2"
 #define	USERBAD_KEYID	"userbad"
 
-#define ITEM_MATCHES(config_item, s) \
+#define	ITEM_MATCHES(config_item, s) \
 	(strlen(s) == (config_item).len && \
 	 strncmp((config_item).str, s, (config_item).len) == 0)
 
@@ -222,7 +222,7 @@ rotate_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 /*
  * rotate_sizing --
- *	A sizing example returns the header size needed.
+ *	A sizing example that returns the header size needed.
  */
 static int
 rotate_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
