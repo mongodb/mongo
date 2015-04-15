@@ -315,7 +315,7 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	WT_RET(__wt_name_to_config(session, method, &trans));
 	for (epp = conn->config_entries;
 	    *epp != NULL && (*epp)->method != NULL; ++epp)
-		if (strcmp((*epp)->method, method) == 0)
+		if (strcmp((*epp)->method, trans) == 0)
 			break;
 	if (*epp == NULL || (*epp)->method == NULL)
 		WT_RET_MSG(session,
