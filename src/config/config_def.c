@@ -935,8 +935,7 @@ __wt_conn_config_init(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	/* Build a list of pointers to the configuration information. */
-	WT_RET(__wt_calloc_def(session,
-	    sizeof(config_entries) / sizeof(config_entries[0]), &epp));
+	WT_RET(__wt_calloc_def(session, WT_ELEMENTS(config_entries), &epp));
 	conn->config_entries = epp;
 
 	/* Fill in the list to reference the default information. */
