@@ -34,7 +34,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_upgrade_helpers.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/util/log.h"
 

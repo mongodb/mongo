@@ -35,6 +35,7 @@
 #include <map>
 #include <set>
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -42,7 +43,6 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/type_collection.h"

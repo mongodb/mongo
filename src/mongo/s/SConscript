@@ -217,7 +217,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_ops',
         'cluster_write_op_conversion',

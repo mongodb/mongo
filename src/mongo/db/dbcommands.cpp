@@ -105,38 +105,49 @@ namespace mongo {
     using std::string;
     using std::stringstream;
 
-    CmdShutdown cmdShutdown;
 
-    void CmdShutdown::help( stringstream& help ) const {
-        help << "shutdown the database.  must be ran against admin db and "
-             << "either (1) ran from localhost or (2) authenticated. If "
-             << "this is a primary in a replica set and there is no member "
-             << "within 10 seconds of its optime, it will not shutdown "
-             << "without force : true.  You can also specify timeoutSecs : "
-             << "N to wait N seconds for other members to catch up.";
-    }
-
-    bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        invariant(!fromRepl == txn->writesAreReplicated());
-        bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-
-        long long timeoutSecs = 0;
-        if (cmdObj.hasField("timeoutSecs")) {
-            timeoutSecs = cmdObj["timeoutSecs"].numberLong();
+    class CmdShutdownMongoD : public CmdShutdown {
+    public:
+        virtual void help(stringstream& help) const {
+            help << "shutdown the database.  must be ran against admin db and "
+                 << "either (1) ran from localhost or (2) authenticated. If "
+                 << "this is a primary in a replica set and there is no member "
+                 << "within 10 seconds of its optime, it will not shutdown "
+                 << "without force : true.  You can also specify timeoutSecs : "
+                 << "N to wait N seconds for other members to catch up.";
         }
 
-        Status status = repl::getGlobalReplicationCoordinator()->stepDown(
-                txn,
-                force,
-                repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
-                repl::ReplicationCoordinator::Milliseconds(120 * 1000));
-        if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
-            return appendCommandStatus(result, status);
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            invariant(!fromRepl == txn->writesAreReplicated());
+            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
+
+            long long timeoutSecs = 0;
+            if (cmdObj.hasField("timeoutSecs")) {
+                timeoutSecs = cmdObj["timeoutSecs"].numberLong();
+            }
+
+            Status status = repl::getGlobalReplicationCoordinator()->stepDown(
+                                    txn,
+                                    force,
+                                    repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
+                                    repl::ReplicationCoordinator::Milliseconds(120 * 1000));
+            if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
+                return appendCommandStatus(result, status);
+            }
+
+            // Never returns
+            shutdownHelper();
+            return true;
         }
 
-        shutdownHelper();
-        return true;
-    }
+    } cmdShutdownMongoD;
 
     class CmdDropDatabase : public Command {
     public:

@@ -883,16 +883,16 @@ env.Library('coreshard',
                 's/shard_key_pattern.cpp'
             ],
             LIBDEPS=[
-                's/base',
-                's/client/sharding_client',
-                's/cluster_ops_impl',
+                '$BUILD_DIR/mongo/s/base',
+                '$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy',
+                '$BUILD_DIR/mongo/s/client/sharding_client',
+                '$BUILD_DIR/mongo/s/cluster_ops_impl',
             ])
 
 env.Library('mongoscore',
             [
                 's/balance.cpp',
                 's/cluster_last_error_info.cpp',
-                's/commands_public.cpp',
                 's/cursors.cpp',
                 's/request.cpp',
                 's/s_only.cpp',
@@ -905,10 +905,8 @@ env.Library('mongoscore',
                 'db/fts/ftsmongos',
                 'db/query/explain_common',
                 'db/query/lite_parsed_query',
-                's/client/sharding_connection_hook',
                 's/cluster_ops',
                 's/cluster_write_op_conversion',
-                's/commands/cluster_commands',
             ])
 
 env.CppUnitTest("mongoscore_test",
@@ -1201,9 +1199,11 @@ env.Install(
         [
             "s/server.cpp",
             "s/mongos_options.cpp",
-            "s/mongos_options_init.cpp"
+            "s/mongos_options_init.cpp",
         ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/s/client/sharding_connection_hook',
+            '$BUILD_DIR/mongo/s/commands/cluster_commands',
             "mongoscore",
             "coreserver",
             "coredb",

@@ -40,7 +40,6 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/log.h"

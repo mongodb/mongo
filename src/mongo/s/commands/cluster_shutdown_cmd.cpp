@@ -34,25 +34,27 @@
 namespace mongo {
 namespace {
 
-    CmdShutdown cmdShutdown;
+    class ClusterShutdownCmd : public CmdShutdown {
+    public:
+        virtual void help(std::stringstream& help) const {
+            help << "shutdown the database.  must be ran against admin db and "
+                 << "either (1) ran from localhost or (2) authenticated.";
+        }
+
+        virtual bool run(OperationContext* txn,
+                         const std::string& dbname,
+                         BSONObj& cmdObj,
+                         int options,
+                         std::string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            // Never returns
+            shutdownHelper();
+            return true;
+        }
+
+    } clusterShutdownCmd;
 
 } // namespace
-
-    void CmdShutdown::help(std::stringstream& help) const {
-        help << "shutdown the database.  must be ran against admin db and "
-             << "either (1) ran from localhost or (2) authenticated.";
-    }
-
-    bool CmdShutdown::run(OperationContext* txn,
-                          const std::string& dbname,
-                          BSONObj& cmdObj,
-                          int options,
-                          std::string& errmsg,
-                          BSONObjBuilder& result,
-                          bool fromRepl) {
-
-        shutdownHelper();
-        return true;
-    }
-
 } // namespace mongo

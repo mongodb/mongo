@@ -39,7 +39,6 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/type_database.h"
