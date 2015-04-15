@@ -202,12 +202,15 @@ wiredtiger_config_validate(
 	else {
 		conn = S2C(session);
 
-		for (epp = conn->config_entries; (*epp)->method != NULL; ++epp)
-			if (strcmp((*epp)->method, trans) == 0)
+		ep = NULL;
+		for (epp = conn->config_entries;
+		    *epp != NULL && (*epp)->method != NULL; ++epp)
+			if (strcmp((*epp)->method, trans) == 0) {
+				ep = *epp;
 				break;
-		ep = *epp;
+			}
 	}
-	if (ep == NULL || ep->method == NULL)
+	if (ep == NULL)
 		WT_RET_MSG(session,
 		    WT_NOTFOUND, "no method matching %s found", name);
 
@@ -310,10 +313,11 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 * match.
 	 */
 	WT_RET(__wt_name_to_config(session, method, &trans));
-	for (epp = conn->config_entries; (*epp)->method != NULL; ++epp)
+	for (epp = conn->config_entries;
+	    *epp != NULL && (*epp)->method != NULL; ++epp)
 		if (strcmp((*epp)->method, method) == 0)
 			break;
-	if ((*epp)->method == NULL)
+	if (*epp == NULL || (*epp)->method == NULL)
 		WT_RET_MSG(session,
 		    WT_NOTFOUND, "no method matching %s found", method);
 
