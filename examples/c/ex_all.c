@@ -898,9 +898,9 @@ connection_ops(WT_CONNECTION *conn)
 	 *
 	 * Functions are specified by name (for example, "wiredtiger_open").
 	 *
-	 * Methods are specified using the handle name, a period and the method
-	 * name (for example, session create would be "WT_SESSION.create" and
-	 * cursor close would be WT_CURSOR.close").
+	 * Methods are specified using a concatenation of the handle name, a
+	 * period and the method name (for example, session create would be
+	 * "WT_SESSION.create" and cursor close would be WT_CURSOR.close").
 	 */
 	ret = wiredtiger_config_validate(
 	    NULL, "WT_SESSION.create", "allocation_size=32KB");
@@ -920,9 +920,12 @@ connection_ops(WT_CONNECTION *conn)
 	 * Applications opening a cursor for the data-source object "my_data"
 	 * have an additional configuration option "entries", which is an
 	 * integer type, defaults to 5, and must be an integer between 1 and 10.
+	 *
+	 * The method being configured is specified using a concatenation of the
+	 * handle name, a period and the method name.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor",
+	    "WT_SESSION.open_cursor",
 	    "my_data:", "entries=5", "int", "min=1,max=10");
 
 	/*
@@ -931,7 +934,7 @@ connection_ops(WT_CONNECTION *conn)
 	 * of strings.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", "my_data:", "devices", "list", NULL);
+	    "WT_SESSION.open_cursor", "my_data:", "devices", "list", NULL);
 	/*! [Configure method configuration] */
 
 	/*! [Close a connection] */

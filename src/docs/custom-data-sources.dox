@@ -172,9 +172,10 @@ methods using WT_CONNECTION::configure_method.
 
 WT_CONNECTION::configure_method takes the following arguments:
 
-- the name of the method being extended.  For example, \c "session.create"
+- the method being extended, where the name is the concatenation of the handle
+name, a period and the method name.  For example, \c "WT_SESSION.create"
 would add new configuration strings to the WT_SESSION::create method,
-and \c "session.open_cursor" would add the configuration string to the
+and \c "WT_SESSION.open_cursor" would add the configuration string to the
 WT_SESSION::open_cursor method.
 
 - the object type of the data source being extended.  For example, \c "table:"

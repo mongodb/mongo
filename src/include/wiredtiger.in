@@ -1713,7 +1713,7 @@ struct __wt_connection {
 	 * @snippet ex_all.c Configure method configuration
 	 *
 	 * @param connection the connection handle
-	 * @param method the name of the method
+	 * @param method the method being configured
 	 * @param uri the object type or NULL for all object types
 	 * @param config the additional configuration's name and default value
 	 * @param type the additional configuration's type (must be one of
