@@ -731,6 +731,7 @@ namespace {
                 // Ignore the database not found errors
                 if (info["code"].isNumber() &&
                         (info["code"].Int() == ErrorCodes::NamespaceNotFound)) {
+                    conn.done();
                     continue;
                 }
                 errors[shard.getConnString()] = info;
