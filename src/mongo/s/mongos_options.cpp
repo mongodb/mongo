@@ -271,13 +271,17 @@ namespace mongo {
 
         std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
 
-        if (configServers.size() != 1 && configServers.size() != 3) {
-            return Status(ErrorCodes::BadValue, "need either 1 or 3 configdbs");
+        if (!(mongosGlobalParams.configdbs.type() == ConnectionString::SYNC) &&
+                !(mongosGlobalParams.configdbs.type() == ConnectionString::SET &&
+                        configServers.size() == 1)) {
+            return Status(ErrorCodes::BadValue,
+                          "Must have either 3 node old-style config servers, or a single server "
+                          "replica set config server");
         }
 
-        if (configServers.size() == 1) {
-            warning() << "running with 1 config server should be done only for testing purposes "
-                    << "and is not recommended for production" << endl;
+        if (configServers.size() < 3) {
+            warning() << "running with less than 3 config servers should be done only for testing "
+                    "purposes and is not recommended for production" << endl;
         }
 
         if (params.count("upgrade")) {
