@@ -49,7 +49,6 @@ typedef struct {
 #define	CHKSUM_LEN	4
 #define	IV_LEN		16
 
-
 /*
  * make_cksum --
  *	This is where one would call a checksum function on the encrypted
