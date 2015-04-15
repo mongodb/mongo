@@ -58,26 +58,9 @@ namespace dur {
         // Declare write intents. Use these methods to declare "i'm about to write to x and it
         // should be logged for redo."
         //
-        // Failure to call writing...() is checked in MONGO_CONFIG_DEBUG_BUILD mode by using a
-        // read only mapped view (i.e., you'll segfault if the code is covered in that
+        // Failure to call declare write intents is checked in MONGO_CONFIG_DEBUG_BUILD mode by
+        // using a read only mapped view (i.e., you'll segfault if the code is covered in that
         // situation).  The debug check doesn't verify that your length is correct though.
-
-        /**
-         * Declare intent to write to x for up to len.
-         *
-         * @return pointer where to write.
-         */
-        virtual void* writingPtr(void *x, unsigned len) = 0;
-
-        /**
-         * Declare write intent after write has been done.
-         */
-        virtual void declareWriteIntent(void *x, unsigned len) = 0;
-
-        /**
-         * Allows you to declare many write intents at once more efficiently than repeated calls
-         * to declareWriteIntent.
-         */
         virtual void declareWriteIntents(
             const std::vector<std::pair<void*, unsigned> >& intents) = 0;
 
@@ -144,14 +127,6 @@ namespace dur {
         virtual void syncDataAndTruncateJournal(OperationContext* txn) = 0;
 
         virtual bool isDurable() const = 0;
-
-        /**
-         * Declare intent to write to x for sizeof(*x)
-         */
-        template <typename T>
-        T* writing(T *x) {
-            return static_cast<T*>(writingPtr(x, sizeof(T)));
-        }
 
         static DurableInterface& getDur() { return *_impl; }
 

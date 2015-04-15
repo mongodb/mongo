@@ -35,6 +35,8 @@
 #include "mongo/db/storage/mmap_v1/data_file.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <utility>
+#include <vector>
 
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
@@ -224,16 +226,20 @@ namespace {
             // The writes done in this function must not be rolled back. If the containing
             // UnitOfWork rolls back it should roll back to the state *after* these writes. This
             // will leave the file empty, but available for future use. That is why we go directly
-            // to the global dur dirty list rather than going through the OperationContext.
+            // to the global dur dirty list rather than going through the RecoveryUnit.
             getDur().createdFile(filename, filelength);
 
-            DataFileHeader* const h = getDur().writing(this);
-            h->fileLength = filelength;
-            h->version = DataFileVersion::defaultForNewFiles();
-            h->unused.set(fileno, HeaderSize);
-            h->unusedLength = fileLength - HeaderSize - 16;
-            h->freeListStart.Null();
-            h->freeListEnd.Null();
+            typedef std::pair<void*, unsigned> Intent;
+            std::vector<Intent> intent;
+            intent.push_back(std::make_pair(this, sizeof(DataFileHeader)));
+            getDur().declareWriteIntents(intent);
+
+            fileLength = filelength;
+            version = DataFileVersion::defaultForNewFiles();
+            unused.set(fileno, HeaderSize);
+            unusedLength = fileLength - HeaderSize - 16;
+            freeListStart.Null();
+            freeListEnd.Null();
         }
         else {
             checkUpgrade(txn);
