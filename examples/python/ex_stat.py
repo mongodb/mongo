@@ -28,8 +28,7 @@
 #      This is an example demonstrating how to query database statistics.
 
 import os
-from wiredtiger import wiredtiger_open,WIREDTIGER_VERSION_STRING
-from _wiredtiger import WT_STAT_DSRC_BLOCK_SIZE,WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE,WT_STAT_DSRC_CURSOR_INSERT_BYTES,WT_STAT_DSRC_CURSOR_REMOVE_BYTES,WT_STAT_DSRC_CURSOR_UPDATE_BYTES,WT_STAT_DSRC_CACHE_BYTES_WRITE,WT_STAT_DSRC_BTREE_OVERFLOW
+from wiredtiger import wiredtiger_open,WIREDTIGER_VERSION_STRING,stat
 
 def main():
     # Create a clean test directory for this run of the test program
@@ -46,7 +45,6 @@ def main():
     cursor = session.open_cursor('table:access', None)
 
     cursor['key'] = 'value'    
-    cursor.insert()
     cursor.close()
     
     session.checkpoint()
@@ -58,52 +56,39 @@ def main():
     conn.close()
 
 def print_database_stats(session):
-    try:
-        statcursor = session.open_cursor("statistics:")
-    except:
-        return
+    statcursor = session.open_cursor("statistics:")
     print_cursor(statcursor)
     statcursor.close()
 
 def print_file_stats(session):
-    try:
-        fstatcursor = session.open_cursor("statistics:table:access")
-    except:
-        return
+    fstatcursor = session.open_cursor("statistics:table:access")
     print_cursor(fstatcursor)
     fstatcursor.close()
 
 def print_overflow_pages(session):
-    try:
-        ostatcursor = session.open_cursor("statistics:table:access")
-    except:
-        return
-    val = ostatcursor[WT_STAT_DSRC_BTREE_OVERFLOW]
+    ostatcursor = session.open_cursor("statistics:table:access")
+    val = ostatcursor[stat.dsrc.btree_overflow]
     if val != 0 :
         print str(val[0]) + '=' + str(val[1])
     ostatcursor.close()
 
 def print_derived_stats(session):
-    try:
-        dstatcursor = session.open_cursor("statistics:table:access")
-    except:
-        return
-    ckpt_size = dstatcursor[WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE][1]
-    file_size = dstatcursor[WT_STAT_DSRC_BLOCK_SIZE][1]
+    dstatcursor = session.open_cursor("statistics:table:access")
+    ckpt_size = dstatcursor[stat.dsrc.block_checkpoint_size][1]
+    file_size = dstatcursor[stat.dsrc.block_size][1]
     percent = 0
     if file_size != 0 :
         percent = 100 * ((float(file_size) - float(ckpt_size)) / float(file_size))
     print "Table is %" + str(percent) + " fragmented"
 
-    app_insert = int(dstatcursor[WT_STAT_DSRC_CURSOR_INSERT_BYTES][1])
-    app_remove = int(dstatcursor[WT_STAT_DSRC_CURSOR_REMOVE_BYTES][1])
-    app_update = int(dstatcursor[WT_STAT_DSRC_CURSOR_UPDATE_BYTES][1])
-    fs_writes  = int(dstatcursor[WT_STAT_DSRC_CACHE_BYTES_WRITE][1])
+    app_insert = int(dstatcursor[stat.dsrc.cursor_insert_bytes][1])
+    app_remove = int(dstatcursor[stat.dsrc.cursor_remove_bytes][1])
+    app_update = int(dstatcursor[stat.dsrc.cursor_update_bytes][1])
+    fs_writes  = int(dstatcursor[stat.dsrc.cache_bytes_write][1])
 
     if(app_insert + app_remove + app_update != 0):
         print "Write amplification is " + '{:.2f}'.format(fs_writes / (app_insert + app_remove + app_update))
     dstatcursor.close()
-
 
 def print_cursor(mycursor):
     while mycursor.next() == 0:
