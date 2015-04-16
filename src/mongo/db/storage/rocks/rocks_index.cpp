@@ -35,6 +35,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <cstdlib>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -534,7 +535,15 @@ namespace mongo {
 
     RocksIndexBase::RocksIndexBase(rocksdb::DB* db, std::string prefix, std::string ident,
                                    Ordering order)
-        : _db(db), _prefix(prefix), _ident(std::move(ident)), _order(order) {}
+        : _db(db), _prefix(prefix), _ident(std::move(ident)), _order(order) {
+        {
+            uint64_t storageSize;
+            std::string nextPrefix = std::move(rocksGetNextPrefix(_prefix));
+            rocksdb::Range wholeRange(_prefix, nextPrefix);
+            _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
+            _indexStorageSize.store(static_cast<long long>(storageSize), std::memory_order_relaxed);
+        }
+    }
 
     void RocksIndexBase::fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
                                       BSONObjBuilder* output) const {
@@ -563,13 +572,10 @@ namespace mongo {
     }
 
     long long RocksIndexBase::getSpaceUsedBytes(OperationContext* txn) const {
-        uint64_t storageSize;
-        std::string nextPrefix = std::move(rocksGetNextPrefix(_prefix));
-        rocksdb::Range wholeRange(_prefix, nextPrefix);
-        _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
         // There might be some bytes in the WAL that we don't count here. Some
         // tests depend on the fact that non-empty indexes have non-zero sizes
-        return static_cast<long long>(std::max(storageSize, static_cast<uint64_t>(1)));
+        return static_cast<long long>(
+            std::max(_indexStorageSize.load(std::memory_order_relaxed), static_cast<long long>(1)));
     }
 
     std::string RocksIndexBase::_makePrefixedKey(const std::string& prefix,
@@ -599,6 +605,9 @@ namespace mongo {
         if (!ru->transaction()->registerWrite(prefixedKey)) {
             throw WriteConflictException();
         }
+
+        _indexStorageSize.fetch_add(static_cast<long long>(prefixedKey.size()),
+                                    std::memory_order_relaxed);
 
         std::string currentValue;
         auto getStatus = ru->Get(prefixedKey, &currentValue);
@@ -665,6 +674,9 @@ namespace mongo {
         if (!ru->transaction()->registerWrite(prefixedKey)) {
             throw WriteConflictException();
         }
+
+        _indexStorageSize.fetch_sub(static_cast<long long>(prefixedKey.size()),
+                                    std::memory_order_relaxed);
 
         if (!dupsAllowed) {
             ru->writeBatch()->Delete(prefixedKey);
@@ -776,10 +788,13 @@ namespace mongo {
             return s;
         }
 
-        // If we're inserting an index element, this means we already "locked" the RecordId of the
-        // document. No need to register write here
         KeyString encodedKey(key, _order, loc);
         std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        if (!ru->transaction()->registerWrite(prefixedKey)) {
+            throw WriteConflictException();
+        }
 
         rocksdb::Slice value;
         if (!encodedKey.getTypeBits().isAllZeros()) {
@@ -788,7 +803,8 @@ namespace mongo {
                                encodedKey.getTypeBits().getSize());
         }
 
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        _indexStorageSize.fetch_add(static_cast<long long>(prefixedKey.size()),
+                                    std::memory_order_relaxed);
         ru->writeBatch()->Put(prefixedKey, value);
 
         return Status::OK();
@@ -797,12 +813,17 @@ namespace mongo {
     void RocksStandardIndex::unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
                                      bool dupsAllowed) {
         invariant(dupsAllowed);
-        // If we're unindexing an index element, this means we already "locked" the RecordId of the
-        // document. No need to register write here
 
         KeyString encodedKey(key, _order, loc);
         std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
+
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        if (!ru->transaction()->registerWrite(prefixedKey)) {
+            throw WriteConflictException();
+        }
+
+        _indexStorageSize.fetch_sub(static_cast<long long>(prefixedKey.size()),
+                                    std::memory_order_relaxed);
         ru->writeBatch()->Delete(prefixedKey);
     }
 

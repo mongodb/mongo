@@ -80,6 +80,9 @@ namespace mongo {
         std::string _prefix;
         std::string _ident;
 
+        // very approximate index storage size
+        std::atomic<long long> _indexStorageSize;
+
         // used to construct RocksCursors
         const Ordering _order;
 

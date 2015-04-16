@@ -42,6 +42,7 @@
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/timer.h"
 
 namespace rocksdb {
     class DB;
@@ -252,12 +253,20 @@ namespace mongo {
         const bool _isOplog;
         // nullptr iff _isOplog == false
         RocksOplogKeyTracker* _oplogKeyTracker;
-        // SeekToFirst() on an oplog is an expensive operation because bunch of keys at the start
-        // are deleted. To reduce the overhead, we remember the next key to delete and seek directly
-        // to it. This will not work correctly if somebody inserted a key before this
-        // _oplogNextToDelete. However, we prevent this from happening by using
+        // keep track of when we compacted oplog last time. only valid when _isOplog == true.
+        // Protected by _cappedDeleterMutex.
+        Timer _oplogSinceLastCompaction;
+        // compact oplog every 30 min
+        static const int kOplogCompactEveryMins = 30;
+
+        // invariant: there is no live records earlier than _cappedOldestKeyHint. There might be
+        // some records that are dead after _cappedOldestKeyHint.
+        // SeekToFirst() on an capped collection is an expensive operation because bunch of keys at
+        // the start are deleted. To reduce the overhead, we remember the next key to delete and
+        // seek directly to it. This will not work correctly if somebody inserted a key before this
+        // _cappedOldestKeyHint. However, we prevent this from happening by using
         // _cappedVisibilityManager and checking isCappedHidden() during deletions
-        RecordId _oplogNextToDelete;
+        RecordId _cappedOldestKeyHint;
 
         boost::shared_ptr<CappedVisibilityManager> _cappedVisibilityManager;
 

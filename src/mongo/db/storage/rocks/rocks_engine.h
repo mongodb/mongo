@@ -49,6 +49,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/util/string_map.h"
 
+#include "rocks_compaction_scheduler.h"
 #include "rocks_counter_manager.h"
 #include "rocks_transaction.h"
 
@@ -66,6 +67,8 @@ namespace rocksdb {
 namespace mongo {
 
     struct CollectionOptions;
+    class RocksIndexBase;
+    class RocksRecordStore;
 
     class RocksEngine : public KVEngine {
         MONGO_DISALLOW_COPYING( RocksEngine );
@@ -129,6 +132,7 @@ namespace mongo {
         rocksdb::DB* getDB() { return _db.get(); }
         const rocksdb::DB* getDB() const { return _db.get(); }
         size_t getBlockCacheUsage() const { return _block_cache->GetUsage(); }
+        std::shared_ptr<rocksdb::Cache> getBlockCache() { return _block_cache; }
         std::unordered_set<uint32_t> getDroppedPrefixes() const;
 
         RocksTransactionEngine* getTransactionEngine() { return &_transactionEngine; }
@@ -161,6 +165,14 @@ namespace mongo {
         // protected by _identPrefixMapMutex
         uint32_t _maxPrefix;
 
+        // _identObjectMapMutex protects both _identIndexMap and _identCollectionMap. It should
+        // never be locked together with _identPrefixMapMutex
+        mutable boost::mutex _identObjectMapMutex;
+        // mapping from ident --> index object. we don't own the object
+        StringMap<RocksIndexBase*> _identIndexMap;
+        // mapping from ident --> collection object
+        StringMap<RocksRecordStore*> _identCollectionMap;
+
         // set of all prefixes that are deleted. we delete them in the background thread
         mutable boost::mutex _droppedPrefixesMutex;
         std::unordered_set<uint32_t> _droppedPrefixes;
@@ -170,6 +182,8 @@ namespace mongo {
 
         // CounterManages manages counters like numRecords and dataSize for record stores
         boost::scoped_ptr<RocksCounterManager> _counterManager;
+
+        boost::scoped_ptr<RocksCompactionScheduler> _compactionScheduler;
 
         static const std::string kMetadataPrefix;
         static const std::string kDroppedPrefix;

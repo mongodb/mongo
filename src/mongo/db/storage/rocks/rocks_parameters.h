@@ -82,4 +82,21 @@ namespace mongo {
     private:
         RocksEngine* _engine;
     };
+
+    // We use mongo's setParameter() API to dynamically change the size of the block cache
+    // To compact entire RocksDB instance, call:
+    // db.adminCommand({setParameter:1, rocksdbRuntimeConfigCacheSizeGB: 10})
+    class RocksCacheSizeParameter : public ServerParameter {
+        MONGO_DISALLOW_COPYING(RocksCacheSizeParameter);
+
+    public:
+        RocksCacheSizeParameter(RocksEngine* engine);
+        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+        virtual Status set(const BSONElement& newValueElement);
+        virtual Status setFromString(const std::string& str);
+
+    private:
+        Status _set(int newNum);
+        RocksEngine* _engine;
+    };
 }

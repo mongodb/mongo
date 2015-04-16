@@ -36,6 +36,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include <rocksdb/cache.h>
 #include <rocksdb/db.h>
 #include <rocksdb/experimental.h>
 
@@ -112,5 +113,43 @@ namespace mongo {
     Status RocksCompactServerParameter::setFromString(const std::string& str) {
         auto s = rocksdb::experimental::SuggestCompactRange(_engine->getDB(), nullptr, nullptr);
         return rocksToMongoStatus(s);
+    }
+
+    RocksCacheSizeParameter::RocksCacheSizeParameter(RocksEngine* engine)
+        : ServerParameter(ServerParameterSet::getGlobal(), "rocksdbRuntimeConfigCacheSizeGB", false,
+                          true),
+          _engine(engine) {}
+
+    void RocksCacheSizeParameter::append(OperationContext* txn, BSONObjBuilder& b,
+                                         const std::string& name) {
+        const long long bytesInGB = 1024 * 1024 * 1024LL;
+        long long cacheSizeInGB = _engine->getBlockCache()->GetCapacity() / bytesInGB;
+        b.append(name, cacheSizeInGB);
+    }
+
+    Status RocksCacheSizeParameter::set(const BSONElement& newValueElement) {
+        if (!newValueElement.isNumber()) {
+            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be a number");
+        }
+        return _set(newValueElement.numberInt());
+    }
+
+    Status RocksCacheSizeParameter::setFromString(const std::string& str) {
+        int num = 0;
+        Status status = parseNumberFromString(str, &num);
+        if (!status.isOK()) return status;
+        return _set(num);
+    }
+
+    Status RocksCacheSizeParameter::_set(int newNum) {
+        if (newNum <= 0) {
+            return Status(ErrorCodes::BadValue, str::stream() << name() << " has to be > 0");
+        }
+        log() << "RocksDB: changing block cache size to " << newNum << "GB";
+        const long long bytesInGB = 1024 * 1024 * 1024LL;
+        size_t newSizeInBytes = static_cast<size_t>(newNum * bytesInGB);
+        _engine->getBlockCache()->SetCapacity(newSizeInBytes);
+
+        return Status::OK();
     }
 }

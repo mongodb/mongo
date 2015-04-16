@@ -36,6 +36,8 @@
 #include "boost/scoped_ptr.hpp"
 
 #include <rocksdb/db.h>
+#include <rocksdb/env.h>
+#include <rocksdb/thread_status.h>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -114,6 +116,63 @@ namespace mongo {
                    static_cast<long long>(_engine->getTransactionEngine()->numKeysTracked()));
         bob.append("transaction-engine-snapshots",
                    static_cast<long long>(_engine->getTransactionEngine()->numActiveSnapshots()));
+
+        std::vector<rocksdb::ThreadStatus> threadList;
+        auto s = rocksdb::Env::Default()->GetThreadList(&threadList);
+        if (s.ok()) {
+            BSONArrayBuilder threadStatus;
+            for (auto& ts : threadList) {
+                if (ts.operation_type == rocksdb::ThreadStatus::OP_UNKNOWN ||
+                    ts.thread_type == rocksdb::ThreadStatus::USER) {
+                    continue;
+                }
+                BSONObjBuilder threadObjBuilder;
+                threadObjBuilder.append("type",
+                                        rocksdb::ThreadStatus::GetOperationName(ts.operation_type));
+                threadObjBuilder.append(
+                    "time_elapsed", rocksdb::ThreadStatus::MicrosToString(ts.op_elapsed_micros));
+                auto op_properties = rocksdb::ThreadStatus::InterpretOperationProperties(
+                    ts.operation_type, ts.op_properties);
+
+                const std::vector<std::pair<std::string, std::string>> properties(
+                    {{"JobID", "job_id"},
+                     {"BaseInputLevel", "input_level"},
+                     {"OutputLevel", "output_level"},
+                     {"IsManual", "manual"}});
+                for (const auto& prop : properties) {
+                    auto itr = op_properties.find(prop.first);
+                    if (itr != op_properties.end()) {
+                        threadObjBuilder.append(prop.second, static_cast<int>(itr->second));
+                    }
+                }
+
+                const std::vector<std::pair<std::string, std::string>> byte_properties(
+                    {{"BytesRead", "bytes_read"}, {"BytesWritten", "bytes_written"},
+                     {"TotalInputBytes", "total_bytes"}});
+                for (const auto& prop : byte_properties) {
+                    auto itr = op_properties.find(prop.first);
+                    if (itr != op_properties.end()) {
+                        threadObjBuilder.append(prop.second,
+                                                PrettyPrintBytes(static_cast<size_t>(itr->second)));
+                    }
+                }
+
+                const std::vector<std::pair<std::string, std::string>> speed_properties(
+                    {{"BytesRead", "read_throughput"}, {"BytesWritten", "write_throughput"}});
+                for (const auto& prop : speed_properties) {
+                    auto itr = op_properties.find(prop.first);
+                    if (itr != op_properties.end()) {
+                        size_t speed =
+                            (itr->second * 1000 * 1000) / static_cast<size_t>(ts.op_elapsed_micros);
+                        threadObjBuilder.append(
+                            prop.second, PrettyPrintBytes(static_cast<size_t>(speed)) + "/s");
+                    }
+                }
+
+                threadStatus.append(threadObjBuilder.obj());
+            }
+            bob.appendArray("thread-status", threadStatus.arr());
+        }
 
         return bob.obj();
     }

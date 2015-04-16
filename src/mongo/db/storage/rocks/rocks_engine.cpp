@@ -33,6 +33,8 @@
 
 #include "rocks_engine.h"
 
+#include <algorithm>
+
 #include <boost/filesystem/operations.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/shared_ptr.hpp>
@@ -152,7 +154,7 @@ namespace mongo {
     const std::string RocksEngine::kDroppedPrefix("\0\0\0\0droppedprefix-", 18);
 
     RocksEngine::RocksEngine(const std::string& path, bool durable)
-        : _path(path), _durable(durable) {
+        : _path(path), _durable(durable), _maxPrefix(0) {
         {  // create block cache
             uint64_t cacheSizeGB = rocksGlobalOptions.cacheSizeGB;
             if (cacheSizeGB == 0) {
@@ -166,7 +168,7 @@ namespace mongo {
                     cacheSizeGB = 1;
                 }
             }
-            _block_cache = rocksdb::NewLRUCache(cacheSizeGB * 1024 * 1024 * 1024LL, 10);
+            _block_cache = rocksdb::NewLRUCache(cacheSizeGB * 1024 * 1024 * 1024LL, 7);
         }
         _maxWriteMBPerSec = rocksGlobalOptions.maxWriteMBPerSec;
         _rateLimiter.reset(
@@ -179,12 +181,12 @@ namespace mongo {
 
         _counterManager.reset(
             new RocksCounterManager(_db.get(), rocksGlobalOptions.crashSafeCounters));
+        _compactionScheduler.reset(new RocksCompactionScheduler(_db.get()));
 
         // open iterator
         boost::scoped_ptr<rocksdb::Iterator> iter(_db->NewIterator(rocksdb::ReadOptions()));
 
         // find maxPrefix
-        _maxPrefix = 0;
         iter->SeekToLast();
         if (iter->Valid()) {
             // otherwise the DB is empty, so we just keep it at 0
@@ -193,7 +195,8 @@ namespace mongo {
             invariant(ok);
         }
 
-        // load ident to prefix map
+        // load ident to prefix map. also update _maxPrefix if there's any prefix bigger than
+        // current _maxPrefix
         {
             boost::mutex::scoped_lock lk(_identPrefixMapMutex);
             for (iter->Seek(kMetadataPrefix);
@@ -213,8 +216,14 @@ namespace mongo {
 
                 uint32_t identPrefix = static_cast<uint32_t>(element.numberInt());
                 _identPrefixMap[StringData(ident.data(), ident.size())] = identPrefix;
+
+                _maxPrefix = std::max(_maxPrefix, identPrefix);
             }
         }
+
+        // just to be extra sure. we need this if last collection is oplog -- in that case we
+        // reserve prefix+1 for oplog key tracker
+        ++_maxPrefix;
 
         // load dropped prefixes
         {
@@ -255,20 +264,26 @@ namespace mongo {
 
     RecoveryUnit* RocksEngine::newRecoveryUnit() {
         return new RocksRecoveryUnit(&_transactionEngine, _db.get(), _counterManager.get(),
-                                     _durable);
+                                     _compactionScheduler.get(), _durable);
     }
 
     Status RocksEngine::createRecordStore(OperationContext* opCtx, const StringData& ns,
                                           const StringData& ident,
                                           const CollectionOptions& options) {
         auto s = _createIdentPrefix(ident);
-        if (NamespaceString::oplog(ns)) {
+        if (s.isOK() && NamespaceString::oplog(ns)) {
             _oplogIdent = ident.toString();
             // oplog needs two prefixes, so we also reserve the next one
+            uint64_t oplogTrackerPrefix = 0;
             {
                 boost::mutex::scoped_lock lk(_identPrefixMapMutex);
-                ++_maxPrefix;
+                oplogTrackerPrefix = ++_maxPrefix;
             }
+            // we also need to write out the new prefix to the database. this is just an
+            // optimization
+            std::string encodedPrefix(encodePrefix(oplogTrackerPrefix));
+            s = rocksToMongoStatus(
+                _db->Put(rocksdb::WriteOptions(), encodedPrefix, rocksdb::Slice()));
         }
         return s;
     }
@@ -279,15 +294,20 @@ namespace mongo {
         if (NamespaceString::oplog(ns)) {
             _oplogIdent = ident.toString();
         }
-        if (options.capped) {
-            return new RocksRecordStore(
-                ns, ident, _db.get(), _counterManager.get(), _getIdentPrefix(ident), true,
-                options.cappedSize ? options.cappedSize : 4096,  // default size
-                options.cappedMaxDocs ? options.cappedMaxDocs : -1);
-        } else {
-            return new RocksRecordStore(ns, ident, _db.get(), _counterManager.get(),
-                                        _getIdentPrefix(ident));
+        RocksRecordStore* recordStore =
+            options.capped
+                ? new RocksRecordStore(
+                      ns, ident, _db.get(), _counterManager.get(), _getIdentPrefix(ident), true,
+                      options.cappedSize ? options.cappedSize : 4096,  // default size
+                      options.cappedMaxDocs ? options.cappedMaxDocs : -1)
+                : new RocksRecordStore(ns, ident, _db.get(), _counterManager.get(),
+                                       _getIdentPrefix(ident));
+
+        {
+            boost::mutex::scoped_lock lk(_identObjectMapMutex);
+            _identCollectionMap[ident] = recordStore;
         }
+        return recordStore;
     }
 
     Status RocksEngine::createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
@@ -298,13 +318,20 @@ namespace mongo {
     SortedDataInterface* RocksEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              const StringData& ident,
                                                              const IndexDescriptor* desc) {
+        RocksIndexBase* index;
         if (desc->unique()) {
-            return new RocksUniqueIndex(_db.get(), _getIdentPrefix(ident), ident.toString(),
-                                        Ordering::make(desc->keyPattern()));
+            index = new RocksUniqueIndex(_db.get(), _getIdentPrefix(ident), ident.toString(),
+                                         Ordering::make(desc->keyPattern()));
         } else {
-            return new RocksStandardIndex(_db.get(), _getIdentPrefix(ident), ident.toString(),
-                                          Ordering::make(desc->keyPattern()));
+            index = new RocksStandardIndex(_db.get(), _getIdentPrefix(ident), ident.toString(),
+                                           Ordering::make(desc->keyPattern()));
         }
+
+        {
+            boost::mutex::scoped_lock lk(_identObjectMapMutex);
+            _identIndexMap[ident] = index;
+        }
+        return index;
     }
 
     // cannot be rolled back
@@ -371,12 +398,20 @@ namespace mongo {
     void RocksEngine::cleanShutdown() { _counterManager->sync(); }
 
     int64_t RocksEngine::getIdentSize(OperationContext* opCtx, const StringData& ident) {
-        uint64_t storageSize;
-        std::string prefix = _getIdentPrefix(ident);
-        std::string nextPrefix = std::move(rocksGetNextPrefix(prefix));
-        rocksdb::Range wholeRange(prefix, nextPrefix);
-        _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
-        return std::max(static_cast<int64_t>(storageSize), static_cast<int64_t>(1));
+        boost::mutex::scoped_lock lk(_identObjectMapMutex);
+
+        auto indexIter = _identIndexMap.find(ident);
+        if (indexIter != _identIndexMap.end()) {
+            return static_cast<int64_t>(indexIter->second->getSpaceUsedBytes(opCtx));
+        }
+        auto collectionIter = _identCollectionMap.find(ident);
+        if (collectionIter != _identCollectionMap.end()) {
+            return collectionIter->second->storageSize(opCtx);
+        }
+
+        // this can only happen if collection or index exists, but it's not opened (i.e.
+        // getRecordStore or getSortedDataInterface are not called)
+        return 1;
     }
 
     void RocksEngine::setMaxWriteMBPerSec(int maxWriteMBPerSec) {
@@ -422,6 +457,12 @@ namespace mongo {
         auto s = _db->Put(rocksdb::WriteOptions(), kMetadataPrefix + ident.toString(),
                           rocksdb::Slice(config.objdata(), config.objsize()));
 
+        if (s.ok()) {
+            // As an optimization, add a key <prefix> to the DB
+            std::string encodedPrefix(encodePrefix(prefix));
+            s = _db->Put(rocksdb::WriteOptions(), encodedPrefix, rocksdb::Slice());
+        }
+
         return rocksToMongoStatus(s);
     }
 
@@ -444,26 +485,33 @@ namespace mongo {
         options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
 
         options.write_buffer_size = 64 * 1024 * 1024;  // 64MB
+        options.level0_slowdown_writes_trigger = 8;
         options.max_write_buffer_number = 4;
-        options.max_background_compactions = 4;
+        options.max_background_compactions = 8;
         options.max_background_flushes = 2;
         options.target_file_size_base = 64 * 1024 * 1024; // 64MB
         options.soft_rate_limit = 2.5;
         options.hard_rate_limit = 3;
+        options.level_compaction_dynamic_level_bytes = true;
         options.max_bytes_for_level_base = 512 * 1024 * 1024;  // 512 MB
         // This means there is no limit on open files. Make sure to always set ulimit so that it can
         // keep all RocksDB files opened.
         options.max_open_files = -1;
         options.compaction_filter_factory.reset(new PrefixDeletingCompactionFilterFactory(this));
+        options.enable_thread_tracking = true;
 
+        options.compression_per_level.resize(3);
+        options.compression_per_level[0] = rocksdb::kNoCompression;
+        options.compression_per_level[1] = rocksdb::kNoCompression;
         if (rocksGlobalOptions.compression == "snappy") {
-            options.compression = rocksdb::kSnappyCompression;
+            options.compression_per_level[2] = rocksdb::kSnappyCompression;
         } else if (rocksGlobalOptions.compression == "zlib") {
-            options.compression = rocksdb::kZlibCompression;
+            options.compression_per_level[2] = rocksdb::kZlibCompression;
         } else if (rocksGlobalOptions.compression == "none") {
-            options.compression = rocksdb::kNoCompression;
+            options.compression_per_level[2] = rocksdb::kNoCompression;
         } else {
             log() << "Unknown compression, will use default (snappy)";
+            options.compression_per_level[2] = rocksdb::kSnappyCompression;
         }
 
         // create the DB if it's not already present

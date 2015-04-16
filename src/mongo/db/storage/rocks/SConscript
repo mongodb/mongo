@@ -6,6 +6,7 @@ if has_option("rocksdb"):
     env.Library(
         target= 'storage_rocks_base',
         source= [
+            'rocks_compaction_scheduler.cpp',
             'rocks_counter_manager.cpp',
             'rocks_global_options.cpp',
             'rocks_engine.cpp',
