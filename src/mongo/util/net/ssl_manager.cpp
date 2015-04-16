@@ -540,21 +540,7 @@ namespace mongo {
         // SSL_OP_ALL - Activate all bug workaround options, to support buggy client SSL's.
         // SSL_OP_NO_SSLv2 - Disable SSL v2 support
         // SSL_OP_NO_SSLv3 - Disable SSL v3 support
-        long supportedProtocols = SSL_OP_ALL|SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3;
-
-        // Set the supported TLS protocols. Allow --sslDisabledProtocols to disable selected ciphers.
-        if (!params.sslDisabledProtocols.empty()) {
-            for (const SSLParams::Protocols& protocol : params.sslDisabledProtocols) {
-                if (protocol == SSLParams::Protocols::TLS1_0) {
-                    supportedProtocols |= SSL_OP_NO_TLSv1;
-                } else if (protocol == SSLParams::Protocols::TLS1_1) {
-                    supportedProtocols |= SSL_OP_NO_TLSv1_1;
-                } else if (protocol == SSLParams::Protocols::TLS1_2) {
-                    supportedProtocols |= SSL_OP_NO_TLSv1_2;
-                }
-            }
-        }
-        SSL_CTX_set_options(*context, supportedProtocols);
+        SSL_CTX_set_options(*context, SSL_OP_ALL|SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
 
         // HIGH - Enable strong ciphers
         // !EXPORT - Disable export ciphers (40/56 bit) 
