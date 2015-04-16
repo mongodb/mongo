@@ -404,8 +404,6 @@ simple_walk_log(WT_SESSION *session)
 #define	MAX_KEYS	20
 
 #define	EXTENSION_NAME  "local=(entry=add_my_encryptors)"
-#define	COMPRESS_NAME \
-    "../../ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
 
 int
 main(void)
@@ -431,7 +429,7 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
 
@@ -525,7 +523,7 @@ main(void)
 	 */
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ",secretkey=" SYS_BADPW ")", &conn);
 	if (ret != EPERM) {
@@ -537,7 +535,7 @@ main(void)
 	 */
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ")", &conn);
 	if (ret != EPERM) {
@@ -549,7 +547,7 @@ main(void)
 	 */
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true,compressor=snappy)", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect no encryption\n");
@@ -558,7 +556,7 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "extensions=[" EXTENSION_NAME "],"
 	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
 

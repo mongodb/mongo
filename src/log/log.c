@@ -1655,7 +1655,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_ENCRYPTOR *encryptor;
 	WT_ITEM *ip;
 	WT_LOG *log;
-	WT_LOG_RECORD *complrp, *origrp;
+	WT_LOG_RECORD *newlrp, *origrp;
 	int compression_failed;
 	size_t len, src_len, dst_len, result_len, size;
 	uint32_t *elen;
@@ -1734,12 +1734,12 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			memcpy(citem->mem, record->mem, WT_LOG_COMPRESS_SKIP);
 			citem->size = result_len;
 			ip = citem;
-			complrp = (WT_LOG_RECORD *)citem->mem;
-			F_SET(complrp, WT_LOG_RECORD_COMPRESSED);
+			newlrp = (WT_LOG_RECORD *)citem->mem;
+			F_SET(newlrp, WT_LOG_RECORD_COMPRESSED);
 			WT_ASSERT(session, result_len < UINT32_MAX &&
 			    record->size < UINT32_MAX);
-			complrp->len = WT_STORE_SIZE(result_len);
-			complrp->mem_len = WT_STORE_SIZE(record->size);
+			newlrp->len = WT_STORE_SIZE(result_len);
+			newlrp->mem_len = WT_STORE_SIZE(record->size);
 		}
 	}
 	if ((encryptor = conn->encryptor) != NULL) {
@@ -1748,15 +1748,13 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
 		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;
 
-		len = encryptor->size_const;
-
-		size = ip->size + len + WT_ENCRYPT_LEN;
+		size = ip->size + encryptor->size_const + WT_ENCRYPT_LEN;
 		WT_ERR(__wt_scr_alloc(session, size, &eitem));
 
 		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)eitem->mem +
 		    WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-		dst_len = src_len + len;
+		dst_len = src_len + encryptor->size_const;
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
 		result_len += WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
@@ -1770,8 +1768,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		memcpy(eitem->mem, ip->mem, WT_LOG_ENCRYPT_SKIP);
 		eitem->size = result_len;
 		ip = eitem;
-		complrp = (WT_LOG_RECORD *)eitem->mem;
-		F_SET(complrp, WT_LOG_RECORD_ENCRYPTED);
+		newlrp = (WT_LOG_RECORD *)eitem->mem;
+		F_SET(newlrp, WT_LOG_RECORD_ENCRYPTED);
 		WT_ASSERT(session, result_len < UINT32_MAX &&
 		    ip->size < UINT32_MAX);
 		/*
@@ -1781,8 +1779,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		elen = (uint32_t *)((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
 		*elen = WT_STORE_SIZE(result_len);
 
-		complrp->len = WT_STORE_SIZE(result_len);
-		complrp->mem_len = origrp->mem_len;
+		newlrp->len = WT_STORE_SIZE(result_len);
+		newlrp->mem_len = origrp->mem_len;
 	}
 	ret = __log_write_internal(session, ip, lsnp, flags);
 
