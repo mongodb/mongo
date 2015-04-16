@@ -1261,20 +1261,6 @@ test = env.Install(
 if len(env.subst('$PROGSUFFIX')):
     env.Alias( "dbtest", "#/${PROGPREFIX}dbtest${PROGSUFFIX}" )
 
-env.Install('$BUILD_ROOT/', env.Program('file_allocator_bench',
-            'util/file_allocator_bench.cpp',
-            LIBDEPS=[
-                'mongocommon',
-                'signal_handlers_synchronous',
-                '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
-                'serveronly',
-                'coredb',
-                'coreserver',
-                "ntservice_mock",
-            ]))
-
-env.Alias('file_allocator_bench', "$BUILD_ROOT/" + add_exe("file_allocator_bench"))
-
 # --- sniffer ---
 mongosniff_built = False
 if env.TargetOSIs('osx') or env["_HAVEPCAP"]:

@@ -3,7 +3,6 @@
 import os
 
 Import("env")
-Import("s3push")
 Import("has_option")
 
 env = env.Clone()
@@ -145,11 +144,4 @@ env.Command(msi,
 env.AlwaysBuild(msi)
 
 env.Alias( "msi" , msi )
-
-def s3msipush( env , target , source ):
-    s3push( source )
-
-env.Alias( "s3msi" , [ msi ] , [ s3msipush ] )
-env.AlwaysBuild( "s3msi" )
-
 

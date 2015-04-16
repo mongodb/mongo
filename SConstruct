@@ -13,10 +13,8 @@
 # This file, SConstruct, configures the build environment, and then delegates to
 # several, subordinate SConscript files, which describe specific build rules.
 
-import buildscripts
 import copy
 import datetime
-import imp
 import os
 import re
 import shlex
@@ -24,9 +22,6 @@ import shutil
 import stat
 import sys
 import textwrap
-import types
-import urllib
-import urllib2
 import uuid
 from buildscripts import utils
 from buildscripts import moduleconfig
@@ -34,11 +29,6 @@ from buildscripts import moduleconfig
 import libdeps
 
 EnsureSConsVersion( 2, 3, 0 )
-
-def findSettingsSetup():
-    sys.path.append( "." )
-    sys.path.append( ".." )
-    sys.path.append( "../../" )
 
 def versiontuple(v):
     return tuple(map(int, (v.split("."))))
@@ -581,7 +571,7 @@ if releaseBuild and (debugBuild or not optBuild):
     print("Error: A --release build may not have debugging, and must have optimization")
     Exit(1)
 
-noshell = has_option( "noshell" ) 
+noshell = has_option( "noshell" )
 
 jsEngine = get_option( "js-engine")
 
@@ -882,12 +872,6 @@ elif env.TargetOSIs('solaris'):
     env['LINK_LIBGROUP_END'] = ''
 
 # ---- other build setup -----
-dontReplacePackage = False
-isBuildingLatest = False
-
-def filterExists(paths):
-    return filter(os.path.exists, paths)
-
 if debugBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
 
@@ -1040,6 +1024,10 @@ elif env.TargetOSIs('windows'):
     if usev8:
         env.Append(LIBS=['winmm.lib'])
 
+# When building on visual studio, this sets the name of the debug symbols file
+if env.ToolchainIs('msvc'):
+    env['PDB'] = '${TARGET.base}.pdb'
+
 env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 if env.TargetOSIs('posix'):
 
@@ -1137,11 +1125,7 @@ if env['TARGET_ARCH'] == 'i386':
     if env.ToolchainIs('GCC', 'clang'):
         env.Append( CCFLAGS=['-march=nocona', '-mtune=generic'] )
 
-try:
-    umask = os.umask(022)
-except OSError:
-    pass
-
+# Needed for auth tests since key files are stored in git with mode 644.
 if not env.TargetOSIs('windows'):
     for keysuffix in [ "1" , "2" ]:
         keyfile = "jstests/libs/key%s" % keysuffix
@@ -1999,8 +1983,6 @@ env = doConfigure( env )
 # compilation database entries for the configure tests, which is weird.
 env.Tool("compilation_db")
 
-env['PDB'] = '${TARGET.base}.pdb'
-
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
@@ -2009,31 +1991,7 @@ def checkErrorCodes():
 
 checkErrorCodes()
 
-#  ---- astyle ----
-
-def doStyling( env , target , source ):
-
-    res = utils.execsys( "astyle --version" )
-    res = " ".join(res)
-    if res.count( "2." ) == 0:
-        print( "astyle 2.x needed, found:" + res )
-        Exit(-1)
-
-    files = utils.getAllSourceFiles() 
-    files = filter( lambda x: not x.endswith( ".c" ) , files )
-
-    cmd = "astyle --options=mongo_astyle " + " ".join( files )
-    res = utils.execsys( cmd )
-    print( res[0] )
-    print( res[1] )
-
-
-env.Alias( "style" , [] , [ doStyling ] )
-env.AlwaysBuild( "style" )
-
 # --- lint ----
-
-
 
 def doLint( env , target , source ):
     import buildscripts.lint
@@ -2052,19 +2010,9 @@ def getSystemInstallName():
     n = env.GetTargetOSName() + "-" + arch_name
     if has_option("nostrip"):
         n += "-debugsymbols"
-    if env.TargetOSIs('posix') and os.uname()[2].startswith("8."):
-        n += "-tiger"
 
     if len(mongo_modules):
             n += "-" + "-".join(m.name for m in mongo_modules)
-
-    try:
-        findSettingsSetup()
-        import settings
-        if "distmod" in dir(settings):
-            n = n + "-" + str(settings.distmod)
-    except:
-        pass
 
     dn = GetOption("distmod")
     if dn and len(dn) > 0:
@@ -2079,95 +2027,12 @@ if mongoCodeVersion == None:
 if has_option('distname'):
     distName = GetOption( "distname" )
 elif mongoCodeVersion[-1] not in ("+", "-"):
-    dontReplacePackage = True
     distName = mongoCodeVersion
 else:
-    isBuildingLatest = True
     distName = utils.getGitBranchString("" , "-") + datetime.date.today().strftime("%Y-%m-%d")
 
 
 env['SERVER_DIST_BASENAME'] = 'mongodb-%s-%s' % (getSystemInstallName(), distName)
-
-distFile = "${SERVER_ARCHIVE}"
-
-#  ---- CONVENIENCE ----
-
-def tabs( env, target, source ):
-    from subprocess import Popen, PIPE
-    from re import search, match
-    diff = Popen( [ "git", "diff", "-U0", "origin", "master" ], stdout=PIPE ).communicate()[ 0 ]
-    sourceFile = False
-    for line in diff.split( "\n" ):
-        if match( "diff --git", line ):
-            sourceFile = not not search( "\.(h|hpp|c|cpp)\s*$", line )
-        if sourceFile and match( "\+ *\t", line ):
-            return True
-    return False
-env.Alias( "checkSource", [], [ tabs ] )
-env.AlwaysBuild( "checkSource" )
-
-def gitPush( env, target, source ):
-    import subprocess
-    return subprocess.call( [ "git", "push" ] )
-env.Alias( "push", [ ".", "smoke", "checkSource" ], gitPush )
-env.AlwaysBuild( "push" )
-
-
-# ---- deploying ---
-
-def s3push(localName, remoteName=None, platformDir=True):
-    localName = str( localName )
-
-    if isBuildingLatest:
-        remotePrefix = utils.getGitBranchString("-") + "-latest"
-    else:
-        remotePrefix = "-" + distName
-
-    findSettingsSetup()
-
-    import simples3
-    import settings
-
-    s = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
-
-    if remoteName is None:
-        remoteName = localName
-
-    name = '%s-%s%s' % (remoteName , getSystemInstallName(), remotePrefix)
-    lastDotIndex = localName.rfind('.')
-    if lastDotIndex != -1:
-        name += localName[lastDotIndex:]
-    name = name.lower()
-
-    if platformDir:
-        name = platform + "/" + name
-
-    print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
-    if dontReplacePackage:
-        for ( key , modify , etag , size ) in s.listdir( prefix=name ):
-            print( "error: already a file with that name, not uploading" )
-            Exit(2)
-    s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
-    print( "  done uploading!" )
-
-def s3shellpush( env , target , source ):
-    s3push( "mongo" , "mongo-shell" )
-
-env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
-env.AlwaysBuild( "s3shell" )
-
-def s3dist( env , target , source ):
-    s3push( str(source[0]) , "mongodb" )
-
-env.AlwaysBuild(env.Alias( "s3dist" , [ '$SERVER_ARCHIVE' ] , [ s3dist ] ))
-
-# --- an uninstall target ---
-if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
-    SetOption("clean", 1)
-    # By inspection, changing COMMAND_LINE_TARGETS here doesn't do
-    # what we want, but changing BUILD_TARGETS does.
-    BUILD_TARGETS.remove("uninstall")
-    BUILD_TARGETS.append("install")
 
 module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 
@@ -2188,7 +2053,6 @@ Export("v8version v8suffix")
 Export("boostSuffix")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
-Export("s3push")
 Export("wiredtiger")
 
 def injectMongoIncludePaths(thisEnv):
@@ -2200,19 +2064,4 @@ env.Alias("compiledb", env.CompilationDatabase('compile_commands.json'))
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 env.SConscript('SConscript.smoke')
 
-def clean_old_dist_builds(env, target, source):
-    prefix = "mongodb-%s-%s" % (platform, processor)
-    filenames = sorted(os.listdir("."))
-    filenames = [x for x in filenames if x.startswith(prefix)]
-    to_keep = [x for x in filenames if x.endswith(".tgz") or x.endswith(".zip")][-2:]
-    for filename in [x for x in filenames if x not in to_keep]:
-        print "removing %s" % filename
-        try:
-            shutil.rmtree(filename)
-        except:
-            os.remove(filename)
-
-env.Alias("dist_clean", [], [clean_old_dist_builds])
-env.AlwaysBuild("dist_clean")
-
-env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'file_allocator_bench'])
+env.Alias('all', ['core', 'tools', 'dbtest', 'unittests'])
