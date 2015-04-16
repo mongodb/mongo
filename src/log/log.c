@@ -584,7 +584,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *log_fh, *tmp_fh;
+	WT_FH *log_fh;
 	WT_LOG *log;
 	uint32_t lognum;
 	u_int i, logcount;
@@ -601,10 +601,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__log_openfile(session, 0, &log_fh, file_prefix, lsn->file));
 	WT_ERR(__wt_ftruncate(session, log_fh, lsn->offset));
-	tmp_fh = log_fh;
-	log_fh = NULL;
-	WT_ERR(__wt_fsync(session, tmp_fh));
-	WT_ERR(__wt_close(session, &tmp_fh));
+	WT_ERR(__wt_fsync(session, log_fh));
+	WT_ERR(__wt_close(session, &log_fh));
 
 	/*
 	 * If we just want to truncate the current log, return and skip
@@ -625,10 +623,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 			 */
 			WT_ERR(__wt_ftruncate(session,
 			    log_fh, LOG_FIRST_RECORD));
-			tmp_fh = log_fh;
-			log_fh = NULL;
-			WT_ERR(__wt_fsync(session, tmp_fh));
-			WT_ERR(__wt_close(session, &tmp_fh));
+			WT_ERR(__wt_fsync(session, log_fh));
+			WT_ERR(__wt_close(session, &log_fh));
 		}
 	}
 err:	WT_TRET(__wt_close(session, &log_fh));
@@ -650,7 +646,7 @@ __wt_log_allocfile(
 	WT_DECL_ITEM(from_path);
 	WT_DECL_ITEM(to_path);
 	WT_DECL_RET;
-	WT_FH *log_fh, *tmp_fh;
+	WT_FH *log_fh;
 	WT_LOG *log;
 
 	conn = S2C(session);
@@ -675,10 +671,8 @@ __wt_log_allocfile(
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
 	if (prealloc)
 		WT_ERR(__log_prealloc(session, log_fh));
-	tmp_fh = log_fh;
-	log_fh = NULL;
-	WT_ERR(__wt_fsync(session, tmp_fh));
-	WT_ERR(__wt_close(session, &tmp_fh));
+	WT_ERR(__wt_fsync(session, log_fh));
+	WT_ERR(__wt_close(session, &log_fh));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_prealloc: rename %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
