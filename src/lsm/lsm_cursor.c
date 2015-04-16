@@ -394,10 +394,18 @@ __clsm_open_cursors(
 	lsm_tree = clsm->lsm_tree;
 	chunk = NULL;
 
-	if (update) {
-		if (txn->isolation == TXN_ISO_SNAPSHOT)
-			F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
-	} else
+	/*
+	 * Ensure that any snapshot update has cursors on the right set of
+	 * chunks to guarantee visibility is correct.
+	 */
+	if (update && txn->isolation == TXN_ISO_SNAPSHOT)
+		F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
+
+	/*
+	 * Query operations need a full set of cursors. Overwrite cursors
+	 * do queries in service of updates.
+	 */
+	if (!update || !F_ISSET(c, WT_CURSTD_OVERWRITE))
 		F_SET(clsm, WT_CLSM_OPEN_READ);
 
 	if (lsm_tree->nchunks == 0)
