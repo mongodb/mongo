@@ -44,3 +44,22 @@ env.CppUnitTest(
         ]
     )
 
+env.Library(
+    target='progress_meter',
+    source=[
+        'progress_meter.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/logger/logger',
+    ],
+)
+
+env.CppUnitTest(
+    target='progress_meter_test',
+    source=[
+        'progress_meter_test.cpp',
+    ],
+    LIBDEPS=[
+        'progress_meter',
+    ],
+)

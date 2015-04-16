@@ -257,10 +257,31 @@ env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
                          'synchronization',
                 ])
 
-env.CppUnitTest('curop_test',
-                ['db/curop_test.cpp'],
-                LIBDEPS=['serveronly', 'coredb', 'coreserver', 'ntservice_mock'],
-                NO_CRUTCH=True)
+env.Library(
+    target='curop',
+    source=[
+        'db/curop.cpp',
+    ],
+    LIBDEPS=[
+        'fail_point',
+        'network',
+        'service_context',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/util/progress_meter',
+    ],
+)
+
+env.CppUnitTest(
+    target='curop_test',
+    source=[
+        'db/curop_test.cpp',
+    ],
+    LIBDEPS=[
+        'curop',
+    ],
+)
 
 env.Library('index_names',["db/index_names.cpp"])
 
@@ -407,7 +428,6 @@ env.Library('namespace_string', ['db/namespace_string.cpp'], LIBDEPS=['foundatio
 commonFiles = [ "shell/mongo.cpp",
                 "util/file_allocator.cpp",
                 "util/paths.cpp",
-                "util/progress_meter.cpp",
                 "util/concurrency/task.cpp",
                 "util/password.cpp",
                 "util/concurrency/rwlockimpl.cpp",
@@ -481,6 +501,7 @@ env.Library('mongocommon', commonFiles,
                      '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                      '$BUILD_DIR/third_party/shim_boost',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
+                     '$BUILD_DIR/mongo/util/progress_meter',
                      ] +
                      extraCommonLibdeps)
 
@@ -766,7 +787,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/commands/write_commands/batch_executor.cpp",
                     "db/commands/write_commands/write_commands.cpp",
                     "db/commands/writeback_compatibility_shim.cpp",
-                    "db/curop.cpp",
                     "db/dbcommands.cpp",
                     "db/dbdirectclient.cpp",
                     "db/dbeval.cpp",
@@ -1038,6 +1058,7 @@ env.CppUnitTest('range_deleter_test',
 serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = ["coreshard",
+                     'curop',
                      "db/auth/authmongod",
                      "db/fts/ftsmongod",
                      "db/common",

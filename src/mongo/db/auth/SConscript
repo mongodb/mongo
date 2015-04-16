@@ -28,8 +28,10 @@ env.Library('authcore', ['action_set.cpp',
                          'user_management_commands_parser.cpp',
                          'user_name.cpp',
                          'user_set.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/base/base',
+            LIBDEPS=['sasl_options',
+                     '$BUILD_DIR/mongo/base/base',
                      '$BUILD_DIR/mongo/bson',
+                     '$BUILD_DIR/mongo/crypto/scramauth',
                      '$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/db/ops/update_driver',
                      '$BUILD_DIR/mongo/md5',
@@ -41,25 +43,42 @@ env.Library('authcommon',
             ['internal_user_auth.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/bson'])
 
-env.Library('authservercommon',
+env.Library('authorization_manager_global',
             [
                 'auth_decorations.cpp',
                 'authorization_manager_global.cpp',
+            ],
+            LIBDEPS=[
+                'authcore',
+                '$BUILD_DIR/mongo/service_context',
+            ])
+
+env.Library('authservercommon',
+            [
                 'authz_session_external_state_server_common.cpp',
                 'sasl_commands.cpp',
                 'security_key.cpp',
             ],
-            LIBDEPS=['authcommon', 'authcore', 'authmocks', 'saslauth'])
+            LIBDEPS=[
+                'authcommon',
+                'authcore',
+                'authmocks',
+                'authorization_manager_global',
+                'saslauth',
+            ])
+
+env.Library('sasl_options',
+            ['sasl_options.cpp'])
 
 env.Library('saslauth',
              ['native_sasl_authentication_session.cpp',
              'sasl_authentication_session.cpp',
-             'sasl_options.cpp',
              'sasl_plain_server_conversation.cpp',
              'sasl_scramsha1_server_conversation.cpp',
              'sasl_server_conversation.cpp'],
              LIBDEPS=[
                 'authcore',
+                'sasl_options',
                 '$BUILD_DIR/mongo/crypto/scramauth',
                 '$BUILD_DIR/mongo/network'])
 
