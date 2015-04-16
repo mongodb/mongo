@@ -669,7 +669,7 @@ namespace mongo {
     }
 
     ConnectionString ConfigServer::getConnectionString() const {
-        return ConnectionString(_primary.getConnString(), ConnectionString::SYNC);
+        return _primary.getAddress();
     }
 
     bool ConfigServer::init( const ConnectionString& configCS ) {
@@ -717,17 +717,14 @@ namespace mongo {
             return false;
         }
 
-        string fullString;
-        joinStringDelim(configHosts, &fullString, ',');
-
         // This should be the first time we are trying to set up the primary shard (i.e. init
         // should be called only once)
         invariant(_primary == Shard::EMPTY);
-        _primary = Shard("config", ConnectionString(fullString, ConnectionString::SYNC), 0, false);
+        _primary = Shard("config", configCS, 0, false);
 
         Shard::installShard("config", _primary);
 
-        LOG(1) << " config string : " << fullString;
+        LOG(1) << " config string : " << configCS.toString();
 
         return true;
     }
