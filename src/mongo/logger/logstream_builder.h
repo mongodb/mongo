@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -58,7 +58,7 @@ namespace logger {
          * "severity" is the logging severity of the message.
          */
         LogstreamBuilder(MessageLogDomain* domain,
-                         const std::string& contextName,
+                         std::string contextName,
                          LogSeverity severity);
 
         /**
@@ -69,7 +69,7 @@ namespace logger {
          * "component" is the primary log component of the message.
          */
         LogstreamBuilder(MessageLogDomain* domain,
-                         const std::string& contextName,
+                         std::string contextName,
                          LogSeverity severity,
                          LogComponent component);
 
@@ -81,13 +81,19 @@ namespace logger {
                          LabeledLevel labeledLevel);
 
         /**
-         * Copies a LogstreamBuilder.  LogstreamBuilder instances are copyable only until the first
-         * call to stream() or operator<<.
+         * Move constructor.
          *
-         * TODO(schwerin): After C++11 transition, replace with a move-constructor, and make
-         * LogstreamBuilder movable.
+         * TODO: Replace with = default implementation when minimum MSVC version is bumped to
+         * MSVC2015.
          */
-        LogstreamBuilder(const LogstreamBuilder& other);
+        LogstreamBuilder(LogstreamBuilder&& other);
+
+        /**
+         * Move assignment operator.
+         *
+         * TODO: Replace with =default implementation when minimum MSVC version is bumped to VS2015.
+         */
+        LogstreamBuilder& operator=(LogstreamBuilder&& other);
 
         /**
          * Destroys a LogstreamBuilder().  If anything was written to it via stream() or operator<<,
@@ -104,7 +110,7 @@ namespace logger {
             return *this;
         }
 
-        std::ostream& stream() { makeStream(); return *_os; }
+        std::ostream& stream() { if (!_os) makeStream(); return *_os; }
 
         LogstreamBuilder& operator<<(const char *x) { stream() << x; return *this; }
         LogstreamBuilder& operator<<(const std::string& x) { stream() << x; return *this; }
@@ -146,7 +152,6 @@ namespace logger {
         void operator<<(Tee* tee);
 
     private:
-        LogstreamBuilder& operator=(const LogstreamBuilder& other);
 
         void makeStream();
 
@@ -155,7 +160,7 @@ namespace logger {
         LogSeverity _severity;
         LogComponent _component;
         std::string _baseMessage;
-        std::ostringstream* _os;
+        std::unique_ptr<std::ostringstream> _os;
         Tee* _tee;
 
     };

@@ -29,11 +29,13 @@
 
 #include "mongo/logger/logstream_builder.h"
 
+#include <memory>
+
 #include "mongo/base/init.h"
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/tee.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"  // TODO: remove apple dep for this in threadlocal.h
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/time_support.h"
@@ -41,11 +43,6 @@
 namespace mongo {
 
 namespace {
-
-    /// Type of per-thread cache for storing pre-constructed ostringstreams.  While its type is
-    /// vector, it should only ever contain 0 or 1 item.  It is a vector rather than just a
-    /// thread_specific_ptr<> because of the high cost of thread_specific_ptr<>::reset().
-    typedef OwnedPointerVector<std::ostringstream> OwnedOstreamVector;
 
     /// This flag indicates whether the system providing a per-thread cache of ostringstreams
     /// for use by LogstreamBuilder instances is initialized and ready for use.  Until this
@@ -59,8 +56,8 @@ namespace {
 
 }  // namespace
 
-    TSP_DECLARE(OwnedOstreamVector, threadOstreamCache);
-    TSP_DEFINE(OwnedOstreamVector, threadOstreamCache);
+    TSP_DECLARE(std::unique_ptr<std::ostringstream>, threadOstreamCache);
+    TSP_DEFINE(std::unique_ptr<std::ostringstream>, threadOstreamCache);
 
 namespace {
     // During unittests, where we don't use quickExit(), static finalization may destroy the
@@ -76,52 +73,53 @@ namespace {
 namespace logger {
 
     LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
-                                       const std::string& contextName,
+                                       std::string contextName,
                                        LogSeverity severity)
-        : _domain(domain),
-          _contextName(contextName),
-          _severity(severity),
-          _component(LogComponent::kDefault),
-          _os(NULL),
-          _tee(NULL) {
-    }
+        : LogstreamBuilder(domain,
+                           std::move(contextName),
+                           std::move(severity),
+                           LogComponent::kDefault) {}
 
     LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
-                                       const std::string& contextName,
+                                       std::string contextName,
                                        LogSeverity severity,
                                        LogComponent component)
         : _domain(domain),
-          _contextName(contextName),
-          _severity(severity),
-          _component(component),
-          _os(NULL),
-          _tee(NULL) {
+          _contextName(std::move(contextName)),
+          _severity(std::move(severity)),
+          _component(std::move(component)),
+          _tee(nullptr) {
     }
 
     LogstreamBuilder::LogstreamBuilder(logger::MessageLogDomain* domain,
                                        const std::string& contextName,
                                        LabeledLevel labeledLevel)
-            : _domain(domain),
-              _contextName(contextName),
-              _severity(labeledLevel),
-              _component(LogComponent::kDefault),
-              _os(NULL),
-              _tee(NULL) {
+        : LogstreamBuilder(domain,
+                           std::move(contextName),
+                           static_cast<LogSeverity>(labeledLevel)) {
 
         setBaseMessage(labeledLevel.getLabel());
     }
 
-    LogstreamBuilder::LogstreamBuilder(const LogstreamBuilder& other)
-        : _domain(other._domain),
-          _contextName(other._contextName),
-          _severity(other._severity),
-          _component(other._component),
-          _baseMessage(other._baseMessage),
-          _os(NULL),
-          _tee(NULL) {
+    LogstreamBuilder::LogstreamBuilder(LogstreamBuilder&& other)
+        : _domain(std::move(other._domain)),
+          _contextName(std::move(other._contextName)),
+          _severity(std::move(other._severity)),
+          _component(std::move(other._component)),
+          _baseMessage(std::move(other._baseMessage)),
+          _os(std::move(other._os)),
+          _tee(std::move(other._tee)) {
+    }
 
-        if (other._os || other._tee)
-            abort();
+    LogstreamBuilder& LogstreamBuilder::operator=(LogstreamBuilder&& other) {
+        _domain = std::move(other._domain);
+        _contextName = std::move(other._contextName);
+        _severity = std::move(other._severity);
+        _component = std::move(other._component);
+        _baseMessage = std::move(other._baseMessage);
+        _os = std::move(other._os);
+        _tee = std::move(other._tee);
+        return *this;
     }
 
 
@@ -139,11 +137,8 @@ namespace logger {
                 _tee->write(_os->str());
             }
             _os->str("");
-            if (isThreadOstreamCacheInitialized && threadOstreamCache.getMake()->vector().empty()) {
-                threadOstreamCache.get()->mutableVector().push_back(_os);
-            }
-            else {
-                delete _os;
+            if (isThreadOstreamCacheInitialized && !threadOstreamCache.getMake()->get()) {
+                *threadOstreamCache.get() = std::move(_os);
             }
         }
     }
@@ -156,15 +151,11 @@ namespace logger {
 
     void LogstreamBuilder::makeStream() {
         if (!_os) {
-            if (isThreadOstreamCacheInitialized &&
-                !threadOstreamCache.getMake()->vector().empty()) {
-
-                std::vector<std::ostringstream*>& oses = threadOstreamCache.get()->mutableVector();
-                _os = oses.back();
-                oses.pop_back();
+            if (isThreadOstreamCacheInitialized && threadOstreamCache.getMake()->get()) {
+                _os = std::move(*threadOstreamCache.get());
             }
             else {
-                _os = new std::ostringstream;
+                _os = stdx::make_unique<std::ostringstream>();
             }
         }
     }
