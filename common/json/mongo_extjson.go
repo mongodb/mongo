@@ -17,6 +17,8 @@ type Date int64
 
 type ISODate string
 
+type ObjectId string
+
 // Represents a reference to another document.
 type DBRef struct {
 	Collection string
@@ -42,8 +44,6 @@ type NumberInt int32
 
 // Represents a signed 64-bit integer.
 type NumberLong int64
-
-type ObjectId string
 
 // Represents a regular expression.
 type RegExp struct {
@@ -78,6 +78,7 @@ var (
 	dateType        = reflect.TypeOf(Date(0))
 	isoDateType     = reflect.TypeOf(ISODate(""))
 	dbRefType       = reflect.TypeOf(DBRef{})
+	dbPointerType   = reflect.TypeOf(DBPointer{})
 	maxKeyType      = reflect.TypeOf(MaxKey{})
 	minKeyType      = reflect.TypeOf(MinKey{})
 	numberIntType   = reflect.TypeOf(NumberInt(0))
@@ -164,6 +165,19 @@ func stateD(s *scanner, c int) int {
 	return scanContinue
 }
 
+// stateDB is the state after reading `DB`.
+func stateDB(s *scanner, c int) int {
+	if c == 'R' {
+		s.step = stateDBR
+		return scanContinue
+	}
+	if c == 'P' {
+		s.step = stateDBP
+		return scanContinue
+	}
+	return s.error(c, "in state DB (expecting 'R or P')")
+}
+
 // stateI is the state after reading `I`.
 func stateI(s *scanner, c int) int {
 	switch c {
@@ -194,12 +208,19 @@ func (d *decodeState) storeExtendedLiteral(item []byte, v reflect.Value, fromQuo
 	case 'B': // BinData
 		d.storeBinData(v)
 
-	case 'D': // Date, DBRef, or Dbref
+	case 'D': // Date, DBRef, DBPointer, Dbpointer,or Dbref
 		switch item[1] {
 		case 'a': // Date
 			d.storeDate(v)
-		case 'B', 'b': // DBRef or Dbref
+		case 'b': //Dbref
 			d.storeDBRef(v)
+		case 'B': // DBRef or DBPointer
+			switch item[2] {
+			case 'R': //DBRef
+				d.storeDBRef(v)
+			case 'P': //DBPointer
+				d.storeDBPointer(v)
+			}
 		}
 	case 'I':
 		switch item[1] {
@@ -282,8 +303,15 @@ func (d *decodeState) getExtendedLiteral(item []byte) (interface{}, bool) {
 		switch item[1] {
 		case 'a': // Date
 			return d.getDate(), true
-		case 'B', 'b': // DBRef or Dbref
+		case 'b': // Dbref
 			return d.getDBRef(), true
+		case 'B': // DBRef or DBPoiner
+			switch item[2] {
+			case 'R': // DBRef
+				return d.getDBRef(), true
+			case 'P': // DBPointer
+				return d.getDBPointer(), true
+			}
 		}
 
 	case 'M': // MinKey or MaxKey

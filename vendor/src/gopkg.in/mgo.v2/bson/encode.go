@@ -1,18 +1,18 @@
 // BSON library for Go
-// 
+//
 // Copyright (c) 2010-2012 - Gustavo Niemeyer <gustavo@niemeyer.net>
-// 
+//
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met: 
-// 
+// modification, are permitted provided that the following conditions are met:
+//
 // 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer. 
+//    list of conditions and the following disclaimer.
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution. 
-// 
+//    and/or other materials provided with the distribution.
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 // ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 // WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -212,7 +212,7 @@ func (e *encoder) addSlice(v reflect.Value) {
 		return
 	}
 	l := v.Len()
-	et  := v.Type().Elem()
+	et := v.Type().Elem()
 	if et == typeDocElem {
 		for i := 0; i < l; i++ {
 			elem := v.Index(i).Interface().(DocElem)
@@ -415,7 +415,7 @@ func (e *encoder) addElem(name string, v reflect.Value, minSize bool) {
 		case time.Time:
 			// MongoDB handles timestamps as milliseconds.
 			e.addElemName('\x09', name)
-			e.addInt64(s.Unix() * 1000 + int64(s.Nanosecond() / 1e6))
+			e.addInt64(s.Unix()*1000 + int64(s.Nanosecond()/1e6))
 
 		case url.URL:
 			e.addElemName('\x02', name)

@@ -9,12 +9,12 @@ import (
 // Adapted from encoding/json/scanner.go.
 
 // stateDB is the state after reading `DB`.
-func stateDB(s *scanner, c int) int {
-	if c == 'R' {
-		s.step = generateState("DBRef", []byte("ef"), stateConstructor)
+func stateDBR(s *scanner, c int) int {
+	if c == 'e' {
+		s.step = generateState("DBRef", []byte("f"), stateConstructor)
 		return scanContinue
 	}
-	return s.error(c, "in literal DBRef (expecting 'R')")
+	return s.error(c, "in literal DBRef (expecting 'e')")
 }
 
 // stateDb is the state after reading `Db`.
