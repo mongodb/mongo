@@ -51,6 +51,7 @@
                     if ( "a_1" == idxSpec.name &&
                          1 == idxSpec.key.a &&
                          idxSpec.background &&
+                         op.progress &&
                          (op.progress.done / op.progress.total) > 0.20) {
                         indexBuildOpId = op.opid;
                     }
