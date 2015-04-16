@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/config.h"
+#include "mongo/util/scopeguard.h"
 
 #ifndef MONGO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds
@@ -46,7 +47,19 @@ namespace crypto {
     bool sha1(const unsigned char* input,
               const size_t inputLen,
               unsigned char* output) {
-        return SHA1(input, inputLen, output);
+
+        EVP_MD_CTX digestCtx;
+        EVP_MD_CTX_init(&digestCtx);
+
+        if (1 != EVP_DigestInit_ex(&digestCtx, EVP_sha1(), NULL)) {
+            return false;
+        }
+
+        if (1 != EVP_DigestUpdate(&digestCtx, input, inputLen)) {
+            return false;
+        }
+
+        return (1 == EVP_DigestFinal_ex(&digestCtx, output, NULL)); 
     }
 
     /*

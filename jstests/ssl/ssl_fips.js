@@ -22,6 +22,10 @@ if (mongo != 0) {
             /this version of mongodb was not compiled with FIPS support/));
 }
 else {
+    // verify that auth works, SERVER-18051
+    md.getDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]});
+    assert(md.getDB("admin").auth("root", "root"), "auth failed");
+
     // kill mongod
     MongoRunner.stopMongod(md);
 }
