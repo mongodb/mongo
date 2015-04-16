@@ -50,6 +50,7 @@ namespace crypto {
 
         EVP_MD_CTX digestCtx;
         EVP_MD_CTX_init(&digestCtx);
+        ON_BLOCK_EXIT(EVP_MD_CTX_cleanup, &digestCtx);
 
         if (1 != EVP_DigestInit_ex(&digestCtx, EVP_sha1(), NULL)) {
             return false;
