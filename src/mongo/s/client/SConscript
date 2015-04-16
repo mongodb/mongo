@@ -22,7 +22,7 @@ env.Library(
         'sharding_connection_hook.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver',
     ]
 )
 
