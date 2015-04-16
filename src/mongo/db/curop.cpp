@@ -39,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/json.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -244,7 +245,8 @@ namespace mongo {
 
     void CurOp::recordGlobalTime(bool isWriteLocked, long long micros) const {
         string nsStr = _ns.toString();
-        Top::global.record(nsStr, _op, isWriteLocked ? 1 : -1, micros, _isCommand);
+        int lockType = isWriteLocked ? 1 : -1;
+        Top::get(getGlobalServiceContext()).record(nsStr, _op, lockType, micros, _isCommand);
     }
 
     void CurOp::reportState(BSONObjBuilder* builder) {

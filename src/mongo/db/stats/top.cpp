@@ -33,13 +33,10 @@
 
 #include "mongo/db/stats/top.h"
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
-#include "mongo/db/commands.h"
 
 namespace mongo {
 
@@ -47,6 +44,12 @@ namespace mongo {
     using std::string;
     using std::stringstream;
     using std::vector;
+
+namespace {
+
+    const auto getTop = ServiceContext::declareDecoration<Top>();
+
+} // namespace
 
     Top::UsageData::UsageData( const UsageData& older, const UsageData& newer ) {
         // this won't be 100% accurate on rollovers and drop(), but at least it won't be negative
@@ -65,6 +68,11 @@ namespace mongo {
           remove( older.remove, newer.remove ),
           commands( older.commands, newer.commands ) {
 
+    }
+
+    // static
+    Top& Top::get(ServiceContext* service) {
+        return getTop(service);
     }
 
     void Top::record( StringData ns, int op, int lockType, long long micros, bool command ) {
@@ -178,39 +186,5 @@ namespace mongo {
         bb.appendNumber( "count", map.count );
         bb.done();
     }
-
-    class TopCmd : public Command {
-    public:
-        TopCmd() : Command( "top", true ) {}
-
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream& help ) const { help << "usage by collection, in micros "; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::top);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-        virtual bool run(OperationContext* txn,
-                         const string&,
-                         BSONObj& cmdObj,
-                         int,
-                         string& errmsg,
-                         BSONObjBuilder& result) {
-            {
-                BSONObjBuilder b( result.subobjStart( "totals" ) );
-                b.append( "note", "all times in microseconds" );
-                Top::global.append( b );
-                b.done();
-            }
-            return true;
-        }
-
-    } topCmd;
-
-    Top Top::global;
 
 }

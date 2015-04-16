@@ -36,12 +36,16 @@
 
 namespace mongo {
 
+    class ServiceContext;
+
     /**
      * tracks usage by collection
      */
     class Top {
 
     public:
+        static Top& get(ServiceContext* service);
+
         Top() : _lock("Top") { }
 
         struct UsageData {
@@ -83,9 +87,6 @@ namespace mongo {
         void append( BSONObjBuilder& b );
         void cloneMap(UsageMap& out) const;
         void collectionDropped( StringData ns );
-
-    public: // static stuff
-        static Top global;
 
     private:
         void _appendToUsageMap( BSONObjBuilder& b, const UsageMap& map ) const;
