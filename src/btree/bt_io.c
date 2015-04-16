@@ -21,7 +21,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	const WT_PAGE_HEADER *dsk;
-	size_t result_len, skip;
+	size_t decrypted_size, result_len, skip;
+	uint32_t encrypt_len;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -59,11 +60,14 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_buf_initsize(session, buf, dsk->mem_size + skip));
 
 		memcpy(buf->mem, tmp->data, skip);
+		encrypt_len = WT_STORE_SIZE(*((uint32_t *)
+		    ((uint8_t *)tmp->data + skip)));
+		decrypted_size = encrypt_len - skip - btree->encryptor->size_const;
 		ret = btree->encryptor->decrypt(
 		    btree->encryptor, &session->iface,
-		    (uint8_t *)tmp->data + skip,
-		    dsk->mem_size + btree->encryptor->size_const,
-		    (uint8_t *)buf->mem + skip, dsk->mem_size, &result_len);
+		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
+		    encrypt_len - skip,
+		    (uint8_t *)buf->mem + skip, decrypted_size, &result_len);
 
 		/*
 		 * If checksums were turned off because we're depending on the
@@ -71,7 +75,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 * here after corruption happens.  If we're salvaging the file,
 		 * it's OK, otherwise it's really, really bad.
 		 */
-		if (ret != 0 || result_len != dsk->mem_size)
+		if (ret != 0)
 			WT_ERR(
 			    F_ISSET(btree, WT_BTREE_VERIFY) ||
 			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
@@ -173,11 +177,13 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_PAGE_HEADER *dsk;
 	size_t len, src_len, dst_len, result_len, size;
 	int data_cksum, compression_failed, encrypted;
+	uint32_t encrypt_len, *elen;
 	uint8_t *src, *dst;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	encrypted = 0;
+	encrypt_len = 0;
 
 	/* Checkpoint calls are different than standard calls. */
 	WT_ASSERT(session,
@@ -286,8 +292,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		}
 	}
 	/*
-	 * Optionally stream-compress the data, but don't compress blocks that
-	 * are already as small as they're going to get.
+	 * Optionally encrypt the data.  We need to add in the original
+	 * length, in case both compression and encryption are done.
 	 */
 	if (btree->encryptor != NULL &&
 	    btree->encryptor->encrypt != NULL) {
@@ -295,22 +301,19 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		src = (uint8_t *)ip->mem + WT_BLOCK_ENCRYPT_SKIP;
 		src_len = ip->size - WT_BLOCK_ENCRYPT_SKIP;
 
-		/* TODO: ensure (when encryptor is added?)
-		 * that sizing is set.
-		 */
 		/*
 		 * Compute the size needed for the destination buffer.
 		 */
 		len = btree->encryptor->size_const;
 
-		size = ip->size + len;
+		size = ip->size + len + WT_ENCRYPT_LEN;
 		WT_ERR(bm->write_size(bm, session, &size));
 		WT_ERR(__wt_scr_alloc(session, size, &etmp));
 
 		/* Skip the header bytes of the destination data. */
-		dst = (uint8_t *)etmp->mem + WT_BLOCK_ENCRYPT_SKIP;
+		dst = (uint8_t *)etmp->mem +
+		    WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 		dst_len = src_len + len;
-
 		if ((ret = btree->encryptor->encrypt(btree->encryptor,
 		    &session->iface,
 		    src, src_len,
@@ -321,11 +324,18 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			    WT_SIZET_FMT " bytes", btree->dhandle->name,
 			    src_len);
 
-		result_len += WT_BLOCK_ENCRYPT_SKIP;
+		result_len += WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 
 		/*TODO: stats*/
 
 		encrypted = 1;
+		/*
+		 * Store original size so we know how much space is needed
+		 * on the decryption side.
+		 */
+		elen = (uint32_t *)((uint8_t *)etmp->mem + WT_BLOCK_ENCRYPT_SKIP);
+		*elen = WT_STORE_SIZE(result_len);
+
 		/*
 		 * Copy in the skipped header bytes, set the final data
 		 * size.

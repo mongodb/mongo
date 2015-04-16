@@ -155,7 +155,9 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Make sure it is big enough.
 	 */
 	if (dst_len < src_len - CHKSUM_LEN - IV_LEN) {
-		fprintf(stderr, "Rotate: ENOMEM ERROR\n");
+		fprintf(stderr,
+		    "Rotate: ENOMEM ERROR: dst_len %lu src_len %lu\n",
+		    dst_len, src_len);
 		return (ENOMEM);
 	}
 
@@ -402,6 +404,8 @@ simple_walk_log(WT_SESSION *session)
 #define	MAX_KEYS	20
 
 #define	EXTENSION_NAME  "local=(entry=add_my_encryptors)"
+#define	COMPRESS_NAME \
+    "../../ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
 
 int
 main(void)
@@ -427,11 +431,24 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
+	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
 	    "log=(enabled=true),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
+
+	/*
+	 * Write a log record that is larger than the base 128 bytes and
+	 * also should compress.
+	 */
+	ret = session->log_printf(session,
+	    "aaabbbcccdddeeefffggghhhiiijjjkkklllmmm"
+	    "nnnooopppqqqrrrssstttuuuvvvwwwxxxyyyzzz"
+	    "aaabbbcccdddeeefffggghhhiiijjjkkklllmmm"
+	    "nnnooopppqqqrrrssstttuuuvvvwwwxxxyyyzzz"
+	    "aaabbbcccdddeeefffggghhhiiijjjkkklllmmm"
+	    "nnnooopppqqqrrrssstttuuuvvvwwwxxxyyyzzz"
+	    "The quick brown fox jumps over the lazy dog ");
 
 	/*
 	 * Create and open some encrypted and not encrypted tables.
@@ -508,8 +525,8 @@ main(void)
 	 */
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=rotn,"
+	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ",secretkey=" SYS_BADPW ")", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect bad password\n");
@@ -520,8 +537,8 @@ main(void)
 	 */
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=rotn,"
+	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ")", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect missing password\n");
@@ -532,8 +549,8 @@ main(void)
 	 */
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true)", &conn);
+	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "log=(enabled=true,compressor=snappy)", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect no encryption\n");
 		exit (1);
@@ -541,8 +558,8 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=rotn,"
+	    "extensions=[" EXTENSION_NAME "," COMPRESS_NAME "],"
+	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
 	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
@@ -586,7 +603,7 @@ main(void)
 			fprintf(stderr, "Val2 %s and Val3 %s do not match\n",
 			    val2, val3);
 
-		printf("Read key %s; value %s\n", key1, val1);
+		printf("Verified key %s; value %s\n", key1, val1);
 	}
 	ret = conn->close(conn, NULL);
 	return (ret);
