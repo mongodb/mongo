@@ -1100,8 +1100,10 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
 
 	/* Handle forced discard (when dropping a file). */
-	if (force)
-		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
+	if (force) {
+		F_SET(session->dhandle, WT_DHANDLE_DEAD);
+		return (0);
+	}
 
 	/*
 	 * If closing an unmodified file, check that no update is required

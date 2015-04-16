@@ -47,7 +47,7 @@ __session_add_dhandle(
  *	the schema lock.
  */
 int
-__wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags)
+__wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, int *deadp)
 {
 	enum { NOLOCK, READLOCK, WRITELOCK } locked;
 	WT_BTREE *btree;
@@ -57,6 +57,8 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags)
 	btree = S2BT(session);
 	dhandle = session->dhandle;
 	locked = NOLOCK;
+	if (deadp != NULL)
+		*deadp = 0;
 
 	/*
 	 * Special operation flags will cause the handle to be reopened.
@@ -95,7 +97,10 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags)
 	 * required, we're done.  Otherwise, check that the handle is open and
 	 * that no special flags are required.
 	 */
-	if (LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
+	if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
+		WT_ASSERT(session, deadp != NULL);
+		*deadp = 1;
+	} else if (LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    (F_ISSET(dhandle, WT_DHANDLE_OPEN) && special_flags == 0))
 		return (0);
 
@@ -348,6 +353,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	uint64_t bucket;
+	int is_dead;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 	WT_ASSERT(session, !LF_ISSET(WT_DHANDLE_HAVE_REF));
@@ -357,6 +363,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	SLIST_FOREACH(dhandle_cache, &session->dhhash[bucket], hashl) {
 		dhandle = dhandle_cache->dhandle;
+		if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
+			continue;
 		if (strcmp(uri, dhandle->name) != 0)
 			continue;
 		if (checkpoint == NULL && dhandle->checkpoint == NULL)
@@ -381,7 +389,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	if (dhandle != NULL) {
 		/* Try to lock the handle; if this succeeds, we're done. */
-		if ((ret = __wt_session_lock_dhandle(session, flags)) == 0)
+		if ((ret =
+		    __wt_session_lock_dhandle(session, flags, &is_dead)) == 0)
 			goto done;
 
 		/* Propagate errors we don't expect. */
@@ -399,7 +408,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			return (ret);
 
 		/* We found the data handle, don't try to get it again. */
-		LF_SET(WT_DHANDLE_HAVE_REF);
+		if (!is_dead)
+			LF_SET(WT_DHANDLE_HAVE_REF);
 	}
 
 	/*
