@@ -1658,7 +1658,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOG_RECORD *newlrp, *origrp;
 	int compression_failed;
 	size_t len, src_len, dst_len, result_len, size;
-	uint32_t *elen;
+	uint32_t *unpadded_lenp;
 	uint8_t *src, *dst;
 
 	conn = S2C(session);
@@ -1758,6 +1758,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
 		result_len += WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
+		WT_ASSERT(session, result_len == size);
 
 		/* TODO: stats */
 
@@ -1773,13 +1774,20 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		WT_ASSERT(session, result_len < UINT32_MAX &&
 		    ip->size < UINT32_MAX);
 		/*
-		 * Store original size so we know how much space is needed
+		 * Store unpadded size so we know how much space is needed
 		 * on the decryption side.
 		 */
-		elen = (uint32_t *)((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
-		*elen = WT_STORE_SIZE(result_len);
+		unpadded_lenp = (uint32_t *)
+		    ((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
+		*unpadded_lenp = WT_STORE_SIZE(size);
 
-		newlrp->len = WT_STORE_SIZE(result_len);
+		/*
+		 * The length will get overwritten when it is padded in the
+		 * internal code.  The in memory length stays the same as the
+		 * original indicating it is our ultimate length when we
+		 * read and decrypt.
+		 */
+		newlrp->len = WT_STORE_SIZE(size);
 		newlrp->mem_len = origrp->mem_len;
 	}
 	ret = __log_write_internal(session, ip, lsnp, flags);

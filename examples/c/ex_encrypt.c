@@ -405,6 +405,14 @@ simple_walk_log(WT_SESSION *session)
 
 #define	EXTENSION_NAME  "local=(entry=add_my_encryptors)"
 
+#define	WT_OPEN_CONFIG_COMMON \
+    "create,cache_size=100MB,extensions=[" EXTENSION_NAME "],"\
+    "log=(enabled=true,compressor=snappy)," \
+
+#define	WT_OPEN_CONFIG_GOOD \
+    WT_OPEN_CONFIG_COMMON \
+    "encryption=(name=rotn,keyid=" SYS_KEYID ",secretkey=" SYS_PW ")"
+
 int
 main(void)
 {
@@ -427,11 +435,7 @@ main(void)
 
 	srandom((unsigned int)getpid());
 
-	ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true),encryption=(name=rotn,"
-	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
+	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
@@ -521,11 +525,9 @@ main(void)
 	/*
 	 * Confirm we detect a bad password.
 	 */
-	ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
-	    "keyid=" SYS_KEYID ",secretkey=" SYS_BADPW ")", &conn);
+	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON
+	    "encryption=(name=rotn,keyid=" SYS_KEYID ",secretkey=" SYS_BADPW ")",
+	    &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect bad password\n");
 		exit (1);
@@ -533,11 +535,8 @@ main(void)
 	/*
 	 * Confirm we detect no password.
 	 */
-	ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
-	    "keyid=" SYS_KEYID ")", &conn);
+	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON
+	    "encryption=(name=rotn,keyid=" SYS_KEYID ")", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect missing password\n");
 		exit (1);
@@ -545,20 +544,13 @@ main(void)
 	/*
 	 * Confirm we detect not using encryption at all.
 	 */
-	ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,compressor=snappy)", &conn);
+	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON, &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect no encryption\n");
 		exit (1);
 	}
 
-	ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=100MB,"
-	    "extensions=[" EXTENSION_NAME "],"
-	    "log=(enabled=true,compressor=snappy),encryption=(name=rotn,"
-	    "keyid=" SYS_KEYID ",secretkey=" SYS_PW ")", &conn);
+	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	/*
