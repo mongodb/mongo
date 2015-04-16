@@ -36,7 +36,6 @@
 #include "mongo/client/connpool.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config.h"
 #include "mongo/s/type_collection.h"
@@ -55,21 +54,17 @@ namespace mongo {
 
     MONGO_FP_DECLARE(neverBalance);
 
+
     Grid::Grid() : _allowLocalShard(true) {
 
     }
 
-    bool Grid::initCatalogManager(const ConnectionString& configDBString) {
-        std::auto_ptr<CatalogManagerLegacy> cm(new CatalogManagerLegacy());
-        Status status = cm->init(configDBString);
-        if (!status.isOK()) {
-            severe() << "Catalog manager failed to initialize " << status;
-            return false;
-        }
+    void Grid::setCatalogManager(std::unique_ptr<CatalogManager> catalogManager) {
+        invariant(!_catalogManager);
+        invariant(!_catalogCache);
 
-        _catalogManager.reset(cm.release());
-        _catalogCache.reset(new CatalogCache(_catalogManager.get()));
-        return true;
+        _catalogManager = std::move(catalogManager);
+        _catalogCache = std::make_unique<CatalogCache>(_catalogManager.get());
     }
 
     StatusWith<shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {

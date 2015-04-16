@@ -64,19 +64,21 @@ env.CppUnitTest('type_tags_test', 'type_tags_test.cpp',
 # Support for maintaining persistent sharding state and data.
 #
 
-env.Library('metadata',
-            [
-                'collection_metadata.cpp',
-                'metadata_loader.cpp'
-            ],
-            LIBDEPS=[
-                'base',
-                '$BUILD_DIR/mongo/bson',
-                '$BUILD_DIR/mongo/base/base',
-                '$BUILD_DIR/mongo/client/clientdriver',
-                '$BUILD_DIR/mongo/range_arithmetic',
-                '$BUILD_DIR/mongo/s/catalog/catalog_types'
-            ])
+env.Library(
+    target='metadata',
+    source=[
+        'collection_metadata.cpp',
+        'metadata_loader.cpp',
+    ],
+    LIBDEPS=[
+        'base',
+        'catalog/catalog_types',
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/range_arithmetic',
+    ]
+)
 
 env.CppUnitTest('chunk_diff_test',
                 'chunk_diff_test.cpp',

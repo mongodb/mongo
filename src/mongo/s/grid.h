@@ -29,10 +29,11 @@
 #pragma once
 
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <string>
 #include <vector>
+
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -53,12 +54,10 @@ namespace mongo {
         Grid();
 
         /**
-         * Called at startup time so the catalog manager can be set.
-         *
-         * Returns whether the catalog manager has been initialized successfully. Must be called
-         * only once.
+         * Called at startup time so the catalog manager can be set. Should be called only once
+         * for the lifetime of the grid object. Takes ownership of the passed in pointer.
          */
-        bool initCatalogManager(const ConnectionString& configDBString);
+        void setCatalogManager(std::unique_ptr<CatalogManager> catalogManager);
 
         /**
          * Implicitly creates the specified database as non-sharded.
@@ -122,8 +121,8 @@ namespace mongo {
         static bool _inBalancingWindow(const BSONObj& balancerDoc, const boost::posix_time::ptime& now);
 
     private:
-        boost::scoped_ptr<CatalogManager> _catalogManager;
-        boost::scoped_ptr<CatalogCache> _catalogCache;
+        std::unique_ptr<CatalogManager> _catalogManager;
+        std::unique_ptr<CatalogCache> _catalogCache;
 
         // can 'localhost' be used in shard addresses?
         bool _allowLocalShard;

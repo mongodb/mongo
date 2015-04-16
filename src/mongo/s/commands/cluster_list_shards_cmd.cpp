@@ -32,7 +32,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 

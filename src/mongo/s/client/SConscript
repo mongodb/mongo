@@ -11,6 +11,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/s/catalog/catalog_manager',
     ]
 )
 
@@ -34,8 +35,8 @@ env.CppUnitTest(
         'shard_connection_test.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/client/sharding_connection_hook',
+        'sharding_client',
+        'sharding_connection_hook',
         '$BUILD_DIR/mongo/coredb',
         '$BUILD_DIR/mongo/coreserver',
         '$BUILD_DIR/mongo/coreshard',

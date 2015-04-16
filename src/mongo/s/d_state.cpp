@@ -28,12 +28,6 @@
 *    then also delete it in the license file.
 */
 
-
-/**
-   these are commands that live in mongod
-   mostly around shard management and checking
- */
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
@@ -58,12 +52,14 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/metadata_loader.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
@@ -484,9 +480,11 @@ namespace mongo {
                 configServerCS.isValid());
 
         configServer.init(configServerCS);
-        uassert(28627,
-                "failed to initialize catalog manager",
-                grid.initCatalogManager(configServerCS));
+
+        auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
+        uassertStatusOK(catalogManager->init(configServerCS));
+        grid.setCatalogManager(std::move(catalogManager));
+
         _enabled = true;
     }
 
