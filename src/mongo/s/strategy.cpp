@@ -54,6 +54,7 @@
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/dbclient_shard_resolver.h"
 #include "mongo/s/grid.h"

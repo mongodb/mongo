@@ -44,6 +44,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 

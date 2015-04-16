@@ -49,6 +49,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 

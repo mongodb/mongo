@@ -43,6 +43,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/type_collection.h"
