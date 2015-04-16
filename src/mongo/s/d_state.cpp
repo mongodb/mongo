@@ -479,7 +479,7 @@ namespace mongo {
 
         std::string errmsg;
         ConnectionString configServerCS = ConnectionString::parse(server, errmsg);
-        uassert(28631,
+        uassert(28633,
                 str::stream() << "Invalid config server connection string: " << errmsg,
                 configServerCS.isValid());
 
