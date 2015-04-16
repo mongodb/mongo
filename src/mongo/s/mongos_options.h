@@ -83,5 +83,7 @@ namespace mongo {
 
     Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args);
 
+    // This function should eventually go away, but needs to be here now because the sorter and
+    // the version manager must know at runtime which binary it is in.
     bool isMongos();
 }

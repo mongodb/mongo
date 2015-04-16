@@ -198,8 +198,7 @@ env.CppUnitTest(
         'cluster_ops',
         'cluster_write_op_conversion',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
-        "$BUILD_DIR/mongo/client/clientdriver",
+        '$BUILD_DIR/mongo/client/clientdriver',
     ]
 )
 

@@ -491,7 +491,9 @@ namespace {
 
     void ShardConnection::kill() {
         if ( _conn ) {
-            if( versionManager.isVersionableCB( _conn ) ) versionManager.resetShardVersionCB( _conn );
+            if (versionManager.isVersionableCB(_conn)) {
+                versionManager.resetShardVersionCB(_conn);
+            }
 
             if (_conn->isFailed()) {
                 // Let the pool know about the bad connection and also delegate disposal to it.

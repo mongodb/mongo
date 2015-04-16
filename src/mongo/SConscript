@@ -871,57 +871,67 @@ quick_exit_env.Library(target='quick_exit',
                 'util/quick_exit.cpp',
             ])
 
-env.Library('coreshard',
-            [
-                # This is only here temporarily for auto-split logic in chunk.cpp.
-                's/balancer_policy.cpp',
-                's/distlock.cpp',
-                's/config.cpp',
-                's/grid.cpp',
-                's/chunk.cpp',
-                's/chunk_manager.cpp',
-                's/config_server_checker_service.cpp',
-                's/shard_key_pattern.cpp'
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/s/base',
-                '$BUILD_DIR/mongo/s/client/sharding_client',
-                '$BUILD_DIR/mongo/s/cluster_ops_impl',
-            ])
+# This library contains sharding functionality used by both mongod and mongos. Certain tests,
+# which exercise this functionality also link against it.
+env.Library(
+    target='coreshard',
+    source=[
+        # This is only here temporarily for auto-split logic in chunk.cpp.
+        's/balancer_policy.cpp',
+        's/distlock.cpp',
+        's/config.cpp',
+        's/grid.cpp',
+        's/chunk.cpp',
+        's/chunk_manager.cpp',
+        's/config_server_checker_service.cpp',
+        's/shard_key_pattern.cpp',
+        's/version_manager.cpp',
+    ],
+    LIBDEPS=[
+        's/base',
+        's/client/sharding_client',
+        's/cluster_ops_impl',
+    ]
+)
 
-env.Library('mongoscore',
-            [
-                's/balance.cpp',
-                's/cluster_last_error_info.cpp',
-                's/cursors.cpp',
-                's/request.cpp',
-                's/s_only.cpp',
-                's/strategy.cpp',
-                's/version_manager.cpp',
-                's/version_mongos.cpp',
-            ],
-            LIBDEPS=[
-                'db/auth/authmongos',
-                'db/fts/ftsmongos',
-                'db/query/explain_common',
-                'db/query/lite_parsed_query',
-                's/cluster_ops',
-                's/cluster_write_op_conversion',
-            ])
+# This library is only used by the mongos execuable and any tests which require mongos runtime
+# objects, such as the request processing pipeline or the balancer.
+env.Library(
+    target='mongoscore',
+    source=[
+        's/balance.cpp',
+        's/cluster_last_error_info.cpp',
+        's/cursors.cpp',
+        's/request.cpp',
+        's/s_only.cpp',
+        's/strategy.cpp',
+        's/version_mongos.cpp',
+    ],
+    LIBDEPS=[
+        'db/auth/authmongos',
+        'db/fts/ftsmongos',
+        'db/query/explain_common',
+        'db/query/lite_parsed_query',
+        's/cluster_ops',
+        's/cluster_write_op_conversion',
+    ]
+)
 
-env.CppUnitTest("mongoscore_test",
-                ["s/shard_key_pattern_test.cpp",
-                 "s/balancing_window_test.cpp",
-                 "s/balancer_policy_tests.cpp",
-                ],
-                LIBDEPS=["mongoscore",
-                         "coreshard",
-                         "mongocommon",
-                         "coreserver",
-                         "coredb"])
-
-env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
-                 LIBDEPS=['$BUILD_DIR/mongo/client/clientdriver', 'mocklib'])
+env.CppUnitTest(
+    target='mongoscore_test',
+    source=[
+        's/shard_key_pattern_test.cpp',
+        's/balancing_window_test.cpp',
+        's/balancer_policy_tests.cpp',
+    ],
+    LIBDEPS=[
+        'mongoscore',
+        'coreshard',
+        'mongocommon',
+        'coreserver',
+        'coredb',
+    ]
+)
 
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
@@ -933,15 +943,6 @@ env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                     "mongoscore",
                     "ntservice_mock"],
                  NO_CRUTCH=True)
-
-env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
-                LIBDEPS=[ "mongoscore",
-                          "coreshard",
-                          "mongocommon",
-                          "coreserver",
-                          "coredb",
-                          "message_server_port",
-                          "mocklib"])
 
 env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
                 LIBDEPS=[ "mongoscore",
@@ -968,8 +969,6 @@ if has_option( 'use-cpu-profiler' ):
     # conditionally made to depend on this file, as a library and then we could easily scope
     # just to this file.
     env.InjectThirdPartyIncludePaths('tcmalloc')
-
-env.Library("defaultversion", "s/default_version.cpp")
 
 env.CppUnitTest(
     target="index_filter_commands_test",
@@ -1043,7 +1042,6 @@ serveronlyLibdeps = ["coreshard",
                      "db/concurrency/lock_manager",
                      "db/concurrency/write_conflict_exception",
                      "db/ops/update_driver",
-                     "defaultversion",
                      "global_timestamp",
                      "index_key_validate",
                      'range_deleter',

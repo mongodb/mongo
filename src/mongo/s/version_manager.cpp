@@ -43,6 +43,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongos_options.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -112,7 +113,12 @@ namespace mongo {
         connectionShardStatus.reset( conn );
     }
 
-    bool VersionManager::isVersionableCB( DBClientBase* conn ){
+    bool VersionManager::isVersionableCB(DBClientBase* conn) {
+        // We do not version shard connections when issued from mongod
+        if (!isMongos()) {
+            return false;
+        }
+
         return conn->type() == ConnectionString::MASTER || conn->type() == ConnectionString::SET;
     }
 

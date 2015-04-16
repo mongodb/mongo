@@ -72,6 +72,12 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
+
+    bool isMongos() {
+        return false;
+    }
+
+
     // -----ShardingState START ----
 
     ShardingState::ShardingState()

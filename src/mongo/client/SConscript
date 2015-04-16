@@ -36,3 +36,7 @@ env.Library('clientdriver', [
 env.CppUnitTest("replica_set_monitor_test",
                 ["replica_set_monitor_test.cpp"],
                 LIBDEPS=["clientdriver"])
+
+env.CppUnitTest("dbclient_rs_test",
+                ["dbclient_rs_test.cpp"],
+                LIBDEPS=['clientdriver', '$BUILD_DIR/mongo/mocklib'])

@@ -67,8 +67,4 @@ namespace mongo {
 
     void printCommandLineOpts();
 
-    // This function should eventually go away, but needs to be here now because we have a lot of
-    // code that is shared between mongod and mongos that must know at runtime which binary it is in
-    bool isMongos();
-
 } // namespace mongo

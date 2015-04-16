@@ -953,7 +953,4 @@ namespace {
         return Status::OK();
     }
 
-    // FIXME: This function will not return the correct value if someone renames the mongos binary
-    bool isMongos() { return serverGlobalParams.binaryName == "mongos"; }
-
 } // namespace mongo
