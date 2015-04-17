@@ -162,6 +162,7 @@ __sweep_flush(WT_SESSION_IMPL *session)
 
 	return (0);
 }
+
 /*
  * __sweep_remove_handles --
  *	Remove closed dhandles from the connection list.
