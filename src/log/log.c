@@ -63,31 +63,30 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 		return (0);
 
 	/*
-	 * The LSN is the last written log record before the checkpoint.
-	 * See if the next record after that is a checkpoint and it is
-	 * the last record.  That is the only case where we can skip.
+	 * See if there are any data modification records between the
+	 * checkpoint LSN and the end of the log.  If there are none then
+	 * we can skip recovery.
 	 */
 	WT_RET(__wt_curlog_open(session, "log:", NULL, &c));
 	c->set_key(c, ckp_lsn->file, ckp_lsn->offset, 0);
 	if ((ret = c->search(c)) == 0) {
-		if ((ret = c->next(c)) == 0) {
+		while ((ret = c->next(c)) == 0) {
 			/*
 			 * The only thing we care about is the rectype.
 			 */
 			WT_ERR(c->get_value(c, &dummy_txnid, &rectype,
 			    &dummy_optype, &dummy_fileid,
 			    &dummy_key, &dummy_value));
-			/*
-			 * Only if the record is a checkpoint and it is the
-			 * last record can we skip.
-			 */
-			if (rectype == WT_LOGREC_CHECKPOINT &&
-			    (ret = c->next(c)) == WT_NOTFOUND) {
-				*rec = 0;
-				ret = 0;
-			}
-		} else if (ret == WT_NOTFOUND)
+			if (rectype == WT_LOGREC_COMMIT)
+				break;
+		}
+		/*
+		 * If we get to the end of the log, we can skip recovery.
+		 */
+		if (ret == WT_NOTFOUND) {
+			*rec = 0;
 			ret = 0;
+		}
 	} else if (ret == WT_NOTFOUND)
 		/*
 		 * We should always find the checkpoint LSN as it now points
