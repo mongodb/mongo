@@ -55,21 +55,25 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		skip = WT_BLOCK_ENCRYPT_SKIP;
+		encrypt_len = WT_STORE_SIZE(*((uint32_t *)
+		    ((uint8_t *)tmp->data + skip)));
+		if (encrypt_len > tmp->size)
+			WT_ERR_MSG(session, WT_ERROR,
+			    "corrupted encrypted block: padded size less than "
+			    "actual size");
 		/*
 		 * We're allocating the exact number of bytes we're expecting
 		 * from decryption plus the unencrypted header.
 		 */
-		WT_ERR(__wt_buf_initsize(session, buf, dsk->mem_size + skip));
+		WT_ERR(__wt_buf_initsize(session, buf, encrypt_len));
 
 		memcpy(buf->mem, tmp->data, skip);
-		encrypt_len = WT_STORE_SIZE(*((uint32_t *)
-		    ((uint8_t *)tmp->data + skip)));
-		decrypted_size = encrypt_len - skip -
+		decrypted_size = encrypt_len - skip - WT_ENCRYPT_LEN -
 		    btree->kencryptor->size_const;
 		ret = encryptor->decrypt(
 		    encryptor, &session->iface,
 		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
-		    encrypt_len - skip,
+		    encrypt_len - skip - WT_ENCRYPT_LEN,
 		    (uint8_t *)buf->mem + skip, decrypted_size, &result_len);
 
 		/*
@@ -84,6 +88,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
+		if (decrypted_size != result_len)
+			WT_ERR_MSG(session, WT_ERROR,
+			    "encrypted block: calculated size different than "
+			    "result size");
+		memcpy((uint8_t *)tmp->data + skip,
+		    (uint8_t *)buf->mem + skip, decrypted_size);
 	}
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
 		if (btree->compressor == NULL ||
