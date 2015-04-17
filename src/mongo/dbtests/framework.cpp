@@ -46,6 +46,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
+#include "mongo/s/d_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -119,6 +120,9 @@ namespace mongo {
             printSysInfo();
 
             getGlobalServiceContext()->setGlobalStorageEngine(storageGlobalParams.engine);
+
+            // Initialize the sharding state so we can run starding tests in isolation
+            shardingState.initialize("$dummy:10000");
 
             TestWatchDog twd;
             twd.go();
