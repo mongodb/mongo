@@ -74,9 +74,9 @@ __conn_dhandle_open_lock(
 		 *
 		 * Wait for a read lock if we want exclusive access and failed
 		 * to get it: the sweep server may be closing this handle, and
-		 * we need to wait for it to complete.  If we want exclusive
-		 * access and find the handle open once we get the read lock,
-		 * give up: some other thread has it locked for real.
+		 * we need to wait for it to release its lock.  If we want
+		 * exclusive access and find the handle open once we get the
+		 * read lock, give up: some other thread has it locked for real.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (!want_exclusive || lock_busy)) {
