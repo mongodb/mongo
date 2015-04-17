@@ -447,16 +447,6 @@ def skipTest(path):
                         ## Capped tests
                         "capped_max1.js", "capped_convertToCapped1.js", "rename.js"]:
             return True
-    if use_ssl:
-        # Skip tests using mongobridge since it does not support SSL
-        # TODO: Remove when SERVER-10910 has been resolved.  
-        if basename in ["gridfs.js", "initial_sync3.js", "majority.js", "no_chaining.js",
-                        "rollback4.js", "slavedelay3.js", "sync2.js", "tags.js"]:
-            return True
-        # TODO: For now skip tests using MongodRunner, remove when SERVER-10909 has been resolved
-        if basename in ["fastsync.js", "index_retry.js", "ttl_repl_maintenance.js", 
-                        "unix_socket1.js"]:
-            return True;
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly
         if parentDir.lower() == "auth" or "auth" in basename.lower():
