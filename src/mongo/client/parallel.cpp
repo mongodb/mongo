@@ -270,7 +270,7 @@ namespace mongo {
     }
 
     // LEGACY Constructor
-    ParallelSortClusteredCursor::ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns ,
+    ParallelSortClusteredCursor::ParallelSortClusteredCursor( const set<string>& servers , const string& ns ,
             const Query& q ,
             int options , const BSONObj& fields  )
         : _servers( servers ) {
@@ -1135,7 +1135,7 @@ namespace mongo {
             PCMData& mdata = i->second;
 
             _cursors[ index ].reset( mdata.pcState->cursor.get(), &mdata );
-            _servers.insert( ServerAndQuery( i->first.getConnString(), BSONObj() ) );
+            _servers.insert(i->first.getConnString());
 
             index++;
         }
@@ -1191,45 +1191,15 @@ namespace mongo {
         else return i->second.pcState->cursor;
     }
 
-    static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extra ) {
-        BSONObjBuilder b;
-        b.appendElements( filter );
-        b.appendElements( extra );
-        return b.obj();
-        // TODO: should do some simplification here if possibl ideally
-    }
-
-    static BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter ) {
-        if ( ! query.hasField( "query" ) )
-            return _concatFilter( query , extraFilter );
-
-        BSONObjBuilder b;
-        BSONObjIterator i( query );
-        while ( i.more() ) {
-            BSONElement e = i.next();
-
-            if ( strcmp( e.fieldName() , "query" ) ) {
-                b.append( e );
-                continue;
-            }
-
-            b.append( "query" , _concatFilter( e.embeddedObjectUserCheck() , extraFilter ) );
-        }
-        return b.obj();
-    }
-
-    // DEPRECATED
+    // DEPRECATED (but still used by map/reduce)
     void ParallelSortClusteredCursor::_oldInit() {
-
-        // log() << "Starting parallel search..." << endl;
-
         // make sure we're not already initialized
         verify( ! _cursors );
         _cursors = new DBClientCursorHolder[_numServers];
 
         bool returnPartial = ( _options & QueryOption_PartialResults );
 
-        vector<ServerAndQuery> queries( _servers.begin(), _servers.end() );
+        vector<string> serverHosts(_servers.begin(), _servers.end());
         set<int> retryQueries;
         int finishedQueries = 0;
 
@@ -1253,35 +1223,34 @@ namespace mongo {
 
             if( ! firstPass ){
                 log() << "retrying " << ( returnPartial ? "(partial) " : "" ) << "parallel connection to ";
-                for( set<int>::iterator it = retryQueries.begin(); it != retryQueries.end(); ++it ){
-                    log() << queries[*it]._server << ", ";
+                for (set<int>::const_iterator it = retryQueries.begin();
+                     it != retryQueries.end();
+                     ++it) {
+
+                    log() << serverHosts[*it] << ", ";
                 }
                 log() << finishedQueries << " finished queries." << endl;
             }
 
             size_t num = 0;
-            for ( vector<ServerAndQuery>::iterator it = queries.begin(); it != queries.end(); ++it ) {
+            for (vector<string>::const_iterator it = serverHosts.begin();
+                 it != serverHosts.end();
+                 ++it) {
+
                 size_t i = num++;
 
-                const ServerAndQuery& sq = *it;
+                const string& serverHost = *it;
 
                 // If we're not retrying this cursor on later passes, continue
                 if( ! firstPass && retryQueries.find( i ) == retryQueries.end() ) continue;
 
-                // log() << "Querying " << _query << " from " << _ns << " for " << sq._server << endl;
-
-                BSONObj q = _query;
-                if ( ! sq._extra.isEmpty() ) {
-                    q = concatQuery( q , sq._extra );
-                }
-
-                string errLoc = " @ " + sq._server;
+                const string errLoc = " @ " + serverHost;
 
                 if( firstPass ){
 
                     // This may be the first time connecting to this shard, if so we can get an error here
                     try {
-                        conns.push_back( shared_ptr<ShardConnection>( new ShardConnection( sq._server , _ns ) ) );
+                        conns.push_back(shared_ptr<ShardConnection>(new ShardConnection(serverHost, _ns)));
                     }
                     catch( std::exception& e ){
                         socketExs.push_back( e.what() + errLoc );
@@ -1293,7 +1262,7 @@ namespace mongo {
                         continue;
                     }
 
-                    servers.push_back( sq._server );
+                    servers.push_back(serverHost);
                 }
 
                 if ( conns[i]->setVersion() ) {
@@ -1310,11 +1279,12 @@ namespace mongo {
                     break;
                 }
 
-                LOG(5) << "ParallelSortClusteredCursor::init server:" << sq._server << " ns:" << _ns
-                       << " query:" << q << " _fields:" << _fields << " options: " << _options  << endl;
+                LOG(5) << "ParallelSortClusteredCursor::init server:" << serverHost
+                       << " ns:" << _ns << " query:" << _query << " fields:" << _fields
+                       << " options: " << _options;
 
                 if( ! _cursors[i].get() )
-                    _cursors[i].reset( new DBClientCursor( conns[i]->get() , _ns , q ,
+                    _cursors[i].reset( new DBClientCursor( conns[i]->get() , _ns , _query,
                                                             0 , // nToReturn
                                                             0 , // nToSkip
                                                             _fields.isEmpty() ? 0 : &_fields , // fieldsToReturn
@@ -1345,9 +1315,7 @@ namespace mongo {
             // TODO:  Better error classification would make this easier, errors are indicated in all sorts of ways
             // here that we need to trap.
             for ( size_t i = 0; i < num; i++ ) {
-
-                // log() << "Finishing query for " << cons[i].get()->getHost() << endl;
-                string errLoc = " @ " + queries[i]._server;
+                const string errLoc = " @ " + serverHosts[i];
 
                 if( ! _cursors[i].get() || ( ! firstPass && retryQueries.find( i ) == retryQueries.end() ) ){
                     if( conns[i] ) conns[i].get()->done();

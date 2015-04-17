@@ -1641,11 +1641,11 @@ namespace {
                 return b.obj();
             }
 
-            void cleanUp( const set<ServerAndQuery>& servers, string dbName, string shardResultCollection ) {
+            void cleanUp( const set<string>& servers, string dbName, string shardResultCollection ) {
                 try {
                     // drop collections with tmp results on each shard
-                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-                        ScopedDbConnection conn(i->_server);
+                    for ( set<string>::const_iterator i=servers.begin(); i!=servers.end(); i++ ) {
+                        ScopedDbConnection conn(*i);
                         conn->dropCollection( dbName + "." + shardResultCollection );
                         conn.done();
                     }
@@ -1775,7 +1775,7 @@ namespace {
                 }
 
                 set<Shard> shards;
-                set<ServerAndQuery> servers;
+                set<string> servers;
                 vector<Strategy::CommandResult> results;
 
                 BSONObjBuilder shardResultsB;
@@ -1801,7 +1801,7 @@ namespace {
                             i != results.end(); ++i ) {
 
                     	// need to gather list of all servers even if an error happened
-                        string server = i->shardTarget.getConnString();
+                        const string server = i->shardTarget.getConnString();
                         servers.insert( server );
                         if ( !ok ) continue;
 

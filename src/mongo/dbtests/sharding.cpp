@@ -58,25 +58,6 @@ namespace ShardingTests {
     using std::string;
     using std::vector;
 
-    namespace serverandquerytests {
-        class test1 {
-        public:
-            void run() {
-                ServerAndQuery a( "foo:1" , BSON( "a" << GT << 0 << LTE << 100 ) );
-                ServerAndQuery b( "foo:1" , BSON( "a" << GT << 200 << LTE << 1000 ) );
-
-                ASSERT( a < b );
-                ASSERT( ! ( b < a ) );
-
-                set<ServerAndQuery> s;
-                s.insert( a );
-                s.insert( b );
-
-                ASSERT_EQUALS( (unsigned int)2 , s.size() );
-            }
-        };
-    }
-
     static int rand( int max = -1 ){
         static unsigned seed = 1337;
 
@@ -682,7 +663,6 @@ namespace ShardingTests {
         }
 
         void setupTests() {
-            add< serverandquerytests::test1 >();
             add< ChunkManagerCreateBasicTest >();
             add< ChunkManagerCreateFullTest >();
             add< ChunkManagerLoadBasicTest >();

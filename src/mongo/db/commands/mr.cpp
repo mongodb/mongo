@@ -1590,15 +1590,14 @@ namespace mongo {
 
                 ProgressMeterHolder pm(op->setMessage("m/r: merge sort and reduce",
                                                       "M/R Merge Sort and Reduce Progress"));
-                set<ServerAndQuery> servers;
+                set<string> servers;
 
                 {
                     // parse per shard results
-                    BSONObjIterator i( shardCounts );
-                    while ( i.more() ) {
+                    BSONObjIterator i(shardCounts);
+                    while (i.more()) {
                         BSONElement e = i.next();
-                        string shard = e.fieldName();
-                        servers.insert( shard );
+                        servers.insert(e.fieldName());
                     }
                 }
 

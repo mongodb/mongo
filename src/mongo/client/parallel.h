@@ -34,52 +34,16 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard_connection.h"
 
 namespace mongo {
 
+    class DBClientCursorHolder;
     class Shard;
     class StaleConfigException;
-
-    /**
-     * holder for a server address and a query to run
-     */
-    class ServerAndQuery {
-    public:
-        ServerAndQuery( const std::string& server , BSONObj extra = BSONObj() , BSONObj orderObject = BSONObj() ) :
-            _server( server ) , _extra( extra.getOwned() ) , _orderObject( orderObject.getOwned() ) {
-        }
-
-        bool operator<( const ServerAndQuery& other ) const {
-            if ( ! _orderObject.isEmpty() )
-                return _orderObject.woCompare( other._orderObject ) < 0;
-
-            if ( _server < other._server )
-                return true;
-            if ( other._server > _server )
-                return false;
-            return _extra.woCompare( other._extra ) < 0;
-        }
-
-        std::string toString() const {
-            StringBuilder ss;
-            ss << "server:" << _server << " _extra:" << _extra.toString() << " _orderObject:" << _orderObject.toString();
-            return ss.str();
-        }
-
-        operator std::string() const {
-            return toString();
-        }
-
-        std::string _server;
-        BSONObj _extra;
-        BSONObj _orderObject;
-    };
-
     class ParallelConnectionMetadata;
-    class DBClientCursorHolder;
+
 
     class CommandInfo {
     public:
@@ -180,7 +144,7 @@ namespace mongo {
         ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo() );
 
         // DEPRECATED legacy constructor for pure mergesort functionality - do not use
-        ParallelSortClusteredCursor( const std::set<ServerAndQuery>& servers , const std::string& ns ,
+        ParallelSortClusteredCursor( const std::set<std::string>& servers , const std::string& ns ,
                                      const Query& q , int options=0, const BSONObj& fields=BSONObj() );
 
         ~ParallelSortClusteredCursor();
@@ -264,7 +228,7 @@ namespace mongo {
         // LEGACY BELOW
         int _numServers;
         int _lastFrom;
-        std::set<ServerAndQuery> _servers;
+        std::set<std::string> _servers;
         BSONObj _sortKey;
 
         DBClientCursorHolder * _cursors;
