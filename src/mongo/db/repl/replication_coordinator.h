@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/reporter.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -75,7 +76,7 @@ namespace repl {
      * with the rest of the system.  The public methods on ReplicationCoordinator are the public
      * API that the replication subsystem presents to the rest of the codebase.
      */
-    class ReplicationCoordinator {
+    class ReplicationCoordinator : ReplicationProgressManager {
         MONGO_DISALLOW_COPYING(ReplicationCoordinator);
 
     public:
