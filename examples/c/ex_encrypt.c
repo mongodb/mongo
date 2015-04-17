@@ -382,22 +382,29 @@ simple_walk_log(WT_SESSION *session)
 	WT_ITEM logrec_key, logrec_value;
 	uint64_t txnid;
 	uint32_t fileid, opcount, optype, rectype;
-	int ret;
+	int found, ret;
 
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
 
+	found = 0;
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
 		ret = cursor->get_value(cursor, &txnid,
 		    &rectype, &optype, &fileid, &logrec_key, &logrec_value);
 
-		if (rectype == WT_LOGREC_MESSAGE)
+		if (rectype == WT_LOGREC_MESSAGE) {
+			found = 1;
 			printf("Application Log Record: %s\n",
 			    (char *)logrec_value.data);
+		}
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	ret = cursor->close(cursor);
+	if (found == 0) {
+		fprintf(stderr, "Did not find log messages.\n");
+		exit(1);
+	}
 	return (ret);
 }
 
@@ -407,7 +414,7 @@ simple_walk_log(WT_SESSION *session)
 
 #define	WT_OPEN_CONFIG_COMMON \
     "create,cache_size=100MB,extensions=[" EXTENSION_NAME "],"\
-    "log=(enabled=true,compressor=snappy)," \
+    "log=(archive=false,enabled=true,compressor=snappy)," \
 
 #define	WT_OPEN_CONFIG_GOOD \
     WT_OPEN_CONFIG_COMMON \

@@ -398,13 +398,11 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
-	WT_LOG_RECORD *logrec, *newlogrec;
-	size_t decrypted_size, header_skip, result_len;
-	uint32_t encrypt_len;
+	size_t decrypted_size, dst_len, result_len, src_len;
+	uint32_t unpadded_len;
+	uint8_t *dst, *src;
 
 	conn = S2C(session);
-	logrec = (WT_LOG_RECORD *)in->mem;
-	header_skip = WT_LOG_ENCRYPT_SKIP;
 	kencryptor = conn->kencryptor;
 	if (kencryptor == NULL ||
 	    (encryptor = kencryptor->encryptor) == NULL ||
@@ -415,52 +413,46 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 
 	/*
 	 * There are a lot of sizes and offsets to keep track of here.
-	 * in->size: the size of the log record including padding to
-	 *	the log record allocation size.
-	 * header_skip: the size of the log record header that is not encrypted.
-	 * logrec->mem_len: the final size of the log record in memory.  This
-	 *	size is the original size before compression.
-	 * logrec->len: the size of the log record in memory in its current
-	 *	state including compressed or encrypted.  This includes the
-	 *	header, encryption constant and data.
-	 * encrypt_len: the size of the encrypted log record in memory.  This
-	 *	was the log record size before padding.
-	 * size_const: the constant space added to the record by then
-	 *	encrypt function.
-	 * decrypted_size: the final size of the original data written
-	 *	less the log header.
+	 * unpadded_len: the size of the encrypted log record in memory.  This
+	 *	was the encrypted log record size before padding.
+	 * decrypted_size: the size of the original data including
+	 *	the log header.
+	 * src_len: the final size of the encrypted data without the log header.
+	 * dst_len: the final size of the decrypted original  data without
+	 *	the log header.
 	 *
 	 * For the decrypted output, we need to allocate a buffer large
 	 * enough for a record header and the decrypted data.
-	 * We copy the log record into the new decrypted buffer and then
-	 * we decrypt.  The args to decrypt are:
-	 * src: input buffer after the log header.
-	 * src_len: unpadded log record size minus the log header.
-	 * dst: output buffer after log header.
-	 * dst_len: final decrypted size.
 	 */
-	encrypt_len = WT_STORE_SIZE(*((uint32_t *)
-	    ((uint8_t *)in->data + header_skip)));
-	WT_ASSERT(session, encrypt_len > 0);
-	decrypted_size = encrypt_len - header_skip - kencryptor->size_const;
+	unpadded_len = WT_STORE_SIZE(*((uint32_t *)
+	    ((uint8_t *)in->data + WT_LOG_ENCRYPT_SKIP)));
+	WT_ASSERT(session, unpadded_len > 0);
+	/*
+	 * The size of the new buffer should be the unpadded length less
+	 * the extra non-user data overhead added for encryption.
+	 */
+	decrypted_size = unpadded_len - kencryptor->size_const - WT_ENCRYPT_LEN;
 	WT_ERR(__wt_scr_alloc(session, 0, out));
-	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size + header_skip));
-	memcpy((*out)->mem, in->mem, header_skip);
-	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
-	    (uint8_t *)in->mem + header_skip + WT_ENCRYPT_LEN,
-	    encrypt_len - header_skip,
-	    (uint8_t *)(*out)->mem + header_skip,
-	    decrypted_size, &result_len));
+	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size));
 
-	newlogrec = (WT_LOG_RECORD *)(*out)->mem;
-	newlogrec->mem_len = logrec->mem_len;
+	src = (uint8_t *)in->mem + WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
+	src_len = unpadded_len - WT_LOG_ENCRYPT_SKIP - WT_ENCRYPT_LEN;
+	dst = (uint8_t *)(*out)->mem + WT_LOG_ENCRYPT_SKIP;
+	dst_len = decrypted_size - WT_LOG_ENCRYPT_SKIP;
+	/*
+	 * Copy in the skipped header bytes.
+	 */
+	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
+	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
+	    src, src_len, dst, dst_len, &result_len));
+
 	/*
 	 * If checksums were turned off because we're depending on the
 	 * decryption to fail on any corrupted data, we'll end up
 	 * here after corruption happens.  If we're salvaging the file,
 	 * it's OK, otherwise it's really, really bad.
 	 */
-	if (ret != 0 || result_len != decrypted_size)
+	if (ret != 0 || result_len != dst_len)
 		WT_ERR(WT_ERROR);
 err:	return (ret);
 }
@@ -1672,14 +1664,14 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_DECL_ITEM(eitem);
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
-	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_ITEM *ip;
+	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_LOG *log;
-	WT_LOG_RECORD *newlrp, *origrp;
+	WT_LOG_RECORD *newlrp;
 	int compression_failed;
-	size_t len, src_len, dst_len, result_len, size;
+	size_t dst_len, len, new_size, result_len, src_len;
 	uint32_t *unpadded_lenp;
-	uint8_t *src, *dst;
+	uint8_t *dst, *src;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -1713,8 +1705,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			WT_ERR(compressor->pre_size(compressor,
 			    &session->iface, src, src_len, &len));
 
-		size = len + WT_LOG_COMPRESS_SKIP;
-		WT_ERR(__wt_scr_alloc(session, size, &citem));
+		new_size = len + WT_LOG_COMPRESS_SKIP;
+		WT_ERR(__wt_scr_alloc(session, new_size, &citem));
 
 		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)citem->mem + WT_LOG_COMPRESS_SKIP;
@@ -1758,58 +1750,54 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			F_SET(newlrp, WT_LOG_RECORD_COMPRESSED);
 			WT_ASSERT(session, result_len < UINT32_MAX &&
 			    record->size < UINT32_MAX);
-			newlrp->len = WT_STORE_SIZE(result_len);
 			newlrp->mem_len = WT_STORE_SIZE(record->size);
 		}
 	}
 	if ((kencryptor = conn->kencryptor) != NULL) {
 		encryptor = kencryptor->encryptor;
-		origrp = (WT_LOG_RECORD *)ip->mem;
-		/* Skip the log header */
+
+		/*
+		 * Allocate enough space for the original record plus the
+		 * encryption size constant plus the length we store.
+		 */
+		new_size = ip->size +
+		    kencryptor->size_const + WT_ENCRYPT_LEN;
+		WT_ERR(__wt_scr_alloc(session, new_size, &eitem));
+
+		/*
+		 * Initialize the new buffer with the original header
+		 * bytes and set up the new unpadded size that we add.
+		 */
+		memcpy(eitem->mem, ip->mem, WT_LOG_ENCRYPT_SKIP);
+		unpadded_lenp = (uint32_t *)
+		    ((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
+		*unpadded_lenp = WT_STORE_SIZE(new_size);
+		eitem->size = new_size;
+
+		/*
+		 * Set up the source and destination pointers and lengths
+		 * for the encryption function.  These point into the part
+		 * of the buffers beyond the headers.
+		 */
 		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
 		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;
-
-		size = ip->size + kencryptor->size_const + WT_ENCRYPT_LEN;
-		WT_ERR(__wt_scr_alloc(session, size, &eitem));
-
-		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)eitem->mem +
 		    WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 		dst_len = src_len + kencryptor->size_const;
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
-		result_len += WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-		WT_ASSERT(session, result_len == size);
 
 		/* TODO: stats */
 
 		/*
-		 * Copy in the skipped header bytes, set the final data
-		 * size.
+		 * Final setup of new buffer.  Set the flag for
+		 * encryption in the record header.
 		 */
-		memcpy(eitem->mem, ip->mem, WT_LOG_ENCRYPT_SKIP);
-		eitem->size = result_len;
 		ip = eitem;
 		newlrp = (WT_LOG_RECORD *)eitem->mem;
 		F_SET(newlrp, WT_LOG_RECORD_ENCRYPTED);
-		WT_ASSERT(session, result_len < UINT32_MAX &&
+		WT_ASSERT(session, new_size < UINT32_MAX &&
 		    ip->size < UINT32_MAX);
-		/*
-		 * Store unpadded size so we know how much space is needed
-		 * on the decryption side.
-		 */
-		unpadded_lenp = (uint32_t *)
-		    ((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
-		*unpadded_lenp = WT_STORE_SIZE(size);
-
-		/*
-		 * The length will get overwritten when it is padded in the
-		 * internal code.  The in memory length stays the same as the
-		 * original indicating it is our ultimate length when we
-		 * read and decrypt.
-		 */
-		newlrp->len = WT_STORE_SIZE(size);
-		newlrp->mem_len = origrp->mem_len;
 	}
 	ret = __log_write_internal(session, ip, lsnp, flags);
 
