@@ -63,17 +63,7 @@ namespace mongo {
         }
     }
 
-    void LastError::appendSelfStatus( BSONObjBuilder &b ) {
-        if ( writebackId.isSet() ) {
-            b.append( "writeback" , writebackId );
-            b.append( "writebackSince", writebackSince );
-            b.append( "instanceIdent" , prettyHostName() ); // this can be any unique string
-        }
-    }
-
     bool LastError::appendSelf( BSONObjBuilder &b , bool blankErr ) {
-
-        appendSelfStatus( b );
 
         if ( !valid ) {
             if ( blankErr )
@@ -112,7 +102,6 @@ namespace mongo {
         uassert(13649, "no operation yet", le);
         le->disabled = true;
         le->nPrev--; // caller is a command that shouldn't count as an operation
-        le->writebackSince--; // same as above
         return le;
     }
 
@@ -164,7 +153,6 @@ namespace mongo {
         else {
             err->disabled = false;
             err->nPrev++;
-            err->writebackSince++;
         }
     }
 

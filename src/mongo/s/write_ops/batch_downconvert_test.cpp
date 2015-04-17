@@ -144,32 +144,6 @@ namespace {
         ASSERT_EQUALS( errors.wcError->getErrCode(), 10990 );
     }
 
-    TEST(GLEParsing, OldStaleWrite) {
-
-        const BSONObj gleResponse =
-            fromjson( "{ok: 1.0, err: null, writeback: 'abcde', writebackSince: 1}" );
-
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( !errors.writeError.get() );
-        ASSERT( !errors.wcError.get() );
-    }
-
-    TEST(GLEParsing, StaleWriteErrAndNotMasterGLEFail) {
-
-        // Not master code in response
-        const BSONObj gleResponse = fromjson( "{ok: 0.0, err: null, errmsg: 'message', code: 10990,"
-                                              " writeback: 'abcde', writebackSince: 0}" );
-
-        GLEErrors errors;
-        ASSERT_OK( extractGLEErrors( gleResponse, &errors ) );
-        ASSERT( errors.writeError.get() );
-        ASSERT_EQUALS( errors.writeError->getErrCode(), ErrorCodes::StaleShardVersion );
-        ASSERT( errors.wcError.get() );
-        ASSERT_EQUALS( errors.wcError->getErrMessage(), "message" );
-        ASSERT_EQUALS( errors.wcError->getErrCode(), 10990 );
-    }
-
     TEST(GLEParsing, WriteErrWithStats) {
         const BSONObj gleResponse = fromjson( "{ok: 1.0, n: 2, err: 'message', code: 1000}" );
 

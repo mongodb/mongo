@@ -175,7 +175,6 @@ namespace mongo {
             if ( !lastOpTimePresent ) {
                 if ( le->nPrev != 1 ) {
                     errorOccurred = LastError::noError.appendSelf( result, false );
-                    le->appendSelfStatus( result );
                 }
                 else {
                     errorOccurred = le->appendSelf( result, false );
