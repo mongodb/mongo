@@ -32,11 +32,13 @@
 
 #include "mongo/util/signal_handlers_synchronous.h"
 
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
 #include <boost/thread.hpp>
+#include <csignal>
 #include <exception>
 #include <iostream>
 #include <memory>
-#include <signal.h>
 #include <streambuf>
 #include <typeinfo>
 
@@ -149,6 +151,11 @@ namespace {
                 catch (const std::exception& ex) {
                     typeInfo = &typeid(ex);
                     mallocFreeOStream << "std::exception::what(): " << ex.what() << '\n';
+                }
+                catch (const boost::exception& ex) {
+                    typeInfo = &typeid(ex);
+                    mallocFreeOStream << "boost::diagnostic_information(): "
+                                      << boost::diagnostic_information(ex) << '\n';
                 }
                 catch (...) {
                     mallocFreeOStream << "A non-standard exception type was thrown\n";
