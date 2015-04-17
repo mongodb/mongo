@@ -1511,9 +1511,6 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "# these settings, set a WIREDTIGER_CONFIG environment variable\n"
 	    "# or create a WiredTiger.config file to override them.");
 
-	fprintf(fp, "version=(major=%d,minor=%d)\n\n",
-	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
-
 	/*
 	 * We were passed an array of configuration strings where slot 0 is all
 	 * possible values and the second and subsequent slots are changes
@@ -1603,9 +1600,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
+	char version[64];
 
 	/* Leave space for optional additional configuration. */
-	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
+	const char *cfg[] = {
+	    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 
 	*wt_connp = NULL;
 
@@ -1675,6 +1674,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	__conn_config_append(cfg, config);
 	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
 	WT_ERR(__conn_config_env(session, cfg, i3));
+
+	WT_ERR_TEST(snprintf(version, sizeof(version),
+	    "version=(major=%d,minor=%d)",
+	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR) >=
+	    (int)sizeof(version), ENOMEM);
+	__conn_config_append(cfg, version);
 
 	/*
 	 * Configuration ...
