@@ -977,7 +977,6 @@ namespace mongo {
      *   min: {},
      *   max: {},
      *   maxChunkBytes: numeric,
-     *   shardId: "_id of chunk document in config.chunks",
      *   configdb: "hostAndPort",
      *
      *   // optional
@@ -1089,7 +1088,6 @@ namespace mongo {
 
             BSONObj min  = cmdObj["min"].Obj();
             BSONObj max  = cmdObj["max"].Obj();
-            BSONElement shardId = cmdObj["shardId"];
             BSONElement maxSizeElem = cmdObj["maxChunkSizeBytes"];
 
             if ( ns.empty() ) {
@@ -1113,11 +1111,6 @@ namespace mongo {
 
             if ( max.isEmpty() ) {
                 errmsg = "need to specify a max";
-                return false;
-            }
-
-            if ( shardId.eoo() ) {
-                errmsg = "need shardId";
                 return false;
             }
 

@@ -445,7 +445,6 @@ namespace {
         cmd.append( "max" , getMax() );
         cmd.append( "from" , getShard().getName() );
         cmd.append( "splitKeys" , m );
-        cmd.append( "shardId" , genID() );
         cmd.append( "configdb" , configServer.modelServer() );
         cmd.append("epoch", _manager->getVersion().epoch());
         BSONObj cmdObj = cmd.obj();
@@ -497,7 +496,6 @@ namespace {
         builder.append("min", _min);
         builder.append("max", _max);
         builder.append("maxChunkSizeBytes", chunkSize);
-        builder.append("shardId", genID());
         builder.append("configdb", configServer.modelServer());
 
         // For legacy secondary throttle setting.

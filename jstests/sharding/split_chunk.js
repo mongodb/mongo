@@ -14,7 +14,6 @@ testDB.adminCommand({ enableSharding: 'test' });
 var callSplit = function(db, minKey, maxKey, splitPoints) {
     return db.runCommand({
         splitChunk: 'test.user',
-        shardId: 'dummy',
         from: 'shard0000',
         min: minKey,
         max: maxKey,

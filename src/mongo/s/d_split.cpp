@@ -568,12 +568,6 @@ namespace mongo {
                 splitKeys.push_back( it.next().Obj().getOwned() );
             }
 
-            const BSONElement shardId = cmdObj["shardId"];
-            if ( shardId.eoo() ) {
-                errmsg = "need to provide shardId";
-                return false;
-            }
-
             //
             // Get sharding state up-to-date
             //
