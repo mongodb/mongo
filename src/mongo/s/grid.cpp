@@ -64,7 +64,7 @@ namespace mongo {
         invariant(!_catalogCache);
 
         _catalogManager = std::move(catalogManager);
-        _catalogCache = std::make_unique<CatalogCache>(_catalogManager.get());
+        _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
     }
 
     StatusWith<shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
