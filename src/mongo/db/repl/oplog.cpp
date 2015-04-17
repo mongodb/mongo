@@ -452,7 +452,7 @@ namespace {
 namespace {
     NamespaceString parseNs(const string& ns, const BSONObj& cmdObj) {
         BSONElement first = cmdObj.firstElement();
-        uassert(28631,
+        uassert(28635,
                 "no collection name specified",
                 first.canonicalType() == canonicalizeBSONType(mongo::String)
                 && first.valuestrsize() > 0);
