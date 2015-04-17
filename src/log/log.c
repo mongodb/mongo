@@ -377,6 +377,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
+	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_LOG_RECORD *logrec, *newlogrec;
 	size_t decrypted_size, header_skip, result_len;
 	uint32_t encrypt_len;
@@ -384,8 +385,10 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	conn = S2C(session);
 	logrec = (WT_LOG_RECORD *)in->mem;
 	header_skip = WT_LOG_ENCRYPT_SKIP;
-	encryptor = conn->encryptor;
-	if (encryptor == NULL || encryptor->decrypt == NULL)
+	kencryptor = conn->kencryptor;
+	if (kencryptor == NULL ||
+	    (encryptor = kencryptor->encryptor) == NULL ||
+	    encryptor->decrypt == NULL)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "log_read: Encrypted record with "
 		    "no configured decrypt method");
@@ -400,8 +403,8 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * logrec->len: the size of the log record in memory in its current
 	 *	state including compressed or encrypted.  This includes the
 	 *	header, encryption constant and data.
-	 * encrypt_len: the size of the encrypted log record in memory.  This was
-	 *	the log record size before padding.
+	 * encrypt_len: the size of the encrypted log record in memory.  This
+	 *	was the log record size before padding.
 	 * size_const: the constant space added to the record by then
 	 *	encrypt function.
 	 * decrypted_size: the final size of the original data written
@@ -419,7 +422,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	encrypt_len = WT_STORE_SIZE(*((uint32_t *)
 	    ((uint8_t *)in->data + header_skip)));
 	WT_ASSERT(session, encrypt_len > 0);
-	decrypted_size = encrypt_len - header_skip - encryptor->size_const;
+	decrypted_size = encrypt_len - header_skip - kencryptor->size_const;
 	WT_ERR(__wt_scr_alloc(session, 0, out));
 	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size + header_skip));
 	memcpy((*out)->mem, in->mem, header_skip);
@@ -1653,6 +1656,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_DECL_ITEM(eitem);
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
+	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_ITEM *ip;
 	WT_LOG *log;
 	WT_LOG_RECORD *newlrp, *origrp;
@@ -1742,19 +1746,20 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			newlrp->mem_len = WT_STORE_SIZE(record->size);
 		}
 	}
-	if ((encryptor = conn->encryptor) != NULL) {
+	if ((kencryptor = conn->kencryptor) != NULL) {
+		encryptor = kencryptor->encryptor;
 		origrp = (WT_LOG_RECORD *)ip->mem;
 		/* Skip the log header */
 		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
 		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;
 
-		size = ip->size + encryptor->size_const + WT_ENCRYPT_LEN;
+		size = ip->size + kencryptor->size_const + WT_ENCRYPT_LEN;
 		WT_ERR(__wt_scr_alloc(session, size, &eitem));
 
 		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)eitem->mem +
 		    WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-		dst_len = src_len + encryptor->size_const;
+		dst_len = src_len + kencryptor->size_const;
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
 		result_len += WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;

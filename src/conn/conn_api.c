@@ -604,7 +604,8 @@ __wt_encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
  */
 int
 __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
-    WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *cfg_arg, WT_ENCRYPTOR **encryptorp)
+    WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *cfg_arg,
+    WT_KEYED_ENCRYPTOR **kencryptorp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -612,7 +613,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 
-	*encryptorp = NULL;
+	*kencryptorp = NULL;
 	conn = S2C(session);
 	kenc = NULL;
 
@@ -626,7 +627,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 
 	TAILQ_FOREACH(kenc, &nenc->keyedqh, q)
 		if (WT_STRING_MATCH(kenc->keyid, keyid->str, keyid->len)) {
-			*encryptorp = kenc->encryptor;
+			*kencryptorp = kenc;
 			return (0);
 		}
 
@@ -641,13 +642,13 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 		else
 			kenc->owned = 1;
 	}
+	WT_ERR(encryptor->sizing(encryptor, &session->iface,
+	    &kenc->size_const));
 	kenc->encryptor = encryptor;
 
 	TAILQ_INSERT_TAIL(&nenc->keyedqh, kenc, q);
-	WT_ERR(encryptor->sizing(encryptor, &session->iface,
-	    &encryptor->size_const));
 
-	*encryptorp = encryptor;
+	*kencryptorp = kenc;
 	kenc = NULL;
 
 err:	if (kenc != NULL) {
@@ -1977,7 +1978,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * extensions may load encryptors.  We have to do this before creating
 	 * the metadata file.
 	 */
-	conn->encryptor = NULL;
+	conn->kencryptor = NULL;
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.secretkey",
@@ -1986,7 +1987,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (enc.len != 0)
 		WT_ERR(__wt_strndup(session, enc.str, enc.len, &enc_cfg[0]));
 	WT_ERR(__wt_encryptor_config(session, &cval, &keyid,
-	    (WT_CONFIG_ARG *)enc_cfg, &conn->encryptor));
+	    (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
 	if (secretval.len != 0) {
 		/*
 		 * After making the secret key available to the encryptor,

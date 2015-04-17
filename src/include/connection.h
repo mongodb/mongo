@@ -29,6 +29,7 @@ extern WT_PROCESS __wt_process;
 struct __wt_keyed_encryptor {
 	const char *keyid;		/* Key id of encryptor */
 	int owned;			/* Encryptor needs to be terminated */
+	size_t size_const;		/* The result of the sizing callback */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
 					/* Linked list of encryptors */
 	TAILQ_ENTRY(__wt_keyed_encryptor) q;
@@ -288,7 +289,7 @@ struct __wt_connection_impl {
 
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
-	WT_ENCRYPTOR	*encryptor;     /* Encryptor for metadata and log */
+	WT_KEYED_ENCRYPTOR *kencryptor;	/* Encryptor for metadata and log */
 
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */

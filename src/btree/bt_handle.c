@@ -170,7 +170,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 		btree->collator_owned = 0;
 	}
 	btree->collator = NULL;
-	btree->encryptor = NULL;
+	btree->kencryptor = NULL;
 
 	btree->bulk_load_ok = 0;
 
@@ -312,8 +312,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
-	if (WT_IS_METADATA(btree->dhandle) && conn->encryptor != NULL)
-		btree->encryptor = conn->encryptor;
+	if (WT_IS_METADATA(btree->dhandle) && conn->kencryptor != NULL)
+		btree->kencryptor = conn->kencryptor;
 	else {
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "encryption.name", &cval));
@@ -324,7 +324,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 			WT_RET(__wt_strndup(session, enc.str, enc.len,
 			    &enc_cfg[0]));
 		ret = __wt_encryptor_config(session, &cval, &metadata,
-		    (WT_CONFIG_ARG *)enc_cfg, &btree->encryptor);
+		    (WT_CONFIG_ARG *)enc_cfg, &btree->kencryptor);
 		__wt_free(session, enc_cfg[0]);
 		WT_RET(ret);
 	}

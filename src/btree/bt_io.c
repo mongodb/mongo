@@ -20,6 +20,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	WT_ENCRYPTOR *encryptor;
 	const WT_PAGE_HEADER *dsk;
 	size_t decrypted_size, result_len, skip;
 	uint32_t encrypt_len;
@@ -32,7 +33,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	 * buffer and decompress into the caller's buffer.  Else, read directly
 	 * into the caller's buffer.
 	 */
-	if (btree->compressor == NULL && btree->encryptor == NULL) {
+	if (btree->compressor == NULL && btree->kencryptor == NULL) {
 		WT_RET(bm->read(bm, session, buf, addr, addr_size));
 		dsk = buf->data;
 	} else {
@@ -46,8 +47,9 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	 * image into place, then decompress.
 	 */
 	if (F_ISSET(dsk, WT_PAGE_ENCRYPTED)) {
-		if (btree->encryptor == NULL ||
-		    btree->encryptor->decrypt == NULL)
+		if (btree->kencryptor == NULL ||
+		    (encryptor = btree->kencryptor->encryptor) == NULL ||
+		    encryptor->decrypt == NULL)
 			WT_ERR_MSG(session, WT_ERROR,
 			    "read encrypted block where no decryption engine "
 			    "configured");
@@ -62,9 +64,10 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		memcpy(buf->mem, tmp->data, skip);
 		encrypt_len = WT_STORE_SIZE(*((uint32_t *)
 		    ((uint8_t *)tmp->data + skip)));
-		decrypted_size = encrypt_len - skip - btree->encryptor->size_const;
-		ret = btree->encryptor->decrypt(
-		    btree->encryptor, &session->iface,
+		decrypted_size = encrypt_len - skip -
+		    btree->kencryptor->size_const;
+		ret = encryptor->decrypt(
+		    encryptor, &session->iface,
 		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
 		    encrypt_len - skip,
 		    (uint8_t *)buf->mem + skip, decrypted_size, &result_len);
@@ -170,10 +173,11 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
-	WT_ITEM *ip;
 	WT_DECL_ITEM(ctmp);
 	WT_DECL_ITEM(etmp);
 	WT_DECL_RET;
+	WT_ENCRYPTOR *encryptor;
+	WT_ITEM *ip;
 	WT_PAGE_HEADER *dsk;
 	size_t len, src_len, dst_len, result_len, size;
 	int data_cksum, compression_failed, encrypted;
@@ -295,8 +299,9 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Optionally encrypt the data.  We need to add in the original
 	 * length, in case both compression and encryption are done.
 	 */
-	if (btree->encryptor != NULL &&
-	    btree->encryptor->encrypt != NULL) {
+	if (btree->kencryptor != NULL &&
+	    (encryptor = btree->kencryptor->encryptor) != NULL &&
+	    encryptor->encrypt != NULL) {
 		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)ip->mem + WT_BLOCK_ENCRYPT_SKIP;
 		src_len = ip->size - WT_BLOCK_ENCRYPT_SKIP;
@@ -304,7 +309,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		/*
 		 * Compute the size needed for the destination buffer.
 		 */
-		len = btree->encryptor->size_const;
+		len = btree->kencryptor->size_const;
 
 		size = ip->size + len + WT_ENCRYPT_LEN;
 		WT_ERR(bm->write_size(bm, session, &size));
@@ -314,7 +319,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		dst = (uint8_t *)etmp->mem +
 		    WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 		dst_len = src_len + len;
-		if ((ret = btree->encryptor->encrypt(btree->encryptor,
+		if ((ret = encryptor->encrypt(encryptor,
 		    &session->iface,
 		    src, src_len,
 		    dst, dst_len,
@@ -333,7 +338,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		 * Store original size so we know how much space is needed
 		 * on the decryption side.
 		 */
-		elen = (uint32_t *)((uint8_t *)etmp->mem + WT_BLOCK_ENCRYPT_SKIP);
+		elen = (uint32_t *)((uint8_t *)etmp->mem +
+		    WT_BLOCK_ENCRYPT_SKIP);
 		*elen = WT_STORE_SIZE(result_len);
 
 		/*
