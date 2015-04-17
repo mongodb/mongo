@@ -1525,33 +1525,32 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * an application could leave that file as it is right now and not
 	 * remove a configuration we need, but applications can also guarantee
 	 * all database users specify consistent environment variables and
-	 * wiredtiger_open configuration arguments, and if we protect against
+	 * wiredtiger_open configuration arguments -- if we protect against
 	 * those problems, might as well include the application's configuration
-	 * file as well.
+	 * file in that protection.
 	 *
 	 * We want the list of defaults that have been changed, that is, if the
 	 * application didn't somehow configure a setting, we don't write out a
 	 * default value, so future releases may silently migrate to new default
-	 * values.
+	 * values. We do include configuring the default setting, presumably if
+	 * the application configured it explicitly, that setting should survive
+	 * even if the default changes.
 	 */
-	while (*++cfg != NULL) {
-		WT_ERR(__wt_config_init( session,
-		    &parser, WT_CONFIG_BASE(session, wiredtiger_open_basecfg)));
-		while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
-			if ((ret =
-			    __wt_config_getone(session, *cfg, &k, &v)) == 0) {
-				/* Fix quoting for non-trivial settings. */
-				if (v.type == WT_CONFIG_ITEM_STRING) {
-					--v.str;
-					v.len += 2;
-				}
-				fprintf(fp, "%.*s=%.*s\n",
-				    (int)k.len, k.str, (int)v.len, v.str);
+	WT_ERR(__wt_config_init( session,
+	    &parser, WT_CONFIG_BASE(session, wiredtiger_open_basecfg)));
+	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
+		if ((ret = __wt_config_get(session, cfg + 1, &k, &v)) == 0) {
+			/* Fix quoting for non-trivial settings. */
+			if (v.type == WT_CONFIG_ITEM_STRING) {
+				--v.str;
+				v.len += 2;
 			}
-			WT_ERR_NOTFOUND_OK(ret);
+			fprintf(fp, "%.*s=%.*s\n",
+			    (int)k.len, k.str, (int)v.len, v.str);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Flush the handle and rename the file into place. */
 	return (__wt_sync_and_rename_fp(
