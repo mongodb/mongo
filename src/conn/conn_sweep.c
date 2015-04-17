@@ -131,12 +131,8 @@ __sweep_flush(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	time_t now;
 
 	conn = S2C(session);
-
-	/* Don't discard handles that have been open recently. */
-	WT_RET(__wt_seconds(session, &now));
 
 	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
