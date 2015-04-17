@@ -422,6 +422,7 @@ __log_wrlsn_server(void *arg)
 				slot = &log->slot_pool[written[i].slot_index];
 				WT_ASSERT(session, LOG_CMP(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
+				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
 				WT_ERR(__wt_cond_signal(session,
 				    log->log_write_cond));
@@ -552,6 +553,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ZERO_LSN(&log->sync_dir_lsn);
 	WT_INIT_LSN(&log->trunc_lsn);
 	WT_INIT_LSN(&log->write_lsn);
+	WT_INIT_LSN(&log->write_start_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_cond_alloc(session, "log sync", 0, &log->log_sync_cond));
 	WT_RET(__wt_cond_alloc(session, "log write", 0, &log->log_write_cond));

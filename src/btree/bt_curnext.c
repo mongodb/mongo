@@ -261,12 +261,12 @@ new_page:	/* Find the matching WT_COL slot. */
 				continue;
 			}
 			WT_RET(__wt_page_cell_data_ref(
-			    session, page, &unpack, &cbt->tmp));
+			    session, page, &unpack, cbt->tmp));
 
 			cbt->cip_saved = cip;
 		}
-		val->data = cbt->tmp.data;
-		val->size = cbt->tmp.size;
+		val->data = cbt->tmp->data;
+		val->size = cbt->tmp->size;
 		return (0);
 	}
 	/* NOTREACHED */
