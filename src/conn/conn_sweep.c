@@ -132,10 +132,8 @@ __sweep_flush(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	time_t now;
-	int closed_handles;
 
 	conn = S2C(session);
-	closed_handles = 0;
 
 	/* Don't discard handles that have been open recently. */
 	WT_RET(__wt_seconds(session, &now));
