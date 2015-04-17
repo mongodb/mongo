@@ -154,7 +154,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	 *  - We are joining a cache pool for the first time (including
 	 *  creating the pool) - use the chunk size; that's the default.
 	 */
-	if (__wt_config_gets(session, &cfg[1],
+	if (__wt_config_gets(session, cfg,
 	    "shared_cache.reserve", &cval) == 0 && cval.val != 0)
 		reserve = (uint64_t)cval.val;
 	else if (updating)
