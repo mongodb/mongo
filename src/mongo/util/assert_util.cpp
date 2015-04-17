@@ -40,6 +40,10 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
+#include <exception>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/util/debug_util.h"
@@ -277,16 +281,28 @@ namespace mongo {
     Status exceptionToStatus() {
         try {
             throw;
-        } catch (const DBException& ex) {
+        }
+        catch (const DBException& ex) {
             return ex.toStatus();
-        } catch (const std::exception& ex) {
+        }
+        catch (const std::exception& ex) {
             return Status(ErrorCodes::UnknownError,
-                          mongoutils::str::stream() << "Caught exception of type "
-                                                    << demangleName(typeid(ex))
-                                                    << ": "
-                                                    << ex.what());
-        } catch (...) {
-            return Status(ErrorCodes::UnknownError, "Caught unknown exception");
+                          str::stream() << "Caught std::exception of type "
+                                        << demangleName(typeid(ex))
+                                        << ": "
+                                        << ex.what());
+        }
+        catch (const boost::exception& ex) {
+            return Status(ErrorCodes::UnknownError,
+                          str::stream() << "Caught boost::exception of type "
+                                        << demangleName(typeid(ex))
+                                        << ": "
+                                        << boost::diagnostic_information(ex));
+
+        }
+        catch (...) {
+            severe() << "Caught unknown exception in exceptionToStatus()";
+            std::terminate();
         }
     }
 

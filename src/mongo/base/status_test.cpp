@@ -26,8 +26,11 @@
  *    then also delete it in the license file.
  */
 
+#include <exception>
 #include <stdexcept>
 #include <string>
+
+#include <boost/exception/exception.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
@@ -236,17 +239,21 @@ namespace {
         ASSERT_TRUE(fromStdExcept.reason().find(reason) != std::string::npos);
         ASSERT_EQUALS(fromStdExcept.code(), ErrorCodes::UnknownError);
 
-        Status fromNonExcept = []() {
+        class bar : public boost::exception {};
+
+        Status fromBoostExcept = [=]() {
             try {
-                throw 4;
+                throw bar();
             }
             catch (...) {
                 return exceptionToStatus();
             }
         }();
 
-        ASSERT_NOT_OK(fromNonExcept);
-        ASSERT_EQUALS(fromNonExcept, ErrorCodes::UnknownError);
+        ASSERT_NOT_OK(fromBoostExcept);
+        ASSERT_EQUALS(fromBoostExcept, ErrorCodes::UnknownError);
+        // Reason should include that it was a boost::exception
+        ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
     }
 
 } // unnamed namespace
