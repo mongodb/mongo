@@ -160,7 +160,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         #   Truncate (archive) the log files
         #   Close the backup cursor
         updstr="bcdefghi"
-	for increment in range(0, 5):
+        for increment in range(0, 5):
             full_dir = self.dir + str(increment)
             # Add more work to move the logs forward.
             self.update(self.uri, self.dsize, updstr[increment], self.nops)
