@@ -416,10 +416,12 @@ __clsm_open_cursors(
 	ckpt_cfg[1] = "checkpoint=" WT_CHECKPOINT ",raw";
 	ckpt_cfg[2] = NULL;
 
-	/* Copy the key, so we don't lose the cursor position. */
-	if (F_ISSET(c, WT_CURSTD_KEY_INT) && !WT_DATA_IN_ITEM(&c->key))
-		WT_RET(__wt_buf_set(
-		    session, &c->key, c->key.data, c->key.size));
+	/*
+	 * If the key is pointing to memory that is pinned by a chunk
+	 * cursor, take a copy before closing cursors.
+	 */
+	if (F_ISSET(c, WT_CURSTD_KEY_INT))
+		WT_CURSOR_NEEDKEY(c);
 
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
@@ -1210,9 +1212,21 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		deleted = __clsm_deleted(clsm, &cursor->value);
 		if (!deleted)
 			__clsm_deleted_decode(clsm, &cursor->value);
-		else if ((ret = cursor->next(cursor)) == 0) {
-			cmp = 1;
-			deleted = 0;
+		else  {
+			/*
+			 * We have a key pointing at memory that is
+			 * pinned by the current chunk cursor.  In the
+			 * unlikely event that we have to reopen cursors
+			 * to move to the next record, make sure the cursor
+			 * flags are set so a copy is made before the current
+			 * chunk cursor releases its position.
+			 */
+			F_CLR(cursor, WT_CURSTD_KEY_SET);
+			F_SET(cursor, WT_CURSTD_KEY_INT);
+			if ((ret = cursor->next(cursor)) == 0) {
+				cmp = 1;
+				deleted = 0;
+			}
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 	}
