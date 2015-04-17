@@ -185,6 +185,9 @@ function copydbBetweenClustersTest(configObj) {
     target.stop();
 }
 
+(function() {
+"use strict"
+
 var sourceClusterTypeValues = [ "single", "repl", "sharded" ]
 var isSourceUsingAuthValues = [ true, false ]
 var targetClusterTypeValues = [ "single", "repl", "sharded" ]
@@ -208,6 +211,13 @@ for (var i = 0; i < sourceClusterTypeValues.length; i++) {
                     // SERVER-6427
                     continue;
                 }
+                if (sourceClusterTypeValues[i] === "repl" &&
+                    isSourceUsingAuthValues[j] === false &&
+                    targetClusterTypeValues[k] === "sharded" &&
+                    isTargetUsingAuthValues[l] == true) {
+                    // SERVER-18103
+                    continue;
+                }
                 var testCase = {
                     'sourceClusterType' : sourceClusterTypeValues[i],
                     'isSourceUsingAuth' : isSourceUsingAuthValues[j],
@@ -221,5 +231,5 @@ for (var i = 0; i < sourceClusterTypeValues.length; i++) {
         }
     }
 }
-
+}());
 print(baseName + " success!");
