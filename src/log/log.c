@@ -1563,7 +1563,7 @@ advance:
 		if (rd_lsn.offset != 0) {
 			/*
 			 * We need to manage the different buffers here.
-			 * Buf is the one the function uses to read from
+			 * Buf is the buffer this function uses to read from
 			 * the disk.  The callback buffer may change based
 			 * on whether encryption and compression are used.
 			 *

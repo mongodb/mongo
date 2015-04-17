@@ -413,6 +413,10 @@ simple_walk_log(WT_SESSION *session)
     WT_OPEN_CONFIG_COMMON \
     "encryption=(name=rotn,keyid=" SYS_KEYID ",secretkey=" SYS_PW ")"
 
+#define	COMP_A	"AAAAAAAAAAAAAAAAAA"
+#define	COMP_B	"BBBBBBBBBBBBBBBBBB"
+#define	COMP_C	"CCCCCCCCCCCCCCCCCC"
+
 int
 main(void)
 {
@@ -441,15 +445,11 @@ main(void)
 
 	/*
 	 * Write a log record that is larger than the base 128 bytes and
-	 * also should compress.
+	 * also should compress well.
 	 */
 	ret = session->log_printf(session,
-	    "aaabbbcccdddeeefffggghhhiiijjjkkklllmmm"
-	    "nnnooopppqqqrrrssstttuuuvvvwwwxxxyyyzzz"
-	    "aaabbbcccdddeeefffggghhhiiijjjkkklllmmm"
-	    "nnnooopppqqqrrrssstttuuuvvvwwwxxxyyyzzz"
-	    "aaabbbcccdddeeefffggghhhiiijjjkkklllmmm"
-	    "nnnooopppqqqrrrssstttuuuvvvwwwxxxyyyzzz"
+	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
+	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    "The quick brown fox jumps over the lazy dog ");
 
 	/*
@@ -526,8 +526,8 @@ main(void)
 	 * Confirm we detect a bad password.
 	 */
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON
-	    "encryption=(name=rotn,keyid=" SYS_KEYID ",secretkey=" SYS_BADPW ")",
-	    &conn);
+	    "encryption=(name=rotn,keyid=" SYS_KEYID
+	    ",secretkey=" SYS_BADPW ")", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect bad password\n");
 		exit (1);

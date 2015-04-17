@@ -37,8 +37,10 @@ Bitfield
 Bitwise
 Bsearch
 Btree
+Buf
 Bzip
 CAS
+CCCCCCCCCCCCCCCCCC
 CELL's
 CELLs
 CHECKKEY
@@ -69,6 +71,7 @@ DUPLICATEV
 DbCursor
 DbEnv
 Decrement
+Decrypt
 EAGAIN
 EBUSY
 EINTR
@@ -346,6 +349,7 @@ builtin
 builtins
 bytelock
 bytestring
+byvalue
 bzCompressEnd
 bzCompressInit
 bzDecompress
@@ -392,12 +396,15 @@ config
 conn
 connectionp
 const
+constantp
 copydoc
 copyin
 copyout
 cp
 cpuid
 crc
+crypto
+cryptobad
 ctime
 curbackup
 curbulk
@@ -413,6 +420,7 @@ cursorp
 curstat
 curtable
 cust
+customp
 cv
 cxa
 data's
@@ -430,6 +438,7 @@ decrement
 decrementing
 decrypt
 decrypted
+decrypting
 decrypts
 deflateCopy
 deflateEnd
@@ -583,6 +592,7 @@ jrx
 json
 kb
 keycmp
+keyid
 keyv
 kv
 kvraw
@@ -673,6 +683,7 @@ nfilename
 nhex
 nlpo
 nocase
+nocrypto
 nonliteral
 noop
 nop
@@ -762,6 +773,8 @@ rf
 rle
 rmw
 rng
+rotN
+rotn
 rpc
 run's
 runtime
@@ -771,6 +784,7 @@ sHQ
 sched
 scr
 sd
+secretkey
 sed
 sessionp
 setstr
@@ -868,6 +882,7 @@ unmarshalled
 unmerged
 unmodify
 unpackv
+unpadded
 unreferenced
 unregister
 unsized
@@ -881,6 +896,7 @@ uri's
 uris
 usecs
 usedp
+userbad
 usercfg
 usr
 utf

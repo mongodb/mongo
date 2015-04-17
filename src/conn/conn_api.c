@@ -589,16 +589,6 @@ __encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 }
 
 /*
- * __wt_encryptor_confchk --
- *	Validate the encryptor (public).
- */
-int
-__wt_encryptor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
-{
-	return (__encryptor_confchk(session, cval, NULL));
-}
-
-/*
  * __wt_encryptor_config --
  *	Given a configuration, configure the encryptor.
  */
