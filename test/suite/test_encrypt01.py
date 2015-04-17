@@ -46,7 +46,15 @@ class test_encrypt01(wttest.WiredTigerTestCase):
         ('rotn', dict(encrypt='rotn')),
         ('none', dict(encrypt=None)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, encrypt))
+    compress = [
+#        ('lz4', dict(compress='lz4')),
+        ('bzip2', dict(compress='bzip2')),
+        ('nop', dict(compress='nop')),
+#        ('snappy', dict(compress='snappy')),
+        ('none', dict(compress=None)),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.', types, encrypt,
+                                                    compress))
 
     nrecords = 10000
     bigvalue = "abcdefghij" * 1000
@@ -55,22 +63,28 @@ class test_encrypt01(wttest.WiredTigerTestCase):
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open( dir, 'create,' +
             ('error_prefix="%s: ",' % self.shortid()) +
-            self.extensionArg(self.encrypt))
+            self.extensionArg([('encryptors', self.encrypt),
+                               ('compressors', self.compress)]))
         self.pr(`conn`)
         return conn
 
     # Return the wiredtiger_open extension argument for a shared library.
-    def extensionArg(self, name):
-        if name == None:
+    def extensionArg(self, exts):
+        extfiles = []
+        for ext in exts:
+            (dirname, name) = ext
+            if name != None:
+                testdir = os.path.dirname(__file__)
+                extdir = os.path.join(run.wt_builddir, 'ext', dirname)
+                extfile = os.path.join(
+                    extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
+                if not os.path.exists(extfile):
+                    self.skipTest('extension "' + extfile + '" not built')
+                extfiles.append(extfile)
+        if len(extfiles) == 0:
             return ''
-
-        testdir = os.path.dirname(__file__)
-        extdir = os.path.join(run.wt_builddir, 'ext/encryptors')
-        extfile = os.path.join(
-            extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
-        if not os.path.exists(extfile):
-            self.skipTest('encryption extension "' + extfile + '" not built')
-        return ',extensions=["' + extfile + '"]'
+        else:
+            return ',extensions=["' + '","'.join(extfiles) + '"]'
 
     # Create a table, add keys with both big and small values, then verify them.
     def test_encrypt(self):
@@ -78,6 +92,8 @@ class test_encrypt01(wttest.WiredTigerTestCase):
         params = 'key_format=S,value_format=S'
         if self.encrypt != None:
             params += ',encryption=(name=' + self.encrypt + ',keyid=13)'
+        if self.compress != None:
+            params += ',block_compressor=' + self.compress
 
         self.session.create(self.uri, params)
         cursor = self.session.open_cursor(self.uri, None)
@@ -90,7 +106,8 @@ class test_encrypt01(wttest.WiredTigerTestCase):
             cursor.insert()
         cursor.close()
 
-        # Force the cache to disk, so we read encrypted pages from disk.
+        # Force the cache to disk, so we read
+        # compressed/encrypted pages from disk.
         self.reopen_conn()
 
         cursor = self.session.open_cursor(self.uri, None)
