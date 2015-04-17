@@ -50,8 +50,9 @@ import time
 import threading
 import traceback
 
-from pymongo import Connection
+from pymongo import MongoClient
 from pymongo.errors import OperationFailure
+from pymongo import ReadPreference
 
 import cleanbb
 import smoke
@@ -264,7 +265,8 @@ class mongod(NullMongod):
             raise Exception("Failed to start mongod")
 
         if self.slave:
-            local = Connection(port=self.port, slave_okay=True).local
+            local = MongoClient(port=self.port,
+                read_preference=ReadPreference.SECONDARY_PREFERRED).local
             synced = False
             while not synced:
                 synced = True
@@ -341,7 +343,7 @@ class mongod(NullMongod):
 
     def wait_for_repl(self):
         print "Awaiting replicated (w:2, wtimeout:5min) insert (port:" + str(self.port) + ")"
-        Connection(port=self.port).testing.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+        MongoClient(port=self.port).testing.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
         print "Replicated write completed -- done wait_for_repl"
 
 class Bug(Exception):
@@ -376,7 +378,8 @@ def check_db_hashes(master, slave):
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
-        mongod.dbhash = Connection(port=mongod.port, slave_okay=True).test.command("dbhash")
+        client = MongoClient(port=mongod.port, read_preference=ReadPreference.SECONDARY_PREFERRED)
+        mongod.dbhash = client.test.command("dbhash")
         mongod.dict = mongod.dbhash["collections"]
 
     global lost_in_slave, lost_in_master, screwy_in_slave, replicated_collections
@@ -389,8 +392,9 @@ def check_db_hashes(master, slave):
         mhash = master.dict[coll]
         shash = slave.dict[coll]
         if mhash != shash:
-            mTestDB = Connection(port=master.port, slave_okay=True).test
-            sTestDB = Connection(port=slave.port, slave_okay=True).test
+            mTestDB = MongoClient(port=master.port).test
+            sTestDB = MongoClient(port=slave.port,
+                read_preference=ReadPreference.SECONDARY_PREFERRED).test
             mCount = mTestDB[coll].count()
             sCount = sTestDB[coll].count()
             stats = {'hashes': {'master': mhash, 'slave': shash},
@@ -726,7 +730,7 @@ def run_tests(tests):
                            keyFile=keyFile,
                            use_ssl=use_ssl)
             slave.start()
-            primary = Connection(port=master.port, slave_okay=True);
+            primary = MongoClient(port=master.port);
 
             primary.admin.command({'replSetInitiate' : {'_id' : 'foo', 'members' : [
                             {'_id': 0, 'host':'localhost:%s' % master.port},
@@ -742,7 +746,8 @@ def run_tests(tests):
                     time.sleep(.2)
             
             secondaryUp = False
-            sConn = Connection(port=slave.port, slave_okay=True);
+            sConn = MongoClient(port=slave.port,
+                read_preference=ReadPreference.SECONDARY_PREFERRED);
             while not secondaryUp:
                 result = sConn.admin.command("ismaster");
                 secondaryUp = result["secondary"]
