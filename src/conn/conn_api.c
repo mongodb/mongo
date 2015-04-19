@@ -1649,10 +1649,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * entries override earlier entries):
 	 *
 	 * 1. all possible wiredtiger_open configurations
-	 * 2. base configuration file, created with the database (optional)
-	 * 3. the config passed in by the application.
-	 * 4. user configuration file (optional)
-	 * 5. environment variable settings (optional)
+	 * 2. the WiredTiger compilation version (expected to be overridden by
+	 *    any value in the base configuration file)
+	 * 3. base configuration file, created with the database (optional)
+	 * 4. the config passed in by the application
+	 * 5. user configuration file (optional)
+	 * 6. environment variable settings (optional)
 	 *
 	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
@@ -1662,16 +1664,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_scr_alloc(session, 0, &i3));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open_all);
 	cfg[1] = NULL;
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
-	__conn_config_append(cfg, config);
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
-	WT_ERR(__conn_config_env(session, cfg, i3));
-
 	WT_ERR_TEST(snprintf(version, sizeof(version),
 	    "version=(major=%d,minor=%d)",
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR) >=
 	    (int)sizeof(version), ENOMEM);
 	__conn_config_append(cfg, version);
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
+	__conn_config_append(cfg, config);
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
+	WT_ERR(__conn_config_env(session, cfg, i3));
 
 	/*
 	 * Merge the full configuration stack and save it for reconfiguration.
@@ -1679,10 +1680,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
 
 	/*
-	 * When writing the base configuration file, we only write configuration
-	 * information that's been set by the application (in other words, the
-	 * stack except for cfg[0]). However, some configuration values need to
-	 * be stripped out from the base configuration file; do that now, and
+	 * When writing the base configuration file, we write the version and
+	 * any configuration information set by the application (in other words,
+	 * the stack except for cfg[0]). However, some configuration values need
+	 * to be stripped out from the base configuration file; do that now, and
 	 * merge the rest to be written.
 	 */
 	WT_ERR(__wt_config_merge(
