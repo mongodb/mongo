@@ -889,7 +889,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Third, merge everything together, creating a new connection state. */
-	WT_ERR(__wt_config_merge(session, cfg, &p));
+	WT_ERR(__wt_config_merge(session, cfg, NULL, &p));
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 
@@ -1676,7 +1676,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/*
 	 * Merge the full configuration stack and save it for reconfiguration.
 	 */
-	WT_ERR(__wt_config_merge(session, cfg, &conn->cfg));
+	WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
 
 	/*
 	 * When writing the base configuration file, we only write configuration
@@ -1685,7 +1685,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * be stripped out from the base configuration file; do that now, and
 	 * merge the rest to be written.
 	 */
-	WT_ERR(__wt_config_merge(session, cfg + 1, &base_merge));
+	WT_ERR(__wt_config_merge(
+	    session, cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
 
 	/*
 	 * Reset cfg to the configuration stack we're going to use from now on.
