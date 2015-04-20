@@ -12,34 +12,41 @@ mongo_tools_variables:
     osx_108: &mongo_url_osx108
       mongo_os: "osx"
       mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-latest.tgz"
+      mongo30_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-3.0.2.tgz"
       mongo26_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.5.tgz"
       mongo24_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.4.12.tgz"
     solaris: &mongo_url_solaris
       mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-latest.tgz"
+      mongo30_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-3.0.2.tgz"
       mongo26_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.5.tgz"
       mongo24_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.4.12.tgz"
     linux_64_bit: &mongo_url_ubuntu1204
       mongo_os: "ubuntu1204"
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
+      mongo30_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-3.0.2.tgz"
       mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.6.5.tgz"
       mongo24_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-subscription-ubuntu1204-2.4.12.tgz"
     linux_64_bit_enterprise: &mongo_url_ubuntu1204_enterprise
       mongo_os: "ubuntu1204"
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
+      mongo30_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-3.0.2.tgz"
       mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.6.5.tgz"
       mongo24_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-subscription-ubuntu1204-2.4.12.tgz"
     windows_32_bit: &mongo_url_windows32
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
+      mongo30_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-3.0.2.zip"
       mongo26_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.6.5.zip"
       mongo24_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.4.12.zip"
     windows_64_bit: &mongo_url_windows64
       mongo_os: "windows-64"
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
+      mongo30_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-3.0.2.zip"
       mongo26_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.5.zip"
       mongo24_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.4.12.zip"
     windows_64_bit_enterprise: &mongo_url_windows64_enterprise
       mongo_os: "windows-64"
       mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-latest.zip"
+      mongo30_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-3.0.2.zip"
       mongo26_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-2.6.5.zip"
 
 ## List of tests to run on each buildvariant
@@ -723,6 +730,8 @@ tasks:
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "download mongod"
+      vars:
+        mongo_url: "${mongo30_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport

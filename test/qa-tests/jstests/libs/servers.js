@@ -599,6 +599,7 @@ MongoRunner.runMongod = function( opts ){
     mongod.host = mongod.name
     mongod.port = parseInt( mongod.commandLine.port )
     mongod.runId = runId || ObjectId()
+    mongod.dbpath = fullOptions.dbpath;
     mongod.savedOptions = MongoRunner.savedOptions[ mongod.runId ];
     mongod.fullOptions = fullOptions;
     
@@ -673,7 +674,7 @@ MongoRunner.stopMongod = function( port, signal, opts ){
         if( opts ) port = parseInt( opts.port )
     }
     
-    var exitCode = stopMongod( parseInt( port ), parseInt( signal ), opts )
+    var exitCode = _stopMongoProgram( parseInt( port ), parseInt( signal ), opts )
     
     delete MongoRunner.usedPortMap[ "" + parseInt( port ) ]
 
@@ -735,7 +736,8 @@ MongoRunner.getAndPrepareDumpDirectory = function(testName) {
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
 // var conn = startMongodEmpty("--port", 30000, "--dbpath", "asdf");
-startMongodEmpty = function () {
+// var conn = _startMongodEmpty("--port", 30000, "--dbpath", "asdf");
+_startMongodEmpty = function () {
     var args = createMongoArgs("mongod", arguments);
 
     var dbpath = _parsePath.apply(null, args);
@@ -743,11 +745,11 @@ startMongodEmpty = function () {
 
     return startMongoProgram.apply(null, args);
 }
-startMongod = function () {
+_startMongod = function () {
     print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING ONLY");
-    return startMongodEmpty.apply(null, arguments);
+    return _startMongodEmpty.apply(null, arguments);
 }
-startMongodNoReset = function(){
+_startMongodNoReset = function(){
     var args = createMongoArgs( "mongod" , arguments );
     return startMongoProgram.apply( null, args );
 }
