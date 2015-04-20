@@ -36,11 +36,14 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/scopeguard.h"
@@ -127,11 +130,10 @@ namespace {
             return Status(ErrorCodes::NamespaceExists, "to collection already exists");
 
         // create new collection
-        {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             const auto fromOptions = fromCollection->getCatalogEntry()
                                                    ->getCollectionOptions(txn)
                                                    .toBSON();
-
             OldClientContext ctx(txn,  toNs);
             BSONObjBuilder spec;
             spec.appendBool("capped", true);
@@ -145,7 +147,7 @@ namespace {
             if (!status.isOK())
                 return status;
             wunit.commit();
-        }
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "cloneCollectionAsCapped", fromNs);
 
         Collection* toCollection = db->getCollection(toNs);
         invariant(toCollection); // we created above
@@ -165,30 +167,65 @@ namespace {
                     fromCollection,
                     InternalPlanner::FORWARD));
 
+        exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
+
+        Snapshotted<BSONObj> objToClone;
+        RecordId loc;
+        PlanExecutor::ExecState state = PlanExecutor::FAILURE; // suppress uninitialized warnings
 
         DisableDocumentValidation validationDisabler(txn);
 
+        int retries = 0; // non-zero when retrying our last document.
         while (true) {
-            BSONObj obj;
-            PlanExecutor::ExecState state = exec->getNext(&obj, NULL);
+            if (!retries) {
+                state = exec->getNextSnapshotted(&objToClone, &loc);
+            }
 
             switch(state) {
             case PlanExecutor::IS_EOF:
                 return Status::OK();
             case PlanExecutor::DEAD:
                 db->dropCollection(txn, toNs);
-                return Status(ErrorCodes::InternalError, "executor turned dead while iterating");
+                return Status(ErrorCodes::InternalError, "executor died while iterating");
             case PlanExecutor::FAILURE:
                 return Status(ErrorCodes::InternalError, "executor error while iterating");
             case PlanExecutor::ADVANCED:
                 if (excessSize > 0) {
-                    excessSize -= (4 * obj.objsize()); // 4x is for padding, power of 2, etc...
+                    // 4x is for padding, power of 2, etc...
+                    excessSize -= (4 * objToClone.value().objsize());
+                    continue;
+                }
+            }
+
+            try {
+                // Make sure we are working with the latest version of the document.
+                if (objToClone.snapshotId() != txn->recoveryUnit()->getSnapshotId()
+                    && !fromCollection->findDoc(txn, loc, &objToClone)) {
+                    // doc was deleted so don't clone it.
+                    retries = 0;
                     continue;
                 }
 
                 WriteUnitOfWork wunit(txn);
-                toCollection->insertDocument(txn, obj, true, txn->writesAreReplicated());
+                toCollection->insertDocument(txn,
+                                             objToClone.value(),
+                                             true,
+                                             txn->writesAreReplicated());
                 wunit.commit();
+
+                // Go to the next document
+                retries = 0;
+            }
+            catch (const WriteConflictException& wce) {
+                txn->getCurOp()->debug().writeConflicts++;
+                retries++; // logAndBackoff expects this to be 1 on first call.
+                wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNs);
+
+                // Can't use WRITE_CONFLICT_RETRY_LOOP macros since we need to save/restore exec
+                // around call to abandonSnapshot.
+                exec->saveState();
+                txn->recoveryUnit()->abandonSnapshot();
+                exec->restoreState(txn); // Handles any WCEs internally.
             }
         }
 
@@ -226,8 +263,8 @@ namespace {
         std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
         std::string longTmpName = str::stream() << dbname << "." << shortTmpName;
 
-        WriteUnitOfWork wunit(txn);
         if (db->getCollection(longTmpName)) {
+            WriteUnitOfWork wunit(txn);
             Status status = db->dropCollection(txn, longTmpName);
             if (!status.isOK())
                 return status;
@@ -250,21 +287,24 @@ namespace {
 
         verify(db->getCollection(longTmpName));
 
-        status = db->dropCollection(txn, collectionName.ns());
-        txn->setReplicatedWrites(shouldReplicateWrites);
-        if (!status.isOK())
-            return status;
+        {
+            WriteUnitOfWork wunit(txn);
+            status = db->dropCollection(txn, collectionName.ns());
+            txn->setReplicatedWrites(shouldReplicateWrites);
+            if (!status.isOK())
+                return status;
 
-        status = db->renameCollection(txn, longTmpName, collectionName.ns(), false);
-        if (!status.isOK())
-            return status;
+            status = db->renameCollection(txn, longTmpName, collectionName.ns(), false);
+            if (!status.isOK())
+                return status;
 
-        getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
-                txn,
-                NamespaceString(collectionName),
-                size);
+            getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
+                    txn,
+                    NamespaceString(collectionName),
+                    size);
 
-        wunit.commit();
+            wunit.commit();
+        }
         return Status::OK();
     }
 
