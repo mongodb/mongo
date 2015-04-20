@@ -185,6 +185,10 @@ namespace repl {
         virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                                   ReplSetRequestVotesResponse* response);
 
+        virtual Status processReplSetDeclareElectionWinner(
+                const ReplSetDeclareElectionWinnerArgs& args,
+                ReplSetDeclareElectionWinnerResponse* response);
+
     private:
 
         const ReplSettings _settings;

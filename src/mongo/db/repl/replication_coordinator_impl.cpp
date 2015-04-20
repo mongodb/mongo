@@ -2386,5 +2386,10 @@ namespace {
         return {ErrorCodes::CommandNotFound, "not implemented"};
     }
 
+    Status ReplicationCoordinatorImpl::processReplSetDeclareElectionWinner(
+            const ReplSetDeclareElectionWinnerArgs& args,
+            ReplSetDeclareElectionWinnerResponse* response) {
+        return {ErrorCodes::CommandNotFound, "not implemented"};
+    }
 } // namespace repl
 } // namespace mongo

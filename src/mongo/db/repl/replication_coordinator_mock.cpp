@@ -305,6 +305,10 @@ namespace repl {
         return Status::OK();
     }
 
-
+    Status ReplicationCoordinatorMock::processReplSetDeclareElectionWinner(
+            const ReplSetDeclareElectionWinnerArgs& args,
+            ReplSetDeclareElectionWinnerResponse* response) {
+        return Status::OK();
+    }
 } // namespace repl
 } // namespace mongo

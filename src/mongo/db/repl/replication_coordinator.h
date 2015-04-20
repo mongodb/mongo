@@ -54,6 +54,8 @@ namespace repl {
     class HandshakeArgs;
     class IsMasterResponse;
     class OplogReader;
+    class ReplSetDeclareElectionWinnerArgs;
+    class ReplSetDeclareElectionWinnerResponse;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
     class ReplSetRequestVotesArgs;
@@ -565,6 +567,14 @@ namespace repl {
         */
         virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                                   ReplSetRequestVotesResponse* response) = 0;
+
+        /*
+        * Handles an incoming replSetDeclareElectionWinner command.
+        * Returns a Status with either OK or an error message.
+        */
+        virtual Status processReplSetDeclareElectionWinner(
+                const ReplSetDeclareElectionWinnerArgs& args,
+                ReplSetDeclareElectionWinnerResponse* response) = 0;
 
     protected:
 

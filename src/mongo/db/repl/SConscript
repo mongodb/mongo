@@ -247,7 +247,9 @@ env.Library(
         'replset_commands.cpp',
         'repl_set_command.cpp',
         'repl_set_request_votes.cpp',
-        'repl_set_request_votes_args.cpp'
+        'repl_set_request_votes_args.cpp',
+        'repl_set_declare_election_winner.cpp',
+        'repl_set_declare_election_winner_args.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/logger/logger',

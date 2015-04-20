@@ -60,6 +60,7 @@ namespace repl {
     class HandshakeArgs;
     class HeartbeatResponseAction;
     class OplogReader;
+    class ReplSetDeclareElectionWinnerArgs;
     class ReplSetRequestVotesArgs;
     class ReplicaSetConfig;
     class SyncSourceFeedback;
@@ -231,6 +232,10 @@ namespace repl {
 
         virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                                   ReplSetRequestVotesResponse* response);
+
+        virtual Status processReplSetDeclareElectionWinner(
+                const ReplSetDeclareElectionWinnerArgs& args,
+                ReplSetDeclareElectionWinnerResponse* response);
 
         // ================== Test support API ===================
 
