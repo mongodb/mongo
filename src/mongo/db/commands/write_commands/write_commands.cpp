@@ -104,7 +104,7 @@ namespace mongo {
 
         // TODO: Remove this when we standardize GLE reporting from commands
         if ( !status.isOK() ) {
-            setLastError( status.code(), status.reason().c_str() );
+            LastError::get(client).setLastError(status.code(), status.reason());
         }
 
         return status;
@@ -145,7 +145,7 @@ namespace mongo {
 
         WriteBatchExecutor writeBatchExecutor(txn,
                                               &globalOpCounters,
-                                              lastError.get());
+                                              &LastError::get(txn->getClient()));
 
         writeBatchExecutor.executeBatch( request, &response );
 

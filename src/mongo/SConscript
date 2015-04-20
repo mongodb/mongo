@@ -156,8 +156,9 @@ env.Library(
 env.Library('lasterror', [
             "db/lasterror.cpp",
             ],
-            LIBDEPS=['util/net/network',
-                     'util/foundation',
+            LIBDEPS=[
+                'service_context',
+                'util/foundation',
             ])
 
 def getSysInfo():
@@ -508,8 +509,9 @@ env.Library(
         'db/service_context_noop.cpp',
     ],
     LIBDEPS=[
-        'lasterror',  # TODO(schwerin): REMOVE!
+        'util/concurrency/spin_lock',
         'util/decorable',
+        'util/net/hostandport',
          ])
 
 # Memory-mapped files support.  Used by mongod and some tools.

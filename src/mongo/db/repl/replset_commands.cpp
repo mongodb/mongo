@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/initial_sync.h"
@@ -152,7 +153,7 @@ namespace repl {
                          string& errmsg,
                          BSONObjBuilder& result) {
             if ( cmdObj["forShell"].trueValue() )
-                lastError.disableForCommand();
+                LastError::get(txn->getClient()).disable();
 
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK())

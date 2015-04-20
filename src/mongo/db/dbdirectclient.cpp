@@ -33,6 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 
@@ -122,9 +123,7 @@ namespace mongo {
                               bool assertOk,
                               string* actualServer) {
         DirectClientScope directClientScope(_txn);
-        if (lastError._get()) {
-            lastError.startRequest(toSend, lastError._get());
-        }
+        LastError::get(_txn->getClient()).startRequest();
 
         DbResponse dbResponse;
         assembleResponse(_txn, toSend, dbResponse, dummyHost);
@@ -139,9 +138,7 @@ namespace mongo {
 
     void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
         DirectClientScope directClientScope(_txn);
-        if (lastError._get()) {
-            lastError.startRequest(toSend, lastError._get());
-        }
+        LastError::get(_txn->getClient()).startRequest();
 
         DbResponse dbResponse;
         assembleResponse(_txn, toSend, dbResponse, dummyHost);

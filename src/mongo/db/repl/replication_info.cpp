@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -216,7 +217,7 @@ namespace repl {
                authenticated.
             */
             if ( cmdObj["forShell"].trueValue() )
-                lastError.disableForCommand();
+                LastError::get(txn->getClient()).disable();
 
             appendReplicationInfo(txn, result, 0);
 

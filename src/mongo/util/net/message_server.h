@@ -38,8 +38,6 @@
 
 namespace mongo {
 
-    struct LastError;
-
     class MessageHandler {
     public:
         virtual ~MessageHandler() {}
@@ -53,7 +51,7 @@ namespace mongo {
          * called every time a message comes in
          * handler is responsible for responding to client
          */
-        virtual void process( Message& m , AbstractMessagingPort* p , LastError * err ) = 0;
+        virtual void process(Message& m, AbstractMessagingPort* p) = 0;
     };
 
     class MessageServer {

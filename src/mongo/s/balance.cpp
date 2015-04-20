@@ -37,6 +37,7 @@
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
@@ -496,6 +497,7 @@ namespace mongo {
 
     void Balancer::run() {
 
+        Client::initThread("Balancer");
         // this is the body of a BackgroundJob so if we throw here we're basically ending the balancer thread prematurely
         while ( ! inShutdown() ) {
 

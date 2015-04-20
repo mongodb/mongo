@@ -54,12 +54,10 @@ namespace UpdateTests {
     class ClientBase {
     public:
         ClientBase() : _client(&_txn) {
-            _prevError = mongo::lastError._get( false );
-            mongo::lastError.release();
-            mongo::lastError.reset( new LastError() );
+            mongo::LastError::get(_txn.getClient()).reset();
         }
         virtual ~ClientBase() {
-            mongo::lastError.reset( _prevError );
+            mongo::LastError::get(_txn.getClient()).reset();
         }
 
     protected:
@@ -75,9 +73,6 @@ namespace UpdateTests {
 
         OperationContextImpl _txn;
         DBDirectClient _client;
-
-    private:
-        LastError* _prevError;
     };
 
     class Fail : public ClientBase {

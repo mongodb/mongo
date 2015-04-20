@@ -34,6 +34,7 @@
 
 #include "mongo/db/ops/update_result.h"
 
+#include "mongo/db/lasterror.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
