@@ -211,6 +211,12 @@ __evict_server(void *arg)
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "waking"));
 	}
 
+	/*
+	 * The evction server is shutting down: in case any trees are still
+	 * open, clear walks now so that they can be closed.
+	 */
+	WT_ERR(__evict_clear_walks(session));
+
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction server exiting"));
 
