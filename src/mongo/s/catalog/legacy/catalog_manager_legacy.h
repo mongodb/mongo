@@ -89,6 +89,8 @@ namespace mongo {
         virtual Status applyChunkOpsDeprecated(const BSONArray& updateOps,
                                                const BSONArray& preCondition);
 
+        virtual void logAction(const ActionLogType& actionLog);
+
         virtual void logChange(OperationContext* txn,
                                const std::string& what,
                                const std::string& ns,

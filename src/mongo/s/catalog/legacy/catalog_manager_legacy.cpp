@@ -46,6 +46,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/legacy/config_coordinator.h"
+#include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -256,6 +257,9 @@ namespace {
 
     // Whether the logChange call should attempt to create the changelog collection
     AtomicInt32 changeLogCollectionCreated(0);
+
+    // Whether the logAction call should attempt to create the actionlog collection
+    AtomicInt32 actionLogCollectionCreated(0);
 
 } // namespace
 
@@ -882,6 +886,29 @@ namespace {
         logChange(NULL, "dropCollection", collectionNs, BSONObj());
 
         return Status::OK();
+    }
+
+    void CatalogManagerLegacy::logAction(const ActionLogType& actionLog) {
+        // Create the action log collection and ensure that it is capped. Wrap in try/catch,
+        // because creating an existing collection throws.
+        if (actionLogCollectionCreated.load() == 0) {
+            try {
+                ScopedDbConnection conn(_configServerConnectionString, 30.0);
+                conn->createCollection(ActionLogType::ConfigNS, 1024 * 1024 * 2, true);
+                conn.done();
+
+                actionLogCollectionCreated.store(1);
+            }
+            catch (const DBException& e) {
+                // It's ok to ignore this exception
+                LOG(1) << "couldn't create actionlog collection: " << e;
+            }
+        }
+
+        Status result = insert(ActionLogType::ConfigNS, actionLog.toBSON(), NULL);
+        if (!result.isOK()) {
+            log() << "error encountered while logging action: " << result;
+        }
     }
 
     void CatalogManagerLegacy::logChange(OperationContext* opCtx,

@@ -36,6 +36,7 @@
 
 namespace mongo {
 
+    class ActionLogType;
     class BatchedCommandRequest;
     class BatchedCommandResponse;
     struct BSONArray;
@@ -214,6 +215,12 @@ namespace mongo {
          */
         virtual Status applyChunkOpsDeprecated(const BSONArray& updateOps,
                                                const BSONArray& preCondition) = 0;
+
+        /**
+         * Logs to the actionlog.
+         * Used by the balancer to report the result of a balancing round.
+         */
+        virtual void logAction(const ActionLogType& actionLog) = 0;
 
         /**
          * Logs a diagnostic event locally and on the config server.

@@ -43,6 +43,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
@@ -51,7 +52,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/type_actionlog.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_settings.h"
@@ -239,56 +239,6 @@ namespace mongo {
             builder.append("chunksMoved", chunksMoved);
         }
         return builder.obj();
-    }
-
-    /**
-     * Reports the result of the balancer round into config.actionlog
-     *
-     * @param actionLog, which contains the balancer round information to be logged
-     *
-     */
-
-    static void _reportRound( ActionLogType& actionLog) {
-        try {
-            ScopedDbConnection conn( configServer.getConnectionString(), 30 );
-
-            // send a copy of the message to the log in case it doesn't reach config.actionlog
-            actionLog.setTime(jsTime());
-
-            LOG(1) << "about to log balancer result: " << actionLog;
-
-            // The following method is not thread safe. However, there is only one balancer
-            // thread per mongos process. The create collection is a a no-op when the collection
-            // already exists
-            static bool createActionlog = false;
-            if ( ! createActionlog ) {
-                try {
-                    static const int actionLogSizeBytes = 1024 * 1024 * 2;
-                    conn->createCollection( ActionLogType::ConfigNS , actionLogSizeBytes , true );
-                }
-                catch ( const DBException& ex ) {
-                    LOG(1) << "config.actionlog could not be created, another mongos process "
-                           << "may have done so" << causedBy(ex);
-
-                }
-                createActionlog = true;
-            }
-
-            Status result = grid.catalogManager()->insert(ActionLogType::ConfigNS,
-                                                          actionLog.toBSON(),
-                                                          NULL);
-            if ( !result.isOK() ) {
-                log() << "Error encountered while logging action from balancer "
-                      << result.reason();
-            }
-
-            conn.done();
-        }
-        catch ( const DBException& ex ) {
-            // if we got here, it means the config change is only in the log;
-            // the change didn't make it to config.actionlog
-            warning() << "could not log balancer result" << causedBy(ex);
-        }
     }
 
     bool Balancer::_checkOIDs() {
@@ -693,8 +643,9 @@ namespace mongo {
 
                     actionLog.setDetails( _buildDetails( false, balanceRoundTimer.millis(),
                         static_cast<int>(candidateChunks.size()), _balancedLastTime, "") );
+                    actionLog.setTime(jsTime());
 
-                    _reportRound( actionLog );
+                    grid.catalogManager()->logAction(actionLog);
 
                     LOG(1) << "*** end of balancing round" << endl;
                 }
@@ -715,8 +666,9 @@ namespace mongo {
                 // This round failed, tell the world!
                 actionLog.setDetails( _buildDetails( true, balanceRoundTimer.millis(),
                     0, 0, e.what()) );
+                actionLog.setTime(jsTime());
 
-                _reportRound( actionLog );
+                grid.catalogManager()->logAction(actionLog);
 
                 sleepsecs( sleepTime ); // sleep a fair amount b/c of error
                 continue;
