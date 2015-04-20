@@ -914,6 +914,7 @@ env.Library(
         's/base',
         's/client/sharding_client',
         's/cluster_ops_impl',
+        's/dist_lock',
     ]
 )
 

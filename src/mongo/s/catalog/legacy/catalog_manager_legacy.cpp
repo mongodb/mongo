@@ -55,13 +55,15 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/distlock.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/config.h"
+#include "mongo/s/dist_lock_manager.h"
+#include "mongo/s/legacy_dist_lock_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/type_database.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/log.h"
@@ -358,7 +360,15 @@ namespace {
             _configServers.push_back(_configServerConnectionString);
         }
 
+        _distLockManager = stdx::make_unique<LegacyDistLockManager>(_configServerConnectionString);
+        _distLockManager->startUp();
+
         return Status::OK();
+    }
+
+    void CatalogManagerLegacy::shutDown() {
+        invariant(_distLockManager);
+        _distLockManager->shutDown();
     }
 
     Status CatalogManagerLegacy::enableSharding(const std::string& dbName) {
@@ -499,17 +509,16 @@ namespace {
         invariant(dbName != "config");
 
         // Lock the database globally to prevent conflicts with simultaneous database creation.
-        ScopedDistributedLock dbDistLock(_configServerConnectionString, dbName);
-        dbDistLock.setLockMessage("createDatabase");
-        dbDistLock.setLockTryIntervalMillis(500);
-
-        Status status = dbDistLock.acquire(1000 /*1 second*/);
-        if (!status.isOK()) {
-            return status;
+        auto scopedDistLock = getDistLockManager()->lock(dbName,
+                                                         "createDatabase",
+                                                         stdx::chrono::milliseconds(1000),
+                                                         stdx::chrono::milliseconds(500));
+        if (!scopedDistLock.isOK()) {
+            return scopedDistLock.getStatus();
         }
 
         // Check for case sensitivity violations
-        status = _checkDbDoesNotExist(dbName);
+        auto status = _checkDbDoesNotExist(dbName);
         if (!status.isOK()) {
             return status;
         }
@@ -863,12 +872,9 @@ namespace {
         logChange(NULL, "dropCollection.start", collectionNs, BSONObj());
 
         // Lock the collection globally so that split/migrate cannot run
-        ScopedDistributedLock nsLock(_configServerConnectionString, collectionNs);
-        nsLock.setLockMessage("drop");
-
-        Status lockStatus = nsLock.tryAcquire();
-        if (!lockStatus.isOK()) {
-            return lockStatus;
+        auto scopedDistLock = getDistLockManager()->lock(collectionNs, "drop");
+        if (!scopedDistLock.isOK()) {
+            return scopedDistLock.getStatus();
         }
 
         LOG(1) << "dropCollection " << collectionNs << " started";
@@ -1268,6 +1274,11 @@ namespace {
         conn.done();
 
         return shardCount;
+    }
+
+    DistLockManager* CatalogManagerLegacy::getDistLockManager() {
+        invariant(_distLockManager);
+        return _distLockManager.get();
     }
 
 } // namespace mongo

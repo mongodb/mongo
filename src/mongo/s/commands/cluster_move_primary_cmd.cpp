@@ -33,6 +33,7 @@
 #include <boost/shared_ptr.hpp>
 #include <set>
 
+#include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -42,8 +43,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/config.h"
-#include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -152,13 +153,12 @@ namespace {
             log() << "Moving " << dbname << " primary from: "
                   << config->getPrimary().toString() << " to: " << s.toString();
 
-            ScopedDistributedLock distLock(configServer.getConnectionString(),
-                                           dbname + "-movePrimary");
-            distLock.setLockMessage(str::stream() << "Moving primary shard of " << dbname);
+            string whyMessage(str::stream() << "Moving primary shard of " << dbname);
+            auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                    dbname + "-movePrimary", whyMessage);
 
-            Status lockStatus = distLock.tryAcquire();
-            if (!lockStatus.isOK()) {
-                return appendCommandStatus(result, lockStatus);
+            if (!scopedDistLock.isOK()) {
+                return appendCommandStatus(result, scopedDistLock.getStatus());
             }
 
             set<string> shardedColls;

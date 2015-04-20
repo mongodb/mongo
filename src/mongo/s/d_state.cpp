@@ -57,6 +57,7 @@
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/legacy_dist_lock_manager.h"
 #include "mongo/s/metadata_loader.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"

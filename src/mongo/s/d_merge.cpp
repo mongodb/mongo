@@ -31,14 +31,15 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/client/connpool.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
-#include "mongo/s/distlock.h"
 #include "mongo/s/d_state.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -82,15 +83,15 @@ namespace mongo {
         // Get the distributed lock
         //
 
-        ScopedDistributedLock collLock( configLoc, nss.ns() );
-        collLock.setLockMessage( stream() << "merging chunks in " << nss.ns() << " from "
-                                          << minKey << " to " << maxKey );
+        string whyMessage = stream() << "merging chunks in " << nss.ns()
+                                     << " from " << minKey << " to " << maxKey;
+        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                nss.ns(), whyMessage);
 
-        Status acquisitionStatus = collLock.tryAcquire();
-        if (!acquisitionStatus.isOK()) {
+        if (!scopedDistLock.isOK()) {
             *errMsg = stream() << "could not acquire collection lock for " << nss.ns()
                                << " to merge chunks in [" << minKey << "," << maxKey << ")"
-                               << causedBy(acquisitionStatus);
+                               << causedBy(scopedDistLock.getStatus());
 
             warning() << *errMsg << endl;
             return false;

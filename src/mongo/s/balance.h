@@ -42,13 +42,14 @@ namespace mongo {
     struct WriteConcernOptions;
 
     /**
-     * The balancer is a background task that tries to keep the number of chunks across all servers of the cluster even. Although
-     * every mongos will have one balancer running, only one of them will be active at the any given point in time. The balancer
-     * uses a 'DistributedLock' for that coordination.
+     * The balancer is a background task that tries to keep the number of chunks across all
+     * servers of the cluster even. Although every mongos will have one balancer running, only one
+     * of them will be active at the any given point in time. The balancer uses a distributed lock
+     * for that coordination.
      *
-     * The balancer does act continuously but in "rounds". At a given round, it would decide if there is an imbalance by
-     * checking the difference in chunks between the most and least loaded shards. It would issue a request for a chunk
-     * migration per round, if it found so.
+     * The balancer does act continuously but in "rounds". At a given round, it would decide if
+     * there is an imbalance by checking the difference in chunks between the most and least
+     * loaded shards. It would issue a request for a chunk migration per round, if it found so.
      */
     class Balancer : public BackgroundJob {
     public:

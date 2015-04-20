@@ -37,9 +37,10 @@
 
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/distlock.h"
+#include "mongo/s/legacy_dist_lock_manager.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/type_config_version.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -69,8 +70,6 @@ namespace mongo {
         // Make all connections redirect to the direct client
         _connectHook = new CustomConnectHook(&_txn);
         ConnectionString::setConnectionHook(_connectHook);
-        // Disable the lock pinger
-        setLockPingerEnabled(false);
 
         // Create the default config database before querying, necessary for direct connections
         clearServer();
@@ -119,9 +118,6 @@ namespace mongo {
     void ConfigServerFixture::tearDown() {
         shardingState.clearCollectionMetadata();
         clearServer();
-
-        // Reset the pinger
-        setLockPingerEnabled(true);
 
         // Make all connections redirect to the direct client
         ConnectionString::setConnectionHook(NULL);

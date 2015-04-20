@@ -84,7 +84,9 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/d_state.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/util/exit.h"
@@ -1220,6 +1222,10 @@ namespace {
         getGlobalServiceContext()->setKillAllOperations();
 
         repl::getGlobalReplicationCoordinator()->shutdown();
+        auto catalogMgr = grid.catalogManager();
+        if (catalogMgr) {
+            catalogMgr->shutDown();
+        }
 
         // We should always be able to acquire the global lock at shutdown.
         //

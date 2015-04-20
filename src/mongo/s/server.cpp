@@ -66,6 +66,7 @@
 #include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/legacy_dist_lock_manager.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/request.h"
 #include "mongo/s/version_mongos.h"
@@ -493,6 +494,7 @@ void mongo::signalShutdown() {
 
 void mongo::exitCleanly(ExitCode code) {
     // TODO: do we need to add anything?
+    grid.catalogManager()->shutDown();
     mongo::dbexit( code );
 }
 

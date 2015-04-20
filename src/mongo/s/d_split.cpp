@@ -59,7 +59,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/distlock.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
@@ -620,17 +620,17 @@ namespace mongo {
             // 2. lock the collection's metadata and get highest version for the current shard
             //
 
-            ScopedDistributedLock collLock(configLoc, ns);
-            collLock.setLockMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
-                                                  << ") in " << ns);
+            string whyMessage(str::stream() << "splitting chunk [" << minKey
+                                            << ", " << maxKey
+                                            << ") in " << ns);
+            auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                    ns, whyMessage);
 
-            Status acquisitionStatus = collLock.tryAcquire();
-            if (!acquisitionStatus.isOK()) {
+            if (!scopedDistLock.isOK()) {
                 errmsg = str::stream() << "could not acquire collection lock for " << ns
                                        << " to split chunk [" << minKey << "," << maxKey << ")"
-                                       << causedBy(acquisitionStatus);
-
-                warning() << errmsg << endl;
+                                       << causedBy(scopedDistLock.getStatus());
+                warning() << errmsg;
                 return false;
             }
 

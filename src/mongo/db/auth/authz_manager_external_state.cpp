@@ -39,6 +39,10 @@ namespace mongo {
 
     using std::string;
 
+#ifndef _MSC_EXTENSIONS
+    const long long AuthzManagerExternalState::_authzUpdateLockAcquisitionTimeoutMillis;
+#endif
+
     AuthzManagerExternalState::AuthzManagerExternalState() {}
     AuthzManagerExternalState::~AuthzManagerExternalState() {}
 

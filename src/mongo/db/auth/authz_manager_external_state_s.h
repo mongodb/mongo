@@ -28,20 +28,18 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/stdx/functional.h"
 
 
 namespace mongo {
-
-    class ScopedDistributedLock;
 
     /**
      * The implementation of AuthzManagerExternalState functionality for mongos.
@@ -112,7 +110,7 @@ namespace mongo {
 
     private:
         boost::mutex _distLockGuard; // Guards access to _authzDataUpdateLock
-        boost::scoped_ptr<ScopedDistributedLock> _authzDataUpdateLock;
+        std::unique_ptr<DistLockManager::ScopedDistLock> _authzDataUpdateLock;
     };
 
 } // namespace mongo

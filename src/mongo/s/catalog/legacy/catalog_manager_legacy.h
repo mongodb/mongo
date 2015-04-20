@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    class DistLockManager;
+
     /**
      * Implements the catalog manager using the legacy 3-config server protocol.
      */
@@ -50,6 +52,8 @@ namespace mongo {
          * server. Can only be called once for the lifetime.
          */
         Status init(const ConnectionString& configCS);
+
+        virtual void shutDown() override;
 
         virtual Status enableSharding(const std::string& dbName);
 
@@ -108,6 +112,8 @@ namespace mongo {
         virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
                                              BatchedCommandResponse* response);
 
+        virtual DistLockManager* getDistLockManager() override;
+
     private:
         /**
          * Direct network check to see if a particular database does not already exist with the
@@ -131,6 +137,8 @@ namespace mongo {
         // Parsed config server hosts, as specified on the command line.
         ConnectionString _configServerConnectionString;
         std::vector<ConnectionString> _configServers;
+
+        std::unique_ptr<DistLockManager> _distLockManager;
     };
 
 } // namespace mongo

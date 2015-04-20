@@ -37,6 +37,7 @@
 #include <boost/thread/mutex.hpp>
 #include <string>
 
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -46,7 +47,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
-#include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -339,20 +339,19 @@ namespace {
             return false;
         }
 
-        // Temporarily put into an auto_ptr just in case there is an exception thrown during
-        // lock acquisition.
-        std::auto_ptr<ScopedDistributedLock> lockHolder(new ScopedDistributedLock(
-                configServer.getConnectionString(), "authorizationData"));
-        lockHolder->setLockMessage(why.toString());
+        auto timeout = stdx::chrono::milliseconds(_authzUpdateLockAcquisitionTimeoutMillis);
+        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                "authorizationData", why, timeout);
 
-        Status acquisitionStatus = lockHolder->acquire(_authzUpdateLockAcquisitionTimeoutMillis);
-        if (!acquisitionStatus.isOK()) {
-            warning() <<
-                    "Error while attempting to acquire distributed lock for user modification: " <<
-                    acquisitionStatus.toString() << endl;
+        if (!scopedDistLock.isOK()) {
+            warning() << "Error while attempting to acquire distributed lock for "
+                      << "user modification: " << scopedDistLock.getStatus().toString();
             return false;
         }
-        _authzDataUpdateLock.reset(lockHolder.release());
+
+        _authzDataUpdateLock = stdx::make_unique<DistLockManager::ScopedDistLock>(
+                std::move(scopedDistLock.getValue()));
+
         return true;
     }
 

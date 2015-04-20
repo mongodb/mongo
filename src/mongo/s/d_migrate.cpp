@@ -81,7 +81,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/distlock.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/util/assert_util.h"
@@ -1184,15 +1184,15 @@ namespace mongo {
             // Get the distributed lock
             //
 
-            ScopedDistributedLock collLock(configLoc, ns);
-            collLock.setLockMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
-                                                  << ") in " << ns);
+            string whyMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
+                                            << ") in " << ns);
+            auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                    ns, whyMessage);
 
-            Status acquisitionStatus = collLock.tryAcquire();
-            if (!acquisitionStatus.isOK()) {
+            if (!scopedDistLock.isOK()) {
                 errmsg = stream() << "could not acquire collection lock for " << ns
                                   << " to migrate chunk [" << minKey << "," << maxKey << ")"
-                                  << causedBy(acquisitionStatus);
+                                  << causedBy(scopedDistLock.getStatus());
 
                 warning() << errmsg << endl;
                 return false;
@@ -1442,7 +1442,7 @@ namespace mongo {
             }
 
             // Ensure distributed lock still held
-            Status lockStatus = collLock.checkStatus();
+            Status lockStatus = scopedDistLock.getValue().checkStatus();
             if (!lockStatus.isOK()) {
                 errmsg = str::stream() << "not entering migrate critical section because "
                                        << lockStatus.toString();

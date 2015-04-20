@@ -33,13 +33,15 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/syncclusterconnection.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/distlock.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongo_version_range.h"
 #include "mongo/s/type_config_version.h"
@@ -492,13 +494,14 @@ namespace mongo {
         // time.
         //
 
-        ScopedDistributedLock upgradeLock(configLoc, "configUpgrade");
-        upgradeLock.setLockMessage(stream() << "upgrading config database to new format v"
-                                            << CURRENT_CONFIG_VERSION);
+        string whyMessage(stream() << "upgrading config database to new format v"
+                                   << CURRENT_CONFIG_VERSION);
+        auto lockTimeout = stdx::chrono::milliseconds(20 * 60 * 1000);
+        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                "configUpgrade", whyMessage, lockTimeout);
 
-        Status acquisitionStatus = upgradeLock.acquire(20 * 60 * 1000);
-        if (!acquisitionStatus.isOK()) {
-            *errMsg = acquisitionStatus.toString();
+        if (!scopedDistLock.isOK()) {
+            *errMsg = scopedDistLock.getStatus().toString();
             return false;
         }
 

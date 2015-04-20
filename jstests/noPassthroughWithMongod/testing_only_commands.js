@@ -3,8 +3,7 @@
  * via the --enableTestCommands flag fail when that flag isn't provided.
  */
 
-var testOnlyCommands = ['_testDistLockWithSyncCluster',
-                        '_testDistLockWithSkew',
+var testOnlyCommands = ['_testDistLockWithSkew',
                         '_skewClockCommand',
                         'configureFailPoint',
                         '_hashBSONElement',
@@ -13,7 +12,7 @@ var testOnlyCommands = ['_testDistLockWithSyncCluster',
                         'godinsert',
                         'sleep',
                         'captrunc',
-                        'emptycapped']
+                        'emptycapped'];
 
 var assertCmdNotFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);

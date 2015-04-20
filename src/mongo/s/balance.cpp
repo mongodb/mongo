@@ -35,6 +35,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/owned_pointer_map.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -50,7 +51,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
-#include "mongo/s/distlock.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/client/shard.h"
@@ -564,12 +565,12 @@ namespace mongo {
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
                 {
-                    ScopedDistributedLock balancerLock(config, "balancer");
-                    balancerLock.setLockMessage("doing balance round");
+                    auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                            "balancer", "doing balance round");
 
-                    Status lockStatus = balancerLock.tryAcquire();
-                    if (!lockStatus.isOK()) {
-                        LOG(1) << "skipping balancing round" << causedBy(lockStatus);
+                    if (!scopedDistLock.isOK()) {
+                        LOG(1) << "skipping balancing round"
+                               << causedBy(scopedDistLock.getStatus());
 
                         // Ping again so scripts can determine if we're active without waiting
                         _ping( true );

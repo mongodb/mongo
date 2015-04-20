@@ -33,7 +33,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/logger/labeled_level.h"
-
+#include "mongo/s/dist_lock_manager.h"
 
 namespace mongo {
 
@@ -60,9 +60,24 @@ namespace mongo {
      */
     class LockException : public DBException {
     public:
-        LockException( const char * msg , int code ) : DBException( msg, code ) {}
-        LockException( const std::string& msg, int code ) : DBException( msg, code ) {}
-        virtual ~LockException() throw() { }
+        LockException(StringData msg, int code);
+
+        /**
+         * Use this to signal that a lock with lockID needs to be unlocked. For example, in cases
+         * where the final lock acquisition was not propagated properly to all config servers.
+         */
+        LockException(StringData msg, int code, DistLockHandle lockID);
+
+        /**
+         * Returns the OID of the lock that needs to be unlocked.
+         */
+        DistLockHandle getMustUnlockID() const;
+
+        virtual ~LockException() = default;
+
+    private:
+        // The identifier of a lock that needs to be unlocked.
+        DistLockHandle _mustUnlockID;
     };
 
     /**
@@ -72,7 +87,7 @@ namespace mongo {
     public:
         TimeNotFoundException( const char * msg , int code ) : LockException( msg, code ) {}
         TimeNotFoundException( const std::string& msg, int code ) : LockException( msg, code ) {}
-        virtual ~TimeNotFoundException() throw() { }
+        virtual ~TimeNotFoundException() = default;
     };
 
     /**
@@ -154,12 +169,11 @@ namespace mongo {
          * consider using the dist_lock_try construct to acquire this lock in an exception safe way.
          *
          * @param why human readable description of why the lock is being taken (used to log)
-         * @param whether this is a lock re-entry or a new lock
          * @param other configdb's lock document that is currently holding the lock, if lock is taken, or our own lock
          * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( const std::string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
+        bool lock_try(const std::string& why, BSONObj* other = 0, double timeout = 0.0);
 
         /**
          * Returns OK if this lock is held (but does not guarantee that this owns it) and
@@ -169,17 +183,17 @@ namespace mongo {
         Status checkStatus(double timeout);
 
         /**
-         * Releases a previously taken lock.
+         * Releases a previously taken lock. Returns true on success.
          */
-        void unlock( BSONObj* oldLockPtr = NULL );
+        bool unlock(const OID& lockID);
 
-        Date_t getRemoteTime();
+        Date_t getRemoteTime() const;
 
-        bool isRemoteTimeSkewed();
+        bool isRemoteTimeSkewed() const;
 
-        const std::string& getProcessId();
+        const std::string& getProcessId() const;
 
-        const ConnectionString& getRemoteConnection();
+        const ConnectionString& getRemoteConnection() const;
 
         /**
          * Checks the skew among a cluster of servers and returns true if the min and max clock
@@ -194,8 +208,6 @@ namespace mongo {
          * Get the remote time from a server or cluster
          */
         static Date_t remoteTime( const ConnectionString& cluster, unsigned long long maxNetSkew = MAX_LOCK_NET_SKEW );
-
-        static bool killPinger( DistributedLock& lock );
 
         /**
          * Namespace for lock pings
@@ -222,109 +234,6 @@ namespace mongo {
         void resetLastPing(){ lastPings.setLastPing( _conn, _name, PingData() ); }
         void setLastPing( const PingData& pd ){ lastPings.setLastPing( _conn, _name, pd ); }
         PingData getLastPing(){ return lastPings.getLastPing( _conn, _name ); }
-
-        // May or may not exist, depending on startup
-        mongo::mutex _mutex;
-        std::string _threadId;
-
-    };
-
-    // Helper functions for tests, allows us to turn the creation of a lock pinger on and off.
-    // *NOT* thread-safe
-    bool isLockPingerEnabled();
-    void setLockPingerEnabled(bool enabled);
-
-    /**
-     * Scoped wrapper for a distributed lock acquisition attempt.  One or more attempts to acquire
-     * the distributed lock are managed by this class, and the distributed lock is unlocked if
-     * successfully acquired on object destruction.
-     */
-    class ScopedDistributedLock {
-    public:
-
-        static const long long kDefaultLockTryIntervalMillis;
-        static const long long kDefaultSocketTimeoutMillis;
-
-        ScopedDistributedLock(const ConnectionString& conn, const std::string& name);
-
-        ~ScopedDistributedLock();
-
-        /**
-         * Tries to obtain the lock once.
-         *
-         * Returns OK if the lock was successfully acquired.
-         * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
-         * Returns ErrorCodes::LockBusy if the lock is being held.
-         */
-        Status tryAcquire();
-
-        /**
-         * Tries to unlock the lock if acquired.  Cannot report an error or block indefinitely
-         * (though it may log messages or continue retrying in a non-blocking way).
-         */
-        void unlock();
-
-        /**
-         * Tries multiple times to lock, using the specified lock try interval, until
-         * a certain amount of time has passed or when any error that is not LockBusy
-         * occurred.
-         *
-         * waitForMillis = 0 indicates there should only be one attempt to acquire the lock, and
-         * no waiting.
-         * waitForMillis = -1 indicates we should retry indefinitely.
-         *
-         * Returns OK if the lock was successfully acquired.
-         * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
-         * Returns ErrorCodes::LockBusy if the lock is being held.
-         */
-        Status acquire(long long waitForMillis);
-
-        /**
-         * If lock is held, remotely verifies that the lock has not been forced as a sanity check.
-         * If the lock is not held or cannot be verified, returns not OK.
-         */
-        Status checkStatus();
-
-        bool isAcquired() const {
-            return _acquired;
-        }
-
-        ConnectionString getConfigConnectionString() const {
-            return _lock._conn;
-        }
-
-        void setLockTryIntervalMillis(long long lockTryIntervalMillis) {
-            _lockTryIntervalMillis = lockTryIntervalMillis;
-        }
-
-        long long getLockTryIntervalMillis() const {
-            return _lockTryIntervalMillis;
-        }
-
-        void setLockMessage(const std::string& why) {
-            _why = why;
-        }
-
-        std::string getLockMessage() const {
-            return _why;
-        }
-
-        void setSocketTimeoutMillis(long long socketTimeoutMillis) {
-            _socketTimeoutMillis = socketTimeoutMillis;
-        }
-
-        long long getSocketTimeoutMillis() const {
-            return _socketTimeoutMillis;
-        }
-
-    private:
-        DistributedLock _lock;
-        std::string _why;
-        long long _lockTryIntervalMillis;
-        long long _socketTimeoutMillis;
-
-        bool _acquired;
-        BSONObj _other;
     };
 
 }

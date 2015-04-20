@@ -45,6 +45,7 @@ namespace mongo {
     class CollectionType;
     class ConnectionString;
     class DatabaseType;
+    class DistLockManager;
     class OperationContext;
     class SettingsType;
     class Shard;
@@ -74,6 +75,11 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(CatalogManager);
     public:
         virtual ~CatalogManager() = default;
+
+        /**
+         * Performs necessary cleanup when shutting down cleanly.
+         */
+        virtual void shutDown() = 0;
 
         /**
          * Creates a new database or updates the sharding status for an existing one. Cannot be
@@ -289,6 +295,8 @@ namespace mongo {
          */
         virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
                                              BatchedCommandResponse* response) = 0;
+
+        virtual DistLockManager* getDistLockManager() = 0;
 
         /**
          * Directly inserts a document in the specified namespace on the config server (only the

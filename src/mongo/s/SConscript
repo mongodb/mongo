@@ -229,3 +229,15 @@ env.CppUnitTest(
     ]
 )
 
+env.Library(
+    target='dist_lock',
+    source=[
+        'dist_lock_manager.cpp',
+        'legacy_dist_lock_manager.cpp',
+        'legacy_dist_lock_pinger.cpp',
+    ],
+    LIBDEPS=[
+        'base',
+    ],
+)
+

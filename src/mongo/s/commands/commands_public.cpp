@@ -56,6 +56,7 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_explain.h"
 #include "mongo/s/cluster_last_error_info.h"
@@ -63,7 +64,6 @@
 #include "mongo/s/commands/run_on_all_shards_cmd.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
-#include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/strategy.h"
@@ -1921,14 +1921,14 @@ namespace {
                     map<BSONObj, int> chunkSizes;
                     {
                         // take distributed lock to prevent split / migration.
-                        ScopedDistributedLock nsLock(configServer.getConnectionString(),
-                                                     finalColLong);
-                        nsLock.setLockMessage("mr-post-process");
-                        nsLock.setLockTryIntervalMillis(100);
+                        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                                finalColLong,
+                                "mr-post-process",
+                                stdx::chrono::milliseconds(-1), // retry indefinitely
+                                stdx::chrono::milliseconds(100));
 
-                        Status lockStatus = nsLock.acquire(-1 /* retry indefinitely */);
-                        if (!lockStatus.isOK()) {
-                            return appendCommandStatus(result, lockStatus);
+                        if (!scopedDistLock.isOK()) {
+                            return appendCommandStatus(result, scopedDistLock.getStatus());
                         }
 
                         BSONObj finalCmdObj = finalCmd.obj();
