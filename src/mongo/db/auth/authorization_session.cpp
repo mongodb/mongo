@@ -160,6 +160,7 @@ namespace {
             ActionSet setupServerConfigActionSet;
             setupServerConfigActionSet.addAction(ActionType::addShard);
             setupServerConfigActionSet.addAction(ActionType::getCmdLineOpts);
+            setupServerConfigActionSet.addAction(ActionType::getParameter);
             setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
             setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
             setupServerConfigActionSet.addAction(ActionType::serverStatus);
