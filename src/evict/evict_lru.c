@@ -656,6 +656,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 			btree->evict_ref = NULL;
 			WT_TRET(__wt_page_release(session, ref, 0));
 		}
+		session->dhandle = NULL;
 	}
 
 	return (ret);
