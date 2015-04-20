@@ -470,9 +470,11 @@ main(void)
 	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
 	    "columns=(value0,key0)");
 	ret = session->create(session, "table:crypto2",
+	    "block_compressor=snappy,"
 	    "encryption=(name=rotn,keyid=" USER2_KEYID"),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:nocrypto",
+	    "block_compressor=snappy,"
 	    "key_format=S,value_format=S");
 
 	ret = session->create(session, "table:cryptobad",
