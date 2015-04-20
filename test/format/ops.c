@@ -90,7 +90,7 @@ wts_ops(int lastrun)
 	if (g.c_timer == 0)
 		fourths = -1;
 	else
-		fourths = (g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
+		fourths = ((int64_t)g.c_timer * 4 * 60) / FORMAT_OPERATION_REPS;
 
 	/* Initialize the table extension code. */
 	table_append_init();
@@ -486,7 +486,7 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 			goto deadlock;
 
 		/* Reset the cursor: there is no reason to keep pages pinned. */
-		if (cursor != NULL && (ret = cursor->reset(cursor)) != 0)
+		if ((ret = cursor->reset(cursor)) != 0)
 			die(ret, "cursor.reset");
 
 		/*
