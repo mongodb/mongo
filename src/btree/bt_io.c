@@ -181,13 +181,12 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_PAGE_HEADER *dsk;
 	size_t len, src_len, dst_len, result_len, size;
 	int data_cksum, compression_failed, encrypted;
-	uint32_t encrypt_len, *elen;
+	uint32_t *unpadded_lenp;
 	uint8_t *src, *dst;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	encrypted = 0;
-	encrypt_len = 0;
 
 	/* Checkpoint calls are different than standard calls. */
 	WT_ASSERT(session,
@@ -329,25 +328,22 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			    WT_SIZET_FMT " bytes", btree->dhandle->name,
 			    src_len);
 
-		result_len += WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-
 		/*TODO: stats*/
-
 		encrypted = 1;
-		/*
-		 * Store original size so we know how much space is needed
-		 * on the decryption side.
-		 */
-		elen = (uint32_t *)((uint8_t *)etmp->mem +
-		    WT_BLOCK_ENCRYPT_SKIP);
-		*elen = WT_STORE_SIZE(result_len);
-
+		result_len += WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 		/*
 		 * Copy in the skipped header bytes, set the final data
 		 * size.
 		 */
 		memcpy(etmp->mem, ip->mem, WT_BLOCK_ENCRYPT_SKIP);
 		etmp->size = result_len;
+		/*
+		 * Store original size so we know how much space is needed
+		 * on the decryption side.
+		 */
+		unpadded_lenp = (uint32_t *)((uint8_t *)etmp->mem +
+		    WT_BLOCK_ENCRYPT_SKIP);
+		*unpadded_lenp = WT_STORE_SIZE(result_len);
 		ip = etmp;
 	}
 	dsk = ip->mem;
