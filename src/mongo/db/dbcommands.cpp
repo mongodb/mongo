@@ -82,6 +82,9 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repair_database.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_after_optime_args.h"
+#include "mongo/db/repl/read_after_optime_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -1186,14 +1189,14 @@ namespace mongo {
         bool _impersonation;
     };
 
-    namespace {
-        void appendGLEHelperData(BSONObjBuilder& bob, const Timestamp& opTime, const OID& oid) {
-            BSONObjBuilder subobj(bob.subobjStart(kGLEStatsFieldName));
-            subobj.append(kGLEStatsLastOpTimeFieldName, opTime);
-            subobj.appendOID(kGLEStatsElectionIdFieldName, const_cast<OID*>(&oid));
-            subobj.done();
-        }
+namespace {
+    void appendGLEHelperData(BSONObjBuilder& bob, const Timestamp& opTime, const OID& oid) {
+        BSONObjBuilder subobj(bob.subobjStart(kGLEStatsFieldName));
+        subobj.append(kGLEStatsLastOpTimeFieldName, opTime);
+        subobj.appendOID(kGLEStatsElectionIdFieldName, const_cast<OID*>(&oid));
+        subobj.done();
     }
+} // unnamed namespace
 
     /**
      * this handles
@@ -1333,6 +1336,25 @@ namespace mongo {
         txn->getCurOp()->ensureStarted();
 
         c->_commandsExecuted.increment();
+
+        {
+            // Handle read after opTime.
+
+            repl::ReadAfterOpTimeArgs readAfterOptimeSettings;
+            auto readAfterParseStatus = readAfterOptimeSettings.initialize(cmdObj);
+            if (!readAfterParseStatus.isOK()) {
+                appendCommandStatus(result, readAfterParseStatus);
+                return;
+            }
+
+            auto readAfterResult = replCoord->waitUntilOpTime(txn, readAfterOptimeSettings);
+            readAfterResult.appendInfo(&result);
+
+            if (!readAfterResult.getStatus().isOK()) {
+                appendCommandStatus(result, readAfterResult.getStatus());
+                return;
+            }
+        }
 
         retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result);
 

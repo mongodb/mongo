@@ -121,6 +121,9 @@ error_code("NamespaceNotSharded", 118)
 error_code("InvalidSyncSource", 119)
 error_code("OplogStartMissing", 120)
 error_code("DocumentValidationFailure", 121) # Only for the document validator on collections.
+error_code("ReadAfterOptimeTimeout", 122)
+error_code("NotAReplicaSet", 123)
+error_code("IncompatibleElectionProtocol", 124)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

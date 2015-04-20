@@ -443,10 +443,19 @@ def skipTest(path):
     parentPath = os.path.dirname(path)
     parentDir = os.path.basename(parentPath)
     if small_oplog or small_oplog_rs: # For tests running in parallel
-        if basename in ["cursor8.js", "indexh.js", "dropdb.js", "dropdb_race.js", 
-                        "connections_opened.js", "opcounters_write_cmd.js", "dbadmin.js",
+        if basename in ["cursor8.js",
+                        "indexh.js",
+                        "dropdb.js",
+                        "dropdb_race.js",
+                        "connections_opened.js",
+                        "opcounters_write_cmd.js",
+                        "dbadmin.js",
+                        # Should not run in repl mode:
+                        "read_after_optime.js",
                         ## Capped tests
-                        "capped_max1.js", "capped_convertToCapped1.js", "rename.js"]:
+                        "capped_max1.js",
+                        "capped_convertToCapped1.js",
+                        "rename.js"]:
             return True
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly

@@ -31,6 +31,7 @@
 #include <cmath>
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/repl/read_after_optime_args.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -326,6 +327,11 @@ namespace mongo {
                                                 << optionsObj.toString() << ". "
                                                 << "You may need to update your shell or driver.");
                 }
+            }
+            else if (mongoutils::str::equals(fieldName,
+                                             repl::ReadAfterOpTimeArgs::kRootFieldName.c_str())) {
+                // read after optime parsing is handled elsewhere.
+                continue;
             }
             else {
                 mongoutils::str::stream ss;

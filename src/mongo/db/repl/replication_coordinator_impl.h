@@ -91,21 +91,21 @@ namespace repl {
 
         // ================== Members of public ReplicationCoordinator API ===================
 
-        virtual void startReplication(OperationContext* txn);
+        virtual void startReplication(OperationContext* txn) override;
 
-        virtual void shutdown();
+        virtual void shutdown() override;
 
-        virtual const ReplSettings& getSettings() const;
+        virtual const ReplSettings& getSettings() const override;
 
-        virtual Mode getReplicationMode() const;
+        virtual Mode getReplicationMode() const override;
 
-        virtual MemberState getMemberState() const;
+        virtual MemberState getMemberState() const override;
 
-        virtual bool isInPrimaryOrSecondaryState() const;
+        virtual bool isInPrimaryOrSecondaryState() const override;
 
-        virtual Seconds getSlaveDelaySecs() const;
+        virtual Seconds getSlaveDelaySecs() const override;
 
-        virtual void clearSyncSourceBlacklist();
+        virtual void clearSyncSourceBlacklist() override;
 
         /*
          * Implementation of the KillOpListenerInterface interrupt method so that we can wake up
@@ -156,107 +156,112 @@ namespace repl {
 
         virtual Timestamp getMyLastOptime() const;
 
-        virtual OpTime getMyLastOptimeV1() const;
+        virtual OpTime getMyLastOptimeV1() const override;
 
-        virtual OID getElectionId();
+        virtual ReadAfterOpTimeResponse waitUntilOpTime(
+                const OperationContext* txn,
+                const ReadAfterOpTimeArgs& settings) override;
 
-        virtual OID getMyRID() const;
+        virtual OID getElectionId() override;
 
-        virtual int getMyId() const;
+        virtual OID getMyRID() const override;
 
-        virtual bool setFollowerMode(const MemberState& newState);
+        virtual int getMyId() const override;
 
-        virtual bool isWaitingForApplierToDrain();
+        virtual bool setFollowerMode(const MemberState& newState) override;
 
-        virtual void signalDrainComplete(OperationContext* txn);
+        virtual bool isWaitingForApplierToDrain() override;
 
-        virtual void signalUpstreamUpdater();
+        virtual void signalDrainComplete(OperationContext* txn) override;
 
-        virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+        virtual void signalUpstreamUpdater() override;
 
-        virtual Status processReplSetGetStatus(BSONObjBuilder* result);
+        virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) override;
 
-        virtual void fillIsMasterForReplSet(IsMasterResponse* result);
+        virtual Status processReplSetGetStatus(BSONObjBuilder* result) override;
 
-        virtual void appendSlaveInfoData(BSONObjBuilder* result);
+        virtual void fillIsMasterForReplSet(IsMasterResponse* result) override;
 
-        virtual ReplicaSetConfig getConfig() const;
+        virtual void appendSlaveInfoData(BSONObjBuilder* result) override;
 
-        virtual void processReplSetGetConfig(BSONObjBuilder* result);
+        virtual ReplicaSetConfig getConfig() const override;
 
-        virtual Status setMaintenanceMode(bool activate);
+        virtual void processReplSetGetConfig(BSONObjBuilder* result) override;
 
-        virtual bool getMaintenanceMode();
+        virtual Status setMaintenanceMode(bool activate) override;
+
+        virtual bool getMaintenanceMode() override;
 
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
-                                              BSONObjBuilder* resultObj);
+                                              BSONObjBuilder* resultObj) override;
 
-        virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
+        virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) override;
 
         virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
-                                        ReplSetHeartbeatResponse* response);
+                                        ReplSetHeartbeatResponse* response) override;
 
         virtual Status processReplSetReconfig(OperationContext* txn,
                                               const ReplSetReconfigArgs& args,
-                                              BSONObjBuilder* resultObj);
+                                              BSONObjBuilder* resultObj) override;
 
         virtual Status processReplSetInitiate(OperationContext* txn,
                                               const BSONObj& configObj,
-                                              BSONObjBuilder* resultObj);
+                                              BSONObjBuilder* resultObj) override;
 
-        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
+        virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj) override;
 
-        virtual void incrementRollbackID();
+        virtual void incrementRollbackID() override;
 
         virtual Status processReplSetFresh(const ReplSetFreshArgs& args,
-                                           BSONObjBuilder* resultObj);
+                                           BSONObjBuilder* resultObj) override;
 
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
-                                           BSONObjBuilder* response);
+                                           BSONObjBuilder* response) override;
 
         virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
-                                                    long long* configVersion);
+                                                    long long* configVersion) override;
 
-        virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake);
+        virtual Status processHandshake(OperationContext* txn,
+                                        const HandshakeArgs& handshake) override;
 
-        virtual bool buildsIndexes();
+        virtual bool buildsIndexes() override;
 
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op);
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op) override;
 
-        virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
+        virtual std::vector<HostAndPort> getOtherNodesInReplSet() const override;
 
-        virtual WriteConcernOptions getGetLastErrorDefault();
+        virtual WriteConcernOptions getGetLastErrorDefault() override;
 
-        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
+        virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) override;
 
-        virtual bool isReplEnabled() const;
+        virtual bool isReplEnabled() const override;
 
-        virtual HostAndPort chooseNewSyncSource();
+        virtual HostAndPort chooseNewSyncSource() override;
 
-        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
+        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
 
-        virtual void resetLastOpTimeFromOplog(OperationContext* txn);
+        virtual void resetLastOpTimeFromOplog(OperationContext* txn) override;
 
-        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) override;
 
-        virtual Timestamp getLastCommittedOpTime() const;
+        virtual Timestamp getLastCommittedOpTime() const override;
 
         virtual Status processReplSetRequestVotes(OperationContext* txn,
                                                   const ReplSetRequestVotesArgs& args,
-                                                  ReplSetRequestVotesResponse* response);
+                                                  ReplSetRequestVotesResponse* response) override;
 
         virtual Status processReplSetDeclareElectionWinner(
                 const ReplSetDeclareElectionWinnerArgs& args,
-                long long* responseTerm);
+                long long* responseTerm) override;
 
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
 
         virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                          ReplSetHeartbeatResponseV1* response);
+                                          ReplSetHeartbeatResponseV1* response) override;
 
-        virtual bool isV1ElectionProtocol();
+        virtual bool isV1ElectionProtocol() override;
 
-        virtual void summarizeAsHtml(ReplSetHtmlSummary* s);
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* s) override;
 
         // ================== Test support API ===================
 
@@ -879,6 +884,10 @@ namespace repl {
         // list of information about clients waiting on replication.  Does *not* own the
         // WaiterInfos.
         std::vector<WaiterInfo*> _replicationWaiterList;                                  // (M)
+
+        // list of information about clients waiting for a particular opTime.
+        // Does *not* own the WaiterInfos.
+        std::vector<WaiterInfo*> _opTimeWaiterList;                                       // (M)
 
         // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;                                                                 // (M)

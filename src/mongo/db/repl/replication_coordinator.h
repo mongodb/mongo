@@ -55,6 +55,8 @@ namespace repl {
     class IsMasterResponse;
     class OplogReader;
     class OpTime;
+    class ReadAfterOpTimeArgs;
+    class ReadAfterOpTimeResponse;
     class ReplSetDeclareElectionWinnerArgs;
     class ReplSetDeclareElectionWinnerResponse;
     class ReplSetHeartbeatArgs;
@@ -286,6 +288,23 @@ namespace repl {
          * Returns the last optime recorded by setMyLastOptime.
          */
         virtual Timestamp getMyLastOptime() const = 0;
+
+        /**
+         * Waits until the optime of the current node is at least the opTime specified in
+         * 'settings'.
+         *
+         * The returned ReadAfterOpTimeResponse object's didWait() method returns true if
+         * an attempt was made to wait for the specified opTime. Cases when this can be
+         * false could include:
+         *
+         * 1. No read after opTime was specified.
+         * 2. Attempting to do read after opTime when node is not a replica set member.
+         *
+         * Note: getDuration() on the returned ReadAfterOpTimeResponse will only be valid if
+         * its didWait() method returns true.
+         */
+        virtual ReadAfterOpTimeResponse waitUntilOpTime(const OperationContext* txn,
+                                                        const ReadAfterOpTimeArgs& settings) = 0;
 
         /**
          * Retrieves and returns the current election id, which is a unique id that is local to

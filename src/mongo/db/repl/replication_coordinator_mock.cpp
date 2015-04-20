@@ -32,6 +32,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/db/repl/read_after_optime_args.h"
+#include "mongo/db/repl/read_after_optime_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/assert_util.h"
@@ -143,6 +145,12 @@ namespace repl {
     Timestamp ReplicationCoordinatorMock::getMyLastOptime() const {
         // TODO
         return Timestamp();
+    }
+
+    ReadAfterOpTimeResponse ReplicationCoordinatorMock::waitUntilOpTime(
+            const OperationContext* txn,
+            const ReadAfterOpTimeArgs& settings) {
+        return ReadAfterOpTimeResponse();
     }
 
 

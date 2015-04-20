@@ -36,10 +36,50 @@
 namespace mongo {
 namespace repl {
 
-    OperationContextReplMock::OperationContextReplMock()
-        : _lockState(new MMAPV1LockerImpl()) { }
+    OperationContextReplMock::OperationContextReplMock():
+            _lockState(new MMAPV1LockerImpl()),
+            _opID(0),
+            _checkForInterruptStatus(Status::OK()),
+            _maxTimeMicrosRemaining(0) {
+    }
 
     OperationContextReplMock::~OperationContextReplMock() {}
+
+    Locker* OperationContextReplMock::lockState() const {
+        return _lockState.get();
+    }
+
+    unsigned int OperationContextReplMock::getOpID() const {
+        return _opID;
+    }
+
+    void OperationContextReplMock::setOpID(unsigned int opID) {
+        _opID = opID;
+    }
+
+    void OperationContextReplMock::checkForInterrupt() const {
+        uassertStatusOK(checkForInterruptNoAssert());
+    }
+
+    Status OperationContextReplMock::checkForInterruptNoAssert() const {
+        if (!_checkForInterruptStatus.isOK()) {
+            return _checkForInterruptStatus;
+        }
+
+        return Status::OK();
+    }
+
+    void OperationContextReplMock::setCheckForInterruptStatus(Status status) {
+        _checkForInterruptStatus = std::move(status);
+    }
+
+    uint64_t OperationContextReplMock::getRemainingMaxTimeMicros() const {
+        return _maxTimeMicrosRemaining;
+    }
+
+    void OperationContextReplMock::setRemainingMaxTimeMicros(uint64_t micros) {
+        _maxTimeMicrosRemaining = micros;
+    }
 
 }  // namespace repl
 }  // namespace mongo

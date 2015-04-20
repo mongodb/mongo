@@ -103,6 +103,10 @@ namespace repl {
 
         virtual Timestamp getMyLastOptime() const;
 
+        virtual ReadAfterOpTimeResponse waitUntilOpTime(
+                        const OperationContext* txn,
+                        const ReadAfterOpTimeArgs& settings) override;
+
         virtual OID getElectionId();
 
         virtual OID getMyRID() const;

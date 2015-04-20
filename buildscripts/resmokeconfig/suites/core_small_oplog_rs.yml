@@ -11,6 +11,7 @@ selector:
     - jstests/core/dropdb_race.js
     - jstests/core/opcounters_write_cmd.js
     - jstests/core/rename.js
+    - jstests/core/read_after_optime.js
 
 executor:
   js_test:

@@ -40,34 +40,36 @@ namespace mongo {
 
         virtual ~OperationContextImpl();
 
-        virtual RecoveryUnit* recoveryUnit() const;
+        virtual RecoveryUnit* recoveryUnit() const override;
 
-        virtual RecoveryUnit* releaseRecoveryUnit();
+        virtual RecoveryUnit* releaseRecoveryUnit() override;
 
-        virtual void setRecoveryUnit(RecoveryUnit* unit);
+        virtual void setRecoveryUnit(RecoveryUnit* unit) override;
 
-        virtual Locker* lockState() const;
+        virtual Locker* lockState() const override;
 
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name,
                                           unsigned long long progressMeterTotal,
-                                          int secondsBetween);
+                                          int secondsBetween) override;
 
-        virtual std::string getNS() const;
+        virtual std::string getNS() const override;
 
-        virtual Client* getClient() const;
+        virtual Client* getClient() const override;
 
-        virtual CurOp* getCurOp() const;
+        virtual CurOp* getCurOp() const override;
 
-        virtual unsigned int getOpID() const;
+        virtual unsigned int getOpID() const override;
 
-        virtual void checkForInterrupt() const;
-        virtual Status checkForInterruptNoAssert() const;
+        virtual uint64_t getRemainingMaxTimeMicros() const override;
 
-        virtual bool isPrimaryFor( StringData ns );
+        virtual void checkForInterrupt() const override;
+        virtual Status checkForInterruptNoAssert() const override;
 
-        virtual void setReplicatedWrites(bool writesAreReplicated = true);
-        virtual bool writesAreReplicated() const;
+        virtual bool isPrimaryFor( StringData ns ) override;
+
+        virtual void setReplicatedWrites(bool writesAreReplicated = true) override;
+        virtual bool writesAreReplicated() const override;
 
     private:
         std::auto_ptr<RecoveryUnit> _recovery;

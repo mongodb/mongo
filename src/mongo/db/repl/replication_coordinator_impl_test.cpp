@@ -32,6 +32,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -42,6 +43,9 @@
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_after_optime_args.h"
+#include "mongo/db/repl/read_after_optime_response.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
@@ -57,12 +61,15 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace repl {
 namespace {
 
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
+    Status kInterruptedStatus(ErrorCodes::Interrupted, "operation was interrupted");
 
     TEST_F(ReplCoordTest, StartupWithValidLocalConfig) {
         assertStartSuccess(
@@ -324,7 +331,7 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         BSONObjBuilder result1;
-        getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace, 
+        getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace,
                                                                      "The test set this"));
         ASSERT_EQUALS(
                 ErrorCodes::OutOfDiskSpace,
@@ -840,50 +847,9 @@ namespace {
         awaiter.reset();
     }
 
-    class OperationContextNoopWithInterrupt : public OperationContextReplMock {
-    public:
-
-        OperationContextNoopWithInterrupt() : _opID(0), _interruptOp(false) {}
-
-        virtual unsigned int getOpID() const {
-            return _opID;
-        }
-
-        /**
-         * Can only be called before any multi-threaded access to this object has begun.
-         */
-        void setOpID(unsigned int opID) {
-            _opID = opID;
-        }
-
-        virtual void checkForInterrupt() const {
-            if (_interruptOp) {
-                uasserted(ErrorCodes::Interrupted, "operation was interrupted");
-            }
-        }
-
-        virtual Status checkForInterruptNoAssert() const {
-            if (_interruptOp) {
-                return Status(ErrorCodes::Interrupted, "operation was interrupted");
-            }
-            return Status::OK();
-        }
-
-        /**
-         * Can only be called before any multi-threaded access to this object has begun.
-         */
-        void setInterruptOp(bool interrupt) {
-            _interruptOp = interrupt;
-        }
-
-    private:
-        unsigned int _opID;
-        bool _interruptOp;
-    };
-
     TEST_F(ReplCoordTest, AwaitReplicationInterrupt) {
         // Tests that a thread blocked in awaitReplication can be killed by a killOp operation
-        OperationContextNoopWithInterrupt txn;
+        OperationContextReplMock txn;
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
@@ -914,7 +880,7 @@ namespace {
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time1));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time1));
 
-        txn.setInterruptOp(true);
+        txn.setCheckForInterruptStatus(kInterruptedStatus);
         getReplCoord()->interrupt(opID);
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::Interrupted, statusAndDur.status);
@@ -1202,7 +1168,7 @@ namespace {
     }
 
     TEST_F(StepDownTest, InterruptStepDown) {
-        OperationContextNoopWithInterrupt txn;
+        OperationContextReplMock txn;
         Timestamp optime1(100, 1);
         Timestamp optime2(100, 2);
         // No secondary is caught up
@@ -1223,7 +1189,7 @@ namespace {
 
         unsigned int opID = 100;
         txn.setOpID(opID);
-        txn.setInterruptOp(true);
+        txn.setCheckForInterruptStatus(kInterruptedStatus);
         getReplCoord()->interrupt(opID);
 
         ASSERT_EQUALS(ErrorCodes::Interrupted, runner.getResult());
@@ -1558,7 +1524,7 @@ namespace {
         IsMasterResponse roundTripped;
         ASSERT_OK(roundTripped.initialize(response.toBSON()));
     }
-         
+
     TEST_F(ReplCoordTest, ShutDownBeforeStartUpFinished) {
         init();
         startCapturingLogMessages();
@@ -1943,6 +1909,172 @@ namespace {
         ASSERT_EQUALS(newTime, getReplCoord()->getLastCommittedOpTime());
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, newTime));
         ASSERT_EQUALS(newTime, getReplCoord()->getLastCommittedOpTime());
+    }
+
+    TEST_F(ReplCoordTest, CantUseReadAfterIfNotReplSet) {
+        init(ReplSettings());
+        OperationContextNoop txn;
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 1),
+                                    Milliseconds(0)));
+
+        ASSERT_FALSE(result.didWait());
+        ASSERT_EQUALS(ErrorCodes::NotAReplicaSet, result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterWhileShutdown) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+        getReplCoord()->setMyLastOptime(Timestamp(10, 0));
+
+        shutdown();
+
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 1),
+                                    Milliseconds(0)));
+
+        ASSERT_TRUE(result.didWait());
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterInterrupted) {
+        OperationContextReplMock txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+        getReplCoord()->setMyLastOptime(Timestamp(10, 0));
+
+        txn.setCheckForInterruptStatus(Status(ErrorCodes::Interrupted, "test"));
+
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 1),
+                                    Milliseconds(0)));
+
+        ASSERT_TRUE(result.didWait());
+        ASSERT_EQUALS(ErrorCodes::Interrupted, result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterNoOpTime) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+        auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs());
+
+        ASSERT_FALSE(result.didWait());
+        ASSERT_OK(result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterGreaterOpTime) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(OpTime(Timestamp(50, 0), 1),
+                                    Milliseconds(100)));
+
+        ASSERT_TRUE(result.didWait());
+        ASSERT_OK(result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterEqualOpTime) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+
+        OpTime time(Timestamp(100, 0), 1);
+        getReplCoord()->setMyLastOptime(time.getTimestamp());
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(time, Milliseconds(100)));
+
+        ASSERT_TRUE(result.didWait());
+        ASSERT_OK(result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterDeferredGreaterOpTime) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+        getReplCoord()->setMyLastOptime(Timestamp(0, 0));
+
+        auto pseudoLogOp = std::async(std::launch::async, [this]() {
+            // Not guaranteed to be scheduled after waitUnitl blocks...
+            getReplCoord()->setMyLastOptime(Timestamp(200, 0));
+        });
+
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(OpTime(Timestamp(100, 0), 1),
+                                    Milliseconds(0)));
+        pseudoLogOp.get();
+
+        ASSERT_TRUE(result.didWait());
+        ASSERT_OK(result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterDeferredEqualOpTime) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+        getReplCoord()->setMyLastOptime(Timestamp(0, 0));
+
+        repl::OpTime opTimeToWait(Timestamp(100, 0), 1);
+
+        auto pseudoLogOp = std::async(std::launch::async, [this, &opTimeToWait]() {
+            // Not guaranteed to be scheduled after waitUnitl blocks...
+            getReplCoord()->setMyLastOptime(opTimeToWait.getTimestamp());
+        });
+
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(opTimeToWait, Milliseconds(0)));
+        pseudoLogOp.get();
+
+        ASSERT_TRUE(result.didWait());
+        ASSERT_OK(result.getStatus());
+    }
+
+    TEST_F(ReplCoordTest, ReadAfterOpTimeTimeoutNoMaxTimeMS) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0))),
+                HostAndPort("node1", 12345));
+
+        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+
+        auto result = getReplCoord()->waitUntilOpTime(&txn,
+                ReadAfterOpTimeArgs(OpTime(Timestamp(200, 0), 1), Milliseconds(10)));
+
+        ASSERT_TRUE(result.didWait());
+        ASSERT_EQUALS(ErrorCodes::ReadAfterOptimeTimeout, result.getStatus());
     }
 
     // TODO(schwerin): Unit test election id updating

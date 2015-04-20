@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,49 +28,51 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <string>
 
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/base/status.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    class Locker;
+    class BSONObj;
 
 namespace repl {
 
-    /**
-     * Mock implementation of OperationContext that can be used with real instances of LockManager.
-     * Note this is not thread safe and the setter methods should only be called in the context
-     * where access to this object is guaranteed to be serialized.
-     */
-    class OperationContextReplMock : public OperationContextNoop {
+    class ReadAfterOpTimeArgs {
     public:
-        OperationContextReplMock();
-        virtual ~OperationContextReplMock();
 
-        virtual Locker* lockState() const override;
+        static const std::string kRootFieldName;
+        static const std::string kOpTimeFieldName;
+        static const std::string kOpTimestampFieldName;
+        static const std::string kOpTermFieldName;
+        static const std::string kTimeoutFieldName;
 
-        virtual unsigned int getOpID() const override;
+        ReadAfterOpTimeArgs();
+        ReadAfterOpTimeArgs(OpTime opTime, Milliseconds timeout);
 
-        void setOpID(unsigned int opID);
+        /**
+         * Format:
+         * {
+         *    find: “coll”,
+         *    filter: <Query Object>,
+         *    after: { // optional
+         *      opTime: { ts: <timestamp>, term: <NumberLong> },
+         *      timeoutMS: <NumberLong> //optional
+         *    }
+         * }
+         */
+        Status initialize(const BSONObj& cmdObj);
 
-        virtual void checkForInterrupt() const override;
-
-        virtual Status checkForInterruptNoAssert() const override;
-
-        void setCheckForInterruptStatus(Status status);
-
-        virtual uint64_t getRemainingMaxTimeMicros() const override;
-
-        void setRemainingMaxTimeMicros(uint64_t micros);
+        const OpTime& getOpTime() const;
+        const Milliseconds& getTimeout() const;
 
     private:
-        boost::scoped_ptr<Locker> _lockState;
-        unsigned int _opID;
 
-        Status _checkForInterruptStatus;
-        uint64_t _maxTimeMicrosRemaining;
+        OpTime _opTime;
+        Milliseconds _timeout;
     };
 
-}  // namespace repl
-}  // namespace mongo
+} // namespace repl
+} // namespace mongo

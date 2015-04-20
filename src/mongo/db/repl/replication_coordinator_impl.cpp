@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <boost/thread.hpp>
+#include <limits>
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -45,6 +46,8 @@
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/read_after_optime_args.h"
+#include "mongo/db/repl/read_after_optime_response.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -736,10 +739,19 @@ namespace {
         if (getReplicationMode() != modeReplSet) {
             return;
         }
+
+        for (auto& opTimeWaiter : _opTimeWaiterList) {
+            if (*(opTimeWaiter->opTime) <= ts) {
+                opTimeWaiter->condVar->notify_all();
+            }
+        }
+
         if (_getMemberState_inlock().primary()) {
             return;
         }
+
         lock->unlock();
+
         _externalState->forwardSlaveProgress(); // Must do this outside _mutex
     }
 
@@ -756,6 +768,85 @@ namespace {
     Timestamp ReplicationCoordinatorImpl::getMyLastOptime() const {
         boost::lock_guard<boost::mutex> lock(_mutex);
         return _getMyLastOptime_inlock();
+    }
+
+    ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
+            const OperationContext* txn,
+            const ReadAfterOpTimeArgs& settings) {
+        // TODO: SERVER-18217 use OpTime directly.
+        const auto& ts = settings.getOpTime().getTimestamp();
+        const auto& timeout = settings.getTimeout();
+
+        if (ts.isNull()) {
+            return ReadAfterOpTimeResponse();
+        }
+
+        if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
+            return ReadAfterOpTimeResponse(Status(ErrorCodes::NotAReplicaSet,
+                    "node needs to be a replica set member to use read after opTime"));
+        }
+
+        // TODO: SERVER-18298 enable code once V1 protocol is fully implemented.
+#if 0
+        if (!isV1ElectionProtocol()) {
+            return ReadAfterOpTimeResponse(Status(ErrorCodes::IncompatibleElectionProtocol,
+                    "node needs to be running on v1 election protocol to "
+                    "use read after opTime"));
+        }
+#endif
+
+        Timer timer;
+        boost::unique_lock<boost::mutex> lock(_mutex);
+
+        while (ts > _getMyLastOptime_inlock()) {
+            Status interruptedStatus = txn->checkForInterruptNoAssert();
+            if (!interruptedStatus.isOK()) {
+                return ReadAfterOpTimeResponse(interruptedStatus,
+                        Milliseconds(timer.millis()));
+            }
+
+            if (_inShutdown) {
+                return ReadAfterOpTimeResponse(
+                        Status(ErrorCodes::ShutdownInProgress, "shutting down"),
+                        Milliseconds(timer.millis()));
+            }
+
+            const auto elapsedMS = timer.millis();
+            if (timeout.total_milliseconds() > 0 &&
+                    elapsedMS > timeout.total_milliseconds()) {
+                return ReadAfterOpTimeResponse(
+                        Status(ErrorCodes::ReadAfterOptimeTimeout,
+                              str::stream() << "timed out waiting for opTime: "
+                                            << ts.toStringPretty()),
+                        Milliseconds(timer.millis()));
+            }
+
+            boost::condition_variable condVar;
+            WaiterInfo waitInfo(&_opTimeWaiterList,
+                                txn->getOpID(),
+                                &ts,
+                                nullptr, // Don't care about write concern.
+                                &condVar);
+
+            uint64_t maxTimeMicrosRemaining = txn->getRemainingMaxTimeMicros();
+            auto maxTimeMSRemaining = (maxTimeMicrosRemaining == 0) ?
+                    std::numeric_limits<uint64_t>::max() : (maxTimeMicrosRemaining / 1000);
+
+            auto timeoutMSRemaining = (timeout.total_milliseconds() == 0) ?
+                    std::numeric_limits<uint64_t>::max() :
+                    static_cast<uint64_t>(timeout.total_milliseconds() - elapsedMS);
+
+            auto sleepTimeMS = std::min(maxTimeMSRemaining, timeoutMSRemaining);
+
+            if (sleepTimeMS == std::numeric_limits<uint64_t>::max()) {
+                condVar.wait(lock);
+            }
+            else {
+                condVar.timed_wait(lock, Milliseconds(sleepTimeMS));
+            }
+        }
+
+        return ReadAfterOpTimeResponse(Status::OK(), Milliseconds(timer.millis()));
     }
 
     Timestamp ReplicationCoordinatorImpl::_getMyLastOptime_inlock() const {
@@ -847,6 +938,13 @@ namespace {
             }
         }
 
+        for (auto& opTimeWaiter : _opTimeWaiterList) {
+            if (opTimeWaiter->opID == opId) {
+                opTimeWaiter->condVar->notify_all();
+                return;
+            }
+        }
+
         _replExecutor.scheduleWork(
                 stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
                            this,
@@ -859,6 +957,10 @@ namespace {
                 it != _replicationWaiterList.end(); ++it) {
             WaiterInfo* info = *it;
             info->condVar->notify_all();
+        }
+
+        for (auto& opTimeWaiter : _opTimeWaiterList) {
+            opTimeWaiter->condVar->notify_all();
         }
 
         _replExecutor.scheduleWork(

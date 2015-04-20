@@ -120,6 +120,8 @@ namespace mongo {
          */
         virtual CurOp* getCurOp() const = 0;
 
+        virtual uint64_t getRemainingMaxTimeMicros() const = 0;
+
         /**
          * Returns the operation ID associated with this operation.
          * WARNING: Due to SERVER-14995, this OpID is not guaranteed to stay the same for the

@@ -86,7 +86,10 @@ var db;
                                                      'auth1|' +
                                                      'auth2|' +
                                                      'dropdb_race|' +
-                                                     'unix_socket\\d*' +
+                                                     'unix_socket\\d*|' +
+                                                     // TODO: SERVER-17284 remove once find cmd is
+                                                     // implemented in mongos
+                                                     'read_after_optime' +
                                                      ')\.js$');
 
              // These are bugs (some might be fixed now):

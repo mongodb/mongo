@@ -53,60 +53,64 @@ namespace mongo {
 
         virtual ~OperationContextNoop() { }
 
-        virtual Client* getClient() const {
+        virtual Client* getClient() const override {
             invariant(false);
             return NULL;
         }
 
-        virtual CurOp* getCurOp() const {
+        virtual CurOp* getCurOp() const override {
             invariant(false);
             return NULL;
         }
 
-        virtual RecoveryUnit* recoveryUnit() const {
+        virtual RecoveryUnit* recoveryUnit() const override {
             return _recoveryUnit.get();
         }
 
-        virtual RecoveryUnit* releaseRecoveryUnit() {
+        virtual RecoveryUnit* releaseRecoveryUnit() override {
             return _recoveryUnit.release();
         }
 
-        virtual void setRecoveryUnit(RecoveryUnit* unit) {
+        virtual void setRecoveryUnit(RecoveryUnit* unit) override {
             _recoveryUnit.reset(unit);
         }
 
-        virtual Locker* lockState() const {
+        virtual Locker* lockState() const override {
             return _locker.get();
         }
 
         virtual ProgressMeter* setMessage(const char * msg,
                                           const std::string &name,
                                           unsigned long long progressMeterTotal,
-                                          int secondsBetween) {
+                                          int secondsBetween) override {
             return &_pm;
         }
 
-        virtual void checkForInterrupt() const { }
-        virtual Status checkForInterruptNoAssert() const {
+        virtual void checkForInterrupt() const override { }
+        virtual Status checkForInterruptNoAssert() const override {
             return Status::OK();
         }
 
-        virtual bool isPrimaryFor( StringData ns ) {
+        virtual bool isPrimaryFor( StringData ns ) override {
             return true;
         }
 
-        virtual std::string getNS() const {
+        virtual std::string getNS() const override {
             return std::string();
         };
 
-        virtual unsigned int getOpID() const {
+        virtual unsigned int getOpID() const override {
             return 0;
         }
 
-        void setReplicatedWrites(bool writesAreReplicated = true) {}
+        void setReplicatedWrites(bool writesAreReplicated = true) override {}
 
-        bool writesAreReplicated() const {
+        bool writesAreReplicated() const override {
             return false;
+        }
+
+        virtual uint64_t getRemainingMaxTimeMicros() const override {
+            return 0;
         }
 
     private:
