@@ -40,30 +40,27 @@ namespace repl {
 
     class ReplSetRequestVotesArgs {
     public:
-        /**
-         * Initializes from the parsed contents of argsObj.
-         */
-        void initialize(const BSONObj& argsObj);
+        Status initialize(const BSONObj& argsObj);
 
         const std::string& getSetName() const;
         long long getTerm() const;
-        int getCandidateId() const;
-        int getConfigVersion() const;
+        long long getCandidateId() const;
+        long long getConfigVersion() const;
         OpTime getLastCommittedOp() const;
 
         void addToBSON(BSONObjBuilder* builder) const;
 
     private:
         std::string _setName; // Name of the replset
-        long long _term; // Current known term of the command issuer
-        int _candidateId; // replSet id of the member that sent the replSetRequestVotes command
-        int _cfgver; // replSet config version known to the command issuer
+        long long _term = -1; // Current known term of the command issuer
+        long long _candidateId = -1; // replSet id of the member who sent the replSetRequestVotesCmd
+        long long _cfgver = -1; // replSet config version known to the command issuer
         OpTime _lastCommittedOp; // The last known committed op of the command issuer 
     };
 
     class ReplSetRequestVotesResponse {
     public:
-        void initialize(const BSONObj& argsObj);
+        Status initialize(const BSONObj& argsObj);
         
         bool getOk() const;
         long long getTerm() const;
@@ -73,9 +70,9 @@ namespace repl {
         void addToBSON(BSONObjBuilder* builder) const;
 
     private:
-        bool _ok;
-        long long _term;
-        bool _voteGranted;
+        bool _ok = false;
+        long long _term = -1;
+        bool _voteGranted = false;
         std::string _reason;
     };
 

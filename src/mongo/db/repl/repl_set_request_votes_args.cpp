@@ -28,19 +28,82 @@
 
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 
+#include "mongo/bson/util/bson_check.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace repl {
+namespace {
 
-    void ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
-            _setName = argsObj["setName"].String();
-            _term = argsObj["term"].Long();
-            _candidateId = argsObj["candidateId"].Int();
-            _cfgver = argsObj["cfgver"].Long();
-            BSONObj lastCommittedOp = argsObj["lastCommittedOp"].Obj();
-            _lastCommittedOp = OpTime(lastCommittedOp["optime"].timestamp(),
-                                      lastCommittedOp["term"].Long());
+    const std::string kCandidateIdFieldName = "candidateId";
+    const std::string kCommandName = "replSetRequestVotes";
+    const std::string kConfigVersionFieldName = "cfgver";
+    const std::string kLastCommittedOpFieldName = "lastCommittedOp";
+    const std::string kOkFieldName = "ok";
+    const std::string kOpTimeFieldName = "optime";
+    const std::string kReasonFieldName = "reason";
+    const std::string kSetNameFieldName = "setName";
+    const std::string kTermFieldName = "term";
+    const std::string kVoteGrantedFieldName = "voteGranted";
+
+    const std::string kLegalArgsFieldNames[] = {
+        kCandidateIdFieldName,
+        kCommandName,
+        kConfigVersionFieldName,
+        kLastCommittedOpFieldName,
+        kOpTimeFieldName,
+        kSetNameFieldName,
+        kTermFieldName,
+    };
+
+    const std::string kLegalResponseFieldNames[] = {
+        kOkFieldName,
+        kReasonFieldName,
+        kTermFieldName,
+        kVoteGrantedFieldName,
+    };
+
+}  // namespace
+
+
+    Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
+        Status status = bsonCheckOnlyHasFields("ReplSetRequestVotes",
+                                               argsObj,
+                                               kLegalArgsFieldNames);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractIntegerField(argsObj, kCandidateIdFieldName, &_candidateId);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_cfgver);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractStringField(argsObj, kSetNameFieldName, &_setName);
+        if (!status.isOK())
+            return status;
+
+        // extracting the lastCommittedOp is a bit of a process
+        BSONObj lastCommittedOp = argsObj[kLastCommittedOpFieldName].Obj();
+        Timestamp ts;
+        status = bsonExtractTimestampField(lastCommittedOp, kOpTimeFieldName, &ts);
+        if (!status.isOK())
+            return status;
+        long long term;
+        status = bsonExtractIntegerField(lastCommittedOp, kTermFieldName, &term);
+        if (!status.isOK())
+            return status;
+        _lastCommittedOp = OpTime(lastCommittedOp[kOpTimeFieldName].timestamp(),
+                                  lastCommittedOp[kTermFieldName].Long());
+
+        return Status::OK();
     }
 
     const std::string& ReplSetRequestVotesArgs::getSetName() const {
@@ -51,11 +114,11 @@ namespace repl {
         return _term;
     }
 
-    int ReplSetRequestVotesArgs::getCandidateId() const {
+    long long ReplSetRequestVotesArgs::getCandidateId() const {
         return _candidateId;
     }
 
-    int ReplSetRequestVotesArgs::getConfigVersion() const {
+    long long ReplSetRequestVotesArgs::getConfigVersion() const {
         return _cfgver;
     }
 
@@ -64,22 +127,41 @@ namespace repl {
     }
 
     void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
-        builder->append("replSetRequestVotes", 1);
-        builder->append("setName", _setName);
-        builder->append("term", _term);
-        builder->appendIntOrLL("candidateId", _candidateId);
-        builder->appendIntOrLL("cfgver", _cfgver);
-        BSONObjBuilder lastCommittedOp(builder->subobjStart("lastCommittedOp"));
-        lastCommittedOp.append("optime", _lastCommittedOp.getTimestamp());
-        lastCommittedOp.append("term", _lastCommittedOp.getTerm());
+        builder->append(kCommandName, 1);
+        builder->append(kSetNameFieldName, _setName);
+        builder->append(kTermFieldName, _term);
+        builder->appendIntOrLL(kCandidateIdFieldName, _candidateId);
+        builder->appendIntOrLL(kConfigVersionFieldName, _cfgver);
+        BSONObjBuilder lastCommittedOp(builder->subobjStart(kLastCommittedOpFieldName));
+        lastCommittedOp.append(kOpTimeFieldName, _lastCommittedOp.getTimestamp());
+        lastCommittedOp.append(kTermFieldName, _lastCommittedOp.getTerm());
         lastCommittedOp.done();
     }
 
-    void ReplSetRequestVotesResponse::initialize(const BSONObj& argsObj) {
-        _ok = argsObj["ok"].Bool();
-        _term = argsObj["term"].Long();
-        _voteGranted = argsObj["voteGranted"].Bool();
-        _reason = argsObj["reason"].String();
+    Status ReplSetRequestVotesResponse::initialize(const BSONObj& argsObj) {
+        Status status = bsonCheckOnlyHasFields("ReplSetRequestVotes",
+                                               argsObj,
+                                               kLegalResponseFieldNames);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractBooleanField(argsObj, kVoteGrantedFieldName, &_voteGranted);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractStringField(argsObj, kReasonFieldName, &_reason);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractBooleanField(argsObj, kOkFieldName, &_ok);
+        if (!status.isOK())
+            return status;
+
+        return Status::OK();
     }
 
     bool ReplSetRequestVotesResponse::getOk() const {
@@ -99,10 +181,10 @@ namespace repl {
     }
 
     void ReplSetRequestVotesResponse::addToBSON(BSONObjBuilder* builder) const {
-        builder->append("ok", _ok);
-        builder->append("term", _term);
-        builder->append("voteGranted", _voteGranted);
-        builder->append("reason", _reason);
+        builder->append(kOkFieldName, _ok);
+        builder->append(kTermFieldName, _term);
+        builder->append(kVoteGrantedFieldName, _voteGranted);
+        builder->append(kReasonFieldName, _reason);
     }
 
 } // namespace repl

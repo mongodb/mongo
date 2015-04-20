@@ -53,7 +53,10 @@ namespace repl {
             }
 
             ReplSetRequestVotesArgs parsedArgs;
-            parsedArgs.initialize(cmdObj);
+            status = parsedArgs.initialize(cmdObj);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
 
             ReplSetRequestVotesResponse response;
             status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(parsedArgs,
