@@ -95,7 +95,7 @@ ToolTest.prototype.startDB = function( coll ){
 ToolTest.prototype.stop = function(){
     if ( ! this.m )
         return;
-    stopMongod( this.port );
+    _stopMongoProgram( this.port );
     this.m = null;
     this.db = null;
 
@@ -222,7 +222,7 @@ ReplTest.prototype.start = function( master , options , restart, norepl ){
     if (restart) {
         return startMongoProgram.apply(null, o);
     } else {
-        var conn = startMongod.apply(null, o);
+        var conn = _startMongod.apply(null, o);
         if (jsTestOptions().keyFile || jsTestOptions().auth || jsTestOptions().useX509) {
             jsTest.authenticate(conn);
         }
@@ -238,7 +238,7 @@ ReplTest.prototype.stop = function( master , signal ){
     }
 
     print('*** ' + this.name + " completed successfully ***");
-    return stopMongod( this.getPort( master ) , signal || 15 );
+    return _stopMongoProgram( this.getPort( master ) , signal || 15 );
 }
 
 allocatePorts = function( n , startPort ) {
@@ -255,7 +255,7 @@ SyncCCTest = function( testName , extraMongodOptions ){
     this._connections = [];
     
     for ( var i=0; i<3; i++ ){
-        this._connections.push( startMongodTest( 30000 + i , testName + i , false, extraMongodOptions ) );
+        this._connections.push( MongoRunner.runMongod(extraMongodOptions))
     }
     
     this.url = this._connections.map( function(z){ return z.name; } ).join( "," );
@@ -264,7 +264,7 @@ SyncCCTest = function( testName , extraMongodOptions ){
 
 SyncCCTest.prototype.stop = function(){
     for ( var i=0; i<this._connections.length; i++){
-        stopMongod( 30000 + i );
+        _stopMongoProgram( 30000 + i );
     }
 
     print('*** ' + this._testName + " completed successfully ***");
@@ -284,12 +284,14 @@ SyncCCTest.prototype.checkHashes = function( dbname , msg ){
 
 SyncCCTest.prototype.tempKill = function( num ){
     num = num || 0;
-    stopMongod( 30000 + num );
+    _stopMongoProgram(this._connections[num]);
 }
 
 SyncCCTest.prototype.tempStart = function( num ){
     num = num || 0;
-    this._connections[num] = startMongodTest( 30000 + num , this._testName + num , true );
+    var old = this._connections[num];
+    this._connections[num] = MongoRunner.runMongod({ restart: true, cleanData: false, port: old.port, dbpath: old.dbpath});
+
 }
 
 
