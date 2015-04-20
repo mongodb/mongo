@@ -9,6 +9,7 @@ env.Library(
         'type_changelog.cpp',
         'type_chunk.cpp',
         'type_collection.cpp',
+        'type_settings.cpp',
         'type_shard.cpp'
     ],
     LIBDEPS=[
@@ -39,6 +40,7 @@ env.CppUnitTest(
         'type_changelog_test.cpp',
         'type_chunk_test.cpp',
         'type_collection_test.cpp',
+        'type_settings_test.cpp',
         'type_shard_test.cpp'
     ],
     LIBDEPS=[

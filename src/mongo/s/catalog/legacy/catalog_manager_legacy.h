@@ -103,6 +103,8 @@ namespace mongo {
                                const std::string& ns,
                                const BSONObj& detail);
 
+        virtual StatusWith<SettingsType> getGlobalSettings(const std::string& key);
+
         virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
                                              BatchedCommandResponse* response);
 

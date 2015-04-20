@@ -27,8 +27,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/type_settings.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 

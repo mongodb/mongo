@@ -47,7 +47,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/type_settings.h"
 #include "mongo/util/log.h"
 
 namespace {

@@ -36,9 +36,9 @@
 #include "mongo/client/connpool.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config.h"
-#include "mongo/s/type_settings.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -50,9 +50,6 @@ namespace mongo {
     using std::set;
     using std::string;
     using std::vector;
-
-    MONGO_FP_DECLARE(neverBalance);
-
 
     Grid::Grid() : _allowLocalShard(true) {
 
@@ -96,11 +93,7 @@ namespace mongo {
      * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
      * collection.
      */
-
     bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
-        // Allow disabling the balancer for testing
-        if (MONGO_FAIL_POINT(neverBalance)) return false;
-
         if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {
             return false;
         }
@@ -113,32 +106,14 @@ namespace mongo {
         return true;
     }
 
-    bool Grid::getBalancerSettings(SettingsType* settings, string* errMsg) const {
-        BSONObj balancerDoc;
-        ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-
-        try {
-            balancerDoc = conn->findOne(SettingsType::ConfigNS,
-                                        BSON(SettingsType::key("balancer")));
-            conn.done();
-        }
-        catch (const DBException& ex) {
-            *errMsg = str::stream() << "failed to read balancer settings from " << conn.getHost()
-                                    << ": " << causedBy(ex);
-            return false;
-        }
-
-        return settings->parseBSON(balancerDoc, errMsg);
-    }
-
     bool Grid::getConfigShouldBalance() const {
-        SettingsType balSettings;
-        string errMsg;
-
-        if (!getBalancerSettings(&balSettings, &errMsg)) {
-            warning() << errMsg;
+        auto balSettingsResult =
+            grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+        if (!balSettingsResult.isOK()) {
+            warning() << balSettingsResult.getStatus();
             return false;
         }
+        SettingsType balSettings = balSettingsResult.getValue();
 
         if (!balSettings.isKeySet()) {
             // Balancer settings doc does not exist. Default to yes.
@@ -196,15 +171,6 @@ namespace mongo {
         }
 
         return false;
-    }
-
-    BSONObj Grid::getConfigSetting( const std::string& name ) const {
-        ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
-        BSONObj result = conn->findOne( SettingsType::ConfigNS,
-                                        BSON( SettingsType::key(name) ) );
-        conn.done();
-
-        return result;
     }
 
     Grid grid;

@@ -25,7 +25,7 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
-#include "mongo/s/type_settings.h"
+#include "mongo/s/catalog/type_settings.h"
 
 #include "mongo/db/field_parser.h"
 #include "mongo/db/write_concern_options.h"

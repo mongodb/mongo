@@ -65,7 +65,6 @@ namespace mongo {
      * balancer settings or chunk size settings document).
      */
     class SettingsType {
-        MONGO_DISALLOW_COPYING(SettingsType);
     public:
 
         //

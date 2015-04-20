@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/s/type_settings.h"
+#include "mongo/s/catalog/type_settings.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

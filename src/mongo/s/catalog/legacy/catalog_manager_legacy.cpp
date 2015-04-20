@@ -50,6 +50,7 @@
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/dbclient_multi_command.h"
@@ -1046,6 +1047,32 @@ namespace {
             warning() << "Error encountered while logging config change with ID "
                       << changeID << ": " << result;
         }
+    }
+
+    StatusWith<SettingsType> CatalogManagerLegacy::getGlobalSettings(const string& key) {
+        SettingsType settingsType;
+
+        try {
+            ScopedDbConnection conn(_configServerConnectionString, 30);
+            BSONObj settingsDoc = conn->findOne(SettingsType::ConfigNS,
+                                                BSON(SettingsType::key(key)));
+
+            string errMsg;
+            if (!settingsType.parseBSON(settingsDoc, &errMsg)) {
+                conn.done();
+                return Status(ErrorCodes::UnsupportedFormat,
+                              str::stream() << "error parsing config.settings document: "
+                                            << errMsg);
+            }
+            conn.done();
+        }
+        catch (const DBException& ex) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "unable to successfully obtain config.settings document: "
+                                        << causedBy(ex));
+        }
+
+        return settingsType;
     }
 
     void CatalogManagerLegacy::getDatabasesForShard(const string& shardName,

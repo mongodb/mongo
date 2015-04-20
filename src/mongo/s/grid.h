@@ -81,29 +81,12 @@ namespace mongo {
         bool shouldBalance(const SettingsType& balancerSettings) const;
 
         /**
-         * Retrieve the balancer settings from the config server. Returns false if an error
-         * occurred while retrieving the document. If the balancer settings document does not
-         * exist, it is not considered as an error, but the "key" property of the settings
-         * output parameter will not be set.
-         */
-        bool getBalancerSettings(SettingsType* settings, std::string* errMsg) const;
-
-        /**
          * Returns true if the config server settings indicate that the balancer should be active.
          */
         bool getConfigShouldBalance() const;
 
         CatalogManager* catalogManager() const { return _catalogManager.get(); }
         CatalogCache* catalogCache() const { return _catalogCache.get(); }
-
-        /**
-         * 
-         * Obtain grid configuration and settings data.
-         *
-         * @param name identifies a particular type of configuration data.
-         * @return a BSON object containing the requested data.
-         */
-        BSONObj getConfigSetting( const std::string& name ) const;
 
         // exposed methods below are for testing only
 

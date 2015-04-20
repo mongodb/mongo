@@ -10,7 +10,6 @@ env.Library('base', ['mongo_version_range.cpp',
                      'type_database.cpp',
                      'type_locks.cpp',
                      'type_lockpings.cpp',
-                     'type_settings.cpp',
                      'type_config_version.cpp',
                      'type_mongos.cpp',
                      'type_tags.cpp'],
@@ -39,10 +38,6 @@ env.CppUnitTest('type_locks_test', 'type_locks_test.cpp',
                          '$BUILD_DIR/mongo/db/common'])
 
 env.CppUnitTest('type_lockpings_test', 'type_lockpings_test.cpp',
-                LIBDEPS=['base',
-                         '$BUILD_DIR/mongo/db/common'])
-
-env.CppUnitTest('type_settings_test', 'type_settings_test.cpp',
                 LIBDEPS=['base',
                          '$BUILD_DIR/mongo/db/common'])
 

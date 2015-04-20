@@ -46,6 +46,7 @@
 #include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
@@ -54,7 +55,6 @@
 #include "mongo/s/server.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/type_mongos.h"
-#include "mongo/s/type_settings.h"
 #include "mongo/s/type_tags.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -97,14 +97,13 @@ namespace mongo {
 
             // If the balancer was disabled since we started this round, don't start new
             // chunks moves.
-            SettingsType balancerConfig;
-            std::string errMsg;
-
-            if (!grid.getBalancerSettings(&balancerConfig, &errMsg)) {
-                warning() << errMsg;
-                // No point in continuing the round if the config servers are unreachable.
+            auto balSettingsResult =
+                grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+            if (!balSettingsResult.isOK()) {
+                warning() << balSettingsResult.getStatus();
                 return movedCount;
             }
+            const SettingsType& balancerConfig = balSettingsResult.getValue();
 
             if ((balancerConfig.isKeySet() && // balancer config doc exists
                     !grid.shouldBalance(balancerConfig)) ||
@@ -538,13 +537,13 @@ namespace mongo {
                 // refresh chunk size (even though another balancer might be active)
                 Chunk::refreshChunkSize();
 
-                SettingsType balancerConfig;
-                string errMsg;
-
-                if (!grid.getBalancerSettings(&balancerConfig, &errMsg)) {
-                    warning() << errMsg;
-                    return ;
+                auto balSettingsResult =
+                    grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+                if (!balSettingsResult.isOK()) {
+                    warning() << balSettingsResult.getStatus();
+                    return;
                 }
+                const SettingsType& balancerConfig = balSettingsResult.getValue();
 
                 // now make sure we should even be running
                 if ((balancerConfig.isKeySet() && // balancer config doc exists

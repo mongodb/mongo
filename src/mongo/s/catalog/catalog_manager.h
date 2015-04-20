@@ -46,6 +46,7 @@ namespace mongo {
     class ConnectionString;
     class DatabaseType;
     class OperationContext;
+    class SettingsType;
     class Shard;
     class ShardKeyPattern;
     class ShardType;
@@ -265,6 +266,16 @@ namespace mongo {
                                const std::string& what,
                                const std::string& ns,
                                const BSONObj& detail) = 0;
+
+        /**
+         * Returns global settings for a certain key.
+         * @param key: key for SettingsType::ConfigNS document.
+         *
+         * NOTE: If no document with such a key exists, an empty SettingsType object will
+         *       will be returned. It is up to the caller to check if the SettingsType
+         *       is non-empty (via the keySet() method on the SettingsType).
+         */
+        virtual StatusWith<SettingsType> getGlobalSettings(const std::string& key) = 0;
 
         /**
          * Directly sends the specified command to the config server and returns the response.
