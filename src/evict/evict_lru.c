@@ -8,6 +8,7 @@
 
 #include "wt_internal.h"
 
+static int   __evict_clear_all_walks(WT_SESSION_IMPL *);
 static int   __evict_clear_walks(WT_SESSION_IMPL *);
 static int   __evict_has_work(WT_SESSION_IMPL *, uint32_t *);
 static int   WT_CDECL __evict_lru_cmp(const void *, const void *);
@@ -213,9 +214,9 @@ __evict_server(void *arg)
 
 	/*
 	 * The eviction server is shutting down: in case any trees are still
-	 * open, clear walks now so that they can be closed.
+	 * open, clear all walks now so that they can be closed.
 	 */
-	WT_ERR(__evict_clear_walks(session));
+	WT_ERR(__evict_clear_all_walks(session));
 
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction server exiting"));
@@ -604,11 +605,12 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_tree_walk_clear --
- *	Clear the tree's current eviction point, acquiring the eviction lock.
+ * __evict_request_walk_clear --
+ *	Request that the eviction server clear the tree's current eviction
+ *	point.
  */
 static int
-__evict_tree_walk_clear(WT_SESSION_IMPL *session)
+__evict_request_walk_clear(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -626,6 +628,35 @@ __evict_tree_walk_clear(WT_SESSION_IMPL *session)
 	}
 
 	F_CLR(session, WT_SESSION_CLEAR_EVICT_WALK);
+
+	return (ret);
+}
+
+/*
+ * __evict_clear_all_walks --
+ *	Clear the eviction walk points for all file a session is waiting on.
+ */
+static int
+__evict_clear_all_walks(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+	WT_REF *ref;
+
+	conn = S2C(session);
+
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+		if (!WT_PREFIX_MATCH(dhandle->name, "file:"))
+			continue;
+		session->dhandle = dhandle;
+		btree = S2BT(session);
+		if ((ref = btree->evict_ref) != NULL) {
+			btree->evict_ref = NULL;
+			WT_TRET(__wt_page_release(session, ref, 0));
+		}
+	}
 
 	return (ret);
 }
@@ -702,7 +733,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp)
 	__wt_spin_unlock(session, &cache->evict_walk_lock);
 
 	/* Clear any existing LRU eviction walk for the file. */
-	WT_RET(__evict_tree_walk_clear(session));
+	WT_RET(__evict_request_walk_clear(session));
 
 	/* Hold the evict lock to remove any queued pages from this file. */
 	__wt_spin_lock(session, &cache->evict_lock);
