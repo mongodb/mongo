@@ -1690,10 +1690,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    session, cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
 
 	/*
-	 * Reset cfg to the configuration stack we're going to use from now on.
+	 * Reset cfg to the configuration stack we're going to use for the rest
+	 * of the open.
+	 *
+	 * Underlying code distinguishes the base values from the user-specified
+	 * information by ignoring cfg[0]. Make that work by leaving base values
+	 * in cfg[0], and the collapsed user-specified values in cfg[1].
 	 */
-	cfg[0] = conn->cfg;
-	cfg[1] = NULL;
+	cfg[1] = base_merge;
+	cfg[2] = NULL;
 
 	/*
 	 * Configuration ...
