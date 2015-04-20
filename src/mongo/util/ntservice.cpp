@@ -535,8 +535,8 @@ namespace {
 
         // We periodically check if we are done exiting by polling at half of each wait interval
         //
-        while (!serviceWorkerThread.try_join_for(
-            boost::chrono::milliseconds(kStopWaitHintMillis / 2))) {
+        while (!serviceWorkerThread.timed_join(
+            boost::get_system_time() + boost::posix_time::millisec(kStopWaitHintMillis / 2))) {
             reportStatus(SERVICE_STOP_PENDING, kStopWaitHintMillis);
             log() << "Service Stop is waiting for storage engine to finish shutdown";
         }
