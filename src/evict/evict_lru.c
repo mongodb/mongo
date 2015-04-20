@@ -212,28 +212,13 @@ __evict_server(void *arg)
 	}
 
 	/*
-	 * The evction server is shutting down: in case any trees are still
+	 * The eviction server is shutting down: in case any trees are still
 	 * open, clear walks now so that they can be closed.
 	 */
 	WT_ERR(__evict_clear_walks(session));
 
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction server exiting"));
-
-	if (cache->pages_inmem != cache->pages_evict)
-		__wt_errx(session,
-		    "cache server: exiting with %" PRIu64 " pages in "
-		    "memory and %" PRIu64 " pages evicted",
-		    cache->pages_inmem, cache->pages_evict);
-	if (cache->bytes_inmem != 0)
-		__wt_errx(session,
-		    "cache server: exiting with %" PRIu64 " bytes in memory",
-		    cache->bytes_inmem);
-	if (cache->bytes_dirty != 0 || cache->pages_dirty != 0)
-		__wt_errx(session,
-		    "cache server: exiting with %" PRIu64
-		    " bytes dirty and %" PRIu64 " pages dirty",
-		    cache->bytes_dirty, cache->pages_dirty);
 
 	if (0) {
 err:		WT_PANIC_MSG(session, ret, "cache eviction server error");
@@ -328,7 +313,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 
 /*
  * __wt_evict_destroy --
- *	Destroy the eviction server thread.
+ *	Destroy the eviction threads.
  */
 int
 __wt_evict_destroy(WT_SESSION_IMPL *session)
