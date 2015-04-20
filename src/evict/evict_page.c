@@ -90,7 +90,7 @@ __wt_evict(
 	mod = page->modify;
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!LF_ISSET(WT_EXCLUSIVE) && WT_PAGE_IS_INTERNAL(page)) {
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) && WT_PAGE_IS_INTERNAL(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_internal);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_internal);
 	}
@@ -118,14 +118,14 @@ __wt_evict(
 		else
 			WT_ERR(
 			    __evict_page_dirty_update(
-			    session, ref, LF_ISSET(WT_EXCLUSIVE)));
+			    session, ref, LF_ISSET(WT_EVICT_EXCLUSIVE)));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
 	}
 
 	if (0) {
-err:		if (!LF_ISSET(WT_EXCLUSIVE))
+err:		if (!LF_ISSET(WT_EVICT_EXCLUSIVE))
 			__evict_exclusive_clear(session, ref);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
@@ -284,7 +284,7 @@ __evict_review(
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
 	 */
-	if (!LF_ISSET(WT_EXCLUSIVE)) {
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE)) {
 		WT_RET(__evict_exclusive(session, ref));
 
 		/*
@@ -314,7 +314,7 @@ __evict_review(
 	}
 
 	/* Check if the page can be evicted. */
-		if (!LF_ISSET(WT_EXCLUSIVE) && !__wt_page_can_evict(session,
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) && !__wt_page_can_evict(session,
 	    page, flags))
 		return (EBUSY);
 
@@ -328,7 +328,7 @@ __evict_review(
 	 * If an in-memory split completes, the page stays in memory and the
 	 * tree is left in the desired state: avoid the usual cleanup.
 	 */
-	if (!LF_ISSET(WT_EXCLUSIVE)) {
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE)) {
 		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
 		if (*inmem_splitp)
 			return (0);
@@ -354,7 +354,7 @@ __evict_review(
 	 * updates that can be saved and restored.
 	 */
 	if (__wt_page_is_modified(page)) {
-		if (LF_ISSET(WT_EXCLUSIVE))
+		if (LF_ISSET(WT_EVICT_EXCLUSIVE))
 			LF_SET(WT_SKIP_UPDATE_ERR);
 		else if (!WT_PAGE_IS_INTERNAL(page) &&
 		    page->read_gen == WT_READGEN_OLDEST)
@@ -369,7 +369,7 @@ __evict_review(
 	 * If the page was ever modified, make sure all of the updates
 	 * on the page are old enough they can be discarded from cache.
 	 */
-	if (!LF_ISSET(WT_EXCLUSIVE) && mod != NULL &&
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) && mod != NULL &&
 	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
 	    !LF_ISSET(WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);

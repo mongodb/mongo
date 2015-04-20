@@ -974,7 +974,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
-	if (LF_ISSET(WT_CHECK_SPLITS) && WT_PAGE_IS_INTERNAL(page) &&
+	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
 
@@ -985,7 +985,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * has not already been a split on this page as the MULTIBLOCK flag is
 	 * unset.
 	 */
-	if (LF_ISSET(WT_FORCE_SPLIT) &&
+	if (LF_ISSET(WT_EVICT_FORCE_SPLIT) &&
 	    page->memory_footprint > btree->maxmempage &&
 	    btree->checkpointing && !F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
 		return (1);
@@ -1031,7 +1031,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * If the page was recently split in-memory, don't force it out: we
 	 * hope an eviction thread will find it first.
 	 */
-	if (LF_ISSET(WT_CHECK_SPLITS) &&
+	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) &&
 	    !__wt_txn_visible_all(session, mod->inmem_split_txn))
 		return (0);
 
@@ -1067,9 +1067,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	}
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
-	/*
-	 * We only want to trigger an in-memory split if the page is too big.
-	 */
+	/* We only want to trigger an in-memory split if the page is too big. */
 	if ((ret = __wt_evict_page(session, ref, too_big)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
@@ -1125,7 +1123,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    !__wt_page_can_evict(session, page,
-		WT_CHECK_SPLITS | WT_FORCE_SPLIT))
+		WT_EVICT_CHECK_SPLITS | WT_EVICT_FORCE_SPLIT))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));

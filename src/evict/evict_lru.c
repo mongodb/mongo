@@ -671,7 +671,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref, int inmem_split)
 	WT_ASSERT(session,
 	    !F_ISSET(txn, TXN_HAS_ID) || !__wt_txn_visible(session, txn->id));
 
-	ret = __wt_evict(session, ref, (inmem_split ? WT_FORCE_SPLIT : 0));
+	ret = __wt_evict(session, ref, inmem_split ? WT_EVICT_FORCE_SPLIT : 0);
 	txn->isolation = saved_iso;
 
 	return (ret);
@@ -1211,7 +1211,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 
 fast:		/* If the page can't be evicted, give up. */
 		if (!__wt_page_can_evict(session,
-		    page, WT_CHECK_SPLITS | WT_FORCE_SPLIT))
+		    page, WT_EVICT_CHECK_SPLITS | WT_EVICT_FORCE_SPLIT))
 			continue;
 
 		/*

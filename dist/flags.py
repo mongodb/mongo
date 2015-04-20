@@ -45,9 +45,9 @@ flags = {
         'READ_WONT_NEED',
     ],
     'page_eviction' : [
-        'CHECK_SPLITS',
-        'EXCLUSIVE',
-        'FORCE_SPLIT'
+        'EVICT_CHECK_SPLITS',
+        'EVICT_EXCLUSIVE',
+        'EVICT_FORCE_SPLIT'
     ],
     'rec_write' : [
         'EVICTING',

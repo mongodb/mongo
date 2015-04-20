@@ -857,11 +857,11 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			continue;
 		}
 		/*
-		 * If the WT_FORCE_SPLIT flag is set, we should return ebusy.
+		 * If the WT_EVICT_FORCE_SPLIT flag is set, we should return ebusy.
 		 * This avoids an infinite loop where we are trying to split a
 		 * page that is currently being accessed by a checkpoint.
 		 */
-		if (LF_ISSET(WT_FORCE_SPLIT))
+		if (LF_ISSET(WT_EVICT_FORCE_SPLIT))
 			return (EBUSY);
 		__wt_yield();
 	}
@@ -1039,7 +1039,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_TRET(__split_safe_free(session,
-		split_gen, LF_ISSET(WT_EXCLUSIVE), pindex, size));
+		split_gen, LF_ISSET(WT_EVICT_EXCLUSIVE), pindex, size));
 	parent_decr += size;
 
 	/*
@@ -1064,7 +1064,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 *	Do the check here because we've just grown the parent page and
 	 * are holding it locked.
 	 */
-	if (ret == 0 && !LF_ISSET(WT_EXCLUSIVE) &&
+	if (ret == 0 && !LF_ISSET(WT_EVICT_EXCLUSIVE) &&
 	    !F_ISSET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN) &&
 	    __split_should_deepen(session, parent_ref, &children)) {
 		/*
@@ -1369,7 +1369,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_incr, WT_FORCE_SPLIT)) != 0) {
+	    session, ref, split_ref, 2, parent_incr, WT_EVICT_FORCE_SPLIT)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1489,7 +1489,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent( session, ref, ref_new,
-	    new_entries, parent_incr, (exclusive ? WT_EXCLUSIVE : 0)));
+	    new_entries, parent_incr, exclusive ? WT_EVICT_EXCLUSIVE : 0));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);
