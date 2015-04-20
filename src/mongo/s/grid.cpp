@@ -100,7 +100,7 @@ namespace mongo {
 
         if (balancerSettings.isBalancerActiveWindowSet()) {
             boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-            return _inBalancingWindow(balancerSettings.getBalancerActiveWindow(), now);
+            return balancerSettings.inBalancingWindow(now);
         }
 
         return true;
@@ -121,56 +121,6 @@ namespace mongo {
         }
 
         return shouldBalance(balSettings);
-    }
-
-    bool Grid::_inBalancingWindow( const BSONObj& balancerDoc , const boost::posix_time::ptime& now ) {
-        // check the 'activeWindow' marker
-        // if present, it is an interval during the day when the balancer should be active
-        // { start: "08:00" , stop: "19:30" }, strftime format is %H:%M
-        BSONElement windowElem = balancerDoc[SettingsType::balancerActiveWindow()];
-        if ( windowElem.eoo() ) {
-            return true;
-        }
-
-        // check if both 'start' and 'stop' are present
-        if ( ! windowElem.isABSONObj() ) {
-            warning() << "'activeWindow' format is { start: \"hh:mm\" , stop: ... }" << balancerDoc << endl;
-            return true;
-        }
-        BSONObj intervalDoc = windowElem.Obj();
-        const string start = intervalDoc["start"].str();
-        const string stop = intervalDoc["stop"].str();
-        if ( start.empty() || stop.empty() ) {
-            warning() << "must specify both start and end of balancing window: " << intervalDoc << endl;
-            return true;
-        }
-
-        // check that both 'start' and 'stop' are valid time-of-day
-        boost::posix_time::ptime startTime, stopTime;
-        if ( ! toPointInTime( start , &startTime ) || ! toPointInTime( stop , &stopTime ) ) {
-            warning() << "cannot parse active window (use hh:mm 24hs format): " << intervalDoc << endl;
-            return true;
-        }
-
-        LOG(1).stream() << "_inBalancingWindow: "
-                        << " now: " << now
-                        << " startTime: " << startTime
-                        << " stopTime: " << stopTime;
-
-        // allow balancing if during the activeWindow
-        // note that a window may be open during the night
-        if ( stopTime > startTime ) {
-            if ( ( now >= startTime ) && ( now <= stopTime ) ) {
-                return true;
-            }
-        }
-        else if ( startTime > stopTime ) {
-            if ( ( now >=startTime ) || ( now <= stopTime ) ) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     Grid grid;

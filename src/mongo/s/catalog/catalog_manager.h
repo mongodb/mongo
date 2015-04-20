@@ -277,9 +277,7 @@ namespace mongo {
          * Returns global settings for a certain key.
          * @param key: key for SettingsType::ConfigNS document.
          *
-         * NOTE: If no document with such a key exists, an empty SettingsType object will
-         *       will be returned. It is up to the caller to check if the SettingsType
-         *       is non-empty (via the keySet() method on the SettingsType).
+         * Returns NoSuchKey if no SettingsType::ConfigNS document with such key exists.
          */
         virtual StatusWith<SettingsType> getGlobalSettings(const std::string& key) = 0;
 

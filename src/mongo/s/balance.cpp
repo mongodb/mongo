@@ -100,15 +100,15 @@ namespace mongo {
             // chunks moves.
             auto balSettingsResult =
                 grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
-            if (!balSettingsResult.isOK()) {
+            const bool isBalSettingsAbsent = balSettingsResult.getStatus() == ErrorCodes::NoSuchKey;
+            if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
                 warning() << balSettingsResult.getStatus();
                 return movedCount;
             }
             const SettingsType& balancerConfig = balSettingsResult.getValue();
 
-            if ((balancerConfig.isKeySet() && // balancer config doc exists
-                    !grid.shouldBalance(balancerConfig)) ||
-                    MONGO_FAIL_POINT(skipBalanceRound)) {
+            if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
+                 MONGO_FAIL_POINT(skipBalanceRound)) {
                 LOG(1) << "Stopping balancing round early as balancing was disabled";
                 return movedCount;
             }
@@ -540,16 +540,17 @@ namespace mongo {
 
                 auto balSettingsResult =
                     grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
-                if (!balSettingsResult.isOK()) {
+                const bool isBalSettingsAbsent =
+                    balSettingsResult.getStatus() == ErrorCodes::NoSuchKey;
+                if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
                     warning() << balSettingsResult.getStatus();
                     return;
                 }
                 const SettingsType& balancerConfig = balSettingsResult.getValue();
 
                 // now make sure we should even be running
-                if ((balancerConfig.isKeySet() && // balancer config doc exists
-                        !grid.shouldBalance(balancerConfig)) ||
-                        MONGO_FAIL_POINT(skipBalanceRound)) {
+                if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
+                    MONGO_FAIL_POINT(skipBalanceRound)) {
 
                     LOG(1) << "skipping balancing round because balancing is disabled" << endl;
 
@@ -584,16 +585,9 @@ namespace mongo {
                     const bool waitForDelete = (balancerConfig.isWaitForDeleteSet() ?
                             balancerConfig.getWaitForDelete() : false);
 
-                    scoped_ptr<WriteConcernOptions> writeConcern;
+                    std::unique_ptr<WriteConcernOptions> writeConcern;
                     if (balancerConfig.isKeySet()) { // if balancer doc exists.
-                        StatusWith<WriteConcernOptions*> extractStatus =
-                                balancerConfig.extractWriteConcern();
-                        if (extractStatus.isOK()) {
-                            writeConcern.reset(extractStatus.getValue());
-                        }
-                        else {
-                            warning() << extractStatus.getStatus().toString();
-                        }
+                        writeConcern = std::move(balancerConfig.getWriteConcern());
                     }
 
                     LOG(1) << "*** start balancing round. "

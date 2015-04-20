@@ -303,22 +303,14 @@ namespace mongo {
     }
 
     // Returns true if we can confirm the balancer is stopped
-    bool _isBalancerStopped(const ConnectionString& configLoc, string* errMsg) {
-        
-        // Get the balancer information
-        BSONObj balancerDoc;
-        try {
-            ScopedDbConnection conn(configLoc, 30);
-            balancerDoc = conn->findOne(SettingsType::ConfigNS,
-                                        BSON(SettingsType::key("balancer")));
-            conn.done();
-        }
-        catch (const DBException& e) {
-            *errMsg = e.toString();
+    bool _isBalancerStopped() {
+        auto balSettingsResult =
+            grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+        if (!balSettingsResult.isOK()) {
             return false;
         }
-        
-        return balancerDoc[SettingsType::balancerStopped()].trueValue();
+        SettingsType balSettings = balSettingsResult.getValue();
+        return balSettings.getBalancerStopped();
     }
 
     // Checks that all config servers are online
@@ -479,7 +471,7 @@ namespace mongo {
 
         // Check whether or not the balancer is online, if it is online we will not upgrade
         // (but we will initialize the config server)
-        if (!isEmptyVersion && !_isBalancerStopped(configLoc, errMsg)) {
+        if (!isEmptyVersion && !_isBalancerStopped()) {
             
             *errMsg = stream() << "balancer must be stopped for config upgrade"
                                << causedBy(errMsg);

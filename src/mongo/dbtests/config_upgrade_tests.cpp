@@ -57,8 +57,9 @@ namespace mongo {
             // DBDirectClient
             DBDirectClient client(&_txn);
             client.update(SettingsType::ConfigNS,
-                          BSON(SettingsType::key("balancer")),
-                          BSON(SettingsType::key("balancer") << SettingsType::balancerStopped(true)),
+                          BSON(SettingsType::key(SettingsType::BalancerDocKey)),
+                          BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
+                               SettingsType::balancerStopped(true)),
                           true, false);
         }
 

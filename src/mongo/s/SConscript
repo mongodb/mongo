@@ -295,7 +295,6 @@ env.CppUnitTest(
     target='mongoscore_test',
     source=[
         'balancer_policy_tests.cpp',
-        'balancing_window_test.cpp',
         'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[

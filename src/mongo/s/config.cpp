@@ -779,35 +779,41 @@ namespace mongo {
         set<string> got;
 
         try {
-
             ScopedDbConnection conn(_primary.getConnString(), 30.0);
             auto_ptr<DBClientCursor> cursor = conn->query(SettingsType::ConfigNS, BSONObj());
             verify(cursor.get());
-            while (cursor->more()) {
 
-                BSONObj o = cursor->nextSafe();
-                string name = o[SettingsType::key()].valuestrsafe();
-                got.insert( name );
-                if ( name == "chunksize" ) {
-                    int csize = o[SettingsType::chunksize()].numberInt();
+            while (cursor->more()) {
+                StatusWith<SettingsType> settingsResult =
+                    SettingsType::fromBSON(cursor->nextSafe());
+                if (!settingsResult.isOK()) {
+                    warning() << settingsResult.getStatus();
+                    continue;
+                }
+                SettingsType settings = settingsResult.getValue();
+                string key = settings.getKey();
+                got.insert(key);
+
+                if (key == SettingsType::ChunkSizeDocKey) {
+                    int csize = settings.getChunkSize();
 
                     // validate chunksize before proceeding
-                    if ( csize == 0 ) {
+                    if (csize == 0) {
                         // setting was not modified; mark as such
-                        got.erase(name);
+                        got.erase(key);
                         log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
                     } else {
                         LOG(1) << "MaxChunkSize: " << csize << endl;
-                        if ( !Chunk::setMaxChunkSizeSizeMB( csize ) ) {
+                        if (!Chunk::setMaxChunkSizeSizeMB(csize)) {
                             warning() << "invalid chunksize: " << csize << endl;
                         }
                     }
                 }
-                else if ( name == "balancer" ) {
+                else if (key == SettingsType::BalancerDocKey) {
                     // ones we ignore here
                 }
                 else {
-                    log() << "warning: unknown setting [" << name << "]" << endl;
+                    log() << "warning: unknown setting [" << key << "]";
                 }
             }
 
@@ -817,13 +823,13 @@ namespace mongo {
             warning() << "couldn't load settings on config db" << causedBy(ex);
         }
 
-        if ( ! got.count( "chunksize" ) ) {
+        if (!got.count(SettingsType::ChunkSizeDocKey)) {
             const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
-            Status result = grid.catalogManager()->insert(
-                                                    SettingsType::ConfigNS,
-                                                    BSON(SettingsType::key("chunksize")
-                                                            << SettingsType::chunksize(chunkSize)),
-                                                    NULL);
+            Status result =
+                grid.catalogManager()->insert(SettingsType::ConfigNS,
+                                              BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)
+                                                   << SettingsType::chunkSize(chunkSize)),
+                                              NULL);
             if (!result.isOK()) {
                 warning() << "couldn't set chunkSize on config db" << causedBy(result);
             }

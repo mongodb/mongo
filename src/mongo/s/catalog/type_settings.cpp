@@ -25,241 +25,282 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
+
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/catalog/type_settings.h"
 
-#include "mongo/db/field_parser.h"
-#include "mongo/db/write_concern_options.h"
+#include <memory>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-    using std::auto_ptr;
-    using std::string;
-
-    using mongoutils::str::stream;
 
     const std::string SettingsType::ConfigNS = "config.settings";
     const std::string SettingsType::BalancerDocKey("balancer");
     const std::string SettingsType::ChunkSizeDocKey("chunksize");
 
     const BSONField<std::string> SettingsType::key("_id");
-    const BSONField<int> SettingsType::chunksize("value");
+    const BSONField<long long> SettingsType::chunkSize("value");
     const BSONField<bool> SettingsType::balancerStopped("stopped");
     const BSONField<BSONObj> SettingsType::balancerActiveWindow("activeWindow");
-    const BSONField<bool> SettingsType::deprecated_secondaryThrottle("_secondaryThrottle", true);
+    const BSONField<bool> SettingsType::deprecated_secondaryThrottle("_secondaryThrottle");
     const BSONField<BSONObj> SettingsType::migrationWriteConcern("_secondaryThrottle");
     const BSONField<bool> SettingsType::waitForDelete("_waitForDelete");
 
-    SettingsType::SettingsType() {
-        clear();
-    }
+    StatusWith<SettingsType> SettingsType::fromBSON(const BSONObj& source) {
+        SettingsType settings;
 
-    SettingsType::~SettingsType() {
-    }
-
-    bool SettingsType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
+        {
+            std::string settingsKey;
+            Status status = bsonExtractStringField(source, key.name(), &settingsKey);
+            if (!status.isOK()) return status;
+            settings._key = settingsKey;
         }
 
-        // All the mandatory fields must be present.
-        if (!_isKeySet) {
-            *errMsg = stream() << "missing " << key.name() << " field";
-            return false;
+        if (settings._key == ChunkSizeDocKey) {
+            long long settingsChunkSize;
+            Status status = bsonExtractIntegerField(source,
+                                                    chunkSize.name(),
+                                                    &settingsChunkSize);
+            if (!status.isOK()) return status;
+            settings._chunkSize = settingsChunkSize;
+        }
+        else if (settings._key == BalancerDocKey) {
+            {
+                bool settingsBalancerStopped;
+                Status status = bsonExtractBooleanFieldWithDefault(source,
+                                                                   balancerStopped.name(),
+                                                                   false,
+                                                                   &settingsBalancerStopped);
+                if (!status.isOK()) return status;
+                settings._balancerStopped = settingsBalancerStopped;
+            }
+
+            {
+                BSONElement settingsBalancerActiveWindowElem;
+                Status status = bsonExtractTypedField(source,
+                                                      balancerActiveWindow.name(),
+                                                      Object,
+                                                      &settingsBalancerActiveWindowElem);
+                if (status != ErrorCodes::NoSuchKey) {
+                    if (!status.isOK()) return status;
+                    StatusWith<BoostTimePair> timePairResult =
+                        settings._parseBalancingWindow(settingsBalancerActiveWindowElem.Obj());
+                    if (!timePairResult.isOK()) return timePairResult.getStatus();
+                    settings._balancerActiveWindow = timePairResult.getValue();
+                }
+            }
+
+            {
+                BSONElement settingsMigrationWriteConcernElem;
+                Status status = bsonExtractTypedField(source,
+                                                      migrationWriteConcern.name(),
+                                                      Object,
+                                                      &settingsMigrationWriteConcernElem);
+                if (status == ErrorCodes::TypeMismatch) {
+                    bool settingsSecondaryThrottle;
+                    status = bsonExtractBooleanFieldWithDefault(source,
+                                                                deprecated_secondaryThrottle
+                                                                    .name(),
+                                                                true,
+                                                                &settingsSecondaryThrottle);
+                    if (!status.isOK()) return status;
+                    settings._secondaryThrottle = settingsSecondaryThrottle;
+                }
+                else if (status != ErrorCodes::NoSuchKey) {
+                    if (!status.isOK()) return status;
+                    settings._migrationWriteConcern = WriteConcernOptions();
+                    status = settings._migrationWriteConcern->parse(
+                        settingsMigrationWriteConcernElem.Obj()
+                    );
+                    if (!status.isOK()) return status;
+                }
+            }
+
+            {
+                bool settingsWaitForDelete;
+                Status status = bsonExtractBooleanField(source,
+                                                        waitForDelete.name(),
+                                                        &settingsWaitForDelete);
+                if (status != ErrorCodes::NoSuchKey) {
+                    if (!status.isOK()) return status;
+                    settings._waitForDelete = settingsWaitForDelete;
+                }
+            }
+        }
+
+        return settings;
+    }
+
+    Status SettingsType::validate() const {
+        if (!_key.is_initialized() || _key->empty()) {
+            return Status(ErrorCodes::NoSuchKey,
+                          str::stream() << "missing " << key.name() << " field");
         }
 
         if (_key == ChunkSizeDocKey) {
-            if (_isChunksizeSet) {
-                if (!(_chunksize > 0)) {
-                    *errMsg = stream() << "chunksize specified in " << chunksize.name() <<
-                                          " field must be greater than zero";
-                    return false;
-                }
-            } else {
-                *errMsg = stream() << "chunksize must be specified in " << chunksize.name() <<
-                                      " field for chunksize setting";
-                return false;
+            if (!(getChunkSize() > 0)) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "chunksize specified in " << chunkSize.name()
+                                            << " field must be greater than zero");
             }
-            return true;
         }
         else if (_key == BalancerDocKey) {
-            if (_balancerActiveWindow.nFields() != 0) {
-                // check if both 'start' and 'stop' are present
-                const std::string start = _balancerActiveWindow["start"].str();
-                const std::string stop = _balancerActiveWindow["stop"].str();
-                if ( start.empty() || stop.empty() ) {
-                    *errMsg = stream() << balancerActiveWindow.name() <<
-                                          " format is { start: \"hh:mm\" , stop: \"hh:mm\" }";
-                    return false;
-                }
-
-                // check that both 'start' and 'stop' are valid time-of-day
-                boost::posix_time::ptime startTime, stopTime;
-                if ( !toPointInTime( start , &startTime ) || !toPointInTime( stop , &stopTime ) ) {
-                    *errMsg = stream() << balancerActiveWindow.name() <<
-                                          " format is { start: \"hh:mm\" , stop: \"hh:mm\" }";
-                    return false;
-                }
-
-                if (_isSecondaryThrottleSet && _isMigrationWriteConcernSet) {
-                    *errMsg = stream() << "cannot have both secondary throttle and migration "
-                                       << "write concern set at the same time";
-                    return false;
-                }
+            if (_secondaryThrottle.is_initialized() &&
+                _migrationWriteConcern.is_initialized()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "cannot have both secondary throttle and "
+                                            << "migration write concern set at the same time");
             }
-            return true;
         }
         else {
-            *errMsg = stream() << "unsupported key in  " << key.name() << " field";
-            return false;
+            return Status(ErrorCodes::UnsupportedFormat,
+                          str::stream() << "unsupported key in " << key.name() << " field");
         }
+
+        return Status::OK();
     }
 
     BSONObj SettingsType::toBSON() const {
         BSONObjBuilder builder;
 
-        if (_isKeySet) builder.append(key(), _key);
-        if (_isChunksizeSet) builder.append(chunksize(), _chunksize);
-        if (_isBalancerStoppedSet) builder.append(balancerStopped(), _balancerStopped);
-        if (_isBalancerActiveWindowSet) {
-            builder.append(balancerActiveWindow(), _balancerActiveWindow);
+        if (_key) builder.append(key(), getKey());
+        if (_chunkSize) builder.append(chunkSize(), getChunkSize());
+        if (_balancerStopped) builder.append(balancerStopped(), getBalancerStopped());
+        if (_secondaryThrottle) {
+            builder.append(deprecated_secondaryThrottle(), getSecondaryThrottle());
         }
-        if (_isSecondaryThrottleSet) {
-            builder.append(deprecated_secondaryThrottle(), _secondaryThrottle);
+        if (_migrationWriteConcern) {
+            builder.append(migrationWriteConcern(), getMigrationWriteConcern().toBSON());
         }
+        if (_waitForDelete) builder.append(waitForDelete(), getWaitForDelete());
 
-        if (_isMigrationWriteConcernSet) {
-            builder.append(migrationWriteConcern(), _migrationWriteConcern);
-        }
         return builder.obj();
-    }
-
-    bool SettingsType::parseBSON(const BSONObj& source, string* errMsg) {
-        clear();
-
-        std::string dummy;
-        if (!errMsg) errMsg = &dummy;
-
-        FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, key, &_key, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isKeySet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, chunksize, &_chunksize, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isChunksizeSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, balancerStopped, &_balancerStopped, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isBalancerStoppedSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, balancerActiveWindow,
-                                          &_balancerActiveWindow, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isBalancerActiveWindowSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source,
-                                          migrationWriteConcern,
-                                          &_migrationWriteConcern,
-                                          errMsg);
-        _isMigrationWriteConcernSet = fieldState == FieldParser::FIELD_SET;
-
-        if (fieldState == FieldParser::FIELD_INVALID) {
-            fieldState = FieldParser::extract(source, deprecated_secondaryThrottle,
-                                              &_secondaryThrottle, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID) return false;
-            errMsg->clear(); // Note: extract method doesn't clear errMsg.
-            _isSecondaryThrottleSet = fieldState == FieldParser::FIELD_SET;
-        }
-
-        fieldState = FieldParser::extract(source, waitForDelete, &_waitForDelete, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWaitForDeleteSet = fieldState == FieldParser::FIELD_SET;
-
-        return true;
-    }
-
-    void SettingsType::clear() {
-
-        _key.clear();
-        _isKeySet = false;
-
-        _chunksize = 0;
-        _isChunksizeSet = false;
-
-        _balancerStopped = false;
-        _isBalancerStoppedSet = false;
-
-        _balancerActiveWindow = BSONObj();
-        _isBalancerActiveWindowSet = false;
-
-        _secondaryThrottle = false;
-        _isSecondaryThrottleSet = false;
-
-        _migrationWriteConcern = BSONObj();
-        _isMigrationWriteConcernSet= false;
-
-        _waitForDelete = false;
-        _isWaitForDeleteSet = false;
-    }
-
-    void SettingsType::cloneTo(SettingsType* other) const {
-        other->clear();
-
-        other->_key = _key;
-        other->_isKeySet = _isKeySet;
-
-        other->_chunksize = _chunksize;
-        other->_isChunksizeSet = _isChunksizeSet;
-
-        other->_balancerStopped = _balancerStopped;
-        other->_isBalancerStoppedSet = _isBalancerStoppedSet;
-
-        other->_balancerActiveWindow = _balancerActiveWindow.copy();
-        other->_isBalancerActiveWindowSet = _isBalancerActiveWindowSet;
-
-        other->_secondaryThrottle = _secondaryThrottle;
-        other->_isSecondaryThrottleSet = _isSecondaryThrottleSet;
-
-        other->_migrationWriteConcern = _migrationWriteConcern.copy();
-        other->_isMigrationWriteConcernSet = _isMigrationWriteConcernSet;
-
-        other->_waitForDelete = _waitForDelete;
-        other->_isWaitForDeleteSet = _isWaitForDeleteSet;
     }
 
     std::string SettingsType::toString() const {
         return toBSON().toString();
     }
 
-    StatusWith<WriteConcernOptions*> SettingsType::extractWriteConcern() const {
-        dassert(_isKeySet);
+    std::unique_ptr<WriteConcernOptions> SettingsType::getWriteConcern() const {
+        dassert(_key.is_initialized());
         dassert(_key == BalancerDocKey);
 
-        const bool isSecondaryThrottle = getSecondaryThrottle();
-        if (!isSecondaryThrottle) {
-            return(StatusWith<WriteConcernOptions*>(
-                                new WriteConcernOptions(1, WriteConcernOptions::NONE, 0)));
+        if (isSecondaryThrottleSet() && !getSecondaryThrottle()) {
+            return stdx::make_unique<WriteConcernOptions>(1, WriteConcernOptions::NONE, 0);
         }
-
-        const BSONObj migrationWOption(isMigrationWriteConcernSet() ?
-                getMigrationWriteConcern() : BSONObj());
-
-        if (migrationWOption.isEmpty()) {
+        else if (!isMigrationWriteConcernSet()) {
             // Default setting.
-            return StatusWith<WriteConcernOptions*>(NULL);
+            return nullptr;
+        }
+        else {
+            return stdx::make_unique<WriteConcernOptions>(getMigrationWriteConcern());
+        }
+    }
+
+    StatusWith<BoostTimePair> SettingsType::_parseBalancingWindow(const BSONObj& balancingWindowObj) {
+        if (balancingWindowObj.isEmpty()) {
+            return Status(ErrorCodes::BadValue,
+                          "'activeWindow' can't be empty");
         }
 
-        auto_ptr<WriteConcernOptions> writeConcern(new WriteConcernOptions());
-        Status status = writeConcern->parse(migrationWOption);
-
-        if (!status.isOK()) {
-            return StatusWith<WriteConcernOptions*>(status);
+        // check if both 'start' and 'stop' are present
+        std::string start = balancingWindowObj.getField("start").str();
+        std::string stop = balancingWindowObj.getField("stop").str();
+        if (start.empty() || stop.empty()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "must specify both start and end of balancing window: "
+                                        << balancingWindowObj);
         }
 
-        return StatusWith<WriteConcernOptions*>(writeConcern.release());
+        // check that both 'start' and 'stop' are valid time-of-day
+        boost::posix_time::ptime startTime, stopTime;
+        if (!toPointInTime(start, &startTime) || !toPointInTime(stop, &stopTime)) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << balancerActiveWindow.name() << " format is "
+                                        << " { start: \"hh:mm\" , stop: \"hh:mm\" }");
+        }
+
+        return std::make_pair(startTime, stopTime);
+    }
+
+    bool SettingsType::inBalancingWindow(const boost::posix_time::ptime& now) const {
+        if (!_balancerActiveWindow.is_initialized()) {
+            return true;
+        }
+        const boost::posix_time::ptime& startTime = _balancerActiveWindow->first;
+        const boost::posix_time::ptime& stopTime = _balancerActiveWindow->second;
+
+        LOG(1).stream() << "inBalancingWindow: "
+                        << " now: " << now
+                        << " startTime: " << startTime
+                        << " stopTime: " << stopTime;
+
+        // allow balancing if during the activeWindow
+        // note that a window may be open during the night
+        if (stopTime > startTime) {
+            if ((now >= startTime) && (now <= stopTime)) {
+                return true;
+            }
+        }
+        else if (startTime > stopTime) {
+            if ((now >= startTime) || (now <= stopTime)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void SettingsType::setKey(const std::string& key) {
+        invariant(!key.empty());
+        _key = key;
+    }
+
+    void SettingsType::setChunkSize(const long long chunkSize) {
+        invariant(_key == ChunkSizeDocKey);
+        invariant(chunkSize > 0);
+        _chunkSize = chunkSize;
+    }
+
+    void SettingsType::setBalancerStopped(const bool balancerStopped) {
+        invariant(_key == BalancerDocKey);
+        _balancerStopped = balancerStopped;
+    }
+
+    void SettingsType::setBalancerActiveWindow(const BSONObj& balancerActiveWindow) {
+        invariant(_key == BalancerDocKey);
+        StatusWith<BoostTimePair> timePairResult = _parseBalancingWindow(balancerActiveWindow);
+        invariant(timePairResult.isOK());
+        _balancerActiveWindow = timePairResult.getValue();
+    }
+
+    void SettingsType::setSecondaryThrottle(const bool secondaryThrottle) {
+        invariant(_key == BalancerDocKey);
+        _secondaryThrottle = secondaryThrottle;
+    }
+
+    void SettingsType::setMigrationWriteConcern(const BSONObj& migrationWCBSONObj) {
+        invariant(_key == BalancerDocKey);
+        invariant(!migrationWCBSONObj.isEmpty());
+        Status status = _migrationWriteConcern->parse(migrationWCBSONObj);
+        invariant(status.isOK());
+    }
+
+    void SettingsType::setWaitForDelete(const bool waitForDelete) {
+        invariant(_key == BalancerDocKey);
+        _waitForDelete = waitForDelete;
     }
 
 } // namespace mongo
