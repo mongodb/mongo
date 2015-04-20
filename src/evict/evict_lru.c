@@ -563,17 +563,38 @@ __evict_pass(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __evict_clear_walk --
+ *	Clear a single walk point.
+ */
+static int
+__evict_clear_walk(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_REF *ref;
+
+	btree = S2BT(session);
+
+	if ((ref = btree->evict_ref) == NULL)
+		return (0);
+
+	/*
+	 * Clear evict_ref first, in case releasing it forces eviction (we
+	 * assert we never try to evict the current eviction walk point).
+	 */
+	btree->evict_ref = NULL;
+	return (__wt_page_release(session, ref, 0));
+}
+
+/*
  * __evict_clear_walks --
  *	Clear the eviction walk points for any file a session is waiting on.
  */
 static int
 __evict_clear_walks(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_REF *ref;
 	WT_SESSION_IMPL *s;
 	u_int i, session_cnt;
 
@@ -586,21 +607,9 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 			continue;
 		if (s->dhandle == cache->evict_file_next)
 			cache->evict_file_next = NULL;
-
-		session->dhandle = s->dhandle;
-		btree = s->dhandle->handle;
-		if ((ref = btree->evict_ref) != NULL) {
-			/*
-			 * Clear evict_ref first, in case releasing it forces
-			 * eviction (we assert that we never try to evict the
-			 * current eviction walk point).
-			 */
-			btree->evict_ref = NULL;
-			WT_TRET(__wt_page_release(session, ref, 0));
-		}
-		session->dhandle = NULL;
+		WT_WITH_DHANDLE(
+		    session, s->dhandle, WT_TRET(__evict_clear_walk(session)));
 	}
-
 	return (ret);
 }
 
@@ -634,31 +643,21 @@ __evict_request_walk_clear(WT_SESSION_IMPL *session)
 
 /*
  * __evict_clear_all_walks --
- *	Clear the eviction walk points for all file a session is waiting on.
+ *	Clear the eviction walk points for all files a session is waiting on.
  */
 static int
 __evict_clear_all_walks(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	WT_REF *ref;
 
 	conn = S2C(session);
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
-		if (!WT_PREFIX_MATCH(dhandle->name, "file:"))
-			continue;
-		session->dhandle = dhandle;
-		btree = S2BT(session);
-		if ((ref = btree->evict_ref) != NULL) {
-			btree->evict_ref = NULL;
-			WT_TRET(__wt_page_release(session, ref, 0));
-		}
-		session->dhandle = NULL;
-	}
-
+	SLIST_FOREACH(dhandle, &conn->dhlh, l)
+		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
+			WT_WITH_DHANDLE(session,
+			    dhandle, WT_TRET(__evict_clear_walk(session)));
 	return (ret);
 }
 
