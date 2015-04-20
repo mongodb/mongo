@@ -1532,9 +1532,7 @@ namespace mongo {
                 // we use the 'applyOps' mechanism to group the two updates and make them safer
                 // TODO pull config update code to a module
 
-                BSONObjBuilder cmdBuilder;
-
-                BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );
+                BSONArrayBuilder updates;
                 {
                     // update for the chunk being moved
                     BSONObjBuilder op;
@@ -1608,9 +1606,7 @@ namespace mongo {
                     log() << "moveChunk moved last chunk out for collection '" << ns << "'" << migrateLog;
                 }
 
-                updates.done();
-
-                BSONArrayBuilder preCond( cmdBuilder.subarrayStart( "preCondition" ) );
+                BSONArrayBuilder preCond;
                 {
                     BSONObjBuilder b;
                     b.append("ns", ChunkType::ConfigNS);
@@ -1625,14 +1621,8 @@ namespace mongo {
                     preCond.append( b.obj() );
                 }
 
-                preCond.done();
-
-                BSONObj cmd = cmdBuilder.obj();
-                LOG(7) << "moveChunk update: " << cmd << migrateLog;
-
                 int exceptionCode = OkCode;
                 ok = false;
-                BSONObj cmdResult;
                 try {
                     
                     // For testing migration failures
@@ -1641,24 +1631,20 @@ namespace mongo {
                                            PrepareConfigsFailedCode );
                     }
 
-                    ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
-                    ok = conn->runCommand( "config" , cmd , cmdResult );
+                    Status status = grid.catalogManager()->applyChunkOpsDeprecated(updates.arr(),
+                                                                                   preCond.arr());
+                    ok = status.isOK();
+                    exceptionCode = status.code();
 
                     if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
                         throw SocketException(SocketException::RECV_ERROR,
                                               shardingState.getConfigServer());
                     }
-
-                    conn.done();
                 }
-                catch ( DBException& e ) {
+                catch (const DBException& e) {
                     warning() << e << migrateLog;
                     ok = false;
                     exceptionCode = e.getCode();
-                    BSONObjBuilder b;
-                    e.getInfo().append( b );
-                    cmdResult = b.obj();
-                    errmsg = cmdResult.toString();
                 }
 
                 if ( exceptionCode == PrepareConfigsFailedCode ) {
@@ -1697,7 +1683,7 @@ namespace mongo {
                     // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
                     // that the old state (before migrating) be brought in
 
-                    warning() << "moveChunk commit outcome ongoing: " << cmd << " for command :" << cmdResult << migrateLog;
+                    warning() << "moveChunk commit outcome ongoing" << migrateLog;
                     sleepsecs( 10 );
 
                     try {

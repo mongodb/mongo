@@ -711,8 +711,7 @@ namespace mongo {
             BSONObj startKey = min;
             splitKeys.push_back( max ); // makes it easier to have 'max' in the next loop. remove later.
 
-            BSONObjBuilder cmdBuilder;
-            BSONArrayBuilder updates( cmdBuilder.subarrayStart( "applyOps" ) );
+            BSONArrayBuilder updates;
 
             for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it ) {
                 BSONObj endKey = *it;
@@ -774,10 +773,8 @@ namespace mongo {
 
             splitKeys.pop_back(); // 'max' was used as sentinel
 
-            updates.done();
-
+            BSONArrayBuilder preCond;
             {
-                BSONArrayBuilder preCond( cmdBuilder.subarrayStart( "preCondition" ) );
                 BSONObjBuilder b;
                 b.append("ns", ChunkType::ConfigNS);
                 b.append("q", BSON("query" << BSON(ChunkType::ns(ns)) <<
@@ -789,30 +786,15 @@ namespace mongo {
                     bb.done();
                 }
                 preCond.append( b.obj() );
-                preCond.done();
             }
 
             //
             // 4. apply the batch of updates to remote and local metadata
             //
-
-            BSONObj cmd = cmdBuilder.obj();
-
-            LOG(1) << "splitChunk update: " << cmd << endl;
-
-            bool ok;
-            BSONObj cmdResult;
-            {
-                ScopedDbConnection conn(shardingState.getConfigServer(), 30);
-                ok = conn->runCommand( "config" , cmd , cmdResult );
-                conn.done();
-            }
-
-            if ( ! ok ) {
-                stringstream ss;
-                ss << "saving chunks failed.  cmd: " << cmd << " result: " << cmdResult;
-                error() << ss.str() << endl;
-                msgasserted( 13593 , ss.str() );
+            Status applyOpsStatus = grid.catalogManager()->applyChunkOpsDeprecated(updates.arr(),
+                                                                                   preCond.arr());
+            if (!applyOpsStatus.isOK()) {
+                return appendCommandStatus(result, applyOpsStatus);
             }
 
             //

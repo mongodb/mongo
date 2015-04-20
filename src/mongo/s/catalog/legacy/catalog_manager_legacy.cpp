@@ -998,6 +998,30 @@ namespace {
         return _getShardCount() > 0;
     }
 
+    Status CatalogManagerLegacy::applyChunkOpsDeprecated(const BSONArray& updateOps,
+                                                         const BSONArray& preCondition) {
+        BSONObj cmd = BSON("applyOps" << updateOps <<
+                           "preCondition" << preCondition);
+        bool ok;
+        BSONObj cmdResult;
+        try {
+            ScopedDbConnection conn(_configServerConnectionString, 30);
+            ok = conn->runCommand("config", cmd, cmdResult);
+            conn.done();
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+        if (!ok) {
+            string errMsg(str::stream() << "Unable to save chunk ops. Command: "
+                                        << cmd << ". Result: " << cmdResult);
+
+            return Status(ErrorCodes::OperationFailed, errMsg);
+        }
+
+        return Status::OK();
+    }
+
     void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& request,
                                                        BatchedCommandResponse* response) {
 

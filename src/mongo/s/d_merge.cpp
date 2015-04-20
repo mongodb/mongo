@@ -50,9 +50,9 @@ namespace mongo {
     using std::string;
     using mongoutils::str::stream;
 
-    static BSONObj buildApplyOpsCmd( const OwnedPointerVector<ChunkType>&,
-                                     const ChunkVersion&,
-                                     const ChunkVersion& );
+    static Status runApplyOpsCmd(const OwnedPointerVector<ChunkType>&,
+                                 const ChunkVersion&,
+                                 const ChunkVersion&);
 
     static BSONObj buildMergeLogEntry( const OwnedPointerVector<ChunkType>&,
                                        const ChunkVersion&,
@@ -270,29 +270,9 @@ namespace mongo {
         //
         // Run apply ops command
         //
-
-        BSONObj applyOpsCmd = buildApplyOpsCmd( chunksToMerge,
-                                                shardVersion,
-                                                mergeVersion );
-
-        bool ok;
-        BSONObj result;
-        try {
-            ScopedDbConnection conn( configLoc, 30.0 );
-            ok = conn->runCommand( "config", applyOpsCmd, result );
-            if ( !ok ) *errMsg = result.toString();
-            conn.done();
-        }
-        catch( const DBException& ex ) {
-            ok = false;
-            *errMsg = ex.toString();
-        }
-
-        if ( !ok ) {
-            *errMsg = stream() << "could not merge chunks for " << nss.ns()
-                               << ", writing to config failed" << causedBy( errMsg );
-
-            warning() << *errMsg << endl;
+        Status applyOpsStatus = runApplyOpsCmd(chunksToMerge, shardVersion, mergeVersion);
+        if (!applyOpsStatus.isOK()) {
+            warning() << applyOpsStatus;
             return false;
         }
 
@@ -379,9 +359,10 @@ namespace mongo {
         return opB.obj();
     }
 
-    BSONObj buildOpPrecond( const string& ns,
-                            const string& shardName,
-                            const ChunkVersion& shardVersion ) {
+    BSONArray buildOpPrecond(const string& ns,
+                             const string& shardName,
+                             const ChunkVersion& shardVersion) {
+        BSONArrayBuilder preCond;
         BSONObjBuilder condB;
         condB.append( "ns", ChunkType::ConfigNS );
         condB.append( "q", BSON( "query" << BSON( ChunkType::ns( ns ) )
@@ -391,16 +372,15 @@ namespace mongo {
             shardVersion.addToBSON( resB, ChunkType::DEPRECATED_lastmod() );
             resB.done();
         }
-
-        return condB.obj();
+        preCond.append(condB.obj());
+        return preCond.arr();
     }
 
-    BSONObj buildApplyOpsCmd( const OwnedPointerVector<ChunkType>& chunksToMerge,
-                              const ChunkVersion& currShardVersion,
-                              const ChunkVersion& newMergedVersion ) {
+    Status runApplyOpsCmd(const OwnedPointerVector<ChunkType>& chunksToMerge,
+                          const ChunkVersion& currShardVersion,
+                          const ChunkVersion& newMergedVersion) {
 
-        BSONObjBuilder applyOpsCmdB;
-        BSONArrayBuilder updatesB( applyOpsCmdB.subarrayStart( "applyOps" ) );
+        BSONArrayBuilder updatesB;
 
         // The chunk we'll be "expanding" is the first chunk
         const ChunkType* chunkToMerge = *chunksToMerge.begin();
@@ -422,14 +402,10 @@ namespace mongo {
             updatesB.append( buildOpRemoveChunk( *chunkToMerge ) );
         }
 
-        updatesB.done();
-
-        applyOpsCmdB.append( "preCondition",
-                             buildOpPrecond( chunkToMerge->getNS(),
-                                             chunkToMerge->getShard(),
-                                             currShardVersion ) );
-
-        return applyOpsCmdB.obj();
+        BSONArray preCond = buildOpPrecond(chunkToMerge->getNS(),
+                                           chunkToMerge->getShard(),
+                                           currShardVersion);
+        return grid.catalogManager()->applyChunkOpsDeprecated(updatesB.arr(), preCond);
     }
 
 }

@@ -38,6 +38,7 @@ namespace mongo {
 
     class BatchedCommandRequest;
     class BatchedCommandResponse;
+    struct BSONArray;
     class BSONObj;
     class ChunkType;
     class ConnectionString;
@@ -203,6 +204,16 @@ namespace mongo {
          * Otherwise, returns false.
          */
         virtual bool doShardsExist() = 0;
+
+        /**
+         * Applies oplog entries to the config servers.
+         * Used by mergeChunk, splitChunk, and moveChunk commands.
+         *
+         * @param updateOps: oplog entries to apply
+         * @param preCondition: preconditions for applying oplog entries
+         */
+        virtual Status applyChunkOpsDeprecated(const BSONArray& updateOps,
+                                               const BSONArray& preCondition) = 0;
 
         /**
          * Logs a diagnostic event locally and on the config server.
