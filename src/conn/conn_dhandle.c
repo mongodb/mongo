@@ -290,25 +290,17 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	 * error to our caller for eventual retry.
 	 */
 	if (!F_ISSET(btree,
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		WT_ERR(__wt_checkpoint_close(session, final, force));
 
-		/*
-		 * If we are simply marking the handle dead, it will be closed
-		 * later.
-		 */
-		if (force)
-			goto done;
-	}
-
-	if (dhandle->checkpoint == NULL)
-		--S2C(session)->open_btree_count;
-
 	WT_TRET(__wt_btree_close(session));
-	F_CLR(dhandle, WT_DHANDLE_OPEN);
+	if (!force || final) {
+		F_CLR(dhandle, WT_DHANDLE_OPEN);
+		if (dhandle->checkpoint == NULL)
+			--S2C(session)->open_btree_count;
+	}
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
-done:
 err:	__wt_spin_unlock(session, &dhandle->close_lock);
 
 	if (no_schema_lock)
@@ -677,7 +669,8 @@ __wt_conn_dhandle_close_all(
 
 	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
 	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl) {
-		if (strcmp(dhandle->name, name) != 0)
+		if (strcmp(dhandle->name, name) != 0 ||
+		    F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
 
 		session->dhandle = dhandle;
@@ -757,7 +750,8 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final, int force)
 
 	dhandle = session->dhandle;
 
-	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+	    (final && F_ISSET(dhandle, WT_DHANDLE_DEAD))) {
 		tret = __wt_conn_btree_sync_and_close(session, final, force);
 		if (final && tret != 0) {
 			__wt_err(session, tret,

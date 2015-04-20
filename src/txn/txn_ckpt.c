@@ -1103,7 +1103,8 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 	if (force) {
 		F_SET(session->dhandle, WT_DHANDLE_DEAD);
 		return (0);
-	}
+	} else if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
 
 	/*
 	 * If closing an unmodified file, check that no update is required
