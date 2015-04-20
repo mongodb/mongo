@@ -495,8 +495,18 @@ namespace {
         invariant(dbName != "admin");
         invariant(dbName != "config");
 
+        // Lock the database globally to prevent conflicts with simultaneous database creation.
+        ScopedDistributedLock dbDistLock(_configServerConnectionString, dbName);
+        dbDistLock.setLockMessage("createDatabase");
+        dbDistLock.setLockTryIntervalMillis(500);
+
+        Status status = dbDistLock.acquire(1000 /*1 second*/);
+        if (!status.isOK()) {
+            return status;
+        }
+
         // Check for case sensitivity violations
-        Status status = _checkDbDoesNotExist(dbName);
+        status = _checkDbDoesNotExist(dbName);
         if (!status.isOK()) {
             return status;
         }
