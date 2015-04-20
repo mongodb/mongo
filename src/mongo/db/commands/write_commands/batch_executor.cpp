@@ -550,8 +550,10 @@ namespace mongo {
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
             _stats->numInserted += stats.n;
-            _le->nObjects = stats.n;
             currentOp->debug().ninserted += stats.n;
+            if (!error) {
+                _le->recordInsert(stats.n);
+            }
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
             if ( stats.upsertedID.isEmpty() ) {
@@ -562,7 +564,7 @@ namespace mongo {
                 ++_stats->numUpserted;
             }
 
-            if ( !error ) {
+            if (!error) {
                 _le->recordUpdate( stats.upsertedID.isEmpty() && stats.n > 0,
                         stats.n,
                         stats.upsertedID );
@@ -577,8 +579,8 @@ namespace mongo {
             currentOp->debug().ndeleted += stats.n;
         }
 
-        if (error && !_le->disabled) {
-            _le->raiseError(error->getErrCode(), error->getErrMessage().c_str());
+        if (error) {
+            _le->setLastError(error->getErrCode(), error->getErrMessage().c_str());
         }
     }
 

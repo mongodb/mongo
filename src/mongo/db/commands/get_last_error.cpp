@@ -72,9 +72,7 @@ namespace mongo {
                  int,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            LastError *le = lastError.get();
-            verify( le );
-            le->reset();
+            LastError::get(txn->getClient()).reset();
             return true;
         }
     } cmdResetError;
@@ -88,7 +86,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         virtual void help( stringstream& help ) const {
-            lastError.disableForCommand(); // SERVER-11492
+            LastError::get(cc()).disable(); // SERVER-11492
             help << "return error status of the last operation on this connection\n"
                  << "options:\n"
                  << "  { fsync:true } - fsync before returning, or wait for journal commit if running with --journal\n"
@@ -128,7 +126,8 @@ namespace mongo {
             // err is null.
             //
 
-            LastError *le = lastError.disableForCommand();
+            LastError *le = &LastError::get(txn->getClient());
+            le->disable();
 
             // Always append lastOp and connectionId
             Client& c = *txn->getClient();
@@ -173,7 +172,7 @@ namespace mongo {
 
             // Errors aren't reported when wOpTime is used
             if ( !lastOpTimePresent ) {
-                if ( le->nPrev != 1 ) {
+                if ( le->getNPrev() != 1 ) {
                     errorOccurred = LastError::noError.appendSelf( result, false );
                 }
                 else {
@@ -284,12 +283,13 @@ namespace mongo {
                  int,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            LastError *le = lastError.disableForCommand();
-            le->appendSelf( result );
-            if ( le->valid )
-                result.append( "nPrev", le->nPrev );
+            LastError *le = &LastError::get(txn->getClient());
+            le->disable();
+            le->appendSelf(result, true);
+            if (le->isValid())
+                result.append("nPrev", le->getNPrev());
             else
-                result.append( "nPrev", -1 );
+                result.append("nPrev", -1);
             return true;
         }
     } cmdGetPrevError;

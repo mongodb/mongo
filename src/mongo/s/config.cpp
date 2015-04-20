@@ -282,7 +282,7 @@ namespace mongo {
     ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload, bool forceReload ){
 	
         // Don't report exceptions here as errors in GetLastError
-        LastError::Disabled ignoreForGLE(lastError.get(false));
+        LastError::Disabled ignoreForGLE(&LastError::get(cc()));
          
         try{
             return getChunkManager( ns, shouldReload, forceReload );

@@ -653,7 +653,7 @@ namespace mongo {
     void Strategy::writeOp( int op , Request& r ) {
 
         // make sure we have a last error
-        dassert( lastError.get( false /* don't create */) );
+        dassert(&LastError::get(cc()));
 
         OwnedPointerVector<BatchedCommandRequest> requestsOwned;
         vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
@@ -665,7 +665,7 @@ namespace mongo {
 
             // Multiple commands registered to last error as multiple requests
             if ( it != requests.begin() )
-                lastError.startRequest( r.m(), lastError.get( false ) );
+                LastError::get(cc()).startRequest();
 
             BatchedCommandRequest* request = *it;
 
@@ -680,7 +680,7 @@ namespace mongo {
 
             {
                 // Disable the last error object for the duration of the write cmd
-                LastError::Disabled disableLastError( lastError.get( false ) );
+                LastError::Disabled disableLastError(&LastError::get(cc()));
                 Command::runAgainstRegistered( cmdNS.c_str(), requestBSON, builder, 0 );
             }
 
@@ -690,8 +690,8 @@ namespace mongo {
             dassert( parsed && response.isValid( NULL ) );
 
             // Populate the lastError object based on the write response
-            lastError.get( false )->reset();
-            bool hadError = batchErrorToLastError( *request, response, lastError.get( false ) );
+            LastError::get(cc()).reset();
+            bool hadError = batchErrorToLastError(*request, response, &LastError::get(cc()));
 
             // Check if this is an ordered batch and we had an error which should stop processing
             if ( request->getOrdered() && hadError )

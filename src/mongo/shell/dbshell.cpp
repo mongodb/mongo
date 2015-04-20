@@ -424,10 +424,6 @@ string finishCode( string code ) {
     return code;
 }
 
-namespace mongo {
-    extern bool isShell;
-}
-
 bool execPrompt( mongo::Scope &scope, const char *promptFunction, string &prompt ) {
     string execStatement = string( "__prompt__ = " ) + promptFunction + "();";
     scope.exec( "delete __prompt__;", "", false, false, false, 0 );
@@ -588,7 +584,6 @@ static void edit( const string& whatToEdit ) {
 }
 
 int _main( int argc, char* argv[], char **envp ) {
-    mongo::isShell = true;
     setupSignalHandlers(true);
     setupSignals();
 

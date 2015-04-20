@@ -44,12 +44,11 @@ namespace mongo {
 
     class BSONObjBuilder;
     class CurOp;
+    class LastError;
     class OpCounters;
     class OperationContext;
-    struct LastError;
-
-    struct WriteOpStats;
     class WriteBatchStats;
+    struct WriteOpStats;
 
     /**
      * An instance of WriteBatchExecutor is an object capable of issuing a write batch.

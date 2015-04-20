@@ -27,139 +27,91 @@
  *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/lasterror.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-    using std::endl;
-
     LastError LastError::noError;
-    LastErrorHolder lastError;
 
-    bool isShell = false;
-    void setLastError(int code , const char *msg) {
-        LastError *le = lastError.get();
-        if ( le == 0 ) {
-            /* might be intentional (non-user thread) */
-            DEV {
-                static unsigned n;
-                if( ++n < 4 && !isShell ) log() << "dev: lastError==0 won't report:" << msg << endl;
-            }
-        }
-        else if ( le->disabled ) {
-            log() << "lastError disabled, can't report: " << code << ":" << msg << endl;
-        }
-        else {
-            le->raiseError(code, msg);
-        }
+    const Client::Decoration<LastError> LastError::get = Client::declareDecoration<LastError>();
+
+    void LastError::reset(bool valid) {
+        *this = LastError();
+        _valid = valid;
     }
 
-    bool LastError::appendSelf( BSONObjBuilder &b , bool blankErr ) {
+    void LastError::setLastError(int code, std::string msg) {
+        if (_disabled) {
+            return;
+        }
+        reset(true);
+        _code = code;
+        _msg = std::move(msg);
+    }
 
-        if ( !valid ) {
-            if ( blankErr )
+    void LastError::recordInsert(long long nObjects) {
+        reset(true);
+        _nObjects = nObjects;
+    }
+
+    void LastError::recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId) {
+        reset(true);
+        _nObjects = nObjects;
+        _updatedExisting = updateObjects ? True : False;
+        if ( upsertedId.valid() && upsertedId.hasField(kUpsertedFieldName) )
+            _upsertedId = upsertedId;
+    }
+
+    void LastError::recordDelete(long long nDeleted) {
+        reset(true);
+        _nObjects = nDeleted;
+    }
+
+    bool LastError::appendSelf(BSONObjBuilder &b , bool blankErr) const {
+
+        if (!_valid) {
+            if (blankErr)
                 b.appendNull( "err" );
             b.append( "n", 0 );
             return false;
         }
 
-        if ( msg.empty() ) {
-            if ( blankErr ) {
+        if (_msg.empty()) {
+            if (blankErr) {
                 b.appendNull( "err" );
             }
         }
         else {
-            b.append( "err", msg );
+            b.append("err", _msg);
         }
 
-        if ( code )
-            b.append( "code" , code );
-        if ( updatedExisting != NotUpdate )
-            b.appendBool( "updatedExisting", updatedExisting == True );
-        if ( !upsertedId.isEmpty() ) {
-            b.append( upsertedId[kUpsertedFieldName] );
+        if (_code)
+            b.append("code" , _code);
+        if (_updatedExisting != NotUpdate)
+            b.appendBool("updatedExisting", _updatedExisting == True);
+        if (!_upsertedId.isEmpty()) {
+            b.append(_upsertedId[kUpsertedFieldName]);
         }
-        b.appendNumber( "n", nObjects );
+        b.appendNumber("n", _nObjects);
 
-        return ! msg.empty();
-    }
-
-    LastErrorHolder::~LastErrorHolder() {
+        return !_msg.empty();
     }
 
 
-    LastError * LastErrorHolder::disableForCommand() {
-        LastError *le = _get();
-        uassert(13649, "no operation yet", le);
-        le->disabled = true;
-        le->nPrev--; // caller is a command that shouldn't count as an operation
-        return le;
+    void LastError::disable() {
+        invariant(!_disabled);
+        _disabled = true;
+        _nPrev--; // caller is a command that shouldn't count as an operation
     }
 
-    LastError * LastErrorHolder::get( bool create ) {
-        LastError *ret = _get( create );
-        if ( ret && !ret->disabled )
-            return ret;
-        return 0;
-    }
-
-    LastError * LastErrorHolder::getSafe() {
-        LastError * le = get(false);
-        if ( ! le ) {
-            error() << " no LastError!" << std::endl;
-            verify( le );
-        }
-        return le;
-    }
-
-    LastError * LastErrorHolder::_get( bool create ) {
-        LastError * le = _tl.get();
-        if ( ! le && create ) {
-            le = new LastError();
-            _tl.reset( le );
-        }
-        return le;
-    }
-
-    void LastErrorHolder::release() {
-        _tl.release();
-    }
-
-    /** ok to call more than once. */
-    void LastErrorHolder::initThread() {
-        if( ! _tl.get() ) 
-            _tl.reset( new LastError() );
-    }
-
-    void LastErrorHolder::reset( LastError * le ) {
-        _tl.reset( le );
-    }
-
-    void prepareErrForNewRequest( Message &m, LastError * err ) {
-        // a killCursors message shouldn't affect last error
-        verify( err );
-        if ( m.operation() == dbKillCursors ) {
-            err->disabled = true;
-        }
-        else {
-            err->disabled = false;
-            err->nPrev++;
-        }
-    }
-
-    LastError * LastErrorHolder::startRequest( Message& m , LastError * le ) {
-        verify( le );
-        prepareErrForNewRequest( m, le );
-        return le;
+    void LastError::startRequest() {
+        _disabled = false;
+        ++_nPrev;
     }
 
 } // namespace mongo
