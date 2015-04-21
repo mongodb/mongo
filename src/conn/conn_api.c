@@ -1686,8 +1686,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * to be stripped out from the base configuration file; do that now, and
 	 * merge the rest to be written.
 	 */
-	WT_ERR(__wt_config_merge(
-	    session, cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
+	WT_ERR(__wt_config_merge(session, cfg + 1, "create=", &base_merge));
 
 	/*
 	 * Reset cfg to the configuration stack we're going to use for the rest
