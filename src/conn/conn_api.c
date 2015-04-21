@@ -1602,6 +1602,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
+	base_merge = NULL;
 
 	WT_RET(__wt_library_init());
 
@@ -1824,6 +1825,8 @@ err:	/* Discard the scratch buffers. */
 	__wt_scr_free(session, &i1);
 	__wt_scr_free(session, &i2);
 	__wt_scr_free(session, &i3);
+
+	__wt_free(session, base_merge);
 
 	/*
 	 * We may have allocated scratch memory when using the dummy session or
