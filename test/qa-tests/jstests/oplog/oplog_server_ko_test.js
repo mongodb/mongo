@@ -11,7 +11,7 @@ if (typeof getToolTest === 'undefined') {
   db.dropDatabase();
 
   var port = 26999;
-  var mongod = startMongod('--auth', '--port', port,
+  var mongod = _startMongod('--auth', '--port', port,
     '--dbpath', MongoRunner.dataPath + 'oplogServerKOTest2');
 
   var start = Date.now();
