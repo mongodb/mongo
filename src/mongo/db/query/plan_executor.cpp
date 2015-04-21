@@ -446,22 +446,16 @@ namespace mongo {
             else if (PlanStage::IS_EOF == code) {
                 return PlanExecutor::IS_EOF;
             }
-            else if (PlanStage::DEAD == code) {
-                if (NULL != objOut) {
-                    BSONObj statusObj;
-                    WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &statusObj);
-                    *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
-                }
-                return PlanExecutor::DEAD;
-            }
             else {
-                verify(PlanStage::FAILURE == code);
+                invariant(PlanStage::DEAD == code || PlanStage::FAILURE == code);
+
                 if (NULL != objOut) {
                     BSONObj statusObj;
                     WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &statusObj);
                     *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
                 }
-                return PlanExecutor::FAILURE;
+
+                return (PlanStage::DEAD == code) ? PlanExecutor::DEAD : PlanExecutor::FAILURE;
             }
         }
     }
@@ -513,13 +507,10 @@ namespace mongo {
             state = this->getNext(&obj, NULL);
         }
 
-        if (PlanExecutor::DEAD == state) {
-            return Status(ErrorCodes::OperationFailed, "Exec error: PlanExecutor killed");
-        }
-        else if (PlanExecutor::FAILURE == state) {
+        if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
             return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "Exec error: "
-                                        << WorkingSetCommon::toStatusString(obj));
+                          str::stream() << "Exec error: " << WorkingSetCommon::toStatusString(obj)
+                                        << ", state: " << PlanExecutor::statestr(state));
         }
 
         invariant(PlanExecutor::IS_EOF == state);

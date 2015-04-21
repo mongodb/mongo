@@ -74,12 +74,13 @@ namespace mongo {
          */
         boost::shared_ptr<PlanExecutor> getChildExecutor();
 
-        //
-        // These should not be used.
-        //
+        // Returns empty PlanStageStats object
+        virtual PlanStageStats* getStats();
 
-        virtual PlanStageStats* getStats() { return NULL; }
+        // Not used.
         virtual CommonStats* getCommonStats() const { return NULL; }
+
+        // Not used.
         virtual SpecificStats* getSpecificStats() const { return NULL; }
 
         // Not used.
@@ -87,6 +88,8 @@ namespace mongo {
 
         // Not used.
         virtual StageType stageType() const { return STAGE_PIPELINE_PROXY; }
+
+        static const char* kStageType;
 
     private:
         boost::optional<BSONObj> getNextBson();

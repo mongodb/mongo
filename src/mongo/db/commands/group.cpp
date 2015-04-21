@@ -158,8 +158,9 @@ namespace mongo {
         BSONObj retval;
         PlanExecutor::ExecState state = planExecutor->getNext(&retval, NULL);
         if (PlanExecutor::ADVANCED != state) {
-            if (PlanExecutor::FAILURE == state &&
-                WorkingSetCommon::isValidStatusMemberObject(retval)) {
+            invariant(PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state);
+
+            if (WorkingSetCommon::isValidStatusMemberObject(retval)) {
                 return appendCommandStatus(out, WorkingSetCommon::getMemberObjectStatus(retval));
             }
             return appendCommandStatus(out,
@@ -168,6 +169,7 @@ namespace mongo {
                                                             << "operation, executor returned "
                                                             << PlanExecutor::statestr(state)));
         }
+
         invariant(planExecutor->isEOF());
 
         invariant(STAGE_GROUP == planExecutor->getRootStage()->stageType());

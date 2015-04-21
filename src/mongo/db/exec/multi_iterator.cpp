@@ -38,6 +38,8 @@ namespace mongo {
 
     using std::vector;
 
+    const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
+
     MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
                                            WorkingSet* ws,
                                            Collection* collection)
@@ -57,8 +59,12 @@ namespace mongo {
     }
 
     PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
-        if ( _collection == NULL )
+        if (_collection == NULL) {
+            Status status(ErrorCodes::InternalError, 
+                          "MultiIteratorStage died on null collection");
+            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
             return PlanStage::DEAD;
+        }
 
         if (_iterators.empty())
             return PlanStage::IS_EOF;
@@ -149,6 +155,13 @@ namespace mongo {
     vector<PlanStage*> MultiIteratorStage::getChildren() const {
         vector<PlanStage*> empty;
         return empty;
+    }
+
+    PlanStageStats* MultiIteratorStage::getStats() {
+        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType), 
+                                                               STAGE_MULTI_ITERATOR));
+        ret->specific.reset(new CollectionScanStats());
+        return ret.release();
     }
 
     void MultiIteratorStage::_advance() {

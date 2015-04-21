@@ -368,17 +368,14 @@ namespace mongo {
                 }
             }
 
-            if (PlanExecutor::FAILURE == *state) {
+            if (PlanExecutor::FAILURE == *state || PlanExecutor::DEAD == *state) {
                 const std::unique_ptr<PlanStageStats> stats(exec->getStats());
-                error() << "GetMore executor error, stats: " << Explain::statsToBSON(*stats);
+                error() << "GetMore command executor error: " << PlanExecutor::statestr(*state)
+                        << ", stats: " << Explain::statsToBSON(*stats);
+
                 return Status(ErrorCodes::OperationFailed,
-                              str::stream() << "GetMore executor error: "
+                              str::stream() << "GetMore command executor error: "
                                             << WorkingSetCommon::toStatusString(obj));
-            }
-            else if (PlanExecutor::DEAD == *state) {
-                return Status(ErrorCodes::OperationFailed,
-                              str::stream() << "Plan executor killed during getMore command, "
-                                            << "ns: " << request.nss.ns());
             }
 
             return Status::OK();

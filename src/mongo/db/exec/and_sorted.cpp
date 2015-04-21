@@ -239,7 +239,7 @@ namespace mongo {
             _ws->free(_targetId);
             return state;
         }
-        else if (PlanStage::FAILURE == state) {
+        else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
             *out = id;
             // If a stage fails, it may create a status WSM to indicate why it
             // failed, in which case 'id' is valid.  If ID is invalid, we

@@ -35,6 +35,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_fetcher.h"
@@ -78,12 +79,19 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        if (_isDead) { return PlanStage::DEAD; }
+        if (_isDead) { 
+            Status status(ErrorCodes::InternalError, "CollectionScan died");
+            *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
+            return PlanStage::DEAD; 
+        }
 
         // Do some init if we haven't already.
         if (NULL == _iter) {
-            if ( _params.collection == NULL ) {
+            if (_params.collection == NULL) {
                 _isDead = true;
+                Status status(ErrorCodes::InternalError, 
+                              "CollectionScan died: collection pointer was null");
+                *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                 return PlanStage::DEAD;
             }
 
@@ -102,10 +110,13 @@ namespace mongo {
 
                     // Advance _iter past where we were last time. If it returns something else,
                     // mark us as dead since we want to signal an error rather than silently
-                    // dropping data from the stream. This is related to the _lastSeenLock handling
+                    // dropping data from the stream. This is related to the _lastSeenLoc handling
                     // in invalidate.
                     if (_iter->getNext() != _lastSeenLoc) {
                         _isDead = true;
+                        Status status(ErrorCodes::InternalError,
+                                      "CollectionScan died: Unexpected RecordId");
+                        *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                         return PlanStage::DEAD;
                     }
                 }
@@ -122,14 +133,19 @@ namespace mongo {
         }
 
         // Should we try getNext() on the underlying _iter?
-        if (isEOF())
+        if (isEOF()) {
+            _commonStats.isEOF = true;
             return PlanStage::IS_EOF;
+        }
 
         const RecordId curr = _iter->curr();
         if (curr.isNull()) {
             // We just hit EOF
             if (_params.tailable)
                 _iter.reset(); // pick up where we left off on the next call to work()
+            else
+                _commonStats.isEOF = true;
+
             return PlanStage::IS_EOF;
         }
 
@@ -148,7 +164,7 @@ namespace mongo {
                 member->setFetcher(fetcher.release());
                 *out = _wsidForFetch;
                 _commonStats.needYield++;
-                return NEED_YIELD;
+                return PlanStage::NEED_YIELD;
             }
         }
 
@@ -256,8 +272,6 @@ namespace mongo {
     }
 
     PlanStageStats* CollectionScan::getStats() {
-        _commonStats.isEOF = isEOF();
-
         // Add a BSON representation of the filter to the stats tree, if there is one.
         if (NULL != _filter) {
             BSONObjBuilder bob;

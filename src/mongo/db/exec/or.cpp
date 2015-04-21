@@ -112,7 +112,7 @@ namespace mongo {
                 return PlanStage::NEED_TIME;
             }
         }
-        else if (PlanStage::FAILURE == childStatus) {
+        else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
             *out = id;
             // If a stage fails, it may create a status WSM to indicate why it
             // failed, in which case 'id' is valid.  If ID is invalid, we

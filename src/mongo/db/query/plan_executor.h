@@ -66,7 +66,11 @@ namespace mongo {
             // We're EOF.  We won't return any more results (edge case exception: capped+tailable).
             IS_EOF,
 
-            // We were killed or had an error.
+            // We were killed. This is a special failure case in which we cannot rely on the
+            // collection or database to still be valid.
+            // If the underlying PlanStage has any information on the error, it will be available in
+            // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
+            // details from the output BSON object.
             DEAD,
 
             // getNext was asked for data it cannot provide, or the underlying PlanStage had an

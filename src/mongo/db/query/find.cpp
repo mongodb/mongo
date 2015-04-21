@@ -327,7 +327,7 @@ namespace mongo {
         // has a valid RecoveryUnit.  As such, we use RAII to accomplish this.
         //
         // This must be destroyed before the ClientCursor is destroyed.
-        std::auto_ptr<ScopedRecoveryUnitSwapper> ruSwapper;
+        std::unique_ptr<ScopedRecoveryUnitSwapper> ruSwapper;
 
         // These are set in the QueryResult msg we return.
         int resultFlags = ResultFlag_AwaitCapable;
@@ -432,23 +432,11 @@ namespace mongo {
 
             if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
                 // Propagate this error to caller.
-                if (PlanExecutor::FAILURE == state) {
-                    scoped_ptr<PlanStageStats> stats(exec->getStats());
-                    error() << "Plan executor error, stats: "
-                            << Explain::statsToBSON(*stats);
-                    uasserted(17406, "getMore executor error: " +
-                              WorkingSetCommon::toStatusString(obj));
-                }
-
-                // In the old system tailable capped cursors would be killed off at the
-                // cursorid level.  If a tailable capped cursor is nuked the cursorid
-                // would vanish.
-                //
-                // In the new system they die and are cleaned up later (or time out).
-                // So this is where we get to remove the cursorid.
-                if (0 == numResults) {
-                    resultFlags = ResultFlag_CursorNotFound;
-                }
+                const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+                error() << "getMore executor error, stats: "
+                        << Explain::statsToBSON(*stats);
+                uasserted(17406, "getMore executor error: " +
+                          WorkingSetCommon::toStatusString(obj));
             }
 
             const bool shouldSaveCursor =
@@ -679,10 +667,10 @@ namespace mongo {
         exec->deregisterExec();
 
         // Caller expects exceptions thrown in certain cases.
-        if (PlanExecutor::FAILURE == state) {
-            scoped_ptr<PlanStageStats> stats(exec->getStats());
-            error() << "Plan executor error, stats: "
-                    << Explain::statsToBSON(*stats);
+        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
+                    << ", stats: " << Explain::statsToBSON(*stats);
             uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
         }
 

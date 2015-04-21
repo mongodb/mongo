@@ -64,17 +64,22 @@ namespace mongo {
 
         virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        //
-        // These should not be used.
-        //
+        // Returns empty PlanStageStats object
+        virtual PlanStageStats* getStats();
 
-        virtual PlanStageStats* getStats() { return NULL; }
+        // Not used.
         virtual CommonStats* getCommonStats() const { return NULL; }
+
+        // Not used.
         virtual SpecificStats* getSpecificStats() const { return NULL; }
 
+        // Not used.
         virtual std::vector<PlanStage*> getChildren() const;
 
+        // Not used.
         virtual StageType stageType() const { return STAGE_MULTI_ITERATOR; }
+
+        static const char* kStageType;
 
     private:
 

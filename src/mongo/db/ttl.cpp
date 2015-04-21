@@ -321,9 +321,9 @@ namespace mongo {
                             return true;
                         }
                     }
-                    if (PlanExecutor::IS_EOF != state) {
-                        if (PlanExecutor::FAILURE == state &&
-                                WorkingSetCommon::isValidStatusMemberObject(obj)) {
+
+                    if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+                        if (WorkingSetCommon::isValidStatusMemberObject(obj)) {
                             error() << "ttl query execution for index " << idx << " failed with: "
                                     << WorkingSetCommon::getMemberObjectStatus(obj);
                             return true;
@@ -332,6 +332,8 @@ namespace mongo {
                                 << PlanExecutor::statestr(state);
                         return true;
                     }
+
+                    invariant(PlanExecutor::IS_EOF == state);
                     break;
                 }
                 catch (const WriteConflictException& dle) {

@@ -44,10 +44,12 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace QueryStageAnd {
@@ -905,6 +907,143 @@ namespace QueryStageAnd {
     };
 
 
+    class QueryStageAndHashDeadChild : public QueryStageAndBase {
+    public:
+        void run() {
+            OldClientWriteContext ctx(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
+            if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
+                coll = db->createCollection(&_txn, ns());
+                wuow.commit();
+            }
+
+            const BSONObj dataObj = fromjson("{'foo': 'bar'}");
+
+            // Confirm PlanStage::DEAD when children contain the following WorkingSetMembers:
+            //     Child1:  Data
+            //     Child2:  NEED_TIME, DEAD
+            {
+                WorkingSet ws;
+                const MatchExpression* const matchExp = NULL;
+                const std::unique_ptr<AndHashStage> andHashStage =
+                    stdx::make_unique<AndHashStage>(&ws, matchExp, coll);
+
+                std::unique_ptr<QueuedDataStage> childStage1 =
+                    stdx::make_unique<QueuedDataStage>(&ws);
+                {
+                    WorkingSetMember wsm;
+                    wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                    wsm.loc = RecordId(1);
+                    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                    childStage1->pushBack(wsm);
+                }
+
+                std::unique_ptr<QueuedDataStage> childStage2 =
+                    stdx::make_unique<QueuedDataStage>(&ws);
+                childStage2->pushBack(PlanStage::NEED_TIME);
+                childStage2->pushBack(PlanStage::DEAD);
+
+                andHashStage->addChild(childStage1.release());
+                andHashStage->addChild(childStage2.release());
+
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState state = PlanStage::NEED_TIME;
+                while (PlanStage::NEED_TIME == state) {
+                    state = andHashStage->work(&id);
+                }
+
+                ASSERT_EQ(PlanStage::DEAD, state);
+            }
+
+            // Confirm PlanStage::DEAD when children contain the following WorkingSetMembers:
+            //     Child1:  Data, DEAD
+            //     Child2:  Data
+            {
+                WorkingSet ws;
+                const MatchExpression* const matchExp = NULL;
+                const std::unique_ptr<AndHashStage> andHashStage =
+                    stdx::make_unique<AndHashStage>(&ws, matchExp, coll);
+
+                std::unique_ptr<QueuedDataStage> childStage1 =
+                    stdx::make_unique<QueuedDataStage>(&ws);
+
+                {
+                    WorkingSetMember wsm;
+                    wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                    wsm.loc = RecordId(1);
+                    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                    childStage1->pushBack(wsm);
+                }
+                childStage1->pushBack(PlanStage::DEAD);
+
+                std::unique_ptr<QueuedDataStage> childStage2 =
+                    stdx::make_unique<QueuedDataStage>(&ws);
+                {
+                    WorkingSetMember wsm;
+                    wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                    wsm.loc = RecordId(2);
+                    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                    childStage2->pushBack(wsm);
+                }
+
+                andHashStage->addChild(childStage1.release());
+                andHashStage->addChild(childStage2.release());
+
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState state = PlanStage::NEED_TIME;
+                while (PlanStage::NEED_TIME == state) {
+                    state = andHashStage->work(&id);
+                }
+
+                ASSERT_EQ(PlanStage::DEAD, state);
+            }
+
+            // Confirm PlanStage::DEAD when children contain the following WorkingSetMembers:
+            //     Child1:  Data
+            //     Child2:  Data, DEAD
+            {
+                WorkingSet ws;
+                const MatchExpression* const matchExp = NULL;
+                const std::unique_ptr<AndHashStage> andHashStage =
+                    stdx::make_unique<AndHashStage>(&ws, matchExp, coll);
+
+                std::unique_ptr<QueuedDataStage> childStage1 =
+                    stdx::make_unique<QueuedDataStage>(&ws);
+                {
+                    WorkingSetMember wsm;
+                    wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                    wsm.loc = RecordId(1);
+                    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                    childStage1->pushBack(wsm);
+                }
+
+                std::unique_ptr<QueuedDataStage> childStage2 =
+                    stdx::make_unique<QueuedDataStage>(&ws);
+                {
+                    WorkingSetMember wsm;
+                    wsm.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                    wsm.loc = RecordId(2);
+                    wsm.obj = Snapshotted<BSONObj>(SnapshotId(), dataObj);
+                    childStage2->pushBack(wsm);
+                }
+                childStage2->pushBack(PlanStage::DEAD);
+
+                andHashStage->addChild(childStage1.release());
+                andHashStage->addChild(childStage2.release());
+
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState state = PlanStage::NEED_TIME;
+                while (PlanStage::NEED_TIME == state) {
+                    state = andHashStage->work(&id);
+                }
+
+                ASSERT_EQ(PlanStage::DEAD, state);
+            }
+        }
+    };
+
     //
     // Sorted AND tests
     //
@@ -1410,6 +1549,7 @@ namespace QueryStageAnd {
             add<QueryStageAndHashInvalidateLookahead>();
             add<QueryStageAndHashFirstChildFetched>();
             add<QueryStageAndHashSecondChildFetched>();
+            add<QueryStageAndHashDeadChild>();
             add<QueryStageAndSortedInvalidation>();
             add<QueryStageAndSortedThreeLeaf>();
             add<QueryStageAndSortedWithNothing>();

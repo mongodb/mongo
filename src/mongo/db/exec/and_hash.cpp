@@ -135,7 +135,7 @@ namespace mongo {
                 for (size_t j = 0; j < kLookAheadWorks; ++j) {
                     StageState childStatus = child->work(&_lookAheadResults[i]);
 
-                    if (PlanStage::IS_EOF == childStatus || PlanStage::DEAD == childStatus) {
+                    if (PlanStage::IS_EOF == childStatus) {
 
                         // A child went right to EOF.  Bail out.
                         _hashingChildren = false;
@@ -147,7 +147,7 @@ namespace mongo {
                         // child.
                         break;
                     }
-                    else if (PlanStage::FAILURE == childStatus) {
+                    else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
                         // Propage error to parent.
                         *out = _lookAheadResults[i];
                         // If a stage fails, it may create a status WSM to indicate why it
@@ -156,14 +156,15 @@ namespace mongo {
                         if (WorkingSet::INVALID_ID == *out) {
                             mongoutils::str::stream ss;
                             ss << "hashed AND stage failed to read in look ahead results "
-                               << "from child " << i;
+                               << "from child " << i 
+                               << ", childStatus: " << PlanStage::stateStr(childStatus);
                             Status status(ErrorCodes::InternalError, ss);
                             *out = WorkingSetCommon::allocateStatusMember( _ws, status);
                         }
 
                         _hashingChildren = false;
                         _dataMap.clear();
-                        return PlanStage::FAILURE;
+                        return childStatus;
                     }
                     // We ignore NEED_TIME. TODO: what do we want to do if we get NEED_YIELD here?
                 }
@@ -317,7 +318,7 @@ namespace mongo {
 
             return PlanStage::NEED_TIME;
         }
-        else if (PlanStage::FAILURE == childStatus) {
+        else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
             *out = id;
             // If a stage fails, it may create a status WSM to indicate why it
             // failed, in which case 'id' is valid.  If ID is invalid, we
@@ -419,7 +420,7 @@ namespace mongo {
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
-        else if (PlanStage::FAILURE == childStatus) {
+        else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
             *out = id;
             // If a stage fails, it may create a status WSM to indicate why it
             // failed, in which case 'id' is valid.  If ID is invalid, we

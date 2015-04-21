@@ -313,13 +313,17 @@ namespace mongo {
             }
 
             // Throw an assertion if query execution fails for any reason.
-            if (PlanExecutor::FAILURE == state) {
+            if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
                 const std::unique_ptr<PlanStageStats> stats(exec->getStats());
-                error() << "Plan executor error, stats: " << Explain::statsToBSON(*stats);
+                error() << "Plan executor error during find command: "
+                        << PlanExecutor::statestr(state) 
+                        << ", stats: " << Explain::statsToBSON(*stats);
+
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::OperationFailed,
-                                                  str::stream() << "Executor error: "
-                                                  << WorkingSetCommon::toStatusString(obj)));
+                                                  str::stream()
+                                                      << "Executor error during find command: "
+                                                      << WorkingSetCommon::toStatusString(obj)));
             }
 
             // 6) Set up the cursor for getMore.

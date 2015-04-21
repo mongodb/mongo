@@ -151,8 +151,18 @@ namespace mongo {
                 return replan(yieldPolicy, shouldCache);
             }
             else if (PlanStage::DEAD == state) {
-                return Status(ErrorCodes::OperationFailed,
-                              "Executor killed during cached plan trial period");
+                BSONObj statusObj;
+                WorkingSetCommon::getStatusMemberObject(*_ws, id, &statusObj);
+
+                LOG(1) << "Execution of cached plan failed: PlanStage died"
+                       << ", query: "
+                       << _canonicalQuery->toStringShort()
+                       << " planSummary: "
+                       << Explain::getPlanSummary(_root.get())
+                       << " status: "
+                       << statusObj;
+
+                return WorkingSetCommon::getMemberObjectStatus(statusObj); 
             }
             else {
                 invariant(PlanStage::NEED_TIME == state);

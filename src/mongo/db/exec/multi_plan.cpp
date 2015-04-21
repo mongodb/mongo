@@ -316,9 +316,7 @@ namespace mongo {
             if (ix == (size_t)_backupPlanIdx) { continue; }
 
             PlanStageStats* stats = _candidates[ix].root->getStats();
-            if (stats) {
-                candidateStats.push_back(stats);
-            }
+            candidateStats.push_back(stats);
         }
 
         return candidateStats.release();

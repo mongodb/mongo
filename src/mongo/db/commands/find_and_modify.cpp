@@ -103,8 +103,12 @@ namespace {
             return boost::optional<BSONObj>(std::move(value));
         }
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-            if (PlanExecutor::FAILURE == state &&
-                WorkingSetCommon::isValidStatusMemberObject(value)) {
+            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            error() << "Plan executor error during findAndModify: "
+                    << PlanExecutor::statestr(state)
+                    << ", stats: " << Explain::statsToBSON(*stats);
+
+            if (WorkingSetCommon::isValidStatusMemberObject(value)) {
                 const Status errorStatus =
                     WorkingSetCommon::getMemberObjectStatus(value);
                 invariant(!errorStatus.isOK());

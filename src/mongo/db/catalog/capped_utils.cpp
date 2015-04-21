@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/capped_utils.h"
@@ -159,17 +161,23 @@ namespace mongo {
             switch(state) {
             case PlanExecutor::IS_EOF:
                 return Status::OK();
-            case PlanExecutor::DEAD:
-                db->dropCollection(txn, toNs);
-                return Status(ErrorCodes::InternalError, "executor died while iterating");
-            case PlanExecutor::FAILURE:
-                return Status(ErrorCodes::InternalError, "executor error while iterating");
             case PlanExecutor::ADVANCED:
+            {
                 if (excessSize > 0) {
                     // 4x is for padding, power of 2, etc...
                     excessSize -= (4 * objToClone.value().objsize());
                     continue;
                 }
+                break;
+            }
+            default:
+                // Unreachable as:
+                // 1) We require a read lock (at a minimum) on the "from" collection
+                //    and won't yield, preventing collection drop and PlanExecutor::DEAD
+                // 2) PlanExecutor::FAILURE is only returned on PlanStage::FAILURE. The
+                //    CollectionScan PlanStage does not have a FAILURE scenario.
+                // 3) All other PlanExecutor states are handled above
+                invariant(false);
             }
 
             try {

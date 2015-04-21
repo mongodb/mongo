@@ -137,7 +137,7 @@ namespace mongo {
 
             return returnIfMatches(member, id, out);
         }
-        else if (PlanStage::FAILURE == status) {
+        else if (PlanStage::FAILURE == status || PlanStage::DEAD == status) {
             *out = id;
             // If a stage fails, it may create a status WSM to indicate why it
             // failed, in which case 'id' is valid.  If ID is invalid, we

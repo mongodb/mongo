@@ -122,10 +122,12 @@ namespace mongo {
         // dispose since we want to keep the _currentBatch.
         _exec.reset();
 
-        uassert(16028, "collection or index disappeared when cursor yielded",
+        uassert(16028, str::stream() << "collection or index disappeared when cursor yielded: "
+                                     << WorkingSetCommon::toStatusString(obj), 
                 state != PlanExecutor::DEAD);
 
-        uassert(17285, "cursor encountered an error: " + WorkingSetCommon::toStatusString(obj),
+        uassert(17285, str::stream() << "cursor encountered an error: " 
+                                     << WorkingSetCommon::toStatusString(obj),
                 state != PlanExecutor::FAILURE);
 
         massert(17286, str::stream() << "Unexpected return from PlanExecutor::getNext: " << state,

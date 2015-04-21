@@ -41,6 +41,8 @@ namespace mongo {
     using boost::shared_ptr;
     using std::vector;
 
+    const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
+
     PipelineProxyStage::PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
                                            const boost::shared_ptr<PlanExecutor>& child,
                                            WorkingSet* ws)
@@ -112,6 +114,13 @@ namespace mongo {
     vector<PlanStage*> PipelineProxyStage::getChildren() const {
         vector<PlanStage*> empty;
         return empty;
+    }
+
+    PlanStageStats* PipelineProxyStage::getStats() {
+        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType), 
+                                                               STAGE_PIPELINE_PROXY));
+        ret->specific.reset(new CollectionScanStats());
+        return ret.release();
     }
 
     boost::optional<BSONObj> PipelineProxyStage::getNextBson() {

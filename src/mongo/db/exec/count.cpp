@@ -128,10 +128,10 @@ namespace mongo {
         else if (PlanStage::DEAD == state) {
             return state;
         }
-        else if (PlanStage::FAILURE == state) {
+        else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
             *out = id;
-            // If a stage fails, it may create a status WSM to indicate why it failed, in which cas
-            // 'id' is valid. If ID is invalid, we create our own error message.
+            // If a stage fails, it may create a status WSM to indicate why it failed, in which
+            // case 'id' is valid. If ID is invalid, we create our own error message.
             if (WorkingSet::INVALID_ID == id) {
                 const std::string errmsg = "count stage failed to read result from child";
                 Status status = Status(ErrorCodes::InternalError, errmsg);

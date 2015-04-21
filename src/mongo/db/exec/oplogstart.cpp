@@ -37,6 +37,8 @@ namespace mongo {
 
     using std::vector;
 
+    const char* OplogStart::kStageType = "OPLOG_START";
+
     // Does not take ownership.
     OplogStart::OplogStart(OperationContext* txn,
                            const Collection* collection,
@@ -195,6 +197,13 @@ namespace mongo {
                 i--;
             }
         }
+    }
+
+    PlanStageStats* OplogStart::getStats() {
+        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType), 
+                                                               STAGE_OPLOG_START));
+        ret->specific.reset(new CollectionScanStats());
+        return ret.release();
     }
 
     vector<PlanStage*> OplogStart::getChildren() const {

@@ -381,18 +381,14 @@ namespace mongo {
                 exec.reset();
                 if (PlanExecutor::IS_EOF == state) { break; }
 
-                if (PlanExecutor::DEAD == state) {
-                    warning(LogComponent::kSharding) << "cursor died: aborting deletion for "
-                              << min << " to " << max << " in " << ns
-                              << endl;
-                    break;
-                }
-
-                if (PlanExecutor::FAILURE == state) {
-                    warning(LogComponent::kSharding) << "cursor error while trying to delete "
+                if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+                    const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+                    warning(LogComponent::kSharding) << PlanExecutor::statestr(state)
+                              << " - cursor error while trying to delete "
                               << min << " to " << max
                               << " in " << ns << ": "
-                              << WorkingSetCommon::toStatusString(obj) << endl;
+                              << WorkingSetCommon::toStatusString(obj) << ", stats: "
+                              << Explain::statsToBSON(*stats) << endl;
                     break;
                 }
 

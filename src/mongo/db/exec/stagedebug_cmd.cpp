@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
@@ -48,10 +50,12 @@
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/text.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -166,11 +170,28 @@ namespace mongo {
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 
-            for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL); ) {
+            BSONObj obj;
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
                 resultBuilder.append(obj);
             }
 
             resultBuilder.done();
+
+            if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+                const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+                error() << "Plan executor error during StageDebug command: "
+                        << PlanExecutor::statestr(state) 
+                        << ", stats: " << Explain::statsToBSON(*stats);
+
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::OperationFailed,
+                                                  str::stream()
+                                                      << "Executor error during " 
+                                                      << "StageDebug command: "
+                                                      << WorkingSetCommon::toStatusString(obj)));
+            }
+
             return true;
         }
 
