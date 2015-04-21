@@ -9,7 +9,7 @@ in the <a href="https://github.com/wiredtiger/wiredtiger"><b>WiredTiger
 source tree repository</b></a>.
 
 Please submit any feature suggestions and bug reports at
-<a href="https://github.com/wiredtiger/wiredtiger/issues">
+<a href="http://jira.mongodb.org/browse/WT">
 <b>WiredTiger's Issues page</b></a>.
 
 Discussion of WiredTiger issues and development can also be found in

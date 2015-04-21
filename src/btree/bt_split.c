@@ -658,6 +658,7 @@ __split_multi_inmem(
 	WT_CLEAR(cbt);
 	cbt.iface.session = &session->iface;
 	cbt.btree = S2BT(session);
+	__wt_btcur_open(&cbt);
 
 	/*
 	 * We can find unresolved updates when attempting to evict a page, which

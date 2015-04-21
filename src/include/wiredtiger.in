@@ -1555,7 +1555,8 @@ struct __wt_connection {
 	 * simultaneous asynchronous operations., an integer between 1 and 4096;
 	 * default \c 1024.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number
-	 * of worker threads to service asynchronous requests., an integer
+	 * of worker threads to service asynchronous requests.  Each worker
+	 * thread uses a session from the configured session_max., an integer
 	 * between 1 and 20; default \c 2.}
 	 * @config{ ),,}
 	 * @config{cache_overhead, assume the heap allocator overhead is the
@@ -1570,8 +1571,9 @@ struct __wt_connection {
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A
 	 * database should configure either \c cache_size or \c shared_cache but
 	 * not both., an integer between 1MB and 10TB; default \c 100MB.}
-	 * @config{checkpoint = (, periodically checkpoint the database., a set
-	 * of related configuration options defined below.}
+	 * @config{checkpoint = (, periodically checkpoint the database.
+	 * Enabling the checkpoint server uses a session from the configured
+	 * session_max., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log
 	 * record bytes to be written to the log between each checkpoint.  A
 	 * database can configure both log_size and wait to set an upper bound
@@ -1590,7 +1592,8 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of
 	 * threads WiredTiger will start to help evict pages from cache.  The
 	 * number of threads started will vary depending on the current eviction
-	 * load., an integer between 1 and 20; default \c 1.}
+	 * load.  Each eviction worker thread uses a session from the configured
+	 * session_max., an integer between 1 and 20; default \c 1.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of
 	 * threads WiredTiger will start to help evict pages from cache.  The
 	 * number of threads currently running will vary depending on the
@@ -1620,16 +1623,21 @@ struct __wt_connection {
 	 * them., an integer between 1 and 100000; default \c 10.}
 	 * @config{ ),,}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree
-	 * management., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where
-	 * possible., a boolean flag; default \c true.}
+	 * management.  The LSM manager is started automatically the first time
+	 * an LSM tree is opened.  The LSM manager uses a session from the
+	 * configured session_max., a set of related configuration options
+	 * defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM
+	 * chunks where possible., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of
-	 * threads to manage merging LSM trees in the database., an integer
-	 * between 3 and 20; default \c 4.}
+	 * threads to manage merging LSM trees in the database.  Each worker
+	 * thread uses a session handle from the configured session_max., an
+	 * integer between 3 and 20; default \c 4.}
 	 * @config{ ),,}
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
-	 * both., a set of related configuration options defined below.}
+	 * both.  Enabling a shared cache uses a session from the configured
+	 * session_max., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
 	 * cache is redistributed., an integer between 1MB and 10TB; default \c
 	 * 10MB.}
@@ -1660,9 +1668,11 @@ struct __wt_connection {
 	 * \c "none"\, \c "clear"; default \c none.}
 	 * @config{statistics_log = (, log any statistics the database is
 	 * configured to maintain\, to a file.  See @ref statistics for more
-	 * information., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database
-	 * close., a boolean flag; default \c false.}
+	 * information.  Enabling the statistics log server uses a session from
+	 * the configured session_max., a set of related configuration options
+	 * defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log
+	 * statistics on database close., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
 	 * which the log records are written\, may contain ISO C standard
 	 * strftime conversion specifications.  If the value is not an absolute
@@ -1900,8 +1910,10 @@ struct __wt_connection {
  * maximum number of expected simultaneous asynchronous operations., an integer
  * between 1 and 4096; default \c 1024.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number of worker threads to
- * service asynchronous requests., an integer between 1 and 20; default \c 2.}
- * @config{ ),,}
+ * service asynchronous requests.  Each worker thread uses a session from the
+ * configured session_max., an integer between 1 and 20; default \c 2.}
+ * @config{
+ * ),,}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
  * I/O. The default value of -1 indicates a platform-specific alignment value
  * should be used (4KB on Linux systems when direct I/O is configured\, zero
@@ -1917,7 +1929,8 @@ struct __wt_connection {
  * @config{cache_size, maximum heap memory to allocate for the cache.  A
  * database should configure either \c cache_size or \c shared_cache but not
  * both., an integer between 1MB and 10TB; default \c 100MB.}
- * @config{checkpoint = (, periodically checkpoint the database., a set of
+ * @config{checkpoint = (, periodically checkpoint the database.  Enabling the
+ * checkpoint server uses a session from the configured session_max., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record
  * bytes to be written to the log between each checkpoint.  A database can
@@ -1952,13 +1965,15 @@ struct __wt_connection {
  * configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
  * WiredTiger will start to help evict pages from cache.  The number of threads
- * started will vary depending on the current eviction load., an integer between
- * 1 and 20; default \c 1.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum
- * number of threads WiredTiger will start to help evict pages from cache.  The
- * number of threads currently running will vary depending on the current
- * eviction load., an integer between 1 and 20; default \c 1.}
- * @config{ ),,}
+ * started will vary depending on the current eviction load.  Each eviction
+ * worker thread uses a session from the configured session_max., an integer
+ * between 1 and 20; default \c 1.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min,
+ * minimum number of threads WiredTiger will start to help evict pages from
+ * cache.  The number of threads currently running will vary depending on the
+ * current eviction load., an integer between 1 and 20; default \c 1.}
+ * @config{
+ * ),,}
  * @config{eviction_dirty_target, continue evicting until the cache has less
  * dirty memory than the value\, as a percentage of the total cache size.  Dirty
  * pages will only be evicted if the cache is full enough to trigger eviction.,
@@ -1995,10 +2010,11 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
- * @config{log = (, enable logging., a set of related configuration options
- * defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
- * archive unneeded log files., a boolean flag; default \c true.}
+ * @config{log = (, enable logging.  Enabling logging uses three sessions from
+ * the configured session_max., a set of related configuration options defined
+ * below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive
+ * unneeded log files., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log
  * records.  Permitted values are \c "none" or custom compression engine name
  * created with WT_CONNECTION::add_compressor.  If WiredTiger has builtin
@@ -2019,11 +2035,14 @@ struct __wt_connection {
  * chosen from the following options: \c "error"\, \c "on"; default \c on.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
- * management., a set of related configuration options defined below.}
+ * management.  The LSM manager is started automatically the first time an LSM
+ * tree is opened.  The LSM manager uses a session from the configured
+ * session_max., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where possible., a
  * boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of threads
- * to manage merging LSM trees in the database., an integer between 3 and 20;
+ * to manage merging LSM trees in the database.  Each worker thread uses a
+ * session handle from the configured session_max., an integer between 3 and 20;
  * default \c 4.}
  * @config{ ),,}
  * @config{mmap, Use memory mapping to access files when possible., a boolean
@@ -2035,7 +2054,8 @@ struct __wt_connection {
  * @config{session_max, maximum expected number of sessions (including server
  * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database
- * should configure either a cache_size or a shared_cache not both., a set of
+ * should configure either a cache_size or a shared_cache not both.  Enabling a
+ * shared cache uses a session from the configured session_max., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is
  * redistributed., an integer between 1MB and 10TB; default \c 10MB.}
@@ -2063,8 +2083,9 @@ struct __wt_connection {
  * list\, with values chosen from the following options: \c "all"\, \c "fast"\,
  * \c "none"\, \c "clear"; default \c none.}
  * @config{statistics_log = (, log any statistics the database is configured to
- * maintain\, to a file.  See @ref statistics for more information., a set of
- * related configuration options defined below.}
+ * maintain\, to a file.  See @ref statistics for more information.  Enabling
+ * the statistics log server uses a session from the configured session_max., a
+ * set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database close.,
  * a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the

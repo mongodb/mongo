@@ -46,7 +46,10 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *c;
 	WT_DECL_RET;
+	WT_ITEM dummy_key, dummy_value;
 	WT_LOG *log;
+	uint64_t dummy_txnid;
+	uint32_t dummy_fileid, dummy_optype, rectype;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -59,21 +62,37 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 	if (log == NULL)
 		return (0);
 
+	/*
+	 * See if there are any data modification records between the
+	 * checkpoint LSN and the end of the log.  If there are none then
+	 * we can skip recovery.
+	 */
 	WT_RET(__wt_curlog_open(session, "log:", NULL, &c));
 	c->set_key(c, ckp_lsn->file, ckp_lsn->offset, 0);
 	if ((ret = c->search(c)) == 0) {
+		while ((ret = c->next(c)) == 0) {
+			/*
+			 * The only thing we care about is the rectype.
+			 */
+			WT_ERR(c->get_value(c, &dummy_txnid, &rectype,
+			    &dummy_optype, &dummy_fileid,
+			    &dummy_key, &dummy_value));
+			if (rectype == WT_LOGREC_COMMIT)
+				break;
+		}
 		/*
-		 * If the checkpoint LSN we're given is the last record,
-		 * then recovery is not needed.
+		 * If we get to the end of the log, we can skip recovery.
 		 */
-		if ((ret = c->next(c)) == WT_NOTFOUND) {
+		if (ret == WT_NOTFOUND) {
 			*rec = 0;
 			ret = 0;
 		}
 	} else if (ret == WT_NOTFOUND)
 		/*
-		 * If we didn't find that LSN, we need to run recovery,
-		 * but not return any error.
+		 * We should always find the checkpoint LSN as it now points
+		 * to the beginning of a written log record.  But if we're
+		 * running recovery on an earlier database we may not.  In
+		 * that case, we need to run recovery, don't return an error.
 		 */
 		ret = 0;
 	else
@@ -564,7 +583,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *log_fh, *tmp_fh;
+	WT_FH *log_fh;
 	WT_LOG *log;
 	uint32_t lognum;
 	u_int i, logcount;
@@ -581,10 +600,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__log_openfile(session, 0, &log_fh, file_prefix, lsn->file));
 	WT_ERR(__wt_ftruncate(session, log_fh, lsn->offset));
-	tmp_fh = log_fh;
-	log_fh = NULL;
-	WT_ERR(__wt_fsync(session, tmp_fh));
-	WT_ERR(__wt_close(session, &tmp_fh));
+	WT_ERR(__wt_fsync(session, log_fh));
+	WT_ERR(__wt_close(session, &log_fh));
 
 	/*
 	 * If we just want to truncate the current log, return and skip
@@ -605,10 +622,8 @@ __log_truncate(WT_SESSION_IMPL *session,
 			 */
 			WT_ERR(__wt_ftruncate(session,
 			    log_fh, LOG_FIRST_RECORD));
-			tmp_fh = log_fh;
-			log_fh = NULL;
-			WT_ERR(__wt_fsync(session, tmp_fh));
-			WT_ERR(__wt_close(session, &tmp_fh));
+			WT_ERR(__wt_fsync(session, log_fh));
+			WT_ERR(__wt_close(session, &log_fh));
 		}
 	}
 err:	WT_TRET(__wt_close(session, &log_fh));
@@ -630,7 +645,7 @@ __wt_log_allocfile(
 	WT_DECL_ITEM(from_path);
 	WT_DECL_ITEM(to_path);
 	WT_DECL_RET;
-	WT_FH *log_fh, *tmp_fh;
+	WT_FH *log_fh;
 	WT_LOG *log;
 
 	conn = S2C(session);
@@ -655,10 +670,8 @@ __wt_log_allocfile(
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
 	if (prealloc)
 		WT_ERR(__log_prealloc(session, log_fh));
-	tmp_fh = log_fh;
-	log_fh = NULL;
-	WT_ERR(__wt_fsync(session, tmp_fh));
-	WT_ERR(__wt_close(session, &tmp_fh));
+	WT_ERR(__wt_fsync(session, log_fh));
+	WT_ERR(__wt_close(session, &log_fh));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_prealloc: rename %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
@@ -967,6 +980,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_write_cond, 200));
 	}
+	log->write_start_lsn = slot->slot_start_lsn;
 	log->write_lsn = slot->slot_end_lsn;
 	WT_ERR(__wt_cond_signal(session, log->log_write_cond));
 
@@ -1122,6 +1136,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 		WT_RET(__wt_fsync(session, log->log_fh));
 		log->sync_lsn = end_lsn;
 		log->write_lsn = end_lsn;
+		log->write_start_lsn = end_lsn;
 	}
 	if (created != NULL)
 		*created = create_log;

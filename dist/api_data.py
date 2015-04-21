@@ -319,8 +319,9 @@ connection_runtime_config = [
             maximum number of expected simultaneous asynchronous
                 operations''', min='1', max='4096'),
         Config('threads', '2', r'''
-            the number of worker threads to service asynchronous
-                requests''',
+            the number of worker threads to service asynchronous requests.
+            Each worker thread uses a session from the configured
+            session_max.''',
                 min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
             ]),
     Config('cache_size', '100MB', r'''
@@ -338,7 +339,8 @@ connection_runtime_config = [
         workloads''',
         min='0', max='30'),
     Config('checkpoint', '', r'''
-        periodically checkpoint the database''',
+        periodically checkpoint the database. Enabling the checkpoint server
+        uses a session from the configured session_max''',
         type='category', subconfig=[
         Config('name', '"WiredTigerCheckpoint"', r'''
             the checkpoint name'''),
@@ -382,11 +384,14 @@ connection_runtime_config = [
             inactive and close them''', min=1, max=100000),
         ]),
     Config('lsm_manager', '', r'''
-        configure database wide options for LSM tree management''',
+        configure database wide options for LSM tree management. The LSM
+        manager is started automatically the first time an LSM tree is opened.
+        The LSM manager uses a session from the configured session_max.''',
         type='category', subconfig=[
         Config('worker_thread_max', '4', r'''
             Configure a set of threads to manage merging LSM trees in
-            the database.''',
+            the database. Each worker thread uses a session handle from
+            the configured session_max''',
             min='3',     # !!! Must match WT_LSM_MIN_WORKERS
             max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
         Config('merge', 'true', r'''
@@ -402,7 +407,8 @@ connection_runtime_config = [
             Config('threads_max', '1', r'''
                 maximum number of threads WiredTiger will start to help evict
                 pages from cache. The number of threads started will vary
-                depending on the current eviction load''',
+                depending on the current eviction load. Each eviction worker
+                thread uses a session from the configured session_max''',
                 min=1, max=20),
             Config('threads_min', '1', r'''
                 minimum number of threads WiredTiger will start to help evict
@@ -412,7 +418,8 @@ connection_runtime_config = [
             ]),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
-        either a cache_size or a shared_cache not both''',
+        either a cache_size or a shared_cache not both. Enabling a
+        shared cache uses a session from the configured session_max''',
         type='category', subconfig=[
         Config('chunk', '10MB', r'''
             the granularity that a shared cache is redistributed''',
@@ -445,7 +452,9 @@ connection_runtime_config = [
         type='list', choices=['all', 'fast', 'none', 'clear']),
     Config('statistics_log', '', r'''
         log any statistics the database is configured to maintain,
-        to a file.  See @ref statistics for more information''',
+        to a file.  See @ref statistics for more information. Enabling
+        the statistics log server uses a session from the configured
+        session_max''',
         type='category', subconfig=[
         Config('on_close', 'false', r'''log statistics on database close''',
             type='boolean'),
@@ -545,7 +554,8 @@ common_wiredtiger_open = [
         handle''',
         min='15'),
     Config('log', '', r'''
-        enable logging''',
+        enable logging. Enabling logging uses three sessions from the
+        configured session_max''',
         type='category', subconfig=[
         Config('archive', 'true', r'''
             automatically archive unneeded log files''',

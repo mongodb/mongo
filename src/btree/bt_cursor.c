@@ -1129,6 +1129,17 @@ err:	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 }
 
 /*
+ * __wt_btcur_open --
+ *	Open a btree cursor.
+ */
+void
+__wt_btcur_open(WT_CURSOR_BTREE *cbt)
+{
+	cbt->row_key = &cbt->_row_key;
+	cbt->tmp = &cbt->_tmp;
+}
+
+/*
  * __wt_btcur_close --
  *	Close a btree cursor.
  */
@@ -1141,8 +1152,8 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	ret = __curfile_leave(cbt);
-	__wt_buf_free(session, &cbt->search_key);
-	__wt_buf_free(session, &cbt->tmp);
+	__wt_buf_free(session, &cbt->_row_key);
+	__wt_buf_free(session, &cbt->_tmp);
 
 	return (ret);
 }
