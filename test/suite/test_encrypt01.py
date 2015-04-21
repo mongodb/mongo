@@ -42,29 +42,45 @@ class test_encrypt01(wttest.WiredTigerTestCase):
         ('table', dict(uri='table:test_encrypt01')),
     ]
     encrypt = [
-        ('nop', dict(encrypt='nop')),
-        ('rotn', dict(encrypt='rotn')),
-        ('none', dict(encrypt=None)),
+        ('none', dict( sys_encrypt='none', sys_encrypt_args='',
+            file_encrypt='none', file_encrypt_args='')),
+        ('nop', dict( sys_encrypt='nop', sys_encrypt_args='',
+            file_encrypt='nop', file_encrypt_args='')),
+        ('rotn', dict( sys_encrypt='rotn', sys_encrypt_args=',keyid=11',
+            file_encrypt='rotn', file_encrypt_args=',keyid=13')),
+        ('rotn-none', dict( sys_encrypt='rotn', sys_encrypt_args=',keyid=9',
+            file_encrypt='none',  file_encrypt_args=''))
     ]
     compress = [
-#        ('lz4', dict(compress='lz4')),
-        ('bzip2', dict(compress='bzip2')),
-        ('nop', dict(compress='nop')),
-#        ('snappy', dict(compress='snappy')),
-        ('none', dict(compress=None)),
+        ('none', dict(log_compress=None, block_compress=None)),
+        ('nop', dict(log_compress='nop', block_compress='nop')),
+        ('lz4', dict(log_compress='lz4', block_compress='lz4')),
+        ('bzip2', dict(log_compress='bzip2', block_compress='bzip2')),
+        ('snappy', dict(log_compress='snappy', block_compress='snappy')),
+        ('bzip2-none', dict(log_compress='bzip2', block_compress=None)),
+        ('none-snappy', dict(log_compress=None, block_compress='snappy')),
+        ('snappy-lz4', dict(log_compress='snappy', block_compress='lz4')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, encrypt,
-                                                    compress))
+    scenarios = number_scenarios(multiply_scenarios('.', types,
+                                                    encrypt, compress))
 
     nrecords = 10000
     bigvalue = "abcdefghij" * 1000
 
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open( dir, 'create,' +
-            ('error_prefix="%s: ",' % self.shortid()) +
-            self.extensionArg([('encryptors', self.encrypt),
-                               ('compressors', self.compress)]))
+        encarg = 'encryption=(name={0}{1}),'.format(
+            self.sys_encrypt, self.sys_encrypt_args)
+        comparg = ''
+        if self.log_compress != None:
+            comparg='log=(compressor={0}),'.format(self.log_compress)
+        extarg = self.extensionArg([('encryptors', self.sys_encrypt),
+            ('encryptors', self.file_encrypt),
+            ('compressors', self.block_compress),
+            ('compressors', self.log_compress)])
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,error_prefix="{0}: ",{1}{2}{3}'.format(
+                self.shortid(), encarg, comparg, extarg))
         self.pr(`conn`)
         return conn
 
@@ -73,14 +89,15 @@ class test_encrypt01(wttest.WiredTigerTestCase):
         extfiles = []
         for ext in exts:
             (dirname, name) = ext
-            if name != None:
+            if name != None and name != 'none':
                 testdir = os.path.dirname(__file__)
                 extdir = os.path.join(run.wt_builddir, 'ext', dirname)
                 extfile = os.path.join(
                     extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
                 if not os.path.exists(extfile):
                     self.skipTest('extension "' + extfile + '" not built')
-                extfiles.append(extfile)
+                if not extfile in extfiles:
+                    extfiles.append(extfile)
         if len(extfiles) == 0:
             return ''
         else:
@@ -88,12 +105,12 @@ class test_encrypt01(wttest.WiredTigerTestCase):
 
     # Create a table, add keys with both big and small values, then verify them.
     def test_encrypt(self):
-
         params = 'key_format=S,value_format=S'
-        if self.encrypt != None:
-            params += ',encryption=(name=' + self.encrypt + ',keyid=13)'
-        if self.compress != None:
-            params += ',block_compressor=' + self.compress
+        if self.file_encrypt != None:
+            params += ',encryption=(name=' + self.file_encrypt + \
+                      self.file_encrypt_args + ')'
+        if self.block_compress != None:
+            params += ',block_compressor=' + self.block_compress
 
         self.session.create(self.uri, params)
         cursor = self.session.open_cursor(self.uri, None)
