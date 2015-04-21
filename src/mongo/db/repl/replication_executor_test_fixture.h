@@ -36,6 +36,8 @@
 namespace mongo {
 namespace repl {
 
+    using std::unique_ptr;
+
     class NetworkInterfaceMock;
     class ReplicationExecutor;
 
@@ -47,7 +49,6 @@ namespace repl {
     protected:
         NetworkInterfaceMock* getNet() { return _net; }
         ReplicationExecutor& getExecutor() { return *_executor; }
-
         /**
          * Runs ReplicationExecutor in background.
          */
@@ -77,10 +78,11 @@ namespace repl {
          */
         virtual void tearDown();
 
+
     private:
         NetworkInterfaceMock* _net;
-        boost::scoped_ptr<ReplicationExecutor> _executor;
-        boost::scoped_ptr<boost::thread> _executorThread;
+        unique_ptr<ReplicationExecutor> _executor;
+        unique_ptr<boost::thread> _executorThread;
     };
 
 }  // namespace repl

@@ -146,24 +146,28 @@ namespace {
 }  // namespace
 
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
-            const ReplSettings& settings,
-            ReplicationCoordinatorExternalState* externalState,
-            ReplicationExecutor::NetworkInterface* network,
-            TopologyCoordinator* topCoord,
-            int64_t prngSeed) :
-        _settings(settings),
-        _replMode(getReplicationModeFromSettings(settings)),
-        _topCoord(topCoord),
-        _replExecutor(network, prngSeed),
-        _externalState(externalState),
-        _inShutdown(false),
-        _memberState(MemberState::RS_STARTUP),
-        _isWaitingForDrainToComplete(false),
-        _rsConfigState(kConfigPreStart),
-        _selfIndex(-1),
-        _sleptLastElection(false),
-        _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.slave)),
-        _canServeNonLocalReads(0U) {
+                                                const ReplSettings& settings,
+                                                ReplicationCoordinatorExternalState* externalState,
+                                                TopologyCoordinator* topCoord,
+                                                int64_t prngSeed,
+                                                ReplicationExecutor::NetworkInterface* network,
+                                                ReplicationExecutor* replExec) :
+                        _settings(settings),
+                        _replMode(getReplicationModeFromSettings(settings)),
+                        _topCoord(topCoord),
+                        _replExecutorIfOwned(replExec ? nullptr :
+                                                        new ReplicationExecutor(network, prngSeed)),
+                        _replExecutor(replExec ? *replExec : *_replExecutorIfOwned),
+                        _externalState(externalState),
+                        _inShutdown(false),
+                        _memberState(MemberState::RS_STARTUP),
+                        _isWaitingForDrainToComplete(false),
+                        _rsConfigState(kConfigPreStart),
+                        _selfIndex(-1),
+                        _sleptLastElection(false),
+                        _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.slave)),
+                        _canServeNonLocalReads(0U),
+                        _dr(DataReplicatorOptions(), &_replExecutor, this) {
 
         if (!isReplEnabled()) {
             return;
@@ -181,6 +185,30 @@ namespace {
         selfInfo.self = true;
         _slaveInfo.push_back(selfInfo);
     }
+
+    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
+            const ReplSettings& settings,
+            ReplicationCoordinatorExternalState* externalState,
+            ReplicationExecutor::NetworkInterface* network,
+            TopologyCoordinator* topCoord,
+            int64_t prngSeed) : ReplicationCoordinatorImpl(settings,
+                                                           externalState,
+                                                           topCoord,
+                                                           prngSeed,
+                                                           network,
+                                                           nullptr) { }
+
+    ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
+            const ReplSettings& settings,
+            ReplicationCoordinatorExternalState* externalState,
+            TopologyCoordinator* topCoord,
+            ReplicationExecutor* replExec,
+            int64_t prngSeed) : ReplicationCoordinatorImpl(settings,
+                                                           externalState,
+                                                           topCoord,
+                                                           prngSeed,
+                                                           nullptr,
+                                                           replExec) { }
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
@@ -1919,7 +1947,7 @@ namespace {
                 // Switching into SECONDARY, but not from PRIMARY.
                 _canServeNonLocalReads.store(1U);
             }
-            result = kActionChooseNewSyncSource;
+            result = kActionFollowerModeStateChange;
         }
         if (newState.secondary() && _topCoord->getRole() == TopologyCoordinator::Role::candidate) {
             // When transitioning to SECONDARY, the only way for _topCoord to report the candidate
@@ -1942,7 +1970,9 @@ namespace {
         switch (action) {
         case kActionNone:
             break;
-        case kActionChooseNewSyncSource:
+        case kActionFollowerModeStateChange:
+            // In follower mode, or sub-mode so ensure replication is active
+            // TODO: _dr.resume();
             _externalState->signalApplierToChooseNewSyncSource();
             break;
         case kActionCloseAllConnections:
@@ -2107,7 +2137,10 @@ namespace {
 
         if (somethingChanged && !_getMemberState_inlock().primary()) {
             lock.unlock();
-            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+            // Must do this outside _mutex
+            // TODO: enable _dr, remove _externalState when DataReplicator is used excl.
+            //_dr.slavesHaveProgressed();
+            _externalState->forwardSlaveProgress();
         }
         return status;
     }

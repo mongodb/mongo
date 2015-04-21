@@ -26,9 +26,12 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/reporter.h"
+#include "mongo/util/log.h"
 
 #include "mongo/db/repl/replication_executor.h"
 
@@ -87,6 +90,8 @@ namespace repl {
             return _status;
         }
 
+        LOG(2) << "Reporter scheduling report to : " << _target;
+
         _willRunAgain = false;
 
         BSONObjBuilder cmd;
@@ -98,6 +103,8 @@ namespace repl {
 
         if (!scheduleResult.isOK()) {
             _status = scheduleResult.getStatus();
+            LOG(2) << "Reporter failed to schedule with status: " << _status;
+
             return _status;
         }
 
@@ -112,6 +119,7 @@ namespace repl {
         _status = rcbd.response.getStatus();
         _active = false;
 
+        LOG(2) << "Reporter ended with status: " << _status << " after reporting to " << _target;
         if (_status.isOK() && _willRunAgain) {
             _schedule_inlock();
         }

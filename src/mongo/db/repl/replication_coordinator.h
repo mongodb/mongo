@@ -78,7 +78,7 @@ namespace repl {
      * with the rest of the system.  The public methods on ReplicationCoordinator are the public
      * API that the replication subsystem presents to the rest of the codebase.
      */
-    class ReplicationCoordinator : ReplicationProgressManager {
+    class ReplicationCoordinator : public ReplicationProgressManager {
         MONGO_DISALLOW_COPYING(ReplicationCoordinator);
 
     public:

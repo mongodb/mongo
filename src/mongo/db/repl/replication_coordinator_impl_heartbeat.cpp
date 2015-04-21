@@ -159,10 +159,13 @@ namespace {
                 targetIndex >= 0 &&
                 hbStatusResponse.getValue().hasState() &&
                 hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            boost::unique_lock<boost::mutex> lk(_mutex);
             if (hbStatusResponse.getValue().getVersion() == _rsConfig.getConfigVersion()) {
                 _updateOpTimeFromHeartbeat_inlock(targetIndex,
                                                   hbStatusResponse.getValue().getOpTime());
+                // TODO: Enable with Data Replicator
+                //lk.unlock();
+                //_dr.slavesHaveProgressed();
             }
         }
 
