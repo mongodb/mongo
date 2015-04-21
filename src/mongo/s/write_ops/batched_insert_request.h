@@ -36,7 +36,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/bson_serializable.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_request_metadata.h"
 
 namespace mongo {

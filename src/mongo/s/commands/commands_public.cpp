@@ -178,7 +178,7 @@ namespace {
 
         private:
             bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , int options , BSONObjBuilder& result ) {
-                ShardConnection conn( conf->getPrimary() , "" );
+                ShardConnection conn(conf->getPrimary().getConnString(), "");
                 BSONObj res;
                 bool ok = conn->runCommand( db , cmdObj , res , passOptions() ? options : 0 );
                 if ( ! ok && res["code"].numberInt() == SendStaleConfigCode ) {
@@ -1040,7 +1040,7 @@ namespace {
                             BSONObjBuilder& result) const {
                 BSONObj res;
 
-                ShardConnection conn(shard, ns);
+                ShardConnection conn(shard.getConnString(), ns);
                 bool ok = conn->runCommand(conf->name(), cmdObj, res);
                 conn.done();
 
@@ -1281,7 +1281,7 @@ namespace {
                 int size = 32;
 
                 for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
-                    ShardConnection conn( *i , fullns );
+                    ShardConnection conn(i->getConnString(), fullns);
                     BSONObj res;
                     bool ok = conn->runCommand( conf->name() , cmdObj , res, options );
                     conn.done();
@@ -1872,7 +1872,7 @@ namespace {
 
                 if (!shardedOutput) {
                     LOG(1) << "MR with single shard output, NS=" << finalColLong << " primary=" << confOut->getPrimary() << endl;
-                    ShardConnection conn( confOut->getPrimary() , finalColLong );
+                    ShardConnection conn(confOut->getPrimary().getConnString(), finalColLong);
                     ok = conn->runCommand( outDB , finalCmd.obj() , singleResult );
 
                     BSONObj counts = singleResult.getObjectField("counts");
@@ -2486,7 +2486,7 @@ namespace {
                                              int queryOptions) {
             // Temporary hack. See comment on declaration for details.
 
-            ShardConnection conn( conf->getPrimary() , "" );
+            ShardConnection conn(conf->getPrimary().getConnString(), "");
             BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
             conn.done();
 

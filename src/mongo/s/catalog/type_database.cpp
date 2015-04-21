@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/type_database.h"
+#include "mongo/s/catalog/type_database.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,10 +46,6 @@ namespace mongo {
     const BSONField<std::string> DatabaseType::primary("primary");
     const BSONField<bool> DatabaseType::sharded("partitioned");
 
-
-    DatabaseType::DatabaseType() {
-        clear();
-    }
 
     StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
         DatabaseType dbt;
@@ -104,12 +100,6 @@ namespace mongo {
         builder.append(sharded.name(), _sharded.get_value_or(false));
 
         return builder.obj();
-    }
-
-    void DatabaseType::clear() {
-        _name.reset();
-        _primary.reset();
-        _sharded.reset();
     }
 
     std::string DatabaseType::toString() const {

@@ -46,7 +46,6 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
     using std::endl;
     using std::string;
     using mongoutils::str::stream;
@@ -163,11 +162,10 @@ namespace mongo {
         itChunk.setNS( nss.ns() );
         itChunk.setShard( shardingState.getShardName() );
 
-        while ( itChunk.getMax().woCompare( maxKey ) < 0 &&
-                metadata->getNextChunk( itChunk.getMax(), &itChunk ) ) {
-            auto_ptr<ChunkType> saved( new ChunkType );
-            itChunk.cloneTo( saved.get() );
-            chunksToMerge.mutableVector().push_back( saved.release() );
+        while (itChunk.getMax().woCompare(maxKey) < 0 &&
+                metadata->getNextChunk(itChunk.getMax(), &itChunk)) {
+
+            chunksToMerge.mutableVector().push_back(new ChunkType(itChunk));
         }
 
         if ( chunksToMerge.empty() ) {
@@ -387,8 +385,7 @@ namespace mongo {
         const ChunkType* chunkToMerge = *chunksToMerge.begin();
 
         // Fill in details not tracked by metadata
-        ChunkType mergedChunk;
-        chunkToMerge->cloneTo( &mergedChunk );
+        ChunkType mergedChunk = *chunkToMerge;
         mergedChunk.setName( Chunk::genID( chunkToMerge->getNS(), chunkToMerge->getMin() ) );
         mergedChunk.setMax( ( *chunksToMerge.vector().rbegin() )->getMax() );
         mergedChunk.setVersion( newMergedVersion );

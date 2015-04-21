@@ -34,7 +34,6 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {

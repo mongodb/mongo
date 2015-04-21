@@ -28,9 +28,11 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/util/compress.h"
 
-#include "snappy.h"
+#include <snappy.h>
 
 namespace mongo {
 

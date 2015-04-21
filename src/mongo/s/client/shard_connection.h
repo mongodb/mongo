@@ -37,14 +37,11 @@
 namespace mongo {
 
     class ChunkManager;
-    class Shard;
-
     typedef boost::shared_ptr<ChunkManager> ChunkManagerPtr;
+
     
     class ShardConnection : public AScopedConnection {
     public:
-        ShardConnection(const Shard* s, const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr());
-        ShardConnection(const Shard& s, const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr());
         ShardConnection(const std::string& addr, const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr());
 
         ~ShardConnection();

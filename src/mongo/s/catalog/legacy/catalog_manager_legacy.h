@@ -34,17 +34,19 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/dist_lock_manager.h"
 
 namespace mongo {
+
+    class DistLockManager;
+
 
     /**
      * Implements the catalog manager using the legacy 3-config server protocol.
      */
     class CatalogManagerLegacy : public CatalogManager {
     public:
-        CatalogManagerLegacy() = default;
-        virtual ~CatalogManagerLegacy() = default;
+        CatalogManagerLegacy();
+        virtual ~CatalogManagerLegacy();
 
         /**
          * Initializes the catalog manager with the hosts, which will be used as a configuration
@@ -133,10 +135,12 @@ namespace mongo {
          */
         size_t _getShardCount(const BSONObj& query = {}) const;
 
+
         // Parsed config server hosts, as specified on the command line.
         ConnectionString _configServerConnectionString;
         std::vector<ConnectionString> _configServers;
 
+        // Distribted lock manager singleton.
         std::unique_ptr<DistLockManager> _distLockManager;
     };
 

@@ -173,7 +173,7 @@ namespace {
                 return false;
             }
 
-            //the rest of the checks require a connection to the primary db
+            // The rest of the checks require a connection to the primary db
             ScopedDbConnection conn(config->getPrimary().getConnString());
 
             //check that collection is not capped

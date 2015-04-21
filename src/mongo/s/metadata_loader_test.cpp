@@ -487,9 +487,10 @@ namespace {
 
             // Infer namespace, shard, epoch, keypattern from first chunk
             const ChunkType* firstChunk = *( chunks.vector().begin() );
-            string ns = firstChunk->isNSSet() ? firstChunk->getNS() : "foo.bar";
-            string shardName = firstChunk->isShardSet() ? firstChunk->getShard() : "shard0000";
-            OID epoch = firstChunk->getVersion().epoch();
+
+            const string ns = firstChunk->getNS();
+            const string shardName = firstChunk->getShard();
+            const OID epoch = firstChunk->getVersion().epoch();
 
             BSONObjBuilder keyPatternB;
             BSONObjIterator keyPatternIt( firstChunk->getMin() );
@@ -510,22 +511,18 @@ namespace {
             _dummyConfig->insert( CollectionType::ConfigNS, coll.toBSON() );
 
             ChunkVersion version( 1, 0, epoch );
-            for ( vector<ChunkType*>::const_iterator it = chunks.vector().begin();
-                    it != chunks.vector().end(); ++it ) {
+            for (const auto chunkVal : chunks.vector()) {
+                ChunkType chunk(*chunkVal);
 
-                ChunkType chunk;
-                ( *it )->cloneTo( &chunk );
-                chunk.setName( OID::gen().toString() );
-                if ( !chunk.isShardSet() ) chunk.setShard( shardName );
-                if ( !chunk.isNSSet() ) chunk.setNS( ns );
-                if ( !chunk.isVersionSet() ) {
-                    chunk.setVersion( version );
+                chunk.setName(OID::gen().toString());
+                if (!chunk.isVersionSet()) {
+                    chunk.setVersion(version);
                     version.incMajor();
                 }
 
                 ASSERT(chunk.validate().isOK());
 
-                _dummyConfig->insert( ChunkType::ConfigNS, chunk.toBSON() );
+                _dummyConfig->insert(ChunkType::ConfigNS, chunk.toBSON());
             }
 
             Status status = loader().makeCollectionMetadata(catalogManager(),
@@ -547,6 +544,8 @@ namespace {
 
     TEST_F(MultipleMetadataFixture, PromotePendingNA) {
         auto_ptr<ChunkType> chunk( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );
         chunk->setMax( BSON( "x" << 0 ) );
         chunk->setVersion( ChunkVersion( 1, 0, OID::gen() ) );
@@ -581,7 +580,10 @@ namespace {
 
     TEST_F(MultipleMetadataFixture, PromotePendingNAVersion) {
         OID epoch = OID::gen();
+
         auto_ptr<ChunkType> chunk( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );
         chunk->setMax( BSON( "x" << 0 ) );
         chunk->setVersion( ChunkVersion( 1, 1, epoch ) );
@@ -625,17 +627,23 @@ namespace {
         OwnedPointerVector<ChunkType> chunks;
 
         auto_ptr<ChunkType> chunk( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );
         chunk->setMax( BSON( "x" << 0 ) );
         chunk->setVersion( ChunkVersion( 1, 0, epoch ) );
         chunks.mutableVector().push_back( chunk.release() );
 
         chunk.reset( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << 10 ) );
         chunk->setMax( BSON( "x" << 20 ) );
         chunks.mutableVector().push_back( chunk.release() );
 
         chunk.reset( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << 30 ) );
         chunk->setMax( BSON( "x" << MAXKEY ) );\
         chunks.mutableVector().push_back( chunk.release() );
@@ -648,7 +656,10 @@ namespace {
         //
 
         chunks.clear();
+
         chunk.reset( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << 0 ) );
         chunk->setMax( BSON( "x" << 10 ) );
         chunk->setVersion( ChunkVersion( 1, 0, epoch ) );
@@ -701,6 +712,8 @@ namespace {
         OwnedPointerVector<ChunkType> chunks;
 
         auto_ptr<ChunkType> chunk( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );
         chunk->setMax( BSON( "x" << 0 ) );
         chunk->setVersion( ChunkVersion( 1, 0, epoch ) );
@@ -715,7 +728,10 @@ namespace {
         //
 
         chunks.clear();
+
         chunk.reset( new ChunkType() );
+        chunk->setNS("foo.bar");
+        chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << 15 ) );
         chunk->setMax( BSON( "x" << MAXKEY ) );
         chunk->setVersion( ChunkVersion( 1, 0, epoch ) );

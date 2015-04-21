@@ -50,6 +50,7 @@
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_manager.h"
@@ -60,7 +61,6 @@
 #include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/legacy_dist_lock_manager.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/type_database.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -269,6 +269,10 @@ namespace {
 } // namespace
 
 
+    CatalogManagerLegacy::CatalogManagerLegacy() = default;
+
+    CatalogManagerLegacy::~CatalogManagerLegacy() = default;
+
     Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
         // Initialization should not happen more than once
         invariant(!_configServerConnectionString.isValid());
@@ -471,8 +475,9 @@ namespace {
                           << ", other mongoses may not see the collection as sharded immediately";
                 break;
             }
+
             try {
-                ShardConnection conn(dbPrimary, ns);
+                ShardConnection conn(dbPrimary.getConnString(), ns);
                 bool isVersionSet = conn.setVersion();
                 conn.done();
                 if (!isVersionSet) {
@@ -487,6 +492,7 @@ namespace {
                           << " on shard primary " << dbPrimary
                           << causedBy(e);
             }
+
             sleepsecs(i);
         }
 

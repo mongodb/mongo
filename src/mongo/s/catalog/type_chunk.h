@@ -78,8 +78,6 @@ namespace mongo {
         static const BSONField<Date_t> DEPRECATED_lastmod;
         static const BSONField<OID> DEPRECATED_epoch;
 
-        ChunkType();
-        ~ChunkType();
 
         /**
          * Constructs a new ChunkType object from BSON.
@@ -104,28 +102,19 @@ namespace mongo {
         void clear();
 
         /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(ChunkType* other) const;
-
-        /**
          * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 
-        bool isNameSet() const { return _name.is_initialized(); }
         const std::string& getName() const { return _name.get(); }
         void setName(const std::string& name);
 
-        bool isNSSet() const { return _ns.is_initialized(); }
         const std::string& getNS() const { return _ns.get(); }
         void setNS(const std::string& name);
 
-        bool isMinSet() const { return _min.is_initialized(); }
         const BSONObj& getMin() const { return _min.get(); }
         void setMin(const BSONObj& min);
 
-        bool isMaxSet() const { return _max.is_initialized(); }
         const BSONObj& getMax() const { return _max.get(); }
         void setMax(const BSONObj& max);
 
@@ -133,13 +122,11 @@ namespace mongo {
         const ChunkVersion& getVersion() const { return _version.get(); }
         void setVersion(const ChunkVersion& version);
 
-        bool isShardSet() const { return _shard.is_initialized(); }
         const std::string& getShard() const { return _shard.get(); }
         void setShard(const std::string& shard);
 
-        bool isJumboSet() const { return _jumbo.is_initialized(); }
-        bool getJumbo() const { return _jumbo.get(); }
-        void setJumbo(const bool);
+        bool getJumbo() const { return _jumbo.get_value_or(false); }
+        void setJumbo(bool jumbo);
 
     private:
 

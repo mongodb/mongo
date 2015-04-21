@@ -34,8 +34,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/config.h"
-#include "mongo/s/type_database.h"
 
 namespace mongo {
 

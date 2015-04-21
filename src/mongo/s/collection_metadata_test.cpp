@@ -676,7 +676,6 @@ namespace {
         ASSERT_EQUALS( version.majorVersion(), newVersion.majorVersion() );
         ASSERT_EQUALS( version.minorVersion() + 1, newVersion.minorVersion() );
 
-        chunk.clear();
         ASSERT( cloned->getNextChunk(BSON("a" << MINKEY), &chunk) );
         ASSERT( chunk.getMin().woCompare( BSON("a" << 10) ) == 0 );
         ASSERT( chunk.getMax().woCompare( BSON("a" << 14) ) == 0 );

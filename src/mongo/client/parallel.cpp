@@ -566,8 +566,8 @@ namespace mongo {
         verify( ! primary || shard == *primary );
 
         // Setup conn
-        if ( !state->conn ){
-            state->conn.reset( new ShardConnection( shard, ns, manager ) );
+        if (!state->conn) {
+            state->conn.reset(new ShardConnection(shard.getConnString(), ns, manager));
         }
 
         const DBClientBase* rawConn = state->conn->getRawConn();

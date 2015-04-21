@@ -372,7 +372,7 @@ namespace mongo {
                 // since we have to move all chunks, lets just do in order
                 for ( unsigned i=0; i<chunks.size(); i++ ) {
                     const ChunkType& chunkToMove = *chunks[i];
-                    if (chunkToMove.isJumboSet() && chunkToMove.getJumbo()) {
+                    if (chunkToMove.getJumbo()) {
                         numJumboChunks++;
                         continue;
                     }
@@ -424,7 +424,7 @@ namespace mongo {
                           << " is not on a shard with the right tag: "
                           << tag << endl;
 
-                    if (chunk.isJumboSet() && chunk.getJumbo()) {
+                    if (chunk.getJumbo()) {
                         warning() << "chunk " << chunk << " is jumbo, so cannot be moved" << endl;
                         continue;
                     }
@@ -497,7 +497,7 @@ namespace mongo {
                 if (distribution.getTagForChunk(chunk) != tag)
                     continue;
 
-                if (chunk.isJumboSet() && chunk.getJumbo()) {
+                if (chunk.getJumbo()) {
                     numJumboChunks++;
                     continue;
                 }

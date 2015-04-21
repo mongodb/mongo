@@ -410,22 +410,6 @@ namespace {
     void usingAShardConnection(const string& addr);
 
 
-    ShardConnection::ShardConnection(const Shard * s, const string& ns, ChunkManagerPtr manager)
-        : _addr(s->getConnString()),
-          _ns(ns),
-          _manager(manager) {
-
-        _init();
-    }
-
-    ShardConnection::ShardConnection(const Shard& s, const string& ns, ChunkManagerPtr manager)
-        : _addr(s.getConnString()),
-          _ns(ns),
-          _manager( manager ) {
-
-        _init();
-    }
-
     ShardConnection::ShardConnection(const string& addr, const string& ns, ChunkManagerPtr manager)
         : _addr(addr),
           _ns(ns),

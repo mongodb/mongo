@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/bson_serializable.h"
 
 namespace mongo {
 
@@ -46,7 +45,7 @@ namespace mongo {
      * TODO: This is a "manual type" but, even so, still needs to comform to what's
      * expected from types.
      */
-    struct ChunkVersion : public BSONSerializable {
+    struct ChunkVersion {
 
         union {
             struct {
@@ -412,17 +411,7 @@ namespace mongo {
             b.append( prefix + "Epoch", _epoch );
         }
 
-        //
-        // bson serializable interface implementation
-        // (toBSON and toString were implemented above)
-        //
-
-        virtual bool isValid(std::string* errMsg) const {
-            // TODO is there any check we want to do here?
-            return true;
-        }
-
-        virtual BSONObj toBSON() const {
+        BSONObj toBSON() const {
             // ChunkVersion wants to be an array.
             BSONArrayBuilder b;
             b.appendTimestamp(_combined);
@@ -430,7 +419,7 @@ namespace mongo {
             return b.arr();
         }
 
-        virtual bool parseBSON(const BSONObj& source, std::string* errMsg) {
+        bool parseBSON(const BSONObj& source, std::string* errMsg) {
             // ChunkVersion wants to be an array.
             BSONArray arrSource = static_cast<BSONArray>(source);
 
@@ -447,7 +436,7 @@ namespace mongo {
             return true;
         }
 
-        virtual void clear() {
+        void clear() {
             _minor = 0;
             _major = 0;
             _epoch = OID();

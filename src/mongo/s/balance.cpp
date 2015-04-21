@@ -354,8 +354,7 @@ namespace mongo {
                     return;
                 }
 
-                auto_ptr<ChunkType> chunk(new ChunkType());
-                chunkRes.getValue().cloneTo(chunk.get());
+                auto_ptr<ChunkType> chunk(new ChunkType(chunkRes.getValue()));
 
                 allChunkMinimums.insert(chunk->getMin().getOwned());
                 OwnedPointerVector<ChunkType>*& chunkList =

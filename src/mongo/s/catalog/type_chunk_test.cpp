@@ -32,7 +32,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 

@@ -7,7 +7,6 @@ Import("env")
 #
 
 env.Library('base', ['mongo_version_range.cpp',
-                     'type_database.cpp',
                      'type_locks.cpp',
                      'type_lockpings.cpp',
                      'type_config_version.cpp',
@@ -26,10 +25,6 @@ env.CppUnitTest('mongo_version_range_test', 'mongo_version_range_test.cpp',
                          '$BUILD_DIR/mongo/db/common'])
 
 env.CppUnitTest('type_config_version_test', 'type_config_version_test.cpp',
-                LIBDEPS=['base',
-                         '$BUILD_DIR/mongo/db/common'])
-
-env.CppUnitTest('type_database_test', 'type_database_test.cpp',
                 LIBDEPS=['base',
                          '$BUILD_DIR/mongo/db/common'])
 

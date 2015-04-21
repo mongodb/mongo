@@ -30,7 +30,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/type_database.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

@@ -53,12 +53,6 @@ namespace mongo {
     const BSONField<Date_t> ChunkType::DEPRECATED_lastmod("lastmod");
     const BSONField<OID> ChunkType::DEPRECATED_epoch("lastmodEpoch");
 
-    ChunkType::ChunkType() {
-        clear();
-    }
-
-    ChunkType::~ChunkType() {
-    }
 
     StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
         ChunkType chunk;
@@ -100,12 +94,16 @@ namespace mongo {
 
         {
             bool chunkJumbo;
-            Status status = bsonExtractBooleanFieldWithDefault(source,
-                                                               jumbo.name(),
-                                                               false,
-                                                               &chunkJumbo);
-            if (!status.isOK()) return status;
-            chunk._jumbo = chunkJumbo;
+            Status status = bsonExtractBooleanField(source, jumbo.name(), &chunkJumbo);
+            if (status.isOK()) {
+                chunk._jumbo = chunkJumbo;
+            }
+            else if (status == ErrorCodes::NoSuchKey) {
+                // Jumbo status is missing, so it will be presumed false
+            }
+            else {
+                return status;
+            }
         }
 
         //
@@ -202,26 +200,7 @@ namespace mongo {
     }
 
     void ChunkType::clear() {
-        _name.reset();
-        _ns.reset();
-        _min.reset();
-        _max.reset();
-        _version.reset();
-        _shard.reset();
-        _jumbo.reset();
-    }
-
-    void ChunkType::cloneTo(ChunkType* other) const {
-        invariant(other);
-        other->clear();
-
-        other->_name = _name;
-        other->_ns = _ns;
-        other->_min = _min->getOwned();
-        other->_max = _max->getOwned();
-        other->_version = _version;
-        other->_shard = _shard;
-        other->_jumbo = _jumbo;
+        *this = ChunkType();
     }
 
     std::string ChunkType::toString() const {
@@ -258,7 +237,7 @@ namespace mongo {
         _shard = shard;
     }
 
-    void ChunkType::setJumbo(const bool jumbo) {
+    void ChunkType::setJumbo(bool jumbo) {
         _jumbo = jumbo;
     }
 

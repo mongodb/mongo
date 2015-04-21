@@ -113,7 +113,7 @@ namespace mongo {
             shard.reset( new Shard( *shards.begin() ) );
         }
 
-        ShardConnection dbcon( *shard , r.getns() );
+        ShardConnection dbcon(shard->getConnString(), r.getns());
         DBClientBase &c = dbcon.conn();
 
         string actualServer;
@@ -515,7 +515,8 @@ namespace mongo {
 
         BSONObj shardResult;
         try {
-            ShardConnection conn(primaryShard, "");
+            ShardConnection conn(primaryShard.getConnString(), "");
+
             // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
             if (!conn->runCommand(db, command, shardResult, options)) {
                 conn.done();

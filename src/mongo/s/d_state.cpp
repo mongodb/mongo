@@ -51,7 +51,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/sharding_connection_hook.h"
