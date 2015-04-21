@@ -597,14 +597,12 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
     WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *cfg_arg,
     WT_KEYED_ENCRYPTOR **kencryptorp)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 
 	*kencryptorp = NULL;
-	conn = S2C(session);
 	kenc = NULL;
 
 	WT_RET(__encryptor_confchk(session, cval, &nenc));
