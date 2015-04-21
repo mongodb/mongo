@@ -601,6 +601,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
+	uint64_t bucket, hash;
 
 	*kencryptorp = NULL;
 	kenc = NULL;
@@ -613,7 +614,9 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 		return (0);
 	}
 
-	TAILQ_FOREACH(kenc, &nenc->keyedqh, q)
+	hash = __wt_hash_city64(keyid->str, keyid->len);
+	bucket = hash % WT_HASH_ARRAY_SIZE;
+	SLIST_FOREACH(kenc, &nenc->keyedhashlh[bucket], l)
 		if (WT_STRING_MATCH(kenc->keyid, keyid->str, keyid->len)) {
 			*kencryptorp = kenc;
 			return (0);
@@ -633,8 +636,8 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_ERR(encryptor->sizing(encryptor, &session->iface,
 	    &kenc->size_const));
 	kenc->encryptor = encryptor;
-
-	TAILQ_INSERT_TAIL(&nenc->keyedqh, kenc, q);
+	SLIST_INSERT_HEAD(&nenc->keyedlh, kenc, l);
+	SLIST_INSERT_HEAD(&nenc->keyedhashlh[bucket], kenc, hashl);
 
 	*kencryptorp = kenc;
 	kenc = NULL;
@@ -658,6 +661,7 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	WT_DECL_RET;
 	WT_NAMED_ENCRYPTOR *nenc;
 	WT_SESSION_IMPL *session;
+	int i;
 
 	WT_UNUSED(name);
 	WT_UNUSED(encryptor);
@@ -685,7 +689,9 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_calloc_one(session, &nenc));
 	WT_ERR(__wt_strdup(session, name, &nenc->name));
 	nenc->encryptor = encryptor;
-	TAILQ_INIT(&nenc->keyedqh);
+	SLIST_INIT(&nenc->keyedlh);
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+		SLIST_INIT(&nenc->keyedhashlh[i]);
 
 	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->encryptqh, nenc, q);
@@ -716,14 +722,15 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
-		while ((kenc = TAILQ_FIRST(&nenc->keyedqh)) != NULL) {
+		while ((kenc = SLIST_FIRST(&nenc->keyedlh)) != NULL) {
 			/* Call any termination method. */
 			if (kenc->owned && kenc->encryptor->terminate != NULL)
 				WT_TRET(kenc->encryptor->terminate(
 				    kenc->encryptor, (WT_SESSION *)session));
 
 			/* Remove from the connection's list, free memory. */
-			TAILQ_REMOVE(&nenc->keyedqh, kenc, q);
+			SLIST_REMOVE(
+			    &nenc->keyedlh, kenc, __wt_keyed_encryptor, l);
 			__wt_free(session, kenc->keyid);
 			__wt_free(session, kenc);
 		}

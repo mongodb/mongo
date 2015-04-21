@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#define	WT_HASH_ARRAY_SIZE	512
+
 /*******************************************
  * Global per-process structure.
  *******************************************/
@@ -32,7 +34,8 @@ struct __wt_keyed_encryptor {
 	size_t size_const;		/* The result of the sizing callback */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
 					/* Linked list of encryptors */
-	TAILQ_ENTRY(__wt_keyed_encryptor) q;
+	SLIST_ENTRY(__wt_keyed_encryptor) hashl;
+	SLIST_ENTRY(__wt_keyed_encryptor) l;
 };
 
 /*
@@ -75,7 +78,9 @@ struct __wt_named_encryptor {
 	const char *name;		/* Name of encryptor */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
 					/* Locked: list of encryptors by key */
-	TAILQ_HEAD(__wt_keyed_qh, __wt_keyed_encryptor) keyedqh;
+	SLIST_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
+				keyedhashlh[WT_HASH_ARRAY_SIZE];
+	SLIST_HEAD(__wt_keyed_lh, __wt_keyed_encryptor) keyedlh;
 					/* Linked list of encryptors */
 	TAILQ_ENTRY(__wt_named_encryptor) q;
 };
@@ -210,7 +215,6 @@ struct __wt_connection_impl {
 	 * URI.
 	 */
 					/* Locked: data handle hash array */
-#define	WT_HASH_ARRAY_SIZE	512
 	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
 					/* Locked: data handle list */
 	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
