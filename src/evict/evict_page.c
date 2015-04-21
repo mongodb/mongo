@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int, int *);
+static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int *, uint32_t);
 
 /*
  * __evict_exclusive_clear --
@@ -49,7 +49,8 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Evict a page.
  */
 int
-__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__wt_evict(
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -73,7 +74,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * to make this check for clean pages, too: while unlikely eviction
 	 * would choose an internal page with children, it's not disallowed.
 	 */
-	WT_ERR(__evict_review(session, ref, exclusive, &inmem_split));
+	WT_ERR(__evict_review(session, ref, &inmem_split, flags));
 
 	/*
 	 * If there was an in-memory split, the tree has been left in the state
@@ -89,7 +90,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	mod = page->modify;
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!exclusive && WT_PAGE_IS_INTERNAL(page)) {
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) && WT_PAGE_IS_INTERNAL(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_internal);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_internal);
 	}
@@ -116,14 +117,15 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			__wt_ref_out(session, ref);
 		else
 			WT_ERR(
-			    __evict_page_dirty_update(session, ref, exclusive));
+			    __evict_page_dirty_update(
+			    session, ref, LF_ISSET(WT_EVICT_EXCLUSIVE)));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
 	}
 
 	if (0) {
-err:		if (!exclusive)
+err:		if (!LF_ISSET(WT_EVICT_EXCLUSIVE))
 			__evict_exclusive_clear(session, ref);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
@@ -271,18 +273,18 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int *inmem_splitp)
+    WT_SESSION_IMPL *session,
+    WT_REF *ref,  int *inmem_splitp, uint32_t flags)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	uint32_t flags;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
 	 */
-	if (!exclusive) {
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE)) {
 		WT_RET(__evict_exclusive(session, ref));
 
 		/*
@@ -312,7 +314,8 @@ __evict_review(
 	}
 
 	/* Check if the page can be evicted. */
-	if (!exclusive && !__wt_page_can_evict(session, page, 0))
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) && !__wt_page_can_evict(session,
+	    page, flags))
 		return (EBUSY);
 
 	/*
@@ -321,7 +324,7 @@ __evict_review(
 	 * access. If an in-memory split completes, the page stays in memory
 	 * and the tree is left in the desired state: avoid the usual cleanup.
 	 */
-	if (!exclusive) {
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE)) {
 		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
 		if (*inmem_splitp)
 			return (0);
@@ -346,24 +349,24 @@ __evict_review(
 	 * Don't set the update-restore flag for internal pages, they don't have
 	 * updates that can be saved and restored.
 	 */
-	flags = WT_EVICTING;
+	uint32_t reconcile_flags = WT_EVICTING;
 	if (__wt_page_is_modified(page)) {
-		if (exclusive)
-			LF_SET(WT_SKIP_UPDATE_ERR);
+		if (LF_ISSET(WT_EVICT_EXCLUSIVE))
+			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);
 		else if (!WT_PAGE_IS_INTERNAL(page) &&
 		    page->read_gen == WT_READGEN_OLDEST)
-			LF_SET(WT_SKIP_UPDATE_RESTORE);
-		WT_RET(__wt_reconcile(session, ref, NULL, flags));
+			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_RESTORE);
+		WT_RET(__wt_reconcile(session, ref, NULL, reconcile_flags));
 		WT_ASSERT(session,
 		    !__wt_page_is_modified(page) ||
-		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));
+		    FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE));
 	}
 
 	/*
 	 * If the page was ever modified, make sure all of the updates
 	 * on the page are old enough they can be discarded from cache.
 	 */
-	if (!exclusive && mod != NULL &&
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) && mod != NULL &&
 	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
 	    !LF_ISSET(WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
