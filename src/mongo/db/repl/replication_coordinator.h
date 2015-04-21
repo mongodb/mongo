@@ -576,6 +576,16 @@ namespace repl {
                 const ReplSetDeclareElectionWinnerArgs& args,
                 ReplSetDeclareElectionWinnerResponse* response) = 0;
 
+        /**
+         * Prepares a BSONObj describing the current term, primary, and lastOp information.
+         */
+        virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder) = 0;
+
+        /**
+         * Returns true if the V1 election protocol is being used and false otherwise.
+         */ 
+        virtual bool isV1ElectionProtocol() = 0;
+
     protected:
 
         ReplicationCoordinator();

@@ -244,6 +244,10 @@ namespace repl {
                 const ReplSetDeclareElectionWinnerArgs& args,
                 ReplSetDeclareElectionWinnerResponse* response);
 
+        virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
+
+        virtual bool isV1ElectionProtocol();
+
         // ================== Test support API ===================
 
         /**

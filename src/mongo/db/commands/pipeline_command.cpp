@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/cursor_responses.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/pipeline_proxy.h"
@@ -148,7 +149,7 @@ namespace mongo {
         }
 
         const long long cursorId = cursor ? cursor->cursorid() : 0LL;
-        Command::appendCursorResponseObject(cursorId, ns, resultsArray.arr(), &result);
+        appendCursorResponseObject(cursorId, ns, resultsArray.arr(), &result);
 
         return static_cast<bool>(cursor);
     }

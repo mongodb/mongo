@@ -310,5 +310,12 @@ namespace repl {
             ReplSetDeclareElectionWinnerResponse* response) {
         return Status::OK();
     }
+
+    void ReplicationCoordinatorMock::prepareCursorResponseInfo(BSONObjBuilder* objBuilder) {}
+
+    bool ReplicationCoordinatorMock::isV1ElectionProtocol() {
+        return true;
+    }
+
 } // namespace repl
 } // namespace mongo

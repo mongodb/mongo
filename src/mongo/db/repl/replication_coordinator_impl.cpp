@@ -2418,5 +2418,18 @@ namespace {
             ReplSetDeclareElectionWinnerResponse* response) {
         return {ErrorCodes::CommandNotFound, "not implemented"};
     }
+
+    void ReplicationCoordinatorImpl::prepareCursorResponseInfo(BSONObjBuilder* objBuilder) {
+        if (getReplicationMode() == modeReplSet && isV1ElectionProtocol()) {
+            BSONObjBuilder replObj(objBuilder->subobjStart("repl"));
+            _topCoord->prepareCursorResponseInfo(objBuilder, getLastCommittedOpTime());
+            replObj.done();
+        }
+    }
+
+    bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
+        return getConfig().getProtocolVersion() == 1;
+    }
+
 } // namespace repl
 } // namespace mongo

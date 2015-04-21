@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/cursor_responses.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/service_context.h"
@@ -260,8 +261,7 @@ namespace mongo {
                 txn->getCurOp()->debug().cursorExhausted = true;
             }
 
-            Command::appendGetMoreResponseObject(respondWithId, request.nss.ns(), nextBatch.arr(),
-                                                 &result);
+            appendGetMoreResponseObject(respondWithId, request.nss.ns(), nextBatch.arr(), &result);
             if (respondWithId) {
                 cursorFreer.Dismiss();
             }

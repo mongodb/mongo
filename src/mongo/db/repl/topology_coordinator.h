@@ -355,6 +355,12 @@ namespace repl {
          */
         virtual void setMyHeartbeatMessage(const Date_t now, const std::string& s) = 0;
 
+        /**
+         * Prepares a BSONObj describing the current term, primary, and lastOp information.
+         */
+        virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
+                                               const Timestamp& lastCommittedOpTime) const = 0;
+
     protected:
         TopologyCoordinator() {}
     };

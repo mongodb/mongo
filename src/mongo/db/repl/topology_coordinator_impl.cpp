@@ -122,6 +122,7 @@ namespace {
 
     TopologyCoordinatorImpl::TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs) :
         _role(Role::follower),
+        _term(0),
         _currentPrimaryIndex(-1),
         _forceSyncSourceIndex(-1),
         _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
@@ -2082,6 +2083,15 @@ namespace {
         return false;
     }
 
+    void TopologyCoordinatorImpl::prepareCursorResponseInfo(
+            BSONObjBuilder* objBuilder,
+            const Timestamp& lastCommittedOpTime) const {
+        objBuilder->append("term", _term);
+        objBuilder->append("lastOpCommittedTimestamp", lastCommittedOpTime.getSecs());
+        objBuilder->append("lastOpCommittedTerm", lastCommittedOpTime.getInc());
+        objBuilder->append("configVersion", _rsConfig.getConfigVersion());
+        objBuilder->append("primaryId", _rsConfig.getMemberAt(_currentPrimaryIndex).getId());
+    }
 
 } // namespace repl
 } // namespace mongo

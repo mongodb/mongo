@@ -186,6 +186,9 @@ namespace repl {
         virtual bool stepDown(Date_t until, bool force, Timestamp lastOpApplied);
         virtual bool stepDownIfPending();
         virtual Date_t getStepDownTime() const;
+        virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
+                                               const Timestamp& lastCommitttedOpTime) const;
+
 
         ////////////////////////////////////////////////////////////
         //
@@ -326,6 +329,10 @@ namespace repl {
         OID _electionId;
         // The time at which the current PRIMARY was elected.
         Timestamp _electionTime;
+
+        // This node's election term.  The term is used as part of the consensus algorithm to elect
+        // and maintain one primary (leader) node in the cluster.
+        long long _term;
 
         // the index of the member we currently believe is primary, if one exists, otherwise -1
         int _currentPrimaryIndex;

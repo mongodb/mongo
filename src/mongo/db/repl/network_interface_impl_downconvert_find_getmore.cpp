@@ -34,6 +34,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/cursor_responses.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/getmore_request.h"
 
@@ -115,7 +116,7 @@ namespace {
             batch.append(cursor->next());
         }
         BSONObjBuilder result;
-        Command::appendCursorResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
+        appendCursorResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
         Command::appendCommandStatus(result, Status::OK());
         *output = result.obj();
         return Status::OK();
@@ -148,7 +149,7 @@ namespace {
             batch.append(cursor->next());
         }
         BSONObjBuilder result;
-        Command::appendGetMoreResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
+        appendGetMoreResponseObject(cursor->getCursorId(), ns, batch.arr(), &result);
         Command::appendCommandStatus(result, Status::OK());
         *output = result.obj();
         return Status::OK();
