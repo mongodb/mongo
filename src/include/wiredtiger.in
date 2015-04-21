@@ -2504,6 +2504,7 @@ struct __wt_config_item {
 	type;
 };
 
+#if !defined(SWIG) && !defined(DOXYGEN)
 /*!
  * Validate a configuration string for a WiredTiger API.
  * This API is outside the scope of a WiredTiger connection handle, since
@@ -2519,6 +2520,7 @@ struct __wt_config_item {
  */
 int wiredtiger_config_validate(
     WT_SESSION *session, const char *name, const char *config);
+#endif
 
 /*!
  * Create a handle that can be used to parse or create configuration strings
