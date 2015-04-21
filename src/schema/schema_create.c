@@ -573,7 +573,7 @@ __create_data_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_create), config, NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_create), config, NULL };
 
 	/*
 	 * Check to be sure the key/value formats are legal: the underlying

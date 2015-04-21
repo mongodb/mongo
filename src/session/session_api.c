@@ -385,7 +385,7 @@ __wt_session_create_strip(WT_SESSION *wt_session,
 {
 	WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
 	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, session_create), v1, v2, NULL };
+	    { WT_CONFIG_BASE(session, WT_SESSION_create), v1, v2, NULL };
 
 	return (__wt_config_collapse(session, cfg, value_ret));
 }
