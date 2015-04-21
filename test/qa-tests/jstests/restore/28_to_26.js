@@ -35,7 +35,7 @@
     testDB.dropDatabase();
 
     // restart the mongod as a 2.6
-    stopMongod(toolTest.port);
+    MongoRunner.stopMongod(toolTest.port);
     toolTest.m = null;
     toolTest.db = null;
     toolTest.options = toolTest.options || {};
