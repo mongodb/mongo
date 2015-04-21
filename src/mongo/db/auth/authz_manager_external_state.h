@@ -56,6 +56,8 @@ namespace mongo {
 
     public:
 
+        static stdx::function<std::unique_ptr<AuthzManagerExternalState>()> create;
+
         virtual ~AuthzManagerExternalState();
 
         /**

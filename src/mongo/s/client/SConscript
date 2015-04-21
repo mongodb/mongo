@@ -41,6 +41,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/coredb',
         '$BUILD_DIR/mongo/coreserver',
         '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/mongocommon',
         '$BUILD_DIR/mongo/s/mongoscore',

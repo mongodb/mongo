@@ -391,33 +391,30 @@ namespace mongo {
 }  // namespace mongo
 #endif
 
-MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
-                          ("SetupInternalSecurityUser",
-                           "OIDGeneration",
-                           "SetGlobalEnvironment",
-                           "EndStartupOptionStorage"),
-                          MONGO_NO_DEPENDENTS)
-        (InitializerContext* context) {
-    auto authzManager = stdx::make_unique<AuthorizationManager>(
-            new AuthzManagerExternalStateMongos());
-    authzManager->setAuthEnabled(serverGlobalParams.isAuthEnabled);
-    AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
-    return Status::OK();
-}
+namespace {
+    std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos() {
+        return stdx::make_unique<AuthzManagerExternalStateMongos>();
+    }
 
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-    return Status::OK();
-}
+    MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory) (InitializerContext* context) {
+        AuthzManagerExternalState::create = &createAuthzManagerExternalStateMongos;
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
+        return Status::OK();
+    }
 
 #ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType, 
-                          MONGO_NO_PREREQUISITES, 
-                          ("SSLManager"))(InitializerContext* context) {
-    isSSLServer = true;
-    return Status::OK();
-}
+    MONGO_INITIALIZER_GENERAL(setSSLManagerType,
+                              MONGO_NO_PREREQUISITES,
+                              ("SSLManager"))(InitializerContext* context) {
+        isSSLServer = true;
+        return Status::OK();
+    }
 #endif
+} // namespace
 
 int mongoSMain(int argc, char* argv[], char** envp) {
     static StaticObserver staticObserver;

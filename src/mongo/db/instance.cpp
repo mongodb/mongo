@@ -37,11 +37,13 @@
 #include <fstream>
 #include <memory>
 
+#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
@@ -152,6 +154,15 @@ namespace mongo {
     MONGO_FP_DECLARE(rsStopGetMore);
 
 namespace {
+
+    std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongod() {
+        return stdx::make_unique<AuthzManagerExternalStateMongod>();
+    }
+
+    MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory) (InitializerContext* context) {
+        AuthzManagerExternalState::create = &createAuthzManagerExternalStateMongod;
+        return Status::OK();
+    }
 
     void generateErrorResponse(const AssertionException* exception,
                                const QueryMessage& queryMessage,

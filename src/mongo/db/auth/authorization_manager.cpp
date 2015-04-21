@@ -252,10 +252,11 @@ namespace mongo {
         boost::unique_lock<boost::mutex> _lock;
     };
 
-    AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
+    AuthorizationManager::AuthorizationManager(
+        std::unique_ptr<AuthzManagerExternalState> externalState) :
             _authEnabled(false),
             _privilegeDocsExist(false),
-            _externalState(externalState),
+            _externalState(std::move(externalState)),
             _version(schemaVersionInvalid),
             _isFetchPhaseBusy(false) {
         _updateCacheGeneration_inlock();

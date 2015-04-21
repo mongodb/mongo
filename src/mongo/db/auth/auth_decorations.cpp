@@ -31,16 +31,33 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(CreateAuthorizationManager,
+                              ("SetupInternalSecurityUser",
+                               "OIDGeneration",
+                               "SetGlobalEnvironment",
+                               "CreateAuthorizationExternalStateFactory",
+                               "EndStartupOptionStorage"))
+            (InitializerContext* context) {
+        auto authzManager = stdx::make_unique<AuthorizationManager>(
+                AuthzManagerExternalState::create());
+        authzManager->setAuthEnabled(serverGlobalParams.isAuthEnabled);
+        AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
+        return Status::OK();
+    }
 
     const auto getAuthenticationSession =
         ClientBasic::declareDecoration<std::unique_ptr<AuthenticationSession>>();

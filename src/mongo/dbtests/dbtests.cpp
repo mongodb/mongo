@@ -36,7 +36,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -105,15 +104,12 @@ namespace dbtests {
 int dbtestsMain( int argc, char** argv, char** envp ) {
     static StaticObserver StaticObserver;
     ::mongo::setupSynchronousSignalHandlers();
-    setGlobalServiceContext(stdx::make_unique<ServiceContextMongoD>());
     repl::ReplSettings replSettings;
     replSettings.oplogSize = 10 * 1024 * 1024;
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
     Command::testCommandsEnabled = 1;
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    AuthorizationManager::set(
-            getGlobalServiceContext(),
-            stdx::make_unique<AuthorizationManager>(new AuthzManagerExternalStateMongod()));
+    getGlobalAuthorizationManager()->setAuthEnabled(false);
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);
 }

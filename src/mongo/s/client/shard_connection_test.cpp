@@ -58,16 +58,6 @@ namespace {
 
     const string TARGET_HOST = "$dummy:27017";
 
-    MONGO_INITIALIZER(SCFTestGlobalServiceContext)(InitializerContext*) {
-        invariant(!hasGlobalServiceContext());
-        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-        AuthorizationManager::set(
-                getGlobalServiceContext(),
-                stdx::make_unique<AuthorizationManager>(
-                        new mongo::AuthzManagerExternalStateMock()));
-        return Status::OK();
-    }
-
     /**
      * Warning: cannot run in parallel
      */

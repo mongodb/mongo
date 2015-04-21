@@ -77,7 +77,7 @@ namespace {
                                          ("NativeSaslServerCore"))
         (InitializerContext*) {
 
-        AuthorizationManager authzManager(new AuthzManagerExternalStateMock());
+        AuthorizationManager authzManager(stdx::make_unique<AuthzManagerExternalStateMock>());
         std::unique_ptr<AuthorizationSession> authzSession =
             authzManager.makeAuthorizationSession();
 

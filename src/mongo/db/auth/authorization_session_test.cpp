@@ -28,8 +28,6 @@
 /**
  * Unit tests of the AuthorizationSession type.
  */
-#include <boost/scoped_ptr.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -38,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
 
@@ -46,8 +45,6 @@
 
 namespace mongo {
 namespace {
-
-    using boost::scoped_ptr;
 
     class FailureCapableAuthzManagerExternalStateMock :
         public AuthzManagerExternalStateMock {
@@ -79,16 +76,17 @@ namespace {
         FailureCapableAuthzManagerExternalStateMock* managerState;
         OperationContextNoop _txn;
         AuthzSessionExternalStateMock* sessionState;
-        scoped_ptr<AuthorizationManager> authzManager;
-        scoped_ptr<AuthorizationSession> authzSession;
+        std::unique_ptr<AuthorizationManager> authzManager;
+        std::unique_ptr<AuthorizationSession> authzSession;
 
         void setUp() {
-            managerState = new FailureCapableAuthzManagerExternalStateMock();
+            auto localManagerState = stdx::make_unique<FailureCapableAuthzManagerExternalStateMock>();
+            managerState = localManagerState.get();
             managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-            authzManager.reset(new AuthorizationManager(managerState));
-            sessionState = new AuthzSessionExternalStateMock(authzManager.get());
-            authzSession.reset(new AuthorizationSession(
-                                       std::unique_ptr<AuthzSessionExternalState>(sessionState)));
+            authzManager = stdx::make_unique<AuthorizationManager>(std::move(localManagerState));
+            auto localSessionState = stdx::make_unique<AuthzSessionExternalStateMock>(authzManager.get());
+            sessionState = localSessionState.get();
+            authzSession = stdx::make_unique<AuthorizationSession>(std::move(localSessionState));
             authzManager->setAuthEnabled(true);
         }
     };

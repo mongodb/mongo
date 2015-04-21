@@ -28,8 +28,6 @@
 /**
  * Unit tests of the AuthorizationManager type.
  */
-#include <boost/scoped_ptr.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/action_set.h"
@@ -41,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
 
@@ -50,7 +49,6 @@
 namespace mongo {
 namespace {
 
-    using boost::scoped_ptr;
     using std::vector;
 
     TEST(RoleParsingTest, BuildRoleBSON) {
@@ -161,14 +159,15 @@ namespace {
         }
 
         void setUp() {
-            externalState = new AuthzManagerExternalStateMock();
+            auto localExternalState = stdx::make_unique<AuthzManagerExternalStateMock>();
+            externalState = localExternalState.get();
             externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-            authzManager.reset(new AuthorizationManager(externalState));
+            authzManager = stdx::make_unique<AuthorizationManager>(std::move(localExternalState));
             externalState->setAuthorizationManager(authzManager.get());
             authzManager->setAuthEnabled(true);
         }
 
-        scoped_ptr<AuthorizationManager> authzManager;
+        std::unique_ptr<AuthorizationManager> authzManager;
         AuthzManagerExternalStateMock* externalState;
     };
 

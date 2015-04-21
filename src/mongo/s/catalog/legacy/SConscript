@@ -34,6 +34,7 @@ env.CppUnitTest(
         'catalog_manager_legacy',
         '$BUILD_DIR/mongo/coredb',
         '$BUILD_DIR/mongo/coreserver',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/mongocommon',

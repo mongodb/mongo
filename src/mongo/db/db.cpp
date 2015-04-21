@@ -48,7 +48,6 @@
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -745,20 +744,6 @@ static void startupConfigActions(const std::vector<std::string>& args) {
         quickExit(EXIT_SUCCESS);
     }
 #endif
-}
-
-MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
-                          ("SetupInternalSecurityUser",
-                           "OIDGeneration",
-                           "SetGlobalEnvironment",
-                           "EndStartupOptionStorage"),
-                          MONGO_NO_DEPENDENTS)
-        (InitializerContext* context) {
-    auto authzManager = stdx::make_unique<AuthorizationManager>(
-            new AuthzManagerExternalStateMongod());
-    authzManager->setAuthEnabled(serverGlobalParams.isAuthEnabled);
-    AuthorizationManager::set(getGlobalServiceContext(), std::move(authzManager));
-    return Status::OK();
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
