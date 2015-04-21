@@ -776,6 +776,8 @@ tasks:
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "download mongod"
+      vars:
+        mongo_url: "${mongo30_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport
