@@ -1766,7 +1766,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ NULL, 0 }
 	};
 
-	WT_CONFIG_ITEM cval, enc, keyid, secretval, sval;
+	WT_CONFIG_ITEM cval, enc, keyid, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(i1);
 	WT_DECL_ITEM(i2);
@@ -1775,7 +1775,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 	const char *enc_cfg[] = { NULL, NULL };
-	const char *base_merge, *new_merge;
+	const char *base_merge;
 	char version[64];
 
 	/* Leave lots of space for optional additional configuration. */
@@ -1786,7 +1786,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
-	base_merge = new_merge = NULL;
+	base_merge = NULL;
 
 	WT_RET(__wt_library_init());
 
@@ -1863,26 +1863,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Merge the full configuration stack and save it for reconfiguration.
 	 */
 	WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
-
-	/*
-	 * When writing the base configuration file, we write the version and
-	 * any configuration information set by the application (in other words,
-	 * the stack except for cfg[0]). However, some configuration values need
-	 * to be stripped out from the base configuration file; do that now, and
-	 * merge the rest to be written.
-	 */
-	WT_ERR(__wt_config_merge(session, cfg + 1, "create=", &base_merge));
-
-	/*
-	 * Reset cfg to the configuration stack we're going to use for the rest
-	 * of the open.
-	 *
-	 * Underlying code distinguishes the base values from the user-specified
-	 * information by ignoring cfg[0]. Make that work by leaving base values
-	 * in cfg[0], and the collapsed user-specified values in cfg[1].
-	 */
-	cfg[1] = base_merge;
-	cfg[2] = NULL;
 
 	/*
 	 * Configuration ...
@@ -1990,21 +1970,32 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->kencryptor = NULL;
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
-	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.secretkey",
-	    &secretval));
 	WT_ERR(__wt_config_gets(session, cfg, "encryption", &enc));
 	if (enc.len != 0)
 		WT_ERR(__wt_strndup(session, enc.str, enc.len, &enc_cfg[0]));
 	WT_ERR(__wt_encryptor_config(session, &cval, &keyid,
 	    (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
-	if (secretval.len != 0) {
-		WT_ERR(__wt_config_merge(session,
-		    cfg + 1, "encryption=(secretkey=)", &new_merge));
-		__wt_free(session, base_merge);
-		base_merge = new_merge;
-		cfg[1] = base_merge;
-		cfg[2] = NULL;
-	}
+
+	/*
+	 * When writing the base configuration file, we write the version and
+	 * any configuration information set by the application (in other words,
+	 * the stack except for cfg[0]). However, some configuration values need
+	 * to be stripped out from the base configuration file; do that now, and
+	 * merge the rest to be written.
+	 */
+	WT_ERR(__wt_config_merge(session,
+	    cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
+
+	/*
+	 * Reset cfg to the configuration stack we're going to use for the rest
+	 * of the open.
+	 *
+	 * Underlying code distinguishes the base values from the user-specified
+	 * information by ignoring cfg[0]. Make that work by leaving base values
+	 * in cfg[0], and the collapsed user-specified values in cfg[1].
+	 */
+	cfg[1] = base_merge;
+	cfg[2] = NULL;
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
