@@ -405,10 +405,6 @@ namespace {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
-        return _getReplicationMode_inlock();
-    }
-
-    ReplicationCoordinator::Mode ReplicationCoordinatorImpl::_getReplicationMode_inlock() const {
         return _replMode;
     }
 
@@ -595,7 +591,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_addSlaveInfo_inlock(const SlaveInfo& slaveInfo) {
-        invariant(_getReplicationMode_inlock() == modeMasterSlave);
+        invariant(getReplicationMode() == modeMasterSlave);
         _slaveInfo.push_back(slaveInfo);
 
         // Wake up any threads waiting for replication that now have their replication
@@ -658,7 +654,7 @@ namespace {
     }
 
     size_t ReplicationCoordinatorImpl::_getMyIndexInSlaveInfo_inlock() const {
-        if (_getReplicationMode_inlock() == modeMasterSlave) {
+        if (getReplicationMode() == modeMasterSlave) {
             // Self data always lives in the first entry in _slaveInfo for master/slave
             return 0;
         }
@@ -681,7 +677,7 @@ namespace {
                 "Received an old style replication progress update, which is only used for Master/"
                     "Slave replication now, but this node is not using Master/Slave replication. "
                     "This is likely caused by an old (pre-2.6) member syncing from this node.",
-                _getReplicationMode_inlock() == modeMasterSlave);
+                getReplicationMode() == modeMasterSlave);
 
         SlaveInfo* slaveInfo = _findSlaveInfoByRID_inlock(rid);
         if (slaveInfo) {
@@ -728,7 +724,7 @@ namespace {
         invariant(isRollbackAllowed || mySlaveInfo->opTime <= ts);
         _updateSlaveInfoOptime_inlock(mySlaveInfo, ts);
 
-        if (_getReplicationMode_inlock() != modeReplSet) {
+        if (getReplicationMode() != modeReplSet) {
             return;
         }
         if (_getMemberState_inlock().primary()) {
@@ -751,7 +747,7 @@ namespace {
                                                              long long memberId,
                                                              const Timestamp& ts) {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        invariant(_getReplicationMode_inlock() == modeReplSet);
+        invariant(getReplicationMode() == modeReplSet);
 
         const UpdatePositionArgs::UpdateInfo update(OID(), ts, cfgVer, memberId);
         long long configVersion;
@@ -766,7 +762,7 @@ namespace {
             return Status(ErrorCodes::NotMasterOrSecondaryCode,
                           "Received replSetUpdatePosition command but we are in state REMOVED");
         }
-        invariant(_getReplicationMode_inlock() == modeReplSet);
+        invariant(getReplicationMode() == modeReplSet);
 
         if (args.memberId < 0) {
             std::string errmsg = str::stream()
@@ -956,7 +952,7 @@ namespace {
             const Timestamp& opTime,
             const WriteConcernOptions& writeConcern) {
 
-        const Mode replMode = _getReplicationMode_inlock();
+        const Mode replMode = getReplicationMode();
         if (replMode == modeNone || serverGlobalParams.configsvr) {
             // no replication check needed (validated above)
             return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
@@ -1229,8 +1225,7 @@ namespace {
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
         if (_settings.usingReplSets()) {
             boost::lock_guard<boost::mutex> lock(_mutex);
-            if (_getReplicationMode_inlock() == modeReplSet &&
-                    _getMemberState_inlock().primary()) {
+            if (getReplicationMode() == modeReplSet && _getMemberState_inlock().primary()) {
                 return true;
             }
             return false;
@@ -1310,7 +1305,7 @@ namespace {
             return false;
         }
         boost::lock_guard<boost::mutex> lock(_mutex);
-        if (_getReplicationMode_inlock() != modeReplSet) {
+        if (getReplicationMode() != modeReplSet) {
             return false;
         }
         // see SERVER-6671
@@ -1445,7 +1440,7 @@ namespace {
                 entry.append("rid", itr->rid);
                 entry.append("optime", itr->opTime);
                 entry.append("host", itr->hostAndPort.toString());
-                if (_getReplicationMode_inlock() == modeReplSet) {
+                if (getReplicationMode() == modeReplSet) {
                     if (_selfIndex == -1) {
                         continue;
                     }
@@ -1491,7 +1486,7 @@ namespace {
     }
 
     Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
-        if (_getReplicationMode_inlock() != modeReplSet) {
+        if (getReplicationMode() != modeReplSet) {
             return Status(ErrorCodes::NoReplicationEnabled,
                           "can only set maintenance mode on replica set members");
         }
@@ -2151,7 +2146,7 @@ namespace {
 
         boost::unique_lock<boost::mutex> lock(_mutex);
 
-        if (_getReplicationMode_inlock() != modeMasterSlave) {
+        if (getReplicationMode() != modeMasterSlave) {
             return Status(ErrorCodes::IllegalOperation,
                           "The handshake command is only used for master/slave replication");
         }
@@ -2189,8 +2184,7 @@ namespace {
                 continue;
             }
 
-            if (_getReplicationMode_inlock() == modeMasterSlave &&
-                    slaveInfo.rid == _getMyRID_inlock()) {
+            if (getReplicationMode() == modeMasterSlave && slaveInfo.rid == _getMyRID_inlock()) {
                 // Master-slave doesn't know the HostAndPort for itself at this point.
                 continue;
             }
@@ -2225,12 +2219,12 @@ namespace {
 
     Status ReplicationCoordinatorImpl::_checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const {
-        if (_getReplicationMode_inlock() == modeNone) {
+        if (getReplicationMode() == modeNone) {
             return Status(ErrorCodes::NoReplicationEnabled,
                           "No replication enabled when checking if write concern can be satisfied");
         }
 
-        if (_getReplicationMode_inlock() == modeMasterSlave) {
+        if (getReplicationMode() == modeMasterSlave) {
             if (!writeConcern.wMode.empty()) {
                 return Status(ErrorCodes::UnknownReplWriteConcern,
                               "Cannot use named write concern modes in master-slave");
@@ -2239,7 +2233,7 @@ namespace {
             return Status::OK();
         }
 
-        invariant(_getReplicationMode_inlock() == modeReplSet);
+        invariant(getReplicationMode() == modeReplSet);
         return _rsConfig.checkIfWriteConcernCanBeSatisfied(writeConcern);
     }
 

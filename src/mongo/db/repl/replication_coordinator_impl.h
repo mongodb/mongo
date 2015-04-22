@@ -589,12 +589,6 @@ namespace repl {
         MemberState _getMemberState_inlock() const;
 
         /**
-         * Returns the current replication mode. This method requires the caller to be holding
-         * "_mutex" to be called safely.
-         */
-        Mode _getReplicationMode_inlock() const;
-
-        /**
          * Starts loading the replication configuration from local storage, and if it is valid,
          * schedules a callback (of _finishLoadLocalConfig) to set it as the current replica set
          * config (sets _rsConfig and _thisMembersConfigIndex).
