@@ -36,6 +36,8 @@ if [ -f "$SYSCONFIG" ]; then
     . "$SYSCONFIG"
 fi
 
+PIDDIR=`dirname $PIDFILEPATH`
+
 # Handle NUMA access to CPUs (SERVER-3574)
 # This verifies the existence of numactl as well as testing that the command works
 NUMACTL_ARGS="--interleave=all"
