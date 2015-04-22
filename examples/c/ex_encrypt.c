@@ -166,7 +166,7 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 */
 	/*
 	 * Copy the encrypted data to the destination buffer and then
-	 * decrypt the destination buffer.
+	 * decrypt the destination buffer in place.
 	 */
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[0], &src[i], dst_len);
@@ -204,6 +204,11 @@ rotate_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		return (ENOMEM);
 
 	i = CHKSUM_LEN + IV_LEN;
+	/*
+	 * Skip over space reserved for checksum and initialization
+	 * vector.  Copy text into destination buffer then encrypt
+	 * in place.
+	 */
 	memcpy(&dst[i], &src[0], src_len);
 	/*
 	 * Call common rotate function on the text portion of the
@@ -461,6 +466,7 @@ main(void)
 
 	/*
 	 * Create and open some encrypted and not encrypted tables.
+	 * Also use column store and compression for some tables.
 	 */
 	ret = session->create(session, "table:crypto1",
 	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
@@ -477,6 +483,11 @@ main(void)
 	    "block_compressor=snappy,"
 	    "key_format=S,value_format=S");
 
+	/*
+	 * Send in an unknown keyid.  WiredTiger will try to add in the
+	 * new keyid, but the customize function above will return an
+	 * error since it is unrecognized.
+	 */
 	ret = session->create(session, "table:cryptobad",
 	    "encryption=(name=rotn,keyid=" USERBAD_KEYID"),"
 	    "key_format=S,value_format=S");
