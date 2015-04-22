@@ -1972,6 +1972,45 @@ def doConfigure(myenv):
         print "Invalid --allocator parameter: \"%s\"" % get_option('allocator')
         Exit(1)
 
+    def CheckStdAtomic(context, type):
+        test_body = """
+        #include <atomic>
+
+        int main() {{
+            std::atomic<{0}> x;
+
+            x.store(0);
+            {0} y = 1;
+            x.fetch_add(y);
+            x.fetch_sub(y);
+            x.exchange(y);
+            x.compare_exchange_strong(y, x);
+            return x.load();
+        }}
+        """.format(type)
+
+        context.Message("Checking whether toolchain supports std::atomic<{0}> ".format(type))
+        ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+        context.Result(ret)
+        return ret
+    conf.AddTest("CheckStdAtomic", CheckStdAtomic)
+
+    def check_all_atomics():
+        for t in ('int64_t', 'uint64_t', 'int32_t', 'uint32_t'):
+            if not conf.CheckStdAtomic(t):
+                return False
+        return True
+
+    if not check_all_atomics():
+        if not conf.env.ToolchainIs('msvc'):
+            conf.env.AppendUnique(LIBS=['atomic'])
+            if not check_all_atomics():
+                print "The toolchain does not support std::atomic, cannot continue"
+                Exit(1)
+        else:
+            print "The toolchain does not support std::atomic, cannot continue"
+            Exit(1)
+
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
 
