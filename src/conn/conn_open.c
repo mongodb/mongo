@@ -229,23 +229,22 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_evict_create(session));
 
 	/*
-	 * Start the handle sweep thread.
-	 */
-	WT_RET(__wt_sweep_create(session));
-
-	/*
 	 * Start the optional statistics thread.  Start statistics first so that
 	 * other optional threads can know if statistics are enabled or not.
 	 */
 	WT_RET(__wt_statlog_create(session, cfg));
-
-	/* Start the optional async threads. */
-	WT_RET(__wt_async_create(session, cfg));
-
 	WT_RET(__wt_logmgr_create(session, cfg));
 
 	/* Run recovery. */
 	WT_RET(__wt_txn_recover(session));
+
+	/*
+	 * Start the handle sweep thread.
+	 */
+	WT_RET(__wt_sweep_create(session));
+
+	/* Start the optional async threads. */
+	WT_RET(__wt_async_create(session, cfg));
 
 	/*
 	 * Start the optional logging/archive thread.
