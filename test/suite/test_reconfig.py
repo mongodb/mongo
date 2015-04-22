@@ -109,5 +109,11 @@ class test_reconfig(wttest.WiredTigerTestCase):
         self.conn.reconfigure(
              "statistics_log=(wait=2,sources=[lsm:],timestamp=\"%b\")")
 
+    def test_file_manager(self):
+        self.conn.reconfigure("file_manager=(close_scan_interval=3)")
+        self.conn.reconfigure("file_manager=(close_idle_time=4)")
+        self.conn.reconfigure(
+            "file_manager=(close_idle_time=4,close_scan_interval=100)")
+
 if __name__ == '__main__':
     wttest.run()

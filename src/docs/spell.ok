@@ -9,6 +9,7 @@ CFLAGS
 CPPFLAGS
 Cheng
 Christoph
+Collet's
 Coverity
 Coverity's
 DB's
@@ -43,8 +44,10 @@ LDFLAGS
 LIBS
 LLVM
 LOGREC
+LRVv
 LSB
 LSM
+LZ
 Lameter
 LevelDB
 Levyx
@@ -80,6 +83,7 @@ WiredTigerPanicException
 WiredTigerRollbackException
 WiredTigerStat
 WiredTigerTestCase
+Yann
 Za
 aR
 abstime
@@ -264,6 +268,7 @@ lrtf
 lsm
 lsn
 lt
+lz
 mailto
 mainpage
 malloc
@@ -409,6 +414,7 @@ substring
 superset
 sys
 sz
+tRuE
 tablename
 tcl
 tcmalloc

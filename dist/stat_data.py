@@ -8,7 +8,7 @@
 # NOTE: All statistics descriptions must have a prefix string followed by ':'.
 #
 # Optional configuration flags:
-#       no_clear        Value ignored by the statistics refresh function
+#       no_clear        Value not cleared when statistics cleared
 #       no_aggregate    Ignore the value when aggregating statistics
 #       max_aggregate   Take the maximum value when aggregating statistics
 #       no_scale        Don't scale value per second in the logging tool script
@@ -145,11 +145,20 @@ connection_stats = [
     # Cache and eviction statistics
     ##########################################
     CacheStat('cache_bytes_dirty',
-        'tracked dirty bytes in the cache', 'no_scale'),
+        'tracked dirty bytes in the cache', 'no_clear,no_scale'),
     CacheStat('cache_bytes_inuse',
         'bytes currently in the cache', 'no_clear,no_scale'),
+    CacheStat('cache_bytes_internal',
+        'tracked bytes belonging to internal pages in the cache',
+        'no_clear,no_scale'),
+    CacheStat('cache_bytes_leaf',
+        'tracked bytes belonging to leaf pages in the cache',
+        'no_clear,no_scale'),
     CacheStat('cache_bytes_max',
         'maximum bytes configured', 'no_clear,no_scale'),
+    CacheStat('cache_bytes_overflow',
+        'tracked bytes belonging to overflow pages in the cache',
+        'no_clear,no_scale'),
     CacheStat('cache_bytes_read', 'bytes read into cache'),
     CacheStat('cache_bytes_write', 'bytes written from cache'),
     CacheStat('cache_eviction_app', 'pages evicted by application threads'),
@@ -187,7 +196,7 @@ connection_stats = [
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty',
-        'tracked dirty pages in the cache', 'no_scale'),
+        'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse',
         'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_read', 'pages read into cache'),
@@ -218,7 +227,8 @@ connection_stats = [
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
-    LogStat('log_prealloc_max', 'number of pre-allocated log files to create'),
+    LogStat('log_prealloc_max',
+        'number of pre-allocated log files to create', 'no_clear,no_scale'),
     LogStat('log_prealloc_used', 'pre-allocated log files used'),
     LogStat('log_reads', 'log read operations'),
     LogStat('log_release_write_lsn', 'log release advances write LSN'),
@@ -256,6 +266,8 @@ connection_stats = [
     ##########################################
     TxnStat('txn_begin', 'transaction begins'),
     TxnStat('txn_checkpoint', 'transaction checkpoints'),
+    TxnStat('txn_checkpoint_generation',
+        'transaction checkpoint generation', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_max',
         'transaction checkpoint max time (msecs)',
         'no_aggregate,no_clear,no_scale'),
@@ -270,6 +282,9 @@ connection_stats = [
         'no_aggregate,no_clear,no_scale'),
     TxnStat('txn_checkpoint_running',
         'transaction checkpoint currently running',
+        'no_aggregate,no_clear,no_scale'),
+    TxnStat('txn_pinned_checkpoint_range',
+        'transaction range of IDs currently pinned by a checkpoint',
         'no_aggregate,no_clear,no_scale'),
     TxnStat('txn_pinned_range',
         'transaction range of IDs currently pinned',
@@ -360,6 +375,8 @@ dsrc_stats = [
     ##########################################
     # Btree statistics
     ##########################################
+    BtreeStat('btree_checkpoint_generation',
+        'btree checkpoint generation', 'no_clear,no_scale'),
     BtreeStat('btree_column_deleted',
         'column-store variable-size deleted values', 'no_scale'),
     BtreeStat('btree_column_fix',

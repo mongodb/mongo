@@ -234,7 +234,7 @@ err:	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
  *	Sync and close the underlying btree handle.
  */
 int
-__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int force)
+__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
@@ -273,7 +273,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int force)
 	 */
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_ERR(__wt_checkpoint_close(session, force));
+		WT_ERR(__wt_checkpoint_close(session, final, force));
 
 	if (dhandle->checkpoint == NULL)
 		--S2C(session)->open_btree_count;
@@ -361,8 +361,7 @@ err:	__wt_free(session, metaconf);
  *	Open the current btree handle.
  */
 static int
-__conn_btree_open(
-	WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+__conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
@@ -392,7 +391,7 @@ __conn_btree_open(
 	 * in the tree that can block the close.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_RET(__wt_conn_btree_sync_and_close(session, 0));
+		WT_RET(__wt_conn_btree_sync_and_close(session, 0, 0));
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_btree_config_clear(session);
@@ -424,7 +423,7 @@ __conn_btree_open(
 err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 		/* If the open failed, close the handle. */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-			WT_TRET(__wt_conn_btree_sync_and_close(session, 0));
+			WT_TRET(__wt_conn_btree_sync_and_close(session, 0, 0));
 	}
 
 	return (ret);
@@ -670,7 +669,7 @@ __wt_conn_dhandle_close_all(
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			if ((ret = __wt_meta_track_sub_on(session)) == 0)
 				ret = __wt_conn_btree_sync_and_close(
-				    session, force);
+				    session, 0, force);
 
 			/*
 			 * If the close succeeded, drop any locks it acquired.
@@ -732,7 +731,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 	dhandle = session->dhandle;
 
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-		tret = __wt_conn_btree_sync_and_close(session, 0);
+		tret = __wt_conn_btree_sync_and_close(session, final, 0);
 		if (final && tret != 0) {
 			__wt_err(session, tret,
 			    "Final close of %s failed", dhandle->name);
@@ -745,7 +744,8 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 	 * Kludge: interrupt the eviction server in case it is holding the
 	 * handle list lock.
 	 */
-	F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
+	if (!F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED))
+		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
 
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_DHANDLE_LOCK(session,

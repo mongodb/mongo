@@ -28,6 +28,7 @@
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from wtscenario import check_scenarios
 
 # test_util03.py
 #    Utilities: wt create
@@ -35,12 +36,12 @@ class test_util03(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util03.a'
     nentries = 1000
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('none', dict(key_format=None,value_format=None)),
         ('SS', dict(key_format='S',value_format='S')),
         ('rS', dict(key_format='r',value_format='S')),
         ('ri', dict(key_format='r',value_format='i')),
-        ]
+    ])
 
     def test_create_process(self):
         """

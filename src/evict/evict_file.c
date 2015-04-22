@@ -72,28 +72,16 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		    WT_READ_CACHE | WT_READ_NO_EVICT));
 
 		switch (syncop) {
-		case WT_SYNC_DISCARD:
-			/*
-			 * Check that the page is clean: if we see a dirty page
-			 * (including a dirty parent page after evicting a
-			 * child), give up.  The higher level can try to
-			 * checkpoint, but during discard we aren't set up to
-			 * manage checkpoints.
-			 */
-			if (__wt_page_is_modified(page))
-				WT_ERR(EBUSY);
-			/* FALLTHROUGH */
 		case WT_SYNC_CLOSE:
 			/*
 			 * Evict the page.
-			 * Do not attempt to evict pages expected to be merged
-			 * into their parents, with the exception that the root
-			 * page can't be merged, it must be written.
 			 */
-			if (__wt_ref_is_root(ref) ||
-			    page->modify == NULL ||
-			    !F_ISSET(page->modify, WT_PM_REC_EMPTY))
-				WT_ERR(__wt_evict(session, ref, 1));
+			WT_ERR(__wt_evict(session, ref, 1));
+			break;
+		case WT_SYNC_DISCARD:
+			WT_ASSERT(session,
+			    __wt_page_can_evict(session, page, 0));
+			__wt_evict_page_clean_update(session, ref);
 			break;
 		case WT_SYNC_DISCARD_FORCE:
 			/*

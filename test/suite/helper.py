@@ -162,6 +162,14 @@ def complex_value_populate(cursor, i):
         str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
         str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
 
+# Return the number of column groups used
+def complex_populate_colgroup_count():
+    return 6
+
+# Return the number of indices used
+def complex_populate_index_count():
+    return 6
+
 # population of a complex object
 #    uri:       object
 #    config:    prefix of the session.create configuration string
@@ -203,6 +211,9 @@ def complex_populate_type(self, uri, config, rows, type):
         cursor.set_value(v[0], v[1], v[2], v[3])
         cursor.insert()
     cursor.close()
+
+def complex_populate_colgroup_name(self, uri):
+    return 'colgroup:' + uri.split(":")[1] + ':cgroup1'
 
 def complex_populate_index_name(self, uri):
     return 'index:' + uri.split(":")[1] + ':indx1'

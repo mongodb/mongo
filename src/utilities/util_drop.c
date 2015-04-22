@@ -30,7 +30,7 @@ util_drop(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
-	if ((name = util_name(*argv, "table")) == NULL)
+	if ((name = util_name(session, *argv, "table")) == NULL)
 		return (1);
 
 	ret = session->drop(session, name, "force");

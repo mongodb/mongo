@@ -32,4 +32,4 @@ refresh:
 TESTS = smoke.sh
 
 clean-local:
-	rm -rf RUNDIR *.core
+	rm -rf RUNDIR s_dumpcmp *.core

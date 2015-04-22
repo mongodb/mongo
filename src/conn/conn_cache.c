@@ -190,6 +190,12 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
 	WT_STAT_SET(stats, cache_pages_dirty, cache->pages_dirty);
+
+	/* Figure out internal, leaf and overflow stats */
+	WT_STAT_SET(stats, cache_bytes_internal, cache->bytes_internal);
+	WT_STAT_SET(stats, cache_bytes_leaf,
+	    conn->cache_size - (cache->bytes_internal + cache->bytes_overflow));
+	WT_STAT_SET(stats, cache_bytes_overflow, cache->bytes_overflow);
 }
 
 /*

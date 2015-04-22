@@ -29,18 +29,19 @@
 import os
 import wiredtiger, wttest
 from helper import key_populate
+from wtscenario import check_scenarios
 
 # test_empty.py
 #       Test that empty objects don't write anything other than a single sector.
 class test_empty(wttest.WiredTigerTestCase):
     name = 'test_empty'
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file-r', dict(type='file:', fmt='r')),
         ('file-S', dict(type='file:', fmt='S')),
         ('table-r', dict(type='table:', fmt='r')),
         ('table-S', dict(type='table:', fmt='S'))
-        ]
+    ])
 
     # Creating an object and then closing it shouldn't write any blocks.
     def test_empty_create(self):

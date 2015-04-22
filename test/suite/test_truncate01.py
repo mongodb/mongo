@@ -34,16 +34,16 @@ import wiredtiger, wttest
 from helper import confirm_empty,\
     key_populate, value_populate, simple_populate,\
     complex_populate, complex_value_populate
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import check_scenarios, multiply_scenarios, number_scenarios
 
 # Test truncation arguments.
 class test_truncate_arguments(wttest.WiredTigerTestCase):
     name = 'test_truncate'
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(type='file:')),
         ('table', dict(type='table:'))
-    ]
+    ])
 
     # Test truncation without URI or cursors specified, or with a URI and
     # either cursor specified, expect errors.
@@ -80,10 +80,10 @@ class test_truncate_arguments(wttest.WiredTigerTestCase):
 # Test truncation of an object using its URI.
 class test_truncate_uri(wttest.WiredTigerTestCase):
     name = 'test_truncate'
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(type='file:')),
         ('table', dict(type='table:'))
-    ]
+    ])
 
     # Populate an object, truncate it by URI, and confirm it's empty.
     def test_truncate_uri(self):

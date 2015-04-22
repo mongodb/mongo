@@ -19,6 +19,7 @@ struct __wt_config {
 struct __wt_config_check {
 	const char *name;
 	const char *type;
+	int (*checkf)(WT_SESSION_IMPL *, WT_CONFIG_ITEM *);
 	const char *checks;
 	const WT_CONFIG_CHECK *subconfigs;
 };

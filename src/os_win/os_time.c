@@ -32,8 +32,10 @@ int
 __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 {
 	uint64_t ns100;
-
 	FILETIME time;
+
+	WT_UNUSED(session);
+
 	GetSystemTimeAsFileTime(&time);
 
 	ns100 = (((int64_t)time.dwHighDateTime << 32) + time.dwLowDateTime)

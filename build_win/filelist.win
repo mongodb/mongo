@@ -103,6 +103,7 @@ src/os_posix/os_alloc.c
 src/os_posix/os_getline.c
 src/os_posix/os_getopt.c
 src/os_posix/os_mtx_rw.c
+src/os_posix/os_stdio.c
 src/os_posix/os_strtouq.c
 src/os_win/os_dir.c
 src/os_win/os_dlopen.c

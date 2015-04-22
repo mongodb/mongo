@@ -31,6 +31,7 @@ import wiredtiger, wttest
 from helper import confirm_does_not_exist,\
     complex_populate, complex_populate_check,\
     simple_populate, simple_populate_check
+from wtscenario import check_scenarios
 
 # test_rename.py
 #    session level rename operation
@@ -38,10 +39,10 @@ class test_rename(wttest.WiredTigerTestCase):
     name1 = 'test_rename1'
     name2 = 'test_rename2'
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
-        ]
+    ])
 
     # Populate and object, and rename it a couple of times, confirming the
     # old name doesn't exist and the new name has the right contents.

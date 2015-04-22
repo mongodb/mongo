@@ -29,16 +29,17 @@
 # test_bug008.py
 #       Regression tests.
 
-from helper import simple_populate, key_populate, value_populate
 import wiredtiger, wttest
+from helper import simple_populate, key_populate, value_populate
+from wtscenario import check_scenarios
 
 # Tests for invisible updates.
 class test_bug008(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('fix', dict(fmt='key_format=r,value_format=8t', empty=1)),
         ('row', dict(fmt='key_format=S', empty=0)),
         ('var', dict(fmt='key_format=r', empty=0))
-    ]
+    ])
 
     # Verify cursor search and search-near operations on a file with a set of
     # on-page visible records, and a set of insert-list invisible records.

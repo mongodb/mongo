@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import check_scenarios
 
 # test_cursor01.py
 #    Cursor operations
@@ -40,7 +41,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
     table_name1 = 'test_cursor01'
     nentries = 10
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('file-col', dict(tablekind='col',uri='file')),
         ('file-fix', dict(tablekind='fix',uri='file')),
         ('file-row', dict(tablekind='row',uri='file')),
@@ -48,7 +49,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         ('table-col', dict(tablekind='col',uri='table')),
         ('table-fix', dict(tablekind='fix',uri='table')),
         ('table-row', dict(tablekind='row',uri='table'))
-        ]
+    ])
 
     def genkey(self, i):
         if self.tablekind == 'row':

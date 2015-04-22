@@ -54,6 +54,7 @@ flags = {
         'TXN_LOG_CKPT_PREPARE',
         'TXN_LOG_CKPT_START',
         'TXN_LOG_CKPT_STOP',
+        'TXN_LOG_CKPT_SYNC',
     ],
     'verbose' : [
         'VERB_API',

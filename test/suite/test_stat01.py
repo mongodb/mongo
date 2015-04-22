@@ -147,7 +147,7 @@ class test_stat01(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(
                 'statistics:' + self.uri, None, 'checkpoint=' + name)
             self.assertEqual(
-                cursor[stat.dsrc.btree_entries][2], self.nentries + 1)
+                cursor[stat.dsrc.btree_entries][2], self.nentries)
             cursor.close()
 
     def test_missing_file_stats(self):

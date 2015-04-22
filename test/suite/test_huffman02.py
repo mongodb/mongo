@@ -40,19 +40,23 @@ class test_huffman02(wttest.WiredTigerTestCase, suite_subprocess):
     table_name = 'table:test_huff'
 
     huffkey = [
-        ('none', dict(huffkey='huffman_key=none')),
-        ('english', dict(huffkey='huffman_key=english')),
-        ('bad', dict(huffkey='huffman_key=bad')),
+        ('none', dict(huffkey=',huffman_key=none')),
+        ('english', dict(huffkey=',huffman_key=english')),
+        ('bad', dict(huffkey=',huffman_key=bad')),
     ]
     huffval = [
         ('bad', dict(huffval=',huffman_value=bad')),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', huffkey, huffval))
+    type = [
+        ('file', dict(type='type=file')),
+        ('lsm', dict(type='type=lsm')),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.',type,huffkey, huffval))
 
     def test_huffman(self):
         gotException = False
-        expectMessage = 'illegal Huffman'
-        config=self.huffkey + self.huffval
+        expectMessage = 'nvalid argument'
+        config=self.type + self.huffkey + self.huffval
         with self.expectedStderrPattern(expectMessage):
             try:
                 self.pr('expect an error message...')

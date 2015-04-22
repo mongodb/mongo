@@ -21,6 +21,8 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->block_major.desc = "block-manager: file major version number";
 	stats->block_size.desc = "block-manager: file size in bytes";
 	stats->block_minor.desc = "block-manager: minor version number";
+	stats->btree_checkpoint_generation.desc =
+	    "btree: btree checkpoint generation";
 	stats->btree_column_fix.desc =
 	    "btree: column-store fixed-size leaf pages";
 	stats->btree_column_internal.desc =
@@ -246,6 +248,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->block_checkpoint_size.v += c->block_checkpoint_size.v;
 	p->block_reuse_bytes.v += c->block_reuse_bytes.v;
 	p->block_size.v += c->block_size.v;
+	p->btree_checkpoint_generation.v += c->btree_checkpoint_generation.v;
 	p->btree_column_fix.v += c->btree_column_fix.v;
 	p->btree_column_internal.v += c->btree_column_internal.v;
 	p->btree_column_deleted.v += c->btree_column_deleted.v;
@@ -398,6 +401,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
 	stats->cache_write.desc = "cache: pages written from cache";
 	stats->cache_overhead.desc = "cache: percentage overhead";
+	stats->cache_bytes_internal.desc =
+	    "cache: tracked bytes belonging to internal pages in the cache";
+	stats->cache_bytes_leaf.desc =
+	    "cache: tracked bytes belonging to leaf pages in the cache";
+	stats->cache_bytes_overflow.desc =
+	    "cache: tracked bytes belonging to overflow pages in the cache";
 	stats->cache_bytes_dirty.desc =
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_pages_dirty.desc =
@@ -513,6 +522,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->txn_begin.desc = "transaction: transaction begins";
 	stats->txn_checkpoint_running.desc =
 	    "transaction: transaction checkpoint currently running";
+	stats->txn_checkpoint_generation.desc =
+	    "transaction: transaction checkpoint generation";
 	stats->txn_checkpoint_time_max.desc =
 	    "transaction: transaction checkpoint max time (msecs)";
 	stats->txn_checkpoint_time_min.desc =
@@ -526,6 +537,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "transaction: transaction failures due to cache overflow";
 	stats->txn_pinned_range.desc =
 	    "transaction: transaction range of IDs currently pinned";
+	stats->txn_pinned_checkpoint_range.desc =
+	    "transaction: transaction range of IDs currently pinned by a checkpoint";
 	stats->txn_commit.desc = "transaction: transactions committed";
 	stats->txn_rollback.desc = "transaction: transactions rolled back";
 }
@@ -580,8 +593,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_split.v = 0;
 	stats->cache_eviction_walk.v = 0;
 	stats->cache_write.v = 0;
-	stats->cache_bytes_dirty.v = 0;
-	stats->cache_pages_dirty.v = 0;
 	stats->cache_eviction_clean.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
@@ -626,7 +637,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_sync_dir.v = 0;
 	stats->log_writes.v = 0;
 	stats->log_slot_consolidated.v = 0;
-	stats->log_prealloc_max.v = 0;
 	stats->log_prealloc_files.v = 0;
 	stats->log_prealloc_used.v = 0;
 	stats->log_slot_toobig.v = 0;

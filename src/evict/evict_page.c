@@ -8,15 +8,45 @@
 
 #include "wt_internal.h"
 
-static int  __evict_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int, int, int *, int *);
-static void __evict_discard_tree(WT_SESSION_IMPL *, WT_REF *, int, int);
-static void __evict_excl_clear(WT_SESSION_IMPL *);
+static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int, int *);
+
+/*
+ * __evict_exclusive_clear --
+ *	Release exclusive access to a page.
+ */
+static inline void
+__evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_ASSERT(session, ref->state == WT_REF_LOCKED && ref->page != NULL);
+
+	ref->state = WT_REF_MEM;
+}
+
+/*
+ * __evict_exclusive --
+ *	Acquire exclusive access to a page.
+ */
+static inline int
+__evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+
+	/*
+	 * Check for a hazard pointer indicating another thread is using the
+	 * page, meaning the page cannot be evicted.
+	 */
+	if (__wt_page_hazard_check(session, ref->page) == NULL)
+		return (0);
+
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_hazard);
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_hazard);
+	return (EBUSY);
+}
 
 /*
  * __wt_evict --
- *	Eviction.
+ *	Evict a page.
  */
 int
 __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
@@ -25,38 +55,25 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	WT_TXN_STATE *txn_state;
-	int forced_eviction, inmem_split, istree;
+	int forced_eviction, inmem_split;
 
 	conn = S2C(session);
 
 	page = ref->page;
 	forced_eviction = (page->read_gen == WT_READGEN_OLDEST);
-	inmem_split = istree = 0;
+	inmem_split = 0;
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", page, __wt_page_type_string(page->type)));
 
 	/*
-	 * Pin the oldest transaction ID: eviction looks at page structures
-	 * that are freed when no transaction in the system needs them.
+	 * Get exclusive access to the page and review it for conditions that
+	 * would block our eviction of the page.  If the check fails (for
+	 * example, we find a page with active children), we're done.  We have
+	 * to make this check for clean pages, too: while unlikely eviction
+	 * would choose an internal page with children, it's not disallowed.
 	 */
-	txn_state = WT_SESSION_TXN_STATE(session);
-	if (txn_state->snap_min == WT_TXN_NONE)
-		txn_state->snap_min = conn->txn_global.oldest_id;
-	else
-		txn_state = NULL;
-
-	/*
-	 * Get exclusive access to the page and review the page and its subtree
-	 * for conditions that would block our eviction of the page.  If the
-	 * check fails (for example, we find a child page that can't be merged),
-	 * we're done.  We have to make this check for clean pages, too: while
-	 * unlikely eviction would choose an internal page with children, it's
-	 * not disallowed anywhere.
-	 */
-	WT_ERR(
-	    __evict_review(session, ref, exclusive, 1, &inmem_split, &istree));
+	WT_ERR(__evict_review(session, ref, exclusive, &inmem_split));
 
 	/*
 	 * If there was an in-memory split, the tree has been left in the state
@@ -72,8 +89,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	mod = page->modify;
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!exclusive &&
-	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)) {
+	if (!exclusive && WT_PAGE_IS_INTERNAL(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_internal);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_internal);
 	}
@@ -86,15 +102,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	if (page->memory_footprint > conn->cache->evict_max_page_size)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
-	/* Discard any subtree rooted in this page. */
-	if (istree)
-		WT_WITH_PAGE_INDEX(session,
-		    __evict_discard_tree(session, ref, exclusive, 1));
-
 	/* Update the reference and discard the page. */
 	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
-		WT_ASSERT(session, exclusive || ref->state == WT_REF_LOCKED);
-
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
@@ -114,22 +123,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	}
 
 	if (0) {
-err:		/*
-		 * If unable to evict this page, release exclusive reference(s)
-		 * we've acquired.
-		 */
-		if (!exclusive)
-			__evict_excl_clear(session);
+err:		if (!exclusive)
+			__evict_exclusive_clear(session, ref);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
-done:	session->excl_next = 0;
 
-	if (txn_state != NULL)
-		txn_state->snap_min = WT_TXN_NONE;
-
-	if ((inmem_split || (forced_eviction && ret == EBUSY)) &&
+done:	if ((inmem_split || (forced_eviction && ret == EBUSY)) &&
 	    !F_ISSET(conn->cache, WT_CACHE_WOULD_BLOCK)) {
 		F_SET(conn->cache, WT_CACHE_WOULD_BLOCK);
 		WT_TRET(__wt_evict_server_wake(session));
@@ -242,69 +243,21 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 }
 
 /*
- * __evict_discard_tree --
- *	Discard the tree rooted a page (that is, any pages merged into it),
- * then the page itself.
- */
-static void
-__evict_discard_tree(
-    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int top)
-{
-	WT_REF *child;
-
-	switch (ref->page->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		/* For each entry in the page... */
-		WT_INTL_FOREACH_BEGIN(session, ref->page, child) {
-			if (child->state == WT_REF_DISK ||
-			    child->state == WT_REF_DELETED)
-				continue;
-			WT_ASSERT(session,
-			    exclusive || child->state == WT_REF_LOCKED);
-			__evict_discard_tree(session, child, exclusive, 0);
-		} WT_INTL_FOREACH_END;
-		/* FALLTHROUGH */
-	default:
-		if (!top)
-			__wt_ref_out(session, ref);
-		break;
-	}
-}
-
-/*
- * __evict_review_subtree --
- *	Review a subtree for conditions that would block its eviction.
+ * __evict_child_check --
+ *	Review an internal page for active children.
  */
 static int
-__evict_review_subtree(WT_SESSION_IMPL *session,
-    WT_REF *ref, int exclusive, int *inmem_splitp, int *istreep)
+__evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 {
-	WT_PAGE *page;
 	WT_REF *child;
 
-	page = ref->page;
-
-	WT_INTL_FOREACH_BEGIN(session, page, child) {
+	WT_INTL_FOREACH_BEGIN(session, parent->page, child) {
 		switch (child->state) {
 		case WT_REF_DISK:		/* On-disk */
 		case WT_REF_DELETED:		/* On-disk, deleted */
 			break;
-		case WT_REF_MEM:		/* In-memory */
-			/*
-			 * Tell our caller if there's a subtree so we
-			 * know to do a full walk when discarding the
-			 * page.
-			 */
-			*istreep = 1;
-			WT_RET(__evict_review(session, child, exclusive,
-			    0, inmem_splitp, istreep));
-			break;
-		case WT_REF_LOCKED:		/* Being evicted */
-		case WT_REF_READING:		/* Being read */
-		case WT_REF_SPLIT:		/* Being split */
+		default:
 			return (EBUSY);
-		WT_ILLEGAL_VALUE(session);
 		}
 	} WT_INTL_FOREACH_END;
 
@@ -317,22 +270,20 @@ __evict_review_subtree(WT_SESSION_IMPL *session,
  *	for conditions that would block its eviction.
  */
 static int
-__evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
-    int exclusive, int top, int *inmem_splitp, int *istreep)
+__evict_review(
+    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int *inmem_splitp)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	uint32_t flags;
 
-	flags = WT_EVICTING;
-
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
 	 */
 	if (!exclusive) {
-		WT_RET(__evict_exclusive(session, ref, top));
+		WT_RET(__evict_exclusive(session, ref));
 
 		/*
 		 * Now the page is locked, remove it from the LRU eviction
@@ -349,46 +300,18 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	mod = page->modify;
 
 	/*
-	 * Recurse through the page's subtree: this happens first because we
-	 * have to write pages in depth-first order, otherwise we'll dirty
-	 * pages after we've written them.
+	 * Fail if an internal has active children, the children must be evicted
+	 * first. The test is necessary but shouldn't fire much: the eviction
+	 * code is biased for leaf pages, an internal page shouldn't be selected
+	 * for eviction until all children have been evicted.
 	 */
 	if (WT_PAGE_IS_INTERNAL(page)) {
-		/*
-		 * Quit if we're trying to push out a "tree", an internal page
-		 * with live internal pages as children, it's not likely to
-		 * succeed.
-		 */
-		if (!top && !exclusive)
-			return (EBUSY);
-
-		WT_WITH_PAGE_INDEX(session, ret = __evict_review_subtree(
-		    session, ref, exclusive, inmem_splitp, istreep));
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_child_check(session, ref));
 		WT_RET(ret);
 	}
 
-	/*
-	 * Check whether the page can be evicted.
-	 *
-	 * If the file is being checkpointed, we can't evict dirty pages:
-	 * if we write a page and free the previous version of the page, that
-	 * previous version might be referenced by an internal page already
-	 * been written in the checkpoint, leaving the checkpoint inconsistent.
-	 *
-	 * Don't rely on new updates being skipped by the transaction used
-	 * for transaction reads: (1) there are paths that dirty pages for
-	 * artificial reasons; (2) internal pages aren't transactional; and
-	 * (3) if an update was skipped during the checkpoint (leaving the page
-	 * dirty), then rolled back, we could still successfully overwrite a
-	 * page and corrupt the checkpoint.
-	 *
-	 * Further, we can't race with the checkpoint's reconciliation of
-	 * an internal page as we evict a clean child from the page's subtree.
-	 * This works in the usual way: eviction locks the page and then checks
-	 * for existing hazard pointers, the checkpoint thread reconciling an
-	 * internal page acquires hazard pointers on child pages it reads, and
-	 * is blocked by the exclusive lock.
-	 */
+	/* Check if the page can be evicted. */
 	if (!exclusive && !__wt_page_can_evict(session, page, 0))
 		return (EBUSY);
 
@@ -402,51 +325,36 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * If an in-memory split completes, the page stays in memory and the
 	 * tree is left in the desired state: avoid the usual cleanup.
 	 */
-	if (top && !exclusive) {
+	if (!exclusive) {
 		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
 		if (*inmem_splitp)
 			return (0);
 	}
 
 	/*
-	 * Fail if any page in the top-level page's subtree won't be merged into
-	 * its parent, the page that cannot be merged must be evicted first.
-	 * The test is necessary but should not fire much: the eviction code is
-	 * biased for leaf pages, an internal page shouldn't be selected for
-	 * eviction until its children have been evicted.
-	 *
-	 * We have to write dirty pages to know their final state, a page marked
-	 * empty may have had records added since reconciliation.  Writing the
-	 * page is expensive, do a cheap test first: if it doesn't seem likely a
-	 * subtree page can be merged, quit.
-	 */
-	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
-		return (EBUSY);
-
-	/*
-	 * If the page is dirty and can possibly change state, write it so we
-	 * know the final state.
+	 * If the page is dirty and can possibly change state, reconcile it to
+	 * determine the final state.
 	 *
 	 * If we have an exclusive lock (we're discarding the tree), assert
 	 * there are no updates we cannot read.
 	 *
-	 * Otherwise, if the top-level page we're evicting is a leaf page
-	 * marked for forced eviction, set the update-restore flag, so
-	 * reconciliation will write blocks it can write and create a list of
-	 * skipped updates for blocks it cannot write.  This is how forced
-	 * eviction of huge pages works: we take a big page and reconcile it
-	 * into blocks, some of which we write and discard, the rest of which
-	 * we re-create as smaller in-memory pages, (restoring the updates that
-	 * stopped us from writing the block), and inserting the whole mess
-	 * into the page's parent.
+	 * Otherwise, if the page we're evicting is a leaf page marked for
+	 * forced eviction, set the update-restore flag, so reconciliation will
+	 * write blocks it can write and create a list of skipped updates for
+	 * blocks it cannot write.  This is how forced eviction of active, huge
+	 * pages works: we take a big page and reconcile it into blocks, some of
+	 * which we write and discard, the rest of which we re-create as smaller
+	 * in-memory pages, (restoring the updates that stopped us from writing
+	 * the block), and inserting the whole mess into the page's parent.
 	 *
-	 * Don't set the update-restore flag for internal pages, they don't
-	 * have updates that can be saved and restored.
+	 * Don't set the update-restore flag for internal pages, they don't have
+	 * updates that can be saved and restored.
 	 */
+	flags = WT_EVICTING;
 	if (__wt_page_is_modified(page)) {
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
-		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
+		else if (!WT_PAGE_IS_INTERNAL(page) &&
 		    page->read_gen == WT_READGEN_OLDEST)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_reconcile(session, ref, NULL, flags));
@@ -464,68 +372,5 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	    !LF_ISSET(WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
 
-	/*
-	 * Repeat the test: fail if any page in the top-level page's subtree
-	 * won't be merged into its parent.
-	 */
-	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
-		return (EBUSY);
-
 	return (0);
-}
-
-/*
- * __evict_excl_clear --
- *	Discard exclusive access and return a page's subtree to availability.
- */
-static void
-__evict_excl_clear(WT_SESSION_IMPL *session)
-{
-	WT_REF *ref;
-	uint32_t i;
-
-	for (i = 0; i < session->excl_next; ++i) {
-		if ((ref = session->excl[i]) == NULL)
-			break;
-		WT_ASSERT(session,
-		    ref->state == WT_REF_LOCKED && ref->page != NULL);
-		ref->state = WT_REF_MEM;
-	}
-}
-
-/*
- * __evict_exclusive --
- *	Request exclusive access to a page.
- */
-static int
-__evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
-{
-	/*
-	 * Make sure there is space to track exclusive access so we can unlock
-	 * to clean up.
-	 */
-	WT_RET(__wt_realloc_def(session, &session->excl_allocated,
-	    session->excl_next + 1, &session->excl));
-
-	/*
-	 * Request exclusive access to the page.  The top-level page should
-	 * already be in the locked state, lock child pages in memory.
-	 * If another thread already has this page, give up.
-	 */
-	if (!top && !WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED))
-		return (EBUSY);	/* We couldn't change the state. */
-	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
-
-	session->excl[session->excl_next++] = ref;
-
-	/* Check for a matching hazard pointer. */
-	if (__wt_page_hazard_check(session, ref->page) == NULL)
-		return (0);
-
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_hazard);
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_hazard);
-
-	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
-	    "page %p hazard request failed", ref->page));
-	return (EBUSY);
 }

@@ -28,18 +28,18 @@
 
 import Queue
 import threading, time, wiredtiger, wttest
-from wtthread import checkpoint_thread, op_thread
 from helper import key_populate, simple_populate
+from wtthread import checkpoint_thread, op_thread
+from wtscenario import check_scenarios
 
 # test_checkpoint02.py
 #   Run background checkpoints repeatedly while doing inserts and other
 #   operations in another thread
 class test_checkpoint02(wttest.WiredTigerTestCase):
-    scenarios = [
+    scenarios = check_scenarios([
         ('table-100', dict(uri='table:test',fmt='L',dsize=100,nops=50000,nthreads=10)),
         ('table-10', dict(uri='table:test',fmt='L',dsize=10,nops=50000,nthreads=30))
-        ]
-
+    ])
 
     def test_checkpoint02(self):
         done = threading.Event()

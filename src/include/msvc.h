@@ -13,6 +13,8 @@
 
 #define	inline __inline
 
+#define	WT_SIZET_FMT	"Iu"			/* size_t format string */
+
 /*
  * Add MSVC-specific attributes and pragmas to types and function declarations.
  */

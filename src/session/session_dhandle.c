@@ -168,7 +168,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 
-		WT_TRET(__wt_conn_btree_sync_and_close(session, 0));
+		WT_TRET(__wt_conn_btree_sync_and_close(session, 0, 0));
 	}
 
 	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))
@@ -288,16 +288,19 @@ __wt_session_close_cache(WT_SESSION_IMPL *session)
 static int
 __session_dhandle_sweep(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
 	time_t now;
+
+	conn = S2C(session);
 
 	/*
 	 * Periodically sweep for dead handles; if we've swept recently, don't
 	 * do it again.
 	 */
 	WT_RET(__wt_seconds(session, &now));
-	if (now - session->last_sweep < WT_DHANDLE_SWEEP_PERIOD)
+	if (now - session->last_sweep < conn->sweep_interval)
 		return (0);
 	session->last_sweep = now;
 
@@ -309,7 +312,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle = dhandle_cache->dhandle;
 		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
-		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
+		    now - dhandle->timeofdeath > conn->sweep_idle_time) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
 			__session_discard_btree(session, dhandle_cache);
 		}
@@ -380,7 +383,20 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		/* Try to lock the handle; if this succeeds, we're done. */
 		if ((ret = __wt_session_lock_dhandle(session, flags)) == 0)
 			goto done;
-		WT_RET_NOTFOUND_OK(ret);
+
+		/* Propagate errors we don't expect. */
+		if (ret != WT_NOTFOUND && ret != EBUSY)
+			return (ret);
+
+		/*
+		 * Don't try harder to get the btree handle if our caller
+		 * hasn't allowed us to take the schema lock - they do so on
+		 * purpose and will handle error returns.
+		 */
+		if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+		    F_ISSET(session,
+		    WT_SESSION_HANDLE_LIST_LOCKED | WT_SESSION_TABLE_LOCKED))
+			return (ret);
 
 		/* We found the data handle, don't try to get it again. */
 		LF_SET(WT_DHANDLE_HAVE_REF);

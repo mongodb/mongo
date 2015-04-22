@@ -123,6 +123,7 @@ src/os_posix/os_remove.c
 src/os_posix/os_rename.c
 src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
+src/os_posix/os_stdio.c
 src/os_posix/os_strtouq.c
 src/os_posix/os_thread.c
 src/os_posix/os_time.c

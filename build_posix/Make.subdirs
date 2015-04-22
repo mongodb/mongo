@@ -7,6 +7,7 @@
 # If a condition is included, the subdir is made conditional via AM_CONDITIONAL
 ext/collators/reverse
 ext/compressors/bzip2 BZIP2
+ext/compressors/lz4 LZ4
 ext/compressors/nop
 ext/compressors/snappy SNAPPY
 ext/compressors/zlib ZLIB

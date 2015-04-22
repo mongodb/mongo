@@ -8,9 +8,6 @@
 
 #include "wt_internal.h"
 
-static int  __curstat_next(WT_CURSOR *cursor);
-static int  __curstat_prev(WT_CURSOR *cursor);
-
 /*
  * The statistics identifier is an offset from a base to ensure the integer ID
  * values don't overlap (the idea is if they overlap it's easy for application
@@ -37,6 +34,22 @@ __curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_ITEM *buf)
 		WT_RET(__wt_buf_fmt(session, buf, "%" PRIu64, v));
 
 	return (0);
+}
+
+/*
+ * __curstat_free_config --
+ *	Free the saved configuration string stack
+ */
+static void
+__curstat_free_config(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
+{
+	size_t i;
+
+	if (cst->cfg != NULL) {
+		for (i = 0; cst->cfg[i] != NULL; ++i)
+			__wt_free(session, cst->cfg[i]);
+		__wt_free(session, cst->cfg);
+	}
 }
 
 /*
@@ -185,6 +198,13 @@ __curstat_next(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
+	/* Initialize on demand. */
+	if (cst->notinitialized) {
+		WT_ERR(__wt_curstat_init(
+		    session, cursor->internal_uri, cst->cfg, cst));
+		cst->notinitialized = 0;
+	}
+
 	/* Move to the next item. */
 	if (cst->notpositioned) {
 		cst->notpositioned = 0;
@@ -215,6 +235,13 @@ __curstat_prev(WT_CURSOR *cursor)
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, NULL);
+
+	/* Initialize on demand. */
+	if (cst->notinitialized) {
+		WT_ERR(__wt_curstat_init(
+		    session, cursor->internal_uri, cst->cfg, cst));
+		cst->notinitialized = 0;
+	}
 
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
@@ -248,7 +275,7 @@ __curstat_reset(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	cst->notpositioned = 1;
+	cst->notinitialized = cst->notpositioned = 1;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END_RET(session, ret);
@@ -270,6 +297,13 @@ __curstat_search(WT_CURSOR *cursor)
 
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_SET);
+
+	/* Initialize on demand. */
+	if (cst->notinitialized) {
+		WT_ERR(__wt_curstat_init(
+		    session, cursor->internal_uri, cst->cfg, cst));
+		cst->notinitialized = 0;
+	}
 
 	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
 		WT_ERR(WT_NOTFOUND);
@@ -294,6 +328,8 @@ __curstat_close(WT_CURSOR *cursor)
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
+
+	__curstat_free_config(session, cst);
 
 	__wt_buf_free(session, &cst->pv);
 
@@ -381,8 +417,6 @@ __wt_curstat_init(WT_SESSION_IMPL *session,
 {
 	const char *dsrc_uri;
 
-	cst->notpositioned = 1;
-
 	if (strcmp(uri, "statistics:") == 0) {
 		__curstat_conn_init(session, cst);
 		return (0);
@@ -439,6 +473,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
+	size_t i;
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 
@@ -497,7 +532,28 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 */
 	cursor->key_format = "i";
 	cursor->value_format = "SSq";
-	WT_ERR(__wt_curstat_init(session, uri, cfg, cst));
+
+	/*
+	 * WT_CURSOR.reset on a statistics cursor refreshes the cursor, save
+	 * the cursor's configuration for that.
+	 */
+	for (i = 0; cfg[i] != NULL; ++i)
+		;
+	WT_ERR(__wt_calloc_def(session, i + 1, &cst->cfg));
+	for (i = 0; cfg[i] != NULL; ++i)
+		WT_ERR(__wt_strdup(session, cfg[i], &cst->cfg[i]));
+
+	/*
+	 * Do the initial statistics snapshot: there won't be cursor operations
+	 * to trigger initialization when aggregating statistics for upper-level
+	 * objects like tables, we need to a valid set of statistics when before
+	 * the open returns.
+	 */
+	WT_ERR(__wt_curstat_init(session, uri, cst->cfg, cst));
+	cst->notinitialized = 0;
+
+	/* The cursor isn't yet positioned. */
+	cst->notpositioned = 1;
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
@@ -509,7 +565,8 @@ config_err:	WT_ERR_MSG(session, EINVAL,
 	}
 
 	if (0) {
-err:		__wt_free(session, cst);
+err:		__curstat_free_config(session, cst);
+		__wt_free(session, cst);
 	}
 
 	return (ret);

@@ -28,28 +28,17 @@
 	__wt_err(session, ret, __VA_ARGS__);				\
 	goto err;							\
 } while (0)
-#define	WT_ERR_BUSY_OK(a) do {						\
-	if ((ret = (a)) != 0) {						\
-		if (ret == EBUSY)					\
-			ret = 0;					\
-		else							\
-			goto err;					\
-	}								\
-} while (0)
-#define	WT_ERR_NOTFOUND_OK(a) do {					\
-	if ((ret = (a)) != 0) {						\
-		if (ret == WT_NOTFOUND)					\
-			ret = 0;					\
-		else							\
-			goto err;					\
-	}								\
-} while (0)
 #define	WT_ERR_TEST(a, v) do {						\
 	if (a) {							\
 		ret = (v);						\
 		goto err;						\
-	}								\
+	} else								\
+		ret = 0;						\
 } while (0)
+#define	WT_ERR_BUSY_OK(a)						\
+	WT_ERR_TEST((ret = (a)) != 0 && ret != EBUSY, ret)
+#define	WT_ERR_NOTFOUND_OK(a)						\
+	WT_ERR_TEST((ret = (a)) != 0 && ret != WT_NOTFOUND, ret)
 
 /* Return tests. */
 #define	WT_RET(a) do {							\
@@ -57,24 +46,22 @@
 	if ((__ret = (a)) != 0)						\
 		return (__ret);						\
 } while (0)
-#define	WT_RET_TEST(a, v) do {						\
-	if (a)								\
-		return (v);						\
-} while (0)
 #define	WT_RET_MSG(session, v, ...) do {				\
 	int __ret = (v);						\
 	__wt_err(session, __ret, __VA_ARGS__);				\
 	return (__ret);							\
 } while (0)
+#define	WT_RET_TEST(a, v) do {						\
+	if (a)								\
+		return (v);						\
+} while (0)
 #define	WT_RET_BUSY_OK(a) do {						\
-	int __ret;							\
-	if ((__ret = (a)) != 0 && __ret != EBUSY)			\
-		return (__ret);						\
+	int __ret = (a);						\
+	WT_RET_TEST(__ret != 0 && __ret != EBUSY, __ret);		\
 } while (0)
 #define	WT_RET_NOTFOUND_OK(a) do {					\
-	int __ret;							\
-	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND)			\
-		return (__ret);						\
+	int __ret = (a);						\
+	WT_RET_TEST(__ret != 0 && __ret != WT_NOTFOUND, __ret);		\
 } while (0)
 /* Set "ret" if not already set. */
 #define	WT_TRET(a) do {							\

@@ -27,8 +27,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import string, os
-from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from suite_subprocess import suite_subprocess
+from wtscenario import check_scenarios
 
 # test_util02.py
 #    Utilities: wt load
@@ -42,12 +43,12 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     nentries = 1000
     stringclass = ''.__class__
 
-    scenarios = [
+    scenarios = check_scenarios([
         ('SS', dict(key_format='S',value_format='S')),
         ('rS', dict(key_format='r',value_format='S')),
         ('ri', dict(key_format='r',value_format='i')),
         ('ii', dict(key_format='i',value_format='i')),
-        ]
+    ])
 
     def get_string(self, i, len):
         """
