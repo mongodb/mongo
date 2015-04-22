@@ -110,7 +110,8 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
                     result += "%0.2x" % ord(c)
                 elif c == '\\':
                     result += '\\\\'
-                elif c == ' ' or (c in string.printable and not c in string.whitespace):
+                elif c == ' ' or \
+                    (c in string.printable and not c in string.whitespace):
                     result += c
                 else:
                     result += '\\' + "%0.2x" % ord(c)
@@ -121,7 +122,8 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
         return result
 
     def table_config(self):
-        return 'key_format=' + self.key_format + ',value_format=' + self.value_format
+        return 'key_format=' + \
+            self.key_format + ',value_format=' + self.value_format
 
     def load_process(self, hexoutput):
         params = self.table_config()
@@ -142,7 +144,8 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.runWt(["load", "-f", "dump.out", "-r", self.tablename2])
 
-        cursor = self.session.open_cursor('table:' + self.tablename2, None, None)
+        cursor =\
+            self.session.open_cursor('table:' + self.tablename2, None, None)
         self.assertEqual(cursor.key_format, self.key_format)
         self.assertEqual(cursor.value_format, self.value_format)
         i = 0
