@@ -41,7 +41,7 @@ namespace {
     const std::string kConfigVersionFieldName = "cfgver";
     const std::string kLastCommittedOpFieldName = "lastCommittedOp";
     const std::string kOkFieldName = "ok";
-    const std::string kOpTimeFieldName = "optime";
+    const std::string kOpTimeFieldName = "ts";
     const std::string kReasonFieldName = "reason";
     const std::string kSetNameFieldName = "setName";
     const std::string kTermFieldName = "term";

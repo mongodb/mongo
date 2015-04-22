@@ -2410,12 +2410,18 @@ namespace {
 
     Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         const ReplSetRequestVotesArgs& args, ReplSetRequestVotesResponse* response) {
+        if (!isV1ElectionProtocol()) {
+            return {ErrorCodes::BadValue, "not using election protocol v1"};
+        }
         return {ErrorCodes::CommandNotFound, "not implemented"};
     }
 
     Status ReplicationCoordinatorImpl::processReplSetDeclareElectionWinner(
             const ReplSetDeclareElectionWinnerArgs& args,
             ReplSetDeclareElectionWinnerResponse* response) {
+        if (!isV1ElectionProtocol()) {
+            return {ErrorCodes::BadValue, "not using election protocol v1"};
+        }
         return {ErrorCodes::CommandNotFound, "not implemented"};
     }
 
@@ -2429,6 +2435,11 @@ namespace {
 
     bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
         return getConfig().getProtocolVersion() == 1;
+    }
+
+    Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+                                                          ReplSetHeartbeatResponseV1* response) {
+        return {ErrorCodes::CommandNotFound, "not implemented"};
     }
 
 } // namespace repl

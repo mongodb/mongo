@@ -313,6 +313,11 @@ namespace repl {
 
     void ReplicationCoordinatorMock::prepareCursorResponseInfo(BSONObjBuilder* objBuilder) {}
 
+    Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
+                                                          ReplSetHeartbeatResponseV1* response) {
+        return Status::OK();
+    }
+
     bool ReplicationCoordinatorMock::isV1ElectionProtocol() {
         return true;
     }
