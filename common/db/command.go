@@ -201,7 +201,7 @@ func ApplyFlags(q *mgo.Query, session *mgo.Session, flags int) *mgo.Query {
 		q = q.Snapshot()
 	}
 	if flags&LogReplay > 0 {
-		q = q.Snapshot()
+		q = q.LogReplay()
 	}
 	if flags&Prefetch > 0 {
 		session.SetPrefetch(1.0)
