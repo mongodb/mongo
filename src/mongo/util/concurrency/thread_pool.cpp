@@ -1,6 +1,3 @@
-/* threadpool.cpp
-*/
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -34,20 +31,18 @@
 
 #include "mongo/util/concurrency/thread_pool.h"
 
-#include <boost/noncopyable.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/util/concurrency/mvar.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
     namespace threadpool {
 
-        using std::endl;
-        
         // Worker thread
-        class Worker : boost::noncopyable {
+        class Worker {
         public:
             explicit Worker(ThreadPool& owner, const std::string& threadName)
                 : _owner(owner)
@@ -63,8 +58,8 @@ namespace mongo {
             }
 
             void set_task(Task& func) {
-                verify(func);
-                verify(_is_done);
+                invariant(func);
+                invariant(_is_done);
                 _is_done = false;
 
                 _task.put(func);
@@ -87,13 +82,13 @@ namespace mongo {
                         task();
                     }
                     catch (DBException& e) {
-                        log() << "Unhandled DBException: " << e.toString() << endl;
+                        log() << "Unhandled DBException: " << e.toString();
                     }
                     catch (std::exception& e) {
-                        log() << "Unhandled std::exception in worker thread: " << e.what() << endl;;
+                        log() << "Unhandled std::exception in worker thread: " << e.what();
                     }
                     catch (...) {
-                        log() << "Unhandled non-exception in worker thread" << endl;
+                        log() << "Unhandled non-exception in worker thread";
                     }
                     _is_done = true;
                     _owner.task_done(this);
@@ -102,9 +97,7 @@ namespace mongo {
         };
 
         ThreadPool::ThreadPool(int nThreads, const std::string& threadNamePrefix)
-            : _tasksRemaining(0)
-            , _nThreads(nThreads)
-            , _threadNamePrefix(threadNamePrefix) {
+            : ThreadPool(DoNotStartThreadsTag(), nThreads, threadNamePrefix) {
             startThreads();
         }
 
@@ -136,7 +129,7 @@ namespace mongo {
         ThreadPool::~ThreadPool() {
             join();
 
-            verify(_tasksRemaining == 0);
+            invariant(_tasksRemaining == 0);
 
             while(!_freeWorkers.empty()) {
                 delete _freeWorkers.front();

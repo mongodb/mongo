@@ -7,6 +7,16 @@ env.Library('thread_name',
             LIBDEPS=['$BUILD_DIR/mongo/base/base',
                      '$BUILD_DIR/third_party/shim_boost'])
 
+env.Library(
+    target='thread_pool',
+    source=[
+        'thread_pool.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)
+
 env.Library('ticketholder',
             ['ticketholder.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base/base',

@@ -1,5 +1,3 @@
-// thread_pool.h
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -30,12 +28,13 @@
 #pragma once
 
 #include <list>
+#include <string>
 
-#include <boost/noncopyable.hpp>
 #include <boost/thread/condition.hpp>
+#include <boost/thread/mutex.hpp>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -45,7 +44,8 @@ namespace mongo {
         typedef stdx::function<void(void)> Task; //nullary function or functor
 
         // exported to the mongo namespace
-        class ThreadPool : boost::noncopyable {
+        class ThreadPool {
+            MONGO_DISALLOW_COPYING(ThreadPool);
         public:
             struct DoNotStartThreadsTag {};
 
@@ -86,7 +86,7 @@ namespace mongo {
             int tasks_remaining() { return _tasksRemaining; }
 
         private:
-            mongo::mutex _mutex;
+            boost::mutex _mutex;
             boost::condition _condition;
 
             std::list<Worker*> _freeWorkers; //used as LIFO stack (always front)
