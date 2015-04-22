@@ -161,7 +161,6 @@ wt_startup(char *config_open)
 	int ret;
 	char config_buf[128];
 
-
 	testutil_make_workdir(home);
 
 	snprintf(config_buf, sizeof(config_buf),
@@ -244,7 +243,6 @@ onint(int signo)
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
-
 
 /*
  * usage --

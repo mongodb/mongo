@@ -55,7 +55,7 @@ char *
 testutil_workdir_from_path(char *dir)
 {
 	char *buffer;
-	if(dir == NULL){
+	if (dir == NULL) {
 		dir = ".";
 	}
 	int inputSize = strlen(dir);
@@ -69,7 +69,7 @@ testutil_workdir_from_path(char *dir)
 	sprintf(buffer, "%s/WT_TEST", dir);
 #endif
 	printf("returning buffer of %s\n", buffer);
-	return buffer;
+	return (buffer);
 }
 
 void
@@ -94,7 +94,7 @@ testutil_make_workdir(char *dir)
 
 	testutil_clean_workdir(dir);
 
-	/* Mkdir shares syntax between windows and linux */
+	/* mkdir shares syntax between windows and Linux */
 	sprintf(CMD, "mkdir %s", dir);
 	if ((ret = system(CMD)) != 0)
 		die(ret, "directory create call failed");
