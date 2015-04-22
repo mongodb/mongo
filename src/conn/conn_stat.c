@@ -142,7 +142,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	uint64_t max;
 	const char *uri;
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_open_cursor), NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 
 	conn = S2C(session);
 

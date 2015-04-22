@@ -26,9 +26,9 @@ __curstat_lsm_init(
 	int locked;
 	char config[64];
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {
-	   WT_CONFIG_BASE(session, session_open_cursor),
+	   WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = 0;

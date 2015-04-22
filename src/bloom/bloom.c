@@ -124,7 +124,7 @@ __bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
 		return (0);
 
 	session = bloom->session;
-	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_open_cursor);
 	cfg[1] = bloom->config;
 	cfg[2] = NULL;
 	c = NULL;

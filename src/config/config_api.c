@@ -105,69 +105,6 @@ err:		__wt_free(session, config_parser);
 }
 
 /*
- * Translation table of the API methods supported by wiredtiger_config_validate
- * and WT_CONNECTION.configure_method APIs.
- */
-static const struct {
-	const char *method;
-	const char *config;
-} name_to_config_list[] = {
-	{ "WT_CONNECTION.async_new_op", "connection.async_new_op" },
-	{ "WT_CONNECTION.close", "connection.close" },
-	{ "WT_CONNECTION.load_extension", "connection.load_extension" },
-	{ "WT_CONNECTION.open_session", "connection.open_session" },
-	{ "WT_CONNECTION.reconfigure", "connection.reconfigure" },
-	{ "WT_CURSOR.close", "cursor.close" },
-	{ "WT_CURSOR.reconfigure", "cursor.reconfigure" },
-	{ "WT_SESSION.begin_transaction", "session.begin_transaction" },
-	{ "WT_SESSION.checkpoint", "session.checkpoint" },
-	{ "WT_SESSION.close", "session.close" },
-	{ "WT_SESSION.commit_transaction", "session.commit_transaction" },
-	{ "WT_SESSION.compact", "session.compact" },
-	{ "WT_SESSION.create", "session.create" },
-	{ "WT_SESSION.drop", "session.drop" },
-	{ "WT_SESSION.open_cursor", "session.open_cursor" },
-	{ "WT_SESSION.reconfigure", "session.reconfigure" },
-	{ "WT_SESSION.rename", "session.rename" },
-	{ "WT_SESSION.rollback_transaction", "session.rollback_transaction" },
-	{ "WT_SESSION.salvage", "session.salvage" },
-	{ "WT_SESSION.strerror", "session.strerror" },
-	{ "WT_SESSION.truncate", "session.truncate" },
-	{ "WT_SESSION.upgrade", "session.upgrade" },
-	{ "WT_SESSION.verify", "session.verify" },
-	{ "wiredtiger_open", "wiredtiger_open" },
-};
-
-/*
- * __wt_name_to_config --
- *	Translate a stylized handle/method name to one of our configuration
- * entries.
- */
-static int
-__wt_name_to_config(
-    WT_SESSION_IMPL *session, const char *method, const char **configp)
-{
-	u_int base, indx, limit;
-	int cmp;
-
-	for (base = 0, limit =
-	    WT_ELEMENTS(name_to_config_list); limit != 0; limit >>= 1) {
-		indx = base + (limit >> 1);
-		cmp = strcmp(name_to_config_list[indx].method, method);
-		if (cmp == 0) {
-			*configp = name_to_config_list[indx].config;
-			return (0);
-		}
-		if (cmp < 0) {
-			base = indx + 1;
-			--limit;
-		}
-	}
-	WT_RET_MSG(session, EINVAL,
-	    "unknown or unsupported configuration method: '%s'", method);
-}
-
-/*
  * wiredtiger_config_validate --
  *	Validate a configuration string.
  */
@@ -178,7 +115,6 @@ wiredtiger_config_validate(
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
 	const WT_CONFIG_ENTRY *ep, **epp;
-	const char *trans;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -187,32 +123,28 @@ wiredtiger_config_validate(
 	if (config == NULL)
 		WT_RET_MSG(session, EINVAL, "no configuration specified");
 
-	/* 
-	 * Translate the name to a WiredTiger configuration string name.
-	 */
-	WT_RET(__wt_name_to_config(session, name, &trans));
-
 	/*
 	 * If we don't yet have a connection, look for a matching name in the
 	 * static list, otherwise look in the configuration list (which has any
 	 * configuration information the application has added).
 	 */
 	if (session == NULL)
-		ep = __wt_conn_config_match(trans);
+		ep = __wt_conn_config_match(name);
 	else {
 		conn = S2C(session);
 
 		ep = NULL;
 		for (epp = conn->config_entries;
 		    *epp != NULL && (*epp)->method != NULL; ++epp)
-			if (strcmp((*epp)->method, trans) == 0) {
+			if (strcmp((*epp)->method, name) == 0) {
 				ep = *epp;
 				break;
 			}
 	}
 	if (ep == NULL)
-		WT_RET_MSG(session,
-		    WT_NOTFOUND, "no method matching %s found", name);
+		WT_RET_MSG(session, EINVAL,
+		    "unknown or unsupported configuration API: %s",
+		    name);
 
 	return (__wt_config_check(session, ep, config, 0));
 }
@@ -276,7 +208,6 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	size_t cnt;
 	char *newcheck_name, *p;
-	const char *trans;
 
 	/*
 	 * !!!
@@ -312,10 +243,9 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 * Translate the method name to our configuration names, then find a
 	 * match.
 	 */
-	WT_RET(__wt_name_to_config(session, method, &trans));
 	for (epp = conn->config_entries;
 	    *epp != NULL && (*epp)->method != NULL; ++epp)
-		if (strcmp((*epp)->method, trans) == 0)
+		if (strcmp((*epp)->method, method) == 0)
 			break;
 	if (*epp == NULL || (*epp)->method == NULL)
 		WT_RET_MSG(session,
