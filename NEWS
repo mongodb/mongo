@@ -5,14 +5,20 @@ The WiredTiger 2.5.3 release contains important bug fixes.
 
 API and behavior changes:
 
-* Update configuration string parsing to always be case sensitive.
+* Update configuration string parsing to always be case sensitive. See
+  upgrading documentation for more information.
+
+* Change the statistics cursor WT_CURSOR.reset method to re-load statistics
+  values. See upgrading documentation for more information.
+  Refs WT-1533
+
+* Only align buffers on Linux if direct I/O is configured. See upgrading
+  documentation for more information.
 
 * Fixes to how and when idle handles are closed.
   Refs WT-1808, WT-1811, WT-1814
 
 * Add some new statistics related to cache usage.
-
-* Only align buffers on Linux if direct I/O is configured.
 
 * Add new configuration strings to provide control of how often handles are
   are reviewed for closure, and how long a handle needs to be idle before
@@ -24,10 +30,6 @@ API and behavior changes:
 
 * Update the async configuration API to allow a minimum of 1. That is change:
   async=(ops_max=X) so that the minimum value is now 1 the old minimum was 10.
-
-* Change the statistics cursor WT_CURSOR.reset method to re-load statistics
-  values.
-  Refs WT-1533
 
 Bug fixes and other significant changes:
 
