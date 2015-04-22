@@ -1,3 +1,96 @@
+WiredTiger release 2.5.3, 2015-04-22
+------------------------------------
+
+The WiredTiger 2.5.3 release contains important bug fixes.
+
+API and behavior changes:
+
+* Update configuration string parsing to always be case sensitive.
+
+* Fixes to how and when idle handles are closed.
+  Refs WT-1808, WT-1811, WT-1814
+
+* Add some new statistics related to cache usage.
+
+* Only align buffers on Linux if direct I/O is configured.
+
+* Add new configuration strings to provide control of how often handles are
+  are reviewed for closure, and how long a handle needs to be idle before
+  it is closed. The option is via the wiredtiger_open API,
+  file_manager=(close_idle_time=30,close_scan_interval=10)
+
+* Add support for running WiredTiger command line utilities without logging.
+  Refs WT-1732
+
+* Update the async configuration API to allow a minimum of 1. That is change:
+  async=(ops_max=X) so that the minimum value is now 1 the old minimum was 10.
+
+* Change the statistics cursor WT_CURSOR.reset method to re-load statistics
+  values.
+  Refs WT-1533
+
+Bug fixes and other significant changes:
+
+* Fixes and improvements to Windows support.
+
+* Fix several bugs where eviction could stop itself from evicting a page.
+  Refs SERVER-16662, SERVER-17382, WT-1777
+
+* Various fixes for file management. Ensuring files are present on create
+  and contents are flushed on close.
+
+* Fix a race when stopping eviction workers on shutdown.
+  Refs WT-1698
+
+* Fix a bug where if the system crashes during create the base configuration
+  file could be left in an invalid state.
+  Refs WT-1775, WT-1776, SERVER-17571
+
+* Fix cases where WT_SESSSION::truncate could return EBUSY when a schema level
+  operation is running - for example a checkpoint.
+  Refs WT-1404, WT-1643
+
+* Fix a bug in logging - where we could fail to update the end of the log
+  when there is a gap in the log records.
+  Refs WT-1766, SERVER-17569, SERVER-17613
+
+* Fix how we account for space used in the cache to be more accurate.
+Refs SERVER-17424
+
+* Fix a bug where we could leak memory if opening a statistics cursor failed.
+  Refs WT-1760
+
+* Fix a bug where a single page could consume a large portion of the cache.
+  Leading to cases where a small cache size could result in a hang.
+  Refs WT-1759
+
+* Fix a bug in the eviction server that could cause a WT_PANIC. The issue
+  was encountered when the number of open handles exceeded the configured
+  number of hazard pointers.
+  Refs SERVER-17551
+
+* Fix a bug parsing huffman configuration options that could lead to a segfault.
+
+* Fix accounting in btree statistics gathering, so page tracking is accurate.
+  Refs WT-1733
+
+* Fix a memory leak in cache management, where a race during page split could
+  leave a key structure allocated.
+  Refs WT-1582, WT-1747
+
+* Enhance checkpoint tracking code to allow eviction in files once the
+  checkpoint has finished processing them. This helps reduce the impact of
+  checkpoints on workloads with cache pressure.
+  Refs WT-1745
+
+* Fix when aggregation is set on statistics fields. Fixes problems with
+  visualising statistics via wtstats graphs.
+  Refs WT-1742
+
+* Change how checkpoints use empty blocks in on-disk files. Use a first-fit
+  algorithm.
+
+
 WiredTiger release 2.5.2, 2015-03-23
 ------------------------------------
 
