@@ -244,7 +244,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		    table, cval.str, cval.len, NULL, 1, &fmt));
 	}
 	sourcecfg[1] = fmt.data;
-	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));
+	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
 
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
@@ -458,7 +458,7 @@ __create_index(WT_SESSION_IMPL *session,
 	    session, &fmt, ",index_key_columns=%u", npublic_cols));
 
 	sourcecfg[1] = fmt.data;
-	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));
+	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
 
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
