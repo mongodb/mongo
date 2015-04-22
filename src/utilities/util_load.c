@@ -11,7 +11,6 @@
 
 static int config_read(WT_SESSION *, char ***, int *);
 static int config_rename(WT_SESSION *, char **, const char *);
-static void config_remove(char *, const char *);
 static int format(WT_SESSION *);
 static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
@@ -351,12 +350,8 @@ int
 config_update(WT_SESSION *session, char **list)
 {
 	int found;
-	const char *cfg[] = { NULL, NULL, NULL };
+	const char *p, *cfg[] = { NULL, NULL, NULL };
 	char **configp, **listp;
-	const char **rm;
-	static const char *rmnames[] = {
-		"filename", "id", "checkpoint",	"checkpoint_lsn",
-		"version", "source", NULL };
 
 	/*
 	 * If the object has been renamed, replace all of the column group,
@@ -383,14 +378,22 @@ config_update(WT_SESSION *session, char **list)
 	}
 
 	/*
-	 * Remove all "filename=", "source=" and other configurations
-	 * that foil loading from the values. New filenames are chosen
-	 * as part of table load.
+	 * New filenames will be chosen as part of the table load, remove all
+	 * "filename=", "source=" and other configurations that foil loading
+	 * from the values; we call an unpublished API to do the removal.
 	 */
-	for (listp = list; *listp != NULL; listp += 2)
-		for (rm = rmnames; *rm != NULL; rm++)
-			if (strstr(listp[1], *rm) != NULL)
-				config_remove(listp[1], *rm);
+	for (listp = list; *listp != NULL; listp += 2) {
+		cfg[0] = listp[1];
+		cfg[1] = NULL;
+		if (__wt_config_merge((WT_SESSION_IMPL *)session,
+		    cfg,
+		    "filename=,id=,"
+		    "checkpoint=,checkpoint_lsn=,version=,source=,",
+		    &p))
+			return (1);
+		free(listp[1]);
+		listp[1] = (char *)p;
+	}
 
 	/*
 	 * It's possible to update everything except the key/value formats.
@@ -423,11 +426,8 @@ config_update(WT_SESSION *session, char **list)
 			 * We support JSON configuration strings, which leads to
 			 * configuration strings with brackets.  Unfortunately,
 			 * that implies we can't simply append new configuration
-			 * strings to existing ones.  We call an unpublished
-			 * WiredTiger API to do the concatenation: if anyone
-			 * else ever needs it we can make it public, but I think
-			 * that's unlikely.  We're also playing fast and loose
-			 * with types, but it should work.
+			 * strings to existing ones, we call an unpublished API
+			 * to do the concatenation.
 			 */
 			cfg[0] = listp[1];
 			cfg[1] = configp[1];
@@ -484,46 +484,6 @@ config_rename(WT_SESSION *session, char **urip, const char *name)
 	*urip = buf;
 
 	return (0);
-}
-
-/*
- * config_remove --
- *	Remove a single config key and its value.
- */
-static void
-config_remove(char *config, const char *ckey)
-{
-	int parens, quoted;
-	char *begin, match[100], *next, *p;
-
-	snprintf(match, sizeof(match), "%s=", ckey);
-	if ((begin = strstr(config, match)) != NULL) {
-		parens = 0;
-		quoted = 0;
-		next = NULL;
-		for (p = begin + strlen(match); !next && *p; p++)
-			switch (*p) {
-			case '(':
-				if (!quoted)
-					parens++;
-				break;
-			case ')':
-				if (!quoted)
-					parens--;
-				break;
-			case '"':
-				quoted = !quoted;
-				break;
-			case ',':
-				if (!quoted && parens == 0)
-					next = p + 1;
-				break;
-			}
-		if (next)
-			memmove(begin, next, strlen(next) + 1);
-		else
-			*begin = '\0';
-	}
 }
 
 /*
