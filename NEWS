@@ -35,11 +35,8 @@ Bug fixes and other significant changes:
 
 * Fixes and improvements to Windows support.
 
-* Fix several bugs where eviction could stop itself from evicting a page.
+* Fix several bugs that prevent page eviction.
   refs SERVER-16662, SERVER-17382, WT-1777
-
-* Various fixes for file management. Ensuring files are present on create
-  and contents are flushed on close.
 
 * Fix a race when stopping eviction workers on shutdown.
   refs WT-1698
