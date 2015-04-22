@@ -30,7 +30,7 @@
 #   Basic block encryption operations
 #
 
-import os, run
+import os, run, random
 import wiredtiger, wttest
 from wtscenario import multiply_scenarios, number_scenarios
 
@@ -64,8 +64,8 @@ class test_encrypt01(wttest.WiredTigerTestCase):
     scenarios = number_scenarios(multiply_scenarios('.', types,
                                                     encrypt, compress))
 
-    nrecords = 10000
-    bigvalue = "abcdefghij" * 1000
+    nrecords = 5000
+    bigvalue = "abcdefghij" * 1001    # len(bigvalue) = 10010
 
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
@@ -114,12 +114,14 @@ class test_encrypt01(wttest.WiredTigerTestCase):
 
         self.session.create(self.uri, params)
         cursor = self.session.open_cursor(self.uri, None)
+        r = random.Random()
+        r.seed(0)
         for idx in xrange(1,self.nrecords):
-            cursor.set_key(`idx`)
-            if idx / 12 == 0:
-                cursor.set_value(`idx` + self.bigvalue)
-            else:
-                cursor.set_value(`idx` + "abcdefg")
+            start = r.randint(0,9)
+            key = self.bigvalue[start:r.randint(0,100)] + str(idx)
+            val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
+            cursor.set_key(key)
+            cursor.set_value(val)
             cursor.insert()
         cursor.close()
 
@@ -128,13 +130,14 @@ class test_encrypt01(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         cursor = self.session.open_cursor(self.uri, None)
+        r.seed(0)
         for idx in xrange(1,self.nrecords):
-            cursor.set_key(`idx`)
+            start = r.randint(0,9)
+            key = self.bigvalue[start:r.randint(0,100)] + str(idx)
+            val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
+            cursor.set_key(key)
             self.assertEqual(cursor.search(), 0)
-            if idx / 12 == 0:
-                self.assertEquals(cursor.get_value(), `idx` + self.bigvalue)
-            else:
-                self.assertEquals(cursor.get_value(), `idx` + "abcdefg")
+            self.assertEquals(cursor.get_value(), val)
         cursor.close()
 
 
