@@ -27,6 +27,7 @@
  */
 
 #include "thread.h"
+#include "../utility/util.h"
 
 static void *fop(void *);
 static void  print_stats(u_int);

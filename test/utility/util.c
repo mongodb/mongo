@@ -55,10 +55,13 @@ char *
 testutil_workdir_from_path(char *dir)
 {
 	char *buffer;
+	char default_dir[2] = ".";
+	size_t inputSize;
+
 	if (dir == NULL) {
-		dir = ".";
+		dir = default_dir;
 	}
-	int inputSize = strlen(dir);
+	inputSize = strlen(dir);
 	//Alloc space for a new buffer
 	buffer = (char*) malloc (inputSize+8);
 
