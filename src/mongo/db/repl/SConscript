@@ -393,3 +393,53 @@ env.CppUnitTest(
         'base_cloner_test_fixture',
     ],
 )
+
+env.Library(
+    target='task_runner',
+    source=[
+        'task_runner.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+    ],
+)
+
+env.Library(
+    target='task_runner_test_fixture',
+    source=[
+        'task_runner_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'task_runner',
+        '$BUILD_DIR/mongo/util/decorable',
+    ],
+)
+
+env.CppUnitTest(
+    target='task_runner_test',
+    source='task_runner_test.cpp',
+    LIBDEPS=[
+        'task_runner_test_fixture',
+    ],
+)
+
+env.Library(
+    target='database_task',
+    source=[
+        'database_task.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+    ],
+)
+
+env.CppUnitTest(
+    target='database_task_test',
+    source='database_task_test.cpp',
+    LIBDEPS=[
+        'database_task',
+        'replmocks',
+        'task_runner_test_fixture',
+    ],
+)
