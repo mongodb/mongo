@@ -30,6 +30,7 @@ import string, os
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wtscenario import check_scenarios
+from helper import complex_populate
 
 # test_util02.py
 #    Utilities: wt load
@@ -160,6 +161,64 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_load_process_hex(self):
         self.load_process(True)
+
+
+# test_load_commandline --
+#       Test the command-line processing.
+class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
+    uri = "table:command_line"
+
+    def load_commandline(self, args, fail):
+        errfile= "errfile"
+        complex_populate(self, self.uri, "key_format=S,value_format=S", 20)
+        self.runWt(["dump", self.uri], outfilename="dump.out")
+        loadargs = ["load", "-f", "dump.out"] + args
+        self.runWt(loadargs, errfilename=errfile)
+        if fail:
+                self.check_non_empty_file(errfile)
+        else:
+                self.check_empty_file(errfile)
+
+    # Empty arguments should suceed.
+    def test_load_commandline_1(self):
+        self.load_commandline([], 0)
+
+    # Arguments are in pairs.
+    def test_load_commandline_2(self):
+        self.load_commandline(["table"], 1)
+        self.load_commandline([self.uri, "block_allocation=first", self.uri], 1)
+
+    # You can use short-hand URIs for a single object, but cannot match multiple
+    # objects.
+    def test_load_commandline_3(self):
+        self.load_commandline(["table", "block_allocation=first"], 0)
+        self.load_commandline(["colgroup", "block_allocation=first"], 1)
+
+    # You can't reference non-existent objects.
+    def test_load_commandline_4(self):
+        self.load_commandline([self.uri, "block_allocation=first"], 0)
+        self.load_commandline(["table:bar", "block_allocation=first"], 1)
+
+    # You can specify multipleconfiguration arguments for the same object.
+    def test_load_commandline_5(self):
+        self.load_commandline([
+            self.uri, "block_allocation=first",
+            self.uri, "block_allocation=best",
+            self.uri, "block_allocation=first",
+            self.uri, "block_allocation=best"], 0)
+
+    # You can't modify a format.
+    def test_load_commandline_6(self):
+        self.load_commandline(["table", "key_format=d"], 1)
+        self.load_commandline(["table", "value_format=d"], 1)
+
+    # You can set the source or version, but it gets stripped; confirm the
+    # attempt succeeds, so we know they configuration values are stripped.
+    def test_load_commandline_7(self):
+        self.load_commandline(["table", "filename=bar"], 0)
+        self.load_commandline(["table", "source=bar"], 0)
+        self.load_commandline(["table", "version=(100,200)"], 0)
+
 
 if __name__ == '__main__':
     wttest.run()
