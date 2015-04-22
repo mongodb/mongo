@@ -180,10 +180,11 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	const char **cfgp, *cfg[4] =
 	    { WT_CONFIG_BASE(session, colgroup_meta), config, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char *cgname, *source, *tablename;
-	char *cgconf, *sourceconf, *oldconf;
+	const char *cgname, *source, *sourceconf, *tablename;
+	char *cgconf, *oldconf;
 
-	cgconf = sourceconf = oldconf = NULL;
+	sourceconf = NULL;
+	cgconf = oldconf = NULL;
 	WT_CLEAR(fmt);
 	WT_CLEAR(confbuf);
 	WT_CLEAR(namebuf);
@@ -322,13 +323,14 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char *source, *idxname, *tablename;
-	char *sourceconf, *idxconf;
+	const char *source, *sourceconf, *idxname, *tablename;
+	char *idxconf;
 	size_t tlen;
 	int have_extractor;
 	u_int i, npublic_cols;
 
-	idxconf = sourceconf = NULL;
+	sourceconf = NULL;
+	idxconf = NULL;
 	WT_CLEAR(confbuf);
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
