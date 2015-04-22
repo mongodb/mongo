@@ -548,8 +548,6 @@ namespace mongo {
             return validStatus;
         }
 
-        this->generateCacheKey();
-
         // Validate the projection if there is one.
         if (!_pq->getProj().isEmpty()) {
             ParsedProjection* pp;
@@ -604,6 +602,9 @@ namespace mongo {
     }
 
     const PlanCacheKey& CanonicalQuery::getPlanCacheKey() const {
+        if (_cacheKey.empty()) {
+            const_cast<CanonicalQuery*>(this)->generateCacheKey();
+        }
         return _cacheKey;
     }
 
