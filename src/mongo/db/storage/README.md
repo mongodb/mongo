@@ -1,243 +1,123 @@
-Frequently Asked Questions
-==========================
-
-This is a list of frequently asked questions relating to storage engines, nearly
-all of which come from the mongodb-dev Google group. Many of the categories
-overlap, so please do not pay too much attention to the section titles. 
-
-**Q**: If I have a question about the storage API, what's the best way to get an answer?
-**A**: Your best bet is to post on mongodb-dev.  Everybody involved in the storage API will read the
-email.
-
 Storage Engine API
-------------------
-**Q**: On InnoDB, row locks are not released until log sync is done. Will that be a
-problem in the API?  
-**A**: It’s not a problem with the API. A storage engine implementation could log sync at the end of
-every unit of work. The exact behavior depends on the durability behavior of the storage engine
-implementation.  Row locks will be held by MongoDB until the end of a WriteUnitOfWork (eg an
-operation on one document).
+==================
 
-**Q**: As far as I can tell, the storage engine API allows storage engines to keep
-some context in the OperationContext's RecoveryUnit, but only for updates (there
-is no beginUnitOfWork equivalent for queries). This is presumably because of the
-history of locking inside MongoDB, but to prepare for future storage engines, it
-would be helpful to have some context that the storage engine can track across
-related read operations.  
-**A**: We agree that it would be helpful. We haven’t gotten to this yet because our
-current storage engine and isolation level don’t require this. Feel encouraged
-to suggest details.
+The purpose of the Storage Engine API is to allow for pluggable storage engines in MongoDB, see
+also the [Storage FAQ][].  This document gives a brief overview of the API, and provides pointers
+to places with more detailed documentation. Where referencing code, links are to the version that
+was current at the time when the reference was made. Always compare with the latest version for
+changes not yet reflected here.  For questions on the API that are not addressed by this material,
+use the [mongodb-dev][] Google group. Everybody involved in the Storage Engine API will read your
+post.
 
-**Q**: Does the API expect committed changes from a transaction to be visible to
-others before log sync?
-**A**: The API does not require a log sync along with the commit of a unit of work.
-Changes should only be visible to the operation making the changes until those
-changes are committed, at which point the changes should be visible to all
-clients of the storage engine.
+Third-party storage engines are integrated through self-contained modules that can be dropped into
+an existing MongoDB source tree, and will be automatically configured and included. A typical
+module would at least have the following files:
 
-**Q**: What is the difference between storageSize and dataSize in RecordStore?
-**A**: dataSize is the size of the data stored and storageSize is the (approximate) on-disk size of
-the data and metadata.  Indices are not counted in storageSize; they are counted separately.
+    src/             Directory with the actual source files
+    README.md        Information specific to the storage engine
+    SConscript       Scons build rules
+    build.py         Module configuration script
 
-**Q**: Is RecordStore::numRecords called frequently? Does it need to be fast?
-**A**: Yes and yes. Our Rocks implementation caches numRecords and dataSize so accessing that data
-is O(1) instead of O(n)
-
-Operation Context
------------------
-**Q**: I didn't find documentation for the transaction API, nor source code for it.
-How can I find the information for it?  
-**A**: You can find the documentation and source code for this in
-src/mongo/db/operation_context.h and src/mongo/db/operation_context_impl.cpp,
-respectively.  OperationContext contains many classes, in particular the Locker
-and RecoveryUnit, which have their own definitions.
-
-**Q**: In the RecordStore::getIterator() interface, the first parameter is a
-OperationContext "txn". I didn't find any documentation about how this context
-should be used by a specific storage implementation. I don't find it used in
-rocks implementation, nor heap1 or mmap_v1. How can I find answer to this
-question?  
-**A**: OperationContext is all of the state for an operation: the locks, the client
-information, the recovery unit, etc.  In particular, a record store
-implementation would probably access the lock state and the recovery unit.
- Storage engines are free to do whatever they need to with the OperationContext
-in order to satisfy the storage APIs.
-
-**Q**: About OperationContext "txn", does it mean states in operation context are only used by the
-storage engines to ensure the consistency inside the storage engines, and storage engine needs to
-follow no synchronization guideline because of it? To be more precise, if the same "txn" is passed
-to RecordStore::getIterator() twice, does it mean the iterator should be built from the same
-snapshot?
-**A**: Yes.
-
-**Q**: What guarantees must a storage engine provide if a document is updateRecord()'d and then
-returned by a getIterator()?  That is, do storage engines read their own writes?
-**A**: Operations should read their own writes.
+See <https://github.com/mongodb-partners/mongo-rocks> for a good example of the structure.
 
 
-Reading & Writing
------------------
-**Q**: Are write cursors expected to see their changes in progress?
-**A**: Yes, this is currently expected. There has been some discussion about removing this
-requirement. For now we are not planning on doing so. Instead, a queryable and iterable WriteBatch
-class is being created to allow access to data which has not yet been committed.
+Concepts
+--------
 
-**Q**: "Read-your-writes" consistency was mentioned in Mathias's MongoWorld
-presentation, but as far as I can see, the storage engine has no way to connect
-a RecordStore::insertRecord call with a subsequent RecordStore::dataFor -- the
-latter doesn't take an OperationContext.  Is this an oversight?  
-**A**: Yes, this is an oversight.  We’ll be doing a sweep through and fixing this
-and other problems.  (FYI, as an implementation side-effect, mmapv1
-automatically provides read-your-writes, which partially explains this
-oversight.)
+### Record Stores
+A database contains one or more collections, each with a number of indexes, and a catalog listing
+them. All MongoDB collections are implemented with record stores: one for the documents themselves,
+and one for each index. By using the KVEngine class, you only have to deal with the abstraction, as
+the KVStorageEngine] implements the StorageEngine interface, using record stores for catalogs and
+indexes.
 
-**Q**: Storage engines need to support a "read-your-own-update.”  In the storage
-engine interface, which parameter/variable passes this transaction/session
-information?  
-**A**: The OperationContext “txn”, which is also called “opCtx” in some areas, has
-the information.  There are probably some places we have neglected to pass this
-in.
+#### Record Identities
+A RecordId is a unique identifier, assigned by the storage engine, for a specific document or entry
+in a record store at a given time. For storage engines based in the KVEngine the record identity is
+fixed, but other storage engines, such as MMAPv1, may change it when updating a document. Note that
+this can be very expensive, as indexes map to the RecordId. A single document with a large array
+may have thousands of index entries, resulting in very expensive updates.
 
-**Q**: When executing a query, if both of indexes ("btree") and record store are
-read, how do we make sure we are reading from a consistent view of them (RocksDB
-or other storage)? I didn't find any handling of that from the codes. Can you
-point me in a direction to look for this?  
-**A**: We do not handle this now, because it is not an issue with our current
-(mmapv1) storage engine. We’re discussing how to solve this. We currently store
-the information necessary to obtain a consistent view of the database in the
-RocksRecoveryUnit class, which is itself a member of the OperationContext class.
-Therefore, one possible solution would be to pass the OperationContext class to
-every method which needs a consistent view of the database. We will soon merge
-code which has comments mentioning every instance in rocks where this needs to
-be done.
+#### Cloning and bulk operations
+Currently all cloning, [initial sync][] and other operations are done in terms of operating on
+individual documents, though there is a BulkBuilder class for more efficiently building indexes.
 
-**Q**: The RocksDB implementation of insert, update, delete methods for RecordStore add something to
-a write batch. This is fast and unlikely to fail. The real work is delayed until commit. What is the
-expected behavior when writing the write batch on commit fails because of a disk write timeout, disk
-full or other odd error? The likely error would occur on insert or update when unique index
-maintenance is done, but that has yet to be implemented.
-**A**: We’re planning on implementing operation-level retry to avoid deadlocks that might otherwise
-occur while processing a document.  An operation could probably be similarly retried in the case of
-transient errors upon commit.
+### Locking and Concurrency
+MongoDB uses multi-granular intent locking, see the [Concurrency FAQ][]. In all cases, this will
+ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
+with respect to other accesses. Storage engines can choose to support document-level concurrency,
+in which case the storage engine is responsible for any additional synchronization necessary. For
+storage engines not supporting document-level concurrency, MongoDB will use shared/exclusive locks
+at the collection level, so all record store accesses will be serialized.
 
-**Q**: What kind of operations might occur between prepareToYield and recoverFromYield? DDL
-including drop collection? Or just other transactions? For an index scan does prepareToYield require
-me to save the last key seen so that recover knows where to restart?
-**A**: In 2.6, DDL could occur, as could other transactions.  These methods were introduced when
-operations were scheduled through “time-slicing” with voluntary lock yielding.  They’re changing
-meaning now that yielding is gone.  We’re still figuring out what state-saving behavior we need, in
-particular for operations that mutate the results of a query.  The getMore implementation currently
-uses them as well and will probably continue to do so.
+MongoDB uses [two-phase locking][] (2PL) to guarantee serializability of accesses to resources it
+manages. For storage engines that support document level concurrency, MongoDB will only use intent
+locks for the most common operations, leaving synchronization at the record store layer up to the
+storage engine.
 
-**Q**: Is there global locking for SortedDataInterface::isEmpty to prevent inserts from being done
-when the answer is being determined?
-**A**: Yes.  Any caller of isEmpty must have locks to ensure that it is still true by the time it
-acts on that information.
+### Transactions
+Each operation creates an OperationContext with a new RecoveryUnit, implemented by the storage
+engine, that lives until the  operation finishes. Currently, query operations that return a cursor
+to the client live as long as that client cursor, with the operation context switching between its
+own recovery unit and that of the client cursor. In a few other cases an internal command may use
+an extra recovery unit as well. The recovery unit must implement transaction semantics as described
+below.
 
+#### Atomicity
+Writes must only become visible when explicitly committed, and in that case all pending writes
+become visible atomically. Writes that are not committed before the unit of work ends must be
+rolled back. In addition to writes done directly through the Storage API, such as document updates
+and creation of record stores, other custom changes can be registered with the recovery unit.
 
-RecoveryUnit
-------------
-**Q**: As documented I don’t understand the point of the RecoverUnit::endUnitOfWork
-nesting behavior. Can you explain where it is used or will be used?  
-**A**: The RecoveryUnit interface and the mmapv1 (current mongodb storage engine)
-implementation are both works in progress :)  We’re currently adding unit of
-work declarations and two phase locking.  The nesting behavior currently exists
-to verify that we’re adding units of work correctly and we expect to remove it
-when two phase locking is completed.
+#### Consistency
+Storage engines must ensure that atomicity and isolation guarantees span all record stores, as
+otherwise the guarantee of atomic updates on a document and all its indexes would be violated.
 
-**Q**: RecoveryUnit::{beginUnitOfWork, endUnitOfWork, commitUnitOfWork} - these
-return nothing. What happens on failure? With optimistic concurrency control
-commit can fail in the normal case. In theory, someone might try to use
-optimistic CC for a RocksDB+Mongo engine.  
-**A**: We’re currently not planning these interfaces with OCC (or MVCC) in mind.
- Currently, if any of these fooUnitOfWork functions fail, we expect to roll back
-and probably retry the operation. The interfaces are rather fluid right now and
-will probably return a Status (or throw an exception) at some point. However,
-rollback should never fail.
+#### Isolation
+Storage engines must provide snapshot isolation, either through locking (as is the case for the
+MMAPv1 engine), through multi-version concurrency control (MVCC) or otherwise. The first read
+implicitly establishes the snapshot. Operations can always see all changes they make in the context
+of a recovery unit, but other operations cannot until a successfull commit.
+
+#### Durability
+Once a transaction is committed, it is not necessarily durable: if, and only if the server fails,
+as result of power loss or otherwise, the database may recover to an earlier point in time.
+However, atomicity of transactions must remain preserved. Similarly, in a replica set, a primary
+that becomes unavailable may need to rollback to an earlier state when rejoining the replicas et,
+if its changes were not yet seen by a majority of nodes. The RecoveryUnit implements methods to
+allow operations to wait for their committed transactions to become durable.
+
+A transaction may become visible to other transactions as soon as it commits, and a storage engine
+may use a group commit bundling a number of transactions to achieve durability. Alternatively, a
+storage engine may wait for durability at commit time.
+
+### Write Conflicts
+Systems with optimistic concurrency control (OCC) or multi-version concurrency control (MVCC) may
+find that a transaction conflicts with other transactions, that executing an operation would result
+in deadlock or violate other resource constraints. In such cases the storage engine may throw a
+WriteConflictException to signal the transient failure. MongoDB will handle the exception, abort
+and restart the transaction.
 
 
-RocksDB
--------
-**Q**: I think RocksRecoveryUnit::awaitCommit should remain in RecoveryUnit but be
-renamed to ::awaitLogSync. If force log once per second is done, then this
-blocks until the next time log is forced to disk. But I think we [should] be explicit
-about "commit" vs "forcing redo log to storage" given that many engines
-including InnoDB, RocksDB & MongoDB let commit get done without a log force.  
-**A**: We agree that these should be two separately defined pieces of functionality.
-We’re currently discussing whether or not to expose the “forcing redo log to
-storage” in the API. We also are planning on doing a renaming pass.
+Classes to implement
+--------------------
 
-**Q**: Why doesn't RocksRecoveryUnit::endUnitOfWork respect _defaultCommit before
-calling commitUnitOfWork?  
-**A**: _defaultCommit is a temporary boolean that should disappear once we’ve fully
-implemented rollbacks.
+A storage engine should generally implement the following classes. See their definition for more
+details.
 
-**Q**: Why is RocksRecoveryUnit::isCommitNeeded based on size of buffered write
-batch? Isn't this supposed to return TRUE If a WAL sync is needed?  
-**A**: This is an mmapv1-specific method that will be going away.  It’s part of the
-API but will be removed soon.
+* KVEngine
+* RecordStore
+* RecordIterator
+* RecoveryUnit
+* SortedDataInterface
+* ServerStatusSection
+* ServerParameter
 
-**Q**: In RocksRecordStore::updateWithDamages() there is a comment "todo: this
-should use the merge functionality in rocks". Can you explain more about the
-motivation? Is it for atomicity, or for reducing write amplification?  
-**A**: We want to do this for speed, as it will allow us to avoid reading in data
-from rocks, updating it in memory, and writing it back. However, due to the way
-the rest of our code works, we’re not sure if this will yield much of a
-performance increase. For now, we’re focusing on getting minimal functionality
-working, but may benchmark this in the future.
 
-**Q**: How do I install RocksDB?  
-**A**: https://groups.google.com/forum/#!topic/mongodb-dev/ilcHAg6JgQI
-
-**Q**: I think RocksRecordStore::_nextId needs to be persistent. But I also think the API needs to
-support logical IDs as DiskLoc is physical today and using (int,int) for file number / offset
-implies that files are at most 2G. And I suspect that the conversion of it to a byte stream means
-that Rocks documents are not in PK order on little endian (see _makeKey).
-**A**: We're planning on pushing DiskLoc under the storage layer API (it’s really an mmapv1 data
-type) and replacing it with a 64-bit RecordID type that can be converted into whatever a storage
-engine requires.
-
-General
-=======
-**Q**: Does the storage engine allow for group commit?  
-**A**: Yes.  In fact, the mmapv1 impl does group commit.
-
-**Q**: cleanShutdown has no return value. What is to be done on an internal error
-(assert & crash)?  
-**A**: Yes, on internal error, assert and crash.
-
-**Q**: Storage engine initialization is done in the constructor. How are errors on
-init to be returned or handled?  
-**A**: Currently all errors on storage engine init are fatal.  We assume if the
-storage engine can’t work, the database probably can’t work either.
-
-**Q**: Is Command::runAgainstRegistered() the entry point of query and update
-queries? I saw these lines:
-
-    OperationContext* noTxn = NULL; // mongos doesn't use transactions SERVER-13931
-    execCommandClientBasic(noTxn, c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
-
-Are we always passing noTxn to the query? What does it mean?  
-**A**: The entry point of query and updates is assembleResponse in instance.cpp.  In
-the case you cite, the command is being invoked from mongos, which doesn’t need
-to pay attention to durability or take locks.
-
-**Q**: From my reading of the codes, the Cloner component is the way for MongoDB to
-build a new slave from a master (called by ReplSource::resync()). If I
-understand the codes correctly, cloning always does logical copy of keys
-(reading keys one by one and insert them one by one). Two comments I have:
-
-    1. RocksDB uses LSM, which provides a good feature that you can do physical copy
-       of the files, which should be faster. Is there a long term plan to make
-       use of it?   
-    2. If we stick on logical copy, the best practice is to tune the RocksDB in 
-       the new slave side to speed up the copy process:   
-            1. Disable WAL tune compactions  
-            2. Tune compaction to never happen   
-            3. Use vectorrep mem table   
-            4. Issue a full compaction and reopen the DB after cloning finishes.  
-We might consider to design the storage plug-in and components to use it to be  
-flexible enough to make it easy to make those future improvements when needed.  
-**A**: Offering a physical file copy for initial sync is something we're
-considering for the future, but not at this time.
+[Concurrency FAQ]: http://docs.mongodb.org/manual/faq/concurrency/
+[initial sync]: http://docs.mongodb.org/manual/core/replica-set-sync/#replica-set-initial-sync
+[mongodb-dev]: https://groups.google.com/forum/#!forum/mongodb-dev
+[replica set]: http://docs.mongodb.org/manual/replication/
+[Storage FAQ]: http://docs.mongodb.org/manual/faq/storage
+[two-phase locking]: http://en.wikipedia.org/wiki/Two-phase_locking
 
