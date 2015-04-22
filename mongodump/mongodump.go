@@ -4,6 +4,7 @@ package mongodump
 import (
 	"bufio"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/archive"
 	"github.com/mongodb/mongo-tools/common/auth"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
@@ -16,6 +17,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
+	"os"
 	"time"
 )
 
@@ -43,6 +45,7 @@ type MongoDump struct {
 	oplogStart      bson.MongoTimestamp
 	isMongos        bool
 	authVersion     int
+	archive         *archive.ArchiveWriter
 	progressManager *progress.Manager
 }
 
@@ -138,6 +141,19 @@ func (dump *MongoDump) Dump() error {
 		}
 	}
 
+	if dump.OutputOptions.Archive {
+		dump.archive = &archive.ArchiveWriter{
+			Out: os.Stdout,
+			Mux: &archive.Multiplexer{Out: os.Stdout, Control: make(chan byte)},
+		}
+		go dump.archive.Mux.Run()
+	}
+	defer func() {
+		if dump.OutputOptions.Archive {
+			close(dump.archive.Mux.Control)
+		}
+	}()
+
 	// switch on what kind of execution to do
 	switch {
 	case dump.ToolOptions.DB == "" && dump.ToolOptions.Collection == "":
@@ -190,6 +206,17 @@ func (dump *MongoDump) Dump() error {
 	err = dump.DumpMetadata()
 	if err != nil {
 		return fmt.Errorf("error dumping metadata: %v", err)
+	}
+
+	if dump.OutputOptions.Archive {
+		dump.archive.Prelude, err = archive.NewPrelude(dump.manager, dump.ToolOptions.HiddenOptions.MaxProcs)
+		if err != nil {
+			return fmt.Errorf("creating archive prelude: %v", err)
+		}
+		err = dump.archive.Prelude.Write(dump.archive.Out)
+		if err != nil {
+			return fmt.Errorf("error writing metadata in to archive: %v", err)
+		}
 	}
 
 	err = dump.DumpSystemIndexes()

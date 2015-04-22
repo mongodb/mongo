@@ -2,21 +2,39 @@ package archive
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"hash"
 	"hash/crc32"
+	"io"
+	"os"
 	"testing"
-	"time"
 )
 
-var namespaces = []string{
-	"foo.bar",
-	"ding.bats",
-	"ding.dong",
-	"flim.flam.fooey",
-	"crow.bar",
+var testIntents = []*intents.Intent{
+	&intents.Intent{
+		DB:       "foo",
+		C:        "bar",
+		BSONPath: "foo.bar",
+	},
+	&intents.Intent{
+		DB:       "ding",
+		C:        "bats",
+		BSONPath: "ding.bats",
+	},
+	&intents.Intent{
+		DB:       "flim",
+		C:        "flam.fooey",
+		BSONPath: "flim.flam.fooey",
+	},
+	&intents.Intent{
+		DB:       "crow",
+		C:        "bar",
+		BSONPath: "crow.bar",
+	},
 }
 
 type testDoc struct {
@@ -27,10 +45,10 @@ type testDoc struct {
 func TestBasicMux(t *testing.T) {
 	var err error
 
-	Convey("10000 docs in each of five collections multiplexed and demultiplexed", t, func() {
+	Convey("with 10000 docs in each of five collections", t, func() {
 		buf := &bytes.Buffer{}
 
-		mux := &Multiplexer{out: buf}
+		mux := &Multiplexer{Out: buf, Control: make(chan byte)}
 		muxIns := map[string]*MuxIn{}
 
 		inChecksum := map[string]hash.Hash{}
@@ -38,64 +56,83 @@ func TestBasicMux(t *testing.T) {
 		outChecksum := map[string]hash.Hash{}
 		outLength := map[string]int{}
 
-		for _, dbc := range namespaces {
-			inChecksum[dbc] = crc32.NewIEEE()
-			muxIns[dbc] = &MuxIn{namespace: dbc, mux: mux}
-			err = muxIns[dbc].Open()
+		for _, dbc := range testIntents {
+			inChecksum[dbc.Namespace()] = crc32.NewIEEE()
+			muxIns[dbc.Namespace()] = &MuxIn{Intent: dbc, Mux: mux}
 		}
-		for index, dbc := range namespaces {
+		errChan := make(chan byte)
+		for index, dbc := range testIntents {
 			closeDbc := dbc
 			go func() {
-				defer muxIns[closeDbc].Close()
+				muxIns[closeDbc.Namespace()].Open()
+				defer muxIns[closeDbc.Namespace()].Close()
 				staticBSONBuf := make([]byte, db.MaxBSONSize)
 				for i := 0; i < 10000; i++ {
 
-					bsonMarshal, _ := bson.Marshal(testDoc{Bar: index * i, Baz: closeDbc})
-					bsonBuf := staticBSONBuf[:len(bsonMarshal)]
-					copy(bsonBuf, bsonMarshal)
-					muxIns[closeDbc].Write(bsonBuf)
-					inChecksum[closeDbc].Write(bsonBuf)
-					inLength[closeDbc] += len(bsonBuf)
+					bsonBytes, _ := bson.Marshal(testDoc{Bar: index * i, Baz: closeDbc.Namespace()})
+					bsonBuf := staticBSONBuf[:len(bsonBytes)]
+					copy(bsonBuf, bsonBytes)
+					muxIns[closeDbc.Namespace()].Write(bsonBuf)
+					inChecksum[closeDbc.Namespace()].Write(bsonBuf)
+					inLength[closeDbc.Namespace()] += len(bsonBuf)
 				}
+				errChan <- nil
 			}()
 		}
-		mux.Run()
+		Convey("each document should be multiplexed", func() {
+			fmt.Fprintf(os.Stderr, "About to mux\n")
+			go mux.Run()
 
-		demux := &Demultiplexer{in: buf}
-		demuxOuts := map[string]*DemuxOut{}
+			for _, _ = range testIntents {
+				err := <-errChan
+				So(err, ShouldBeNil)
+			}
+			close(mux.Control)
+			demux := &Demultiplexer{in: buf}
+			demuxOuts := map[string]*DemuxOut{}
 
-		for _, dbc := range namespaces {
-			outChecksum[dbc] = crc32.NewIEEE()
-			demuxOuts[dbc] = &DemuxOut{namespace: dbc, demux: demux}
-			demuxOuts[dbc].Open()
-		}
-
-		for _, dbc := range namespaces {
-			closeDbc := dbc
-			go func() {
-				bs := make([]byte, db.MaxBSONSize)
-				var readErr error
-				//var length int
-				var i int
-				for {
-					i++
-					var length int
-					length, readErr = demuxOuts[closeDbc].Read(bs)
-					//		fmt.Fprintf(os.Stderr, "%v\n", bs[:length])
-					if readErr != nil {
-						break
+			for _, dbc := range testIntents {
+				outChecksum[dbc.Namespace()] = crc32.NewIEEE()
+				demuxOuts[dbc.Namespace()] = &DemuxOut{Intent: dbc, Demux: demux}
+				demuxOuts[dbc.Namespace()].Open()
+			}
+			errChan := make(chan error)
+			for _, dbc := range testIntents {
+				closeDbc := dbc
+				go func() {
+					bs := make([]byte, db.MaxBSONSize)
+					var readErr error
+					//var length int
+					var i int
+					for {
+						i++
+						var length int
+						length, readErr = demuxOuts[closeDbc.Namespace()].Read(bs)
+						if readErr != nil {
+							break
+						}
+						outChecksum[closeDbc.Namespace()].Write(bs[:length])
+						outLength[closeDbc.Namespace()] += len(bs[:length])
 					}
-					outChecksum[closeDbc].Write(bs[:length])
-					outLength[closeDbc] += len(bs[:length])
+					if readErr == io.EOF {
+						readErr = nil
+					}
+					errChan <- readErr
+				}()
+			}
+			Convey("and demultiplexed successfully", func() {
+				err = demux.Run()
+				So(err, ShouldBeNil)
+				for _, _ = range testIntents {
+					err := <-errChan
+					So(err, ShouldBeNil)
 				}
-			}()
-		}
-		demux.Run()
-		time.Sleep(time.Second)
-		for _, dbc := range namespaces {
-			So(inLength[dbc], ShouldEqual, outLength[dbc])
-			So(string(inChecksum[dbc].Sum([]byte{})), ShouldEqual, string(outChecksum[dbc].Sum([]byte{})))
-		}
+				for _, dbc := range testIntents {
+					So(inLength[dbc.Namespace()], ShouldEqual, outLength[dbc.Namespace()])
+					So(inChecksum[dbc.Namespace()].Sum([]byte{}), ShouldResemble, outChecksum[dbc.Namespace()].Sum([]byte{}))
+				}
+			})
+		})
 	})
 	return
 }

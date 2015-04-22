@@ -1,7 +1,9 @@
 package mongodump
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/archive"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
@@ -92,10 +94,9 @@ func (dump *MongoDump) outputPath(dbName, colName string) string {
 // NewIntent creates a bare intent without populating the options.
 func (dump *MongoDump) NewIntent(dbName, collName string, stdout bool) (*intents.Intent, error) {
 	intent := &intents.Intent{
-		DB:           dbName,
-		C:            collName,
-		BSONPath:     dump.outputPath(dbName, collName) + ".bson",
-		MetadataPath: dump.outputPath(dbName, collName) + ".metadata.json",
+		DB:       dbName,
+		C:        collName,
+		BSONPath: dump.outputPath(dbName, collName) + ".bson",
 	}
 
 	// add stdout flags if we're using stdout
@@ -104,6 +105,24 @@ func (dump *MongoDump) NewIntent(dbName, collName string, stdout bool) (*intents
 		// We don't actually need a stdoutMetadataFile type because none of the methods on the stdoutFile
 		// Make any use of the BSON or Metadata parts of the intent
 		intent.MetadataFile = &stdoutFile{intent: intent}
+	}
+
+	if dump.OutputOptions.Archive {
+		intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
+	} else {
+		intent.BSONFile = &bsonFileFile{intent: intent}
+	}
+
+	if !intent.IsSystemIndexes() {
+		intent.MetadataPath = dump.outputPath(dbName, colName+".metadata.json")
+		if dump.OutputOptions.Archive {
+			intent.MetadataFile = &archive.Metadata{
+				Intent: intent,
+				Buffer: &bytes.Buffer{},
+			}
+		} else {
+			intent.MetadataFile = &metadataFileFile{intent: intent}
+		}
 	}
 
 	// get a document count for scheduling purposes
@@ -139,7 +158,11 @@ func (dump *MongoDump) CreateOplogIntents() error {
 		C:        dump.oplogCollection,
 		BSONPath: filepath.Join(dump.OutputOptions.Out, "oplog.bson"),
 	}
-	oplogIntent.BSONFile = &bsonFileFile{intent: oplogIntent}
+	if dump.OutputOptions.Archive {
+		oplogIntent.BSONFile = &archive.MuxIn{Mux: dump.archive.Mux, Intent: oplogIntent}
+	} else {
+		oplogIntent.BSONFile = &bsonFileFile{intent: oplogIntent}
+	}
 	dump.manager.Put(oplogIntent)
 	return nil
 }
@@ -160,29 +183,33 @@ func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
 		C:        "system.users",
 		BSONPath: filepath.Join(outDir, "$admin.system.users.bson"),
 	}
-	usersIntent.BSONFile = &bsonFileFile{intent: usersIntent}
-	dump.manager.Put(usersIntent)
-
 	rolesIntent := &intents.Intent{
 		DB:       "admin",
 		C:        "system.roles",
 		BSONPath: filepath.Join(outDir, "$admin.system.roles.bson"),
 	}
-	rolesIntent.BSONFile = &bsonFileFile{intent: rolesIntent}
-	dump.manager.Put(rolesIntent)
-
 	versionIntent := &intents.Intent{
 		DB:       "admin",
 		C:        "system.version",
 		BSONPath: filepath.Join(outDir, "$admin.system.version.bson"),
 	}
-	versionIntent.BSONFile = &bsonFileFile{intent: versionIntent}
+	if dump.OutputOptions.Archive {
+		usersIntent.BSONFile = &archive.MuxIn{Intent: usersIntent, Mux: dump.archive.Mux}
+		rolesIntent.BSONFile = &archive.MuxIn{Intent: rolesIntent, Mux: dump.archive.Mux}
+		versionIntent.BSONFile = &archive.MuxIn{Intent: versionIntent, Mux: dump.archive.Mux}
+	} else {
+		usersIntent.BSONFile = &bsonFileFile{intent: usersIntent}
+		rolesIntent.BSONFile = &bsonFileFile{intent: rolesIntent}
+		versionIntent.BSONFile = &bsonFileFile{intent: versionIntent}
+	}
+	dump.manager.Put(usersIntent)
+	dump.manager.Put(rolesIntent)
 	dump.manager.Put(versionIntent)
 
 	return nil
 }
 
-// CreateIntentsForCollection builds an intent for a given collection and
+// CreateCollectionIntent builds an intent for a given collection and
 // puts it into the intent manager.
 func (dump *MongoDump) CreateCollectionIntent(dbName, colName string) error {
 	if dump.shouldSkipCollection(colName) {
@@ -244,6 +271,7 @@ func (dump *MongoDump) createIntentFromOptions(dbName string, ci *collectionInfo
 func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 	// we must ensure folders for empty databases are still created, for legacy purposes
 	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
+	// XXX move to the open
 	err := os.MkdirAll(dbFolder, defaultPermissions)
 	if err != nil {
 		return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)

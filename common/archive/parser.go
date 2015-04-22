@@ -30,6 +30,7 @@ type ParserError struct {
 	Msg string
 }
 
+// Error is part of the Error interface. It formats a ParserError for human readability.
 func (pe *ParserError) Error() string {
 	err := fmt.Sprintf("corruption found in archive; %v", pe.Msg)
 	if pe.Err != nil {
@@ -38,12 +39,14 @@ func (pe *ParserError) Error() string {
 	return err
 }
 
+// parserError creates a ParserError with just a message
 func parserError(msg string) error {
 	return &ParserError{
 		Msg: msg,
 	}
 }
 
+// parserError creates a ParserError with a message as well as an underlying cause error
 func parserErrError(msg string, err error) error {
 	return &ParserError{
 		Err: err,
@@ -51,7 +54,11 @@ func parserErrError(msg string, err error) error {
 	}
 }
 
-// readBSONOrTerminator
+// readBSONOrTerminator reads at least four bytes, determines
+// if the first four bytes are a terminator, a bson lenght, or something else.
+// If they are a terminator, true,nil are returned. If they are a BSON length,
+// then the remainder of the BSON document are read in to the parser, otherwise
+// an error is returned.
 func (parse *Parser) readBSONOrTerminator() (bool, error) {
 	parse.length = 0
 	_, err := io.ReadAtLeast(parse.In, parse.buf[0:4], 4)
@@ -88,6 +95,8 @@ func (parse *Parser) readBSONOrTerminator() (bool, error) {
 	return false, nil
 }
 
+// ReadAllBlocks calls ReadBlock() until it returns an error.
+// If the error is EOF, then nil is returned, otherwise it returns the error
 func (parse *Parser) ReadAllBlocks(consumer ParserConsumer) (err error) {
 	for err == nil {
 		err = parse.ReadBlock(consumer)
@@ -98,6 +107,13 @@ func (parse *Parser) ReadAllBlocks(consumer ParserConsumer) (err error) {
 	return err
 }
 
+// ReadBlock reads one archive block ( header + body* + terminator )
+// calling consumer.HeaderBSON() on the header, consumer.BodyBSON() on each piece of body,
+// and consumer.EOF() when EOF is encountered before any data was read.
+// It returns nil if a whole block was read, io.EOF is nothing was read,
+// and a ParserError if there was any io error in the middle of the block,
+// if either of the consumer methods return error, or if there was any sort of
+// parsing failure.
 func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 	isTerminator, err := parse.readBSONOrTerminator()
 	if err == io.EOF {

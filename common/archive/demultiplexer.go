@@ -3,6 +3,7 @@ package archive
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 )
@@ -10,10 +11,11 @@ import (
 var errorSuffix string = "dump archive format error"
 
 type Demultiplexer struct {
-	in               io.Reader
-	outs             map[string]*DemuxOut
-	currentNamespace string
-	buf              [db.MaxBSONSize]byte
+	in                   io.Reader
+	outs                 map[string]*DemuxOut
+	currentNamespace     string
+	buf                  [db.MaxBSONSize]byte
+	managerNameSpaceChan chan string
 }
 
 func (dmx *Demultiplexer) Run() error {
@@ -22,9 +24,9 @@ func (dmx *Demultiplexer) Run() error {
 }
 
 // HeaderBSON is part of the ParserConsumer interface and recieves headers from parser.
-// Its main role is to implement opens and EOF's of the embedded stream
+// Its main role is to implement opens and EOF's of the embedded stream.
 func (dmx *Demultiplexer) HeaderBSON(buf []byte) error {
-	colHeader := CollectionHeader{}
+	colHeader := NamespaceHeader{}
 	err := bson.Unmarshal(buf, &colHeader)
 	if err != nil {
 		return fmt.Errorf("%v; header bson doesn't unmarshal as a collection header: (%v)", errorSuffix, err)
@@ -48,7 +50,7 @@ func (dmx *Demultiplexer) HeaderBSON(buf []byte) error {
 	return nil
 }
 
-// End is part of the ParserConsumer interface and recieves the end of archive notification
+// End is part of the ParserConsumer interface and recieves the end of archive notification.
 func (dmx *Demultiplexer) End() error {
 	//TODO, check that the outs are all closed here and error if they are not
 	if len(dmx.outs) != 0 {
@@ -57,20 +59,24 @@ func (dmx *Demultiplexer) End() error {
 	return nil
 }
 
-// End is part of the ParserConsumer interface and recieves BSON bodys from the parser.
-// Its main role is to dispatch the body to the Read() function of the current DemuxOut
+// BSONBody is part of the ParserConsumer interface and recieves BSON bodys from the parser.
+// Its main role is to dispatch the body to the Read() function of the current DemuxOut.
 func (dmx *Demultiplexer) BodyBSON(buf []byte) error {
 	if dmx.currentNamespace == "" {
 		return fmt.Errorf("%v; collection data without a collection header", errorSuffix)
 	}
+	_, ok := dmx.outs[dmx.currentNamespace]
+	if !ok {
+		return fmt.Errorf("%v; no intent currently reading collection %v", errorSuffix, dmx.currentNamespace)
+	}
 	// First write a meaningless value to the reader because if the reader writes first
 	// then it will panic when the chan is closed. We want the reader to be able to detect
-	// that the chan is closed and act accordingly
+	// that the chan is closed, by reading, and act accordingly.
 	dmx.outs[dmx.currentNamespace].readLenChan <- 0
-	// Recieve from the reader to put the bytes in to
+	// Receive from the reader a buffer to put the bytes into
 	readBufChan := <-dmx.outs[dmx.currentNamespace].readBufChan
-	if len(readBufChan) > len(buf) {
-		return fmt.Errorf("%v; readbuf is not large enough for incomming BodyBSON")
+	if len(readBufChan) < len(buf) {
+		return fmt.Errorf("readbuf is not large enough for incoming BodyBSON (%v<%v)", len(readBufChan), len(buf))
 	}
 	copy(readBufChan, buf)
 	// Send back the length of the data copied in to the buffer
@@ -78,16 +84,16 @@ func (dmx *Demultiplexer) BodyBSON(buf []byte) error {
 	return nil
 }
 
-// DemuxOut implements the intent.file interface, which is effectively a ReadWriteCloseOpener
-// It is what the intent uses to read data from the demultiplexer
+// DemuxOut implements the intent.file interface, which is effectively a ReadWriteCloseOpener.
+// It is what the intent uses to read data from the demultiplexer.
 type DemuxOut struct {
 	readLenChan chan int
 	readBufChan chan []byte
-	namespace   string
-	demux       *Demultiplexer
+	Intent      *intents.Intent
+	Demux       *Demultiplexer
 }
 
-// Read is part of the intent.file interface
+// Read is part of the intent.file interface.
 func (dmxOut *DemuxOut) Read(p []byte) (int, error) {
 	// Since we're the "reader" here, not the "writer" we need to start with a read, in case the chan is closed
 	_, ok := <-dmxOut.readLenChan
@@ -101,7 +107,7 @@ func (dmxOut *DemuxOut) Read(p []byte) (int, error) {
 	return length, nil
 }
 
-// Open is part of the intent.file interface
+// Open is part of the intent.file interface.
 // closing the readLenChan chan will cause the next Read() to return EOF
 func (dmxOut *DemuxOut) Close() error {
 	close(dmxOut.readLenChan)
@@ -109,19 +115,22 @@ func (dmxOut *DemuxOut) Close() error {
 	return nil
 }
 
-// Open is part of the intent.file interface
+// Open is part of the intent.file interface.
 // It creates the chan's in the DemuxOut and adds the DemuxOut to the
 // set of DemuxOuts in the demultiplexer
 func (dmxOut *DemuxOut) Open() error {
-	if dmxOut.demux.outs == nil {
-		dmxOut.demux.outs = make(map[string]*DemuxOut)
+	if dmxOut.Demux.outs == nil {
+		dmxOut.Demux.outs = make(map[string]*DemuxOut)
 	}
 	dmxOut.readLenChan = make(chan int)
 	dmxOut.readBufChan = make(chan []byte)
 	// TODO, figure out weather we need to lock around accessing outs
-	dmxOut.demux.outs[dmxOut.namespace] = dmxOut
+	dmxOut.Demux.outs[dmxOut.Intent.Namespace()] = dmxOut
 	return nil
 }
+
+// Write is part of the intent.file interface.
+// It does nothing, and only exists so that DemuxOut fulfills the interface
 func (dmxOut *DemuxOut) Write([]byte) (int, error) {
 	return 0, nil
 }

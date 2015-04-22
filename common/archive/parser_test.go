@@ -46,10 +46,10 @@ var notTerm = []byte{0xFF, 0xFF, 0xFF, 0xFE}
 
 func TestParsing(t *testing.T) {
 
-	Convey("with a parser with a simple parse consumer", t, func() {
+	Convey("With a parser with a simple parser consumer", t, func() {
 		tc := &testConsumer{}
 		parser := Parser{}
-		Convey("A well formed header and body data", func() {
+		Convey("a well formed header and body data parse correctly", func() {
 			buf := bytes.Buffer{}
 			b, _ := bson.Marshal(strStruct{"header"})
 			buf.Write(b)
@@ -67,7 +67,31 @@ func TestParsing(t *testing.T) {
 			So(err, ShouldEqual, io.EOF)
 			So(tc.eof, ShouldBeTrue)
 		})
-		Convey("An incorrect terminator", func() {
+		Convey("a well formed header and multiple body datas parse correctly", func() {
+			buf := bytes.Buffer{}
+			b, _ := bson.Marshal(strStruct{"header"})
+			buf.Write(b)
+			b, _ = bson.Marshal(strStruct{"body0"})
+			buf.Write(b)
+			b, _ = bson.Marshal(strStruct{"body1"})
+			buf.Write(b)
+			b, _ = bson.Marshal(strStruct{"body2"})
+			buf.Write(b)
+			buf.Write(term)
+			parser.In = &buf
+			err := parser.ReadBlock(tc)
+			So(err, ShouldBeNil)
+			So(tc.eof, ShouldBeFalse)
+			So(tc.oobd[0], ShouldEqual, "header")
+			So(tc.ibd[0], ShouldEqual, "body0")
+			So(tc.ibd[1], ShouldEqual, "body1")
+			So(tc.ibd[2], ShouldEqual, "body2")
+
+			err = parser.ReadBlock(tc)
+			So(err, ShouldEqual, io.EOF)
+			So(tc.eof, ShouldBeTrue)
+		})
+		Convey("an incorrect terminator should cause an error", func() {
 			buf := bytes.Buffer{}
 			b, _ := bson.Marshal(strStruct{"header"})
 			buf.Write(b)
@@ -78,21 +102,21 @@ func TestParsing(t *testing.T) {
 			err := parser.ReadBlock(tc)
 			So(err, ShouldNotBeNil)
 		})
-		Convey("An empty block", func() {
+		Convey("an empty block should result in EOF", func() {
 			buf := bytes.Buffer{}
 			parser.In = &buf
 			err := parser.ReadBlock(tc)
 			So(err, ShouldEqual, io.EOF)
 			So(tc.eof, ShouldBeTrue)
 		})
-		Convey("with an error comming from End", func() {
+		Convey("an error comming from the consumer should propigate through the parser", func() {
 			tc.eof = true
 			buf := bytes.Buffer{}
 			parser.In = &buf
 			err := parser.ReadBlock(tc)
 			So(err.Error(), ShouldContainSubstring, "double end")
 		})
-		Convey("with an early EOF", func() {
+		Convey("a partial block should result in a non-EOF error", func() {
 			buf := bytes.Buffer{}
 			b, _ := bson.Marshal(strStruct{"header"})
 			buf.Write(b)
@@ -105,7 +129,7 @@ func TestParsing(t *testing.T) {
 			So(tc.oobd[0], ShouldEqual, "header")
 			So(tc.ibd[0], ShouldEqual, "body")
 		})
-		Convey("with an bson without a null terminator", func() {
+		Convey("a block with a missing terminator shoud result in a non-EOF error", func() {
 			buf := bytes.Buffer{}
 			b, _ := bson.Marshal(strStruct{"header"})
 			buf.Write(b)

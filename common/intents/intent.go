@@ -81,7 +81,8 @@ func (it *Intent) IsSystemIndexes() bool {
 
 type Manager struct {
 	// map for merging metadata with BSON intents
-	intents map[string]*Intent
+	intents        map[string]*Intent
+	specialIntents map[string]*Intent
 
 	// legacy mongorestore works in the order that paths are discovered,
 	// so we need an ordered data structure to preserve this behavior.
@@ -106,6 +107,7 @@ type Manager struct {
 func NewIntentManager() *Manager {
 	return &Manager{
 		intents:                 map[string]*Intent{},
+		specialIntents:          map[string]*Intent{},
 		intentsByDiscoveryOrder: []*Intent{},
 		priotitizerLock:         &sync.Mutex{},
 		indexIntents:            map[string]*Intent{},
@@ -134,27 +136,32 @@ func (manager *Manager) Put(intent *Intent) {
 	// bucket special-case collections
 	if intent.IsOplog() {
 		manager.oplogIntent = intent
+		manager.specialIntents[intent.Namespace()] = intent
 		return
 	}
 	if intent.IsSystemIndexes() {
 		manager.indexIntents[intent.DB] = intent
+		manager.specialIntents[intent.Namespace()] = intent
 		return
 	}
 	if intent.IsUsers() {
 		if intent.BSONPath != "" {
 			manager.usersIntent = intent
+			manager.specialIntents[intent.Namespace()] = intent
 		}
 		return
 	}
 	if intent.IsRoles() {
 		if intent.BSONPath != "" {
 			manager.rolesIntent = intent
+			manager.specialIntents[intent.Namespace()] = intent
 		}
 		return
 	}
 	if intent.IsAuthVersion() {
 		if intent.BSONPath != "" {
 			manager.versionIntent = intent
+			manager.specialIntents[intent.Namespace()] = intent
 		}
 		return
 	}
@@ -211,6 +218,15 @@ func (manager *Manager) Intents() []*Intent {
 		allIntents = append(allIntents, manager.versionIntent)
 	}
 	return allIntents
+}
+
+func (manager *Manager) IntentForNamespace(ns string) *Intent {
+	intent := manager.intents[ns]
+	if intent != nil {
+		return intent
+	}
+	intent = manager.specialIntents[ns]
+	return intent
 }
 
 // Pop returns the next available intent from the manager. If the manager is
@@ -295,6 +311,10 @@ func (manager *Manager) Finalize(pType PriorityType) {
 	case MultiDatabaseLTF:
 		log.Log(log.DebugHigh, "finalizing intent manager with multi-database longest task first prioritizer")
 		manager.prioritizer = NewMultiDatabaseLTFPrioritizer(manager.intentsByDiscoveryOrder)
+	case ArchiveOrder:
+		log.Log(log.DebugHigh, "finalizing intent manager with archive order prioritizer")
+		// XXX figure how how to get the required parameters here
+		//		manager.prioritizer = NewArchivePrioritizer(manager.intentsByDiscoveryOrder)
 	default:
 		panic("cannot initialize IntentPrioritizer with unknown type")
 	}
