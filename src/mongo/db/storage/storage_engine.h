@@ -204,6 +204,7 @@ namespace mongo {
          * override this method if they have clean-up to do that is different from unclean shutdown.
          * MongoDB will not call into the storage subsystem after calling this function.
          *
+         * On error, the storage engine should assert and crash.
          * There is intentionally no uncleanShutdown().
          */
         virtual void cleanShutdown() = 0;
