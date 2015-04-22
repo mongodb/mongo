@@ -25,47 +25,77 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#include <sys/types.h>
-#ifndef _WIN32
-#include <sys/time.h>
-#endif
-
-#include <errno.h>
-#include <inttypes.h>
-#ifndef _WIN32
-#include <pthread.h>
-#endif
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
-
+#include <stdlib.h>
+#include <stdio.h>
 #include <wiredtiger.h>
+#include "../utility/util.h"
 
-extern WT_CONNECTION *conn;			/* WiredTiger connection */
+/*
+ * die --
+ *	Report an error and quit.
+ */
 
-extern u_int nops;				/* Operations per thread */
+void
+die(int e, const char *fmt, ...)
+{
+	va_list ap;
 
-extern const char *uri;				/* Object */
-extern const char *config;			/* Object config */
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	if (e != 0)
+		fprintf(stderr, ": %s", wiredtiger_strerror(e));
+	fprintf(stderr, "\n");
+	exit(EXIT_FAILURE);
+}
 
-extern pthread_rwlock_t single;			/* Single-thread */
+//Takes a directory as input and returns it with "WT_TEST appended"
+char *
+testutil_workdir_from_path(char *dir)
+{
+	char *buffer;
+	if(dir == NULL){
+		dir = ".";
+	}
+	int inputSize = strlen(dir);
+	//Alloc space for a new buffer
+	buffer = (char*) malloc (inputSize+8);
 
-int  fop_start(u_int);
-void obj_bulk(void);
-void obj_bulk_unique(void);
-void obj_checkpoint(void);
-void obj_create(void);
-void obj_create_unique(void);
-void obj_cursor(void);
-void obj_drop(void);
-void obj_upgrade(void);
-void obj_verify(void);
+	/* Is this windows or *nix? */
+#ifdef _WIN32
+	sprintf(buffer, "%s\\WT_TEST", dir);
+#else
+	sprintf(buffer, "%s/WT_TEST", dir);
+#endif
+	printf("returning buffer of %s\n", buffer);
+	return buffer;
+}
+
+void
+testutil_clean_workdir(char *dir)
+{
+	char CMD[512];
+	int ret;
+#ifdef _WIN32
+	sprintf(CMD, "rd /s /q %s", dir);
+#else
+	sprintf(CMD, "rm -rf %s", dir);
+#endif
+	if ((ret = system(CMD)) != 0)
+		die(ret, "directory cleanup call failed");
+}
+
+void
+testutil_make_workdir(char *dir)
+{
+	char CMD[512];
+	int ret;
+
+	testutil_clean_workdir(dir);
+
+	/* Mkdir shares syntax between windows and linux */
+	sprintf(CMD, "mkdir %s", dir);
+	if ((ret = system(CMD)) != 0)
+		die(ret, "directory create call failed");
+}

@@ -27,6 +27,7 @@
  */
 
 #include "thread.h"
+#include "../utility/util.h"
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
 pthread_rwlock_t single;			/* Single thread */
@@ -36,6 +37,8 @@ const char *config;				/* Object config */
 
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
+
+char *home;
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
@@ -82,10 +85,13 @@ main(int argc, char *argv[])
 	nthreads = 10;
 	runs = 1;
 
-	while ((ch = __wt_getopt(progname, argc, argv, "C:l:n:r:t:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:h:l:n:r:t:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			config_open = __wt_optarg;
+			break;
+		case 'h':
+			home = __wt_optarg;
 			break;
 		case 'l':			/* log */
 			if ((logfp = fopen(__wt_optarg, "w")) == NULL) {
@@ -111,6 +117,8 @@ main(int argc, char *argv[])
 	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
+
+	home = testutil_workdir_from_path(home);
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -153,24 +161,16 @@ wt_startup(char *config_open)
 	int ret;
 	char config_buf[128];
 
-#undef	CMD
-#ifdef _WIN32
-#define	CMD "rd /s /q WT_TEST & mkdir WT_TEST"
-#else
-#define	CMD "rm -rf WT_TEST && mkdir WT_TEST"
-#endif
 
-	if ((ret = system(CMD)) != 0)
-		die(ret, "directory cleanup call failed");
+	testutil_make_workdir(home);
 
 	snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
-
 	if ((ret = wiredtiger_open(
-	    "WT_TEST", &event_handler, config_buf, &conn)) != 0)
+	    home, &event_handler, config_buf, &conn)) != 0)
 		die(ret, "wiredtiger_open");
 }
 
@@ -192,18 +192,9 @@ wt_shutdown(void)
  *	Clean up from previous runs.
  */
 static void
-shutdown(void)
+shutdown()
 {
-	int ret;
-
-#undef	CMD
-#ifdef _WIN32
-#define	CMD "if exist WT_TEST rd /s /q WT_TEST"
-#else
-#define	CMD "rm -rf WT_TEST"
-#endif
-	if ((ret = system(CMD)) != 0)
-		die(ret, "directory cleanup call failed");
+	testutil_clean_workdir(home);
 }
 
 static int
@@ -254,24 +245,6 @@ onint(int signo)
 	exit(EXIT_FAILURE);
 }
 
-/*
- * die --
- *	Report an error and quit.
- */
-void
-die(int e, const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "%s: ", progname);
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	if (e != 0)
-		fprintf(stderr, ": %s", wiredtiger_strerror(e));
-	fprintf(stderr, "\n");
-	exit(EXIT_FAILURE);
-}
 
 /*
  * usage --
@@ -286,6 +259,7 @@ usage(void)
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"
+	    "\t-h home (default 'RUNDIR')\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
 	    "\t-r set number of runs\n"
