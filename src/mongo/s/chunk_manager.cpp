@@ -407,16 +407,6 @@ namespace {
         
         log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns
               << " using new epoch " << version.epoch() ;
-        
-        ScopedDbConnection conn(config, 30);
-
-        // Make sure we don't have any chunks that already exist here
-        unsigned long long existingChunks =
-            conn->count(ChunkType::ConfigNS, BSON(ChunkType::ns(_ns)));
-
-        uassert( 13449 , str::stream() << "collection " << _ns << " already sharded with "
-                                       << existingChunks << " chunks", existingChunks == 0 );
-        conn.done();
 
         for ( unsigned i=0; i<=splitPoints.size(); i++ ) {
             BSONObj min = i == 0 ? _keyPattern.getKeyPattern().globalMin() : splitPoints[i-1];

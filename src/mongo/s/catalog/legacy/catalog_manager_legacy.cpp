@@ -426,8 +426,26 @@ namespace {
         if (!status.isOK()) {
             return status.getStatus();
         }
+
         DatabaseType dbt = status.getValue();
         Shard dbPrimary = Shard::make(dbt.getPrimary());
+
+        // This is an extra safety check that the collection is not getting sharded concurrently by
+        // two different mongos instances. It is not 100%-proof, but it reduces the chance that two
+        // invocations of shard collection will step on each other's toes.
+        {
+            ScopedDbConnection conn(_configServerConnectionString, 30);
+            unsigned long long existingChunks = conn->count(ChunkType::ConfigNS,
+                                                            BSON(ChunkType::ns(ns)));
+            if (existingChunks > 0) {
+                conn.done();
+                return Status(ErrorCodes::AlreadyInitialized,
+                    str::stream() << "collection " << ns << " already sharded with "
+                                  << existingChunks << " chunks.");
+            }
+
+            conn.done();
+        }
 
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder;
 
