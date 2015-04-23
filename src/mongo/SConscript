@@ -103,14 +103,6 @@ env.CppUnitTest('util/time_support_test', 'util/time_support_test.cpp', LIBDEPS=
 
 env.Library('stringutils', ['util/stringutils.cpp', 'util/base64.cpp', 'util/hex.cpp'])
 
-env.Library('md5', [
-        'util/md5.cpp',
-        'util/password_digest.cpp',
-        ])
-
-env.CppUnitTest( "md5_test", ["util/md5_test.cpp", "util/md5main.cpp" ],
-                 LIBDEPS=["md5"] )
-
 env.CppUnitTest( "stringutils_test", [ "util/stringutils_test.cpp" ],
                  LIBDEPS=["stringutils"] )
 
@@ -130,10 +122,10 @@ env.Library('bson', [
         'bson/bsontypes.cpp',
         'db/json.cpp'
         ], LIBDEPS=[
-        'base/base',
-        'md5',
-        'stringutils',
         '$BUILD_DIR/mongo/platform/platform',
+        'base/base',
+        'stringutils',
+        'util/md5',
         ])
 
 env.Library('mutable_bson_test_utils', [
@@ -488,7 +480,6 @@ env.Library('mongocommon', commonFiles,
                      'foundation',
                      'service_context',
                      'lasterror',
-                     'md5',
                      'mongohasher',
                      'namespace_string',
                      'network',
@@ -498,6 +489,7 @@ env.Library('mongocommon', commonFiles,
                      'stringutils',
                      'synchronization',
                      'util/concurrency/thread_name',
+                     'util/md5',
                      'version',
                      '$BUILD_DIR/third_party/shim_pcrecpp',
                      '$BUILD_DIR/third_party/murmurhash3/murmurhash3',

@@ -63,3 +63,22 @@ env.CppUnitTest(
         'progress_meter',
     ],
 )
+
+env.Library(
+    target='md5',
+    source=[
+        'md5.cpp',
+        'password_digest.cpp',
+    ],
+)
+
+env.CppUnitTest(
+    target="md5_test",
+    source=[
+        "md5_test.cpp",
+        "md5main.cpp",
+    ],
+    LIBDEPS=[
+        "md5",
+    ],
+)
