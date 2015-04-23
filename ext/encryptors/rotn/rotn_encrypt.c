@@ -56,12 +56,12 @@
  * (repeating) secretkey.  The distance is increased by the value of
  * the keyid.  Thus, with secretkey "ABC" and keyid "2", we show how
  * we map the input "MySecret".
- *    secretkey          =   ABC
- *    distances from 'A' =   012
- *    add keyid (2)      =   234
- *    repeated           =   23423423
- *    input              =   MySecret
- *    output             =   ObWgfvgw
+ *    secretkey          = ABC
+ *    distances from 'A' = 012
+ *    add keyid (2)      = 234
+ *    repeated           = 23423423
+ *    input              = MySecret
+ *    output             = ObWgfvgw
  * In this case, we transform all bytes in the input.
  */
 
