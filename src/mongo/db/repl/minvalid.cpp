@@ -34,6 +34,7 @@
 
 #include "mongo/bson/optime.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -50,45 +51,54 @@ namespace {
 } // namespace
 
     void clearInitialSyncFlag(OperationContext* txn) {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-        Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+            Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "clearInitialSyncFlags", minvalidNS);
     }
 
     void setInitialSyncFlag(OperationContext* txn) {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-        Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+            Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setInitialSyncFlags", minvalidNS);
     }
 
     bool getInitialSyncFlag() {
         OperationContextImpl txn;
-        ScopedTransaction transaction(&txn, MODE_IX);
-        Lock::DBLock lk(txn.lockState(), "local", MODE_X);
-        BSONObj mv;
-        bool found = Helpers::getSingleton( &txn, minvalidNS, mv);
-
-        if (found) {
-            return mv[initialSyncFlagString].trueValue();
-        }
-        return false;
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction transaction(&txn, MODE_IX);
+            Lock::DBLock lk(txn.lockState(), "local", MODE_X);
+            BSONObj mv;
+            bool found = Helpers::getSingleton( &txn, minvalidNS, mv);
+            if (found) {
+                return mv[initialSyncFlagString].trueValue();
+            }
+            return false;
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "getInitialSyncFlags", minvalidNS);
     }
 
     void setMinValid(OperationContext* ctx, OpTime ts) {
-        ScopedTransaction transaction(ctx, MODE_IX);
-        Lock::DBLock lk(ctx->lockState(), "local", MODE_X);
-        Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction transaction(ctx, MODE_IX);
+            Lock::DBLock lk(ctx->lockState(), "local", MODE_X);
+            Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(ctx, "setMinValid", minvalidNS);
     }
 
     OpTime getMinValid(OperationContext* txn) {
-        ScopedTransaction transaction(txn, MODE_IS);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_S);
-        BSONObj mv;
-        bool found = Helpers::getSingleton(txn, minvalidNS, mv);
-        if (found) {
-            return mv["ts"]._opTime();
-        }
-        return OpTime();
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction transaction(txn, MODE_IS);
+            Lock::DBLock lk(txn->lockState(), "local", MODE_S);
+            BSONObj mv;
+            bool found = Helpers::getSingleton(txn, minvalidNS, mv);
+            if (found) {
+                return mv["ts"]._opTime();
+            }
+            return OpTime();
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "getMinValid", minvalidNS);
     }
 
 }
