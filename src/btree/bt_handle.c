@@ -259,8 +259,15 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
 		if (cval.val)
 			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
-		else
+		else {
 			F_CLR(btree, WT_BTREE_NO_EVICTION);
+
+			/*
+			 * If we're configuring eviction, we must have already
+			 * configured hazard pointers.
+			 */
+			WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_NO_HAZARD));
+		}
 	}
 
 	/* Checksums */
