@@ -408,7 +408,7 @@ simple_walk_log(WT_SESSION *session)
 	ret = cursor->close(cursor);
 	if (found == 0) {
 		fprintf(stderr, "Did not find log messages.\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	return (ret);
 }
@@ -493,7 +493,7 @@ main(void)
 	    "key_format=S,value_format=S");
 	if (ret == 0) {
 		fprintf(stderr, "Did not detect bad/unknown keyid error\n");
-		exit (1);
+		exit(EXIT_FAILURE);
 	}
 
 	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
@@ -550,7 +550,7 @@ main(void)
 	    ",secretkey=" SYS_BADPW ")", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect bad password\n");
-		exit (1);
+		exit(EXIT_FAILURE);
 	}
 	/*
 	 * Confirm we detect no password.
@@ -559,7 +559,7 @@ main(void)
 	    "encryption=(name=rotn,keyid=" SYS_KEYID ")", &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect missing password\n");
-		exit (1);
+		exit(EXIT_FAILURE);
 	}
 	/*
 	 * Confirm we detect not using encryption at all.
@@ -567,7 +567,7 @@ main(void)
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON, &conn);
 	if (ret != EPERM) {
 		fprintf(stderr, "Did not detect no encryption\n");
-		exit (1);
+		exit(EXIT_FAILURE);
 	}
 
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);

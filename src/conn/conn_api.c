@@ -603,12 +603,12 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 	uint64_t bucket, hash;
-	int locked;
+	int inserted, locked;
 
 	*kencryptorp = NULL;
 	kenc = NULL;
 	conn = S2C(session);
-	locked = 0;
+	inserted = locked = 0;
 
 	__wt_spin_lock(session, &conn->encryptor_lock);
 	locked = 1;
@@ -642,14 +642,29 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	kenc->encryptor = encryptor;
 	SLIST_INSERT_HEAD(&nenc->keyedlh, kenc, l);
 	SLIST_INSERT_HEAD(&nenc->keyedhashlh[bucket], kenc, hashl);
+	inserted = 1;
 out:
 	__wt_spin_unlock(session, &conn->encryptor_lock);
 	locked = 0;
 
 	*kencryptorp = kenc;
+	/*
+	 * Check if encryption is set on the connection.  If
+	 * someone wants encryption on a table, it needs to be
+	 * configured on the database as well.  This check happens
+	 * here so that it is valid when configuring the
+	 * connection initially as well.
+	 */
+	if (conn->kencryptor == NULL && kenc != NULL)
+		WT_ERR_MSG(session, EINVAL, "table encryption "
+		    "requires connection encryption to be set");
 	kenc = NULL;
+	return (0);
 
 err:	if (kenc != NULL) {
+		if (inserted)
+			SLIST_REMOVE(
+			    &nenc->keyedlh, kenc, __wt_keyed_encryptor, l);
 		__wt_free(session, kenc->keyid);
 		__wt_free(session, kenc);
 	}
@@ -741,7 +756,8 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 			/* Remove from the connection's list, free memory. */
 			SLIST_REMOVE(
 			    &nenc->keyedlh, kenc, __wt_keyed_encryptor, l);
-			__wt_free(session, kenc->keyid);
+			if (kenc->keyid != NULL)
+				__wt_free(session, kenc->keyid);
 			__wt_free(session, kenc);
 		}
 
