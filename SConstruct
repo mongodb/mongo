@@ -1972,7 +1972,7 @@ def doConfigure(myenv):
         print "Invalid --allocator parameter: \"%s\"" % get_option('allocator')
         Exit(1)
 
-    def CheckStdAtomic(context, type):
+    def CheckStdAtomic(context, base_type, extra_message):
         test_body = """
         #include <atomic>
 
@@ -1987,27 +1987,30 @@ def doConfigure(myenv):
             x.compare_exchange_strong(y, x);
             return x.load();
         }}
-        """.format(type)
+        """.format(base_type)
 
-        context.Message("Checking whether toolchain supports std::atomic<{0}> ".format(type))
+        context.Message(
+            "Checking if std::atomic<{0}> works{1}... ".format(
+                base_type, extra_message
+            )
+        )
+
         ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
         context.Result(ret)
         return ret
     conf.AddTest("CheckStdAtomic", CheckStdAtomic)
 
-    def check_all_atomics():
+    def check_all_atomics(extra_message=''):
         for t in ('int64_t', 'uint64_t', 'int32_t', 'uint32_t'):
-            if not conf.CheckStdAtomic(t):
+            if not conf.CheckStdAtomic(t, extra_message):
                 return False
         return True
 
     if not check_all_atomics():
-        if not conf.env.ToolchainIs('msvc'):
-            conf.env.AppendUnique(LIBS=['atomic'])
-            if not check_all_atomics():
-                print "The toolchain does not support std::atomic, cannot continue"
-                Exit(1)
-        else:
+        if not conf.CheckLib('atomic', symbol=None, header=None, language='C', autoadd=1):
+            print "Some atomic ops are not intrinsically supported, but no libatomic found"
+            Exit(1)
+        if not check_all_atomics(' with libatomic'):
             print "The toolchain does not support std::atomic, cannot continue"
             Exit(1)
 
