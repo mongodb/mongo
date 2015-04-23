@@ -982,8 +982,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * Allow for the splitting of pages when a checkpoint is underway only
 	 * if the allow_splits flag has been passed, we know we are performing
 	 * a checkpoint, the page is larger than the stated maximum and there
-	 * has not already been a split on this page as the MULTIBLOCK flag is
-	 * unset.
+	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
+	 * flag is unset.
 	 */
 	if (LF_ISSET(WT_EVICT_FORCE_SPLIT) &&
 	    page->memory_footprint > btree->maxmempage &&

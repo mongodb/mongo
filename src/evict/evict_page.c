@@ -279,6 +279,7 @@ __evict_review(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
+	uint32_t reconcile_flags = WT_EVICTING;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -349,7 +350,6 @@ __evict_review(
 	 * Don't set the update-restore flag for internal pages, they don't have
 	 * updates that can be saved and restored.
 	 */
-	uint32_t reconcile_flags = WT_EVICTING;
 	if (__wt_page_is_modified(page)) {
 		if (LF_ISSET(WT_EVICT_EXCLUSIVE))
 			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);

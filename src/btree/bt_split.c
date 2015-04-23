@@ -857,7 +857,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			continue;
 		}
 		/*
-		 * If the WT_EVICT_FORCE_SPLIT flag is set, we should return ebusy.
+		 * If the WT_EVICT_FORCE_SPLIT flag is set, we return EBUSY.
 		 * This avoids an infinite loop where we are trying to split a
 		 * page that is currently being accessed by a checkpoint.
 		 */
@@ -1369,7 +1369,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_incr, WT_EVICT_FORCE_SPLIT)) != 0) {
+	    session, ref, split_ref, 2,
+	    parent_incr, WT_EVICT_FORCE_SPLIT)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
