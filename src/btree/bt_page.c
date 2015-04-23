@@ -102,10 +102,17 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			return (WT_RESTART);
 		case WT_REF_MEM:
 			/*
-			 * The page is in memory: get a hazard pointer, update
-			 * the page's LRU and return.  The expected reason we
-			 * can't get a hazard pointer is because the page is
-			 * being evicted; yield and try again.
+			 * The page is in memory.
+			 *
+			 * Check if we need an autocommit transaction.
+			 */
+			WT_RET(__wt_txn_autocommit_check(session));
+
+			/*
+			 * Get a hazard pointer, update the page's LRU and
+			 * return.  The expected reason we can't get a hazard
+			 * pointer is because the page is being evicted; yield
+			 * and try again.
 			 */
 #ifdef HAVE_DIAGNOSTIC
 			WT_RET(
@@ -147,12 +154,6 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				 * page-acquisition loop.
 				 */
 				continue;
-			}
-
-			/* Check if we need an autocommit transaction. */
-			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
-				WT_TRET(__wt_hazard_clear(session, page));
-				return (ret);
 			}
 
 			/*
