@@ -349,8 +349,10 @@ config_reorder(WT_SESSION *session, char **list)
 int
 config_update(WT_SESSION *session, char **list)
 {
+	WT_DECL_RET;
 	int found;
-	const char *p, *cfg[] = { NULL, NULL, NULL };
+	size_t cnt;
+	const char *p, **cfg;
 	char **configp, **listp;
 
 	/*
@@ -378,64 +380,29 @@ config_update(WT_SESSION *session, char **list)
 	}
 
 	/*
-	 * New filenames will be chosen as part of the table load, remove all
-	 * "filename=", "source=" and other configurations that foil loading
-	 * from the values; we call an unpublished API to do the removal.
-	 */
-	for (listp = list; *listp != NULL; listp += 2) {
-		cfg[0] = listp[1];
-		cfg[1] = NULL;
-		if (__wt_config_merge((WT_SESSION_IMPL *)session,
-		    cfg,
-		    "filename=,id=,"
-		    "checkpoint=,checkpoint_lsn=,version=,source=,",
-		    &p))
-			return (1);
-		free(listp[1]);
-		listp[1] = (char *)p;
-	}
-
-	/*
-	 * It's possible to update everything except the key/value formats.
+	 * Updating the key/value formats seems like an easy mistake to make.
 	 * If there were command-line configuration pairs, walk the list of
-	 * command-line configuration strings, and check.
+	 * command-line configuration strings and check.
 	 */
 	for (configp = cmdconfig;
-	    cmdconfig != NULL && *configp != NULL; configp += 2)
+	    configp != NULL && *configp != NULL; configp += 2)
 		if (strstr(configp[1], "key_format=") ||
 		    strstr(configp[1], "value_format="))
 			return (util_err(session, 0,
-			    "the command line configuration string may not "
-			    "modify the object's key or value format"));
+			    "an object's key or value format may not be "
+			    "modified"));
 
 	/*
 	 * If there were command-line configuration pairs, walk the list of
-	 * command-line URIs and find a matching dump URI.  For each match,
-	 * rewrite the dump configuration as described by the command-line
-	 * configuration.  It is an error if a command-line URI doesn't find
-	 * a single, exact match, that's likely a mistake.
+	 * command-line URIs and find a matching dump URI.  It is an error
+	 * if a command-line URI doesn't find a single, exact match, that's
+	 * likely a mistake.
 	 */
 	for (configp = cmdconfig;
-	    cmdconfig != NULL && *configp != NULL; configp += 2) {
-		found = 0;
-		for (listp = list; *listp != NULL; listp += 2) {
-			if (strncmp(*configp, listp[0], strlen(*configp)) != 0)
-				continue;
-			/*
-			 * !!!
-			 * We support JSON configuration strings, which leads to
-			 * configuration strings with brackets.  Unfortunately,
-			 * that implies we can't simply append new configuration
-			 * strings to existing ones, we call an unpublished API
-			 * to do the concatenation.
-			 */
-			cfg[0] = listp[1];
-			cfg[1] = configp[1];
-			if (__wt_config_concat(
-			    (WT_SESSION_IMPL *)session, cfg, &listp[1]) != 0)
-				return (1);
-			++found;
-		}
+	    configp != NULL && *configp != NULL; configp += 2) {
+		for (found = 0, listp = list; *listp != NULL; listp += 2)
+			if (strncmp(*configp, listp[0], strlen(*configp)) == 0)
+				++found;
 		switch (found) {
 		case 0:
 			return (util_err(session, 0,
@@ -451,8 +418,46 @@ config_update(WT_SESSION *session, char **list)
 		}
 	}
 
-	/* Leak the memory, I don't care. */
-	return (0);
+	/*
+	 * Allocate a big enough configuration stack to hold all of the command
+	 * line arguments, a list of configuration values to remove, and the
+	 * base configuration values, plus some slop.
+	 */
+	for (cnt = 0, configp = cmdconfig;
+	    cmdconfig != NULL && *configp != NULL; configp += 2)
+		++cnt;
+	if ((cfg = calloc(cnt + 10, sizeof(cfg[0]))) == NULL)
+		return (util_err(session, errno, NULL));
+
+	/*
+	 * For each match, rewrite the dump configuration as described by any
+	 * command-line configuration arguments.
+	 *
+	 * New filenames will be chosen as part of the table load, remove all
+	 * "filename=", "source=" and other configurations that foil loading
+	 * from the values; we call an unpublished API to do the work.
+	 */
+	for (listp = list; *listp != NULL; listp += 2) {
+		cnt = 0;
+		cfg[cnt++] = listp[1];
+		for (configp = cmdconfig;
+		    cmdconfig != NULL && *configp != NULL; configp += 2)
+			if (strncmp(*configp, listp[0], strlen(*configp)) == 0)
+				cfg[cnt++] = configp[1];
+		cfg[cnt++] = NULL;
+
+		if ((ret = __wt_config_merge((WT_SESSION_IMPL *)session,
+		    cfg,
+		    "filename=,id=,"
+		    "checkpoint=,checkpoint_lsn=,version=,source=,",
+		    &p)) != 0)
+			break;
+
+		free(listp[1]);
+		listp[1] = (char *)p;
+	}
+	free(cfg);
+	return (ret);
 }
 
 /*

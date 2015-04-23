@@ -197,7 +197,6 @@ extern int __wt_configure_method(WT_SESSION_IMPL *session, const char *method, c
 extern int __wt_config_check(WT_SESSION_IMPL *session, const WT_CONFIG_ENTRY *entry, const char *config, size_t config_len);
 extern int __wt_config_collapse( WT_SESSION_IMPL *session, const char **cfg, char **config_ret);
 extern int __wt_config_merge(WT_SESSION_IMPL *session, const char **cfg, const char *cfg_strip, const char **config_ret);
-extern int __wt_config_concat( WT_SESSION_IMPL *session, const char **cfg, char **config_ret);
 extern int __wt_conn_config_init(WT_SESSION_IMPL *session);
 extern void __wt_conn_config_discard(WT_SESSION_IMPL *session);
 extern int __wt_ext_config_parser_open(WT_EXTENSION_API *wt_ext, WT_SESSION *wt_session, const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
@@ -427,6 +426,7 @@ extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_metadata_search( WT_SESSION_IMPL *session, const char *key, char **valuep);
 extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_find_handle( WT_SESSION_IMPL *session, const char *name, const char *checkpoint);
 extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll);
 extern int __wt_meta_track_sub_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_sub_off(WT_SESSION_IMPL *session);
