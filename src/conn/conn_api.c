@@ -597,30 +597,34 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
     WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *cfg_arg,
     WT_KEYED_ENCRYPTOR **kencryptorp)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 	uint64_t bucket, hash;
+	int locked;
 
 	*kencryptorp = NULL;
 	kenc = NULL;
+	conn = S2C(session);
+	locked = 0;
 
-	WT_RET(__encryptor_confchk(session, cval, &nenc));
+	__wt_spin_lock(session, &conn->encryptor_lock);
+	locked = 1;
+	WT_ERR(__encryptor_confchk(session, cval, &nenc));
 	if (nenc == NULL) {
 		if (keyid->len != 0)
-			WT_RET_MSG(session, EINVAL, "encryption.keyid "
+			WT_ERR_MSG(session, EINVAL, "encryption.keyid "
 			    "requires encryption.name to be set");
-		return (0);
+		goto out;
 	}
 
 	hash = __wt_hash_city64(keyid->str, keyid->len);
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	SLIST_FOREACH(kenc, &nenc->keyedhashlh[bucket], l)
-		if (WT_STRING_MATCH(kenc->keyid, keyid->str, keyid->len)) {
-			*kencryptorp = kenc;
-			return (0);
-		}
+		if (WT_STRING_MATCH(kenc->keyid, keyid->str, keyid->len))
+			goto out;
 
 	WT_ERR(__wt_calloc_one(session, &kenc));
 	WT_ERR(__wt_strndup(session, keyid->str, keyid->len, &kenc->keyid));
@@ -638,6 +642,9 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	kenc->encryptor = encryptor;
 	SLIST_INSERT_HEAD(&nenc->keyedlh, kenc, l);
 	SLIST_INSERT_HEAD(&nenc->keyedhashlh[bucket], kenc, hashl);
+out:
+	__wt_spin_unlock(session, &conn->encryptor_lock);
+	locked = 0;
 
 	*kencryptorp = kenc;
 	kenc = NULL;
@@ -646,6 +653,8 @@ err:	if (kenc != NULL) {
 		__wt_free(session, kenc->keyid);
 		__wt_free(session, kenc);
 	}
+	if (locked)
+		__wt_spin_unlock(session, &conn->encryptor_lock);
 	return (ret);
 }
 
@@ -693,10 +702,10 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
 		SLIST_INIT(&nenc->keyedhashlh[i]);
 
-	__wt_spin_lock(session, &conn->api_lock);
+	__wt_spin_lock(session, &conn->encryptor_lock);
 	TAILQ_INSERT_TAIL(&conn->encryptqh, nenc, q);
 	nenc = NULL;
-	__wt_spin_unlock(session, &conn->api_lock);
+	__wt_spin_unlock(session, &conn->encryptor_lock);
 
 err:	if (nenc != NULL) {
 		__wt_free(session, nenc->name);
@@ -721,6 +730,7 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
+	__wt_spin_lock(session, &conn->encryptor_lock);
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
 		while ((kenc = SLIST_FIRST(&nenc->keyedlh)) != NULL) {
 			/* Call any termination method. */
@@ -745,6 +755,7 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 		__wt_free(session, nenc->name);
 		__wt_free(session, nenc);
 	}
+	__wt_spin_unlock(session, &conn->encryptor_lock);
 	return (ret);
 }
 
