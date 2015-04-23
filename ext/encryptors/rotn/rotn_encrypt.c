@@ -51,7 +51,7 @@
  * text "Hello" maps to "Uryyb", as we preserve case.  Only the alphabetic
  * characters in the input text are changed.
  *
- * When there is a secretkey we are implementing a Vigenère cipher.
+ * When there is a secretkey we are implementing a Vigenere cipher.
  * Each byte is rotated the distance from 'A' for each letter in the
  * (repeating) secretkey.  The distance is increased by the value of
  * the keyid.  Thus, with secretkey "ABC" and keyid "2", we show how
@@ -72,9 +72,9 @@ typedef struct {
 	uint32_t rot_N;		/* rotN value */
 	char *keyid;		/* Saved keyid */
 	char *secretkey;		/* Saved secretkey */
-	unsigned char *shift_forw; /* Encrypt shifter from secretkey */
-	unsigned char *shift_back; /* Decrypt shifter from secretkey */
-	size_t shift_len;	/* Length of shift_{forw,back} */
+	unsigned char *shift_forw; /* Encrypt shift data from secretkey */
+	unsigned char *shift_back; /* Decrypt shift data from secretkey */
+	size_t shift_len;	/* Length of shift* byte arrays */
 
 } ROTN_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
@@ -142,7 +142,7 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 
 /*
  * do_shift --
- *	Perform a Vigenère cipher
+ *	Perform a Vigenere cipher
  */
 static void
 do_shift(uint8_t *buf, size_t len, unsigned char *shift, size_t shiftlen)

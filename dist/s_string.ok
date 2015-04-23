@@ -182,6 +182,7 @@ MongoDB
 MoveFile
 Multithreaded
 Mutex
+MySecret
 NEEDKEY
 NEEDVALUE
 NOLL
@@ -197,6 +198,7 @@ Nul
 OPTYPE
 OUTBUFF
 OVFL
+ObWgfvgw
 Obama
 PARAM
 POSIX
@@ -269,11 +271,13 @@ UnixLib
 Unmap
 UnmapViewOfFile
 Unmarshall
+Uryyb
 VARCHAR
 VLDB
 VMSG
 Vc
 Vfprintf
+Vigenere
 Vixie
 Vo
 Vv
