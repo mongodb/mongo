@@ -45,7 +45,7 @@
             continue;                                                   \
         }                                                               \
         break;                                                          \
-    } while (true); } while (false)
+    } while (true); } while (false);
 
 namespace mongo {
 

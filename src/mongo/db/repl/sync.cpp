@@ -37,8 +37,11 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/util/assert_util.h"
@@ -115,41 +118,43 @@ namespace repl {
 
     bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
         const NamespaceString nss(o.getStringField("ns"));
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            // Take an X lock on the database in order to preclude other modifications.
+            // Also, the database might not exist yet, so create it.
+            AutoGetOrCreateDb autoDb(txn, nss.db(), MODE_X);
+            Database* const db = autoDb.getDb();
 
-        // Take an X lock on the database in order to preclude other modifications. Also, the
-        // database might not exist yet, so create it.
-        AutoGetOrCreateDb autoDb(txn, nss.db(), MODE_X);
-        Database* const db = autoDb.getDb();
+            // we don't have the object yet, which is possible on initial sync.  get it.
+            log() << "adding missing object" << endl; // rare enough we can log
 
-        // we don't have the object yet, which is possible on initial sync.  get it.
-        log() << "adding missing object" << endl; // rare enough we can log
+            BSONObj missingObj = getMissingDoc(txn, db, o);
 
-        BSONObj missingObj = getMissingDoc(txn, db, o);
+            if( missingObj.isEmpty() ) {
+                log() << "missing object not found on source."
+                         " presumably deleted later in oplog";
+                log() << "o2: " << o.getObjectField("o2").toString();
+                log() << "o firstfield: " << o.getObjectField("o").firstElementFieldName();
 
-        if( missingObj.isEmpty() ) {
-            log() << "missing object not found on source. presumably deleted later in oplog" << endl;
-            log() << "o2: " << o.getObjectField("o2").toString() << endl;
-            log() << "o firstfield: " << o.getObjectField("o").firstElementFieldName() << endl;
+                return false;
+            }
+            else {
+                WriteUnitOfWork wunit(txn);
 
-            return false;
-        }
-        else {
-            WriteUnitOfWork wunit(txn);
+                Collection* const coll = db->getOrCreateCollection(txn, nss.toString());
+                invariant(coll);
 
-            Collection* const collection = db->getOrCreateCollection(txn, nss.toString());
-            invariant(collection);
+                StatusWith<RecordId> result = coll->insertDocument(txn, missingObj, true);
+                uassert(15917,
+                        str::stream() << "failed to insert missing doc: "
+                                      << result.getStatus().toString(),
+                        result.isOK() );
 
-            StatusWith<RecordId> result = collection->insertDocument(txn, missingObj, true);
-            uassert(15917,
-                    str::stream() << "failed to insert missing doc: "
-                                  << result.getStatus().toString(),
-                    result.isOK() );
+                LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;
 
-            LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;
-
-            wunit.commit();
-            return true;
-        }
+                wunit.commit();
+                return true;
+            }
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "InsertRetry", nss.ns());
     }
 
 } // namespace repl

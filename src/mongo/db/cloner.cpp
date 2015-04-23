@@ -49,6 +49,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/service_context.h"
@@ -147,11 +148,12 @@ namespace mongo {
                          << "collection dropped during clone ["
                          << to_collection.ns() << "]",
                          !createdCollection );
-                WriteUnitOfWork wunit(txn);
-                collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
-                verify(collection);
-
-                wunit.commit();
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    WriteUnitOfWork wunit(txn);
+                    collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
+                    verify(collection);
+                    wunit.commit();
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", to_collection.ns());
             }
 
             while( i.moreInCurrentBatch() ) {
@@ -217,19 +219,18 @@ namespace mongo {
                 }
 
                 ++numSeen;
-                WriteUnitOfWork wunit(txn);
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    WriteUnitOfWork wunit(txn);
 
-                BSONObj js = tmp;
-
-                StatusWith<RecordId> loc = collection->insertDocument( txn, js, true );
-                if ( !loc.isOK() ) {
-                    error() << "error: exception cloning object in " << from_collection
-                            << ' ' << loc.getStatus() << " obj:" << js;
-                }
-                uassertStatusOK( loc.getStatus() );
-
-                wunit.commit();
-
+                    BSONObj doc = tmp;
+                    StatusWith<RecordId> loc = collection->insertDocument( txn, doc, true );
+                    if ( !loc.isOK() ) {
+                        error() << "error: exception cloning object in " << from_collection
+                                << ' ' << loc.getStatus() << " obj:" << doc;
+                    }
+                    uassertStatusOK( loc.getStatus() );
+                    wunit.commit();
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "cloner insert", to_collection.ns());
                 RARELY if ( time( 0 ) - saveLast > 60 ) {
                     log() << numSeen << " objects cloned so far from collection " << from_collection;
                     saveLast = time( 0 );
@@ -325,10 +326,12 @@ namespace mongo {
 
         Collection* collection = db->getCollection( to_collection );
         if ( !collection ) {
-            WriteUnitOfWork wunit(txn);
-            collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
-            invariant(collection);
-            wunit.commit();
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wunit(txn);
+                collection = db->createCollection(txn, to_collection.ns(), CollectionOptions());
+                invariant(collection);
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", to_collection.ns());
         }
 
         // TODO pass the MultiIndexBlock when inserting into the collection rather than building the
@@ -389,13 +392,15 @@ namespace mongo {
             invariant(collList.size() <= 1);
             BSONObj col = collList.front();
             if (col["options"].isABSONObj()) {
-                WriteUnitOfWork wunit(txn);
-                Status status = userCreateNS(txn, db, ns, col["options"].Obj(), 0);
-                if ( !status.isOK() ) {
-                    errmsg = status.toString();
-                    return false;
-                }
-                wunit.commit();
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    WriteUnitOfWork wunit(txn);
+                    Status status = userCreateNS(txn, db, ns, col["options"].Obj(), 0);
+                    if ( !status.isOK() ) {
+                        errmsg = status.toString();
+                        return false;
+                    }
+                    wunit.commit();
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createUser", ns);
             }
         }
 
@@ -569,19 +574,20 @@ namespace mongo {
                 Database* db = dbHolder().openDb(txn, toDBName);
 
                 {
-                    WriteUnitOfWork wunit(txn);
+                    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                        WriteUnitOfWork wunit(txn);
 
-                    // we defer building id index for performance - building it in batch is much
-                    // faster
-                    Status createStatus = userCreateNS(txn, db, to_name.ns(), options, false);
-                    if ( !createStatus.isOK() ) {
-                        errmsg = str::stream() << "failed to create collection \""
-                                               << to_name.ns() << "\": "
-                                               << createStatus.reason();
-                        return false;
-                    }
-
-                    wunit.commit();
+                        // we defer building id index for performance - building it in batch is much
+                        // faster
+                        Status createStatus = userCreateNS(txn, db, to_name.ns(), options, false);
+                        if ( !createStatus.isOK() ) {
+                            errmsg = str::stream() << "failed to create collection \""
+                                                   << to_name.ns() << "\": "
+                                                   << createStatus.reason();
+                            return false;
+                        }
+                        wunit.commit();
+                    } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createUser", to_name.ns());
                 }
 
                 LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;

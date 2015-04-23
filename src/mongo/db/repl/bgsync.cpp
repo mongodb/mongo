@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
@@ -493,14 +494,16 @@ namespace {
     long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
         BSONObj oplogEntry;
         try {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-            bool success = Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry);
-            if (!success) {
-                // This can happen when we are to do an initial sync.  lastHash will be set
-                // after the initial sync is complete.
-                return 0;
-            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+                bool success = Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry);
+                if (!success) {
+                    // This can happen when we are to do an initial sync.  lastHash will be set
+                    // after the initial sync is complete.
+                    return 0;
+                }
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "readLastAppliedHash", rsOplogName);
         }
         catch (const DBException& ex) {
             severe() << "Problem reading " << rsOplogName << ": " << ex.toStatus();

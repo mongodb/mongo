@@ -558,10 +558,18 @@ namespace mongo {
 
         for (vector<string>::iterator i = n.begin(); i != n.end(); i++) {
             if (*i != "local") {
-                Database* db = dbHolder().get(txn, *i);
-                invariant(db);
-
-                dropDatabase(txn, db);
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    Database* db = dbHolder().get(txn, *i);
+                    // This is needed since dropDatabase can't be rolled back.
+                    // This is safe be replaced by "invariant(db);dropDatabase(txn, db);" once fixed
+                    if (db == nullptr) {
+                        log() << "database disappeared after listDatabases but before drop: " << *i;
+                    } else {
+                        dropDatabase(txn, db);
+                    }
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn,
+                                                      "dropAllDatabasesExceptLocal",
+                                                      *i);
             }
         }
     }

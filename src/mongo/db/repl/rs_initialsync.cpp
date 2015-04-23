@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/op_observer.h"
@@ -90,10 +91,12 @@ namespace {
         // Truncate the oplog in case there was a prior initial sync that failed.
         Collection* collection = autoDb.getDb()->getCollection(rsOplogName);
         fassert(28565, collection);
-        WriteUnitOfWork wunit(txn);
-        Status status = collection->truncate(txn);
-        fassert(28564, status);
-        wunit.commit();
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(txn);
+            Status status = collection->truncate(txn);
+            fassert(28564, status);
+            wunit.commit();
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "truncate", collection->ns().ns());
     }
 
     /**
@@ -448,13 +451,11 @@ namespace {
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.
-            WriteUnitOfWork wunit(&txn);
             setMinValid(&txn, lastOpTimeWritten);
 
             // Clear the initial sync flag.
             clearInitialSyncFlag(&txn);
             BackgroundSync::get()->setInitialSyncRequestedFlag(false);
-            wunit.commit();
         }
 
         // If we just cloned & there were no ops applied, we still want the primary to know where

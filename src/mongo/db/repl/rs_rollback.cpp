@@ -41,6 +41,7 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
@@ -616,9 +617,14 @@ namespace {
                                     catch (DBException& e) {
                                         if (e.getCode() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
-                                            WriteUnitOfWork wunit(txn);
-                                            uassertStatusOK(collection->truncate(txn));
-                                            wunit.commit();
+                                            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                                                WriteUnitOfWork wunit(txn);
+                                                uassertStatusOK(collection->truncate(txn));
+                                                wunit.commit();
+                                            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                                                                            txn,
+                                                                            "truncate",
+                                                                            collection->ns().ns());
                                         }
                                         else {
                                             throw e;

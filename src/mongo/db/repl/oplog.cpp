@@ -321,10 +321,11 @@ namespace {
 
     Timestamp writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        Timestamp lastOptime = replCoord->getMyLastOptime();
-        invariant(!ops.empty());
 
+        Timestamp lastOptime;
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            lastOptime = replCoord->getMyLastOptime();
+            invariant(!ops.empty());
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), "local", MODE_X);
 
@@ -435,11 +436,13 @@ namespace {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
-        WriteUnitOfWork uow( txn );
-        invariant(ctx.db()->createCollection(txn, _oplogCollectionName, options));
-        if( !rs )
-            getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, BSONObj());
-        uow.commit();
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork uow( txn );
+            invariant(ctx.db()->createCollection(txn, _oplogCollectionName, options));
+            if( !rs )
+                getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, BSONObj());
+            uow.commit();
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", _oplogCollectionName);
 
         /* sync here so we don't get any surprising lag later when we try to sync */
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
