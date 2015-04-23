@@ -109,10 +109,16 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			WT_RET(__wt_txn_autocommit_check(session));
 
 			/*
-			 * Get a hazard pointer, update the page's LRU and
-			 * return.  The expected reason we can't get a hazard
-			 * pointer is because the page is being evicted; yield
-			 * and try again.
+			 * Get a hazard pointer if one is required. We cannot
+			 * be evicting if no hazard pointer is required, we're
+			 * done.
+			 */
+			if (F_ISSET(S2BT(session), WT_BTREE_NO_HAZARD))
+				return (0);
+
+			/*
+			 * The expected reason we can't get a hazard pointer is
+			 * because the page is being evicted, yield, try again.
 			 */
 #ifdef HAVE_DIAGNOSTIC
 			WT_RET(
@@ -126,12 +132,19 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				break;
 			}
 
-			page = ref->page;
-			WT_ASSERT(session, page != NULL);
+			/*
+			 * If eviction is configured for this file, check to see
+			 * if the page qualifies for forced eviction and update
+			 * the page's generation number. If eviction isn't being
+			 * done on this file, we're done.
+			 */
+			if (F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
+				return (0);
 
 			/*
 			 * Forcibly evict pages that are too big.
 			 */
+			page = ref->page;
 			if (force_attempts < 10 &&
 			    __evict_force_check(session, page, flags)) {
 				++force_attempts;
