@@ -39,7 +39,7 @@ func (d *decodeState) storeDBPointer(v reflect.Value) {
 		if !ok {
 			d.error(fmt.Errorf("expected second argument to DBPointer to be of type ObjectId, but ended up being %t", args[1]))
 		}
-		id := bson.ObjectId(arg1)
+		id := bson.ObjectIdHex(string(arg1))
 		v.Set(reflect.ValueOf(DBPointer{arg0, id}))
 	default:
 		d.error(fmt.Errorf("cannot store %v value into %v type", dbPointerType, kind))
