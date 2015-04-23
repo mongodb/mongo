@@ -359,6 +359,7 @@ struct __wt_connection_impl {
 	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
 
 					/* Locked: encryptor list */
+	WT_SPINLOCK encryptor_lock;	/* Encryptor list lock */
 	TAILQ_HEAD(__wt_encrypt_qh, __wt_named_encryptor) encryptqh;
 
 					/* Locked: extractor list */
