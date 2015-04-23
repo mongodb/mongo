@@ -1,6 +1,58 @@
 3.2.0, Date TBA
 ------------------
 
+commit 9166bca3d07d6592c1426c2c33bd56b6be0667e0
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Apr 23 05:43:35 2015 +0000
+
+    Fix a deadlock related to handle locking.
+
+    If one thread does a __wt_session_release_btree of a handle at the same time
+    as another thread does a __wt_session_get_btree both wanting exclusive access
+    to the file. It was possible for one thread to get the dhandle list lock and
+    wait on the handle lock, which another thread held the handle lock waiting for
+    the handle list lock.
+
+    Temporarily fix by doing a try-lock on the __wt_session_get_btree path, long term
+    the solution is to get rid of the __conn_dhandle_open_lock method, and split get
+    and lock into two passes.
+
+    Refs BF-716
+
+commit 3e254079484ce35a3cb70c48478c69defdb8f012
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Apr 23 05:42:08 2015 +0000
+
+    Fix a deadlock related to LSM. There are cases where closing a file with
+    an existing checkpoint could self deadlock.
+
+    Check in the meta tracking whether we've already visited a checkpoint handle.
+
+    Refs WT-716
+
+commit 1e80654b284b47b2dd9c302395ba908bf3a9b898
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Wed Apr 22 13:54:03 2015 -0400
+
+    __wt_config_concat() is a special case of __wt_config_merge(), replace
+    the three calls to __wt_config_concat() with __wt_config_merge().
+
+commit 1c412df22489dc3c18aa5390164ff68474293daf
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Wed Apr 22 13:29:05 2015 -0400
+
+    Instead of doing a configuration line merge to remove configuration
+    values we don't included, followed by a call to concatenate additional
+    configuration values, do a single merge call including all of the
+    configuration values we care about.
+
+    This change is slightly more defensive -- if a user tries to change one
+    of the configuration values we don't allow, we'll strip it, rather than
+    failing the load.
+
+    Clean up memory handling a bit so we don't leak memory, someday Coverity
+    will thank me.
+
 commit 6093e42b21d7e947d7bd053f6691aa1fed1a7f99
 Author: Keith Bostic <keith@wiredtiger.com>
 Date:   Wed Apr 22 11:33:21 2015 -0400
