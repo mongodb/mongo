@@ -138,16 +138,22 @@ namespace IndexCatalogTests {
             ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
 
             // Change value of "expireAfterSeconds" on disk.
-            WriteUnitOfWork wuow(&txn);
-            _coll->getCatalogEntry()->updateTTLSetting(&txn, "x_1", 10);
-            wuow.commit();
+            {
+                WriteUnitOfWork wuow(&txn);
+                _coll->getCatalogEntry()->updateTTLSetting(&txn, "x_1", 10);
+                wuow.commit();
+            }
 
             // Verify that the catalog does not yet know of the change.
             desc = _catalog->findIndexByName(&txn, indexName);
             ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
 
-            // Notify the catalog of the change.
-            desc = _catalog->refreshEntry(&txn, desc);
+            {
+                // Notify the catalog of the change.
+                WriteUnitOfWork wuow(&txn);
+                desc = _catalog->refreshEntry(&txn, desc);
+                wuow.commit();
+            }
 
             // Test that the catalog reflects the change.
             ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());

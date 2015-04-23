@@ -82,7 +82,8 @@ namespace mongo {
 
         // Transfer ownership of the RecoveryUnit from the ClientCursor to the OpCtx.
         RecoveryUnit* ccRecoveryUnit = cc->releaseOwnedRecoveryUnit();
-        txn->setRecoveryUnit(ccRecoveryUnit);
+        _txnPreviousRecoveryUnitState = txn->setRecoveryUnit(ccRecoveryUnit,
+                                                             OperationContext::kNotInUnitOfWork);
     }
 
     void ScopedRecoveryUnitSwapper::dismiss() {
@@ -101,7 +102,7 @@ namespace mongo {
             _cc->setOwnedRecoveryUnit(_txn->releaseRecoveryUnit());
         }
 
-        _txn->setRecoveryUnit(_txnPreviousRecoveryUnit.release());
+        _txn->setRecoveryUnit(_txnPreviousRecoveryUnit.release(), _txnPreviousRecoveryUnitState);
     }
 
     /**
@@ -709,7 +710,9 @@ namespace mongo {
                 txn->recoveryUnit()->abandonSnapshot();
                 cc->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
                 StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-                txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
+                invariant(txn->setRecoveryUnit(storageEngine->newRecoveryUnit(),
+                                               OperationContext::kNotInUnitOfWork)
+                          == OperationContext::kNotInUnitOfWork);
             }
 
             LOG(5) << "caching executor with cursorid " << ccId

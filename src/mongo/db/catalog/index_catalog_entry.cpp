@@ -167,14 +167,13 @@ namespace mongo {
         RecoveryUnitSwap(OperationContext* txn, RecoveryUnit* newRecoveryUnit)
             : _txn(txn),
               _oldRecoveryUnit(_txn->releaseRecoveryUnit()),
-              _newRecoveryUnit(newRecoveryUnit) {
-
-            _txn->setRecoveryUnit(_newRecoveryUnit.get());
-        }
+              _oldRecoveryUnitState(_txn->setRecoveryUnit(newRecoveryUnit,
+                                                          OperationContext::kNotInUnitOfWork)),
+              _newRecoveryUnit(newRecoveryUnit) { }
 
         ~RecoveryUnitSwap() {
             _txn->releaseRecoveryUnit();
-            _txn->setRecoveryUnit(_oldRecoveryUnit);
+            _txn->setRecoveryUnit(_oldRecoveryUnit, _oldRecoveryUnitState);
         }
 
     private:
@@ -183,6 +182,7 @@ namespace mongo {
 
         // Owned, but life-time is not controlled
         RecoveryUnit* const _oldRecoveryUnit;
+        OperationContext::RecoveryUnitState const _oldRecoveryUnitState;
 
         // Owned and life-time is controlled
         const boost::scoped_ptr<RecoveryUnit> _newRecoveryUnit;

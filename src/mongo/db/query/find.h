@@ -58,6 +58,7 @@ namespace mongo {
         bool _dismissed;
 
         std::unique_ptr<RecoveryUnit> _txnPreviousRecoveryUnit;
+        OperationContext::RecoveryUnitState _txnPreviousRecoveryUnitState;
     };
 
     /**

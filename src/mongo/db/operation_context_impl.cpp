@@ -101,10 +101,14 @@ namespace {
         return _recovery.release();
     }
 
-    void OperationContextImpl::setRecoveryUnit(RecoveryUnit* unit) {
+    OperationContext::RecoveryUnitState OperationContextImpl::setRecoveryUnit(RecoveryUnit* unit,
+                                                                         RecoveryUnitState state) {
         _recovery.reset(unit);
+        RecoveryUnitState oldState = _ruState;
+        _ruState = state;
         if ( unit )
             unit->beingSetOnOperationContext();
+        return oldState;
     }
 
     Locker* OperationContextImpl::lockState() const {

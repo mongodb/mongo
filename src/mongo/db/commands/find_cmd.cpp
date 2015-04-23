@@ -336,7 +336,8 @@ namespace mongo {
                     txn->recoveryUnit()->abandonSnapshot();
                     cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
                     StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
-                    txn->setRecoveryUnit(engine->newRecoveryUnit());
+                    txn->setRecoveryUnit(engine->newRecoveryUnit(),
+                                         OperationContext::kNotInUnitOfWork);
                 }
             }
             else {

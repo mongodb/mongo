@@ -177,15 +177,9 @@ namespace mongo {
      */
     class HeapRecordStoreBtreeRecoveryUnit : public RecoveryUnit {
     public:
-        HeapRecordStoreBtreeRecoveryUnit() {
-            _depth = 0;
-        }
-
-        virtual ~HeapRecordStoreBtreeRecoveryUnit();
-
-        virtual void beginUnitOfWork(OperationContext* opCtx);
-        virtual void commitUnitOfWork();
-        virtual void endUnitOfWork();
+        void beginUnitOfWork(OperationContext* opCtx) final { };
+        void commitUnitOfWork() final;
+        void abortUnitOfWork() final;
 
         virtual bool waitUntilDurable() { return true; }
 
@@ -209,7 +203,6 @@ namespace mongo {
                                   HeapRecordStoreBtree* rs, const RecordId& loc );
 
     private:
-        int _depth;
         struct InsertEntry {
             HeapRecordStoreBtree* rs;
             RecordId loc;

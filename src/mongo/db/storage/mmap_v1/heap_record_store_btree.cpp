@@ -108,23 +108,12 @@ namespace mongo {
 
     // ---------------------------
 
-    HeapRecordStoreBtreeRecoveryUnit::~HeapRecordStoreBtreeRecoveryUnit() {
-        invariant( _depth == 0 );
-    }
-
-    void HeapRecordStoreBtreeRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-        _depth++;
-    }
-
     void HeapRecordStoreBtreeRecoveryUnit::commitUnitOfWork() {
-        invariant( _depth == 1 );
         _insertions.clear();
         _mods.clear();
     }
 
-    void HeapRecordStoreBtreeRecoveryUnit::endUnitOfWork() {
-        invariant( _depth-- == 1 );
-
+    void HeapRecordStoreBtreeRecoveryUnit::abortUnitOfWork() {
         // reverse in case we write same area twice
         for ( size_t i = _mods.size(); i > 0; i-- ) {
             ModEntry& e = _mods[i-1];

@@ -114,8 +114,9 @@ namespace mongo {
                                                 StringData ns ) const;
 
         /**
-         * Creates a CollectionCatalogEntry in the for an index rather than a collection. MMAPv1
-         * puts both indexes and collections into CCEs. A namespace named 'name' must not exist.
+         * Creates a CollectionCatalogEntry in the form of an index rather than a collection.
+         * MMAPv1 puts both indexes and collections into CCEs. A namespace named 'name' must not
+         * exist.
          */
         void createNamespaceForIndex(OperationContext* txn, StringData name);
 

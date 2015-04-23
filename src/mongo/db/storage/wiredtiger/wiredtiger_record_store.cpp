@@ -447,7 +447,9 @@ namespace {
             checked_cast<WiredTigerRecoveryUnit*>( txn->releaseRecoveryUnit() );
         invariant( realRecoveryUnit );
         WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
-        txn->setRecoveryUnit( new WiredTigerRecoveryUnit( sc ) );
+        OperationContext::RecoveryUnitState const realRUstate =
+            txn->setRecoveryUnit(new WiredTigerRecoveryUnit(sc),
+                                 OperationContext::kNotInUnitOfWork);
 
         WiredTigerRecoveryUnit::get(txn)->markNoTicketRequired(); // realRecoveryUnit already has
         WT_SESSION* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn)->getSession();
@@ -531,18 +533,18 @@ namespace {
         }
         catch ( const WriteConflictException& wce ) {
             delete txn->releaseRecoveryUnit();
-            txn->setRecoveryUnit( realRecoveryUnit );
+            txn->setRecoveryUnit(realRecoveryUnit, realRUstate);
             log() << "got conflict truncating capped, ignoring";
             return 0;
         }
         catch ( ... ) {
             delete txn->releaseRecoveryUnit();
-            txn->setRecoveryUnit( realRecoveryUnit );
+            txn->setRecoveryUnit(realRecoveryUnit, realRUstate);
             throw;
         }
 
         delete txn->releaseRecoveryUnit();
-        txn->setRecoveryUnit( realRecoveryUnit );
+        txn->setRecoveryUnit(realRecoveryUnit, realRUstate);
         return docsRemoved;
     }
 

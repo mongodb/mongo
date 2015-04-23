@@ -140,7 +140,9 @@ namespace mongo {
                 txn->recoveryUnit()->abandonSnapshot();
                 cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
                 StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-                txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
+                invariant(txn->setRecoveryUnit(storageEngine->newRecoveryUnit(),
+                                               OperationContext::kNotInUnitOfWork)
+                          == OperationContext::kNotInUnitOfWork);
             }
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State

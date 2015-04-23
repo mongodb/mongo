@@ -46,64 +46,38 @@
 namespace mongo {
 
     DurRecoveryUnit::DurRecoveryUnit()
-        : _writeCount(0), _writeBytes(0), _mustRollback(false), _rollbackWritesDisabled(false) {
+        : _writeCount(0), _writeBytes(0), _inUnitOfWork(false), _rollbackWritesDisabled(false) {
     }
 
     void DurRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-        _startOfUncommittedChangesForLevel.push_back(Indexes(_changes.size(), _writeCount));
+        invariant(!_inUnitOfWork);
+        _inUnitOfWork = true;
     }
 
     void DurRecoveryUnit::commitUnitOfWork() {
-        invariant(inAUnitOfWork());
-        invariant(!_mustRollback);
-
-        if (!inOutermostUnitOfWork()) {
-            // If we are nested, make all changes for this level part of the containing UnitOfWork.
-            // They will be added to the global damages list once the outermost UnitOfWork commits,
-            // which it must now do.
-            if (haveUncommittedChangesAtCurrentLevel()) {
-                _startOfUncommittedChangesForLevel.back() =
-                    Indexes(_changes.size(), _writeCount);
-            }
-            return;
-        }
+        invariant(_inUnitOfWork);
 
         commitChanges();
 
         // global journal flush opportunity
         getDur().commitIfNeeded();
+
+        resetChanges();
     }
 
-    void DurRecoveryUnit::endUnitOfWork() {
-        invariant(inAUnitOfWork());
+    void DurRecoveryUnit::abortUnitOfWork() {
+        invariant(_inUnitOfWork);
 
-        if (haveUncommittedChangesAtCurrentLevel()) {
-            _mustRollback = true;
-        }
-
-        // Reset back to default if this is the last unwind of the recovery unit. That way, it can
-        // be reused for new operations.
-        if (inOutermostUnitOfWork()) {
-            rollbackChanges();
-            _rollbackWritesDisabled = false;
-            dassert(_changes.empty() && _initialWrites.empty() && _mergedWrites.empty());
-            dassert( _preimageBuffer.empty() && !_writeCount && !_writeBytes && !_mustRollback);
-        }
-
-        _startOfUncommittedChangesForLevel.pop_back();
+        rollbackChanges();
+        resetChanges();
     }
 
     void DurRecoveryUnit::abandonSnapshot() {
-        invariant( !inAUnitOfWork() );
+        invariant(!_inUnitOfWork);
         // no-op since we have no transaction
     }
 
     void DurRecoveryUnit::commitChanges() {
-        invariant(!_mustRollback);
-        invariant(inOutermostUnitOfWork());
-        invariant(_startOfUncommittedChangesForLevel.front().changeIndex == 0);
-        invariant(_startOfUncommittedChangesForLevel.front().writeCount == 0);
-
         if (getDur().isDurable())
             markWritesForJournaling();
 
@@ -112,8 +86,6 @@ namespace mongo {
                     it != end; ++it) {
                 (*it)->commit();
             }
-
-            resetChanges();
         }
         catch (...) {
             std::terminate();
@@ -193,13 +165,11 @@ namespace mongo {
         _mergedWrites.clear();
         _changes.clear();
         _preimageBuffer.clear();
+        _rollbackWritesDisabled = false;
+        _inUnitOfWork = false;
     }
 
     void DurRecoveryUnit::rollbackChanges() {
-        invariant(inOutermostUnitOfWork());
-        invariant(!_startOfUncommittedChangesForLevel.back().changeIndex);
-        invariant(!_startOfUncommittedChangesForLevel.back().writeCount);
-
         // First rollback disk writes, then Changes. This matches behavior in other storage engines
         // that either rollback a transaction or don't write a writebatch.
 
@@ -232,9 +202,6 @@ namespace mongo {
                 LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*_changes[i]));
                 _changes[i]->rollback();
             }
-
-            resetChanges();
-            _mustRollback = false;
         }
         catch (...) {
             std::terminate();
@@ -242,7 +209,7 @@ namespace mongo {
     }
 
     bool DurRecoveryUnit::waitUntilDurable() {
-        invariant(!inAUnitOfWork());
+        invariant(!_inUnitOfWork);
         return getDur().waitUntilDurable();
     }
 
@@ -303,7 +270,7 @@ namespace mongo {
     }
 
     void* DurRecoveryUnit::writingPtr(void* addr, size_t len) {
-        invariant(inAUnitOfWork());
+        invariant(_inUnitOfWork);
 
         if (len == 0) {
             return addr; // Don't need to do anything for empty ranges.
@@ -349,12 +316,12 @@ namespace mongo {
     }
 
     void DurRecoveryUnit::setRollbackWritesDisabled() {
-        invariant(inOutermostUnitOfWork());
+        invariant(_inUnitOfWork);
         _rollbackWritesDisabled = true;
     }
 
     void DurRecoveryUnit::registerChange(Change* change) {
-        invariant(inAUnitOfWork());
+        invariant(_inUnitOfWork);
         _changes.push_back(change);
     }
 

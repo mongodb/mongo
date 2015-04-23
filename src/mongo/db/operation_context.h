@@ -42,26 +42,39 @@ namespace mongo {
     class CurOp;
     class ProgressMeter;
     class StringData;
+    class WriteUnitOfWork;
+
     /**
-     * This class encompasses the state required by an operation.
-     *
-     * TODO(HK): clarify what this means.  There's one OperationContext for one user operation...
-     *           but is this true for getmore?  Also what about things like fsyncunlock / internal
-     *           users / etc.?
-     *
-     * On construction, an OperationContext associates itself with the current client, and only on
-     * destruction it deassociates itself. At any time a client can be associated with at most one
-     * OperationContext.
+     * This class encompasses the state required by an operation and lives from the time a network
+     * peration is dispatched until its execution is finished. Note that each "getmore" on a cursor
+     * is a separate operation. On construction, an OperationContext associates itself with the
+     * current client, and only on destruction it deassociates itself. At any time a client can be
+     * associated with at most one OperationContext. Each OperationContext has a RecoveryUnit
+     * associated with it, though the lifetime is not necesarily the same, see releaseRecoveryUnit 
+     * and setRecoveryUnit. The operation context also keeps track of some transaction state
+     * (RecoveryUnitState) to reduce complexity and duplication in the storage-engine specific
+     * RecoveryUnit and to allow better invariant checking.
      */
     class OperationContext : public Decorable<OperationContext> {
         MONGO_DISALLOW_COPYING(OperationContext);
+        
     public:
+        /**
+         * The RecoveryUnitState is used by WriteUnitOfWork to ensure valid state transitions.
+         */
+        enum RecoveryUnitState {
+            kNotInUnitOfWork, // not in a unit of work, no writes allowed
+            kActiveUnitOfWork, // in a unit of work that still may either commit or abort
+            kFailedUnitOfWork  // in a unit of work that has failed and must be aborted
+        };
+
         virtual ~OperationContext() { }
 
         /**
          * Interface for durability.  Caller DOES NOT own pointer.
          */
         virtual RecoveryUnit* recoveryUnit() const = 0;
+
 
         /**
          * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
@@ -77,7 +90,13 @@ namespace mongo {
          */
         virtual RecoveryUnit* releaseRecoveryUnit() = 0;
 
-        virtual void setRecoveryUnit(RecoveryUnit* unit) = 0;
+        /**
+         * Associates the OperatingContext with a different RecoveryUnit for getMore or
+         * subtransactions, see RecoveryUnitSwap. The new state is passed and the old state is
+         * returned separately even though the state logically belongs to the RecoveryUnit,
+         * as it is managed by the OperationContext.
+         */
+        virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit, RecoveryUnitState state) = 0;
 
         /**
          * Interface for locking.  Caller DOES NOT own pointer.
@@ -158,7 +177,10 @@ namespace mongo {
     protected:
         OperationContext() { }
 
+        RecoveryUnitState _ruState = kNotInUnitOfWork;
+
     private:
+        friend class WriteUnitOfWork;
         WriteConcernOptions _writeConcern;
     };
 
@@ -167,33 +189,45 @@ namespace mongo {
     public:
         WriteUnitOfWork(OperationContext* txn)
                  : _txn(txn),
-                   _ended(false) {
-
+                   _committed(false),
+                   _toplevel(txn->_ruState == OperationContext::kNotInUnitOfWork) {
             _txn->lockState()->beginWriteUnitOfWork();
-            _txn->recoveryUnit()->beginUnitOfWork(_txn);
+            if (_toplevel) {
+                _txn->recoveryUnit()->beginUnitOfWork(_txn);
+                _txn->_ruState = OperationContext::kActiveUnitOfWork;
+            }
         }
 
         ~WriteUnitOfWork() {
-            _txn->recoveryUnit()->endUnitOfWork();
-
-            if (!_ended) {
+            if (!_committed) {
+                invariant(_txn->_ruState != OperationContext::kNotInUnitOfWork);
+                if (_toplevel) {
+                    _txn->recoveryUnit()->abortUnitOfWork();
+                    _txn->_ruState = OperationContext::kNotInUnitOfWork;
+                }
+                else {
+                    _txn->_ruState = OperationContext::kFailedUnitOfWork;
+                }
                 _txn->lockState()->endWriteUnitOfWork();
             }
         }
 
         void commit() {
-            invariant(!_ended);
-
-            _txn->recoveryUnit()->commitUnitOfWork();
+            invariant(!_committed);
+            invariant (_txn->_ruState == OperationContext::kActiveUnitOfWork);
+            if (_toplevel) {
+                _txn->recoveryUnit()->commitUnitOfWork();
+                _txn->_ruState = OperationContext::kNotInUnitOfWork;
+            }
             _txn->lockState()->endWriteUnitOfWork();
-
-            _ended = true;
+            _committed = true;
         }
 
     private:
         OperationContext* const _txn;
 
-        bool _ended;
+        bool _committed;
+        bool _toplevel;
     };
 
 

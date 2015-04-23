@@ -42,12 +42,9 @@ namespace mongo {
 
     class InMemoryRecoveryUnit : public RecoveryUnit {
     public:
-        InMemoryRecoveryUnit() : _depth(0) {}
-        virtual ~InMemoryRecoveryUnit();
-
-        virtual void beginUnitOfWork(OperationContext* opCtx);
-        virtual void commitUnitOfWork();
-        virtual void endUnitOfWork();
+        void beginUnitOfWork(OperationContext* opCtx) final { };
+        void commitUnitOfWork() final;
+        void abortUnitOfWork() final;
 
         virtual bool waitUntilDurable() {
             return true;
@@ -71,8 +68,7 @@ namespace mongo {
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;
 
-        int _depth;
         Changes _changes;
     };
 
-}
+} // namespace mongo

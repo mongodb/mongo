@@ -44,7 +44,8 @@ namespace mongo {
 
         virtual RecoveryUnit* releaseRecoveryUnit() override;
 
-        virtual void setRecoveryUnit(RecoveryUnit* unit) override;
+        virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
+                                                  RecoveryUnitState state) override;
 
         virtual Locker* lockState() const override;
 

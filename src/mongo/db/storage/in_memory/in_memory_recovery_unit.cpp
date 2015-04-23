@@ -36,18 +36,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-    InMemoryRecoveryUnit::~InMemoryRecoveryUnit() {
-        invariant(_depth == 0);
-    }
-
-    void InMemoryRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
-        _depth++;
-    }
 
     void InMemoryRecoveryUnit::commitUnitOfWork() {
-        if ( _depth > 1 )
-            return;
-
         try {
             for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
                 (*it)->commit();
@@ -59,11 +49,7 @@ namespace mongo {
         }
     }
 
-    void InMemoryRecoveryUnit::endUnitOfWork() {
-         _depth--;
-         if (_depth > 0 )
-             return;
-
+    void InMemoryRecoveryUnit::abortUnitOfWork() {
          try {
              for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
                      it != end; ++it) {

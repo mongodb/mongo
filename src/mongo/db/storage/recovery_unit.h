@@ -57,26 +57,14 @@ namespace mongo {
         /**
          * These should be called through WriteUnitOfWork rather than directly.
          *
-         * begin and end mark the begining and end of a unit of work. Each call to begin must be
-         * matched with exactly one call to end. commit can be called any number of times between
-         * begin and end but must not be called outside. When end() is called, all changes since the
-         * last commit (if any) will be rolled back.
-         *
-         * If UnitsOfWork nest (ie begin is called twice before a call to end), the prior paragraph
-         * describes the behavior of the outermost UnitOfWork. Inner UnitsOfWork neither commit nor
-         * rollback on their own but rely on the outermost to do it. If an inner UnitOfWork commits
-         * any changes, it is illegal for an outer unit to rollback. If an inner UnitOfWork
-         * rollsback any changes, it is illegal for an outer UnitOfWork to do anything other than
-         * rollback.
-         *
-         * The goal is not to fully support nested transaction, instead we want to allow delaying
-         * commit on a unit if it is part of a larger atomic unit.
-         *
-         * TODO see if we can get rid of nested UnitsOfWork.
+         * A call to 'beginUnitOfWork' marks the beginning of a unit of work. Each call to
+         * 'beginUnitOfWork' must be matched with exactly one call to either 'commitUnitOfWork' or
+         * 'abortUnitOfWork'. When 'abortUnitOfWork' is called, all changes made since the begin
+         * of the unit of work will be rolled back.
          */
         virtual void beginUnitOfWork(OperationContext* opCtx) = 0;
         virtual void commitUnitOfWork() = 0;
-        virtual void endUnitOfWork() = 0;
+        virtual void abortUnitOfWork() = 0;
 
         // WARNING: "commit" in functions below refers to a global journal flush which implicitly
         // commits the current UnitOfWork as well. They are actually stronger than commitUnitOfWork
