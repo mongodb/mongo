@@ -1,0 +1,138 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+env.Library(
+    target='path',
+    source=[
+        'path.cpp',
+        'path_internal.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/common',
+    ],
+)
+
+env.CppUnitTest(
+    target='path_test',
+    source=[
+        'path_test.cpp',
+    ],
+    LIBDEPS=[
+        'path',
+    ],
+)
+
+env.Library(
+    target='expressions',
+    source=[
+        'expression.cpp',
+        'expression_array.cpp',
+        'expression_leaf.cpp',
+        'expression_parser.cpp',
+        'expression_parser_tree.cpp',
+        'expression_tree.cpp',
+        'expression_where_noop.cpp',
+        'match_details.cpp',
+        'matchable.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
+        'path',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_test',
+    source=[
+        'expression_array_test.cpp',
+        'expression_leaf_test.cpp',
+        'expression_test.cpp',
+        'expression_tree_test.cpp',
+    ],
+    LIBDEPS=[
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_parser_test',
+    source=[
+        'expression_parser_array_test.cpp',
+        'expression_parser_leaf_test.cpp',
+        'expression_parser_test.cpp',
+        'expression_parser_tree_test.cpp',
+    ],
+    LIBDEPS=[
+        'expressions',
+    ],
+)
+
+env.Library(
+    target='expression_algo',
+    source=[
+        'expression_algo.cpp',
+    ],
+    LIBDEPS=[
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_algo_test',
+    source=[
+        'expression_algo_test.cpp',
+    ],
+    LIBDEPS=[
+        'expression_algo',
+    ],
+)
+
+env.Library(
+    target='expressions_geo',
+    source=[
+        'expression_geo.cpp',
+        'expression_parser_geo.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/geo/geometry',
+        '$BUILD_DIR/mongo/db/geo/geoparser',
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_geo_test',
+    source=[
+        'expression_geo_test.cpp',
+        'expression_parser_geo_test.cpp',
+    ],
+    LIBDEPS=[
+        'expressions_geo',
+    ],
+)
+
+env.Library(
+    target='expressions_text',
+    source=[
+        'expression_text.cpp',
+        'expression_parser_text.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/fts/base',
+        'expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='expression_text_test',
+    source=[
+        'expression_parser_text_test.cpp',
+    ],
+    LIBDEPS=[
+        'expressions_text',
+    ],
+)

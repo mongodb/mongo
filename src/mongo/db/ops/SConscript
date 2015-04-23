@@ -13,7 +13,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/foundation',
-        '$BUILD_DIR/mongo/expressions',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
     ],
 )
 
@@ -45,7 +45,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/mutable_bson_test_utils',
-        '$BUILD_DIR/mongo/expressions',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
         'update_common',
     ],
 )
@@ -68,7 +68,7 @@ env.Library(
         'modifier_unset.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/expressions',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/global_timestamp',
         'update_common',
     ],

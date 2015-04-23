@@ -36,6 +36,7 @@ env.SConscript(
         'db/fts',
         'db/geo',
         'db/index',
+        'db/matcher',
         'db/ops',
         'db/pipeline',
         'db/query',
@@ -170,74 +171,6 @@ env.CppUnitTest('update_index_data_test', ['db/update_index_data_test.cpp'],
 
 env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
                 LIBDEPS=['bson'])
-
-env.Library('path',
-            ['db/matcher/path.cpp',
-             'db/matcher/path_internal.cpp'],
-            LIBDEPS=['bson',
-                     '$BUILD_DIR/mongo/db/common'])
-
-env.CppUnitTest('path_test', ['db/matcher/path_test.cpp'],
-                LIBDEPS=['path'])
-
-
-env.Library('expressions',
-            ['db/matcher/expression.cpp',
-             'db/matcher/expression_array.cpp',
-             'db/matcher/expression_leaf.cpp',
-             'db/matcher/expression_tree.cpp',
-             'db/matcher/expression_parser.cpp',
-             'db/matcher/expression_parser_tree.cpp',
-             'db/matcher/expression_where_noop.cpp',
-             'db/matcher/matchable.cpp',
-             'db/matcher/match_details.cpp'],
-            LIBDEPS=['bson',
-                     'path',
-                     '$BUILD_DIR/mongo/db/common',
-                     '$BUILD_DIR/third_party/shim_pcrecpp'
-                     ] )
-
-env.Library('expression_algo',
-            ['db/matcher/expression_algo.cpp'],
-            LIBDEPS=['expressions'])
-
-env.CppUnitTest('expression_algo_test',
-            ['db/matcher/expression_algo_test.cpp'],
-            LIBDEPS=['expression_algo'])
-
-env.Library('expressions_geo',
-            ['db/matcher/expression_geo.cpp',
-             'db/matcher/expression_parser_geo.cpp'],
-            LIBDEPS=['expressions','db/geo/geometry','db/geo/geoparser'] )
-
-env.Library('expressions_text',
-            ['db/matcher/expression_text.cpp',
-             'db/matcher/expression_parser_text.cpp'],
-            LIBDEPS=['expressions','db/fts/base'] )
-
-env.CppUnitTest('expression_test',
-                ['db/matcher/expression_test.cpp',
-                 'db/matcher/expression_leaf_test.cpp',
-                 'db/matcher/expression_tree_test.cpp',
-                 'db/matcher/expression_array_test.cpp'],
-                LIBDEPS=['expressions'] )
-
-env.CppUnitTest('expression_geo_test',
-                ['db/matcher/expression_geo_test.cpp',
-                 'db/matcher/expression_parser_geo_test.cpp'],
-                LIBDEPS=['expressions_geo'] )
-
-env.CppUnitTest('expression_text_test',
-                ['db/matcher/expression_parser_text_test.cpp'],
-                LIBDEPS=['expressions_text'] )
-
-env.CppUnitTest('expression_parser_test',
-                ['db/matcher/expression_parser_test.cpp',
-                 'db/matcher/expression_parser_array_test.cpp',
-                 'db/matcher/expression_parser_tree_test.cpp',
-                 'db/matcher/expression_parser_leaf_test.cpp'],
-                LIBDEPS=['expressions'] )
-
 
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
@@ -596,9 +529,9 @@ coredbEnv.Library("coredb", [
                            'db/pipeline/document_value',
                            'scripting_common',
                            'server_parameters',
-                           'expressions',
-                           'expressions_geo',
-                           'expressions_text',
+                           'db/matcher/expressions',
+                           'db/matcher/expressions_geo',
+                           'db/matcher/expressions_text',
                            'index_names',
                            'db/exec/working_set',
                            'db/index/key_generator',

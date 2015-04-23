@@ -25,9 +25,9 @@ env.Library(
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
-        "$BUILD_DIR/mongo/expression_algo",
-        "$BUILD_DIR/mongo/expressions",
-        "$BUILD_DIR/mongo/expressions_text",
+        "$BUILD_DIR/mongo/db/matcher/expression_algo",
+        "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/matcher/expressions_text",
         "$BUILD_DIR/mongo/index_names",
         "$BUILD_DIR/mongo/server_parameters",
     ],
@@ -80,7 +80,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson",
-        "$BUILD_DIR/mongo/expressions_geo",
+        "$BUILD_DIR/mongo/db/matcher/expressions_geo",
         "$BUILD_DIR/mongo/index_names",
         "$BUILD_DIR/mongo/mongohasher",
         "$BUILD_DIR/mongo/server_parameters",
@@ -164,7 +164,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_planner",
-        "$BUILD_DIR/mongo/expressions_text",
+        "$BUILD_DIR/mongo/db/matcher/expressions_text",
     ],
 )
 

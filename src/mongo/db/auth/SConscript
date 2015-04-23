@@ -97,7 +97,7 @@ env.Library('authmongos',
 env.Library('authmocks',
             ['authz_manager_external_state_mock.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/db/ops/update_driver',
-                     '$BUILD_DIR/mongo/expressions'])
+                     '$BUILD_DIR/mongo/db/matcher/expressions'])
 
 env.Library('sasltestcrutch',
             ['sasl_test_crutch.cpp'],
