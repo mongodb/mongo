@@ -215,13 +215,6 @@ namespace mongo {
 
         static int VERSION;
 
-
-        /**
-         * check to see if all config servers have the same state
-         * will try tries time to make sure not catching in a bad state
-         */
-        bool checkConfigServersConsistent( std::string& errmsg , int tries = 4 ) const;
-
     private:
         std::string getHost( const std::string& name , bool withPort );
 

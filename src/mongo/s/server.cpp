@@ -63,7 +63,6 @@
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
-#include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/legacy_dist_lock_manager.h"
@@ -240,19 +239,18 @@ static ExitCode runMongosServer( bool doUpgrade ) {
         return EXIT_SHARDING_ERROR;
     }
 
+    Status statusConfigChecker = catalogManager->startConfigServerChecker();
+    if (!statusConfigChecker.isOK()) {
+        mongo::log(LogComponent::kSharding) << "unable to start config servers checker thread "
+                                            << statusConfigChecker;;
+        return EXIT_SHARDING_ERROR;
+    }
     grid.setCatalogManager(std::move(catalogManager));
 
     if (!configServer.init(mongosGlobalParams.configdbs)) {
         mongo::log(LogComponent::kSharding) << "couldn't resolve config db address" << endl;
         return EXIT_SHARDING_ERROR;
     }
-
-    if (!configServer.ok(true)) {
-        mongo::log(LogComponent::kSharding) << "configServer connection startup check failed" << endl;
-        return EXIT_SHARDING_ERROR;
-    }
-
-    startConfigServerChecker();
 
     VersionType initVersionInfo;
     VersionType versionInfo;

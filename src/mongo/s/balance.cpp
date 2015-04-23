@@ -51,7 +51,6 @@
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
-#include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
@@ -579,14 +578,6 @@ namespace mongo {
                         conn.done();
                         
                         sleepsecs( sleepTime ); // no need to wake up soon
-                        continue;
-                    }
-
-                    if ( !isConfigServerConsistent() ) {
-                        conn.done();
-                        warning() << "Skipping balancing round because data inconsistency"
-                                  << " was detected amongst the config servers." << endl;
-                        sleepsecs( sleepTime );
                         continue;
                     }
 

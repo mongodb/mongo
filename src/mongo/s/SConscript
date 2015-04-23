@@ -255,7 +255,6 @@ env.Library(
         'chunk.cpp',
         'chunk_manager.cpp',
         'config.cpp',
-        'config_server_checker_service.cpp',
         'distlock.cpp',
         'grid.cpp',
         'shard_key_pattern.cpp',

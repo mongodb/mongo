@@ -64,6 +64,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/log.h"
@@ -367,12 +368,28 @@ namespace {
         _distLockManager = stdx::make_unique<LegacyDistLockManager>(_configServerConnectionString);
         _distLockManager->startUp();
 
+        _consistentFromLastCheck.store(true);
+
+        return Status::OK();
+    }
+
+    Status CatalogManagerLegacy::startConfigServerChecker() {
+        if (!_checkConfigServersConsistent()) {
+            return Status(ErrorCodes::IncompatibleShardingMetadata,
+                          "Data inconsistency detected amongst config servers");
+        }
+
+        boost::thread t(stdx::bind(&CatalogManagerLegacy::_consistencyChecker, this));
+        _consistencyCheckerThread.swap(t);
+
         return Status::OK();
     }
 
     void CatalogManagerLegacy::shutDown() {
         invariant(_distLockManager);
         _distLockManager->shutDown();
+
+        _consistencyCheckerThread.join();
     }
 
     Status CatalogManagerLegacy::enableSharding(const std::string& dbName) {
@@ -1198,6 +1215,15 @@ namespace {
     void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& request,
                                                        BatchedCommandResponse* response) {
 
+        // check if config servers are consistent
+        if (!_isConsistentFromLastCheck()) {
+            toBatchError(
+                Status(ErrorCodes::IncompatibleShardingMetadata,
+                       "Data inconsistency detected amongst config servers"),
+                response);
+            return;
+        }
+
         // We only support batch sizes of one for config writes
         if (request.sizeWriteOps() != 1) {
             toBatchError(
@@ -1303,6 +1329,131 @@ namespace {
     DistLockManager* CatalogManagerLegacy::getDistLockManager() {
         invariant(_distLockManager);
         return _distLockManager.get();
+    }
+
+    bool CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries) const {
+        if (tries <= 0)
+            return false;
+
+        unsigned firstGood = 0;
+        int up = 0;
+        vector<BSONObj> res;
+
+        // The last error we saw on a config server
+        string errMsg;
+
+        for (unsigned i = 0; i < _configServers.size(); i++) {
+            BSONObj result;
+            boost::scoped_ptr<ScopedDbConnection> conn;
+
+            try {
+                conn.reset(new ScopedDbConnection(_configServers[i], 30.0));
+
+                if (!conn->get()->runCommand("config",
+                                             BSON("dbhash" << 1 <<
+                                                  "collections" << BSON_ARRAY("chunks" <<
+                                                                              "databases" <<
+                                                                              "collections" <<
+                                                                              "shards" <<
+                                                                              "version")),
+                                              result)) {
+
+                    errMsg = result["errmsg"].eoo() ? "" : result["errmsg"].String();
+                    if (!result["assertion"].eoo()) errMsg = result["assertion"].String();
+
+                    warning() << "couldn't check dbhash on config server " << _configServers[i]
+                              << causedBy(result.toString());
+
+                    result = BSONObj();
+                }
+                else {
+                    result = result.getOwned();
+                    if (up == 0)
+                        firstGood = i;
+                    up++;
+                }
+                conn->done();
+            }
+            catch (const DBException& e) {
+                if (conn) {
+                    conn->kill();
+                }
+
+                // We need to catch DBExceptions b/c sometimes we throw them
+                // instead of socket exceptions when findN fails
+
+                errMsg = e.toString();
+                warning() << " couldn't check dbhash on config server "
+                          << _configServers[i] << causedBy(e);
+            }
+            res.push_back(result);
+        }
+
+        if (_configServers.size() == 1)
+            return true;
+
+        if (up == 0) {
+            // Use a ptr to error so if empty we won't add causedby
+            error() << "no config servers successfully contacted" << causedBy(&errMsg);
+            return false;
+        }
+        else if (up == 1) {
+            warning() << "only 1 config server reachable, continuing";
+            return true;
+        }
+
+        BSONObj base = res[firstGood];
+        for (unsigned i = firstGood+1; i < res.size(); i++) {
+            if (res[i].isEmpty())
+                continue;
+
+            string chunksHash1 = base.getFieldDotted("collections.chunks");
+            string chunksHash2 = res[i].getFieldDotted("collections.chunks");
+
+            string databaseHash1 = base.getFieldDotted("collections.databases");
+            string databaseHash2 = res[i].getFieldDotted("collections.databases");
+
+            string collectionsHash1 = base.getFieldDotted("collections.collections");
+            string collectionsHash2 = res[i].getFieldDotted("collections.collections");
+
+            string shardHash1 = base.getFieldDotted("collections.shards");
+            string shardHash2 = res[i].getFieldDotted("collections.shards");
+
+            string versionHash1 = base.getFieldDotted("collections.version") ;
+            string versionHash2 = res[i].getFieldDotted("collections.version");
+
+            if (chunksHash1 == chunksHash2 &&
+                databaseHash1 == databaseHash2 &&
+                collectionsHash1 == collectionsHash2 &&
+                shardHash1 == shardHash2 &&
+                versionHash1 == versionHash2) {
+                continue;
+            }
+
+            warning() << "config servers " << _configServers[firstGood].toString()
+                      << " and " << _configServers[i].toString() << " differ";
+            if (tries <= 1) {
+                error() << ": " << base["collections"].Obj()
+                        << " vs " << res[i]["collections"].Obj();
+                return false;
+            }
+
+            return _checkConfigServersConsistent(tries - 1);
+        }
+
+        return true;
+    }
+
+    void CatalogManagerLegacy::_consistencyChecker() {
+        while (!inShutdown()) {
+            _consistentFromLastCheck.store(_checkConfigServersConsistent());
+
+            sleepsecs(60);
+        }
+    }
+
+    bool CatalogManagerLegacy::_isConsistentFromLastCheck() {
+        return _consistentFromLastCheck.loadRelaxed();
     }
 
 } // namespace mongo

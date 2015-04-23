@@ -49,7 +49,6 @@
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
-#include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -556,12 +555,6 @@ namespace {
             // since it nots 100% tcp queue bound
             // this was implicit before since we did a splitVector on the same socket
             ShardConnection::sync();
-
-            if ( !isConfigServerConsistent() ) {
-                 RARELY warning() << "will not perform auto-split because "
-                                  << "config servers are inconsistent";
-                return false;
-            }
 
             LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold;
 

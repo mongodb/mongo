@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include <boost/thread/thread.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager.h"
 
 namespace mongo {
@@ -53,6 +55,12 @@ namespace mongo {
          * server. Can only be called once for the lifetime.
          */
         Status init(const ConnectionString& configCS);
+
+        /**
+         * Starts the thread that periodically checks data consistency amongst the config servers.
+         * Note: this is not thread safe and can only be called once for the lifetime.
+         */
+        Status startConfigServerChecker();
 
         virtual void shutDown() override;
 
@@ -135,6 +143,22 @@ namespace mongo {
          */
         size_t _getShardCount(const BSONObj& query = {}) const;
 
+        /**
+         * Returns true if all config servers have the same state.
+         * If inconsistency detected on first attempt, checks at most 3 more times.
+         */
+        bool _checkConfigServersConsistent(const unsigned tries = 4) const;
+
+        /**
+         * Checks data consistency amongst config servers every 60 seconds.
+         */
+        void _consistencyChecker();
+
+        /**
+         * Returns true if the config servers have the same contents since the last
+         * check was performed.
+         */
+        bool _isConsistentFromLastCheck();
 
         // Parsed config server hosts, as specified on the command line.
         ConnectionString _configServerConnectionString;
@@ -142,6 +166,14 @@ namespace mongo {
 
         // Distribted lock manager singleton.
         std::unique_ptr<DistLockManager> _distLockManager;
+
+        // used by consistency checker thread to check if config
+        // servers are consistent
+        AtomicWord<bool> _consistentFromLastCheck;
+
+        // Thread that runs dbHash on config servers for checking data consistency.
+        boost::thread _consistencyCheckerThread;
+
     };
 
 } // namespace mongo
