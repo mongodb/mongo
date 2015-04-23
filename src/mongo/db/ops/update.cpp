@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/update_driver.h"
@@ -74,28 +75,30 @@ namespace mongo {
                       locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()),
                                                 MODE_X));
 
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 
-            if (!request.isFromReplication() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                nsString.db())) {
-                uassertStatusOK(Status(ErrorCodes::NotMaster, str::stream()
-                    << "Not primary while creating collection " << nsString.ns()
-                    << " during upsert"));
-            }
+                if (!request.isFromReplication() &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                    nsString.db())) {
+                    uassertStatusOK(Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while creating collection " << nsString.ns()
+                        << " during upsert"));
+                }
 
-            WriteUnitOfWork wuow(txn);
-            collection = db->createCollection(txn, nsString.ns());
-            invariant(collection);
+                WriteUnitOfWork wuow(txn);
+                collection = db->createCollection(txn, nsString.ns());
+                invariant(collection);
 
-            if (!request.isFromReplication()) {
-                repl::logOp(txn,
-                            "c",
-                            (db->name() + ".$cmd").c_str(),
-                            BSON("create" << (nsString.coll())));
-            }
-            wuow.commit();
+                if (!request.isFromReplication()) {
+                    repl::logOp(txn,
+                                "c",
+                                (db->name() + ".$cmd").c_str(),
+                                BSON("create" << (nsString.coll())));
+                }
+                wuow.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", nsString.ns());
         }
 
         // Parse the update, get an executor for it, run the executor, get stats out.

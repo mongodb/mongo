@@ -382,62 +382,57 @@ namespace {
 
     OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        OpTime lastOptime = replCoord->getMyLastOptime();
-        invariant(!ops.empty());
+        OpTime lastOptime;
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            lastOptime = replCoord->getMyLastOptime();
+            invariant(!ops.empty());
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
 
-        while (1) {
-            try {
-                ScopedTransaction transaction(txn, MODE_IX);
-                Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+            if ( localOplogRSCollection == 0 ) {
+                Client::Context ctx(txn, rsoplog);
 
-                if ( localOplogRSCollection == 0 ) {
-                    Client::Context ctx(txn, rsoplog);
-
-                    localDB = ctx.db();
-                    verify( localDB );
-                    localOplogRSCollection = localDB->getCollection(rsoplog);
-                    massert(13389,
-                            "local.oplog.rs missing. did you drop it? if so restart server",
-                            localOplogRSCollection);
-                }
-
-                Client::Context ctx(txn, rsoplog, localDB);
-                WriteUnitOfWork wunit(txn);
-
-                for (std::deque<BSONObj>::const_iterator it = ops.begin();
-                     it != ops.end();
-                     ++it) {
-                    const BSONObj& op = *it;
-                    const OpTime ts = op["ts"]._opTime();
-
-                    checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
-
-                    if (!(lastOptime < ts)) {
-                        severe() << "replication oplog stream went back in time. "
-                            "previous timestamp: " << lastOptime << " newest timestamp: " << ts
-                                 << ". Op being applied: " << op;
-                        fassertFailedNoTrace(18905);
-                    }
-                    lastOptime = ts;
-                }
-                wunit.commit();
-
-                BackgroundSync* bgsync = BackgroundSync::get();
-                // Keep this up-to-date, in case we step up to primary.
-                long long hash = ops.back()["h"].numberLong();
-                bgsync->setLastAppliedHash(hash);
-
-                ctx.getClient()->setLastOp(lastOptime);
-
-                replCoord->setMyLastOptime(lastOptime);
-                setNewOptime(lastOptime);
-
-                return lastOptime;
+                localDB = ctx.db();
+                verify( localDB );
+                localOplogRSCollection = localDB->getCollection(rsoplog);
+                massert(13389,
+                        "local.oplog.rs missing. did you drop it? if so restart server",
+                        localOplogRSCollection);
             }
-            catch (const WriteConflictException& wce) {
-                log() << "WriteConflictException while writing oplog, retrying.";
+
+            Client::Context ctx(txn, rsoplog, localDB);
+            WriteUnitOfWork wunit(txn);
+
+            for (std::deque<BSONObj>::const_iterator it = ops.begin();
+                 it != ops.end();
+                 ++it) {
+                const BSONObj& op = *it;
+                const OpTime ts = op["ts"]._opTime();
+
+                checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
+
+                if (!(lastOptime < ts)) {
+                    severe() << "replication oplog stream went back in time. "
+                        "previous timestamp: " << lastOptime << " newest timestamp: " << ts
+                             << ". Op being applied: " << op;
+                    fassertFailedNoTrace(18905);
+                }
+                lastOptime = ts;
             }
-        }
+            wunit.commit();
+
+            BackgroundSync* bgsync = BackgroundSync::get();
+            // Keep this up-to-date, in case we step up to primary.
+            long long hash = ops.back()["h"].numberLong();
+            bgsync->setLastAppliedHash(hash);
+
+            ctx.getClient()->setLastOp(lastOptime);
+
+            replCoord->setMyLastOptime(lastOptime);
+            setNewOptime(lastOptime);
+
+            return lastOptime;
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "write oplog entry", rsoplog);
     }
 
     void createOplog(OperationContext* txn) {
@@ -510,11 +505,13 @@ namespace {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
-        WriteUnitOfWork uow( txn );
-        invariant(ctx.db()->createCollection(txn, ns, options));
-        if( !rs )
-            logOp(txn, "n", "", BSONObj() );
-        uow.commit();
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork uow( txn );
+            invariant(ctx.db()->createCollection(txn, ns, options));
+            if( !rs )
+                logOp(txn, "n", "", BSONObj() );
+            uow.commit();
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", ns);
 
         /* sync here so we don't get any surprising lag later when we try to sync */
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
