@@ -432,7 +432,7 @@ namespace {
 
 
         writeConcern.wNumNodes = 0;
-        writeConcern.wMode = "majority";
+        writeConcern.wMode = WriteConcernOptions::kMajority;
         // w:majority always works on master/slave
         ReplicationCoordinator::StatusAndDuration statusAndDur = getReplCoord()->awaitReplication(
                 &txn, time, writeConcern);
@@ -574,7 +574,7 @@ namespace {
         // Set up valid write concerns for the rest of the test
         WriteConcernOptions majorityWriteConcern;
         majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-        majorityWriteConcern.wMode = "majority";
+        majorityWriteConcern.wMode = WriteConcernOptions::kMajority;
 
         WriteConcernOptions multiDCWriteConcern;
         multiDCWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -1817,7 +1817,7 @@ namespace {
         // majority nodes waiting for time
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-        writeConcern.wMode = "majority";
+        writeConcern.wMode = WriteConcernOptions::kMajority;
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
         awaiter.setOpTime(time);
@@ -1827,7 +1827,7 @@ namespace {
         // demonstrate that majority cannot currently be satisfied
         WriteConcernOptions writeConcern2;
         writeConcern2.wTimeout = WriteConcernOptions::kNoWaiting;
-        writeConcern2.wMode = "majority";
+        writeConcern2.wMode = WriteConcernOptions::kMajority;
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                       getReplCoord()->awaitReplication(&txn, time, writeConcern2).status);
 
@@ -1884,7 +1884,7 @@ namespace {
 
         WriteConcernOptions majorityWriteConcern;
         majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-        majorityWriteConcern.wMode = "majority";
+        majorityWriteConcern.wMode = WriteConcernOptions::kMajority;
 
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                       getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);

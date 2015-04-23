@@ -859,7 +859,7 @@ namespace {
 
         if (!writeConcern.wMode.empty()) {
             StringData patternName;
-            if (writeConcern.wMode == "majority") {
+            if (writeConcern.wMode == WriteConcernOptions::kMajority) {
                 patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
             }
             else {
@@ -960,7 +960,7 @@ namespace {
             return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
 
-        if (replMode == modeMasterSlave && writeConcern.wMode == "majority") {
+        if (replMode == modeMasterSlave && writeConcern.wMode == WriteConcernOptions::kMajority) {
             // with master/slave, majority is equivalent to w=1
             return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }

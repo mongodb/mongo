@@ -735,32 +735,13 @@ namespace mongo {
                                           std::vector<BatchedUpsertDetail*>* upsertedIds,
                                           std::vector<WriteErrorDetail*>* errors ) {
 
-        WriteConcernOptions originalWC = _txn->getWriteConcern();
-
-        // We adjust the write concern attached to the OperationContext to not wait for
-        // journal.  Later, the code will restore the write concern to wait for journal on
-        // the last write of the batch.
-        if (request.sizeWriteOps() > 1
-            && originalWC.syncMode == WriteConcernOptions::JOURNAL)
-        {
-            WriteConcernOptions writeConcern = originalWC;
-            writeConcern.syncMode = WriteConcernOptions::NONE;
-            _txn->setWriteConcern(writeConcern);
-        }
-
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
-            execInserts( request, originalWC, errors );
+            execInserts( request, errors );
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
 
                 if ( i + 1 == request.sizeWriteOps() ) {
-                    // For the last write in the batch, restore the write concern back to the
-                    // original provided one; this may set WriteConcernOptions::JOURNAL back
-                    // to true.
-                    _txn->setWriteConcern(originalWC);
-                    // Use the original write concern to possibly await the commit of this write,
-                    // in order to flush the journal as requested.
                     setupSynchronousCommit( _txn );
                 }
 
@@ -787,12 +768,6 @@ namespace mongo {
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
 
                 if ( i + 1 == request.sizeWriteOps() ) {
-                    // For the last write in the batch, restore the write concern back to the
-                    // original provided one; this may set WriteConcernOptions::JOURNAL back
-                    // to true.
-                    _txn->setWriteConcern(originalWC);
-                    // Use the original write concern to possibly await the commit of this write,
-                    // in order to flush the journal as requested.
                     setupSynchronousCommit( _txn );
                 }
 
@@ -837,7 +812,6 @@ namespace mongo {
     }
 
     void WriteBatchExecutor::execInserts( const BatchedCommandRequest& request,
-                                          const WriteConcernOptions& originalWC,
                                           std::vector<WriteErrorDetail*>* errors ) {
 
         // Theory of operation:
@@ -882,12 +856,6 @@ namespace mongo {
              ++state.currIndex) {
 
             if (state.currIndex + 1 == state.request->sizeWriteOps()) {
-                // For the last write in the batch, restore the write concern back to the
-                // original provided one; this may set WriteConcernOptions::JOURNAL back
-                // to true.
-                _txn->setWriteConcern(originalWC);
-                // Use the original write concern to possibly await the commit of this write,
-                // in order to flush the journal as requested.
                 setupSynchronousCommit(_txn);
             }
 
