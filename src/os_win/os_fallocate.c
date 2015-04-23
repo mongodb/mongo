@@ -39,5 +39,10 @@ int
 __wt_fallocate(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
+
 	return (ENOTSUP);
 }
