@@ -27,7 +27,7 @@
  */
 
 #include "thread.h"
-#include "../utility/util.h"
+#include "test_util.h"
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
 pthread_rwlock_t single;			/* Single thread */

@@ -20,6 +20,10 @@ examples/c
 lang/java JAVA
 examples/java JAVA
 lang/python PYTHON
+
+#Utility needs to be built first, as other tests can depend on it
+test/utility
+
 test/bloom
 test/checkpoint
 test/fops

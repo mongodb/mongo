@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <wiredtiger.h>
-#include "../utility/util.h"
+#include "test_util.h"
 
 /*
  * die --
