@@ -85,7 +85,7 @@ namespace {
 
             // TODO: Remove this when we standardize GLE reporting from commands
             if (!status.isOK()) {
-                LastError::get(client).setLastError(status.code(), status.reason());
+                setLastError(status.code(), status.reason().c_str());
             }
 
             return status;
@@ -149,7 +149,8 @@ namespace {
 
             ClusterWriter writer(true, 0);
 
-            LastError* cmdLastError = &LastError::get(cc());
+            // NOTE: Sometimes this command is invoked with LE disabled for legacy writes
+            LastError* cmdLastError = lastError.get(false);
 
             {
                 // Disable the last error object for the duration of the write
@@ -173,9 +174,11 @@ namespace {
                 dassert(response.isValid(NULL));
             }
 
-            // Populate the lastError object based on the write response
-            cmdLastError->reset();
-            batchErrorToLastError(request, response, cmdLastError);
+            if (cmdLastError) {
+                // Populate the lastError object based on the write response
+                cmdLastError->reset();
+                batchErrorToLastError(request, response, cmdLastError);
+            }
 
             size_t numAttempts;
 

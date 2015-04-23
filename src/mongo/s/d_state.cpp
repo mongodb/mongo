@@ -48,7 +48,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/wire_version.h"
@@ -1029,7 +1028,7 @@ namespace mongo {
             
             // step 1
 
-            LastError::get(txn->getClient()).disable();
+            lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
 
             bool authoritative = cmdObj.getBoolField( "authoritative" );

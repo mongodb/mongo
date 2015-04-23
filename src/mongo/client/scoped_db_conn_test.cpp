@@ -103,7 +103,9 @@ namespace mongo {
         virtual void connected(AbstractMessagingPort* p) {
         }
 
-        virtual void process(Message& m, AbstractMessagingPort* por) {
+        virtual void process(Message& m,
+                AbstractMessagingPort* port,
+                LastError * le) {
             boost::this_thread::interruption_point();
         }
     };

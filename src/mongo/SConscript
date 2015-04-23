@@ -357,9 +357,8 @@ env.Library(
 env.Library('lasterror', [
             "db/lasterror.cpp",
             ],
-            LIBDEPS=[
-                'foundation',
-                'service_context',
+            LIBDEPS=['network',
+                     'foundation',
             ])
 
 def getSysInfo():
@@ -710,8 +709,7 @@ env.Library(
         'db/service_context_noop.cpp',
     ],
     LIBDEPS=[
-        'hostandport',
-        'spin_lock',
+        'lasterror',  # TODO(schwerin): REMOVE!
         'util/decorable',
          ])
 

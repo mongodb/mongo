@@ -72,7 +72,7 @@ namespace {
                          BSONObjBuilder& result) {
 
             if (cmdObj["forShell"].trueValue()) {
-                LastError::get(cc()).disable();
+                lastError.disableForCommand();
                 ClusterLastErrorInfo::get(cc()).disableForCommand();
             }
 

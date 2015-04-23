@@ -203,8 +203,8 @@ namespace mongo {
         // Record an error if one exists
         if ( lastBatchError ) {
             string errMsg = lastBatchError->getErrMessage();
-            error->setLastError(lastBatchError->getErrCode(),
-                                errMsg.empty() ? "see code for details" : errMsg.c_str());
+            error->raiseError( lastBatchError->getErrCode(),
+                               errMsg.empty() ? "see code for details" : errMsg.c_str() );
             return true;
         }
 

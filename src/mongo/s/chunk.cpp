@@ -532,7 +532,7 @@ namespace {
 
     bool Chunk::splitIfShould( long dataWritten ) const {
         dassert( ShouldAutoSplit );
-        LastError::Disabled d(&LastError::get(cc()));
+        LastError::Disabled d( lastError.get() );
 
         try {
             _dataWritten += dataWritten;

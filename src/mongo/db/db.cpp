@@ -70,6 +70,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer.h"
@@ -156,13 +157,15 @@ namespace mongo {
             Client::initThread("conn", p);
         }
 
-        virtual void process(Message& m , AbstractMessagingPort* port) {
+        virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
             OperationContextImpl txn;
             while ( true ) {
                 if ( inShutdown() ) {
                     log() << "got request after shutdown()" << endl;
                     break;
                 }
+
+                lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
                 assembleResponse(&txn, m, dbresponse, port->remote());

@@ -37,7 +37,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/cursors.h"
@@ -68,7 +67,6 @@ namespace mongo {
         }
 
         _m.header().setId(_id);
-        LastError::get(_clientInfo).startRequest();
         ClusterLastErrorInfo::get(_clientInfo).clearRequestInfo();
 
         if (_d.messageShouldHaveNs()) {

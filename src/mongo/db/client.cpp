@@ -83,6 +83,7 @@ namespace mongo {
         }
 
         setThreadName(fullDesc.c_str());
+        mongo::lastError.initThread();
 
         // Create the client obj, attach to thread
         *currentClient.get() = service->makeClient(fullDesc, mp);

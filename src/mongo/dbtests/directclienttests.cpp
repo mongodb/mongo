@@ -33,7 +33,6 @@
 
 #include <iostream>
 
-#include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
@@ -50,11 +49,15 @@ namespace DirectClientTests {
     class ClientBase {
     public:
         ClientBase() {
-            mongo::LastError::get(cc()).reset();
+            _prevError = mongo::lastError._get( false );
+            mongo::lastError.release();
+            mongo::lastError.reset( new LastError() );
         }
         virtual ~ClientBase() {
-            mongo::LastError::get(cc()).reset();
+            mongo::lastError.reset( _prevError );
         }
+    private:
+        LastError* _prevError;
     };
 
     const char *ns = "a.b";

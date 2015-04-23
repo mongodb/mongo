@@ -29,13 +29,16 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+#include <boost/thread/tss.hpp>
 #include <string>
 
-#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/bson/oid.h"
 
 namespace mongo {
     class BSONObjBuilder;
+    class Message;
 
     static const char kUpsertedFieldName[] = "upserted";
     static const char kGLEStatsFieldName[] = "$gleStats";
@@ -43,80 +46,107 @@ namespace mongo {
     static const char kGLEStatsLastOpTimeTermFieldName[] = "lastOpTimeTerm";
     static const char kGLEStatsElectionIdFieldName[] = "electionId";
 
-    class LastError {
-    public:
-        static const Client::Decoration<LastError> get;
+    struct LastError {
+        int code;
+        std::string msg;
+        enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
+        // _id field value from inserted doc, returned as kUpsertedFieldName (above)
+        BSONObj upsertedId;
+        long long nObjects;
+        int nPrev;
+        bool valid;
+        bool disabled;
+        void raiseError(int _code , const char *_msg) {
+            reset( true );
+            code = _code;
+            msg = _msg;
+        }
+        void recordUpdate( bool _updateObjects , long long _nObjects , BSONObj _upsertedId ) {
+            reset( true );
+            nObjects = _nObjects;
+            updatedExisting = _updateObjects ? True : False;
+            if ( _upsertedId.valid() && _upsertedId.hasField(kUpsertedFieldName) )
+                upsertedId = _upsertedId;
+
+        }
+        void recordDelete( long long nDeleted ) {
+            reset( true );
+            nObjects = nDeleted;
+        }
+        LastError() {
+            reset();
+        }
+        void reset( bool _valid = false ) {
+            code = 0;
+            msg.clear();
+            updatedExisting = NotUpdate;
+            nObjects = 0;
+            nPrev = 1;
+            valid = _valid;
+            disabled = false;
+            upsertedId = BSONObj();
+        }
 
         /**
-         * Resets the object to a newly constructed state.  If "valid" is true, marks the last-error
-         * object as "valid".
+         * @return if there is an err
          */
-        void reset(bool valid = false);
+        bool appendSelf( BSONObjBuilder &b , bool blankErr = true );
 
-        /**
-         * when db receives a message/request, call this
-         */
-        void startRequest();
-
-        /**
-         * Disables error recording for the current operation.
-         */
-        void disable();
-
-        /**
-         * Sets the error information for the current operation, if error recording was not
-         * explicitly disabled via a call to disable() since the call to startRequest.
-         */
-        void setLastError(int code, std::string msg);
-
-        void recordInsert(long long nObjects);
-
-        void recordUpdate(bool updateObjects, long long nObjects, BSONObj upsertedId);
-
-        void recordDelete(long long nDeleted);
-
-        /**
-         * Writes the last-error state described by this object to "b".
-         *
-         * If "blankErr" is true, the "err" field will be explicitly set to null in the result
-         * instead of being omitted when the error string is empty.
-         *
-         * Returns true if there is a non-empty error message.
-         */
-        bool appendSelf(BSONObjBuilder &b, bool blankErr) const;
-
-        bool isValid() const { return _valid; }
-        int const getNPrev() const { return _nPrev; }
-
-        class Disabled {
-        public:
-            explicit Disabled(LastError* le) : _le(le), _prev(le->_disabled) {
-                _le->_disabled = true;
+        struct Disabled : boost::noncopyable {
+            Disabled( LastError * le ) {
+                _le = le;
+                if ( _le ) {
+                    _prev = _le->disabled;
+                    _le->disabled = true;
+                }
+                else {
+                    _prev = false;
+                }
             }
 
             ~Disabled() {
-                _le->_disabled = _prev;
+                if ( _le )
+                    _le->disabled = _prev;
             }
 
-        private:
-            LastError * const _le;
-            const bool _prev;
+            LastError * _le;
+            bool _prev;
         };
 
         static LastError noError;
-
-    private:
-        enum UpdatedExistingType { NotUpdate, True, False };
-
-        int _code = 0;
-        std::string _msg = {};
-        UpdatedExistingType _updatedExisting = NotUpdate;
-        // _id field value from inserted doc, returned as kUpsertedFieldName (above)
-        BSONObj _upsertedId = {};
-        long long _nObjects = 0;
-        int _nPrev = 1;
-        bool _valid = false;
-        bool _disabled = false;
     };
+
+    extern class LastErrorHolder {
+    public:
+        LastErrorHolder(){}
+        ~LastErrorHolder();
+
+        LastError * get( bool create = false );
+        LastError * getSafe();
+        LastError * _get( bool create = false ); // may return a disabled LastError
+
+        void reset( LastError * le );
+
+        /** ok to call more than once. */
+        void initThread();
+
+        void release();
+
+        /** when db receives a message/request, call this */
+        LastError * startRequest( Message& m , LastError * connectionOwned );
+
+        // used to disable lastError reporting while processing a killCursors message
+        // disable causes get() to return 0.
+        LastError *disableForCommand(); // only call once per command invocation!
+    private:
+        boost::thread_specific_ptr<LastError> _tl;
+
+        struct Status {
+            time_t time;
+            LastError *lerr;
+        };
+    } lastError;
+
+    void setLastError(int code , const char *msg);
 
 } // namespace mongo

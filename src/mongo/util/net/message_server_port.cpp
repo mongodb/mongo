@@ -207,6 +207,9 @@ namespace {
             Message m;
             int64_t counter = 0;
             try {
+                LastError * le = new LastError();
+                lastError.reset( le ); // lastError now has ownership
+
                 handler->connected(portWithHandler.get());
 
                 while ( ! inShutdown() ) {
@@ -224,7 +227,7 @@ namespace {
                         break;
                     }
 
-                    handler->process(m, portWithHandler.get());
+                    handler->process(m, portWithHandler.get(), le);
                     networkCounter.hit(portWithHandler->psock->getBytesIn(),
                                        portWithHandler->psock->getBytesOut());
 

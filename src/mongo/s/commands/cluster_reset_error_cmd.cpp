@@ -66,7 +66,10 @@ namespace {
                          std::string& errmsg,
                          BSONObjBuilder& result) {
 
-            LastError::get(cc()).reset();
+            LastError* le = lastError.get();
+            if (le) {
+                le->reset();
+            }
 
             const std::set<std::string>* shards =
                 ClusterLastErrorInfo::get(cc()).getPrevShardHosts();

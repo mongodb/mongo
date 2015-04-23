@@ -141,9 +141,12 @@ namespace mongo {
             Client::initThread("conn", getGlobalServiceContext(), p);
         }
 
-        virtual void process(Message& m, AbstractMessagingPort* p) {
+        virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {
             verify( p );
             Request r( m , p );
+
+            verify( le );
+            lastError.startRequest( m , le );
 
             try {
                 r.init();
@@ -161,7 +164,7 @@ namespace mongo {
                 }
 
                 // We *always* populate the last error for now
-                LastError::get(cc()).setLastError(ex.getCode(), ex.what());
+                le->raiseError( ex.getCode() , ex.what() );
             }
             catch ( const DBException& ex ) {
 
@@ -175,7 +178,7 @@ namespace mongo {
                 }
 
                 // We *always* populate the last error for now
-                LastError::get(cc()).setLastError(ex.getCode(), ex.what());
+                le->raiseError( ex.getCode() , ex.what() );
             }
 
             // Release connections back to pool, if any still cached

@@ -25,7 +25,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
 
 #include "mongo/s/write_ops/batch_upconvert.h"
 

@@ -88,13 +88,12 @@ namespace {
             // about 2.4 behavior?
             //
 
-            LastError *le = &LastError::get(cc());
-            le->disable();
-
+            LastError *le = lastError.disableForCommand();
+            invariant(le);
 
             // Write commands always have the error stored in the mongos last error
             bool errorOccurred = false;
-            if (le->getNPrev() == 1) {
+            if (le->nPrev == 1) {
                 errorOccurred = le->appendSelf(result, false);
             }
 

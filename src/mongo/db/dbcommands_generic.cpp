@@ -330,7 +330,7 @@ namespace mongo {
                  int,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            LastError::get(txn->getClient()).setLastError(10038, "forced error");
+            setLastError(10038, "forced error");
             return false;
         }
     } cmdForceError;

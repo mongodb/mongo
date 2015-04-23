@@ -46,7 +46,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/max_time.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/concurrency/task.h"
@@ -368,7 +367,6 @@ namespace mongo {
     }
 
     void CursorCache::gotKillCursors(Message& m ) {
-        LastError::get(cc()).disable();
         DbMessage dbmessage(m);
         int n = dbmessage.pullInt();
 
