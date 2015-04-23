@@ -73,12 +73,6 @@ def add_exe( v ):
 
 # ------    SOURCE FILE SETUP -----------
 
-
-env.Library('stringutils', ['util/stringutils.cpp', 'util/base64.cpp', 'util/hex.cpp'])
-
-env.CppUnitTest( "stringutils_test", [ "util/stringutils_test.cpp" ],
-                 LIBDEPS=["stringutils"] )
-
 env.Library('bson', [
         'bson/mutable/document.cpp',
         'bson/mutable/element.cpp',
@@ -97,7 +91,7 @@ env.Library('bson', [
         ], LIBDEPS=[
         '$BUILD_DIR/mongo/platform/platform',
         'base/base',
-        'stringutils',
+        'util/stringutils',
         'util/md5',
         ])
 
@@ -391,7 +385,7 @@ env.Library('mongocommon', commonFiles,
                      'processinfo',
                      'spin_lock',
                      'stacktrace',
-                     'stringutils',
+                     'util/stringutils',
                      'synchronization',
                      'util/concurrency/thread_name',
                      'util/md5',
@@ -781,7 +775,7 @@ env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.
 env.Library('stacktrace',
             'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
             LIBDEPS=['bson',
-                     'stringutils',
+                     'util/stringutils',
                      'version',
                      '$BUILD_DIR/mongo/base/base'])
 

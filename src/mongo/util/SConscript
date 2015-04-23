@@ -133,3 +133,22 @@ env.CppUnitTest(
         'foundation',
     ],
 )
+
+env.Library(
+    target='stringutils',
+    source=[
+        'base64.cpp',
+        'hex.cpp',
+        'stringutils.cpp',
+    ],
+)
+
+env.CppUnitTest(
+    target="stringutils_test",
+    source=[
+        "stringutils_test.cpp",
+    ],
+    LIBDEPS=[
+        "stringutils",
+    ],
+)

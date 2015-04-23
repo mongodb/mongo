@@ -12,7 +12,7 @@ env.Library('crypto_openssl',
 env.Library('scramauth',
             ['mechanism_scram.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/mongo/stringutils',
+                     '$BUILD_DIR/mongo/util/stringutils',
                      'crypto_${MONGO_CRYPTO}'])
 
 env.CppUnitTest('crypto_test',
