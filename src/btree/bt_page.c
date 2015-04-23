@@ -113,7 +113,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * be evicting if no hazard pointer is required, we're
 			 * done.
 			 */
-			if (F_ISSET(S2BT(session), WT_BTREE_NO_HAZARD))
+			if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
 				return (0);
 
 			/*

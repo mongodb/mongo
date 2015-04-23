@@ -1094,10 +1094,10 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		return (0);
 
 	/*
-	 * If hazard pointers aren't configured for this file, we can't be
+	 * If hazard pointers aren't necessary for this file, we can't be
 	 * evicting, we're done.
 	 */
-	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))
+	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
 		return (0);
 
 	/*
