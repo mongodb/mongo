@@ -35,13 +35,46 @@
 #include <wiredtiger_ext.h>
 
 /*! [WT_ENCRYPTOR initialization structure] */
+
+/*
+ * This encryptor is used for testing and demonstration only.
+ *
+ * IT IS TRIVIAL TO BREAK AND DOES NOT OFFER ANY SECURITY!
+ *
+ * There are two configuration parameters that control it: the keyid and the
+ * secretkey (which may be thought of as a password).  The keyid is expected
+ * to be a digits giving a number between 0 and 25.  The secretkey, when
+ * present, must be composed of alphabetic characters.
+ *
+ * When there is no secretkey, the encryptor acts as a ROT(N) encryptor (a
+ * "Caesar cipher"), where N is the value of keyid.  Thus, with keyid=13,
+ * text "Hello" maps to "Uryyb", as we preserve case.  Only the alphabetic
+ * characters in the input text are changed.
+ *
+ * When there is a secretkey we are implementing a Vigenère cipher.
+ * Each byte is rotated the distance from 'A' for each letter in the
+ * (repeating) secretkey.  The distance is increased by the value of
+ * the keyid.  Thus, with secretkey "ABC" and keyid "2", we show how
+ * we map the input "MySecret".
+ *    secretkey          =   ABC
+ *    distances from 'A' =   012
+ *    add keyid (2)      =   234
+ *    repeated           =   23423423
+ *    input              =   MySecret
+ *    output             =   ObWgfvgw
+ * In this case, we transform all bytes in the input.
+ */
+
 /* Local encryptor structure. */
 typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
 	WT_EXTENSION_API *wt_api; /* Extension API */
 	uint32_t rot_N;		/* rotN value */
 	char *keyid;		/* Saved keyid */
-	char *password;		/* Saved password */
+	char *secretkey;		/* Saved secretkey */
+	unsigned char *shift_forw; /* Encrypt shifter from secretkey */
+	unsigned char *shift_back; /* Decrypt shifter from secretkey */
+	size_t shift_len;	/* Length of shift_{forw,back} */
 
 } ROTN_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
@@ -95,7 +128,7 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 {
 	uint32_t i;
 	/*
-	 * Now rotate
+	 * Now rotate.
 	 */
 	for (i = 0; i < len; i++) {
 		if (isalpha(buf[i])) {
@@ -105,6 +138,21 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 				buf[i] = (buf[i] - 'A' + rotn) % 26 + 'A';
 		}
 	}
+}
+
+/*
+ * do_shift --
+ *	Perform a Vigenère cipher
+ */
+static void
+do_shift(uint8_t *buf, size_t len, unsigned char *shift, size_t shiftlen)
+{
+	uint32_t i;
+	/*
+	 * Now shift.
+	 */
+	for (i = 0; i < len; i++)
+		buf[i] += shift[i % shiftlen];
 }
 
 /*! [WT_ENCRYPTOR encrypt] */
@@ -131,11 +179,16 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[i], &src[0], src_len);
 	/*
-	 * Call common rotate function on the text portion of the
-	 * destination buffer.  Send in src_len as the length of
+	 * Depending on whether we have a secret key or not,
+	 * call the common rotate or shift function on the text portion
+	 * of the destination buffer.  Send in src_len as the length of
 	 * the text.
 	 */
-	do_rotate(&dst[i], src_len, rotn_encryptor->rot_N);
+	if (rotn_encryptor->shift_len == 0)
+		do_rotate(&dst[i], src_len, rotn_encryptor->rot_N);
+	else
+		do_shift(&dst[i], src_len,
+		    rotn_encryptor->shift_forw,  rotn_encryptor->shift_len);
 	/*
 	 * Checksum the encrypted buffer and add the IV.
 	 */
@@ -184,13 +237,19 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[0], &src[i], dst_len);
 	/*
-	 * Call common rotate function on the text portion of the
-	 * buffer.  Send in dst_len as the length of the text.
+	 * Depending on whether we have a secret key or not,
+	 * call the common rotate or shift function on the text portion
+	 * of the destination buffer.  Send in dst_len as the length of
+	 * the text.
 	 */
 	/*
 	 * !!! Most implementations would need the IV too.
 	 */
-	do_rotate(&dst[0], dst_len, 26 - rotn_encryptor->rot_N);
+	if (rotn_encryptor->shift_len == 0)
+		do_rotate(&dst[0], dst_len, 26 - rotn_encryptor->rot_N);
+	else
+		do_shift(&dst[0], dst_len,
+		    rotn_encryptor->shift_back,  rotn_encryptor->shift_len);
 	*result_lenp = dst_len;
 	return (0);
 }
@@ -222,8 +281,10 @@ static int
 rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     WT_CONFIG_ARG *encrypt_config, WT_ENCRYPTOR **customp)
 {
-	int ret, rotamt;
+	int ret, keyid_val;
 	const ROTN_ENCRYPTOR *orig;
+	size_t i, len;
+	unsigned char base;
 	ROTN_ENCRYPTOR *rotn_encryptor;
 	WT_CONFIG_ITEM keyid, secret;
 	WT_EXTENSION_API *wt_api;
@@ -236,11 +297,18 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	if ((rotn_encryptor = calloc(1, sizeof(ROTN_ENCRYPTOR))) == NULL)
 		return (errno);
 	*rotn_encryptor = *orig;
-	rotn_encryptor->keyid = rotn_encryptor->password = NULL;
+	rotn_encryptor->keyid = rotn_encryptor->secretkey = NULL;
 
 	/*
-	 * Stash the keyid and the (optional) secret key
-	 * from the configuration string.
+	 * In this demonstration, we expect keyid to be a number.
+	 */
+	if ((keyid_val = atoi(keyid.str)) < 0) {
+		ret = EINVAL;
+		goto err;
+	}
+
+	/*
+	 * Stash the keyid from the configuration string.
 	 */
 	if ((ret = wt_api->config_get(wt_api, session, encrypt_config,
 	    "keyid", &keyid)) == 0 && keyid.len != 0) {
@@ -252,33 +320,55 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		rotn_encryptor->keyid[keyid.len] = '\0';
 	}
 
+	/*
+	 * In this demonstration, the secret key must be alphabetic characters.
+	 * We stash the secret key from the configuration string
+	 * and build some shift bytes to make encryption/decryption easy.
+	 */
 	if ((ret = wt_api->config_get(wt_api, session, encrypt_config,
 	    "secretkey", &secret)) == 0 && secret.len != 0) {
-		if ((rotn_encryptor->password = malloc(secret.len + 1))
-		    == NULL) {
+		len = secret.len;
+		if ((rotn_encryptor->secretkey = malloc(len + 1)) == NULL ||
+		    (rotn_encryptor->shift_forw = malloc(len)) == NULL ||
+		    (rotn_encryptor->shift_back = malloc(len)) == NULL) {
 			ret = errno;
 			goto err;
 		}
-		strncpy(rotn_encryptor->password, secret.str, secret.len + 1);
-		rotn_encryptor->password[secret.len] = '\0';
+		for (i = 0; i < len; i++) {
+			if (islower(secret.str[i]))
+				base = 'a';
+			else if (isupper(secret.str[i]))
+				base = 'A';
+			else {
+				ret = EINVAL;
+				goto err;
+			}
+			base -= keyid_val;
+			rotn_encryptor->shift_forw[i] = secret.str[i] - base;
+			rotn_encryptor->shift_back[i] = base - secret.str[i];
+		}
+		rotn_encryptor->shift_len = len;
+		strncpy(rotn_encryptor->secretkey, secret.str, secret.len + 1);
+		rotn_encryptor->secretkey[secret.len] = '\0';
 	}
+
 	/*
-	 * Presumably we'd have some sophisticated key management
-	 * here that maps the id onto a secret key.
+	 * In a real encryptor, we could use some sophisticated key management
+	 * here to map the keyid onto a secret key.
 	 */
-	if ((rotamt = atoi(keyid.str)) < 0) {
-		ret = EINVAL;
-		goto err;
-	}
-	rotn_encryptor->rot_N = rotamt;
+	rotn_encryptor->rot_N = keyid_val;
 
 	*customp = &rotn_encryptor->encryptor;
 	return (0);
 err:
 	if (rotn_encryptor->keyid != NULL)
 		free(rotn_encryptor->keyid);
-	if (rotn_encryptor->password != NULL)
-		free(rotn_encryptor->password);
+	if (rotn_encryptor->secretkey != NULL)
+		free(rotn_encryptor->secretkey);
+	if (rotn_encryptor->shift_forw != NULL)
+		free(rotn_encryptor->shift_forw);
+	if (rotn_encryptor->shift_back != NULL)
+		free(rotn_encryptor->shift_back);
 	free(rotn_encryptor);
 	return (EPERM);
 }
@@ -297,14 +387,10 @@ rotn_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 	(void)session;				/* Unused parameters */
 
 	/* Free the allocated memory. */
-	if (rotn_encryptor->password != NULL) {
-		free(rotn_encryptor->password);
-		rotn_encryptor->password = NULL;
-	}
-	if (rotn_encryptor->keyid != NULL) {
-		free(rotn_encryptor->keyid);
-		rotn_encryptor->keyid = NULL;
-	}
+	free(rotn_encryptor->secretkey);
+	free(rotn_encryptor->keyid);
+	free(rotn_encryptor->shift_forw);
+	free(rotn_encryptor->shift_back);
 
 	free(encryptor);
 
