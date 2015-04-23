@@ -41,6 +41,7 @@ HyperDex
 HyperLevelDB
 IEC
 JavaScript
+KMS
 LD
 LDFLAGS
 LIBS
@@ -164,6 +165,8 @@ dbformat
 dbm
 dbt
 decl
+decrypt
+decrypted
 del
 desc
 destructor
@@ -182,6 +185,9 @@ dt
 dumpfile
 dup
 dups
+encrypt
+encryptor
+encryptors
 endcode
 endcond
 endian
@@ -247,6 +253,7 @@ json
 kb
 keyexist
 keyfmt
+keyid
 keyname
 keyvalue
 kvs
@@ -390,6 +397,7 @@ scalable
 scanf
 schemas
 scons
+secretkey
 selectable
 seqname
 seqno

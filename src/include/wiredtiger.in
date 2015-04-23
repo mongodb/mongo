@@ -3173,15 +3173,19 @@ struct __wt_data_source {
 };
 
 /*!
- * XXX
  * The interface implemented by applications to provide custom encryption.
  *
  * Encryptors must implement the WT_ENCRYPTOR interface: the
- * WT_ENCRYPTOR::encrypt and WT_ENCRYPTOR::decrypt callbacks must be
- * specified, and WT_ENCRYPTOR::pre_size is optional.  To build your own
- * encryptor, use one of the encryptors in \c ext/encryptors as a template:
- * \c ext/nop_encrypt is a simple encryptor that passes through data
- * unchanged, and is a reasonable starting point.
+ * WT_ENCRYPTOR::encrypt, WT_ENCRYPTOR::decrypt and WT_ENCRYPTOR::sizing
+ * callbacks must be specified, WT_ENCRYPTOR::customize and
+ * WT_ENCRYPTOR::terminate are optional.  To build your own encryptor, use
+ * one of the encryptors in \c ext/encryptors as a template:
+ * \c ext/encryptors/nop_encrypt is a simple encryptor that passes through
+ * data unchanged, and is a reasonable starting point;
+ * \c ext/encryptors/rotn_encrypt is an encryptor implementing
+ * a simple rotation cipher, it shows the use of \c keyid, \c secretkey,
+ * and implements the WT_ENCRYPTOR::customize and
+ * WT_ENCRYPTOR::terminate callbacks.
  *
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_encryptor.

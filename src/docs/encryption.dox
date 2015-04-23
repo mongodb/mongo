@@ -1,11 +1,88 @@
 /*! @m_page{{c,java},encryption,Encryptors}
 
-WiredTiger does not currently offer any builtin support for
-any particular encryption algorithm.
+WiredTiger does not currently offer builtin support for
+any particular encryption algorithm.  Encryption engines in \c ext/encryptors
+are provided for demonstration purposes only.
+@ref encryption_custom "Custom encryption engines" may be used to
+extend WiredTiger.
+
+Encryption is specified using \c encryption= in the configuration
+for the ::wiredtiger_open call. This configuration establishes
+the encryption to be used for database log files and a subset
+of the WiredTiger metadata files. By default, this encryption
+is also used for all data files. We call this the <em>system encryptor</em>.
+
+Different encryption options may be specified for individual data files when
+they the files are first created, using the \c encryption= configuration in
+the WT_SESSION::create call.  Such options override the default encryption
+that was indicated in the ::wiredtiger_open call. It is possible to
+turn encryption off for individual files, or to use a different encryptor,
+or to specify a different \c keyid.
+
+It is an error to specify encryption in a WT_SESSION::create call when it
+was not specified in the ::wiredtiger_open call. This prevents accidental
+exposure of the file's data in log files, which would be written in the
+clear in such a scenario.
+
+@section encryption_parameters Encryption keyid and secretkey
+
+Two parameters, \c keyid and \c secretkey, may be specified
+when configuring encryption to allow the possibility of
+varying the algorithm according to different keys.
+
+The configuration parameter <code>encryption=(keyid)</code> may be used
+in ::wiredtiger_open or WT_SESSION::create calls. This is intended
+to reference a key stored using a Key Management Solution (KMS).
+The \c keyid given to ::wiredtiger_open is stored in the clear in
+WiredTiger configuration files; it should never contain sensitive
+information.  As an example, \c keyid might be a integer between 0 and 99;
+the encryptor may consult the KMS to return one of the 100 keys
+stored within it. The encryptor will use the returned key when
+applying the encryption.  To effectively use the \c keyid, a custom
+encryptor must implement the WT_ENCRYPTOR::customize callback.
+It is during \c customize that the encryptor has an opportunity to use
+the \c keyid to fetch the actual key. The \c customize function is
+called on the first use of a \c keyid, and the same \em customized encryptor
+will be used with each use of the same \c keyid.
+
+The configuration parameter <code>encryption=(secretkey)</code> is used
+only in the ::wiredtiger_open call. The value of the secretkey
+is never stored on disk in any form, so it must always be provided
+when WiredTiger is reopened (again, with the ::wiredtiger_open call).
+The secretkey is available to the encryptor during the
+WT_ENCRYPTOR::customize callback, during which the encryptor may
+be \em customized to keep the secretkey or a transformation of it
+for use during the WT_ENCRYPTOR::encrypt and WT_ENCRYPTOR::decrypt callbacks.
+
+If a \c secretkey is used, it must be provided using the \c -E option
+when using the \c wt utility. Specifying \c keyid is not needed with the \c wt
+utility, as the \c keyid is stored in the clear on disk by WiredTiger.
+Any additional \c keyid values needed to decrypt data files
+are stored in WiredTiger metadata using the system encryptor.
 
 @section encryption_custom Custom encryption engines
 
-WiredTiger may be extended by adding custom encryption engines; see
-WT_ENCRYPTOR for more information.
+WiredTiger may be extended by adding custom encryption engines
+that we call \em encryptors; see WT_ENCRYPTOR for more information.
+
+Custom encryptors are registered by calling WT_CONNECTION::add_encryptor,
+this creates an encryptor name that may be referenced using the
+<code>encryption=(name=...</code> configuration string in the ::wiredtiger_open
+or WT_SESSION::create call.
+
+@section encryption_and_compression Encryption and compression
+
+Encryption may be used with @ref compression "compression".
+When encryption and compression are both specified during
+session create, any block to be written to disk
+is first compressed, then encrypted. Hence, blocks read from disk are
+first decrypted, then decompressed into memory.
+
+When encryption is specified during ::wiredtiger_open, database
+log files and some system metadata files (those containing table,
+index, column names, and configuration pertaining to these) is encrypted.
+Of these, only database log files may also be compressed.  When both
+compression and encryption is done on log files, the same ordering
+(encrypt then compress) applies as log records are written to disk.
 
  */
