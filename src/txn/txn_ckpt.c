@@ -1094,14 +1094,21 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	int bulk, need_tracking;
+	int bulk, evict_reset, need_tracking;
 
 	btree = S2BT(session);
 	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
 
 	/* Handle forced discard (when dropping a file). */
 	if (force) {
+		/*
+		 * We need exclusive access to the file -- disable ordinary
+		 * eviction and drain any blocks already queued.
+		 */
+		WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 		F_SET(session->dhandle, WT_DHANDLE_DEAD);
+		if (evict_reset)
+			__wt_evict_file_exclusive_off(session);
 		return (0);
 	} else if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
