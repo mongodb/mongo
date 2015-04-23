@@ -254,13 +254,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Eviction; the metadata file is never evicted. */
 	if (WT_IS_METADATA(btree->dhandle))
-		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+		F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 	else {
 		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
 		if (cval.val)
-			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+			F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 		else
-			F_CLR(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+			F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 	}
 
 	/* Checksums */
