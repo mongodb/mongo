@@ -11,7 +11,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/foundation'
+        '$BUILD_DIR/mongo/util/foundation'
     ],
 )
 

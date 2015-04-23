@@ -7,7 +7,7 @@ env.Library(
         'field_path.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/util/foundation',
         ]
     )
 
@@ -28,7 +28,7 @@ env.Library(
     LIBDEPS=[
         'field_path',
         '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/intrusive_counter',
         ]
     )

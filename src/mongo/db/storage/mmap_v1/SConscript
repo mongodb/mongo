@@ -43,7 +43,7 @@ env.Library(
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/util/foundation',
         ]
     )
 
@@ -102,7 +102,7 @@ env.CppUnitTest(target = 'record_access_tracker_test',
 
 env.CppUnitTest(target = 'namespace_test',
                 source = ['catalog/namespace_test.cpp'],
-                LIBDEPS = ['$BUILD_DIR/mongo/foundation'])
+                LIBDEPS = ['$BUILD_DIR/mongo/util/foundation'])
 
 env.CppUnitTest(
     target='record_store_v1_simple_test',

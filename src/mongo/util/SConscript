@@ -9,7 +9,7 @@ env.Library(
         'intrusive_counter.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/foundation',
+        'foundation',
         ]
     )
 
@@ -80,5 +80,56 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "md5",
+    ],
+)
+
+env.Library(
+    target='foundation',
+    source=[
+        "startup_test.cpp",
+        "touch_pages.cpp",
+        'assert_util.cpp',
+        'concurrency/mutex.cpp',
+        'concurrency/thread_pool.cpp',
+        'exception_filter_win32.cpp',
+        'file.cpp',
+        'log.cpp',
+        'platform_init.cpp',
+        'text.cpp',
+        'thread_safe_string.cpp',
+        'time_support.cpp',
+        'timer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/logger/logger',
+        '$BUILD_DIR/mongo/platform/platform',
+        '$BUILD_DIR/mongo/stacktrace',
+        '$BUILD_DIR/mongo/synchronization',
+        '$BUILD_DIR/mongo/util/concurrency/thread_name',
+        '$BUILD_DIR/mongo/util/debugger',
+        '$BUILD_DIR/third_party/shim_allocator',
+        '$BUILD_DIR/third_party/shim_boost',
+        '$BUILD_DIR/third_party/shim_tz',
+    ],
+)
+
+env.CppUnitTest(
+    target='text_test',
+    source=[
+        'text_test.cpp'
+    ],
+    LIBDEPS=[
+        'foundation',
+    ],
+)
+
+env.CppUnitTest(
+    target='time_support_test',
+    source=[
+        'time_support_test.cpp',
+    ],
+    LIBDEPS=[
+        'foundation',
     ],
 )

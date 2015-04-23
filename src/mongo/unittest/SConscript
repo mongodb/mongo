@@ -8,7 +8,7 @@ env.Library(target="unittest",
                 'temp_dir.cpp',
                 'unittest_helpers.cpp',
             ],
-            LIBDEPS=['$BUILD_DIR/mongo/foundation',
+            LIBDEPS=['$BUILD_DIR/mongo/util/foundation',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ])
 

@@ -73,34 +73,6 @@ def add_exe( v ):
 
 # ------    SOURCE FILE SETUP -----------
 
-env.Library('foundation',
-            [ 'util/assert_util.cpp',
-              'util/concurrency/mutex.cpp',
-              'util/concurrency/thread_pool.cpp',
-              'util/exception_filter_win32.cpp',
-              'util/file.cpp',
-              'util/log.cpp',
-              'util/platform_init.cpp',
-              'util/text.cpp',
-              'util/time_support.cpp',
-              'util/timer.cpp',
-              'util/thread_safe_string.cpp',
-              "util/touch_pages.cpp",
-              "util/startup_test.cpp",
-              ],
-            LIBDEPS=['stacktrace',
-                     'synchronization',
-                     '$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/mongo/logger/logger',
-                     '$BUILD_DIR/mongo/platform/platform',
-                     '$BUILD_DIR/mongo/util/concurrency/thread_name',
-                     '$BUILD_DIR/mongo/util/debugger',
-                     '$BUILD_DIR/third_party/shim_allocator',
-                     '$BUILD_DIR/third_party/shim_boost',
-                     '$BUILD_DIR/third_party/shim_tz'])
-
-env.CppUnitTest('text_test', 'util/text_test.cpp', LIBDEPS=['foundation'])
-env.CppUnitTest('util/time_support_test', 'util/time_support_test.cpp', LIBDEPS=['foundation'])
 
 env.Library('stringutils', ['util/stringutils.cpp', 'util/base64.cpp', 'util/hex.cpp'])
 
@@ -146,7 +118,7 @@ env.CppUnitTest('safe_num_test', ['util/safe_num_test.cpp'],
                 LIBDEPS=['bson'])
 
 env.CppUnitTest('string_map_test', ['util/string_map_test.cpp'],
-                LIBDEPS=['bson','foundation'])
+                LIBDEPS=['bson','util/foundation'])
 
 env.CppUnitTest('bson_field_test', ['bson/bson_field_test.cpp'],
                 LIBDEPS=['bson'])
@@ -177,7 +149,7 @@ env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['
 
 env.CppUnitTest('descriptive_stats_test',
                 ['util/descriptive_stats_test.cpp'],
-                LIBDEPS=['foundation', 'bson']);
+                LIBDEPS=['util/foundation', 'bson']);
 
 env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
                 LIBDEPS=['network',
@@ -224,7 +196,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/util/foundation',
     ])
 
 env.CppUnitTest(
@@ -244,7 +216,7 @@ env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
 
 env.Library('hostandport', ['util/net/hostandport.cpp'],
             LIBDEPS=[
-                'foundation',
+                'util/foundation',
                 'server_options_core',
             ])
 
@@ -265,7 +237,7 @@ env.Library('network', [
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
                      'background_job',
                      'fail_point',
-                     'foundation',
+                     'util/foundation',
                      'hostandport',
                      'server_options_core',
             ])
@@ -285,7 +257,7 @@ env.Library('lasterror', [
             "db/lasterror.cpp",
             ],
             LIBDEPS=['network',
-                     'foundation',
+                     'util/foundation',
             ])
 
 def getSysInfo():
@@ -350,7 +322,7 @@ env.Library('version',
                 '$BUILD_DIR/mongo/base/base'
             ])
 
-env.Library('namespace_string', ['db/namespace_string.cpp'], LIBDEPS=['foundation'])
+env.Library('namespace_string', ['db/namespace_string.cpp'], LIBDEPS=['util/foundation'])
 
 commonFiles = [ "shell/mongo.cpp",
                 "util/file_allocator.cpp",
@@ -375,7 +347,7 @@ if env['MONGO_BUILD_SASL_CLIENT']:
                  'client/sasl_sspi.cpp'],
                 LIBDEPS = [
                     '$BUILD_DIR/mongo/client/clientdriver',
-                    'foundation',
+                    'util/foundation',
                     'signal_handlers_synchronous',
                 ],
                 SYSLIBDEPS=saslLibs)
@@ -384,7 +356,7 @@ if env['MONGO_BUILD_SASL_CLIENT']:
 # handle processinfo*
 env.Library("processinfo",
             [ "util/processinfo.cpp", "util/processinfo_${TARGET_OS}.cpp" ],
-            LIBDEPS=["foundation", "bson"])
+            LIBDEPS=["util/foundation", "bson"])
 
 env.CppUnitTest("processinfo_test",
                 ["util/processinfo_test.cpp"],
@@ -392,7 +364,7 @@ env.CppUnitTest("processinfo_test",
 
 env.Library("server_parameters",
             ["db/server_parameters.cpp"],
-            LIBDEPS=["foundation","bson"])
+            LIBDEPS=["util/foundation","bson"])
 
 env.CppUnitTest("server_parameters_test",
                 [ "db/server_parameters_test.cpp" ],
@@ -403,14 +375,14 @@ env.Library("fail_point",
             ["util/fail_point.cpp",
              "util/fail_point_registry.cpp",
              "util/fail_point_service.cpp"],
-            LIBDEPS=["foundation", "bson"])
+            LIBDEPS=["util/foundation", "bson"])
 
 env.Library('mongocommon', commonFiles,
             LIBDEPS=['bson',
                      'background_job',
                      '$BUILD_DIR/mongo/client/clientdriver',
                      'fail_point',
-                     'foundation',
+                     'util/foundation',
                      'service_context',
                      'lasterror',
                      'mongohasher',
@@ -536,7 +508,7 @@ coredbEnv.Library("coredb", [
                            'db/exec/working_set',
                            'db/index/key_generator',
                            'db/startup_warnings_common',
-                           '$BUILD_DIR/mongo/foundation',
+                           '$BUILD_DIR/mongo/util/foundation',
                            '$BUILD_DIR/third_party/shim_snappy',
                            'server_options',
                            '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
@@ -545,7 +517,7 @@ coredbEnv.Library("coredb", [
                            ])
 
 env.Library('ntservice', ['util/ntservice.cpp'],
-            LIBDEPS=['foundation',
+            LIBDEPS=['util/foundation',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser'])
 if env.TargetOSIs('windows'):
     env.CppUnitTest('ntservice_test', 'util/ntservice_test.cpp',
@@ -641,11 +613,11 @@ env.Library(
          ])
 
 # Memory-mapped files support.  Used by mongod and some tools.
-env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${TARGET_OS_FAMILY}.cpp'], LIBDEPS=['foundation'])
+env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${TARGET_OS_FAMILY}.cpp'], LIBDEPS=['util/foundation'])
 
 env.Library('elapsed_tracker',
             ['util/elapsed_tracker.cpp'],
-            LIBDEPS=['foundation',
+            LIBDEPS=['util/foundation',
                      'network'] # this is for using listener to check elapsed time
             )
 
@@ -1040,12 +1012,12 @@ env.Library("message_server_port", "util/net/message_server_port.cpp")
 env.Library("signal_handlers_synchronous",
             ['util/signal_handlers_synchronous.cpp',
              'util/allocator.cpp',],
-            LIBDEPS=["stacktrace", "foundation"]
+            LIBDEPS=["stacktrace", "util/foundation"]
             )
 
 env.Library("signal_handlers",
             ["util/signal_handlers.cpp",],
-            LIBDEPS=["foundation", "signal_handlers_synchronous"]
+            LIBDEPS=["util/foundation", "signal_handlers_synchronous"]
             )
 
 # These files go into mongos and mongod only, not into the shell or any tools.
