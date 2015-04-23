@@ -146,32 +146,6 @@ env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
                          'synchronization',
                 ])
 
-env.Library(
-    target='curop',
-    source=[
-        'db/curop.cpp',
-    ],
-    LIBDEPS=[
-        'fail_point',
-        'network',
-        'service_context',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/stats/top',
-        '$BUILD_DIR/mongo/util/progress_meter',
-    ],
-)
-
-env.CppUnitTest(
-    target='curop_test',
-    source=[
-        'db/curop_test.cpp',
-    ],
-    LIBDEPS=[
-        'curop',
-    ],
-)
-
 env.Library('index_names',["db/index_names.cpp"])
 
 env.Library( 'mongohasher', [ "db/hasher.cpp" ] )
@@ -949,7 +923,7 @@ env.CppUnitTest('range_deleter_test',
 serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = ["coreshard",
-                     'curop',
+                     'db/curop',
                      "db/auth/authmongod",
                      "db/fts/ftsmongod",
                      "db/common",

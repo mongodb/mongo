@@ -108,3 +108,29 @@ env.CppUnitTest(
         'startup_warnings_mongod',
     ],
 )
+
+env.Library(
+    target='curop',
+    source=[
+        'curop.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/fail_point',
+        '$BUILD_DIR/mongo/network',
+        '$BUILD_DIR/mongo/service_context',
+        '$BUILD_DIR/mongo/util/progress_meter',
+    ],
+)
+
+env.CppUnitTest(
+    target='curop_test',
+    source=[
+        'curop_test.cpp',
+    ],
+    LIBDEPS=[
+        'curop',
+    ],
+)
