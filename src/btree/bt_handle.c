@@ -260,7 +260,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		if (cval.val)
 			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 		else
-			F_CLR(btree, WT_BTREE_NO_EVICTION);
+			F_CLR(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	}
 
 	/* Checksums */
