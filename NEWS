@@ -1,3 +1,95 @@
+WiredTiger release 2.5.3, 2015-04-22
+------------------------------------
+
+The WiredTiger 2.5.3 release contains important bug fixes.
+
+API and behavior changes:
+
+* Update configuration string parsing to always be case sensitive. See
+  upgrading documentation for more information.
+
+* Change the statistics cursor WT_CURSOR.reset method to re-load statistics
+  values. See upgrading documentation for more information.
+  refs WT-1533
+
+* Only align buffers on Linux if direct I/O is configured. See upgrading
+  documentation for more information.
+
+* Fixes to how and when idle handles are closed.
+  refs WT-1808, WT-1811, WT-1814
+
+* Add some new statistics related to cache usage.
+
+* Add new configuration strings to provide control of how often handles are
+  are reviewed for closure, and how long a handle needs to be idle before
+  it is closed. The option is via the wiredtiger_open API,
+  file_manager=(close_idle_time=30,close_scan_interval=10)
+
+* Add support for running WiredTiger command line utilities without logging.
+  refs WT-1732
+
+* Update the async configuration API to allow a minimum of 1. That is change:
+  async=(ops_max=X) so that the minimum value is now 1 the old minimum was 10.
+
+Bug fixes and other significant changes:
+
+* Fixes and improvements to Windows support.
+
+* Fix several bugs that prevent page eviction.
+  refs SERVER-16662, SERVER-17382, WT-1777
+
+* Fix a race when stopping eviction workers on shutdown.
+  refs WT-1698
+
+* Fix a bug where if the system crashes during create the base configuration
+  file could be left in an invalid state.
+  refs WT-1775, WT-1776, SERVER-17571
+
+* Fix cases where WT_SESSSION::truncate could return EBUSY when a schema level
+  operation is running - for example a checkpoint.
+  refs WT-1404, WT-1643
+
+* Fix a bug in logging - where we could fail to update the end of the log
+  when there is a gap in the log records.
+  refs WT-1766, SERVER-17569, SERVER-17613
+
+* Fix how we account for space used in the cache to be more accurate.
+refs SERVER-17424
+
+* Fix a bug where we could leak memory if opening a statistics cursor failed.
+  refs WT-1760
+
+* Fix a bug where a single page could consume a large portion of the cache.
+  Leading to cases where a small cache size could result in a hang.
+  refs WT-1759
+
+* Fix a bug in the eviction server that could cause a WT_PANIC. The issue
+  was encountered when the number of open handles exceeded the configured
+  number of hazard pointers.
+  refs SERVER-17551
+
+* Fix a bug parsing huffman configuration options that could lead to a segfault.
+
+* Fix accounting in btree statistics gathering, so page tracking is accurate.
+  refs WT-1733
+
+* Fix a memory leak in cache management, where a race during page split could
+  leave a key structure allocated.
+  refs WT-1582, WT-1747
+
+* Enhance checkpoint tracking code to allow eviction in files once the
+  checkpoint has finished processing them. This helps reduce the impact of
+  checkpoints on workloads with cache pressure.
+  refs WT-1745
+
+* Fix when aggregation is set on statistics fields. Fixes problems with
+  visualising statistics via wtstats graphs.
+  refs WT-1742
+
+* Change how checkpoints use empty blocks in on-disk files. Use a first-fit
+  algorithm.
+
+
 WiredTiger release 2.5.2, 2015-03-23
 ------------------------------------
 
@@ -110,7 +202,7 @@ New features and API changes:
 
 * Update the WiredTiger printlog command line utility to generate JSON that
   can be parsed by third party tools.
-  Refs #1438
+  refs #1438
 
 * Change how we track memory allocation overhead. We used to apply a fixed
   size for each allocation (which was difficult to track). The overhead
@@ -134,7 +226,7 @@ Bug fixes for bugs that could cause data inconsistency:
 
 * Fix a bug in recovery where we could lose track of file identifiers and
   apply updates to the wrong file.
-  Refs SERVER-17142 SERVER-17131
+  refs SERVER-17142 SERVER-17131
 
 * Fix several bugs in data consistency that could cause corruption when
   restarting after a hard crash, including:
@@ -186,7 +278,7 @@ Other significant changes:
   refs SERVER-16351
 
 * Significant bug fixes when writing pages to disk, including:
-  - Stop double count the on-disk header when choosing split points. Refs #1655
+  - Stop double count the on-disk header when choosing split points. refs #1655
   - Fill the first and second pages as much as possible when splitting.
     refs #1282
   - Improve the algorithm for fitting large items onto pages when splitting.
@@ -197,7 +289,7 @@ Other significant changes:
 
 * Fix several cases where WT_SESSION::verify and WT_SESSION::salvage could
   return EBUSY unnecessarily.
-  Refs #1404 SERVER-16457
+  refs #1404 SERVER-16457
 
 * Fix a bug where racing between discarding and updating a tree returned an
   error to the application.
