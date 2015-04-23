@@ -109,14 +109,30 @@ err:		__wt_free(session, config_parser);
  *	Validate a configuration string.
  */
 int
-wiredtiger_config_validate(
-    WT_SESSION *wt_session, const char *name, const char *config)
+wiredtiger_config_validate(WT_SESSION *wt_session,
+    WT_EVENT_HANDLER *handler, const char *name, const char *config)
 {
-	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_IMPL *conn, dummy_conn;
 	WT_SESSION_IMPL *session;
 	const WT_CONFIG_ENTRY *ep, **epp;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+
+	/*
+	 * If we're not given a session, but we do have an event handler, build
+	 * a fake session/connection pair and configure the event handler.
+	 */
+	conn = NULL;
+	if (session == NULL && handler != NULL) {
+		WT_CLEAR(dummy_conn);
+		conn = &dummy_conn;
+		session = conn->default_session = &conn->dummy_session;
+		session->iface.connection = &conn->iface;
+		session->name = "wiredtiger_config_validate";
+		__wt_event_handler_set(session, handler);
+	}
+	if (session != NULL)
+		conn = S2C(session);
 
 	if (name == NULL)
 		WT_RET_MSG(session, EINVAL, "no name specified");
@@ -124,15 +140,13 @@ wiredtiger_config_validate(
 		WT_RET_MSG(session, EINVAL, "no configuration specified");
 
 	/*
-	 * If we don't yet have a connection, look for a matching name in the
+	 * If we don't have a real connection, look for a matching name in the
 	 * static list, otherwise look in the configuration list (which has any
 	 * configuration information the application has added).
 	 */
-	if (session == NULL)
+	if (session == NULL || conn == NULL || conn->config_entries == NULL)
 		ep = __wt_conn_config_match(name);
 	else {
-		conn = S2C(session);
-
 		ep = NULL;
 		for (epp = conn->config_entries;
 		    *epp != NULL && (*epp)->method != NULL; ++epp)

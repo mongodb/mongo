@@ -2510,16 +2510,19 @@ struct __wt_config_item {
  * This API is outside the scope of a WiredTiger connection handle, since
  * applications may need to validate configuration strings prior to calling
  * ::wiredtiger_open.
- * @param session the session handle to be used for error reporting (if NULL,
- * error messages will be written to stderr).
+ * @param session the session handle (may be \c NULL if the database not yet
+ * opened).
+ * @param errhandler An error handler (used if \c session is \c NULL; if both
+ * \c session and \c errhandler are \c NULL, error messages will be written to
+ * stderr).
  * @param name the WiredTiger function or method to validate.
  * @param config the configuration string being parsed.
  * @returns zero for success, non-zero to indicate an error.
  *
  * @snippet ex_all.c Validate a configuration string
  */
-int wiredtiger_config_validate(
-    WT_SESSION *session, const char *name, const char *config);
+int wiredtiger_config_validate(WT_SESSION *session,
+    WT_EVENT_HANDLER *errhandler, const char *name, const char *config);
 #endif
 
 /*!
