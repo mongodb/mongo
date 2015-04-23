@@ -57,6 +57,7 @@ class test_encrypt01(wttest.WiredTigerTestCase):
         ('lz4', dict(log_compress='lz4', block_compress='lz4')),
         ('bzip2', dict(log_compress='bzip2', block_compress='bzip2')),
         ('snappy', dict(log_compress='snappy', block_compress='snappy')),
+        ('zlib', dict(log_compress='zlib', block_compress='zlib')),
         ('bzip2-none', dict(log_compress='bzip2', block_compress=None)),
         ('none-snappy', dict(log_compress=None, block_compress='snappy')),
         ('snappy-lz4', dict(log_compress='snappy', block_compress='lz4')),
