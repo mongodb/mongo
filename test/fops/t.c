@@ -38,7 +38,7 @@ const char *config;				/* Object config */
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
-char *home;
+char home[512];
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
@@ -70,7 +70,8 @@ main(int argc, char *argv[])
 	};
 	u_int nthreads;
 	int ch, cnt, ret, runs;
-	char *config_open;
+	char *config_open, *working_dir;
+	working_dir = NULL;
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -91,7 +92,7 @@ main(int argc, char *argv[])
 			config_open = __wt_optarg;
 			break;
 		case 'h':
-			home = __wt_optarg;
+			working_dir = __wt_optarg;
 			break;
 		case 'l':			/* log */
 			if ((logfp = fopen(__wt_optarg, "w")) == NULL) {
@@ -118,7 +119,8 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	home = testutil_workdir_from_path(home);
+	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
+		die(ret, "provided directory name is too long");
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -161,7 +163,7 @@ wt_startup(char *config_open)
 	int ret;
 	char config_buf[128];
 
-	testutil_make_workdir(home);
+	testutil_make_work_dir(home);
 
 	snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
@@ -191,9 +193,9 @@ wt_shutdown(void)
  *	Clean up from previous runs.
  */
 static void
-shutdown()
+shutdown(void)
 {
-	testutil_clean_workdir(home);
+	testutil_clean_work_dir(home);
 }
 
 static int

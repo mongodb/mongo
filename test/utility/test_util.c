@@ -35,7 +35,6 @@
  * die --
  *	Report an error and quit.
  */
-
 void
 die(int e, const char *fmt, ...)
 {
@@ -50,55 +49,75 @@ die(int e, const char *fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
-//Takes a directory as input and returns it with "WT_TEST appended"
-char *
-testutil_workdir_from_path(char *dir)
+/*
+ * testutil_work_dir_from_path --
+ *	Takes a buffer, its size and the intended work directory.
+ *	Creates the full intended work directory in buffer.
+ */
+int
+testutil_work_dir_from_path(char *buffer, size_t inputSize, char *dir)
 {
-	char *buffer;
 	char default_dir[2] = ".";
-	size_t inputSize;
 
 	if (dir == NULL) {
 		dir = default_dir;
 	}
-	inputSize = strlen(dir);
-	//Alloc space for a new buffer
-	buffer = (char*) malloc (inputSize+8);
+
+	/* 9 bytes for the directory and WT_TEST */
+	if (inputSize < strlen(dir) + 9)
+		return (1);
 
 	/* Is this windows or *nix? */
 #ifdef _WIN32
-	sprintf(buffer, "%s\\WT_TEST", dir);
+	snprintf(buffer, inputSize, "%s\\WT_TEST", dir);
 #else
-	sprintf(buffer, "%s/WT_TEST", dir);
+	snprintf(buffer, inputSize, "%s/WT_TEST", dir);
 #endif
-	printf("returning buffer of %s\n", buffer);
-	return (buffer);
+	return (0);
 }
 
+/*
+ * testutil_clean_work_dir --
+ *	Remove any existing work directories
+ */
 void
-testutil_clean_workdir(char *dir)
+testutil_clean_work_dir(char *dir)
 {
-	char CMD[512];
+	char *buffer;
+	size_t inputSize;
 	int ret;
+	/* 10 bytes for the Windows rd command */
+	inputSize = strlen(dir) + 19;
+	buffer = (char*) malloc (inputSize);
+
 #ifdef _WIN32
-	sprintf(CMD, "rd /s /q %s", dir);
+	snprintf(buffer, inputSize, "rd /s /q %s", dir);
 #else
-	sprintf(CMD, "rm -rf %s", dir);
+	snprintf(buffer, inputSize, "rm -rf %s", dir);
 #endif
-	if ((ret = system(CMD)) != 0)
+	if ((ret = system(buffer)) != 0)
 		die(ret, "directory cleanup call failed");
 }
 
+/*
+ * testutil_make_work_dir --
+ *	Delete the existing work directory if it exists, then create a new one.
+ */
 void
-testutil_make_workdir(char *dir)
+testutil_make_work_dir(char *dir)
 {
-	char CMD[512];
+	char *buffer;
+	size_t inputSize;
 	int ret;
 
-	testutil_clean_workdir(dir);
+	testutil_clean_work_dir(dir);
 
-	/* mkdir shares syntax between windows and Linux */
-	sprintf(CMD, "mkdir %s", dir);
-	if ((ret = system(CMD)) != 0)
+	/* 7 bytes for the mkdir command */
+	inputSize = strlen(dir) + 7;
+	buffer = (char*) malloc (inputSize);
+
+	/* mkdir shares syntax between Windows and Linux */
+	snprintf(buffer, inputSize, "mkdir %s", dir);
+	if ((ret = system(buffer)) != 0)
 		die(ret, "directory create call failed");
 }

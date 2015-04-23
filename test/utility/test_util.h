@@ -25,12 +25,12 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-char * testutil_workdir_from_path(char *);
-void testutil_make_workdir(char *);
-void testutil_clean_workdir(char *);
-
 void die(int, const char *, ...)
 #if defined(__GNUC__)
 __attribute__((noreturn))
 #endif
 ;
+
+void testutil_clean_work_dir(char *);
+void testutil_make_work_dir(char *);
+int testutil_work_dir_from_path(char *, size_t, char *);
