@@ -507,8 +507,11 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 
 	btree = S2BT(session);
 
-	/* The metadata file is never evicted. */
-	if (on && !WT_IS_METADATA(btree->dhandle))
+	/* Permanently cache-resident files can never be evicted. */
+	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		return;
+
+	if (on)
 		F_CLR(btree, WT_BTREE_NO_EVICTION);
 	else
 		F_SET(btree, WT_BTREE_NO_EVICTION);
