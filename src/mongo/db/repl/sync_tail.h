@@ -128,11 +128,8 @@ namespace repl {
         // Doles out all the work to the writer pool threads and waits for them to complete
         void applyOps(const std::vector< std::vector<BSONObj> >& writerVectors);
 
-        // mustAwaitCommit is an out-parameter and indicates that at least one of the ops
-        // in 'ops' had j:true.
-        void fillWriterVectors(const std::deque<BSONObj>& ops, 
-                               std::vector< std::vector<BSONObj> >* writerVectors,
-                               bool* mustAwaitCommit);
+        void fillWriterVectors(const std::deque<BSONObj>& ops,
+                               std::vector< std::vector<BSONObj> >* writerVectors);
         void handleSlaveDelay(const BSONObj& op);
 
         // persistent pool of worker threads for writing ops to the databases

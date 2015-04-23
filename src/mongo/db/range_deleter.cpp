@@ -269,7 +269,7 @@ namespace {
     const int kWTimeoutMillis = 60 * 60 * 1000;
 
     bool _waitForMajority(OperationContext* txn, std::string* errMsg) {
-        const WriteConcernOptions writeConcern("majority",
+        const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
                                                WriteConcernOptions::NONE,
                                                kWTimeoutMillis);
 

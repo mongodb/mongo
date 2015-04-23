@@ -302,12 +302,6 @@ namespace {
             b.appendBool("fromMigrate", true);
         }
 
-        if (txn->getWriteConcern().shouldWaitForOtherNodes()
-            && txn->getWriteConcern().syncMode == WriteConcernOptions::JOURNAL)
-        {
-            b.appendBool("j", true);
-        }
-
         if ( o2 ) {
             b.append("o2", *o2);
         }

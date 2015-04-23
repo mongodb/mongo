@@ -62,6 +62,18 @@ namespace mongo {
         }
     }
 
+    namespace {
+        // The consensus protocol requires that w: majority implies j: true on all nodes.
+        void addJournalSyncForWMajority(WriteConcernOptions* writeConcern) {
+            if (repl::getGlobalReplicationCoordinator()->isV1ElectionProtocol()
+                && writeConcern->wMode == WriteConcernOptions::kMajority
+                && writeConcern->syncMode == WriteConcernOptions::NONE)
+            {
+                writeConcern->syncMode = WriteConcernOptions::JOURNAL;
+            }
+        }
+    } // namespace
+
     StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
         // The default write concern if empty is w : 1
         // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
@@ -70,6 +82,8 @@ namespace mongo {
         if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
             writeConcern.wNumNodes = 1;
         }
+        // Upgrade default write concern if necessary.
+        addJournalSyncForWMajority(&writeConcern);
 
         BSONElement writeConcernElement;
         Status wcStatus = bsonExtractTypedField(cmdObj,
@@ -99,6 +113,9 @@ namespace mongo {
         if (!wcStatus.isOK()) {
             return wcStatus;
         }
+
+        // Upgrade parsed write concern if necessary.
+        addJournalSyncForWMajority(&writeConcern);
 
         return writeConcern;
     }
@@ -130,7 +147,7 @@ namespace mongo {
 
         if ( replMode != repl::ReplicationCoordinator::modeReplSet &&
                 !writeConcern.wMode.empty() &&
-                writeConcern.wMode != "majority" ) {
+                writeConcern.wMode != WriteConcernOptions::kMajority ) {
             return Status( ErrorCodes::BadValue,
                            string( "cannot use non-majority 'w' mode " ) + writeConcern.wMode
                            + " when a host is not a member of a replica set" );

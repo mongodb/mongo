@@ -2508,7 +2508,7 @@ namespace mongo {
                                 const WriteConcernOptions& writeConcern) {
             WriteConcernOptions majorityWriteConcern;
             majorityWriteConcern.wTimeout = -1;
-            majorityWriteConcern.wMode = "majority";
+            majorityWriteConcern.wMode = WriteConcernOptions::kMajority;
             Status majorityStatus = repl::getGlobalReplicationCoordinator()->awaitReplication(
                     txn, lastOpApplied, majorityWriteConcern).status;
 

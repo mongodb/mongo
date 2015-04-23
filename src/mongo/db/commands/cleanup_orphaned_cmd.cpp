@@ -53,7 +53,7 @@ namespace {
     using mongo::WriteConcernOptions;
 
     const int kDefaultWTimeoutMs = 60 * 1000;
-    const WriteConcernOptions DefaultWriteConcern("majority",
+    const WriteConcernOptions DefaultWriteConcern(WriteConcernOptions::kMajority,
                                                   WriteConcernOptions::NONE,
                                                   kDefaultWTimeoutMs);
 }
