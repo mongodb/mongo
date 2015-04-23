@@ -185,7 +185,7 @@ static int
 __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval, enc, metadata;
+	WT_CONFIG_ITEM cval, enc, keyid, metadata;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	int64_t maj_version, min_version;
@@ -318,12 +318,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "encryption.name", &cval));
 		WT_RET(__wt_config_gets_none(
-		    session, cfg, "encryption.keyid", &metadata));
+		    session, cfg, "encryption.keyid", &keyid));
 		WT_RET(__wt_config_gets(session, cfg, "encryption", &enc));
 		if (enc.len != 0)
 			WT_RET(__wt_strndup(session, enc.str, enc.len,
 			    &enc_cfg[0]));
-		ret = __wt_encryptor_config(session, &cval, &metadata,
+		ret = __wt_encryptor_config(session, &cval, &keyid,
 		    (WT_CONFIG_ARG *)enc_cfg, &btree->kencryptor);
 		__wt_free(session, enc_cfg[0]);
 		WT_RET(ret);
