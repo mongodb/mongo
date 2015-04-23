@@ -78,7 +78,6 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <iomanip>
-#include <utility>
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
@@ -207,6 +206,8 @@ namespace {
         DurableImpl() { }
 
         // DurableInterface virtual methods
+        virtual void* writingPtr(void *x, unsigned len);
+        virtual void declareWriteIntent(void *, unsigned);
         virtual void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents);
         virtual void createdFile(const std::string& filename, unsigned long long len);
         virtual bool awaitCommit();
@@ -531,6 +532,16 @@ namespace {
         commitJob.noteOp(op);
     }
 
+    void* DurableImpl::writingPtr(void* x, unsigned len) {
+        declareWriteIntent(x, len);
+        return x;
+    }
+
+    void DurableImpl::declareWriteIntent(void *p, unsigned len) {
+        privateViews.makeWritable(p, len);
+        SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+        commitJob.note(p, len);
+    }
 
     void DurableImpl::declareWriteIntents(
         const std::vector<std::pair<void*, unsigned> >& intents) {
