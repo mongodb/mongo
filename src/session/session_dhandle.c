@@ -429,7 +429,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET(__session_add_dhandle(session, NULL));
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
-	    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
+	    (F_ISSET(session->dhandle, WT_DHANDLE_OPEN) &&
+	    !F_ISSET(session->dhandle, WT_DHANDLE_DEAD)));
 
 done:	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
 	    F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE));

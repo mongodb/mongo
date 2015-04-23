@@ -540,6 +540,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 		    __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 		SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+			    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
 			    strcmp(uri, dhandle->name) == 0 &&
 			    (apply_checkpoints || dhandle->checkpoint == NULL))
 				WT_RET(__conn_btree_apply_internal(
@@ -547,6 +548,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	} else {
 		SLIST_FOREACH(dhandle, &conn->dhlh, l)
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+			    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
 			    (apply_checkpoints ||
 			    dhandle->checkpoint == NULL) &&
 			    WT_PREFIX_MATCH(dhandle->name, "file:") &&
