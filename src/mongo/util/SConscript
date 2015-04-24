@@ -152,3 +152,25 @@ env.CppUnitTest(
         "stringutils",
     ],
 )
+
+env.Library(
+    target="processinfo",
+    source=[
+        "processinfo.cpp",
+        "processinfo_${TARGET_OS}.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson",
+        "foundation",
+    ],
+)
+
+env.CppUnitTest(
+    target="processinfo_test",
+    source=[
+        "processinfo_test.cpp",
+    ],
+    LIBDEPS=[
+        "processinfo",
+    ],
+)

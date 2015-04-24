@@ -230,15 +230,6 @@ extraCommonLibdeps = []
 if env['MONGO_BUILD_SASL_CLIENT']:
     extraCommonLibdeps.append('client/cyrus_sasl_client_session')
 
-# handle processinfo*
-env.Library("processinfo",
-            [ "util/processinfo.cpp", "util/processinfo_${TARGET_OS}.cpp" ],
-            LIBDEPS=["util/foundation", "bson"])
-
-env.CppUnitTest("processinfo_test",
-                ["util/processinfo_test.cpp"],
-                LIBDEPS=["processinfo"])
-
 env.Library("server_parameters",
             ["db/server_parameters.cpp"],
             LIBDEPS=["util/foundation","bson"])
@@ -265,7 +256,7 @@ env.Library('mongocommon', commonFiles,
                      'db/mongohasher',
                      'namespace_string',
                      'util/net/network',
-                     'processinfo',
+                     'util/processinfo',
                      'util/concurrency/spin_lock',
                      'stacktrace',
                      'util/stringutils',

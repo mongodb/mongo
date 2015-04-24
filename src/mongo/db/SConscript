@@ -95,7 +95,7 @@ env.Library(
     ],
     LIBDEPS=[
         'startup_warnings_common',
-        '$BUILD_DIR/mongo/processinfo',
+        '$BUILD_DIR/mongo/util/processinfo',
     ]
 )
 
