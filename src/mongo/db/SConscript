@@ -148,3 +148,32 @@ env.Library(
         "hasher.cpp",
     ],
 )
+
+# Range arithmetic library, used by both mongod and mongos
+env.Library(
+    target='range_arithmetic',
+    source=[
+        'range_arithmetic.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
+
+env.CppUnitTest(
+    target='range_arithmetic_test',
+    source=[
+        'range_arithmetic_test.cpp',
+    ],
+    LIBDEPS=[
+        'range_arithmetic',
+    ],
+)
+
+env.Library(
+    target='global_timestamp',
+    source=[
+        'global_timestamp.cpp',
+    ],
+)

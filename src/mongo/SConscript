@@ -142,28 +142,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-# Range arithmetic library, used by both mongod and mongos
-env.Library(
-    'range_arithmetic',
-    [
-        'db/range_arithmetic.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
-        '$BUILD_DIR/mongo/util/foundation',
-    ])
-
-env.CppUnitTest(
-    'range_arithmetic_test',
-    [
-        'db/range_arithmetic_test.cpp',
-    ],
-    LIBDEPS=[
-        'range_arithmetic'
-    ])
-
-env.Library('global_timestamp', ['db/global_timestamp.cpp'])
-
 env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
 env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
                 LIBDEPS=['spin_lock', '$BUILD_DIR/third_party/shim_boost'])
@@ -898,7 +876,7 @@ env.Library('range_deleter',
                 'base/base',
                 'bson',
                 'service_context',
-                'range_arithmetic',
+                'db/range_arithmetic',
                 'util/concurrency/synchronization'
             ])
 
@@ -920,7 +898,7 @@ serveronlyLibdeps = ["coreshard",
                      "db/concurrency/lock_manager",
                      "db/concurrency/write_conflict_exception",
                      "db/ops/update_driver",
-                     "global_timestamp",
+                     "db/global_timestamp",
                      "index_key_validate",
                      'range_deleter',
                      'scripting_server',
