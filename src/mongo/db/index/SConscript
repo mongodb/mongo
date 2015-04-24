@@ -22,7 +22,7 @@ env.Library(
             '$BUILD_DIR/mongo/db/fts/base',
             '$BUILD_DIR/mongo/db/geo/geometry',
             '$BUILD_DIR/mongo/db/geo/geoparser',
-            '$BUILD_DIR/mongo/index_names',
+            '$BUILD_DIR/mongo/db/index_names',
             '$BUILD_DIR/third_party/s2/s2',
         ],
 )
@@ -45,6 +45,6 @@ env.CppUnitTest(
         ],
         LIBDEPS=[
             'key_generator',
-            '$BUILD_DIR/mongo/mongohasher',
+            '$BUILD_DIR/mongo/db/mongohasher',
         ],
 )

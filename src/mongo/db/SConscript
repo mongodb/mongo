@@ -20,7 +20,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/util/foundation',
-        '$BUILD_DIR/mongo/index_names'
+        '$BUILD_DIR/mongo/db/index_names'
     ],
 )
 
@@ -55,7 +55,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'common',
-        '$BUILD_DIR/mongo/mongohasher',
+        '$BUILD_DIR/mongo/db/mongohasher',
     ],
 )
 
@@ -132,5 +132,19 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'curop',
+    ],
+)
+
+env.Library(
+    target='index_names',
+    source=[
+        "index_names.cpp",
+    ],
+)
+
+env.Library(
+    target='mongohasher',
+    source=[
+        "hasher.cpp",
     ],
 )

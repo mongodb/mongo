@@ -142,10 +142,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-env.Library('index_names',["db/index_names.cpp"])
-
-env.Library( 'mongohasher', [ "db/hasher.cpp" ] )
-
 env.Library('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 
 # Range arithmetic library, used by both mongod and mongos
@@ -210,7 +206,7 @@ env.Library(
     LIBDEPS=[
         'bson',
         'db/common',
-        'index_names',
+        'db/index_names',
     ])
 
 env.Library('lasterror', [
@@ -345,7 +341,7 @@ env.Library('mongocommon', commonFiles,
                      'util/foundation',
                      'service_context',
                      'lasterror',
-                     'mongohasher',
+                     'db/mongohasher',
                      'namespace_string',
                      'network',
                      'processinfo',
@@ -464,7 +460,7 @@ coredbEnv.Library("coredb", [
                            'db/matcher/expressions',
                            'db/matcher/expressions_geo',
                            'db/matcher/expressions_text',
-                           'index_names',
+                           'db/index_names',
                            'db/exec/working_set',
                            'db/index/key_generator',
                            'db/startup_warnings_common',
