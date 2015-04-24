@@ -97,7 +97,7 @@ namespace mongo {
                     newArr.push_back(arr[i]);
                 }
             }
-            return Value::consume(newArr);
+            return Value(std::move(newArr));
         }
         else {
             return in;

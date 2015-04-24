@@ -50,7 +50,7 @@ namespace mongo {
     class RCVector : public RefCountable {
     public:
         RCVector() {}
-        RCVector(const std::vector<Value>& v) :vec(v) {}
+        RCVector(std::vector<Value> v) :vec(std::move(v)) {}
         std::vector<Value> vec;
     };
 

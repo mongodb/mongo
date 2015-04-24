@@ -311,7 +311,7 @@ namespace mongo {
         for (size_t i=0; i < vSortKey.size(); i++) {
             keys.push_back(vSortKey[i]->evaluate(&vars));
         }
-        return Value::consume(keys);
+        return Value(std::move(keys));
     }
 
     int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {

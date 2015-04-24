@@ -74,13 +74,13 @@ namespace mongo {
         explicit Value(double value)              : _storage(NumberDouble, value) {}
         explicit Value(const Timestamp& value)    : _storage(bsonTimestamp, value) {}
         explicit Value(const OID& value)          : _storage(jstOID, value) {}
-        explicit Value(StringData value)   : _storage(String, value) {}
-        explicit Value(const std::string& value)       : _storage(String, StringData(value)) {}
+        explicit Value(StringData value)          : _storage(String, value) {}
+        explicit Value(const std::string& value)  : _storage(String, StringData(value)) {}
         explicit Value(const char* value)         : _storage(String, StringData(value)) {}
         explicit Value(const Document& doc)       : _storage(Object, doc) {}
         explicit Value(const BSONObj& obj);
         explicit Value(const BSONArray& arr);
-        explicit Value(const std::vector<Value>& vec)  : _storage(Array, new RCVector(vec)) {}
+        explicit Value(std::vector<Value> vec)    : _storage(Array, new RCVector(std::move(vec))) {}
         explicit Value(const BSONBinData& bd)     : _storage(BinData, bd) {}
         explicit Value(const BSONRegEx& re)       : _storage(RegEx, re) {}
         explicit Value(const BSONCodeWScope& cws) : _storage(CodeWScope, cws) {}
@@ -106,16 +106,6 @@ namespace mongo {
          *  will be an int if value fits, otherwise it will be a long.
         */
         static Value createIntOrLong(long long value);
-
-        /** Construct an Array-typed Value from consumed without copying the vector.
-         *  consumed is replaced with an empty vector.
-         *  In C++11 this would be spelled Value(std::move(consumed)).
-         */
-        static Value consume(std::vector<Value>& consumed) {
-            RCVector* vec = new RCVector();
-            std::swap(vec->vec, consumed);
-            return Value(ValueStorage(Array, vec));
-        }
 
         /** A "missing" value indicates the lack of a Value.
          *  This is similar to undefined/null but should not appear in output to BSON.

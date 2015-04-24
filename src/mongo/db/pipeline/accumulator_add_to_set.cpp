@@ -64,8 +64,7 @@ namespace mongo {
     }
 
     Value AccumulatorAddToSet::getValue(bool toBeMerged) const {
-        vector<Value> valVec(set.begin(), set.end());
-        return Value::consume(valVec);
+        return Value(vector<Value>(set.begin(), set.end()));
     }
 
     AccumulatorAddToSet::AccumulatorAddToSet() {

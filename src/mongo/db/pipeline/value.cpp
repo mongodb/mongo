@@ -1066,7 +1066,7 @@ namespace mongo {
             array.reserve(numElems);
             for (int i = 0; i < numElems; i++)
                 array.push_back(deserializeForSorter(buf, settings));
-            return Value::consume(array);
+            return Value(std::move(array));
         }
         }
         verify(false);

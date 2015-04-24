@@ -1213,7 +1213,7 @@ namespace {
                     result.push_back(doc.freezeToValue());
                 }
 
-                out.addField(field.first, Value::consume(result));
+                out.addField(field.first, Value(std::move(result)));
             }
             else {
                 verify( false );
@@ -1421,7 +1421,7 @@ namespace {
                 result.push_back(nested);
         }
 
-        return Value::consume(result);
+        return Value(std::move(result));
     }
     Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) const {
         // Note this function is very hot so it is important that is is well optimized.
@@ -1681,7 +1681,7 @@ namespace {
             output.push_back(toInsert);
         }
 
-        return Value::consume(output);
+        return Value(std::move(output));
     }
 
     void ExpressionMap::addDependencies(DepsTracker* deps, vector<string>* path) const {
@@ -2120,7 +2120,7 @@ namespace {
                 returnVec.push_back(*it);
             }
         }
-        return Value::consume(returnVec);
+        return Value(std::move(returnVec));
     }
 
     REGISTER_EXPRESSION("$setDifference", ExpressionSetDifference::parse);
@@ -2206,9 +2206,8 @@ namespace {
                 break;
             }
         }
-        vector<Value> result = vector<Value>(currentIntersection.begin(),
-                                             currentIntersection.end());
-        return Value::consume(result);
+        return Value(vector<Value>(currentIntersection.begin(),
+                                   currentIntersection.end()));
     }
 
     REGISTER_EXPRESSION("$setIntersection", ExpressionSetIntersection::parse);
@@ -2315,8 +2314,7 @@ namespace {
 
             unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
         }
-        vector<Value> result = vector<Value>(unionedSet.begin(), unionedSet.end());
-        return Value::consume(result);
+        return Value(vector<Value>(unionedSet.begin(), unionedSet.end()));
     }
 
     REGISTER_EXPRESSION("$setUnion", ExpressionSetUnion::parse);

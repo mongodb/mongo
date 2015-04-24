@@ -541,7 +541,7 @@ namespace mongo {
             return *this << Value(val);
         }
 
-        Value done() { return Value::consume(_array); }
+        Value done() { return Value(std::move(_array)); }
 
     private:
         std::vector<Value> _array;
