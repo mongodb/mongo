@@ -75,6 +75,10 @@ namespace {
         }
     }
 
+    bool AuthzSessionExternalStateServerCommon::serverIsArbiter() const {
+        return false;
+    }
+
     bool AuthzSessionExternalStateServerCommon::shouldAllowLocalhost() const {
         ClientBasic* client = ClientBasic::getCurrent();
         return _allowLocalhost && client->getIsLocalHostConnection();

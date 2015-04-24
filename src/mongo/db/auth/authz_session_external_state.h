@@ -67,6 +67,11 @@ namespace mongo {
         // shouldAllowLocalhost or we could ignore auth checks incorrectly.
         virtual bool shouldAllowLocalhost() const = 0;
 
+        // Returns true if this connection should allow extra server configuration actions under
+        // the localhost exception. This condition is used to allow special privileges on arbiters.
+        // See SERVER-5479 for details on when this may be removed.
+        virtual bool serverIsArbiter() const = 0;
+
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
         virtual void startRequest(OperationContext* txn) = 0;

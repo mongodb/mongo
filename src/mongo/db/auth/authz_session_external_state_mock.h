@@ -44,7 +44,7 @@ namespace mongo {
     public:
         AuthzSessionExternalStateMock(AuthorizationManager* authzManager) :
             AuthzSessionExternalState(authzManager), _ignoreAuthChecksReturnValue(false),
-            _allowLocalhostReturnValue(false) {}
+            _allowLocalhostReturnValue(false), _serverIsArbiterReturnValue(false) {}
 
         virtual bool shouldIgnoreAuthChecks() const {
             return _ignoreAuthChecksReturnValue;
@@ -52,6 +52,10 @@ namespace mongo {
 
         virtual bool shouldAllowLocalhost() const {
             return _allowLocalhostReturnValue;
+        }
+
+        virtual bool serverIsArbiter() const {
+            return _serverIsArbiterReturnValue;
         }
 
         void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
@@ -67,6 +71,7 @@ namespace mongo {
     private:
         bool _ignoreAuthChecksReturnValue;
         bool _allowLocalhostReturnValue;
+        bool _serverIsArbiterReturnValue;
     };
 
 } // namespace mongo
