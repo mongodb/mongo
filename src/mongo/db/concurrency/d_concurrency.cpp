@@ -181,15 +181,16 @@ namespace {
         }
     }
 
-    void Lock::CollectionLock::relockWithMode(LockMode mode, Lock::DBLock& dbLock) {
+    void Lock::CollectionLock::relockAsDatabaseExclusive(Lock::DBLock& dbLock) {
         if (supportsDocLocking() || enableCollectionLocking) {
             _lockState->unlock(_id);
         }
 
-        dbLock.relockWithMode(mode);
+        dbLock.relockWithMode(MODE_X);
 
         if (supportsDocLocking() || enableCollectionLocking) {
-            _lockState->lock(_id, mode);
+            // don't need the lock, but need something to unlock in the destructor
+            _lockState->lock(_id, MODE_IX);
         }
     }
 

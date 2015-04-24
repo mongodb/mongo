@@ -494,7 +494,7 @@ namespace {
                     if (!collection && args.isUpsert()) {
                         // Release the collection lock and reacquire a lock on the database
                         // in exclusive mode in order to create the collection.
-                        collLock.relockWithMode(MODE_X, autoDb.lock());
+                        collLock.relockAsDatabaseExclusive(autoDb.lock());
                         collection = autoDb.getDb()->getCollection(nsString.ns());
                         Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(nsString);
                         if (!isPrimaryAfterRelock.isOK()) {
