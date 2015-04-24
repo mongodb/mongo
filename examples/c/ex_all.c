@@ -903,7 +903,7 @@ connection_ops(WT_CONNECTION *conn)
 	 * "WT_SESSION.create" and cursor close would be WT_CURSOR.close").
 	 */
 	ret = wiredtiger_config_validate(
-	    NULL, "WT_SESSION.create", "allocation_size=32KB");
+	    NULL, NULL, "WT_SESSION.create", "allocation_size=32KB");
 	/*! [Validate a configuration string] */
 
 	{
