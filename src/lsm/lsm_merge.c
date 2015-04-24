@@ -244,7 +244,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	int create_bloom, locked, in_sync, tret;
 	const char *cfg[3];
 	const char *drop_cfg[] =
-	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
+	    { WT_CONFIG_BASE(session, WT_SESSION_drop), "force", NULL };
 
 	bloom = NULL;
 	chunk = NULL;
@@ -337,7 +337,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	/* Discard pages we read as soon as we're done with them. */
 	F_SET(session, WT_SESSION_NO_CACHE);
 
-	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_open_cursor);
 	cfg[1] = "bulk,raw,skip_sort_check";
 	cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));

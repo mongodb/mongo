@@ -349,9 +349,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
-	const char *txn_cfg[] =
-	    { WT_CONFIG_BASE(session, session_begin_transaction),
-	      "isolation=snapshot", NULL };
+	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
+	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
 	void *saved_meta_next;
 	int full, logging, tracking;
 	u_int i;

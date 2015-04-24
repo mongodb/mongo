@@ -138,7 +138,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.session = self.setUpSessionOpen(self.conn)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.verify('table:' + self.tablename, None),
-            "/session.verify/")
+            "/WT_SESSION.verify/")
 
     def test_verify_process_75pct_null(self):
         """

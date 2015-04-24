@@ -96,29 +96,29 @@
 
 #define	CONNECTION_API_CALL(conn, s, n, config, cfg)			\
 	s = (conn)->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, config, cfg)
+	API_CALL(s, WT_CONNECTION, n, NULL, NULL, config, cfg)
 
 #define	CONNECTION_API_CALL_NOCONF(conn, s, n)				\
 	s = (conn)->default_session;					\
-	API_CALL_NOCONF(s, connection, n, NULL, NULL)
+	API_CALL_NOCONF(s, WT_CONNECTION, n, NULL, NULL)
 
 #define	SESSION_API_CALL(s, n, config, cfg)				\
-	API_CALL(s, session, n, NULL, NULL, config, cfg)
+	API_CALL(s, WT_SESSION, n, NULL, NULL, config, cfg)
 
 #define	SESSION_API_CALL_NOCONF(s, n)					\
-	API_CALL_NOCONF(s, session, n, NULL, NULL)
+	API_CALL_NOCONF(s, WT_SESSION, n, NULL, NULL)
 
 #define	SESSION_TXN_API_CALL(s, n, config, cfg)				\
-	TXN_API_CALL(s, session, n, NULL, NULL, config, cfg)
+	TXN_API_CALL(s, WT_SESSION, n, NULL, NULL, config, cfg)
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur,				\
+	API_CALL_NOCONF(s, WT_CURSOR, n, cur,				\
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
 #define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	TXN_API_CALL_NOCONF(s, cursor, n, cur,				\
+	TXN_API_CALL_NOCONF(s, WT_CURSOR, n, cur,			\
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\

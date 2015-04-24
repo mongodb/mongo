@@ -638,13 +638,13 @@ methods = {
 
 'table.meta' : Method(table_meta),
 
-'cursor.close' : Method([]),
+'WT_CURSOR.close' : Method([]),
 
-'cursor.reconfigure' : Method(cursor_runtime_config),
+'WT_CURSOR.reconfigure' : Method(cursor_runtime_config),
 
-'session.close' : Method([]),
+'WT_SESSION.close' : Method([]),
 
-'session.compact' : Method([
+'WT_SESSION.compact' : Method([
     Config('timeout', '1200', r'''
         maximum amount of time to allow for compact in seconds. The
         actual amount of time spent in compact may exceed the configured
@@ -652,7 +652,7 @@ methods = {
         type='int'),
 ]),
 
-'session.create' : Method(file_config + lsm_config + source_meta + 
+'WT_SESSION.create' : Method(file_config + lsm_config + source_meta + 
         index_only_config + table_only_config + [
     Config('exclusive', 'false', r'''
         fail if the object exists.  When false (the default), if the
@@ -661,7 +661,7 @@ methods = {
         type='boolean'),
 ]),
 
-'session.drop' : Method([
+'WT_SESSION.drop' : Method([
     Config('force', 'false', r'''
         return success if the object does not exist''',
         type='boolean'),
@@ -670,9 +670,9 @@ methods = {
         type='boolean'),
 ]),
 
-'session.log_printf' : Method([]),
+'WT_SESSION.log_printf' : Method([]),
 
-'session.open_cursor' : Method(cursor_runtime_config + [
+'WT_SESSION.open_cursor' : Method(cursor_runtime_config + [
     Config('bulk', 'false', r'''
         configure the cursor for bulk-loading, a fast, initial load
         path (see @ref tune_bulk_load for more information).  Bulk-load
@@ -746,17 +746,17 @@ methods = {
         type='list'),
 ]),
 
-'session.rename' : Method([]),
-'session.salvage' : Method([
+'WT_SESSION.rename' : Method([]),
+'WT_SESSION.salvage' : Method([
     Config('force', 'false', r'''
         force salvage even of files that do not appear to be WiredTiger
         files''',
         type='boolean'),
 ]),
-'session.strerror' : Method([]),
-'session.truncate' : Method([]),
-'session.upgrade' : Method([]),
-'session.verify' : Method([
+'WT_SESSION.strerror' : Method([]),
+'WT_SESSION.truncate' : Method([]),
+'WT_SESSION.upgrade' : Method([]),
+'WT_SESSION.verify' : Method([
     Config('dump_address', 'false', r'''
         Display addresses and page types as pages are verified,
         using the application's message handler, intended for debugging''',
@@ -779,7 +779,7 @@ methods = {
         type='boolean')
 ]),
 
-'session.begin_transaction' : Method([
+'WT_SESSION.begin_transaction' : Method([
     Config('isolation', '', r'''
         the isolation level for this transaction; defaults to the
         session's isolation level''',
@@ -796,10 +796,10 @@ methods = {
         type='boolean'),
 ]),
 
-'session.commit_transaction' : Method([]),
-'session.rollback_transaction' : Method([]),
+'WT_SESSION.commit_transaction' : Method([]),
+'WT_SESSION.rollback_transaction' : Method([]),
 
-'session.checkpoint' : Method([
+'WT_SESSION.checkpoint' : Method([
     Config('drop', '', r'''
         specify a list of checkpoints to drop.
         The list may additionally contain one of the following keys:
@@ -821,11 +821,11 @@ methods = {
         if non-empty, checkpoint the list of objects''', type='list'),
 ]),
 
-'connection.add_collator' : Method([]),
-'connection.add_compressor' : Method([]),
-'connection.add_data_source' : Method([]),
-'connection.add_extractor' : Method([]),
-'connection.async_new_op' : Method([
+'WT_CONNECTION.add_collator' : Method([]),
+'WT_CONNECTION.add_compressor' : Method([]),
+'WT_CONNECTION.add_data_source' : Method([]),
+'WT_CONNECTION.add_extractor' : Method([]),
+'WT_CONNECTION.async_new_op' : Method([
     Config('append', 'false', r'''
         append the value as a new record, creating a new record
         number key; valid only for operations with record number keys''',
@@ -847,14 +847,14 @@ methods = {
         value. A value of zero disables the timeout''',
         type='int'),
 ]),
-'connection.close' : Method([
+'WT_CONNECTION.close' : Method([
     Config('leak_memory', 'false', r'''
         don't free memory during close''',
         type='boolean'),
 ]),
-'connection.reconfigure' : Method(connection_runtime_config),
+'WT_CONNECTION.reconfigure' : Method(connection_runtime_config),
 
-'connection.load_extension' : Method([
+'WT_CONNECTION.load_extension' : Method([
     Config('config', '', r'''
         configuration string passed to the entry point of the
         extension as its WT_CONFIG_ARG argument'''),
@@ -869,9 +869,9 @@ methods = {
         ::wiredtiger_extension_terminate'''),
 ]),
 
-'connection.open_session' : Method(session_config),
+'WT_CONNECTION.open_session' : Method(session_config),
 
-'session.reconfigure' : Method(session_config),
+'WT_SESSION.reconfigure' : Method(session_config),
 
 # There are 4 variants of the wiredtiger_open configurations.
 # wiredtiger_open:

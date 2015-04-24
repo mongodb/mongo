@@ -469,9 +469,8 @@ static int
 __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 {
 	WT_DECL_RET;
-	const char *drop_cfg[] = {
-	    WT_CONFIG_BASE(session, session_drop), "remove_files=false", NULL
-	};
+	const char *drop_cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_drop), "remove_files=false", NULL };
 
 	/*
 	 * We need to grab the schema lock to drop the file, so first try to
