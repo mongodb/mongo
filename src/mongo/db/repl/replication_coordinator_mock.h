@@ -99,6 +99,8 @@ namespace repl {
 
         virtual void setMyHeartbeatMessage(const std::string& msg);
 
+        virtual OpTime getMyLastOptimeV1() const;
+
         virtual Timestamp getMyLastOptime() const;
 
         virtual OID getElectionId();
@@ -182,7 +184,8 @@ namespace repl {
 
         virtual Timestamp getLastCommittedOpTime() const;
 
-        virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+        virtual Status processReplSetRequestVotes(OperationContext* txn,
+                                                  const ReplSetRequestVotesArgs& args,
                                                   ReplSetRequestVotesResponse* response);
 
         virtual Status processReplSetDeclareElectionWinner(

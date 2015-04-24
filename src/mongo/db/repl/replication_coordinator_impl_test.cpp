@@ -100,7 +100,7 @@ namespace {
         startCapturingLogMessages();
         start();
         stopCapturingLogMessages();
-        ASSERT_EQUALS(1, countLogLinesContaining("Did not find local "));
+        ASSERT_EQUALS(2, countLogLinesContaining("Did not find local "));
         ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 

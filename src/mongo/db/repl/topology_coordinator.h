@@ -48,6 +48,7 @@ namespace repl {
     class ReplSetHeartbeatArgs;
     class ReplicaSetConfig;
     class TagSubgroup;
+    class LastVote;
     struct MemberState;
 
     /**
@@ -367,6 +368,13 @@ namespace repl {
         virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
         /**
+         * Prepares a ReplSetRequestVotesResponse.
+         */
+        virtual void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+                                                ReplSetRequestVotesResponse* response,
+                                                const OpTime& lastAppliedOpTime) = 0;
+
+        /**
          * Determines whether or not the newly elected primary is valid from our perspective.
          * If it is, sets the _currentPrimaryIndex and term to the received values.
          * If it is not, return ErrorCode::BadValue and the current term from our perspective.
@@ -375,6 +383,13 @@ namespace repl {
         virtual Status processReplSetDeclareElectionWinner(
                 const ReplSetDeclareElectionWinnerArgs& args,
                 long long* responseTerm) = 0;
+
+        /**
+         * Loads an initial LastVote document, which was read from local storage.
+         *
+         * Called only during replication startup. All other updates are done internally.
+         */
+        virtual void loadLastVote(const LastVote& lastVote) = 0;
 
     protected:
         TopologyCoordinator() {}

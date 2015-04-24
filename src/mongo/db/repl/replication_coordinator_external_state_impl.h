@@ -54,6 +54,8 @@ namespace repl {
         virtual bool isSelf(const HostAndPort& host);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
+        virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
+        virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
         virtual void setGlobalTimestamp(const Timestamp& newTime);
         virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);

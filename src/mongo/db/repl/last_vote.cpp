@@ -26,46 +26,67 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/repl/last_vote.h"
 
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_set_command.h"
-#include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/bson/util/bson_check.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace repl {
+namespace {
 
-    class CmdReplSetRequestVotes : public ReplSetCommand {
-    public:
-        CmdReplSetRequestVotes() : ReplSetCommand("replSetRequestVotes") { }
-    private:
-        bool run(OperationContext* txn,
-                 const std::string&,
-                 BSONObj& cmdObj,
-                 int,
-                 std::string& errmsg,
-                 BSONObjBuilder& result) final {
+    const std::string kCandidateIdFieldName = "candidateId";
+    const std::string kTermFieldName = "term";
 
-            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
+    const std::string kLegalFieldNames[] = {
+        kCandidateIdFieldName,
+        kTermFieldName,
+    };
 
-            ReplSetRequestVotesArgs parsedArgs;
-            status = parsedArgs.initialize(cmdObj);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
+}  // namespace
 
-            ReplSetRequestVotesResponse response;
-            status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(txn,
-                                                                                   parsedArgs,
-                                                                                   &response);
-            response.addToBSON(&result);
-            return appendCommandStatus(result, status);
-        }
-    } cmdReplSetRequestVotes;
+    Status LastVote::initialize(const BSONObj& argsObj) {
+        Status status = bsonCheckOnlyHasFields("VotedFar",
+                                               argsObj,
+                                               kLegalFieldNames);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+        if (!status.isOK())
+            return status;
+
+        status = bsonExtractIntegerField(argsObj, kCandidateIdFieldName, &_candidateId);
+        if (!status.isOK())
+            return status;
+
+        return Status::OK();
+    }
+
+    void LastVote::setTerm(long long term) {
+        _term = term;
+    }
+
+    void LastVote::setCandidateId(long long candidateId) {
+        _candidateId = candidateId;
+    }
+
+    long long LastVote::getTerm() const {
+        return _term;
+    }
+
+    long long LastVote::getCandidateId() const {
+        return _candidateId;
+    }
+
+
+    BSONObj LastVote::toBSON() const {
+        BSONObjBuilder builder;
+        builder.append(kTermFieldName, _term);
+        builder.append(kCandidateIdFieldName, _candidateId);
+        return builder.obj();
+    }
 
 } // namespace repl
 } // namespace mongo

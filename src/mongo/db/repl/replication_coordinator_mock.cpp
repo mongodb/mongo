@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -134,6 +135,10 @@ namespace repl {
     void ReplicationCoordinatorMock::setMyLastOptime(const Timestamp& ts) {}
 
     void ReplicationCoordinatorMock::resetMyLastOptime() {}
+
+    OpTime ReplicationCoordinatorMock::getMyLastOptimeV1() const {
+        return OpTime();
+    }
 
     Timestamp ReplicationCoordinatorMock::getMyLastOptime() const {
         // TODO
@@ -300,8 +305,9 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorMock::processReplSetRequestVotes(
-        const ReplSetRequestVotesArgs& args,
-        ReplSetRequestVotesResponse* response) {
+            OperationContext* txn,
+            const ReplSetRequestVotesArgs& args,
+            ReplSetRequestVotesResponse* response) {
         return Status::OK();
     }
 

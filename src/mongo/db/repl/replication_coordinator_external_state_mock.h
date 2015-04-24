@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/repl/last_vote.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -60,6 +61,8 @@ namespace repl {
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
+        virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
+        virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
         virtual void setGlobalTimestamp(const Timestamp& newTime);
         virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn);
         virtual void closeConnections();
@@ -79,6 +82,11 @@ namespace repl {
          * Sets the return value for subsequent calls to loadLocalConfigDocument().
          */
         void setLocalConfigDocument(const StatusWith<BSONObj>& localConfigDocument);
+
+        /**
+         * Sets the return value for subsequent calls to loadLocalLastVoteDocument().
+         */
+        void setLocalLastVoteDocument(const StatusWith<LastVote>& localLastVoteDocument);
 
         /**
          * Sets the return value for subsequent calls to getClientHostAndPort().
@@ -102,16 +110,34 @@ namespace repl {
          */
         void setStoreLocalConfigDocumentToHang(bool hang);
 
+        /**
+         * Sets the return value for subsequent calls to storeLocalLastVoteDocument().
+         * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
+         */ 
+        void setStoreLocalLastVoteDocumentStatus(Status status);
+
+        /**
+         * Sets whether or not subsequent calls to storeLocalLastVoteDocument() should hang
+         * indefinitely or not based on the value of "hang".
+         */
+        void setStoreLocalLastVoteDocumentToHang(bool hang);
+
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
+        StatusWith<LastVote> _localRsLastVoteDocument;
         StatusWith<Timestamp>  _lastOpTime;
         std::vector<HostAndPort> _selfHosts;
         bool _canAcquireGlobalSharedLock;
         Status _storeLocalConfigDocumentStatus;
+        Status _storeLocalLastVoteDocumentStatus;
         // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
-        boost::mutex _shouldHangMutex;
-        boost::condition _shouldHangCondVar;
+        boost::mutex _shouldHangConfigMutex;
+        boost::condition _shouldHangConfigCondVar;
+        // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
+        boost::mutex _shouldHangLastVoteMutex;
+        boost::condition _shouldHangLastVoteCondVar;
         bool _storeLocalConfigDocumentShouldHang;
+        bool _storeLocalLastVoteDocumentShouldHang;
         bool _connectionsClosed;
         HostAndPort _clientHostAndPort;
     };

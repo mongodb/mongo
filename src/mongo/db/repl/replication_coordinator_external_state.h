@@ -45,6 +45,8 @@ namespace mongo {
 
 namespace repl {
 
+    class LastVote;
+
     /**
      * This class represents the interface the ReplicationCoordinator uses to interact with the
      * rest of the system.  All functionality of the ReplicationCoordinatorImpl that would introduce
@@ -110,6 +112,17 @@ namespace repl {
          * Stores the replica set config document in local storage, or returns an error.
          */
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config) = 0;
+
+        /**
+         * Gets the replica set lastVote document from local storage, or returns an error.
+         */
+        virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn) = 0;
+
+        /**
+         * Stores the replica set lastVote document in local storage, or returns an error.
+         */
+        virtual Status storeLocalLastVoteDocument(OperationContext* txn,
+                                                  const LastVote& lastVote) = 0;
 
         /**
          * Sets the global opTime to be 'newTime'.

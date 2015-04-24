@@ -26,46 +26,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_set_command.h"
-#include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#pragma once
 
 namespace mongo {
+
+    class BSONObj;
+    class BSONObjBuilder;
+    class Status;
+
 namespace repl {
 
-    class CmdReplSetRequestVotes : public ReplSetCommand {
+    class LastVote {
     public:
-        CmdReplSetRequestVotes() : ReplSetCommand("replSetRequestVotes") { }
+        Status initialize(const BSONObj& argsObj);
+
+        long long getTerm() const;
+        long long getCandidateId() const;
+
+        void setTerm(long long term);
+        void setCandidateId(long long candidateId);
+        BSONObj toBSON() const;
+
     private:
-        bool run(OperationContext* txn,
-                 const std::string&,
-                 BSONObj& cmdObj,
-                 int,
-                 std::string& errmsg,
-                 BSONObjBuilder& result) final {
-
-            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            ReplSetRequestVotesArgs parsedArgs;
-            status = parsedArgs.initialize(cmdObj);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
-
-            ReplSetRequestVotesResponse response;
-            status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(txn,
-                                                                                   parsedArgs,
-                                                                                   &response);
-            response.addToBSON(&result);
-            return appendCommandStatus(result, status);
-        }
-    } cmdReplSetRequestVotes;
+        long long _candidateId = -1;
+        long long _term = -1;
+    };
 
 } // namespace repl
 } // namespace mongo

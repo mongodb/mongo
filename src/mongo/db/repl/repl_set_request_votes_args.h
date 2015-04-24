@@ -62,12 +62,18 @@ namespace repl {
     public:
         Status initialize(const BSONObj& argsObj);
         
+        void setOk(bool ok) { _ok = ok; }
+        void setVoteGranted(bool voteGranted) { _voteGranted = voteGranted; }
+        void setTerm(long long term) { _term = term; }
+        void setReason(const std::string& reason) { _reason = reason; }
+
         bool getOk() const;
         long long getTerm() const;
         bool getVoteGranted() const;
         const std::string& getReason() const;
 
         void addToBSON(BSONObjBuilder* builder) const;
+        BSONObj toBSON() const;
 
     private:
         bool _ok = false;

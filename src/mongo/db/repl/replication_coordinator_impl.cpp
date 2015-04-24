@@ -57,6 +57,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/repl/last_vote.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
@@ -68,7 +69,7 @@
 
 namespace mongo {
 namespace repl {
-
+    
 namespace {
     typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
 
@@ -226,7 +227,23 @@ namespace {
         return _rsConfig;
     }
 
+    void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {
+        _topCoord->loadLastVote(lastVote);
+    }
+
     bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
+
+        StatusWith<LastVote> lastVote = _externalState->loadLocalLastVoteDocument(txn);
+        if (!lastVote.isOK()) {
+            log() << "Did not find local voted for document at startup;  " << lastVote.getStatus();
+        }
+        else {
+            LastVote vote = lastVote.getValue();
+            _replExecutor.scheduleWork(
+                    stdx::bind(&ReplicationCoordinatorImpl::_updateLastVote,
+                               this,
+                               vote));
+        }
 
         StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(txn);
         if (!cfg.isOK()) {
@@ -734,6 +751,16 @@ namespace {
         }
         lock->unlock();
         _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+    }
+
+    OpTime ReplicationCoordinatorImpl::getMyLastOptimeV1() const {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _getMyLastOptimeV1_inlock();
+    }
+
+    // TODO(dannenberg): _slaveInfo should store OpTimes and they shouldn't always have term=0
+    OpTime ReplicationCoordinatorImpl::_getMyLastOptimeV1_inlock() const {
+        return OpTime(_slaveInfo[_getMyIndexInSlaveInfo_inlock()].opTime, 0);
     }
 
     Timestamp ReplicationCoordinatorImpl::getMyLastOptime() const {
@@ -2411,11 +2438,52 @@ namespace {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
-        const ReplSetRequestVotesArgs& args, ReplSetRequestVotesResponse* response) {
+            OperationContext* txn,
+            const ReplSetRequestVotesArgs& args,
+            ReplSetRequestVotesResponse* response) {
         if (!isV1ElectionProtocol()) {
             return {ErrorCodes::BadValue, "not using election protocol v1"};
         }
-        return {ErrorCodes::CommandNotFound, "not implemented"};
+        Status result{ErrorCodes::InternalError, "didn't set status in processReplSetRequestVotes"};
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_processReplSetRequestVotes_finish,
+                       this,
+                       stdx::placeholders::_1,
+                       args,
+                       response,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return cbh.getStatus();
+        }
+        _replExecutor.wait(cbh.getValue());
+        if (response->getVoteGranted()) {
+            LastVote lastVote;
+            lastVote.setTerm(args.getTerm());
+            lastVote.setCandidateId(args.getCandidateId());
+
+            Status status = _externalState->storeLocalConfigDocument(txn, lastVote.toBSON());
+            if (!status.isOK()) {
+                error() << "replSetReconfig failed to store config document; " << status;
+                return status;
+            }
+
+        }
+        return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processReplSetRequestVotes_finish(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplSetRequestVotesArgs& args,
+            ReplSetRequestVotesResponse* response,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        _topCoord->processReplSetRequestVotes(args, response, getMyLastOptimeV1());
+        *result = Status::OK();
     }
 
     Status ReplicationCoordinatorImpl::processReplSetDeclareElectionWinner(

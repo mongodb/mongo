@@ -54,6 +54,7 @@ namespace repl {
     class HandshakeArgs;
     class IsMasterResponse;
     class OplogReader;
+    class OpTime;
     class ReplSetDeclareElectionWinnerArgs;
     class ReplSetDeclareElectionWinnerResponse;
     class ReplSetHeartbeatArgs;
@@ -275,6 +276,11 @@ namespace repl {
          * Updates our the message we include in heartbeat responses.
          */
         virtual void setMyHeartbeatMessage(const std::string& msg) = 0;
+
+        /**
+         * Returns the last optime recorded by setMyLastOptimeV1.
+         */
+        virtual OpTime getMyLastOptimeV1() const = 0;
 
         /**
          * Returns the last optime recorded by setMyLastOptime.
@@ -570,7 +576,8 @@ namespace repl {
         * Handles an incoming replSetRequestVotes command.
         * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
         */
-        virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+        virtual Status processReplSetRequestVotes(OperationContext* txn,
+                                                  const ReplSetRequestVotesArgs& args,
                                                   ReplSetRequestVotesResponse* response) = 0;
 
         /*

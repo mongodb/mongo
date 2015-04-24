@@ -44,11 +44,14 @@ namespace repl {
 
     ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock()
         : _localRsConfigDocument(ErrorCodes::NoMatchingDocument, "No local config document"),
+          _localRsLastVoteDocument(ErrorCodes::NoMatchingDocument, "No local lastVote document"),
           _lastOpTime(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
-         _canAcquireGlobalSharedLock(true),
-         _storeLocalConfigDocumentStatus(Status::OK()),
-         _storeLocalConfigDocumentShouldHang(false),
-         _connectionsClosed(false) {
+          _canAcquireGlobalSharedLock(true),
+          _storeLocalConfigDocumentStatus(Status::OK()),
+          _storeLocalLastVoteDocumentStatus(Status::OK()),
+          _storeLocalConfigDocumentShouldHang(false),
+          _storeLocalLastVoteDocumentShouldHang(false),
+          _connectionsClosed(false) {
     }
 
     ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
@@ -90,9 +93,9 @@ namespace repl {
             OperationContext* txn,
             const BSONObj& config) {
         {
-            boost::unique_lock<boost::mutex> lock(_shouldHangMutex);
+            boost::unique_lock<boost::mutex> lock(_shouldHangConfigMutex);
             while (_storeLocalConfigDocumentShouldHang) {
-                _shouldHangCondVar.wait(lock);
+                _shouldHangConfigCondVar.wait(lock);
             }
         }
         if (_storeLocalConfigDocumentStatus.isOK()) {
@@ -106,6 +109,33 @@ namespace repl {
             const StatusWith<BSONObj>& localConfigDocument) {
 
         _localRsConfigDocument = localConfigDocument;
+    }
+
+    StatusWith<LastVote> ReplicationCoordinatorExternalStateMock::loadLocalLastVoteDocument(
+            OperationContext* txn) {
+        return _localRsLastVoteDocument;
+    }
+
+    Status ReplicationCoordinatorExternalStateMock::storeLocalLastVoteDocument(
+            OperationContext* txn,
+            const LastVote& lastVote) {
+        {
+            boost::unique_lock<boost::mutex> lock(_shouldHangLastVoteMutex);
+            while (_storeLocalLastVoteDocumentShouldHang) {
+                _shouldHangLastVoteCondVar.wait(lock);
+            }
+        }
+        if (_storeLocalLastVoteDocumentStatus.isOK()) {
+            setLocalLastVoteDocument(StatusWith<LastVote>(lastVote));
+            return Status::OK();
+        }
+        return _storeLocalLastVoteDocumentStatus;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setLocalLastVoteDocument(
+            const StatusWith<LastVote>& localLastVoteDocument) {
+
+        _localRsLastVoteDocument = localLastVoteDocument;
     }
 
     void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(const Timestamp& newTime) {
@@ -126,10 +156,23 @@ namespace repl {
     }
 
     void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentToHang(bool hang) {
-        boost::unique_lock<boost::mutex> lock(_shouldHangMutex);
+        boost::unique_lock<boost::mutex> lock(_shouldHangConfigMutex);
         _storeLocalConfigDocumentShouldHang = hang;
         if (!hang) {
-            _shouldHangCondVar.notify_all();
+            _shouldHangConfigCondVar.notify_all();
+        }
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentStatus(
+            Status status) {
+        _storeLocalLastVoteDocumentStatus = status;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentToHang(bool hang) {
+        boost::unique_lock<boost::mutex> lock(_shouldHangLastVoteMutex);
+        _storeLocalLastVoteDocumentShouldHang = hang;
+        if (!hang) {
+            _shouldHangLastVoteCondVar.notify_all();
         }
     }
 

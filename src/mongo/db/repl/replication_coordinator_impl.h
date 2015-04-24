@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/data_replicator.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
@@ -66,6 +67,7 @@ namespace repl {
     class ReplicaSetConfig;
     class SyncSourceFeedback;
     class TopologyCoordinator;
+    class LastVote;
 
     class ReplicationCoordinatorImpl : public ReplicationCoordinator,
                                        public KillOpListenerInterface {
@@ -154,6 +156,8 @@ namespace repl {
 
         virtual Timestamp getMyLastOptime() const;
 
+        virtual OpTime getMyLastOptimeV1() const;
+
         virtual OID getElectionId();
 
         virtual OID getMyRID() const;
@@ -237,7 +241,8 @@ namespace repl {
 
         virtual Timestamp getLastCommittedOpTime() const;
 
-        virtual Status processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
+        virtual Status processReplSetRequestVotes(OperationContext* txn,
+                                                  const ReplSetRequestVotesArgs& args,
                                                   ReplSetRequestVotesResponse* response);
 
         virtual Status processReplSetDeclareElectionWinner(
@@ -453,6 +458,15 @@ namespace repl {
                 Status* result);
 
         /**
+         * Bottom half of processReplSetRequestVotes.
+         */
+        void _processReplSetRequestVotes_finish(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplSetRequestVotesArgs& args,
+                ReplSetRequestVotesResponse* response,
+                Status* result);
+
+        /**
          * Scheduled to cause the ReplicationCoordinator to reconsider any state that might
          * need to change as a result of time passing - for instance becoming PRIMARY when a single
          * node replica set member's stepDown period ends.
@@ -519,6 +533,7 @@ namespace repl {
 
         Timestamp _getMyLastOptime_inlock() const;
 
+        OpTime _getMyLastOptimeV1_inlock() const;
 
         /**
          * Bottom half of setFollowerMode.
@@ -605,6 +620,15 @@ namespace repl {
 
 
         MemberState _getMemberState_inlock() const;
+
+        /**
+         * Callback that gives the TopologyCoordinator an initial LastVote document from
+         * local storage.
+         *
+         * Called only during replication startup. All other updates come from the
+         * TopologyCoordinator itself.
+         */
+        void _updateLastVote(const LastVote& lastVote);
 
         /**
          * Starts loading the replication configuration from local storage, and if it is valid,
@@ -930,6 +954,7 @@ namespace repl {
 
         // Data Replicator used to replicate data
         DataReplicator _dr;                                                               // (S)
+
     };
 
 } // namespace repl

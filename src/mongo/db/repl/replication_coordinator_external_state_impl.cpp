@@ -54,6 +54,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/last_vote.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_state.h"
 #include "mongo/stdx/functional.h"
@@ -69,6 +70,8 @@ namespace repl {
 namespace {
     const char configCollectionName[] = "local.system.replset";
     const char configDatabaseName[] = "local";
+    const char lastVoteCollectionName[] = "local.replset.election";
+    const char lastVoteDatabaseName[] = "local";
     const char meCollectionName[] = "local.me";
     const char meDatabaseName[] = "local";
     const char tsFieldName[] = "ts";
@@ -192,6 +195,49 @@ namespace {
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn,
                                                   "save replica set config",
                                                   configCollectionName);
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+    }
+
+    StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteDocument(
+            OperationContext* txn) {
+        try {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                BSONObj lastVoteObj;
+                if (!Helpers::getSingleton(txn, lastVoteCollectionName, lastVoteObj)) {
+                    return StatusWith<LastVote>(
+                            ErrorCodes::NoMatchingDocument,
+                            str::stream() << "Did not find replica set lastVote document in "
+                                          << lastVoteCollectionName);
+                }
+                LastVote lastVote;
+                lastVote.initialize(lastVoteObj);
+                return StatusWith<LastVote>(lastVote);
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn,
+                                                  "load replica set lastVote",
+                                                  lastVoteCollectionName);
+        }
+        catch (const DBException& ex) {
+            return StatusWith<LastVote>(ex.toStatus());
+        }
+    }
+
+    Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
+            OperationContext* txn,
+            const LastVote& lastVote) {
+        BSONObj lastVoteObj = lastVote.toBSON();
+        try {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock dbWriteLock(txn->lockState(), lastVoteDatabaseName, MODE_X);
+                Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
+                return Status::OK();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn,
+                                                  "save replica set lastVote",
+                                                  lastVoteCollectionName);
         }
         catch (const DBException& ex) {
             return ex.toStatus();

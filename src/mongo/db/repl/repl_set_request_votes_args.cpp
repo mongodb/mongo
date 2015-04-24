@@ -38,7 +38,7 @@ namespace {
 
     const std::string kCandidateIdFieldName = "candidateId";
     const std::string kCommandName = "replSetRequestVotes";
-    const std::string kConfigVersionFieldName = "cfgver";
+    const std::string kConfigVersionFieldName = "configVersion";
     const std::string kLastCommittedOpFieldName = "lastCommittedOp";
     const std::string kOkFieldName = "ok";
     const std::string kOpTimeFieldName = "ts";
@@ -185,6 +185,12 @@ namespace {
         builder->append(kTermFieldName, _term);
         builder->append(kVoteGrantedFieldName, _voteGranted);
         builder->append(kReasonFieldName, _reason);
+    }
+
+    BSONObj ReplSetRequestVotesResponse::toBSON() const {
+        BSONObjBuilder builder;
+        addToBSON(&builder);
+        return builder.obj();
     }
 
 } // namespace repl
