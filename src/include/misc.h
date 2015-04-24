@@ -60,9 +60,11 @@
 
 /*
  * Encryption needs to know its original length before either the
- * block or logging subsystems pad.  Constant value.
+ * block or logging subsystems pad.  We also store a 32-bit checksum
+ * of the original data so that we can detect a bad decryption.
+ * Constant value.
  */
-#define	WT_ENCRYPT_LEN	sizeof(uint32_t)
+#define	WT_ENCRYPT_LEN	(sizeof(uint32_t) * 2)
 
 /*
  * __wt_calloc_def, __wt_calloc_one --
