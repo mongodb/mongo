@@ -31,11 +31,38 @@ static void
 __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 {
 	WT_TXN *txn;
+	int i, j;
+	uint64_t v;
 
 	txn = &session->txn;
 
-	if (n > 1)
+	switch (n) {
+	case 0: case 1:
+		break;
+	case 2:
+		v = txn->snapshot[1];
+		if (TXNID_LT(v, txn->snapshot[0])) {
+			txn->snapshot[1] = txn->snapshot[0];
+			txn->snapshot[0] = v;
+		}
+		break;
+	case 3: case 4: case 5: case 6: case 7: case 8: case 9: case 10:
+		/*
+		 * Insertion sort for small numbers of items.
+		 */
+		for (i = 1; i < (int)n; ++i) {
+			v = txn->snapshot[i];
+			for (j = i - 1; j >= 0 &&
+			    TXNID_LT(v, txn->snapshot[j]); --j)
+				txn->snapshot[j + 1] = txn->snapshot[j];
+			txn->snapshot[j + 1] = v;
+		}
+		break;
+	default:
 		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
+		break;
+	}
+
 	txn->snapshot_count = n;
 	txn->snap_max = snap_max;
 	txn->snap_min = (n > 0 && TXNID_LE(txn->snapshot[0], snap_max)) ?
