@@ -142,17 +142,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-env.Library(
-    target='index_key_validate',
-    source=[
-        "db/catalog/index_key_validate.cpp",
-    ],
-    LIBDEPS=[
-        'bson',
-        'db/common',
-        'db/index_names',
-    ])
-
 env.Library('lasterror', [
             "db/lasterror.cpp",
             ],
@@ -869,7 +858,7 @@ serveronlyLibdeps = ["coreshard",
                      "db/concurrency/write_conflict_exception",
                      "db/ops/update_driver",
                      "db/global_timestamp",
-                     "index_key_validate",
+                     "db/catalog/index_key_validate",
                      'range_deleter',
                      'scripting_server',
                      "update_index_data",
@@ -1162,7 +1151,7 @@ if not has_option('noshell') and usev8:
                 ],
                 LIBDEPS=[
                     'db/index/external_key_generator',
-                    'index_key_validate',
+                    'db/catalog/index_key_validate',
                     'scripting',
                     'signal_handlers',
                     'mongocommon'
