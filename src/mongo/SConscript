@@ -228,20 +228,7 @@ commonFiles = [ "shell/mongo.cpp",
 extraCommonLibdeps = []
 
 if env['MONGO_BUILD_SASL_CLIENT']:
-    saslLibs = ['sasl2']
-    if env.TargetOSIs('windows'):
-        saslLibs.extend(["secur32"])
-
-    env.Library('cyrus_sasl_client_session',
-                ['client/cyrus_sasl_client_session.cpp',
-                 'client/sasl_sspi.cpp'],
-                LIBDEPS = [
-                    '$BUILD_DIR/mongo/client/clientdriver',
-                    'util/foundation',
-                    'signal_handlers_synchronous',
-                ],
-                SYSLIBDEPS=saslLibs)
-    extraCommonLibdeps.append('cyrus_sasl_client_session')
+    extraCommonLibdeps.append('client/cyrus_sasl_client_session')
 
 # handle processinfo*
 env.Library("processinfo",
