@@ -539,8 +539,7 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  *	Open an LSM tree structure.
  */
 static int
-__lsm_tree_open(
-    WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
+__lsm_tree_open(WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
