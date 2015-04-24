@@ -42,7 +42,7 @@ namespace rpc {
     {}
 
     ReplyBuilder::ReplyBuilder(std::unique_ptr<Message> message)
-        : _message{std::move(_message)}
+        : _message{std::move(message)}
     {}
 
     ReplyBuilder& ReplyBuilder::setMetadata(const BSONObj& metadata) {
