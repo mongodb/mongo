@@ -221,6 +221,18 @@ function startParallelShell( jsCode, port, noConnect ){
 
     var args = ["mongo"];
 
+    if (typeof db == "object") {
+        var hostAndPort = db.getMongo().host.split(':');
+        var host = hostAndPort[0];
+        args.push("--host", host);
+        if (!port && hostAndPort.length >= 2) {
+            var port = hostAndPort[1];
+        }
+    }
+    if (port) {
+        args.push("--port", port);
+    }
+
     // Convert function into call-string
     if (typeof(jsCode) == "function") {
         var id = Math.floor(Math.random() * 100000);
@@ -243,18 +255,6 @@ function startParallelShell( jsCode, port, noConnect ){
     }
 
     args.push("--eval", jsCode);
-
-    if (typeof db == "object") {
-        var hostAndPort = db.getMongo().host.split(':');
-        var host = hostAndPort[0];
-        args.push("--host", host);
-        if (!port && hostAndPort.length >= 2) {
-            var port = hostAndPort[1];
-        }
-    }
-    if (port) {
-        args.push("--port", port);
-    }
 
     x = startMongoProgramNoConnect.apply(null, args);
     return function(){
