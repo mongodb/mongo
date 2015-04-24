@@ -118,6 +118,14 @@ namespace mongo {
     };
 
 
+    /**
+     * A RecordStore provides an abstraction used for storing documents in a collection,
+     * or entries in an index. In storage engines implementing the KVEngine, record stores
+     * are also used for implementing catalogs.
+     *
+     * Many methods take an OperationContext parameter. This contains the RecoveryUnit, with
+     * all RecordStore specific transaction information, as well as the LockState.
+     */
     class RecordStore {
         MONGO_DISALLOW_COPYING(RecordStore);
     public:
@@ -132,9 +140,17 @@ namespace mongo {
 
         virtual const std::string& ns() const { return _ns; }
 
-        virtual long long dataSize( OperationContext* txn ) const = 0;
+        /**
+         * The dataSize is an approximation of the sum of the sizes (in bytes) of the
+         * documents or entries in the recordStore.
+         */
+        virtual long long dataSize(OperationContext* txn) const = 0;
 
-        virtual long long numRecords( OperationContext* txn ) const = 0;
+        /**
+         * Total number of record in the RecordStore. You may need to cache it, so this call
+         * takes constant time, as it is called often.
+         */
+        virtual long long numRecords(OperationContext* txn) const = 0;
 
         virtual bool isCapped() const = 0;
 
@@ -143,6 +159,7 @@ namespace mongo {
         /**
          * @param extraInfo - optional more debug info
          * @param level - optional, level of debug info to put in (higher is more)
+         * @return total estimate size (in bytes) on stable storage
          */
         virtual int64_t storageSize( OperationContext* txn,
                                      BSONObjBuilder* extraInfo = NULL,
@@ -222,7 +239,9 @@ namespace mongo {
 
         /**
          * returned iterator owned by caller
-         * Default arguments return all items in record store.
+         * Default arguments return all items in record store. If this function is called
+         * twice on the same RecoveryUnit (in the OperationContext), without intervening
+         * reset of it, the iterator must be based on the same snapshot.
          */
         virtual RecordIterator* getIterator( OperationContext* txn,
                                              const RecordId& start = RecordId(),
