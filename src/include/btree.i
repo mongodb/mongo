@@ -956,10 +956,14 @@ static inline int
 __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_PAGE_MODIFY *mod;
+	WT_TXN_GLOBAL *txn_global;
 
 	btree = S2BT(session);
+	conn = S2C(session);
 	mod = page->modify;
+	txn_global = &conn->txn_global;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
@@ -1029,10 +1033,12 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	/*
 	 * If the page was recently split in-memory, don't force it out: we
-	 * hope an eviction thread will find it first.
+	 * hope an eviction thread will find it first.  The check here is
+	 * similar to __wt_txn_visible_all, but ignores the checkpoints
+	 * transaction.
 	 */
 	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) &&
-	    !__wt_txn_visible_all(session, mod->inmem_split_txn))
+	    TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
 		return (0);
 
 	return (1);
