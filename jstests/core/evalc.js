@@ -12,7 +12,7 @@ for( i = 0; i < 10; ++i ) {
 
 assert.eq( 0 , t2.count() , "X1" )
 
-s = startParallelShell( "print( 'starting forked:' + Date() ); for ( i=0; i<50000; i++ ){ db.currentOp(); } print( 'ending forked:' + Date() ); db.evalc_done.insert( { x : 1 } ); " )
+s = startParallelShell( "print( 'starting forked:' + Date() ); for ( i=0; i<10*1000; i++ ){ db.currentOp(); } print( 'ending forked:' + Date() ); db.evalc_done.insert( { x : 1 } ); " )
 
 print( "starting eval: " + Date() )
 assert.soon(function() {
