@@ -676,6 +676,8 @@ tasks:
           - key: "create_mongod_users_command"
             value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
     - func: "download mongod"
+      vars:
+        mongo_url: "${mongo30_url}"
     - func: "start mongod"
     - command: shell.exec
       params:
@@ -964,6 +966,8 @@ tasks:
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "download mongod"
+      vars:
+        mongo_url: "${mongo30_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport
@@ -1020,6 +1024,8 @@ tasks:
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "download mongod"
+      vars:
+        mongo_url: "${mongo30_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport
