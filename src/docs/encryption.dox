@@ -1,12 +1,13 @@
 /*! @m_page{{c,java},encryption,Encryptors}
 
-WiredTiger does not currently offer builtin support for
+@ref encryption_custom "Custom encryption engines" may be used to
+extend WiredTiger.  WiredTiger does not currently offer builtin support for
 any particular encryption algorithm.  Encryption engines in \c ext/encryptors
 are provided for demonstration purposes only.
-@ref encryption_custom "Custom encryption engines" may be used to
-extend WiredTiger.
 
-Encryption is specified using \c encryption= in the configuration
+The encryption extension must be loaded in the ::wiredtiger_open call.
+See @subpage extensions for details on extending WiredTiger.
+Also, encryption is specified using \c encryption= in the configuration
 for the ::wiredtiger_open call. This configuration establishes
 the encryption to be used for database log files and a subset
 of the WiredTiger metadata files. By default, this encryption
@@ -27,8 +28,8 @@ clear in such a scenario.
 @section encryption_parameters Encryption keyid and secretkey
 
 Two parameters, \c keyid and \c secretkey, may be specified
-when configuring encryption to allow the possibility of
-varying the algorithm according to different keys.
+when configuring encryption for ::wiredtiger_open to allow the possibility
+of varying the algorithm according to different keys.
 
 The configuration parameter <code>encryption=(keyid)</code> may be used
 in ::wiredtiger_open or WT_SESSION::create calls. This is intended
@@ -80,9 +81,9 @@ first decrypted, then decompressed into memory.
 
 When encryption is specified during ::wiredtiger_open, database
 log files and some system metadata files (those containing table,
-index, column names, and configuration pertaining to these) is encrypted.
+index, column names, and configuration pertaining to these) are encrypted.
 Of these, only database log files may also be compressed.  When both
 compression and encryption is done on log files, the same ordering
-(encrypt then compress) applies as log records are written to disk.
+(compress then encrypt) applies as log records are written to disk.
 
  */
