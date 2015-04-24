@@ -366,6 +366,15 @@ namespace repl {
          */
         virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
+        /**
+         * Determines whether or not the newly elected primary is valid from our perspective.
+         * If it is, sets the _currentPrimaryIndex and term to the received values.
+         * If it is not, return ErrorCode::BadValue and the current term from our perspective.
+         * Populate responseTerm with the current term from our perspective.
+         */
+        virtual Status processReplSetDeclareElectionWinner(
+                const ReplSetDeclareElectionWinnerArgs& args,
+                long long* responseTerm) = 0;
 
     protected:
         TopologyCoordinator() {}

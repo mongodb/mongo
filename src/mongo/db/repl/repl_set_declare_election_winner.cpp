@@ -58,11 +58,11 @@ namespace repl {
                 return appendCommandStatus(result, status);
             }
 
-            ReplSetDeclareElectionWinnerResponse response;
+            long long responseTerm = -1;
             status = getGlobalReplicationCoordinator()->processReplSetDeclareElectionWinner(
                     parsedArgs,
-                    &response);
-            response.addToBSON(&result);
+                    &responseTerm);
+            result.append("term", responseTerm);
             return appendCommandStatus(result, status);
         }
     } cmdReplSetDeclareElectionWinner;

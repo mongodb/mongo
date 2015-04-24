@@ -187,7 +187,7 @@ namespace repl {
 
         virtual Status processReplSetDeclareElectionWinner(
                 const ReplSetDeclareElectionWinnerArgs& args,
-                ReplSetDeclareElectionWinnerResponse* response);
+                long long* responseTerm);
 
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
 

@@ -242,7 +242,7 @@ namespace repl {
 
         virtual Status processReplSetDeclareElectionWinner(
                 const ReplSetDeclareElectionWinnerArgs& args,
-                ReplSetDeclareElectionWinnerResponse* response);
+                long long* responseTerm);
 
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
 
@@ -442,6 +442,15 @@ namespace repl {
          * Bottom half of clearSyncSourceBlacklist
          */
         void _clearSyncSourceBlacklist_finish(const ReplicationExecutor::CallbackData& cbData);
+
+        /**
+         * Bottom half of processReplSetDeclareElectionWinner.
+         */
+        void _processReplSetDeclareElectionWinner_finish(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplSetDeclareElectionWinnerArgs& args,
+                long long* responseTerm,
+                Status* result);
 
         /**
          * Scheduled to cause the ReplicationCoordinator to reconsider any state that might

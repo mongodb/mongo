@@ -37,16 +37,16 @@ namespace repl {
 namespace {
 
     const std::string kCommandName = "replSetDeclareElectionWinner";
-    const std::string kConfigVersionFieldName = "configVersion";
     const std::string kErrorMessageFieldName = "errmsg";
     const std::string kErrorCodeFieldName = "code";
     const std::string kOkFieldName = "ok";
+    const std::string kSetNameFieldName = "setName";
     const std::string kTermFieldName = "term";
     const std::string kWinnerIdFieldName = "winnerId";
 
     const std::string kLegalArgsFieldNames[] = {
         kCommandName,
-        kConfigVersionFieldName,
+        kSetNameFieldName,
         kTermFieldName,
         kWinnerIdFieldName,
     };
@@ -67,6 +67,10 @@ namespace {
         if (!status.isOK())
             return status;
 
+        status = bsonExtractStringField(argsObj, kSetNameFieldName, &_setName);
+        if (!status.isOK())
+            return status;
+
         status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
         if (!status.isOK())
             return status;
@@ -75,11 +79,11 @@ namespace {
         if (!status.isOK())
             return status;
 
-        status = bsonExtractIntegerField(argsObj, kConfigVersionFieldName, &_configVersion);
-        if (!status.isOK())
-            return status;
-
         return Status::OK();
+    }
+
+    std::string ReplSetDeclareElectionWinnerArgs::getReplSetName() const {
+        return _setName;
     }
 
     long long ReplSetDeclareElectionWinnerArgs::getTerm() const {
@@ -90,15 +94,17 @@ namespace {
         return _winnerId;
     }
 
-    long long ReplSetDeclareElectionWinnerArgs::getConfigVersion() const {
-        return _configVersion;
-    }
-
     void ReplSetDeclareElectionWinnerArgs::addToBSON(BSONObjBuilder* builder) const {
         builder->append("replSetDeclareElectionWinner", 1);
+        builder->append(kSetNameFieldName, _setName);
         builder->append(kTermFieldName, _term);
         builder->appendIntOrLL(kWinnerIdFieldName, _winnerId);
-        builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
+    }
+
+    BSONObj ReplSetDeclareElectionWinnerArgs::toBSON() const {
+        BSONObjBuilder builder;
+        addToBSON(&builder);
+        return builder.obj();
     }
 
     Status ReplSetDeclareElectionWinnerResponse::initialize(const BSONObj& argsObj) {

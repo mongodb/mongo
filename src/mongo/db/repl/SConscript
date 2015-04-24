@@ -106,6 +106,7 @@ env.Library('repl_coordinator_impl',
             [
                 'check_quorum_for_config_change.cpp',
                 'elect_cmd_runner.cpp',
+                'election_winner_declarer.cpp',
                 'freshness_checker.cpp',
                 'repl_client_info.cpp',
                 'replica_set_config_checks.cpp',
@@ -185,6 +186,12 @@ env.CppUnitTest('freshness_checker_test',
                          'replica_set_messages',
                          'replmocks'])
 
+env.CppUnitTest('election_winner_declarer_test',
+                'election_winner_declarer_test.cpp',
+                LIBDEPS=['repl_coordinator_impl',
+                         'replica_set_messages',
+                         'replmocks'])
+
 env.CppUnitTest('elect_cmd_runner_test',
                 'elect_cmd_runner_test.cpp',
                 LIBDEPS=['repl_coordinator_impl',
@@ -234,6 +241,7 @@ env.Library('replica_set_messages',
                 'handshake_args.cpp',
                 'is_master_response.cpp',
                 'member_config.cpp',
+                'repl_set_declare_election_winner_args.cpp',
                 'repl_set_heartbeat_args.cpp',
                 'repl_set_heartbeat_args_v1.cpp',
                 'repl_set_heartbeat_response.cpp',
@@ -277,7 +285,6 @@ env.Library(
         'repl_set_request_votes.cpp',
         'repl_set_request_votes_args.cpp',
         'repl_set_declare_election_winner.cpp',
-        'repl_set_declare_election_winner_args.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/logger/logger',

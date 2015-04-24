@@ -188,6 +188,8 @@ namespace repl {
         virtual Date_t getStepDownTime() const;
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
                                                const Timestamp& lastCommitttedOpTime) const;
+        Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
+                                                   long long* responseTerm);
 
         virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
 

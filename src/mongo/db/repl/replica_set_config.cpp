@@ -442,6 +442,18 @@ namespace {
         return -1;
     }
 
+    const int ReplicaSetConfig::findMemberIndexByConfigId(long long configId) const {
+        int x = 0;
+        for (const auto& member : _members) {
+
+            if (member.getId() == configId) {
+                return x;
+            }
+            ++x;
+        }
+        return -1;
+    }
+
     const MemberConfig* ReplicaSetConfig::findMemberByHostAndPort(const HostAndPort& hap) const {
         int idx = findMemberIndexByHostAndPort(hap);
         return idx != -1 ? &getMemberAt(idx) : NULL;

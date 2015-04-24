@@ -38,6 +38,7 @@
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
@@ -2101,6 +2102,29 @@ namespace {
         output->setPrimaryIndex(_currentPrimaryIndex);
         output->setSelfState(getMemberState());
         output->setSelfHeartbeatMessage(_hbmsg);
+    }
+
+    Status TopologyCoordinatorImpl::processReplSetDeclareElectionWinner(
+            const ReplSetDeclareElectionWinnerArgs& args,
+            long long* responseTerm) {
+        if (args.getReplSetName() != _rsConfig.getReplSetName()) {
+            return {ErrorCodes::BadValue, "replSet name does not match"};
+        }
+        else if (args.getTerm() < _term) {
+            return {ErrorCodes::BadValue, "term has already passed"};
+        }
+        else if (args.getTerm() == _term &&
+                 args.getWinnerId() != _rsConfig.getMemberAt(_currentPrimaryIndex).getId()) {
+            return {ErrorCodes::BadValue, "term already has a primary"};
+        }
+
+        if (args.getTerm() > _term) {
+            _term = args.getTerm();
+        }
+        *responseTerm = _term;
+
+        _currentPrimaryIndex = _rsConfig.findMemberIndexByConfigId(args.getWinnerId());
+        return Status::OK();
     }
 
 } // namespace repl

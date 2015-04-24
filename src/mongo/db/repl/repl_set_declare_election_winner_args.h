@@ -43,16 +43,17 @@ namespace repl {
     public:
         Status initialize(const BSONObj& argsObj);
 
+        std::string getReplSetName() const;
         long long getTerm() const;
         long long getWinnerId() const;
-        long long getConfigVersion() const;
 
         void addToBSON(BSONObjBuilder* builder) const;
+        BSONObj toBSON() const;
 
     private:
+        std::string _setName;
         long long _term = -1; // The term for which the winner is being declared.
         long long _winnerId = -1; // replSet id of the member who was the winner.
-        long long _configVersion = -1; // replSet config version known to the command issuer.
     };
 
     class ReplSetDeclareElectionWinnerResponse {

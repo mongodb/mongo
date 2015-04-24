@@ -46,6 +46,7 @@
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
@@ -2419,11 +2420,36 @@ namespace {
 
     Status ReplicationCoordinatorImpl::processReplSetDeclareElectionWinner(
             const ReplSetDeclareElectionWinnerArgs& args,
-            ReplSetDeclareElectionWinnerResponse* response) {
+            long long* responseTerm) {
         if (!isV1ElectionProtocol()) {
             return {ErrorCodes::BadValue, "not using election protocol v1"};
         }
-        return {ErrorCodes::CommandNotFound, "not implemented"};
+        Status result{ErrorCodes::InternalError,
+                      "didn't set status in processReplSetDeclareElectionWinner"};
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish,
+                       this,
+                       stdx::placeholders::_1,
+                       args,
+                       responseTerm,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return cbh.getStatus();
+        }
+        _replExecutor.wait(cbh.getValue());
+        return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplSetDeclareElectionWinnerArgs& args,
+            long long* responseTerm,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+        *result = _topCoord->processReplSetDeclareElectionWinner(args, responseTerm);
     }
 
     void ReplicationCoordinatorImpl::prepareCursorResponseInfo(BSONObjBuilder* objBuilder) {

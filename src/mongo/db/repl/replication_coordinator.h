@@ -576,10 +576,11 @@ namespace repl {
         /*
         * Handles an incoming replSetDeclareElectionWinner command.
         * Returns a Status with either OK or an error message.
+        * Populates responseTerm with the current term from our perspective.
         */
         virtual Status processReplSetDeclareElectionWinner(
                 const ReplSetDeclareElectionWinnerArgs& args,
-                ReplSetDeclareElectionWinnerResponse* response) = 0;
+                long long* responseTerm) = 0;
 
         /**
          * Prepares a BSONObj describing the current term, primary, and lastOp information.
