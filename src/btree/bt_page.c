@@ -104,17 +104,12 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			/*
 			 * The page is in memory.
 			 *
-			 * Check if we need an autocommit transaction.
-			 */
-			WT_RET(__wt_txn_autocommit_check(session));
-
-			/*
 			 * Get a hazard pointer if one is required. We cannot
 			 * be evicting if no hazard pointer is required, we're
 			 * done.
 			 */
 			if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
-				return (0);
+				goto skip_evict;
 
 			/*
 			 * The expected reason we can't get a hazard pointer is
@@ -139,7 +134,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * done on this file, we're done.
 			 */
 			if (F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
-				return (0);
+				goto skip_evict;
 
 			/*
 			 * Forcibly evict pages that are too big.
@@ -183,8 +178,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
 				    __wt_cache_read_gen_set(session);
-
-			return (0);
+skip_evict:
+			/*
+			 * Check if we need an autocommit transaction.
+			 */
+			return (__wt_txn_autocommit_check(session));
 		WT_ILLEGAL_VALUE(session);
 		}
 
