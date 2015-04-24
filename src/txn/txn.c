@@ -261,11 +261,11 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 }
 
 /*
- * __wt_txn_begin_config --
- *	Begin a transaction based on a specified configuration.
+ * __wt_txn_config --
+ *	Configure a transaction.
  */
 int
-__wt_txn_begin_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_TXN *txn;

@@ -217,7 +217,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->txn_logsync = S2C(session)->txn_logsync;
 
 	if (cfg != NULL)
-		WT_RET(__wt_txn_begin_config(session, cfg));
+		WT_RET(__wt_txn_config(session, cfg));
 
 	if (txn->isolation == TXN_ISO_SNAPSHOT) {
 		if (session->ncursors > 0)
