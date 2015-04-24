@@ -71,7 +71,7 @@
     testDB.dropAllRoles();
 
     // restart the mongod as a 2.8
-    MongoRunner.stopMongod(toolTest.port);
+    stopMongod(toolTest.port);
     toolTest.m = null;
     toolTest.db = null;
     delete toolTest.options.binVersion;
@@ -113,7 +113,7 @@
     testDB.dropAllRoles();
 
     // restart the mongod as a 2.6
-    MongoRunner.stopMongod(toolTest.port);
+    stopMongod(toolTest.port);
     toolTest.m = null;
     toolTest.db = null;
     toolTest.options = toolTest.options || {};

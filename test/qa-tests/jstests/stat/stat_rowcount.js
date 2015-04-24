@@ -15,7 +15,7 @@ port = allocatePorts(1);
 
 baseName = "tool_stat1";
 
-m = _startMongod("--port", port[0], "--dbpath", MongoRunner.dataPath + baseName + port[0], "--nohttpinterface", "--bind_ip", "127.0.0.1");
+m = startMongod("--port", port[0], "--dbpath", MongoRunner.dataPath + baseName + port[0], "--nohttpinterface", "--bind_ip", "127.0.0.1");
 
 pid = startMongoProgramNoConnect.apply(null, ["mongostat", "--port", port[0]].concat(commonToolArgs));
 

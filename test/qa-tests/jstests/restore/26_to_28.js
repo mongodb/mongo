@@ -35,7 +35,7 @@
     testDB.dropDatabase();
 
     // restart the mongod as a 3.0
-    MongoRunner.stopMongod(toolTest.port);
+    stopMongod(toolTest.port);
     toolTest.m = null;
     toolTest.db = null;
     delete toolTest.options.binVersion;

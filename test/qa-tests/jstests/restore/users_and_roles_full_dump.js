@@ -94,7 +94,7 @@
         assert.eq(0, ret);
 
         // restart the mongod, with a clean db path
-        MongoRunner.stopMongod(toolTest.port);
+        stopMongod(toolTest.port);
         resetDbpath(toolTest.dbpath);
         toolTest.m = null;
         toolTest.db = null;
