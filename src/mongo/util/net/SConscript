@@ -9,6 +9,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/network',
-        '$BUILD_DIR/mongo/synchronization',
+        '$BUILD_DIR/mongo/util/concurrency/synchronization',
     ],
 )

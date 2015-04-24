@@ -105,7 +105,7 @@ env.Library(
         '$BUILD_DIR/mongo/logger/logger',
         '$BUILD_DIR/mongo/platform/platform',
         '$BUILD_DIR/mongo/stacktrace',
-        '$BUILD_DIR/mongo/synchronization',
+        '$BUILD_DIR/mongo/util/concurrency/synchronization',
         '$BUILD_DIR/mongo/util/concurrency/thread_name',
         '$BUILD_DIR/mongo/util/debugger',
         '$BUILD_DIR/third_party/shim_allocator',

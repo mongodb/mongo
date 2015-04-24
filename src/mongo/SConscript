@@ -142,8 +142,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-env.Library('synchronization', [ 'util/concurrency/synchronization.cpp' ])
-
 # Range arithmetic library, used by both mongod and mongos
 env.Library(
     'range_arithmetic',
@@ -348,7 +346,7 @@ env.Library('mongocommon', commonFiles,
                      'spin_lock',
                      'stacktrace',
                      'util/stringutils',
-                     'synchronization',
+                     'util/concurrency/synchronization',
                      'util/concurrency/thread_name',
                      'util/md5',
                      'version',
@@ -377,7 +375,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "background_job",
         "network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
-        "synchronization",
+        "util/concurrency/synchronization",
     ]
 )
 
@@ -901,7 +899,7 @@ env.Library('range_deleter',
                 'bson',
                 'service_context',
                 'range_arithmetic',
-                'synchronization'
+                'util/concurrency/synchronization'
             ])
 
 env.CppUnitTest('range_deleter_test',

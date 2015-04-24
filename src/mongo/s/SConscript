@@ -147,7 +147,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/client/clientdriver',
         'batch_write_types',
-        '$BUILD_DIR/mongo/synchronization'
+        '$BUILD_DIR/mongo/util/concurrency/synchronization'
     ],
 )
 
