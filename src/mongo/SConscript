@@ -142,10 +142,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
-env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
-                LIBDEPS=['spin_lock', '$BUILD_DIR/third_party/shim_boost'])
-
 env.Library('hostandport', ['util/net/hostandport.cpp'],
             LIBDEPS=[
                 'util/foundation',
@@ -321,7 +317,7 @@ env.Library('mongocommon', commonFiles,
                      'namespace_string',
                      'network',
                      'processinfo',
-                     'spin_lock',
+                     'util/concurrency/spin_lock',
                      'stacktrace',
                      'util/stringutils',
                      'util/concurrency/synchronization',
@@ -343,7 +339,7 @@ env.CppUnitTest(
 )
 
 env.Library('background_job', ["util/background.cpp"],
-            LIBDEPS=['spin_lock'])
+            LIBDEPS=['util/concurrency/spin_lock'])
 
 env.CppUnitTest(
     target="background_job_test",

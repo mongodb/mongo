@@ -18,3 +18,21 @@ env.Library(
         'synchronization.cpp'
     ],
 )
+
+env.Library(
+    target='spin_lock',
+    source=[
+        "spin_lock.cpp",
+    ],
+)
+
+env.CppUnitTest(
+    target='spin_lock_test',
+    source=[
+        'spin_lock_test.cpp',
+    ],
+    LIBDEPS=[
+        'spin_lock',
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)
