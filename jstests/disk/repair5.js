@@ -19,17 +19,18 @@
     // Insert a lot of data so repair runs a long time
     var bulk = dbTest[baseName].initializeUnorderedBulkOp();
     var big = new Array( 5000 ).toString();
-    for( i = 0; i < 20000; ++i ) {
+    for(var i = 0; i < 20000; ++i) {
         bulk.insert( {i:i,b:big} );
     }
     assert.writeOK(bulk.execute());
 
     function killRepair() {
         while( 1 ) {
-            p = db.currentOp().inprog;
+            var p = db.currentOp().inprog;
             for( var i in p ) {
                 var o = p[ i ];
                 printjson( o );
+
                 // Find the active 'repairDatabase' op and kill it.
                 if ( o.active && o.query && o.query.repairDatabase ) {
                     db.killOp( o.opid );
