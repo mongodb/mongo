@@ -86,7 +86,11 @@ env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',
              'authz_session_external_state_d.cpp',
              'auth_index_d.cpp'],
-            LIBDEPS=['authservercommon', '$BUILD_DIR/mongo/server_parameters'])
+            LIBDEPS=[
+                'authservercommon',
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+                '$BUILD_DIR/mongo/server_parameters',
+            ])
 
 env.Library('authmongos',
             ['authz_manager_external_state_s.cpp',

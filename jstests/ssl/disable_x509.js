@@ -1,6 +1,6 @@
 // Test enabling and disabling the MONGODB-X509 auth mech
 
-var CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US"
+var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client"
 
 var conn = MongoRunner.runMongod({smallfiles: "",
                                   auth: "",

@@ -46,6 +46,7 @@ namespace mongo {
 
         virtual bool shouldAllowLocalhost() const;
         virtual bool shouldIgnoreAuthChecks() const;
+        virtual bool serverIsArbiter() const;
 
     protected:
         AuthzSessionExternalStateServerCommon(AuthorizationManager* authzManager);

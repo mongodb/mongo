@@ -158,11 +158,19 @@ namespace {
                 Privilege(externalDBResource, ActionType::createUser);
 
             ActionSet setupServerConfigActionSet;
+
+            // If this server is an arbiter, add specific privileges meant to circumvent
+            // the behavior of an arbiter in an authenticated replset. See SERVER-5479.
+            if (_externalState->serverIsArbiter()) {
+                setupServerConfigActionSet.addAction(ActionType::getCmdLineOpts);
+                setupServerConfigActionSet.addAction(ActionType::getParameter);
+                setupServerConfigActionSet.addAction(ActionType::serverStatus);
+                setupServerConfigActionSet.addAction(ActionType::shutdown);
+            }
+
             setupServerConfigActionSet.addAction(ActionType::addShard);
-            setupServerConfigActionSet.addAction(ActionType::getCmdLineOpts);
             setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
             setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
-            setupServerConfigActionSet.addAction(ActionType::serverStatus);
             Privilege setupServerConfigPrivilege =
                 Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
 
