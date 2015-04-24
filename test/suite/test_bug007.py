@@ -51,7 +51,7 @@ class test_bug007(wttest.WiredTigerTestCase):
         # Salvage should fail.
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError,
-            lambda: self.session.salvage(uri), "/session.salvage/")
+            lambda: self.session.salvage(uri), "/WT_SESSION.salvage/")
 
         # Forced salvage should succeed.
         self.session.salvage(uri, "force")

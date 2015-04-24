@@ -30,6 +30,7 @@ __wt_nlpo2_round
 __wt_print_huffman_code
 __wt_try_readlock
 wiredtiger_config_parser_open
+wiredtiger_config_validate
 wiredtiger_pack_int
 wiredtiger_pack_item
 wiredtiger_pack_str

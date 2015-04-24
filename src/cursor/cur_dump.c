@@ -392,7 +392,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	}
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_open_cursor);
 	cfg[1] = NULL;
 	WT_ERR(__wt_cursor_init(cursor, NULL, owner, cfg, cursorp));
 

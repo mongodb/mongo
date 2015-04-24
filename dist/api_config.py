@@ -306,8 +306,7 @@ __wt_conn_config_init(WT_SESSION_IMPL *session)
 \tconn = S2C(session);
 
 \t/* Build a list of pointers to the configuration information. */
-\tWT_RET(__wt_calloc_def(session,
-\t    sizeof(config_entries) / sizeof(config_entries[0]), &epp));
+\tWT_RET(__wt_calloc_def(session, WT_ELEMENTS(config_entries), &epp));
 \tconn->config_entries = epp;
 
 \t/* Fill in the list to reference the default information. */
@@ -327,6 +326,21 @@ __wt_conn_config_discard(WT_SESSION_IMPL *session)
 \tconn = S2C(session);
 
 \t__wt_free(session, conn->config_entries);
+}
+
+/*        
+ * __wt_conn_config_match --
+ *      Return the static configuration entry for a method.
+ */
+const WT_CONFIG_ENTRY *
+__wt_conn_config_match(const char *method)
+{
+\tconst WT_CONFIG_ENTRY *ep;
+
+\tfor (ep = config_entries; ep->method != NULL; ++ep)
+\t\tif (strcmp(method, ep->method) == 0)
+\t\t\treturn (ep);
+\treturn (NULL);
 }
 ''')
 

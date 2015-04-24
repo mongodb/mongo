@@ -3427,7 +3427,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	/* Add Helium-specific WT_SESSION.create configuration options.  */
 	for (p = session_create_opts; *p != NULL; ++p)
 		if ((ret = connection->configure_method(connection,
-		    "session.create", "helium:", *p, "boolean", NULL)) != 0)
+		    "WT_SESSION.create", "helium:", *p, "boolean", NULL)) != 0)
 			EMSG_ERR(wtext, NULL, ret,
 			    "WT_CONNECTION.configure_method: session.create: "
 			    "%s: %s",
