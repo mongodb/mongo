@@ -1,0 +1,14 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+env.CppUnitTest(
+    target='sock_test',
+    source=[
+        'sock_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/network',
+        '$BUILD_DIR/mongo/synchronization',
+    ],
+)

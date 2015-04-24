@@ -63,6 +63,7 @@ env.SConscript(
         'util/cmdline_utils',
         'util/concurrency',
         'util/mongoutils',
+        'util/net',
         'util/options_parser',
     ],
 )
@@ -140,11 +141,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
-
-env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
-                LIBDEPS=['network',
-                         'synchronization',
-                ])
 
 env.Library('index_names',["db/index_names.cpp"])
 
