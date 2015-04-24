@@ -23,12 +23,10 @@ mongos.getDB( "admin" ).runCommand({ flushRouterConfig : 1 })
 jsTestLog( "Setup complete!" )
 st.printShardingStatus()
 
-var port = parseInt( st._configDB.replace( /^.*:/, "" ) )
-jsTestLog( "Stopping " + port + "..." )
+jsTestLog( "Stopping config servers" );
+st.configRS.stopSet();
 
-MongoRunner.stopMongod( port )
-
-jsTestLog( "Config flushed and config server down!" )
+jsTestLog( "Config flushed and config servers down!" )
 
 // Throws transport error first and subsequent times when loading config data, not no primary
 for( var i = 0; i < 2; i++ ){
@@ -45,6 +43,7 @@ for( var i = 0; i < 2; i++ ){
         // Unfortunately e gets stringified so we have to test this way
         assert(e.message.indexOf("10276") >= 0 ||       // Transport error
                e.message.indexOf("13328") >= 0 ||       // Connect error
+               e.message.indexOf("13639") >= 0 ||       // Connect error to replSet primary
                e.message.indexOf("socket") >= 0 )
     }
 }
