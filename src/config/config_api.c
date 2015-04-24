@@ -118,6 +118,14 @@ wiredtiger_config_validate(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
+	/* 
+	 * It's a logic error to specify both a session and an event handler.
+	 */
+	if (session != NULL && handler != NULL)
+		WT_RET_MSG(session, EINVAL,
+		    "wiredtiger_config_validate error handler ignored when "
+		    "a session also specified");
+
 	/*
 	 * If we're not given a session, but we do have an event handler, build
 	 * a fake session/connection pair and configure the event handler.
