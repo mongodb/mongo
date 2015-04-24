@@ -34,10 +34,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/dist_lock_manager.h"
 
 namespace mongo {
-
-    class DistLockManager;
 
     /**
      * Implements the catalog manager using the legacy 3-config server protocol.
