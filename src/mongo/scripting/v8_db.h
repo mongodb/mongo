@@ -45,6 +45,7 @@ namespace mongo {
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate(V8Scope* scope, bool local);
 
     // Mongo member functions
+    v8::Handle<v8::Value> mongoRunCommand(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> mongoFind(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> mongoInsert(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> mongoRemove(V8Scope* scope, const v8::Arguments& args);

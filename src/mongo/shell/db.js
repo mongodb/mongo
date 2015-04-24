@@ -44,21 +44,77 @@ DB.prototype.commandHelp = function( name ){
     return res.help;
 }
 
-DB.prototype.runCommand = function( obj, extra ){
-    if ( typeof( obj ) == "string" ){
-        var n = {};
-        n[obj] = 1;
-        obj = n;
-        if ( extra && typeof( extra ) == "object" ) {
-            for ( var x in extra ) {
-                n[x] = extra[x];
-            }
-        }
-    }
-    return this.getCollection( "$cmd" ).findOne( obj );
-}
+ // utility to attach readPreference if needed.
+ DB.prototype._attachReadPreferenceToCommand = function (cmdObj) {
+     "use strict";
+     var readPref = this.getMongo().getReadPref();
+     // if the user has not set a readpref, return the original cmdObj
+     if (readPref === null) {
+         return cmdObj;
+     }
+
+     // if user specifies $readPreference manually, then don't change it
+     if (cmdObj.hasOwnProperty("$readPreference")) {
+         return cmdObj;
+     }
+
+     // copy object so we don't mutate the original
+     var clonedCmdObj = Object.extend({}, cmdObj);
+     // The server selection spec mandates that the key is '$query', but
+     // the shell has historically used 'query'. The server accepts both,
+     // so we maintain the existing behavior
+     var cmdObjWithReadPref = { query: clonedCmdObj, $readPreference: readPref };
+     return cmdObjWithReadPref;
+ };
+
+ // if someone passes i.e. runCommand("foo", {bar: "baz"}
+ // we merge it in to runCommand({foo: 1, bar: "baz"}
+ // this helper abstracts that logic.
+ DB.prototype._mergeCommandOptions = function(commandName, extraKeys) {
+     "use strict";
+     var mergedCmdObj = {};
+     mergedCmdObj[commandName] = 1;
+
+     if (typeof(extraKeys) === "object") {
+         // this will traverse the prototype chain of extra, but keeping
+         // to maintain legacy behavior
+         for (var key in extraKeys) {
+             mergedCmdObj[key] = extraKeys[key];
+         }
+     }
+     return mergedCmdObj;
+ };
+
+ // Like runCommand but applies readPreference if one has been set
+ // on the connection. Also sets options automatically.
+ DB.prototype.runReadCommand = function (obj, extra) {
+     "use strict";
+
+     var mergedObj = (typeof(obj) === "string") ? this._mergeCommandOptions(obj, extra) : obj;
+     var cmdObjWithReadPref = this._attachReadPreferenceToCommand(obj);
+
+     var options = 0;
+     // automatically set slaveOk if readPreference is anything but primary
+     if (this.getMongo().getReadPrefMode() !== "primary") {
+         options |= 4;
+     }
+
+     // allow options to be overridden
+     // extra is not used since mergedObj is an object
+     return this.runCommand(cmdObjWithReadPref, null, options);
+ };
+
+ DB.prototype.runCommand = function( obj, extra, queryOptions ){
+     var mergedObj = (typeof(obj) === "string") ? this._mergeCommandOptions(obj, extra) : obj;
+     // if options were passed (i.e. because they were overridden on a collection), use them.
+     // Otherwise use getQueryOptions.
+     var options = (typeof(queryOptions) !== "undefined") ? queryOptions : this.getQueryOptions();
+     return this.getMongo().runCommand(this._name, mergedObj, options);
+ };
+
 
 DB.prototype._dbCommand = DB.prototype.runCommand;
+DB.prototype._dbReadCommand = DB.prototype.runReadCommand;
 
 DB.prototype.adminCommand = function( obj, extra ){
     if ( this._name == "admin" )
@@ -210,7 +266,8 @@ DB.prototype.shutdownServer = function(opts) {
         throw Error('shutdownServer failed: server is still up.');
     }
     catch (e) {
-        if (tojson(e).indexOf('error doing query: failed') >= 0) {
+        // we expect the command to not return a response, as the server will shut down immediately.
+        if (tojson(e).indexOf("transport error") >= 0) {
             print('server should be down...');
             return;
         }
@@ -1041,6 +1098,12 @@ DB.prototype.setSlaveOk = function( value ) {
 DB.prototype.getSlaveOk = function() {
     if (this._slaveOk != undefined) return this._slaveOk;
     return this._mongo.getSlaveOk();
+}
+
+DB.prototype.getQueryOptions = function() {
+   var options = 0;
+   if (this.getSlaveOk()) options |= 4;
+   return options;
 }
 
 /* Loads any scripts contained in system.js into the client shell.

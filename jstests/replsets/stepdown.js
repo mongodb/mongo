@@ -5,6 +5,11 @@
 
 load("jstests/replsets/rslib.js")
 
+// utility to check if an error was due to connection failure.
+var errorWasDueToConnectionFailure = function(error) {
+    return tojson(error).indexOf("transport error") > 0;
+};
+
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2, nodeOptions: {verbose: 1} });
 var nodes = replTest.startSet();
 replTest.initiate();
@@ -92,7 +97,9 @@ try {
     assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown : 100, force : true}));
 }
 catch (e) {
-    if (tojson( e ).indexOf( "error doing query: failed" ) < 0) {
+    // ignore errors due to connection failures as we expect the master to close connections
+    // on stepdown
+    if (!errorWasDueToConnectionFailure(e)) {
         throw e;
     }
 }
@@ -173,7 +180,7 @@ try {
     printjson(currentMaster.getDB("admin").runCommand({shutdown : 1, force : true}));
 }
 catch (e) {
-    if (tojson(e).indexOf( "error doing query: failed" ) < 0) {
+    if (!errorWasDueToConnectionFailure(e)) {
         throw e;
     }
 }

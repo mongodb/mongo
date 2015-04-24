@@ -111,6 +111,7 @@ namespace mongo {
             mongo = scope->createV8Function(mongoConsExternal);
         mongo->InstanceTemplate()->SetInternalFieldCount(1);
         v8::Handle<v8::ObjectTemplate> proto = mongo->PrototypeTemplate();
+        scope->injectV8Method("runCommand", mongoRunCommand, proto);
         scope->injectV8Method("find", mongoFind, proto);
         scope->injectV8Method("insert", mongoInsert, proto);
         scope->injectV8Method("remove", mongoRemove, proto);
@@ -191,6 +192,24 @@ namespace mongo {
             static_cast<boost::shared_ptr<DBClientBase>*>(c->Value());
         massert(16667, "Unable to get db client connection", conn && conn->get());
         return *conn;
+    }
+
+    /**
+     * JavaScript binding for Mongo.prototype.runCommand(database, cmdObj, queryOptions)
+     */
+    v8::Handle<v8::Value> mongoRunCommand(V8Scope* scope, const v8::Arguments& args) {
+        argumentCheck(args.Length() == 3, "runCommand needs 3 args");
+        argumentCheck(args[0]->IsString(), "the database parameter to runCommand must be a string");
+        argumentCheck(args[1]->IsObject(), "the cmdObj parameter to runCommand must be an object");
+        argumentCheck(args[2]->IsNumber(), "the options parameter to runCommand must be a number");
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
+        const string database = toSTLString(args[0]);
+        BSONObj cmdObj = scope->v8ToMongo(args[1]->ToObject());
+        int queryOptions = args[2]->Int32Value();
+        BSONObj cmdRes;
+        conn->runCommand(database, cmdObj, cmdRes, queryOptions);
+        // the returned object is not read only as some of our tests depend on modifying it.
+        return scope->mongoToLZV8(cmdRes, false /* read only */);
     }
 
     /**

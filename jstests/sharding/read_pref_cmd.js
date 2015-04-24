@@ -53,7 +53,9 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
      */
     var cmdTest = function(cmdObj, secOk, profileQuery) {
         jsTest.log('about to do: ' + tojson(cmdObj));
-        var cmdResult = testDB.runCommand(cmdObj);
+        // use runReadCommand so that the cmdObj is modified with the readPreference
+        // set on the connection.
+        var cmdResult = testDB.runReadCommand(cmdObj);
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(cmdResult.ok);
 
@@ -180,19 +182,20 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     var failureMsg, testDB, cmdResult;
 
     jsTest.log('Expecting failure for mode: ' + mode + ', tag sets: ' + tojson(tagSets));
-    conn.setReadPref(mode, tagSets);
+    // use setReadPrefUnsafe to bypass client-side validation
+    conn._setReadPrefUnsafe(mode, tagSets);
     testDB = conn.getDB('test');
 
     // Test that a command that could be routed to a secondary fails with bad mode / tags.
     if (isMongos) {
         // Command result should have ok: 0.
-        cmdResult = testDB.runCommand({ distinct: 'user', key: 'x' });
+        cmdResult = testDB.runReadCommand({ distinct: 'user', key: 'x' });
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(!cmdResult.ok);
     } else {
         try {
             // conn should throw error
-            testDB.runCommand({ distinct: 'user', key: 'x' });
+            testDB.runReadCommand({ distinct: 'user', key: 'x' });
             failureMsg = "Unexpected success running distinct!";
         }
         catch (e) {
@@ -211,7 +214,7 @@ var testAllModes = function(conn, hostList, isMongos) {
     [
         // mode, tagSets, expectedHost
         ['primary', undefined, false],
-        ['primary', [{}], false],
+        ['primary', [], false],
 
         ['primaryPreferred', undefined, false],
         ['primaryPreferred', [{tag: 'one'}], false],

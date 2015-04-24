@@ -95,18 +95,32 @@ DBCollection.prototype.getDB = function(){
     return this._db;
 }
 
-DBCollection.prototype._dbCommand = function( cmd , params ){
-    if ( typeof( cmd ) == "object" )
-        return this._db._dbCommand( cmd );
-    
+DBCollection.prototype._makeCommand = function (cmd, params) {
     var c = {};
     c[cmd] = this.getName();
     if ( params )
-        Object.extend( c , params );
-    return this._db._dbCommand( c );    
+        Object.extend(c, params);
+    return c;
+}
+
+DBCollection.prototype._dbCommand = function( cmd , params ){
+    if (typeof( cmd ) === "object")
+        return this._db._dbCommand(cmd, {}, this.getQueryOptions());
+
+    return this._db._dbCommand(this._makeCommand(cmd, params), {}, this.getQueryOptions());
+}
+
+// Like _dbCommand, but applies $readPreference
+DBCollection.prototype._dbReadCommand = function( cmd , params ){
+    if (typeof( cmd ) === "object")
+        return this._db._dbReadCommand( cmd , {}, this.getQueryOptions());
+
+    return this._db._dbReadCommand(this._makeCommand(cmd, params), {}, this.getQueryOptions());
 }
 
 DBCollection.prototype.runCommand = DBCollection.prototype._dbCommand;
+
+DBCollection.prototype.runReadCommand = DBCollection.prototype._dbReadCommand;
 
 DBCollection.prototype._massageObject = function( q ){
     if ( ! q )
@@ -1121,8 +1135,8 @@ DBCollection.prototype.stats = function(args) {
         throw new Error('Cannot filter indexDetails on both indexDetailsKey and ' +
                         'indexDetailsName');
     }
-
-    var res = this._db.runCommand({collStats: this._shortName, scale: scale});
+    // collStats can run on a secondary, so we need to apply readPreference
+    var res = this._db.runReadCommand({collStats: this._shortName, scale: scale});
     if (!res.ok) {
         return res;
     }
@@ -1223,7 +1237,7 @@ DBCollection.prototype.isCapped = function(){
 }
 
 DBCollection.prototype._distinct = function( keyString , query ){
-    return this._dbCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
+    return this._dbReadCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
 }
 
 DBCollection.prototype.distinct = function( keyString , query ){
@@ -1258,7 +1272,16 @@ DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
         cmd.cursor = {};
     }
 
-    var res = this.runCommand("aggregate", cmd);
+    var hasOutStage = pipeline.length >= 1 && pipeline[pipeline.length - 1].hasOwnProperty("$out");
+
+    var doAgg = function(cmd) {
+        // if we don't have an out stage, we could run on a secondary
+        // so we need to attach readPreference
+        return hasOutStage ?
+            this.runReadCommand("aggregate", cmd) : this.runCommand("aggregate", cmd);
+    }.bind(this);
+
+    var res = doAgg(cmd);
 
     if (!res.ok
             && (res.code == 17020 || res.errmsg == "unrecognized field \"cursor")
@@ -1266,7 +1289,8 @@ DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
         // If the command failed because cursors aren't supported and the user didn't explicitly
         // request a cursor, try again without requesting a cursor.
         delete cmd.cursor;
-        res = this.runCommand("aggregate", cmd);
+
+        res = doAgg(cmd);
 
         if ('result' in res && !("cursor" in res)) {
             // convert old-style output to cursor-style output
@@ -1348,7 +1372,16 @@ DBCollection.prototype.mapReduce = function( map , reduce , optionsOrOutString )
     else
         Object.extend( c , optionsOrOutString );
 
-    var raw = this._db.runCommand( c );
+    var raw;
+
+    if (c["out"].hasOwnProperty("inline") && c["out"]["inline"] === 1) {
+        // if inline output is specified, we need to apply readPreference on the command
+        // as it could be run on a secondary
+        raw = this._db.runReadCommand(c);
+    } else {
+        raw = this._db.runCommand(c);
+    }
+
     if ( ! raw.ok ){
         __mrerror__ = raw;
         throw Error( "map reduce failed:" + tojson(raw) );
@@ -1579,9 +1612,9 @@ DBCollection.prototype.getSlaveOk = function() {
 }
 
 DBCollection.prototype.getQueryOptions = function() {
-    var options = 0;
-    if (this.getSlaveOk()) options |= 4;
-    return options;
+    // inherit this method from DB but use apply so
+    // that slaveOk will be set if is overridden on this DBCollection
+    return this._db.getQueryOptions.apply(this, arguments);
 }
 
 /**
