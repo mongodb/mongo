@@ -38,7 +38,7 @@ env.Library('replication_executor',
                 'scatter_gather_runner.cpp',
             ],
             LIBDEPS=['$BUILD_DIR/mongo/util/foundation',
-                     '$BUILD_DIR/mongo/hostandport'])
+                     '$BUILD_DIR/mongo/util/net/hostandport'])
 
 env.Library(
     target='replication_executor_test_fixture',
@@ -207,7 +207,7 @@ env.Library('repl_coordinator_interface',
             ['replication_coordinator.cpp',
              'replication_coordinator_external_state.cpp'],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/hostandport',
+                '$BUILD_DIR/mongo/util/net/hostandport',
                 'reporter',
             ])
 
@@ -244,7 +244,7 @@ env.Library('replica_set_messages',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/bson',
-                '$BUILD_DIR/mongo/hostandport',
+                '$BUILD_DIR/mongo/util/net/hostandport',
                 '$BUILD_DIR/mongo/db/common',
             ])
 

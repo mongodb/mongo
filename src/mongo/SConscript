@@ -142,34 +142,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-env.Library('hostandport', ['util/net/hostandport.cpp'],
-            LIBDEPS=[
-                'util/foundation',
-                'server_options_core',
-            ])
-
-env.CppUnitTest('hostandport_test', ['util/net/hostandport_test.cpp'],
-                LIBDEPS=['hostandport'])
-
-env.Library('network', [
-            "util/net/sock.cpp",
-            "util/net/socket_poll.cpp",
-            "util/net/ssl_expiration.cpp",
-            "util/net/ssl_manager.cpp",
-            "util/net/ssl_options.cpp",
-            "util/net/httpclient.cpp",
-            "util/net/message.cpp",
-            "util/net/message_port.cpp",
-            "util/net/listen.cpp" ],
-            LIBDEPS=['$BUILD_DIR/mongo/util/concurrency/ticketholder',
-                     '$BUILD_DIR/mongo/util/options_parser/options_parser',
-                     'background_job',
-                     'fail_point',
-                     'util/foundation',
-                     'hostandport',
-                     'server_options_core',
-            ])
-
 env.Library(
     target='index_key_validate',
     source=[
@@ -184,7 +156,7 @@ env.Library(
 env.Library('lasterror', [
             "db/lasterror.cpp",
             ],
-            LIBDEPS=['network',
+            LIBDEPS=['util/net/network',
                      'util/foundation',
             ])
 
@@ -315,7 +287,7 @@ env.Library('mongocommon', commonFiles,
                      'lasterror',
                      'db/mongohasher',
                      'namespace_string',
-                     'network',
+                     'util/net/network',
                      'processinfo',
                      'util/concurrency/spin_lock',
                      'stacktrace',
@@ -348,7 +320,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "background_job",
-        "network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
+        "util/net/network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
         "util/concurrency/synchronization",
     ]
 )
@@ -546,7 +518,7 @@ env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${TARGET_OS_FAMILY}.cpp'], LIBD
 env.Library('elapsed_tracker',
             ['util/elapsed_tracker.cpp'],
             LIBDEPS=['util/foundation',
-                     'network'] # this is for using listener to check elapsed time
+                     'util/net/network'] # this is for using listener to check elapsed time
             )
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
@@ -693,7 +665,7 @@ env.Library("server_options", [
                     "db/server_options_helpers.cpp"
                     ],
             LIBDEPS=['bson',
-                     'network', # temporary crutch that should go away once the networking
+                     'util/net/network', # temporary crutch that should go away once the networking
                                 # library has separate options
                      'server_options_core',
                      'server_parameters',

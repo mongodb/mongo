@@ -2,13 +2,58 @@
 
 Import('env')
 
+env.Library(
+    target='hostandport',
+    source=[
+        'hostandport.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/server_options_core',
+    ],
+)
+
+env.CppUnitTest(
+    target='hostandport_test',
+    source=[
+        'hostandport_test.cpp'
+    ],
+    LIBDEPS=[
+        'hostandport',
+    ],
+)
+
+env.Library(
+    target='network',
+    source=[
+        "httpclient.cpp",
+        "listen.cpp",
+        "message.cpp",
+        "message_port.cpp",
+        "sock.cpp",
+        "socket_poll.cpp",
+        "ssl_expiration.cpp",
+        "ssl_manager.cpp",
+        "ssl_options.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/background_job',
+        '$BUILD_DIR/mongo/fail_point',
+        '$BUILD_DIR/mongo/server_options_core',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'hostandport',
+    ],
+)
+
 env.CppUnitTest(
     target='sock_test',
     source=[
         'sock_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/network',
         '$BUILD_DIR/mongo/util/concurrency/synchronization',
+        'network',
     ],
 )

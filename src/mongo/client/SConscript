@@ -30,7 +30,7 @@ env.Library('clientdriver', [
                      '$BUILD_DIR/mongo/db/auth/authcommon',
                      '$BUILD_DIR/mongo/crypto/scramauth',
                      '$BUILD_DIR/mongo/rpc/command_status',
-                     '$BUILD_DIR/mongo/network'
+                     '$BUILD_DIR/mongo/util/net/network'
             ])
 
 env.CppUnitTest("replica_set_monitor_test",

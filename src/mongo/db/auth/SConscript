@@ -80,7 +80,7 @@ env.Library('saslauth',
                 'authcore',
                 'sasl_options',
                 '$BUILD_DIR/mongo/crypto/scramauth',
-                '$BUILD_DIR/mongo/network'])
+                '$BUILD_DIR/mongo/util/net/network'])
 
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',

@@ -34,7 +34,7 @@ env.Library(
     ],
     LIBDEPS=[
         'document_range',
-        '$BUILD_DIR/mongo/network',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
@@ -48,7 +48,7 @@ env.Library(
     ],
     LIBDEPS=[
         'document_range',
-        '$BUILD_DIR/mongo/network',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
 )
 
