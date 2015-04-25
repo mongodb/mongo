@@ -43,8 +43,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If the block is compressed, copy the skipped bytes of the original
-	 * image into place, then decompress.
+	 * If the block is encrypted, copy the skipped bytes of the original
+	 * image into place, then decrypt.
 	 */
 	if (F_ISSET(dsk, WT_PAGE_ENCRYPTED)) {
 		if (btree->kencryptor == NULL ||
@@ -78,9 +78,13 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 		/*
 		 * If checksums were turned off because we're depending on the
-		 * decryption to fail on any corrupted data, we'll end up
-		 * here after corruption happens.  If we're salvaging the file,
-		 * it's OK, otherwise it's really, really bad.
+		 * decompression to fail on any corrupted data (even with
+		 * decryption), we'll end up here after corruption happens.
+		 * If we're salvaging the file, it's OK, otherwise, we can't
+		 * tell how severe it is.  It may be file corruption, which
+		 * is really, really bad, or it may be a mismatch of
+		 * encryption configuration, for example, an incorrect
+		 * secretkey.
 		 */
 		if (ret != 0)
 			WT_ERR(
@@ -140,7 +144,9 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
 	} else
-		if (btree->compressor == NULL)
+		if (btree->compressor == NULL &&
+		    (btree->kencryptor == NULL ||
+		    F_ISSET(dsk, WT_PAGE_ENCRYPTED)))
 			buf->size = dsk->mem_size;
 		else
 			/*
