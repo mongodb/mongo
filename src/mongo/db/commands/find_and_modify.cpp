@@ -39,6 +39,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/queryutil.h"
@@ -71,6 +72,10 @@ namespace mongo {
             verify( cmdObj["sort"].eoo() );
 
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            Status allowedWriteStatus = userAllowedWriteNS(ns);
+            if (!allowedWriteStatus.isOK()) {
+                return appendCommandStatus(result, allowedWriteStatus);
+            }
 
             BSONObj query = cmdObj.getObjectField("query");
             BSONObj fields = cmdObj.getObjectField("fields");
@@ -299,6 +304,10 @@ namespace mongo {
                 return runNoDirectClient( dbname , cmdObj , x, errmsg , result, y );
 
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            Status allowedWriteStatus = userAllowedWriteNS(ns);
+            if (!allowedWriteStatus.isOK()) {
+                return appendCommandStatus(result, allowedWriteStatus);
+            }
 
             BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
             Query q (origQuery);
