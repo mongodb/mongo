@@ -391,8 +391,9 @@ __clsm_open_cursors(
 	c = &clsm->iface;
 	session = (WT_SESSION_IMPL *)c->session;
 	txn = &session->txn;
-	lsm_tree = clsm->lsm_tree;
 	chunk = NULL;
+	locked = 0;
+	lsm_tree = clsm->lsm_tree;
 
 	/*
 	 * Ensure that any snapshot update has cursors on the right set of
