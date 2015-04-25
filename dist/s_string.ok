@@ -162,6 +162,7 @@ LockFile
 Lookup
 MALLOC
 MEM
+MEMALIGN
 MERCHANTABILITY
 MSVC
 MUTEX
@@ -243,6 +244,7 @@ Spinlocks
 Split's
 Stoica
 TAILQ
+TCMalloc
 TODO
 TORTIOUS
 TXN
