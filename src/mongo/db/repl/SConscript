@@ -292,7 +292,7 @@ env.Library(
     LIBDEPS=[
         'replication_executor',
         '$BUILD_DIR/mongo/logger/logger',
-        '$BUILD_DIR/mongo/namespace_string',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/rpc/command_status',
     ],
 )
@@ -305,7 +305,7 @@ env.Library(
     LIBDEPS=[
         'replication_executor',
         '$BUILD_DIR/mongo/logger/logger',
-        '$BUILD_DIR/mongo/namespace_string',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/rpc/command_status',
     ],
 )

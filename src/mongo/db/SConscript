@@ -177,3 +177,23 @@ env.Library(
         'global_timestamp.cpp',
     ],
 )
+
+env.Library(
+    target='namespace_string',
+    source=[
+        'namespace_string.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
+
+env.CppUnitTest(
+    target='namespace_string_test',
+    source=[
+        'namespace_string_test.cpp',
+    ],
+    LIBDEPS=[
+        'namespace_string',
+    ],
+)

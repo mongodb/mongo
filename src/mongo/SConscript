@@ -130,9 +130,6 @@ env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
 env.CppUnitTest('bsonobjbuilder_test', ['bson/bsonobjbuilder_test.cpp'],
                 LIBDEPS=['bson'])
 
-env.CppUnitTest('namespace_string_test', ['db/namespace_string_test.cpp'],
-                LIBDEPS=['namespace_string'])
-
 env.CppUnitTest('update_index_data_test', ['db/update_index_data_test.cpp'],
                 LIBDEPS=['bson','update_index_data','db/common'])
 
@@ -212,8 +209,6 @@ env.Library('version',
                 '$BUILD_DIR/mongo/base/base'
             ])
 
-env.Library('namespace_string', ['db/namespace_string.cpp'], LIBDEPS=['util/foundation'])
-
 commonFiles = [ "shell/mongo.cpp",
                 "util/file_allocator.cpp",
                 "util/paths.cpp",
@@ -254,7 +249,7 @@ env.Library('mongocommon', commonFiles,
                      'service_context',
                      'lasterror',
                      'db/mongohasher',
-                     'namespace_string',
+                     'db/namespace_string',
                      'util/net/network',
                      'util/processinfo',
                      'util/concurrency/spin_lock',
