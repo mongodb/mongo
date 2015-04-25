@@ -41,6 +41,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
@@ -84,6 +85,10 @@ namespace mongo {
                          bool fromRepl) {
 
             const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
+            Status allowedWriteStatus = userAllowedWriteNS(ns);
+            if (!allowedWriteStatus.isOK()) {
+                return appendCommandStatus(result, allowedWriteStatus);
+            }
 
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj fields = cmdObj.getObjectField("fields");
