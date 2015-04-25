@@ -44,4 +44,11 @@ assert( f.a.isCapped() );
 assert.commandWorked( t.cloneCollection( "localhost:" + fromMongod.port, "a" ) );
 assert( t.a.isCapped(), "cloned collection not capped" );
 
-
+// Check that cloning to "system.profile" is disallowed.
+f.a.drop();
+f.system.profile.drop();
+assert.commandWorked( f.setProfilingLevel( 2 ) );
+assert.writeOK( f.a.insert( {} ) );
+assert.gt( f.system.profile.count(), 0 );
+t.system.profile.drop();
+assert.commandFailed( t.cloneCollection( "localhost:" + fromMongod.port, "system.profile" ) );

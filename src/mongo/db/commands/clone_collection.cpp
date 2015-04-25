@@ -50,6 +50,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 
@@ -121,10 +122,11 @@ namespace mongo {
             }
 
             string collection = parseNs(dbname, cmdObj);
-            if ( collection.empty() ) {
-                errmsg = "bad 'cloneCollection' value";
-                return false;
+            Status allowedWriteStatus = userAllowedWriteNS(dbname, collection);
+            if (!allowedWriteStatus.isOK()) {
+                return appendCommandStatus(result, allowedWriteStatus);
             }
+
             BSONObj query = cmdObj.getObjectField("query");
             if ( query.isEmpty() )
                 query = BSONObj();
