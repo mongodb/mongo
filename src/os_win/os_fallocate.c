@@ -18,16 +18,12 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 	WT_UNUSED(session);
 
 	/*
-	 * fallocate on Windows is implemented using SetEndOfFile which can
-	 * also truncate the file. WiredTiger expects fallocate to ignore
-	 * requests to truncate the file which Windows does not do.
+	 * fallocate on Windows would be implemented using SetEndOfFile, which
+	 * can also truncate the file. WiredTiger expects fallocate to ignore
+	 * requests to truncate the file which Windows does not do, so we don't
+	 * support the call.
 	 */
 	fh->fallocate_available = WT_FALLOCATE_NOT_AVAILABLE;
-
-	/*
-	 * We use a separate handle for file size changes, so there's no need
-	 * for locking.
-	 */
 	fh->fallocate_requires_locking = 0;
 }
 
