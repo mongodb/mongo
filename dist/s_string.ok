@@ -43,6 +43,7 @@ CELL's
 CELLs
 CHECKKEY
 CKPT
+CMP
 CONCAT
 CONFIG
 CPUs
@@ -275,6 +276,7 @@ Vo
 Vv
 VxWorks
 WIREDTIGER
+WRLSN
 WakeAllConditionVariable
 Wconditional
 WeakHashLen
