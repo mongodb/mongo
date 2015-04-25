@@ -141,6 +141,14 @@ namespace mongo {
     }
 
     Status userAllowedWriteNS( StringData db, StringData coll ) {
+        if ( coll == "system.profile" ) {
+            return Status( ErrorCodes::BadValue,
+                           str::stream() << "cannot write to '" << db << ".system.profile'" );
+        }
+        return userAllowedCreateNS( db, coll );
+    }
+
+    Status userAllowedCreateNS( StringData db, StringData coll ) {
         // validity checking
 
         if ( db.size() == 0 )
