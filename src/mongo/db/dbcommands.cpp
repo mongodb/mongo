@@ -583,7 +583,7 @@ namespace mongo {
                     "must pass name of collection to create",
                     firstElt.valuestrsafe()[0] != '\0');
 
-            Status status = userAllowedWriteNS( dbname, firstElt.valuestr() );
+            Status status = userAllowedCreateNS( dbname, firstElt.valuestr() );
             if ( !status.isOK() ) {
                 return appendCommandStatus( result, status );
             }
