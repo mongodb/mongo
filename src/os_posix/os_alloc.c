@@ -17,16 +17,10 @@
 #ifdef HAVE_LIBTCMALLOC
 #include <gperftools/tcmalloc.h>
 
-/*
- * Define HAVE_POSIX_MEMALIGN explicitly since TCMalloc supports it
- */
-#define	HAVE_POSIX_MEMALIGN 1
-
 #define	calloc			tc_calloc
 #define	realloc 		tc_realloc
 #define	posix_memalign 		tc_posix_memalign
 #define	free 			tc_free
-
 #endif
 
 /*
