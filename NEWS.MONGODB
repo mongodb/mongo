@@ -1,3 +1,317 @@
+3.0.3, Apr 25 2015
+------------------
+
+commit 9166bca3d07d6592c1426c2c33bd56b6be0667e0
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Apr 23 05:43:35 2015 +0000
+
+    Fix a deadlock related to handle locking.
+
+    If one thread does a __wt_session_release_btree of a handle at the same time
+    as another thread does a __wt_session_get_btree both wanting exclusive access
+    to the file. It was possible for one thread to get the dhandle list lock and
+    wait on the handle lock, which another thread held the handle lock waiting for
+    the handle list lock.
+
+    Temporarily fix by doing a try-lock on the __wt_session_get_btree path, long term
+    the solution is to get rid of the __conn_dhandle_open_lock method, and split get
+    and lock into two passes.
+
+    Refs BF-716
+
+commit 3e254079484ce35a3cb70c48478c69defdb8f012
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Apr 23 05:42:08 2015 +0000
+
+    Fix a deadlock related to LSM. There are cases where closing a file with
+    an existing checkpoint could self deadlock.
+
+    Check in the meta tracking whether we've already visited a checkpoint handle.
+
+    Refs WT-716
+
+commit 610f629949726b16f938ded85188bb6a21820f7e
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Mon Apr 20 10:40:54 2015 -0400
+
+    Create a "clear a single walk" function and call it from __evict_clear_walks
+    and __evict_clear_all_walks, that way we can use the WT_WITH_DHANDLE macro,
+    and the comment about clearing the eviction reference before releasing the
+    page appears everywhere it should.
+
+commit 3eceb85ce623dcce9273f7b722bb64f509dbe24d
+Author: Michael Cahill <michael.cahill@mongodb.com>
+Date:   Mon Apr 20 16:15:41 2015 +1000
+
+    Clear session->dhandle so that future error messages don't dereference freed memory.
+
+commit 23ce8bae4d6507d6b6d599cb73a26a6c856cce98
+Author: Michael Cahill <michael.cahill@mongodb.com>
+Date:   Mon Apr 20 15:48:29 2015 +1000
+
+    Clear eviction walks in all trees before the eviction server exits.
+
+commit a4bce0e0bc05d528f118b645d0d1915db00cdcf3
+Author: Michael Cahill <michael.cahill@mongodb.com>
+Date:   Mon Apr 20 14:11:57 2015 +1000
+
+    Move the "cache is empty" check to where the cache is destoyed, not when the eviction server is exiting.
+
+commit c8fdd9c676c4a24bee6328a56cf7fd074cd045e0
+Author: Michael Cahill <michael.cahill@mongodb.com>
+Date:   Mon Apr 20 13:25:36 2015 +1000
+
+    Shut down the eviction server before closing file handles to avoid a race.
+
+    refs WT-1893
+
+commit abb0bb80cc6dce29b8db61c6747c228c2701ae5a
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Fri Apr 17 10:49:41 2015 -0400
+
+    Look for any number of non-data-changing log records to determine if we
+    can skip recovery. WT-1892
+
+commit ee02428d1fdf1118c482688ec870a9da69bee45a
+Author: Michael Cahill <michael.cahill@mongodb.com>
+Date:   Fri Apr 17 12:28:52 2015 +1000
+
+    If an LSM search-near operation lands on a deleted item, make a copy of the key before stepping to the next record.
+
+    refs WT-1891
+
+commit 54e856d57da291c5f84da6d0d0ab56280d9956dc
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Thu Apr 16 12:22:31 2015 -0400
+
+    Remove use of unneeded tmp_fh. WT-1872
+
+commit 6a32905c397e57643b15e5a3038dbcb99a8a8dc8
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Apr 16 06:18:31 2015 +0000
+
+    Fix a deadlock in LSM with schema operations.
+
+    There is special code in LSM to co-ordinate schema operations on
+    tables (drop, rename, etc). The code does a dance dropping and
+    acquiring locks, to allow utility operations to drain for the tree
+    while waiting for it to close.
+
+    We were doing the dance with the schema and dhandle list locks. We
+    needed to include the table lock, or parallel cursor opens could block:
+
+    The cursor open is waiting for the table lock:
+    __wt_spin_lock src/include/mutex.i:175
+    __schema_add_table src/schema/schema_list.c:26
+    __wt_schema_get_table src/schema/schema_list.c:98
+    __wt_curtable_open src/third_party/wiredtiger/src/cursor/cur_table.c:875
+    __wt_open_cursor src/session/session_api.c:240
+
+    The LSM table drop is waiting for the schema lock:
+    __wt_spin_lock src/include/mutex.i:175
+    __lsm_tree_close src/lsm/lsm_tree.c:107
+    __wt_lsm_tree_drop src/lsm/lsm_tree.c:943
+    __wt_schema_drop src/schema/schema_drop.c:174
+    __drop_table src/schema/schema_drop.c:124
+    __wt_schema_drop src/schema/schema_drop.c:176
+    __session_drop src/session/session_api.c:528
+
+commit 790646183cc5dd056bbf95c4563c20c51602a808
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Thu Apr 16 04:11:36 2015 +0000
+
+    Fix a bug in LSM where updates with overwrite could be skipped.
+
+    References JIRA BF-829
+
+    The issue was that we were not looking in all chunks of an LSM
+    tree before deciding whether to apply an update (insert or remove).
+
+commit b9e2e76511a24505014369aaf0e1ec286e9c473d
+Author: Michael Cahill <michael.cahill@mongodb.com>
+Date:   Tue Apr 14 16:30:31 2015 +1000
+
+    Merge bulk cursor close with regular file cursor close: we were missing a decrement that kept bulk-loaded files pinned.
+
+commit ed3158e71f0bd2716269a5771fd162b60b9a1cc0
+Author: daveh86 <howsdav@gmail.com>
+Date:   Mon Apr 13 12:59:29 2015 +1000
+
+    Allow forced eviction of pages already queued for eviction
+
+commit 9c83351f63afc2e032e492e3030df4f3b1cd6883
+Author: Mark Benvenuto <mark.benvenuto@mongodb.com>
+Date:   Sun Apr 12 19:02:32 2015 -0400
+
+    Disable fallocate on Windows since SetEndofFile does not
+    ignore truncation requests like POSIX fallocate.
+
+commit 61a7d81ad26db1f2bfb65258d9b8ae4a4ca25b34
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Sun Apr 12 12:44:05 2015 -0400
+
+    When using ftruncate as the file-extension call, we must use WT_FH.size
+    as the starting point of the extension (not offset), and we have to read
+    the size value after acquiring the lock that prevents racing with writers.
+
+    Split the extension functionality out into a separate function and
+    try to make it a little simpler to understand.
+
+    Reference #1871.
+
+commit f26f1c1c59d5cbbc8f5f543215d8fc636e7175d2
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Sun Apr 12 10:16:34 2015 -0400
+
+    The OS layer ftruncate() code sets the WT_FH file size, so when
+    ftruncate is used to extend the file, we skip over the bytes added to
+    the file during block allocation, and verify eventually fails because
+    there are unverified blocks in the file.
+
+    Reference #1871.
+
+commit d20f20f1ac324030986b3ee23e1edf96486c92b4
+Author: Alex Gorrod <alexg@wiredtiger.com>
+Date:   Fri Apr 10 05:59:04 2015 +0000
+
+    Update file_manager=(close_idle_time=,close_scan_interval=) max values.
+
+    The old maximum for both was 1000, the new value is 100 thousand. Setting
+    such large values is not recommended, but there is no internal limitation
+    on them.
+
+commit c36a3308f685d3b85efe9ac6ee0835f0974574b4
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 9 14:32:40 2015 -0400
+
+    Don't ignore sweeping entirely when we reach the open-file-count limit,
+    just ignore the in-use files.
+
+commit 46ef2555bbc51ce6453536e72202782be4949855
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 9 11:06:50 2015 -0400
+
+    Don't keep sweeping once we reach the minimum number of handles.
+
+commit 1fdfcc62726d25a7cceeeefff174a8e1bf9f9e67
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 9 12:39:03 2015 -0400
+
+    const: At condition ret == -1, the value of ret must be equal to -1.
+    CID 72082 (#1 of 1): Redundant test (DEADCODE)
+    dead_error_condition: The condition ret == -1 must be true.
+
+commit d04e3c25d46a5c4426e1c6d4881cd9e250014931
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 9 12:19:24 2015 -0400
+
+    Remove unnecessary atomic operation, fixing CID 69810 along the way.
+
+    CID 69810 (#1 of 1): Parse warning (PW.CONVERSION_TO_POINTER_ADDS_BITS)
+    1. conversion_to_pointer_adds_bits: conversion from smaller integer to pointer
+
+commit d585bdab980508e590cf70508f053182c556d6f2
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 9 12:00:04 2015 -0400
+
+    CID 72073 (#1 of 1): Redundant test (DEADCODE)
+    dead_error_condition: The condition session != NULL must be true.
+
+commit 21907f9193e30f51a59fcbaddfbc46cb7732d3b7
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 9 11:52:13 2015 -0400
+
+    Remove unnecessary error labels, fixing SERVER-17948 along the way.
+
+    Coverity analysis defect 72088: Redundant test:
+    File: /src/third_party/wiredtiger/src/log/log.c
+    Function __log_decompress
+    /src/third_party/wiredtiger/src/log/log.c, line: 363
+    At condition "ret != 0", the value of "ret" must be equal to 0.
+
+commit a29f4d2f40eee784950147af848fdbf277328b7f
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 9 11:31:11 2015 -0400
+
+    SERVER-17954: Coverity analysis defect 72085: Redundant test
+    At condition "ret != 0", the value of "ret" cannot be equal to 0.
+
+commit 1298fd6db4f0c1d6133b3e547b2e2db51ec4a708
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Wed Apr 8 14:38:49 2015 -0400
+
+    Fix places where we were using the wrong link for traversing hash buckets.
+
+commit 7d0e5fe3dfa39f7ff377a1d4660bc2bc36dc0df8
+Author: Mark Benvenuto <mark.benvenuto@mongodb.com>
+Date:   Wed Apr 8 10:19:33 2015 -0400
+
+    Enable test/fops for Windows, and add to CI
+
+    - Added Windows shim for gettimeofday
+
+commit c6270b677499525067d5d729a6fbdce6ad2f533a
+Author: Mark Benvenuto <mark.benvenuto@mongodb.com>
+Date:   Wed Apr 8 13:28:41 2015 -0400
+
+    test/format for Windows
+    - Fixed an issue where fallocate was setting fh->size (incorrectly copied from ftruncate implementation)
+
+commit fac74b4665d6dfa3aebecf741c914fd1678fa628
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Wed Apr 8 08:47:06 2015 -0400
+
+    Rename file_manager.open_handles to file_manager.close_handle_minimum,
+    try and match existing naming for file_manager configuration options.
+
+commit 709cc8d7ac85d31aeae2387b192092910e6cf854
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Wed Apr 8 08:09:23 2015 -0400
+
+    Don't sweep unless there's a reason we need to close file handles.
+    Add a new configuration option, file_manager.open_handles that sets
+    a minimum number of file handles that must be open before sweep runs,
+    default is 250. Reference #1856, SERVER-17907.
+
+commit b79dcdebf0b1987b59fa70e50c8c61e5e0a64e64
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Tue Apr 7 11:52:12 2015 -0400
+
+    If the underlying split buffer grows, existing boundary references may
+    point into freed memory, switch the boundary "first byte" field from a
+    pointer to a buffer offset to avoid the problem, reference #1852.
+
+commit 684fd71475cbc6b15290945af0160fac0313ad6b
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Wed Apr 1 15:44:42 2015 -0400
+
+    Reset eol if we continue.  Return NOTFOUND if checksum mismatch. #1840
+
+commit 9c29e0f13268c03038704372c069353c81357791
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Tue Mar 31 16:49:47 2015 -0400
+
+    Modify log_scan callback args to send in next LSN. #1837
+
+commit 003e6c3598408c7670f65a8720622c38fdaf148d
+Author: Mark Benvenuto <mark.benvenuto@mongodb.com>
+Date:   Thu Mar 26 11:17:57 2015 -0400
+
+    Use Standard C type uint64_t for zlib
+
+commit e12b9e0b005da7364330f4d3409256ded26ba90d
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Mar 26 18:31:15 2015 -0400
+
+    Add checks for Windows builds: _M_AMD64 and _MSC_VER.
+
+commit a609c82bfa6fbf80cd5fb853e1d97c16878a0180
+Author: Susan LoVerso <sue@wiredtiger.com>
+Date:   Mon Mar 23 15:25:23 2015 -0400
+
+    Set checkpoint LSN to existing log record. #1700
+
+
 3.0.2, Mar 26 2015
 ------------------
 
