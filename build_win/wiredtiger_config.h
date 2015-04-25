@@ -70,6 +70,9 @@
 /* Define to 1 if you have the `snappy' library (-lsnappy). */
 /* #undef HAVE_LIBSNAPPY */
 
+/* Define to 1 if you have the `tcmalloc' library (-ltcmalloc). */
+/* #undef HAVE_LIBTCMALLOC */
+
 /* Define to 1 if you have the `z' library (-lz). */
 /* #undef HAVE_LIBZ */
 
