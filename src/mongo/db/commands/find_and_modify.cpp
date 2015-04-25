@@ -46,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -301,6 +302,10 @@ namespace {
                        ExplainCommon::Verbosity verbosity,
                        BSONObjBuilder* out) const override {
             const std::string fullNs = parseNsCollectionRequired(dbName, cmdObj);
+            Status allowedWriteStatus = userAllowedWriteNS(fullNs);
+            if (!allowedWriteStatus.isOK()) {
+                return allowedWriteStatus;
+            }
 
             StatusWith<FindAndModifyRequest> parseStatus =
                 FindAndModifyRequest::parseFromBSON(fullNs, cmdObj);
@@ -399,6 +404,10 @@ namespace {
             // findAndModify command is not replicated directly.
             invariant(txn->writesAreReplicated());
             const std::string fullNs = parseNsCollectionRequired(dbName, cmdObj);
+            Status allowedWriteStatus = userAllowedWriteNS(fullNs);
+            if (!allowedWriteStatus.isOK()) {
+                return appendCommandStatus(result, allowedWriteStatus);
+            }
 
             StatusWith<FindAndModifyRequest> parseStatus =
                 FindAndModifyRequest::parseFromBSON(fullNs, cmdObj);
