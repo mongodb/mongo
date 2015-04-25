@@ -212,7 +212,7 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_handle_minimum", &cval));
-	conn->sweep_handles = (u_int)cval.val;
+	conn->sweep_handles_min = (u_int)cval.val;
 
 	return (0);
 }
