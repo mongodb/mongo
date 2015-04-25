@@ -48,6 +48,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
@@ -679,9 +680,9 @@ namespace mongo {
                 }
             }
             string collection = parseNs(dbname, cmdObj);
-            if ( collection.empty() ) {
-                errmsg = "bad 'cloneCollection' value";
-                return false;
+            Status allowedWriteStatus = userAllowedWriteNS(dbname, collection);
+            if (!allowedWriteStatus.isOK()) {
+                return appendCommandStatus(result, allowedWriteStatus);
             }
             BSONObj query = cmdObj.getObjectField("query");
             if ( query.isEmpty() )
