@@ -227,7 +227,7 @@ if env['MONGO_BUILD_SASL_CLIENT']:
 
 env.Library('mongocommon', commonFiles,
             LIBDEPS=['bson',
-                     'background_job',
+                     'util/background_job',
                      '$BUILD_DIR/mongo/client/clientdriver',
                      'util/fail_point',
                      'util/foundation',
@@ -256,21 +256,6 @@ env.CppUnitTest(
     target="util/version_test",
     source=["util/version_test.cpp"],
     LIBDEPS=["mongocommon"]
-)
-
-env.Library('background_job', ["util/background.cpp"],
-            LIBDEPS=['util/concurrency/spin_lock'])
-
-env.CppUnitTest(
-    target="background_job_test",
-    source=[
-        "util/background_job_test.cpp",
-    ],
-    LIBDEPS=[
-        "background_job",
-        "util/net/network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
-        "util/concurrency/synchronization",
-    ]
 )
 
 if get_option('allocator') == 'tcmalloc':

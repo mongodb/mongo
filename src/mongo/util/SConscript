@@ -198,3 +198,24 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='background_job',
+    source=[
+        "background.cpp",
+    ],
+    LIBDEPS=[
+        'concurrency/spin_lock',
+    ],
+)
+
+env.CppUnitTest(
+    target="background_job_test",
+    source=[
+        "background_job_test.cpp",
+    ],
+    LIBDEPS=[
+        "background_job",
+        "concurrency/synchronization",
+        "net/network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
+    ],
+)

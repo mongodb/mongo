@@ -21,7 +21,7 @@ env.Library(
         'lock_stats.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/background_job',
+        '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/util/foundation',
         # Temporary crutch since the ssl cleanup is hard coded in background.cpp
