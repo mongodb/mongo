@@ -89,7 +89,7 @@ compute_cksum(uint8_t *src, size_t srclen)
 	sum = 0;
 	for (i = 0; i < srclen; i++)
 		sum = ((sum << 3) | (sum >> 29)) ^ src[i];
-	return sum;
+	return (sum);
 }
 
 static int
