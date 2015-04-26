@@ -174,3 +174,27 @@ env.CppUnitTest(
         "processinfo",
     ],
 )
+
+env.Library(
+    target="fail_point",
+    source=[
+        "fail_point.cpp",
+        "fail_point_registry.cpp",
+        "fail_point_service.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson",
+        "foundation",
+    ],
+)
+
+env.CppUnitTest(
+    target="fail_point_test",
+    source=[
+        "fail_point_test.cpp",
+    ],
+    LIBDEPS=[
+        "fail_point",
+    ],
+)
+

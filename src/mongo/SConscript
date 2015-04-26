@@ -225,17 +225,11 @@ extraCommonLibdeps = []
 if env['MONGO_BUILD_SASL_CLIENT']:
     extraCommonLibdeps.append('client/cyrus_sasl_client_session')
 
-env.Library("fail_point",
-            ["util/fail_point.cpp",
-             "util/fail_point_registry.cpp",
-             "util/fail_point_service.cpp"],
-            LIBDEPS=["util/foundation", "bson"])
-
 env.Library('mongocommon', commonFiles,
             LIBDEPS=['bson',
                      'background_job',
                      '$BUILD_DIR/mongo/client/clientdriver',
-                     'fail_point',
+                     'util/fail_point',
                      'util/foundation',
                      'service_context',
                      'lasterror',
@@ -731,10 +725,6 @@ env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
                           "message_server_port",
                           "mocklib"])
 
-
-# Should only need stuff from util, unittest and platform
-env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],
-                LIBDEPS=["fail_point"])
 
 if has_option( 'use-cpu-profiler' ):
     serverOnlyFiles.append( 'db/commands/cpuprofile.cpp' )

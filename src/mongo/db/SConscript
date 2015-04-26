@@ -118,7 +118,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/stats/top',
-        '$BUILD_DIR/mongo/fail_point',
+        '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/service_context',
         '$BUILD_DIR/mongo/util/progress_meter',

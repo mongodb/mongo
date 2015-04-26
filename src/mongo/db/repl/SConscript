@@ -116,7 +116,7 @@ env.Library('repl_coordinator_impl',
             LIBDEPS=[
                      '$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/db/index/index_descriptor',
-                     '$BUILD_DIR/mongo/fail_point',
+                     '$BUILD_DIR/mongo/util/fail_point',
                      '$BUILD_DIR/mongo/db/global_timestamp',
                      '$BUILD_DIR/mongo/rpc/command_status',
                      '$BUILD_DIR/mongo/server_options_core',
