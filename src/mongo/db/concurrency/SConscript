@@ -8,7 +8,7 @@ env.Library(
         'write_conflict_exception.cpp'
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/server_parameters'
+        '$BUILD_DIR/mongo/db/server_parameters'
         ]
 )
 
@@ -26,7 +26,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/foundation',
         # Temporary crutch since the ssl cleanup is hard coded in background.cpp
         '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/server_parameters',
+        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/service_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/third_party/shim_boost',

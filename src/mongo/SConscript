@@ -225,15 +225,6 @@ extraCommonLibdeps = []
 if env['MONGO_BUILD_SASL_CLIENT']:
     extraCommonLibdeps.append('client/cyrus_sasl_client_session')
 
-env.Library("server_parameters",
-            ["db/server_parameters.cpp"],
-            LIBDEPS=["util/foundation","bson"])
-
-env.CppUnitTest("server_parameters_test",
-                [ "db/server_parameters_test.cpp" ],
-                LIBDEPS=["server_parameters"] )
-
-
 env.Library("fail_point",
             ["util/fail_point.cpp",
              "util/fail_point_registry.cpp",
@@ -307,7 +298,7 @@ if get_option('allocator') == 'tcmalloc':
                     'util/tcmalloc_server_status_section.cpp',
                     'util/tcmalloc_set_parameter.cpp',
                 ],
-                LIBDEPS=['server_parameters'],
+                LIBDEPS=['db/server_parameters'],
                 LIBDEPS_DEPENDENTS=['mongod', 'mongos'])
 
 coredbEnv = env.Clone()
@@ -363,7 +354,7 @@ coredbEnv.Library("coredb", [
                            'db/common',
                            'db/pipeline/document_value',
                            'scripting_common',
-                           'server_parameters',
+                           'db/server_parameters',
                            'db/matcher/expressions',
                            'db/matcher/expressions_geo',
                            'db/matcher/expressions_text',
@@ -632,7 +623,7 @@ env.Library("server_options", [
                      'util/net/network', # temporary crutch that should go away once the networking
                                 # library has separate options
                      'server_options_core',
-                     'server_parameters',
+                     'db/server_parameters',
                      '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
                     ])

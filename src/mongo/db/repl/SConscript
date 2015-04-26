@@ -6,7 +6,7 @@ env.Library('repl_settings',
             'repl_settings.cpp',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base/base',
-                '$BUILD_DIR/mongo/server_parameters'
+                '$BUILD_DIR/mongo/db/server_parameters'
             ])
 
 env.Library('rslog',

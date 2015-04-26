@@ -197,3 +197,27 @@ env.CppUnitTest(
         'namespace_string',
     ],
 )
+
+env.Library(
+    target="server_parameters",
+    source=[
+        "server_parameters.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/util/foundation",
+    ],
+)
+
+env.CppUnitTest(
+    target="server_parameters_test",
+    source=[
+        "server_parameters_test.cpp",
+    ],
+    LIBDEPS=[
+        "server_parameters",
+    ],
+)
+
+
+
