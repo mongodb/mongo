@@ -481,6 +481,10 @@ namespace {
         return _lastAppliedHash;
     }
 
+    void BackgroundSync::clearBuffer() {
+        _buffer.clear();
+    }
+
     void BackgroundSync::setLastAppliedHash(long long newHash) {
         boost::lock_guard<boost::mutex> lck(_mutex);
         _lastAppliedHash = newHash;
@@ -531,6 +535,11 @@ namespace {
     void BackgroundSync::setInitialSyncRequestedFlag(bool value) {
         boost::lock_guard<boost::mutex> lock(_initialSyncMutex);
         _initialSyncRequestedFlag = value;
+    }
+
+    void BackgroundSync::pushTestOpToBuffer(const BSONObj& op) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        _buffer.push(op);
     }
 
 

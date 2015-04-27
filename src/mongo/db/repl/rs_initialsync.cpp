@@ -49,6 +49,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -58,6 +59,9 @@ namespace {
 
     using std::list;
     using std::string;
+
+    // Failpoint which fails initial sync and leaves on oplog entry in the buffer.
+    MONGO_FP_DECLARE(failInitSyncWithBufferedEntriesLeft);
 
     /**
      * Truncates the oplog (removes any documents) and resets internal variables that were
@@ -69,6 +73,9 @@ namespace {
     void truncateAndResetOplog(OperationContext* txn, 
                                ReplicationCoordinator* replCoord,
                                BackgroundSync* bgsync) {
+        // Clear minvalid
+        setMinValid(txn, OpTime());
+
         AutoGetDb autoDb(txn, "local", MODE_X);
         massert(28585, "no local database found", autoDb.getDb());
         invariant(txn->lockState()->isCollectionLockedForMode(rsoplog, MODE_X));
@@ -81,6 +88,9 @@ namespace {
         // because the bgsync thread, while running, may update the blacklist.
         replCoord->resetMyLastOptime();
         bgsync->stop();
+        bgsync->setLastAppliedHash(0);
+        bgsync->clearBuffer();
+
         replCoord->clearSyncSourceBlacklist();
 
         // Truncate the oplog in case there was a prior initial sync that failed.
@@ -205,6 +215,15 @@ namespace {
                                  OplogReader* r) {
         const OpTime startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime();
         BSONObj lastOp;
+
+        // If the fail point is set, exit failing.
+        if (MONGO_FAIL_POINT(failInitSyncWithBufferedEntriesLeft)) {
+            log() << "adding fake oplog entry to buffer.";
+            BackgroundSync::get()->pushTestOpToBuffer(
+                                            BSON("ts" << startOpTime << "v" << 1 << "op" << "n"));
+            return false;
+        }
+
         try {
             // It may have been a long time since we last used this connection to
             // query the oplog, depending on the size of the databases we needed to clone.
@@ -250,10 +269,9 @@ namespace {
             }
         }
         catch (const DBException&) {
-            log() << "replSet initial sync failed during oplog application phase, and will retry";
-
             getGlobalReplicationCoordinator()->resetMyLastOptime();
             BackgroundSync::get()->setLastAppliedHash(0);
+            warning() << "initial sync failed during oplog application phase, and will retry";
 
             sleepsecs(5);
             return false;
@@ -326,6 +344,7 @@ namespace {
         OperationContextImpl txn;
         ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 
+        // reset state for initial sync
         truncateAndResetOplog(&txn, replCoord, bgsync);
 
         OplogReader r;

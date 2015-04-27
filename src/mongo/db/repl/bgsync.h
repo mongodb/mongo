@@ -108,6 +108,9 @@ namespace repl {
         void setLastAppliedHash(long long oldH);
         void loadLastAppliedHash(OperationContext* txn);
 
+        // Clears any fetched and buffered oplog entries.
+        void clearBuffer();
+
         bool getInitialSyncRequestedFlag();
         void setInitialSyncRequestedFlag(bool value);
 
@@ -119,6 +122,9 @@ namespace repl {
             return _indexPrefetchConfig;
         }
 
+
+        // Testing related stuff
+        void pushTestOpToBuffer(const BSONObj& op);
     private:
         static BackgroundSync *s_instance;
         // protects creation of s_instance
