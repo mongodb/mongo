@@ -248,8 +248,8 @@ add_option( "sanitize", "enable selected sanitizers", 1, True, metavar="san1,san
 add_option( "llvm-symbolizer", "name of (or path to) the LLVM symbolizer", 1, False, default="llvm-symbolizer" )
 
 # debugging/profiling help
-if is_running_os('linux'):
-    defaultAllocator = 'tcmalloc'
+if is_running_os('linux') or is_running_os('windows'):
+   defaultAllocator = 'tcmalloc'
 else:
     defaultAllocator = 'system'
 add_option( "allocator" , "allocator to use (tcmalloc or system)" , 1 , True,

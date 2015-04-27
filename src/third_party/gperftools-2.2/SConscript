@@ -15,10 +15,8 @@ files = [
     'src/base/elf_mem_image.cc',
     'src/malloc_hook.cc',
     'src/span.cc',
-    'src/maybe_threads.cc',
     'src/internal_logging.cc',
     'src/symbolize.cc',
-    'src/system-alloc.cc',
     'src/memfs_malloc.cc',
     'src/central_freelist.cc',
     'src/thread_cache.cc',
@@ -31,10 +29,22 @@ files = [
     'src/stacktrace.cc'
     ]
 
-if not debugBuild:
-    files += ['src/tcmalloc.cc'],
+if env.TargetOSIs('windows'):
+    files += [
+        'src/windows/port.cc',
+        'src/windows/system-alloc.cc',
+        'src/tcmalloc.cc',
+        ]
 else:
-    files += ['src/debugallocation.cc']
+    files += [
+        'src/maybe_threads.cc',
+        'src/system-alloc.cc',
+        ]
+
+    if not debugBuild:
+        files += ['src/tcmalloc.cc'],
+    else:
+        files += ['src/debugallocation.cc']
 
 if has_option( 'use-cpu-profiler' ):
     files += [
