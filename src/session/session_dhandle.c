@@ -140,30 +140,6 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	dhandle = session->dhandle;
 
 	locked = F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ? WRITELOCK : READLOCK;
-	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_CLOSE)) {
-		/*
-		 * If configured to discard on last close, trade any read lock
-		 * for an exclusive lock. If the exchange succeeds, setup for
-		 * discard. It is expected acquiring an exclusive lock will fail
-		 * sometimes since the handle may still be in use: in that case
-		 * we're done.
-		 */
-		if (locked == READLOCK) {
-			locked = NOLOCK;
-			WT_ERR(__wt_readunlock(session, dhandle->rwlock));
-			ret = __wt_try_writelock(session, dhandle->rwlock);
-			if (ret != 0) {
-				if (ret == EBUSY)
-					ret = 0;
-				goto err;
-			}
-			locked = WRITELOCK;
-			F_CLR(dhandle, WT_DHANDLE_DISCARD_CLOSE);
-			F_SET(dhandle,
-			    WT_DHANDLE_DISCARD | WT_DHANDLE_EXCLUSIVE);
-		}
-	}
-
 	/*
 	 * If we had special flags set, close the handle so that future access
 	 * can get a handle without special flags.
@@ -171,15 +147,16 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
 	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 
-		WT_TRET(__wt_conn_btree_sync_and_close(session, 0, 0));
+		WT_TRET(__wt_conn_btree_sync_and_close(
+		    session, 0, F_ISSET(dhandle, WT_DHANDLE_DISCARD)));
+		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 	}
 
 	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 
-err:	switch (locked) {
+	switch (locked) {
 	case NOLOCK:
 		break;
 	case READLOCK:
@@ -434,7 +411,6 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 done:	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
 	    F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE));
-	F_SET(session->dhandle, LF_ISSET(WT_DHANDLE_DISCARD_CLOSE));
 
 	return (0);
 }
